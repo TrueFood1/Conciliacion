@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conciliación Bancaria — True Food CR</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root {
+  /* TRUE FOOD BRAND — negro + verde lima */
+  --green:#C8E832;--green-l:#1e2800;--green-d:#a8c420;
+  --blue:#4A90D9;--blue-l:#0d1f35;
+  --amber:#D4A017;--amber-l:#2d2200;
+  --purple:#9B6DD6;--purple-l:#1e1535;
+  --forest:#C8E832;--forest-l:#1e2800;
+  --red:#E84040;--red-l:#2d0a0a;
+  --orange:#E8832A;--orange-l:#2d1800;
+  --text:#f0f0f0;--text-m:#999999;--text-h:#555555;
+  --bg:#111111;--bg2:#181818;--bg3:#222222;
+  --border:rgba(255,255,255,.08);--border-m:rgba(255,255,255,.14);
+  --r:8px;--rl:12px;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'SF Mono','Fira Code',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg2);color:var(--text);font-size:14px;min-height:100vh}
+.header{background:var(--bg);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;gap:1rem;height:56px}
+.logo{font-size:15px;font-weight:600;letter-spacing:-.01em}.logo span{color:#C8E832}
+.conn-pill{font-size:11px;padding:3px 10px;border-radius:20px;background:var(--green-l);color:var(--green-d);font-weight:500;display:none}
+.header-sub{font-size:12px;color:var(--text-h);margin-left:auto}
+.main{max-width:1400px;margin:0 auto;padding:1rem 1.5rem}
+.card{background:var(--bg);border:1px solid var(--border);border-radius:var(--rl);padding:1.25rem 1.5rem;margin-bottom:1rem}
+.card-title{font-size:13px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
+.field{margin-bottom:.75rem}
+.field label{display:block;font-size:11px;font-weight:500;color:var(--text-m);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.field input{width:100%;padding:7px 11px;border:1px solid var(--border-m);border-radius:var(--r);font-size:13px;color:var(--text);background:#222;transition:border-color .15s}
+.field input:focus{outline:none;border-color:var(--green)}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.btn{padding:7px 16px;border-radius:var(--r);border:1px solid var(--border-m);background:transparent;cursor:pointer;font-size:13px;font-family:var(--font);color:var(--text);transition:background .12s}
+.btn:hover{background:var(--bg2)}.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-p{background:#C8E832;color:#111;border-color:#C8E832;font-weight:600}.btn-p:hover{background:#a8c420}
+.btn-g{background:#C8E832;color:#111;border-color:#C8E832;font-weight:600}.btn-g:hover{background:#a8c420}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn-confirm{border-color:#C8E832;color:#C8E832}.btn-confirm:hover{background:#1e2800}
+.btn-warn{border-color:var(--amber);color:var(--amber)}.btn-warn:hover{background:var(--amber-l)}
+.uz{border:1.5px dashed var(--border-m);border-radius:var(--r);padding:1.25rem;text-align:center;cursor:pointer;transition:all .15s}
+.uz:hover,.uz.ok{border-color:var(--green);background:var(--green-l)}
+.status{padding:8px 12px;border-radius:var(--r);font-size:13px;margin-bottom:.75rem}
+.s-ok{background:var(--green-l);color:var(--green-d)}
+.s-err{background:var(--red-l);color:var(--red)}
+.s-info{background:var(--blue-l);color:var(--blue)}
+.s-warn{background:var(--amber-l);color:var(--amber)}
+.progress{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-bottom:.5rem}
+.progress-fill{height:3px;background:var(--green);border-radius:2px;transition:width .4s}
+.stats{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:.75rem}
+.stat{background:var(--bg2);border-radius:var(--r);padding:.5rem .6rem}
+.stat-l{font-size:10px;color:var(--text-h);margin-bottom:2px;text-transform:uppercase;letter-spacing:.03em}
+.stat-v{font-size:18px;font-weight:600}
+.tabs{display:flex;gap:4px;margin-bottom:.75rem;flex-wrap:wrap}
+.tab{padding:5px 13px;border-radius:20px;border:1px solid var(--border);background:transparent;cursor:pointer;font-size:12px;color:var(--text-m);transition:all .12s}
+.tab:hover{border-color:var(--border-m);color:var(--text)}
+.tab.on{background:var(--text);color:#fff;border-color:var(--text)}
+.section-header{font-size:11px;font-weight:600;color:var(--text-m);text-transform:uppercase;letter-spacing:.05em;padding:8px 12px;background:var(--bg2);border-bottom:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:7px 10px;font-size:11px;font-weight:600;color:var(--text-m);border-bottom:1px solid var(--border);background:var(--bg2);text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr.r-done td{background:#0f1a00}
+tr.r-done{height:28px}
+tr.r-done td{padding:3px 8px!important;vertical-align:middle;border-bottom:1px solid #1e2800}
+.done-compact{display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden}
+.done-check{color:#C8E832;font-weight:700;font-size:12px;flex-shrink:0}
+.done-desc{font-size:11px;color:var(--text-m);overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.done-fe{font-size:10px;color:var(--green-d);overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.done-monto{font-size:11px;font-family:var(--mono);font-weight:600;color:var(--text-m);flex-shrink:0}
+.done-date{font-size:10px;color:var(--text-h);flex-shrink:0;font-family:var(--mono)}
+.btn-undo{padding:1px 7px;font-size:10px;border-radius:3px;border:1px solid #C8E832;background:transparent;color:#C8E832;cursor:pointer;flex-shrink:0}
+.btn-undo:hover{background:#1e2800}
+tr.r-rev td{background:#1e1e1e}
+tr.r-crear td{background:#1a1a2e}
+tr.r-ing td{background:#0d1f35}
+.badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600;white-space:nowrap}
+.b-rule{background:var(--green-l);color:var(--green-d)}
+.b-fact{background:var(--forest-l);color:var(--forest)}
+.b-cli{background:var(--blue-l);color:var(--blue)}
+.b-monto{background:var(--purple-l);color:var(--purple)}
+.b-rev{background:#0d1f35;color:#4A90D9}
+.b-done{background:var(--green-l);color:var(--green-d)}
+.b-crear{background:var(--orange-l);color:var(--orange)}
+.b-ing{background:#dbeafe;color:#1e40af}
+.actions-bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:100}
+.modal{background:var(--bg);border-radius:var(--rl);padding:1.5rem;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+.modal h3{font-size:15px;font-weight:600;margin-bottom:.5rem}
+.modal p{font-size:13px;color:var(--text-m);margin-bottom:1.25rem;line-height:1.5}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end}
+.desc-bac{font-size:12px;color:var(--text);font-weight:500}
+.desc-extra{font-size:10px;color:var(--text-h);margin-top:2px}
+.match-main{font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px}
+.match-sub{font-size:11px;color:var(--text-h);margin-top:2px;line-height:1.5}
+.match-label{font-size:10px;font-weight:600;color:var(--text-m);text-transform:uppercase;letter-spacing:.03em}
+.match-val{font-size:11px;color:var(--text)}
+.info-row{display:flex;flex-direction:column;gap:2px}
+.info-line{display:flex;gap:6px;align-items:baseline}
+.tag-ing{display:inline-block;font-size:9px;padding:2px 5px;border-radius:4px;background:#1e2800;color:#C8E832;font-weight:700;letter-spacing:.02em}
+.tag-eg{display:inline-block;font-size:9px;padding:2px 5px;border-radius:4px;background:#2d0a0a;color:#E84040;font-weight:700;letter-spacing:.02em}
+.action-col{display:flex;flex-direction:column;gap:5px;align-items:stretch}
+.action-col .btn{text-align:center;white-space:nowrap;text-decoration:none;display:block}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">True Food <span>CR</span></div>
+  <div style="font-size:12px;color:var(--text-h)">Conciliación Bancaria</div>
+  <div class="conn-pill" id="connPill">● Conectado</div>
+  <div class="header-sub" id="headerSub"></div>
+</div>
+<div class="main">
+
+<!-- LOGIN -->
+<div id="vLogin">
+  <div class="card">
+    <div class="card-title">Conectar a Odoo</div>
+    <div class="field-row">
+      <div class="field"><label>URL de Odoo</label><input id="inUrl" value="https://demotruefood.odoo.com"></div>
+      <div class="field"><label>Base de datos</label><input id="inDb" value="demotruefood"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Usuario</label><input id="inUser" value="andrea@truefoodcr.com"></div>
+      <div class="field"><label>Contraseña</label><input id="inApiKey" type="password" value=""></div>
+    </div>
+    <div style="font-size:11px;color:var(--text-h);margin-bottom:.75rem">Usá tu contraseña normal de Odoo</div>
+    <div id="loginStatus"></div>
+    <button class="btn btn-p" onclick="doLogin()">Conectar →</button>
+  </div>
+</div>
+
+<!-- UPLOAD -->
+<div id="vUpload" class="hidden">
+  <div id="alertConn" class="status s-ok hidden"></div>
+  <div class="card">
+    <div class="card-title">Estado de cuenta BAC</div>
+    <div class="uz" id="dzBac" onclick="document.getElementById('fBac').click()">
+      <input type="file" id="fBac" accept=".xls,.xlsx,.csv" style="display:none">
+      <div style="font-size:20px;margin-bottom:5px">📂</div>
+      <div style="font-size:13px;font-weight:500" id="lblBac">Arrastrá o hacé clic — XLS del BAC</div>
+      <div style="font-size:11px;color:var(--text-h);margin-top:2px">XLS · XLSX · CSV</div>
+    </div>
+  </div>
+  <div id="loadingSection" class="hidden">
+    <div class="status s-info" id="loadMsg">Cargando facturas de Odoo...</div>
+    <div class="progress"><div class="progress-fill" id="progFill" style="width:0%"></div></div>
+  </div>
+  <button class="btn btn-p hidden" id="btnRun" onclick="runAll()">Cargar facturas y clasificar →</button>
+</div>
+
+<!-- RESULTS -->
+<div id="vResults" class="hidden">
+  <div class="stats" id="statsGrid"></div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:.75rem 1rem;border-bottom:1px solid var(--border)">
+      <div class="tabs" id="tabsWrap">
+        <button class="tab on" onclick="setTab('all',this)">Todos</button>
+        <button class="tab" onclick="setTab('ing',this)">↑ Ingresos</button>
+        <button class="tab" onclick="setTab('eg',this)">↓ Egresos</button>
+        <button class="tab" onclick="setTab('rule',this)">Regla auto</button>
+        <button class="tab" onclick="setTab('fact',this)">Comprobante</button>
+        <button class="tab" onclick="setTab('cli',this)">Cliente/Prov</button>
+        <button class="tab" onclick="setTab('monto',this)">Monto</button>
+        <button class="tab" onclick="setTab('crear',this)">Crear factura</button>
+        <button class="tab" onclick="setTab('rev',this)">Revisar</button>
+        <button class="tab" onclick="setTab('done',this)">Confirmados</button>
+      </div>
+      <div id="confirmVisibleBar" class="hidden" style="margin-top:6px">
+        <button class="btn btn-g btn-sm" onclick="confirmarVisibles()">✓ Confirmar todos los visibles</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th style="width:75px">Fecha</th>
+          <th style="width:160px">Descripción BAC</th>
+          <th style="width:85px">Monto</th>
+          <th style="width:60px">Tipo</th>
+          <th>Info</th>
+          <th style="width:160px;text-align:center">Acción</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div id="regStatus" class="hidden"></div>
+  <div class="actions-bar">
+    <button class="btn btn-g" onclick="confirmarTodos()">✓ Confirmar todos los matches</button>
+    <button class="btn btn-p" onclick="showModal()">Registrar en Odoo →</button>
+    <button class="btn" onclick="exportCSV()">↓ Exportar CSV</button>
+    <button class="btn" onclick="exportPendientes()">↓ Pendientes para Delfix</button>
+    <button class="btn" onclick="location.reload()">Nueva conciliación</button>
+  </div>
+</div>
+
+</div>
+
+<!-- MODAL -->
+<div class="overlay hidden" id="modalOverlay">
+  <div class="modal">
+    <h3>Registrar pagos en Odoo</h3>
+    <p id="modalMsg"></p>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-g" onclick="closeModal();registrarEnOdoo()">Confirmar y registrar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<!-- PANEL FACTURA PREVIEW -->
+<div id="invPanelOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:300" onclick="cerrarInvPanel()"></div>
+<div id="invPanel" style="display:none;position:fixed;top:0;right:0;width:360px;height:100vh;background:#fff;border-left:1px solid var(--border-m);z-index:301;overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,.15)">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border)">
+    <div style="font-size:14px;font-weight:600" id="invPanelTitle">Pago registrado</div>
+    <button class="btn btn-sm" onclick="cerrarInvPanel()">✕</button>
+  </div>
+  <div id="invPanelContent" style="padding:1.25rem"></div>
+</div>
+
+<!-- PANEL CREAR FACTURA -->
+<div id="panelOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200" onclick="cerrarPanel()"></div>
+<div id="panel" style="display:none;position:fixed;top:0;right:0;width:340px;height:100vh;background:#fff;border-left:1px solid var(--border-m);z-index:201;overflow-y:auto;padding:1.5rem;box-shadow:-4px 0 20px rgba(0,0,0,.12)">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
+    <div style="font-size:15px;font-weight:600">Crear factura</div>
+    <button class="btn btn-sm" onclick="cerrarPanel()">✕</button>
+  </div>
+  <div style="background:var(--blue-l);color:var(--blue);padding:8px 12px;border-radius:var(--r);font-size:12px;margin-bottom:1rem">Copiá cada campo y pegalo en Odoo, luego dale Confirmar.</div>
+  <div id="panelContent"></div>
+  <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border)">
+    <a id="panelLink" href="#" target="_blank" class="btn btn-g" style="display:block;text-align:center;text-decoration:none">Abrir nueva factura en Odoo ↗</a>
+  </div>
+</div>
+
+<script>
+const CURRENT_YEAR = new Date().getFullYear();
+
+// Reglas automaticas puras (sin factura, sin crear)
+const RULES = [
+  {kw:'sinpe movil envio',c:'6400003',n:'Gasto de envíos'},
+  {kw:'sinpe movil envios',c:'6400003',n:'Gasto de envíos'},
+  {kw:' envio',c:'6400003',n:'Gasto de envíos'},
+  {kw:'dieta',c:'6104007',n:'Dieta Socios'},
+  {kw:'ccss',c:'6101003',n:'Cargas patronales'},
+  {kw:'pago ney',c:'6101001',n:'Sueldos y Salarios'},
+  {kw:'pago dani',c:'6101001',n:'Sueldos y Salarios'},
+  {kw:'pago daniel',c:'6101001',n:'Sueldos y Salarios'},
+  {kw:'pago angelo',c:'6101001',n:'Sueldos y Salarios'},
+  {kw:'sinpe movil ney',c:'6101001',n:'Sueldos y Salarios'},
+  {kw:'sinpe movil daniel',c:'6101001',n:'Sueldos y Salarios'},
+  {kw:'sinpe movil angelo',c:'6101001',n:'Sueldos y Salarios'},
+  {kw:'uber eats',c:'6101007',n:'Atención a Empleados',uberEats:true},
+  {kw:'uber rides',c:'6400003',n:'Gasto de envíos'},
+  {kw:'uber trip',c:'6400003',n:'Gasto de envíos'},
+  {kw:'display',c:'6106008',n:'Gastos de Mercadeo y Ventas'},
+  {kw:'pago arrendadora boston',c:'6106021',n:'Alquileres'},
+  {kw:'5473-86',c:'2101005',n:'Pago Tarjeta de Crédito'},
+  {kw:'pago 5473',c:'2101005',n:'Pago Tarjeta de Crédito'},
+];
+
+// Proveedores que requieren CREAR factura manual
+const AUTO_BILL = [
+  {kw:'spotify',ivaKw:'iva -spotify',odooName:'spotify',producto:'suscripciones y afiliaciones',cuenta:'6106011',cuentaN:'Suscripciones y Afiliaciones',impuesto:'Importaciones al 13%',tieneIVA:true},
+  {kw:'anthropic',ivaKw:'iva -anthropic',odooName:'ANTHROPIC',producto:'Servicios Informaticos',cuenta:'6104005',cuentaN:'Servicios Informáticos',impuesto:'Importaciones al 13%',tieneIVA:true},
+  {kw:'google nest',ivaKw:'iva -google',odooName:'Google Nest',producto:'Otros',cuenta:'6106009',cuentaN:'Suministros de Oficina',impuesto:'Tarifa General 13%',tieneIVA:true},
+  {kw:'rugami',ivaKw:null,odooName:'RUGAMI INTERNACIONAL SOCIEDAD ANONIMA',producto:'agua',cuenta:'6106006',cuentaN:'Agua',impuesto:null,tieneIVA:false},
+];
+
+// Proveedores con factura manual compleja — link directo a Odoo para duplicar
+const MANUAL_BILL = [
+  {
+    kw:'cnfl',
+    nombre:'CNFL',
+    cuenta:'6106005',
+    cuentaN:'Electricidad',
+    instruccion:'Duplicá la última factura de CNFL y actualizá los montos y fecha. Una vez listo, marcá Hecho.',
+    urlOdoo:'https://demotruefood.odoo.com/web#action=498&active_id=1044&model=account.move&view_type=list&cids=1&menu_id=136',
+  },
+];
+
+// Mapa de clientes/proveedores BAC → Odoo
+const CLIENT_MAP = [
+  {bac:'amsa',odoo:'Automercado',tipo:'cliente'},
+  {bac:'automercado',odoo:'Automercado',tipo:'cliente'},
+  {bac:'auto mercado',odoo:'Automercado',tipo:'cliente'},
+  {bac:'comprebien',odoo:'COMPRE BIEN',tipo:'cliente'},
+  {bac:'compre bien',odoo:'COMPRE BIEN',tipo:'cliente'},
+  {bac:'cafe claro',odoo:'CAFE CLARO',tipo:'cliente'},
+  {bac:'corporacion de supermercados',odoo:'CORPORACION SUPERMERCADOS',tipo:'cliente'},
+  {bac:'corporacion supermercados',odoo:'CORPORACION SUPERMERCADOS',tipo:'cliente'},
+  {bac:'abner ruiz',odoo:'ABNER GERARDO RUIZ',tipo:'cliente'},
+  {bac:'scarleth palacios',odoo:'Mentha y lim',tipo:'cliente'},
+  {bac:'good food',odoo:'Good Food',tipo:'cliente'},
+  {bac:'cafeteria sula',odoo:'Cafeteria Sula',tipo:'cliente'},
+  {bac:'caffe negroni',odoo:'Caffe Negroni',tipo:'cliente'},
+  {bac:'negroni',odoo:'Caffe Negroni',tipo:'cliente'},
+  {bac:'green center',odoo:'GREEN CENTER',tipo:'cliente'},
+  {bac:'bm uvita',odoo:'Bm De Uvita',tipo:'cliente'},
+  {bac:'bm dominical',odoo:'Bm De Uvita',tipo:'cliente'},
+  {bac:'bm quepos',odoo:'Bmquepos',tipo:'cliente'},
+  {bac:'bmpalmar',odoo:'B.M. Del Palmar',tipo:'cliente'},
+  {bac:'bm palmar',odoo:'B.M. Del Palmar',tipo:'cliente'},
+  {bac:'bm corcovado',odoo:'Comercial Corcovado',tipo:'cliente'},
+  {bac:'bm general',odoo:'Bm. Del General',tipo:'cliente'},
+  {bac:'la misticanza',odoo:'La Misticanza',tipo:'cliente'},
+  {bac:'mercado pacuare',odoo:'Mercado Pacuare',tipo:'cliente'},
+  {bac:'fyc playa grande',odoo:'Flores y Comida Playa Grande',tipo:'cliente'},
+  {bac:'bulali',odoo:'Grupo Dalecia',tipo:'cliente'},
+  {bac:'truefood',odoo:'',tipo:'cliente'},
+  {bac:'true food',odoo:'',tipo:'cliente'},
+  {bac:'kolbi',odoo:'Kolbi',tipo:'proveedor'},
+  {bac:'ice telefono',odoo:'Kolbi',tipo:'proveedor'},
+  {bac:'camara de industrias',odoo:'Camara de Industrias',tipo:'proveedor'},
+  {bac:'da noi',odoo:'DA NOI',tipo:'proveedor'},
+  {bac:'francolina',odoo:'FRANCOLINA',tipo:'proveedor'},
+  {bac:'nacion sushi',odoo:'NACION SUSHI',tipo:'proveedor'},
+  {bac:'rugami',odoo:'RUGAMI INTERNACIONAL SOCIEDAD ANONIMA',tipo:'proveedor'},
+  {bac:'cnfl',odoo:'CNFL',tipo:'proveedor'},
+];
+
+let SESSION = {url:'',db:'',uid:0,apiKey:'',user:''};
+let bacData=[],odooInvoices=[],odooBills=[],matches=[],curTab='all';
+
+function norm(s){
+  return String(s||'').toLowerCase()
+    .replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i')
+    .replace(/[óòö]/g,'o').replace(/[úùü]/g,'u')
+    .replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+}
+function parseMonto(v){return parseFloat(String(v||'').replace(/[₡,\s]/g,''))||0}
+function parseDate(v){
+  if(!v&&v!==0)return'';
+  if(typeof v==='number'){const d=new Date((v-25569)*86400000);return d.toISOString().split('T')[0];}
+  const s=String(v).trim();
+  // DD/MM/YYYY → YYYY-MM-DD
+  const m1=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m1)return m1[3]+'-'+m1[2].padStart(2,'0')+'-'+m1[1].padStart(2,'0');
+  // DD-MM-YYYY → YYYY-MM-DD
+  const m2=s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if(m2)return m2[3]+'-'+m2[2].padStart(2,'0')+'-'+m2[1].padStart(2,'0');
+  return s;
+}
+function fmt(v){return '₡'+Math.abs(v).toLocaleString('es-CR',{minimumFractionDigits:0,maximumFractionDigits:0})}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function invYear(inv){return new Date(inv.invoice_date||'2000-01-01').getFullYear()}
+
+// Proveedores que a veces reciben pago ANTES de emitir la factura
+const PROVEEDORES_PAGO_ADELANTADO = ['etiplast', 'arpinsa', 'colinas'];
+
+function yearOk(inv, bacFecha){
+  const invDate = new Date(inv.invoice_date || '2000-01-01');
+  const bacDate = new Date(bacFecha || '2000-01-01');
+  // diffDays positivo = pago más nuevo que factura (normal: pagamos después)
+  // diffDays negativo = pago anterior a la factura (caso especial)
+  const diffDays = (bacDate - invDate) / 86400000;
+
+  if (diffDays < 0) {
+    // El pago es ANTERIOR a la factura — verificar si es proveedor especial
+    const partner = norm(inv.partner_id?.[1] || '');
+    const esEspecial = PROVEEDORES_PAGO_ADELANTADO.some(p => partner.includes(p));
+    const tolerancia = esEspecial ? 60 : 2;
+    if (Math.abs(diffDays) > tolerancia) return false;
+  }
+
+  // Validar año mínimo (enero/febrero permiten año anterior)
+  const invY = invYear(inv);
+  const bacMonth = parseInt((bacFecha||'').substring(5,7));
+  const minYear = (bacMonth <= 2) ? CURRENT_YEAR - 1 : CURRENT_YEAR;
+  return invY >= minYear;
+}
+
+const PROXY_URL = 'https://truefood-proxy.onrender.com/proxy';
+
+async function odooRpc(endpoint, params){
+  const res = await fetch(PROXY_URL + endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Basic ' + btoa(SESSION.user + ':' + SESSION.apiKey),
+      'x-odoo-url': SESSION.url,
+      'x-odoo-db': SESSION.db
+    },
+    body: JSON.stringify({jsonrpc:'2.0', method:'call', id:1, params})
+  });
+  const data = await res.json();
+  if(data.error) throw new Error(data.error.data?.message || data.error.message || 'Error Odoo');
+  return data.result;
+}
+async function odooCall(model,method,args,kwargs={}){
+  return odooRpc('/web/dataset/call_kw',{model,method,args,kwargs});
+}
+
+async function doLogin(){
+  const url=document.getElementById('inUrl').value.trim().replace(/\/$/,'');
+  const db=document.getElementById('inDb').value.trim();
+  const user=document.getElementById('inUser').value.trim();
+  const apiKey=document.getElementById('inApiKey').value.trim();
+  const st=document.getElementById('loginStatus');
+  st.innerHTML='<div class="status s-info">Conectando...</div>';
+  try{
+    const res=await fetch(PROXY_URL+'/web/dataset/call_kw',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':'Basic '+btoa(user+':'+apiKey),
+        'x-odoo-url': url,
+        'x-odoo-db': db
+      },
+      body:JSON.stringify({jsonrpc:'2.0',method:'call',id:1,params:{
+        model:'res.users',method:'search_read',
+        args:[[['login','=',user]]],
+        kwargs:{fields:['id','name'],limit:1}
+      }})
+    });
+    const data=await res.json();
+    if(data.error)throw new Error(data.error.data?.message||data.error.message);
+    const users=data.result;
+    if(!users||!users.length)throw new Error('No se pudo verificar el usuario');
+    SESSION={url,db,uid:users[0].id,apiKey,user,journalId:null,actionInv:null,actionBill:null};
+    // Buscar diario BAC y IDs de acciones al conectar
+    try{
+      const journals=await fetch(url+'/web/dataset/call_kw',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Basic '+btoa(user+':'+apiKey)},
+        body:JSON.stringify({jsonrpc:'2.0',method:'call',id:2,params:{
+          model:'account.journal',method:'search_read',
+          args:[[['type','=','bank']]],
+          kwargs:{fields:['id','name'],limit:10}
+        }})
+      }).then(r=>r.json());
+      if(!journals.error){
+        const jList=journals.result||[];
+        const bac=jList.find(j=>/bac/i.test(j.name))||jList[0];
+        if(bac)SESSION.journalId=bac.id;
+      }
+    }catch(e){console.warn('No se pudo cargar diario BAC:',e);}
+    st.innerHTML='';
+    document.getElementById('connPill').style.display='block';
+    document.getElementById('headerSub').textContent=users[0].name+' · '+url;
+    document.getElementById('alertConn').textContent='✓ Conectado como '+users[0].name;
+    document.getElementById('alertConn').classList.remove('hidden');
+    document.getElementById('vLogin').classList.add('hidden');
+    document.getElementById('vUpload').classList.remove('hidden');
+  }catch(e){
+    st.innerHTML='<div class="status s-err">Error: '+esc(e.message)+'</div>';
+  }
+}
+
+function setProgress(pct,msg){
+  document.getElementById('loadingSection').classList.remove('hidden');
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('loadMsg').textContent=msg;
+}
+
+async function cargarFacturas(){
+  setProgress(5,'Cargando facturas de clientes...');
+  odooInvoices=await odooCall('account.move','search_read',
+    [[['move_type','=','out_invoice'],['payment_state','in',['not_paid','partial']],['state','=','posted']]],
+    {fields:['name','partner_id','amount_total','amount_residual','invoice_date','ref','payment_reference'],limit:1000}
+  );
+  setProgress(55,'Cargando facturas de proveedores...');
+  odooBills=await odooCall('account.move','search_read',
+    [[['move_type','=','in_invoice'],['payment_state','in',['not_paid','partial']],['state','=','posted'],['ref','not ilike','adicional']]],
+    {fields:['name','partner_id','amount_total','amount_residual','invoice_date','ref','payment_reference'],limit:1000}
+  );
+  setProgress(100,'');
+  setTimeout(()=>document.getElementById('loadingSection').classList.add('hidden'),400);
+}
+
+function readFile(file,cb){
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(ext==='csv'){Papa.parse(file,{header:true,skipEmptyLines:true,complete:r=>cb(r.data)});return;}
+  const reader=new FileReader();
+  reader.onload=e=>{const wb=XLSX.read(e.target.result,{type:'array'});cb(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''}));};
+  reader.readAsArrayBuffer(file);
+}
+
+function parseBACRows(rows){
+  const res=[];let started=false;
+  for(const row of rows){
+    const vals=Object.values(row).map(v=>String(v||'').trim());
+    const joined=vals.join(' ').toLowerCase();
+    if(!started){if(joined.includes('description')||joined.includes('descripci')||joined.includes('code')){started=true;continue;}}
+    const keys=Object.keys(row);
+    const dK=keys.find(k=>/^date$/i.test(k))||keys[0];
+    const descK=keys.find(k=>/desc/i.test(k))||keys[4];
+    const debK=keys.find(k=>/debit/i.test(k))||keys[7];
+    const credK=keys.find(k=>/credit/i.test(k))||keys[8];
+    const date=parseDate(row[dK]);
+    const desc=String(row[descK]||'').trim();
+    const deb=parseMonto(row[debK]);
+    const cred=parseMonto(row[credK]);
+    const monto=cred>0?cred:-deb;
+    if(!date||!desc||date.length<4)continue;
+    res.push({fecha:date,descripcion:desc,monto});
+  }
+  return res;
+}
+
+document.getElementById('fBac').onchange=function(e){
+  const f=e.target.files[0];if(!f)return;
+  readFile(f,data=>{
+    bacData=parseBACRows(data);
+    document.getElementById('lblBac').textContent='✓ '+f.name+' — '+bacData.length+' movimientos';
+    document.getElementById('dzBac').classList.add('ok');
+    document.getElementById('btnRun').classList.remove('hidden');
+  });
+};
+
+// MATCHING
+function applyRule(bac){
+  const nd=norm(bac.descripcion);
+  for(const r of RULES){if(nd.includes(norm(r.kw)))return r;}
+  return null;
+}
+
+function applyAutoBill(bac){
+  const nd=norm(bac.descripcion);
+  // No aplicar si es el cargo de IVA
+  for(const p of AUTO_BILL){
+    if(p.ivaKw&&nd.includes(norm(p.ivaKw)))return null;
+  }
+  for(const p of AUTO_BILL){
+    if(nd.includes(norm(p.kw)))return p;
+  }
+  return null;
+}
+
+function applyManualBill(bac){
+  const nd=norm(bac.descripcion);
+  for(const p of MANUAL_BILL){
+    if(nd.includes(norm(p.kw)))return p;
+  }
+  return null;
+}
+
+function isIVAAgrupado(bac){
+  const nd=norm(bac.descripcion);
+  for(const p of AUTO_BILL){
+    if(p.ivaKw&&nd.includes(norm(p.ivaKw)))return true;
+  }
+  return false;
+}
+
+function findIVAPair(bac){
+  const nd=norm(bac.descripcion);
+  const provider=AUTO_BILL.find(p=>nd.includes(norm(p.kw)));
+  if(!provider||!provider.ivaKw)return null;
+  return bacData.find(b=>b!==bac&&norm(b.descripcion).includes(norm(provider.ivaKw))&&b.fecha.substring(0,7)===bac.fecha.substring(0,7))||null;
+}
+
+function extractFactNum(desc){
+  const m=desc.match(/fact\s*(\d{3,6})/i)||desc.match(/ft(\d{3,6})/i)||desc.match(/_(\d{4,6})-/i);
+  return m?m[1]:null;
+}
+
+function findByRef(factNum,pool,bacFecha){
+  if(!factNum)return null;
+  return pool.find(inv=>{
+    const hay=[inv.name,inv.ref,inv.payment_reference].filter(Boolean).join(' ');
+    return hay.includes(factNum)&&yearOk(inv,bacFecha);
+  })||null;
+}
+
+function detectClient(desc){
+  const nd=norm(desc);
+  for(const cli of CLIENT_MAP){if(nd.includes(norm(cli.bac)))return cli;}
+  return null;
+}
+
+function findByClient(desc,pool,monto,bacFecha){
+  const cli=detectClient(desc);
+  if(!cli||!cli.odoo)return null;
+  const odooN=norm(cli.odoo);
+  const minLen=Math.min(odooN.length,8);
+  const abs=Math.abs(monto);
+  const forClient=pool.filter(i=>norm(i.partner_id?.[1]||'').includes(odooN.substring(0,minLen))&&yearOk(i,bacFecha));
+  if(!forClient.length)return{candidates:[],near:[],client:cli.odoo,tipo:cli.tipo};
+  // Exactos (menos de ₡1 de diferencia)
+  const exact=forClient.filter(i=>Math.abs((i.amount_residual||i.amount_total)-abs)<1);
+  // Cercanos (hasta ₡1.000 de diferencia) que no sean exactos
+  const near=forClient.filter(i=>{
+    const diff=Math.abs((i.amount_residual||i.amount_total)-abs);
+    return diff>=1&&diff<=1000;
+  });
+  return{candidates:exact,near,client:cli.odoo,tipo:cli.tipo};
+}
+
+function findByMonto(monto,pool,bacFecha){
+  const abs=Math.abs(monto);
+  // Retorna hasta 2 facturas más cercanas dentro de ₡1.000
+  const candidates=pool
+    .filter(inv=>yearOk(inv,bacFecha))
+    .map(inv=>({inv,diff:Math.abs((inv.amount_residual||inv.amount_total)-abs)}))
+    .filter(x=>x.diff<=1000)
+    .sort((a,b)=>a.diff-b.diff)
+    .slice(0,2);
+  return candidates.length?candidates:null;
+}
+
+async function runAll(){
+  document.getElementById('btnRun').disabled=true;
+  document.getElementById('btnRun').textContent='Cargando...';
+  try{
+    await cargarFacturas();
+    matches=[];
+    const usedInv=new Set(),usedBill=new Set();
+    const ivaUsados=new Set();
+
+    for(const bac of bacData){
+      const nd=norm(bac.descripcion);
+
+      // IVA agrupado — saltar
+      if(isIVAAgrupado(bac)&&!ivaUsados.has(bac)){
+        matches.push({bac,type:'iva_skip',userStatus:'skip'});
+        continue;
+      }
+
+      // Regla automática
+      const rule=applyRule(bac);
+      if(rule){
+        if(rule.uberEats){
+          // Uber Eats: buscar FE cercanas (±₡1.000) en facturas de proveedores
+          const abs=Math.abs(bac.monto);
+          const nearFE=odooBills.filter(inv=>{
+            const amt=inv.amount_residual||inv.amount_total;
+            return Math.abs(amt-abs)<=1000&&yearOk(inv,bac.fecha);
+          }).sort((a,b)=>Math.abs((a.amount_residual||a.amount_total)-abs)-Math.abs((b.amount_residual||b.amount_total)-abs)).slice(0,3);
+          matches.push({bac,type:'rule',rule,inv:null,nearFE,reasons:['Regla: '+rule.n],userStatus:'pending'});
+        } else {
+          matches.push({bac,type:'rule',rule,inv:null,nearFE:[],reasons:['Regla: '+rule.n],userStatus:'pending'});
+        }
+        continue;
+      }
+
+      // Crear factura (proveedores sin FE)
+      const autoBill=applyAutoBill(bac);
+      if(autoBill){
+        const ivaPair=findIVAPair(bac);
+        if(ivaPair)ivaUsados.add(ivaPair);
+        const total=ivaPair?Math.abs(bac.monto)+Math.abs(ivaPair.monto):Math.abs(bac.monto);
+        matches.push({bac,type:'crear',autoBill,ivaPair,total,inv:null,reasons:['Crear factura'],userStatus:'pending'});
+        continue;
+      }
+
+      // Factura manual compleja (CNFL, etc.) — link directo a Odoo para duplicar
+      const manualBill=applyManualBill(bac);
+      if(manualBill){
+        matches.push({bac,type:'manual',manualBill,inv:null,reasons:['Duplicar factura en Odoo'],userStatus:'pending'});
+        continue;
+      }
+
+      const esIngreso=bac.monto>0;
+      const pool=esIngreso?odooInvoices:odooBills;
+      const usedSet=esIngreso?usedInv:usedBill;
+      const available=pool.filter(inv=>!usedSet.has(inv.id));
+
+      const reasons=[];
+      let bestInv=null;
+
+      // Por número de comprobante
+      const factNum=extractFactNum(bac.descripcion);
+      if(factNum){
+        const found=findByRef(factNum,available,bac.fecha);
+        if(found){usedSet.add(found.id);bestInv=found;reasons.push('Comprobante #'+factNum);}
+      }
+
+      // Por cliente/proveedor
+      const cliRes=findByClient(bac.descripcion,available,bac.monto,bac.fecha);
+      if(cliRes){
+        if(cliRes.candidates.length===1&&!bestInv){
+          usedSet.add(cliRes.candidates[0].id);
+          bestInv=cliRes.candidates[0];
+          reasons.push('Cliente: '+cliRes.client);
+        } else if(cliRes.candidates.length>1&&!bestInv){
+          // Múltiples exactos
+          matches.push({bac,type:'cli',inv:null,candidates:cliRes.candidates,near:[],cliInfo:cliRes,reasons:['Cliente: '+cliRes.client+' ('+cliRes.candidates.length+' facturas exactas)'],userStatus:'pending'});
+          continue;
+        } else if(cliRes.candidates.length===0&&cliRes.near&&cliRes.near.length>0&&!bestInv){
+          // Sin exacto pero hay cercanos dentro de ₡1.000
+          matches.push({bac,type:'cli',inv:null,candidates:[],near:cliRes.near,cliInfo:cliRes,reasons:['Cliente: '+cliRes.client+' ('+cliRes.near.length+' facturas aprox.)'],userStatus:'pending'});
+          continue;
+        } else if(cliRes.candidates.length===0&&cliRes.client){
+          reasons.push('Cliente reconocido: '+cliRes.client+' (sin factura con ese monto)');
+        } else if(bestInv&&reasons.length>0){
+          reasons.push('Cliente: '+cliRes.client);
+        }
+      }
+
+      // Por monto (solo si no hay cliente reconocido)
+      if(!bestInv&&!cliRes){
+        const montoRes=findByMonto(bac.monto,available,bac.fecha);
+        if(montoRes&&montoRes.length===1&&montoRes[0].diff<1){
+          usedSet.add(montoRes[0].inv.id);bestInv=montoRes[0].inv;reasons.push('Monto exacto');
+        } else if(montoRes&&montoRes.length>0){
+          // Mostrar opciones cercanas
+          matches.push({bac,type:'monto',inv:null,candidates:montoRes.map(x=>x.inv),near:[],cliInfo:null,reasons:['Opciones por monto (dif ≤ ₡1.000)'],userStatus:'pending'});
+          continue;
+        }
+      }
+
+      // Detectar cliente aunque no haya factura (para mostrar info)
+      const cliDetected=detectClient(bac.descripcion);
+
+      if(bestInv&&reasons.some(r=>r.startsWith('Comprobante')||r.startsWith('Cliente'))){
+        matches.push({bac,type:reasons[0].startsWith('Comprobante')?'fact':'cli',inv:bestInv,reasons,cliDetected,userStatus:'pending'});
+      } else if(bestInv&&reasons.includes('Monto exacto')){
+        matches.push({bac,type:'monto',inv:bestInv,reasons,cliDetected,userStatus:'pending'});
+      } else {
+        matches.push({bac,type:'rev',inv:null,reasons,cliDetected,userStatus:'pending'});
+      }
+    }
+
+    document.getElementById('vResults').classList.remove('hidden');
+    document.getElementById('vUpload').classList.add('hidden');
+    renderAll();
+  }catch(e){
+    setProgress(0,'Error: '+e.message);
+    document.getElementById('loadMsg').className='status s-err';
+  }
+  document.getElementById('btnRun').disabled=false;
+  document.getElementById('btnRun').textContent='Cargar facturas y clasificar →';
+}
+
+function renderAll(){renderStats();renderTable();}
+
+function renderStats(){
+  const vis=matches.filter(m=>m.type!=='iva_skip');
+  const t=vis.length;
+  const bt=tp=>vis.filter(m=>m.type===tp).length;
+  const done=vis.filter(m=>m.userStatus==='confirmed'||m.userStatus==='created').length;
+  document.getElementById('statsGrid').innerHTML=`
+    <div class="stat"><div class="stat-l">Total</div><div class="stat-v">${t}</div></div>
+    <div class="stat"><div class="stat-l">Regla auto</div><div class="stat-v" style="color:var(--green)">${bt('rule')}</div></div>
+    <div class="stat"><div class="stat-l">Comprobante</div><div class="stat-v" style="color:var(--forest)">${bt('fact')}</div></div>
+    <div class="stat"><div class="stat-l">Cliente/Prov</div><div class="stat-v" style="color:var(--blue)">${bt('cli')}</div></div>
+    <div class="stat"><div class="stat-l">Monto</div><div class="stat-v" style="color:var(--purple)">${bt('monto')}</div></div>
+    <div class="stat"><div class="stat-l">Crear</div><div class="stat-v" style="color:var(--orange)">${bt('crear')}</div></div>
+    <div class="stat"><div class="stat-l">Revisar</div><div class="stat-v" style="color:#1e40af">${bt('rev')}</div></div>
+  `;
+}
+
+function renderTable(){
+  const tbody=document.getElementById('tbody');tbody.innerHTML='';
+  const fil=matches.filter(m=>{
+    if(m.type==='iva_skip')return false;
+    if(curTab==='all')return true;
+    if(curTab==='done')return m.userStatus==='confirmed'||m.userStatus==='created';
+    if(curTab==='ing')return m.bac.monto>0&&m.userStatus!=='confirmed'&&m.userStatus!=='created';
+    if(curTab==='eg')return m.bac.monto<0&&m.userStatus!=='confirmed'&&m.userStatus!=='created';
+    if(curTab==='rev')return m.type==='rev'&&m.userStatus==='pending';
+    if(curTab==='crear')return m.type==='crear'&&m.userStatus==='pending';
+    return m.type===curTab&&m.userStatus==='pending';
+  });
+
+  // Pendientes primero, confirmados al final
+  fil.sort((a,b)=>{
+    const aDone=a.userStatus==='confirmed'||a.userStatus==='created'||a.userStatus==='registered'?1:0;
+    const bDone=b.userStatus==='confirmed'||b.userStatus==='created'||b.userStatus==='registered'?1:0;
+    return aDone-bDone;
+  });
+
+  if(!fil.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-h)">Sin items aquí</td></tr>';return;}
+
+  fil.forEach(m=>{
+    const gi=matches.indexOf(m);
+    const isDone=m.userStatus==='confirmed'||m.userStatus==='created'||m.userStatus==='registered';
+    const esIngreso=m.bac.monto>0;
+    const rowCls=isDone?'r-done':m.type==='rev'?'r-rev':(m.type==='crear'||m.type==='manual')?'r-crear':esIngreso?'r-ing':'';
+
+    // Badge
+    let badge='';
+    if(m.userStatus==='registrando')badge='<span class="badge b-monto">Registrando...</span>';
+    else if(m.userStatus==='registered')badge='<span class="badge b-done">✓ Pagado en Odoo</span>';
+    else if(isDone&&m.type==='crear')badge='<span class="badge b-done">✓ Creada</span>';
+    else if(isDone&&m.type==='manual')badge='<span class="badge b-done">✓ Listo</span>';
+    else if(isDone)badge='<span class="badge b-done">✓ OK</span>';
+    else if(m.type==='rule')badge='<span class="badge b-rule">Regla</span>';
+    else if(m.type==='fact')badge='<span class="badge b-fact">Comprobante</span>';
+    else if(m.type==='cli')badge='<span class="badge b-cli">Cliente/Prov</span>';
+    else if(m.type==='monto')badge='<span class="badge b-monto">Monto</span>';
+    else if(m.type==='crear')badge='<span class="badge b-crear">Crear factura</span>';
+    else if(m.type==='manual')badge='<span class="badge b-crear">Manual</span>';
+    else badge='<span class="badge b-rev">Revisar</span>';
+
+    // Descripción BAC + tag ingreso/egreso + cliente detectado
+    // tag ahora va en columna propia
+    const cliExtra=m.cliDetected?`<div class="desc-extra">${esc(m.cliDetected.odoo||m.cliDetected.bac)}</div>`:'';
+    const descCell=`<div class="desc-bac">${esc(m.bac.descripcion)}</div>${cliExtra}`;
+    const tipoCell=esIngreso
+      ?'<td style="text-align:center;vertical-align:middle"><span class="tag-ing">↑ ING</span></td>'
+      :'<td style="text-align:center;vertical-align:middle"><span class="tag-eg">↓ GST</span></td>';
+
+    // Match info — formato limpio con etiquetas claras
+    let matchCell='';
+    if(m.type==='rule'){
+      matchCell='<div class="match-main">'+esc(m.rule.n)+'</div><div class="match-sub">'+m.rule.c+'</div>';
+      if(m.rule.uberEats&&m.nearFE&&m.nearFE.length>0){
+        matchCell+='<div class="match-sub" style="margin-top:4px;color:var(--amber);font-weight:600">FE cercanas (\xb1\u20a11.000):</div>';
+        m.nearFE.forEach(function(inv,ci){
+          const url=SESSION.url+'/web#id='+inv.id+'&model=account.move&view_type=form';
+          const amt=inv.amount_residual||inv.amount_total;
+          const diff=Math.abs(amt-Math.abs(m.bac.monto));
+          const partner=(inv.partner_id&&inv.partner_id[1])||'';
+          matchCell+='<div class="match-sub" style="margin-top:3px;display:flex;align-items:center;gap:6px">'
+            +'<a href="'+url+'" target="_blank" style="color:var(--blue);font-weight:500">'+esc(inv.name)+'</a>'
+            +' \u00b7 '+esc(partner)+' \u00b7 '+(inv.invoice_date||'')
+            +' <span style="color:var(--amber);font-size:9px">dif \u20a1'+Math.round(diff).toLocaleString('es-CR')+'</span>'
+            +' <button class="btn btn-sm btn-confirm" style="padding:2px 8px;font-size:10px" onclick="usarFEUberEats('+gi+','+ci+')">Usar FE</button>'
+            +'</div>';
+        });
+      }
+    } else if(m.type==='manual'){
+      matchCell='<div class="match-main">'+esc(m.manualBill.nombre)+'</div>'
+        +'<div class="match-sub">'+esc(m.manualBill.cuentaN)+'</div>'
+        +'<div class="match-sub" style="color:var(--amber)">'+esc(m.manualBill.instruccion)+'</div>';
+    } else if(m.type==='crear'){
+      const ivaInfo=m.ivaPair?` + IVA ${fmt(m.ivaPair.monto)}`:' (sin IVA)';
+      matchCell=`<div class="match-main">${esc(m.autoBill.odooName)}</div>`
+        +`<div class="match-sub">${esc(m.autoBill.cuentaN)}</div>`
+        +`<div class="match-sub">${fmt(m.total)}${ivaInfo}</div>`;
+    } else if(m.type==='cli'&&m.candidates&&(m.candidates.length>0||(m.near&&m.near.length>0))){
+      matchCell='<div class="match-main">Cliente: '+esc(m.cliInfo.client)+'</div>';
+      const allOpts=(m.candidates||[]).map(function(c){return{inv:c,exact:true};}).concat((m.near||[]).map(function(c){return{inv:c,exact:false};}));
+      allOpts.forEach(function(opt,ci){
+        const c=opt.inv;
+        const url=SESSION.url+'/web#id='+c.id+'&model=account.move&view_type=form';
+        const amt=c.amount_residual||c.amount_total;
+        const diff=Math.abs(amt-Math.abs(m.bac.monto));
+        const difTag=opt.exact
+          ?'<span style="color:var(--green-d);font-size:9px;font-weight:600">\u2713 exacto</span>'
+          :'<span style="color:var(--amber);font-size:9px">dif \u20a1'+Math.round(diff).toLocaleString('es-CR')+'</span>';
+        matchCell+='<div class="match-sub" style="margin-top:4px;padding:4px 6px;background:var(--bg2);border-radius:4px">'
+          +'<div><span class="match-label">FE:</span> <a href="'+url+'" target="_blank" style="color:var(--blue);font-weight:500">'+esc(c.name)+'</a> '+difTag+'</div>'
+          +'<div><span class="match-label">Fecha:</span> <span class="match-val">'+(c.invoice_date||'\u2014')+'</span></div>'
+          +'<div style="margin-top:3px"><button class="btn btn-sm btn-confirm" style="width:100%;padding:3px" onclick="selectCand('+gi+','+ci+','+JSON.stringify(opt.exact)+')">Usar FE</button></div>'
+          +'</div>';
+      });
+    } else if(m.inv){
+      const url=SESSION.url+'/web#id='+m.inv.id+'&model=account.move&view_type=form';
+      const partner=m.inv.partner_id?.[1]||'';
+      const monto_inv=m.inv.amount_residual||m.inv.amount_total;
+      const diff=Math.abs(monto_inv-Math.abs(m.bac.monto));
+      const diffTag=diff<1?'':`<span style="color:var(--amber);font-size:9px">dif \u20a1${Math.round(diff).toLocaleString('es-CR')}</span>`;
+      matchCell='<div class="info-row">'
+        +(partner?`<div><span class="match-label">Cliente:</span> <span class="match-val">${esc(partner)}</span></div>`:'')
+        +`<div><span class="match-label"># FE:</span> <a href="${url}" target="_blank" style="color:var(--blue);font-weight:500">${esc(m.inv.name)}</a> ${diffTag}</div>`
+        +`<div><span class="match-label">Fecha FE:</span> <span class="match-val">${m.inv.invoice_date||'\u2014'}</span></div>`
+        +'</div>';
+    } else {
+      matchCell='<div class="match-sub" style="color:var(--text-m);font-style:italic">Sin match autom\u00e1tico</div>';
+    }
+
+    // Acciones — columna \u00fanica, botones apilados
+    let actions='';
+    if(isDone){
+      const verBtn=m.inv?`<button class="btn btn-sm" onclick="mostrarInvPanel(matches[${gi}].inv,${m.bac.monto>0},matches[${gi}].payId,'${m.bac.fecha}')">Ver FE</button>`:'';
+      actions=`<div class="action-col"><button class="btn btn-sm" onclick="resetM(${gi})">Deshacer</button>${verBtn}</div>`;
+    } else if(m.type==='manual'){
+      actions=`<div class="action-col">`
+        +`<a href="${m.manualBill.urlOdoo}" target="_blank" class="btn btn-g btn-sm" style="text-decoration:none">Ver facturas \u2197</a>`
+        +`<button class="btn btn-sm btn-confirm" onclick="confirmar(${gi})">\u2713 Hecho</button>`
+        +`</div>`;
+    } else if(m.type==='crear'){
+      const provNombre=m.autoBill?m.autoBill.odooName:'';
+      const urlProvFacts=provNombre
+        ? SESSION.url+'/web#model=account.move&view_type=list'
+        : SESSION.url+'/web#action=account.action_move_in_form';
+      actions=`<div class="action-col">`
+        +`<button class="btn btn-g btn-sm" onclick="mostrarPanel(${gi})">+ Ver datos</button>`
+        +`<a href="${urlProvFacts}" target="_blank" class="btn btn-sm" style="text-decoration:none">Crear Factura ↗</a>`
+        +`</div>`;
+    } else if(m.type==='rev'||(m.type==='cli'&&m.candidates&&m.candidates.length===0&&(!m.near||m.near.length===0))){
+      const cliNombre=m.cliInfo&&m.cliInfo.client?m.cliInfo.client:m.cliDetected&&m.cliDetected.odoo?m.cliDetected.odoo:m.cliDetected&&m.cliDetected.bac?m.cliDetected.bac:'';
+      let urlRev;
+      if(cliNombre){
+        const moveType=esIngreso?'out_invoice':'in_invoice';
+        urlRev=SESSION.url+'/web#model=account.move&view_type=list&domain=[["move_type","=","'+moveType+'"],["partner_id.name","ilike","'+cliNombre+'"],["payment_state","in",["not_paid","partial"]]]';
+      } else {
+        urlRev=SESSION.url+'/web#model=account.move&view_type=list&domain=[["move_type","in",['+(esIngreso?'"out_invoice","out_receipt"':'"in_invoice","in_receipt"')+']],["payment_state","in",["not_paid","partial"]]]';
+      }
+      const btnLabelRev=cliNombre?'Ver facturas '+cliNombre+' ↗':(esIngreso?'Ver facturas cliente ↗':'Ver facturas proveedor ↗');
+      actions=`<div class="action-col">`
+        +`<a href="${urlRev}" target="_blank" class="btn btn-warn btn-sm" style="text-decoration:none">${btnLabelRev}</a>`
+        +`</div>`;
+    } else if(m.type==='monto'&&m.candidates&&m.candidates.length>0){
+      // Monto: múltiples candidatos — mostrar opciones en matchCell y acción para seleccionar
+      actions=`<div class="action-col">`;
+      m.candidates.forEach(function(c,ci){
+        const url=SESSION.url+'/web#id='+c.id+'&model=account.move&view_type=form';
+        const amt=c.amount_residual||c.amount_total;
+        const diff=Math.abs(amt-Math.abs(m.bac.monto));
+        const difTxt=diff<1?'exacto':'dif ₡'+Math.round(diff).toLocaleString('es-CR');
+        const partner=(c.partner_id&&c.partner_id[1])||'';
+        actions+=`<button class="btn btn-sm btn-confirm" style="text-align:left;font-size:10px;padding:3px 6px" onclick="selectMonto(${gi},${ci})">&#10003; ${esc(c.name)} · ${partner?esc(partner)+' · ':''} ${difTxt}</button>`;
+      });
+      actions+=`</div>`;
+    } else if(m.inv){
+      actions=`<div class="action-col"><button class="btn btn-sm btn-confirm" onclick="confirmarYRegistrar(${gi})">\u2713 Confirmar y pagar</button></div>`;
+    } else if(m.type==='rule'){
+      actions=`<div class="action-col"><button class="btn btn-sm btn-confirm" onclick="confirmarYRegistrar(${gi})">\u2713 Confirmar Regla</button></div>`;
+    }
+
+    if(isDone){
+      const feNombre=m.inv?m.inv.name:(m.type==='crear'?'Factura creada':m.type==='manual'?'Manual':'—');
+      const partner=m.inv?(m.inv.partner_id?.[1]||''):'';
+      const statusLabel=m.userStatus==='registered'?'Pagado en Odoo':m.type==='crear'?'Creada':m.type==='manual'?'Listo':'OK';
+      const esG=m.bac.monto<0;
+      tbody.innerHTML+=`<tr class="r-done">
+        <td colspan="7">
+          <div class="done-compact">
+            <span class="done-check">✓ ${statusLabel}</span>
+            <span class="done-date">${m.bac.fecha}</span>
+            <span class="done-desc" title="${esc(m.bac.descripcion)}">${esc(m.bac.descripcion)}</span>
+            <span class="done-monto" style="color:${esG?'#E84040':'#C8E832'}">${fmt(m.bac.monto)}</span>
+            ${m.inv?`<span class="done-fe" title="${esc(feNombre)}">${esc(feNombre)}</span>`:''}
+            <button class="btn-undo" onclick="resetM(${gi})">Deshacer</button>
+          </div>
+        </td>
+      </tr>`;
+    } else {
+    tbody.innerHTML+=`<tr class="${rowCls}">
+      <td style="font-size:11px;font-family:var(--mono);color:var(--text-m);white-space:nowrap">${m.bac.fecha}</td>
+      ${tipoCell}
+      <td>${descCell}</td>
+      <td style="font-weight:600;font-family:var(--mono);white-space:nowrap">${fmt(m.bac.monto)}</td>
+      <td>${badge}</td>
+      <td>${matchCell}</td>
+      <td>${actions}</td>
+    </tr>`;
+    }
+  });
+}
+
+function setTab(t,el){
+  curTab=t;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  // Mostrar botón "Confirmar todos los visibles" solo en tabs que tienen sentido
+  const showConfirm=['rule','fact','cli','monto'].includes(t);
+  document.getElementById('confirmVisibleBar').classList.toggle('hidden',!showConfirm);
+  renderTable();
+}
+
+async function confirmarYRegistrar(gi){
+  console.log('confirmarYRegistrar called with gi='+gi);
+  const m=matches[gi];
+  if(!m){console.error('No match at index '+gi);return;}
+  console.log('Match type='+m.type+' inv='+JSON.stringify(m.inv?.name)+' monto='+m.bac.monto);
+  m.userStatus='registrando';
+  renderAll();
+  const st=document.getElementById('regStatus');
+  st.classList.remove('hidden');st.className='status s-info';
+  st.textContent='Registrando pago en Odoo...';
+
+  if(m.type==='rule'&&!m.inv){
+    m.userStatus='confirmed';
+    st.className='status s-ok';
+    st.textContent='✓ Anotado — cuenta '+m.rule.c;
+    renderAll();return;
+  }
+
+  if(!m.inv){
+    console.error('No inv on match, aborting');
+    m.userStatus='pending';
+    st.className='status s-err';
+    st.textContent='Error: no hay factura asignada a este movimiento';
+    renderAll();return;
+  }
+
+  try{
+    console.log('Getting journal...');
+    let journalId=SESSION.journalId;
+    if(!journalId){
+      const journals=await odooCall('account.journal','search_read',[[['type','=','bank']]],{fields:['id','name'],limit:10});
+      console.log('Journals found:',journals.map(j=>j.name+':'+j.id));
+      const bac=journals.find(j=>/bac/i.test(j.name))||journals[0];
+      if(!bac)throw new Error('No se encontró diario BAC en Odoo');
+      journalId=bac.id;SESSION.journalId=journalId;
+    }
+    console.log('Using journal id='+journalId);
+    const esIngreso=m.bac.monto>0;
+    console.log('Creating payment esIngreso='+esIngreso+' partner='+m.inv.partner_id[0]+' amount='+Math.abs(m.inv.amount_residual||m.inv.amount_total));
+    const payId=await odooCall('account.payment','create',[{
+      payment_type: esIngreso?'inbound':'outbound',
+      partner_type: esIngreso?'customer':'supplier',
+      partner_id:   m.inv.partner_id[0],
+      amount:       Math.abs(m.inv.amount_residual||m.inv.amount_total),
+      date:         m.bac.fecha,
+      journal_id:   journalId,
+      ref:          m.bac.descripcion,
+    }]);
+    console.log('Payment created id='+payId);
+    await odooCall('account.payment','action_post',[[payId]]);
+    console.log('Payment posted');
+    const payObj=await odooCall('account.payment','read',[[payId]],{fields:['move_id']});
+    const moveId=payObj[0]?.move_id?.[0];
+    console.log('Payment move_id='+moveId);
+    if(moveId){
+      const payLines=await odooCall('account.move.line','search_read',
+        [[['move_id','=',moveId],['account_id.reconcile','=',true],['reconciled','=',false]]],
+        {fields:['id','name','debit','credit'],limit:10}
+      );
+      console.log('payLines='+JSON.stringify(payLines.map(l=>({id:l.id,debit:l.debit,credit:l.credit}))));
+      if(payLines.length){
+        const esIngreso2=m.bac.monto>0;
+        // Seleccionar la línea correcta: crédito para ingresos, débito para egresos
+        const targetLine=esIngreso2
+          ? (payLines.find(l=>l.credit>0)||payLines[0])
+          : (payLines.find(l=>l.debit>0)||payLines[0]);
+        console.log('Target line id='+targetLine.id+' inv.id='+m.inv.id);
+        try{
+          // Usar el mismo endpoint exacto que usa Odoo internamente
+          await odooRpc('/web/dataset/call_kw/account.move/js_assign_outstanding_line',{
+            model:'account.move',
+            method:'js_assign_outstanding_line',
+            args:[m.inv.id, targetLine.id],
+            kwargs:{
+              context:{
+                lang:'es_CR',
+                tz:'America/Costa_Rica',
+                uid:SESSION.uid,
+                allowed_company_ids:[1]
+              }
+            }
+          });
+          console.log('Reconciliado OK');
+        }catch(e1){
+          console.error('js_assign_outstanding_line error:',e1.message);
+        }
+      }
+    }
+    m.userStatus='registered';
+    m.payId=payId;
+    const esIngreso2=m.bac.monto>0;
+    const estado=esIngreso2?'"en proceso de pago"':'"pagada" el '+m.bac.fecha;
+    st.className='status s-ok';
+    st.textContent='✓ Pago registrado — factura '+m.inv.name+' queda '+estado+' en Odoo';
+    renderAll();
+    // Mostrar panel de confirmación
+    mostrarInvPanel(m.inv, esIngreso2, payId, m.bac.fecha);
+  }catch(e){
+    console.error('Error in confirmarYRegistrar:',e);
+    m.userStatus='pending';
+    st.className='status s-err';
+    st.textContent='Error: '+e.message;
+    renderAll();
+  }
+}
+
+function confirmar(i){matches[i].userStatus='confirmed';renderAll();}
+function resetM(i){matches[i].userStatus='pending';renderAll();}
+
+function usarFEUberEats(gi,ci){
+  // Reemplazar el match de regla por la FE seleccionada y confirmar
+  const m=matches[gi];
+  m.inv=m.nearFE[ci];
+  m.type='cli'; // Tratar como match de cliente para que se reconcilie
+  m.nearFE=[];
+  m.reasons=['FE Uber Eats'];
+  confirmarYRegistrar(gi);
+}
+async function confirmarVisibles(){
+  // Confirmar y registrar solo los que están visibles en el tab actual
+  const visibles=matches.filter(m=>{
+    if(m.userStatus!=='pending')return false;
+    if(curTab==='rule')return m.type==='rule';
+    if(curTab==='fact')return m.type==='fact'&&m.inv;
+    if(curTab==='cli')return m.type==='cli'&&m.inv;
+    if(curTab==='monto')return m.type==='monto'&&m.inv;
+    return false;
+  });
+  if(!visibles.length){alert('No hay items pendientes en esta categoría.');return;}
+  for(let i=0;i<visibles.length;i++){
+    await confirmarYRegistrar(matches.indexOf(visibles[i]));
+  }
+}
+
+async function confirmarTodos(){
+  const pend=matches.filter(m=>(m.type==='fact'||m.type==='cli'||m.type==='monto'||m.type==='rule')&&m.userStatus==='pending'&&(m.inv||m.type==='rule'));
+  for(let i=0;i<pend.length;i++){await confirmarYRegistrar(matches.indexOf(pend[i]));}
+}
+
+function selectCand(gi,ci,isExact){
+  const m=matches[gi];
+  const allOpts=(m.candidates||[]).concat(m.near||[]);
+  m.inv=allOpts[ci];
+  m.candidates=[];
+  m.near=[];
+  m.type='cli';
+  m.userStatus='confirmed';
+  renderAll();
+}
+
+function selectMonto(gi,ci){
+  const m=matches[gi];
+  m.inv=m.candidates[ci];
+  m.candidates=[];
+  m.type='monto';
+  confirmarYRegistrar(gi);
+}
+
+async function crearFactura(gi){
+  const m=matches[gi];
+  const p=m.autoBill;
+  const st=document.getElementById('regStatus');
+  st.classList.remove('hidden');st.className='status s-info';
+  st.textContent='Buscando proveedor '+p.odooName+'...';
+  try{
+    const partners=await odooCall('res.partner','search_read',[[['name','ilike',p.odooName]]],{fields:['id','name'],limit:5});
+    if(!partners.length)throw new Error('No se encontró "'+p.odooName+'" en Odoo');
+    const partnerId=partners[0].id;
+    let taxIds=[];
+    if(p.tieneIVA&&p.impuesto){
+      const taxes=await odooCall('account.tax','search_read',[[['type_tax_use','=','purchase']]],{fields:['id','name'],limit:20});
+      const tax=taxes.find(t=>t.name.toLowerCase().includes('13'));
+      if(tax)taxIds=[[6,0,[tax.id]]];
+    }
+    const accounts=await odooCall('account.account','search_read',[[['code','=',p.cuenta]]],{fields:['id','name'],limit:1});
+    if(!accounts.length)throw new Error('No se encontró cuenta '+p.cuenta);
+    const accountId=accounts[0].id;
+    const precio=Math.abs(m.bac.monto);
+    const invId=await odooCall('account.move','create',[{
+      move_type:'in_invoice',partner_id:partnerId,invoice_date:m.bac.fecha,
+      invoice_line_ids:[[0,0,{name:p.producto,account_id:accountId,quantity:1,price_unit:precio,tax_ids:taxIds}]]
+    }]);
+    await odooCall('account.move','action_post',[[invId]]);
+    m.inv={id:invId,name:'Factura nueva',partner_id:[partnerId,p.odooName],amount_total:m.total,amount_residual:m.total,invoice_date:m.bac.fecha};
+    m.userStatus='created';
+    st.className='status s-ok';
+    st.textContent='✓ Factura creada para '+p.odooName+' — '+fmt(m.total);
+    renderAll();
+  }catch(e){
+    st.className='status s-err';st.textContent='Error: '+e.message;
+  }
+}
+
+function showModal(){
+  const conf=matches.filter(m=>m.userStatus==='confirmed'&&m.inv);
+  if(!conf.length){alert('Confirmá al menos un item con factura asignada.');return;}
+  document.getElementById('modalMsg').textContent='Se registrarán '+conf.length+' pagos en Odoo y se marcarán las facturas como pagadas. Esta acción no se puede deshacer fácilmente.';
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+function closeModal(){document.getElementById('modalOverlay').classList.add('hidden');}
+
+async function registrarEnOdoo(){
+  const conf=matches.filter(m=>m.userStatus==='confirmed'&&m.inv);
+  const st=document.getElementById('regStatus');
+  st.classList.remove('hidden');st.className='status s-info';
+
+  // Usar journal de SESSION o buscarlo ahora
+  let journalId=SESSION.journalId;
+  if(!journalId){
+    st.textContent='Buscando diario BAC...';
+    const journals=await odooCall('account.journal','search_read',[[['type','=','bank']]],{fields:['id','name'],limit:10});
+    const bac=journals.find(j=>/bac/i.test(j.name))||journals[0];
+    if(!bac)throw new Error('No se encontró diario bancario BAC en Odoo');
+    journalId=bac.id;
+    SESSION.journalId=journalId;
+  }
+
+  let ok=0,err=0,errMsgs=[];
+  for(const m of conf){
+    st.textContent='Registrando '+(ok+err+1)+'/'+conf.length+': '+m.bac.descripcion+'...';
+    try{
+      const esIngreso=m.bac.monto>0;
+      // Crear pago
+      const payId=await odooCall('account.payment','create',[{
+        payment_type: esIngreso?'inbound':'outbound',
+        partner_type: esIngreso?'customer':'supplier',
+        partner_id:   m.inv.partner_id[0],
+        amount:       Math.abs(m.inv.amount_residual||m.inv.amount_total),
+        date:         m.bac.fecha,
+        journal_id:   journalId,
+        ref:          m.bac.descripcion,
+      }]);
+      // Confirmar pago (lo pone en estado posted)
+      await odooCall('account.payment','action_post',[[payId]]);
+
+      // Reconciliar con la factura
+      const payObj=await odooCall('account.payment','read',[[payId]],{fields:['move_id','reconciled_invoice_ids','reconciled_bill_ids']});
+      const moveId=payObj[0]?.move_id?.[0];
+      if(moveId){
+        const payLines=await odooCall('account.move.line','search_read',
+          [[['move_id','=',moveId],['account_id.reconcile','=',true]]],
+          {fields:['id'],limit:10}
+        );
+        const invLines=await odooCall('account.move.line','search_read',
+          [[['move_id','=',m.inv.id],['account_id.reconcile','=',true],['reconciled','=',false]]],
+          {fields:['id'],limit:10}
+        );
+        if(payLines.length&&invLines.length){
+          const allIds=[...payLines.map(l=>l.id),...invLines.map(l=>l.id)];
+          try{
+            await odooRpc('/web/dataset/call_kw',{model:'account.move.line',method:'reconcile',args:[allIds],kwargs:{}});
+          }catch(recErr){
+            console.warn('reconcile failed in registrarEnOdoo:',recErr.message);
+          }
+        }
+      }
+
+      // Resultado esperado:
+      // - Ingreso (cliente): factura queda "in_payment" = en proceso de pago
+      // - Egreso (proveedor): factura queda "paid" = pagada en fecha del BAC
+      m.userStatus='registered';
+      m.payId=payId;
+      ok++;
+    }catch(e){
+      err++;
+      errMsgs.push(m.bac.descripcion+': '+e.message);
+      console.error(e);
+    }
+  }
+  if(err===0){
+    st.className='status s-ok';
+    st.textContent='✓ '+ok+' pagos registrados en Odoo. Ingresos quedan "en proceso de pago", egresos quedan "pagados" en la fecha del BAC.';
+  } else {
+    st.className='status s-warn';
+    st.textContent=ok+' registrados · '+err+' con error: '+errMsgs.slice(0,2).join(' | ');
+  }
+  renderAll();
+}
+
+function mostrarPanel(gi){
+  const m=matches[gi];
+  const p=m.autoBill;
+  const url=SESSION.url+'/web#model=account.move&view_type=list&domain=[["move_type","=","in_invoice"]]';
+  document.getElementById('panelLink').href=url;
+  const campos=[
+    {label:'Proveedor',valor:p.odooName,hint:'Campo Proveedor en Odoo'},
+    {label:'Fecha de factura',valor:m.bac.fecha,hint:''},
+    {label:'Producto',valor:p.producto,hint:'En la línea de factura'},
+    {label:'Cuenta contable',valor:p.cuenta+' '+p.cuentaN,hint:'En la línea de factura'},
+    {label:'Precio unitario',valor:String(Math.abs(m.bac.monto)),hint:'Monto neto sin IVA'},
+    {label:'Impuesto',valor:p.impuesto||'Sin impuesto',hint:'En la línea de factura'},
+  ];
+  let html='';
+  campos.forEach(function(c){
+    html+='<div style="margin-bottom:1rem">';
+    html+='<div style="font-size:10px;font-weight:600;color:var(--text-m);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">'+c.label+'</div>';
+    html+='<div style="display:flex;align-items:center;gap:6px">';
+    html+='<div style="flex:1;font-size:13px;font-weight:500;padding:7px 10px;background:var(--bg2);border-radius:var(--r);border:1px solid var(--border-m)">'+esc(c.valor)+'</div>';
+    html+='<button class="btn btn-sm" data-copy="'+esc(c.valor)+'">Copiar</button>';
+    html+='</div>';
+    if(c.hint)html+='<div style="font-size:10px;color:var(--text-h);margin-top:3px">'+c.hint+'</div>';
+    html+='</div>';
+  });
+  if(m.ivaPair){
+    html+='<div style="font-size:11px;color:var(--amber);margin-top:.5rem;padding:8px;background:var(--amber-l);border-radius:var(--r)">El banco hizo 2 cargos: '+fmt(m.bac.monto)+' + IVA '+fmt(m.ivaPair.monto)+' = '+fmt(m.total)+'. El precio unitario es el monto neto y el IVA se calcula automático.</div>';
+  }
+  html+='<div style="margin-top:1rem;padding:10px;background:var(--green-l);border-radius:var(--r);font-size:12px;color:var(--green-d)"><strong>Total esperado: '+fmt(m.total)+'</strong><br>Verificá que coincida en Odoo antes de Confirmar.</div>';
+  document.getElementById('panelContent').innerHTML=html;
+  document.querySelectorAll('#panelContent [data-copy]').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      navigator.clipboard.writeText(btn.getAttribute('data-copy'));
+      btn.textContent='✓';
+      setTimeout(function(){btn.textContent='Copiar';},1500);
+    });
+  });
+  document.getElementById('panelOverlay').style.display='block';
+  document.getElementById('panel').style.display='block';
+}
+
+function mostrarInvPanel(inv, esIngreso, payId, bacFecha){
+  if(!inv||!inv.id)return;
+  const url=SESSION.url+'/web#id='+inv.id+'&model=account.move&view_type=form';
+  const esIngBool=(esIngreso===true||esIngreso==='true');
+  const estado=esIngBool?'En proceso de pago':'Pagada';
+  const estadoColor=esIngBool?'var(--blue)':'var(--green-d)';
+  const partner=inv.partner_id?.[1]||'';
+  const monto=fmt(inv.amount_residual||inv.amount_total);
+  const title=(esIngBool?'Ingreso cobrado: ':'Egreso pagado: ')+inv.name;
+  document.getElementById('invPanelTitle').textContent=title;
+
+  let html='';
+  html+='<div style="background:var(--green-l);border-radius:var(--r);padding:1rem;margin-bottom:1rem;text-align:center">';
+  html+='<div style="font-size:24px;margin-bottom:4px">✓</div>';
+  html+='<div style="font-size:14px;font-weight:600;color:var(--green-d)">Pago registrado en Odoo</div>';
+  html+='<div style="font-size:12px;color:var(--green-d);margin-top:2px">Factura queda: <strong>'+estado+'</strong></div>';
+  html+='</div>';
+
+  function fila(label, valor){
+    return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">'
+      +'<span style="color:var(--text-m)">'+label+'</span>'
+      +'<span style="font-weight:500">'+valor+'</span></div>';
+  }
+  html+=fila('Factura', inv.name);
+  html+=fila('Cliente/Proveedor', partner);
+  html+=fila('Monto', monto);
+  html+=fila('Fecha de pago', bacFecha||'');
+  html+=fila('Estado en Odoo', '<span style="color:'+estadoColor+'">'+estado+'</span>');
+
+  html+='<div style="margin-top:1.25rem">';
+  html+='<a href="'+url+'" target="_blank" class="btn btn-g" style="display:block;text-align:center;text-decoration:none;width:100%">Ver factura en Odoo ↗</a>';
+  html+='</div>';
+
+  document.getElementById('invPanelContent').innerHTML=html;
+  document.getElementById('invPanelOverlay').style.display='block';
+  document.getElementById('invPanel').style.display='block';
+}
+function cerrarInvPanel(){
+  document.getElementById('invPanelOverlay').style.display='none';
+  document.getElementById('invPanel').style.display='none';
+}
+function mostrarPanel(gi){
+  const m=matches[gi];
+  const p=m.autoBill;
+  const url=SESSION.url+'/web#model=account.move&view_type=form';
+  document.getElementById('panelLink').href=url;
+
+  const campos=[
+    {label:'Proveedor',valor:p.odooName,hint:'Campo Proveedor en Odoo'},
+    {label:'Fecha de factura',valor:m.bac.fecha,hint:''},
+    {label:'Producto',valor:p.producto,hint:'En la línea de factura'},
+    {label:'Cuenta contable',valor:p.cuenta+' '+p.cuentaN,hint:'En la línea de factura'},
+    {label:'Precio unitario',valor:String(Math.abs(m.bac.monto)),hint:'Monto neto sin IVA'},
+    {label:'Impuesto',valor:p.impuesto||'Sin impuesto',hint:'En la línea de factura'},
+  ];
+
+  let html='';
+  campos.forEach(function(c){
+    html+='<div style="margin-bottom:1rem">';
+    html+='<div style="font-size:10px;font-weight:600;color:var(--text-m);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">'+c.label+'</div>';
+    html+='<div style="display:flex;align-items:center;gap:6px">';
+    html+='<div style="flex:1;font-size:13px;font-weight:500;padding:7px 10px;background:var(--bg2);border-radius:var(--r);border:1px solid var(--border-m)">'+esc(c.valor)+'</div>';
+    html+='<button class="btn btn-sm" data-copy="'+esc(c.valor)+'">Copiar</button>';
+    html+='</div>';
+    if(c.hint)html+='<div style="font-size:10px;color:var(--text-h);margin-top:3px">'+c.hint+'</div>';
+    html+='</div>';
+  });
+
+  if(m.ivaPair){
+    html+='<div style="font-size:11px;color:var(--amber);margin-top:.5rem;padding:8px;background:var(--amber-l);border-radius:var(--r)">';
+    html+='El banco hizo 2 cargos: '+fmt(m.bac.monto)+' + IVA '+fmt(m.ivaPair.monto)+' = '+fmt(m.total)+'. ';
+    html+='El precio unitario es el monto neto y el IVA se calcula automático.';
+    html+='</div>';
+  }
+
+  html+='<div style="margin-top:1rem;padding:10px;background:var(--green-l);border-radius:var(--r);font-size:12px;color:var(--green-d)">';
+  html+='<strong>Total esperado: '+fmt(m.total)+'</strong><br>Verificá que coincida en Odoo antes de Confirmar.';
+  html+='</div>';
+
+  document.getElementById('panelContent').innerHTML=html;
+
+  // Attach copy handlers
+  document.querySelectorAll('#panelContent [data-copy]').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      navigator.clipboard.writeText(btn.getAttribute('data-copy'));
+      btn.textContent='✓';
+      setTimeout(function(){btn.textContent='Copiar';},1500);
+    });
+  });
+
+  document.getElementById('panelOverlay').style.display='block';
+  document.getElementById('panel').style.display='block';
+}
+
+function cerrarPanel(){
+  document.getElementById('panelOverlay').style.display='none';
+  document.getElementById('panel').style.display='none';
+}
+
+function exportCSV(){
+  const rows=[['Fecha','Descripción BAC','Tipo','Monto','Factura Odoo','Partner','Monto Factura','Razones','Estado']];
+  matches.filter(m=>m.type!=='iva_skip').forEach(m=>rows.push([
+    m.bac.fecha,m.bac.descripcion,m.bac.monto>0?'Ingreso':'Egreso',m.bac.monto,
+    m.inv?m.inv.name:'',m.inv?(m.inv.partner_id?.[1]||''):'',
+    m.inv?(m.inv.amount_residual||m.inv.amount_total):'',
+    (m.reasons||[]).join(' | '),m.userStatus
+  ]));
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));
+  a.download='conciliacion_truefood_'+new Date().toISOString().split('T')[0]+'.csv';a.click();
+}
+
+function exportPendientes(){
+  const rev=matches.filter(m=>m.type==='rev'&&m.userStatus==='pending');
+  if(!rev.length){alert('No hay pendientes para exportar.');return;}
+  const rows=[['Fecha','Descripción BAC','Tipo','Monto','Cliente/Proveedor Detectado','Notas']];
+  rev.forEach(m=>rows.push([
+    m.bac.fecha,m.bac.descripcion,m.bac.monto>0?'Ingreso':'Egreso',m.bac.monto,
+    m.cliDetected?(m.cliDetected.odoo||m.cliDetected.bac):'',
+    (m.reasons||[]).join(' | ')
+  ]));
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));
+  a.download='pendientes_delfix_'+new Date().toISOString().split('T')[0]+'.csv';a.click();
+}
+</script>
+</body>
+</html>
