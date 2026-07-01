@@ -1256,20 +1256,27 @@ async function authSubmit(){
   authEntrar();
 }
 
-function authEntrar(){
-  document.getElementById('vAuth').classList.add('hidden');
+async function authEntrar(){
+  document.getElementById('vLogin').classList.add('hidden');   // nunca mostrar el login de Odoo viejo (flujo de un solo login)
   document.getElementById('btnSalir').classList.remove('hidden');
-  entrarProd();   // conecta a producción (solo lectura) y muestra el lobby
+  const msg=document.getElementById('authMsg'); if(msg){ msg.style.color='#A8A6A0'; msg.textContent='Conectando a producción…'; }
+  await entrarProd();   // conecta a producción (solo lectura, por el proxy con el JWT) y muestra el lobby
+  if(SESSION && SESSION.uid){
+    document.getElementById('vAuth').classList.add('hidden');   // conectado → recién ahora dejamos ver el lobby
+  }else if(msg){
+    msg.style.color='#FF8A8A'; msg.textContent='No pude conectar a producción. Reintentá.';
+    document.getElementById('btnSalir').classList.add('hidden');
+  }
 }
 async function authLogout(){ try{ await sbClient().auth.signOut(); }catch(e){} location.reload(); }
 window.addEventListener('DOMContentLoaded', authInit);
 
 // Entrar a producción en SOLO LECTURA: apunta la sesión a prod y conecta vía proxy de lectura.
 // No usa usuario/clave del formulario (la cuenta read-only vive en render).
-function entrarProd(){
+async function entrarProd(){
   document.getElementById('inUrl').value='https://truefood.odoo.com';
   document.getElementById('inDb').value='truefoodcr-17-0-10502262';
-  doLogin();
+  await doLogin();
 }
 
 // Navegación lobby ↔ herramienta (no toca la lógica de conexión a Odoo)
