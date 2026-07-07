@@ -4309,13 +4309,15 @@ function calcRender(){
 // Sección 2: producto terminado (conteo cajas+sueltos vs stock.quant, semáforo).
 // Conteo y historial: localStorage (no se escribe en Odoo).
 // ════════════════════════════════════════════════════════════════════════
-// Terminados: id de prod + factor caja→unidad-Odoo (confirmados por Andrea).
+// Terminados: id de prod + factor caja→UNIDADES INDIVIDUALES (confirmados por Andrea).
+// Blanco/Semillas: caja de 6 · Galletas: caja de 12 potes · Francés/Buns: 24 u/caja (6 paq de 4) · Pizza: 12 u/caja (6 paq de 2).
+// El campo "sueltos" es en unidades individuales; el on-hand de Odoo se convierte a unidades individuales (÷ factor UoM) para comparar en la misma unidad.
 const INV_TERM = [
   {id:451, label:'Pan Blanco',      factor:6},
   {id:452, label:'Pan de Semillas', factor:6},
-  {id:453, label:'Pan Francés',     factor:6},
-  {id:472, label:'Pizza Crust',     factor:6},
-  {id:503, label:'Buns',            factor:6},
+  {id:453, label:'Pan Francés',     factor:24},
+  {id:472, label:'Pizza Crust',     factor:12},
+  {id:503, label:'Buns',            factor:24},
   {id:519, label:'Galletas',        factor:12},
 ];
 // Premezclas (producto intermedio). Odoo las lleva en Units; 1 unidad = 1 batch. Conteo directo en batches.
@@ -4573,7 +4575,9 @@ async function cargarInventario(){
     const ids=INV_TERM.map(t=>t.id).concat(INV_PREMEZ.map(p=>p.id));
     const q=await odooCall('stock.quant','read_group',[[['product_id','in',ids],['location_id.usage','=','internal']],['quantity'],['product_id']],{lazy:false});
     const oh={}; q.forEach(r=>{ const pid=r.product_id&&r.product_id[0]; if(pid) oh[pid]=(oh[pid]||0)+(r.quantity||0); });
-    window._invTerm=INV_TERM.map(t=>Object.assign({},t,{odoo:oh[t.id]||0}));
+    // Odoo trae el on-hand en la UoM por defecto (Francés/Buns en paq de 4, Pizza en paq de 2);
+    // lo pasamos a UNIDADES INDIVIDUALES (÷ factor) para comparar contra el físico (cajas×uds + sueltos).
+    window._invTerm=await Promise.all(INV_TERM.map(async t=>Object.assign({},t,{odoo:(oh[t.id]||0)/(await prodUomFactor(t.id))})));
     window._invPremez=INV_PREMEZ.map(p=>Object.assign({},p,{odoo:oh[p.id]||0}));
     renderMP(); renderPremez(); renderTerm(); renderHistInfo();
     st.classList.add('hidden');
