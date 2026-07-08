@@ -165,6 +165,7 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .cob-tbl th[style*="right"]{text-align:right}
 .cob-tbl td{padding:9px 12px;color:var(--text);border:none;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums;white-space:nowrap}
 .cob-tbl tr:last-child td{border-bottom:none}
+.cob-tbl tr.cob-total td{border-top:2px solid var(--border-strong);border-bottom:none}
 .cob-venc{color:var(--red);font-variant-numeric:tabular-nums}
 .cob-fe{font-size:9px;letter-spacing:.05em;color:var(--text-3);border:1px solid var(--border-strong);border-radius:4px;padding:1px 4px;margin-left:6px;cursor:help;vertical-align:middle}
 .cob-copy{margin-left:10px;font-size:11px;color:var(--text-3);background:transparent;border:1px solid var(--border-strong);border-radius:6px;padding:2px 9px;cursor:pointer;font-family:inherit;vertical-align:middle}
@@ -4655,22 +4656,37 @@ function renderCob(){
 }
 // Cliente/proveedor: nombre comercial + razón social (parejo con Ventas).
 function _cobPartner(r){ const razon=(r.partner_id&&r.partner_id[1])||'—'; return r._com ? esc(r._com)+' <span class="muted" style="font-size:11px">· '+esc(razon)+'</span>' : esc(razon); }
+// Documento: en Por pagar = número del PROVEEDOR (campo `ref`, "Referencia del
+// proveedor"), con el consecutivo interno de Odoo como referencia chica; si el
+// proveedor no trae número (~28%), cae al interno. En Por cobrar = nuestro nº de
+// factura (`name`) + ref/FE como secundario. (number_electronic no se usa en compras: 0% poblado.)
+function _cobDoc(r){
+  if(_cobTab==='pagar'){
+    if(r.ref && String(r.ref).trim())
+      return esc(r.ref)+(r.name?' <span class="muted" style="font-size:11px">· interno '+esc(r.name)+'</span>':'');
+    return esc(r.name||'—')+' <span class="muted" style="font-size:11px">· sin nº de proveedor</span>';
+  }
+  const refDist = r.ref && r.ref!==r.name ? ' <span class="muted" style="font-size:11px">· '+esc(r.ref)+'</span>' : '';
+  const fe = r.number_electronic ? ' <span class="cob-fe" title="Comprobante electrónico: '+esc(r.number_electronic)+'">FE</span>' : '';
+  return esc(r.name||'—')+refDist+fe;
+}
 // Fila de una factura (reusada en modo factura y en el detalle del modo cliente). conPartner=incluir columna cliente.
 function _cobFilaFactura(r,conPartner){
   const dv=_diasVencida(r.invoice_date_due);
   const diasCell = dv>0 ? '<span class="cob-venc">'+dv+' d</span>' : '<span class="muted">—</span>';
-  const refDist = r.ref && r.ref!==r.name ? ' <span class="muted" style="font-size:11px">· '+esc(r.ref)+'</span>' : '';
-  const fe = r.number_electronic ? ' <span class="cob-fe" title="Comprobante electrónico: '+esc(r.number_electronic)+'">FE</span>' : '';
   return '<tr><td>'+_fD(r.invoice_date)+'</td><td>'+_fD(r.invoice_date_due)+'</td>'
     +'<td style="text-align:right">'+diasCell+'</td>'
     +(conPartner?'<td>'+_cobPartner(r)+'</td>':'')
-    +'<td>'+esc(r.name||'—')+refDist+fe+'</td>'
+    +'<td>'+_cobDoc(r)+'</td>'
     +'<td style="text-align:right"><strong>'+cM(r.amount_residual||0)+'</strong></td></tr>';
 }
 function renderCobFactura(which,d,el){
   const cliLbl=which==='cobrar'?'Cliente':'Proveedor';
   let h='<div style="overflow-x:auto"><table class="cob-tbl"><tr><th>Fecha</th><th>Vence</th><th style="text-align:right">Días</th><th>'+esc(cliLbl)+'</th><th>Documento</th><th style="text-align:right">Pendiente</th></tr>';
   d.forEach(r=>{ h+=_cobFilaFactura(r,true); });
+  const gtot=d.reduce((s,r)=>s+(r.amount_residual||0),0);
+  h+='<tr class="cob-total"><td colspan="5"><strong>Total</strong> <span class="muted" style="font-size:11px">· '+d.length+' factura'+(d.length===1?'':'s')+' (sobre lo visible)</span></td>'
+    +'<td style="text-align:right"><strong>'+cM(gtot)+'</strong></td></tr>';
   el.innerHTML=h+'</table></div>';
 }
 function renderCobCliente(which,d,el){
@@ -4703,6 +4719,9 @@ function renderCobCliente(which,d,el){
     g.rows.forEach(r=>{ dt+=_cobFilaFactura(r,false); });
     h+=dt+'</table></div></td></tr>';
   });
+  const gtot=arr.reduce((s,g)=>s+g.total,0), gfac=arr.reduce((s,g)=>s+g.rows.length,0);
+  h+='<tr class="cob-total"><td><strong>Total</strong> <span class="muted" style="font-size:11px">· '+arr.length+' '+(which==='cobrar'?'cliente':'proveedor')+(arr.length===1?'':'s')+'</span></td>'
+    +'<td style="text-align:right">'+gfac+'</td><td style="text-align:right"><strong>'+cM(gtot)+'</strong></td><td></td></tr>';
   el.innerHTML=h+'</table></div>';
 }
 function cobToggleGrupo(i){ const row=document.getElementById('cobg-'+i); if(!row)return; row.classList.toggle('hidden');
