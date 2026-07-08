@@ -182,7 +182,11 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .plan-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;vertical-align:middle}
 
 /* ── Alertas del lobby (Bloque 4) ── */
-.lobby-alertas{width:100%;max-width:760px;display:flex;flex-direction:column;margin:2px 0 2px}
+.alertas-fab{position:fixed;right:20px;bottom:20px;z-index:150;display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.alertas-btn{background:var(--surface);border:1px solid var(--border-strong);color:var(--text);font-family:inherit;font-size:13px;font-weight:500;padding:10px 16px;border-radius:999px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+.alertas-btn:hover{border-color:var(--text-3)}
+.alertas-btn.vacio{color:var(--text-3);font-weight:400;box-shadow:none;opacity:.75}
+.alertas-panel{width:340px;max-width:calc(100vw - 40px);max-height:60vh;overflow-y:auto;background:var(--surface);border:1px solid var(--border-strong);border-radius:14px;padding:4px 14px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
 .alerta-linea{display:flex;align-items:center;gap:10px;padding:9px 4px;font-size:13px;color:var(--text-2);cursor:pointer;border-bottom:1px solid var(--border)}
 .alerta-linea:hover{color:var(--text)}
 .alerta-linea:last-child{border-bottom:none}
@@ -798,16 +802,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
         <input placeholder="¿Qué querés consultar?" disabled>
         <button class="home-go" title="Próximamente">↑</button>
       </div>
-      <div class="home-qlist">
-        <div class="home-qrow"><span>¿Cuánto cuesta hoy un pan blanco?</span><span class="arr">→</span></div>
-        <div class="home-qrow"><span>¿Cuál es mi cliente más rentable?</span><span class="arr">→</span></div>
-        <div class="home-qrow"><span>¿Cuánta avena gastamos este mes?</span><span class="arr">→</span></div>
-      </div>
     </div>
     </div><!-- /home-center -->
     <div class="home-bottom">
     <div class="home-sep"></div>
-    <div id="lobbyAlertas" class="lobby-alertas"></div>
     <div class="home-modlabel">TUS MÓDULOS</div>
     <div class="home-grid">
       <div class="home-mod" style="border-color:#21456B" onclick="abrirFinanzas()">
@@ -839,6 +837,12 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     </div><!-- /home-bottom -->
     <div class="home-build" id="homeBuild" style="text-align:center;color:#6E6C68;font-size:11px;letter-spacing:.03em;padding:16px 0 6px"></div>
   </div>
+</div>
+
+<!-- ALERTAS · botón flotante del lobby (Bloque 4, rediseño) -->
+<div id="alertasFab" class="alertas-fab hidden">
+  <div id="alertasPanel" class="alertas-panel hidden"></div>
+  <button id="alertasBtn" class="alertas-btn" onclick="toggleAlertasPanel()">Alertas (0)</button>
 </div>
 
 <!-- UPLOAD -->
@@ -1778,7 +1782,7 @@ async function doLogin(isRetry){
     document.getElementById('alertConn').classList.remove('hidden');
     document.getElementById('vLogin').classList.add('hidden');
     document.getElementById('vLobby').classList.remove('hidden');   // tras conectar → lobby
-    cargarAlertas();   // Bloque 4: revisar avisos operativos (async, no bloquea)
+    mostrarAlertasFab(); cargarAlertas();   // Bloque 4: botón flotante de avisos (async, no bloquea)
   }catch(e){
     st.innerHTML='<div class="status s-err">Error: '+esc(e.message)+'</div>';
   }
@@ -1870,6 +1874,7 @@ function _modShow(id){
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.toggle('hidden', v!==id); });
   document.getElementById('vLobby').classList.add('hidden');
   document.getElementById('appHeader').classList.remove('hidden');
+  ocultarAlertasFab();   // el botón flotante de alertas es solo del lobby
   aplicarModoProduccion();
 }
 function crumbSet(area,cur){
@@ -1892,7 +1897,7 @@ function volverLobby(){
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.add('hidden'); });
   document.getElementById('appHeader').classList.add('hidden');
   document.getElementById('vLobby').classList.remove('hidden');
-  cargarAlertas();   // Bloque 4: refresca la revisión una vez por sesión (guardado interno)
+  mostrarAlertasFab(); cargarAlertas();   // Bloque 4: botón flotante; refresca una vez por sesión
 }
 
 function setProgress(pct,msg){
@@ -4263,27 +4268,36 @@ function _alertaCheckpoint(){
   return null;
 }
 const _ALERTA_COL={op:'#D4537E', fin:'#378ADD', con:'#84BD00'};
+let _alertas=[];
+// Render en el botón flotante + panel (abajo a la derecha del lobby).
 function renderAlertas(alertas){
-  const el=document.getElementById('lobbyAlertas'); if(!el) return;
-  if(!alertas.length){ el.innerHTML='<div class="alerta-linea alerta-vacio">Sin avisos</div>'; return; }
-  el.innerHTML=alertas.slice().sort((a,b)=>a.ord-b.ord).map(a=>
-    '<div class="alerta-linea" onclick="'+a.go+'()"><span class="alerta-dot" style="background:'+(_ALERTA_COL[a.mod]||'#D4537E')+'"></span>'
-    +'<span>'+esc(a.txt)+'</span><span class="alerta-arr">→</span></div>').join('');
+  _alertas=alertas.slice().sort((a,b)=>a.ord-b.ord);
+  const btn=document.getElementById('alertasBtn'), panel=document.getElementById('alertasPanel');
+  if(!btn||!panel) return;
+  const n=_alertas.length;
+  btn.textContent='Alertas ('+n+')';
+  btn.classList.toggle('vacio', n===0);
+  panel.innerHTML = n
+    ? _alertas.map(a=>'<div class="alerta-linea" onclick="alertaIr(\''+a.go+'\')"><span class="alerta-dot" style="background:'+(_ALERTA_COL[a.mod]||'#D4537E')+'"></span><span>'+esc(a.txt)+'</span><span class="alerta-arr">→</span></div>').join('')
+    : '<div class="alerta-linea alerta-vacio">Sin avisos</div>';
 }
+function alertaIr(fn){ cerrarAlertasPanel(); if(typeof window[fn]==='function') window[fn](); }
+function toggleAlertasPanel(){ const p=document.getElementById('alertasPanel'); if(p) p.classList.toggle('hidden'); }
+function cerrarAlertasPanel(){ const p=document.getElementById('alertasPanel'); if(p) p.classList.add('hidden'); }
+function mostrarAlertasFab(){ const f=document.getElementById('alertasFab'); if(f) f.classList.remove('hidden'); }
+function ocultarAlertasFab(){ const f=document.getElementById('alertasFab'); if(f) f.classList.add('hidden'); cerrarAlertasPanel(); }
 let _alertasCargadas=false;
 async function cargarAlertas(force){
-  const el=document.getElementById('lobbyAlertas'); if(!el) return;
+  const btn=document.getElementById('alertasBtn'); if(!btn) return;
   if(_alertasCargadas && !force) return;
   _alertasCargadas=true;
   const found=[];
-  el.innerHTML='<div class="alerta-linea alerta-vacio"><span class="spin"></span> Revisando avisos…</div>';
+  btn.textContent='Alertas …';
   const tasks=[ Promise.resolve(_alertaCheckpoint()), _alertaMerma(), _alertaPlanRojo(), _alertaSinProd(), _alertaMP() ];
-  let pend=tasks.length;
   await Promise.all(tasks.map(t=>t.catch(e=>{console.warn('alerta:',e);return null;}).then(a=>{
-    pend--;
     if(a){ found.push(a); renderAlertas(found); }
-    if(pend===0 && !found.length) renderAlertas([]);   // todas revisadas, ninguna → "Sin avisos"
   })));
+  renderAlertas(found);   // estado final (incluye "Alertas (0)" / "Sin avisos")
 }
 
 // ════════════════════════════════════════════════════════════════════════
