@@ -4222,9 +4222,10 @@ function rentaRender(R, label){
   h+='</tbody><tfoot><tr><td>Total canal</td>'
     +R.colTot.map(t=>'<td class="renta-cell renta-coltot"><div class="rg'+(t<0?' rneg':'')+'">'+cMs(t)+'</div></td>').join('')
     +'<td class="renta-cell renta-grand"><div class="rg">'+cMs(R.gran)+'</div></td></tr></tfoot></table>';
-  // Conciliación + costos de canal aplicados
-  let foot='Ganancia = neto sin IVA − costo de producir (motor) − costo de canal. '
-    +'Ganancia total del mes: <strong style="color:var(--text)">'+cMs(R.gran)+'</strong> sobre neto '+cM(R.netoTot)+'. Tocá un producto para ver su costo real.';
+  // Conciliación + costos de canal aplicados. El gran total NO se repite acá: vive en
+  // la celda esquina (Total canal × Total producto). Acá solo el contexto de neto.
+  let foot='Ganancia = neto sin IVA − costo de producir (motor) − costo de canal '
+    +'(el total del mes está en la esquina de la tabla). Neto del mes: '+cM(R.netoTot)+'. Tocá un producto para ver su costo real.';
   const notas=R.canalesActivos.filter(c=>c.pct||c.frio).map(c=>{
     if(c.pct) return esc(c.label)+' −'+_pct(c.pct*100)+' sobre neto';
     return esc(c.label)+' frío '+cM(c.frio)+'/mes ÷ '+fmtN(Math.round(R.chVol[c.key]||0))+' u = '+cM(R.frioUnit[c.key])+'/u';
