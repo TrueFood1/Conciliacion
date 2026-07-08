@@ -4212,7 +4212,8 @@ function renderPlan(rows){
 function _haceDiasISO(n){ const d=new Date(); d.setDate(d.getDate()-n); const p=x=>String(x).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
 function _fechaCRiso(s){ const m=String(s||'').match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/); if(!m) return String(s||'').slice(0,10);
   const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5])-6*3600*1000),p=x=>String(x).padStart(2,'0'); return d.getUTCFullYear()+'-'+p(d.getUTCMonth()+1)+'-'+p(d.getUTCDate()); }
-function _diasHabilesEntre(d1,d2){ let a=_diaNum(d1),b=_diaNum(d2),c=0; for(let x=a+1;x<=b;x++){ const wd=new Date(x*86400000).getUTCDay(); if(wd>=1&&wd<=5)c++; } return c; }
+// Días hábiles = lun–jue (producción TrueFood; viernes es limpieza, no cuenta).
+function _diasHabilesEntre(d1,d2){ let a=_diaNum(d1),b=_diaNum(d2),c=0; for(let x=a+1;x<=b;x++){ const wd=new Date(x*86400000).getUTCDay(); if(wd>=1&&wd<=4)c++; } return c; }
 async function _alertaMP(){
   const mp = window._invMP && window._invMP.length ? window._invMP : (window._invMP=await listaMP());
   const bajos = mp.filter(m=>mpAlerta(m).nivel==='bajo');
