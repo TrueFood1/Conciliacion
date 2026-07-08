@@ -173,6 +173,36 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .cob-copy.on{color:var(--green);border-color:var(--green)}
 .cob-copy.err{color:var(--red);border-color:var(--red)}
 
+/* ── Ventas: drill-down canal → cliente → factura (rediseño Finanzas) ── */
+.vent-sub{padding:2px 0 8px 20px}
+.vent-cli{display:flex;align-items:center;gap:8px;padding:8px 4px;font-size:13px;color:var(--text-2);cursor:pointer;border-bottom:1px solid var(--border)}
+.vent-cli:hover{color:var(--text)}
+.vent-cli .pcaret{color:var(--text-3);font-size:10px;display:inline-block;width:11px;transition:transform .15s}
+.vent-cli.open .pcaret{transform:rotate(90deg)}
+.vent-monto{margin-left:auto;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
+.vent-fac{padding:4px 0 10px 22px}
+.vent-fac table{width:auto;min-width:300px;border-collapse:collapse}
+.vent-fac th{font-size:10px;font-weight:400;text-transform:uppercase;letter-spacing:.04em;color:var(--text-3);padding:4px 16px 5px 0;text-align:left;border:none}
+.vent-fac th[style*="right"]{text-align:right}
+.vent-fac td{font-size:12.5px;color:var(--text);padding:3px 16px 3px 0;border:none;font-variant-numeric:tabular-nums}
+.vent-fac td.nm{color:var(--text-2)}
+
+/* ── Rentabilidad: matriz producto × canal (rediseño Finanzas) ── */
+.renta-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.renta-tbl th{font-size:11px;font-weight:400;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);padding:10px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--border)}
+.renta-tbl th:first-child{text-align:left}
+.renta-tbl td{padding:10px 12px;text-align:right;border:none;border-bottom:1px solid var(--border);white-space:nowrap;vertical-align:top}
+.renta-prow{cursor:pointer}
+.renta-prow:hover td{background:rgba(255,255,255,.02)}
+.renta-prod{display:inline-flex;align-items:center;gap:8px;color:var(--text)}
+.pdot{width:9px;height:9px;border-radius:2px;display:inline-block;flex-shrink:0}
+.renta-cell .rg{color:var(--text);font-variant-numeric:tabular-nums}
+.renta-cell .rp{color:var(--text-3);font-size:11px;font-variant-numeric:tabular-nums;margin-top:2px}
+.renta-na{color:var(--text-3)}
+.renta-rowtot .rg,.renta-coltot .rg,.renta-grand .rg{font-weight:600}
+.renta-tbl tfoot td{border-top:1px solid var(--border-strong);border-bottom:none;color:var(--text)}
+.renta-tbl tfoot td:first-child{text-align:left;color:var(--text-2)}
+
 /* ── Plan de producción (Bloque 3) ── */
 .plan-tbl{width:100%;border-collapse:collapse;font-size:13px}
 .plan-tbl th{font-size:11px;font-weight:400;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
@@ -956,13 +986,11 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- DASHBOARD DE COSTOS (cara 1) -->
 <div id="vCostos" class="hidden">
   <div class="faces">
-    <button class="face" onclick="irAFacturado()">Facturado por canal</button>
-    <button class="face on">Costos por producto</button>
-    <button class="face" onclick="irARentabilidad()">Rentabilidad por canal</button>
-    <button class="face" onclick="irASimulador()">Simulador</button>
-    <button class="face" onclick="irACalcPrecios()">Calculadora</button>
     <button class="face" onclick="irAResultados()">Resultados</button>
+    <button class="face" onclick="irAVentas()">Ventas</button>
+    <button class="face on">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
+    <button class="face" onclick="irAPrecios()">Precios</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -981,24 +1009,22 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- FACTURADO POR CANAL (módulo Finanzas) -->
 <div id="vFacturado" class="hidden">
   <div class="faces">
-    <button class="face on">Facturado por canal</button>
-    <button class="face" onclick="irACostos()">Costos por producto</button>
-    <button class="face" onclick="irARentabilidad()">Rentabilidad por canal</button>
-    <button class="face" onclick="irASimulador()">Simulador</button>
-    <button class="face" onclick="irACalcPrecios()">Calculadora</button>
     <button class="face" onclick="irAResultados()">Resultados</button>
+    <button class="face on">Ventas</button>
+    <button class="face" onclick="irARentabilidad()">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
+    <button class="face" onclick="irAPrecios()">Precios</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
-      <div class="m3title" style="font-size:24px">Facturado por canal</div>
-      <div class="m3sub" style="margin-top:2px">Facturas de cliente (monto total con IVA) por canal, del mes. Solo lectura.</div>
+      <div class="m3title" style="font-size:24px">Ventas</div>
+      <div class="m3sub" style="margin-top:2px">Cuánto vendiste y a quiénes, del mes (con IVA). Tocá un canal para ver sus clientes; un cliente para sus facturas. Solo lectura.</div>
     </div>
     <div class="live-ind"><span class="live-dot"></span>conectado a Odoo · datos en vivo</div>
   </div>
   <div style="margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
     <label style="font-size:13px;color:var(--text-2)">Mes:</label>
-    <select id="mesFac" onchange="cargarFacturado()" class="mes-select"></select>
+    <select id="mesFac" onchange="cargarVentas()" class="mes-select"></select>
     <span class="muted" style="font-size:11px">El mes en curso puede estar casi vacío; elegí un mes cerrado.</span>
   </div>
   <div id="facStatus" class="status s-info hidden" style="margin-top:14px"></div>
@@ -1085,35 +1111,35 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- RENTABILIDAD POR CANAL (cara 3 del módulo Contabilidad) — teórico, NO depende del mes -->
 <div id="vRentabilidad" class="hidden">
   <div class="faces">
-    <button class="face" onclick="irAFacturado()">Facturado por canal</button>
-    <button class="face" onclick="irACostos()">Costos por producto</button>
-    <button class="face on">Rentabilidad por canal</button>
-    <button class="face" onclick="irASimulador()">Simulador</button>
-    <button class="face" onclick="irACalcPrecios()">Calculadora</button>
     <button class="face" onclick="irAResultados()">Resultados</button>
+    <button class="face" onclick="irAVentas()">Ventas</button>
+    <button class="face on">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
+    <button class="face" onclick="irAPrecios()">Precios</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
-      <div class="m3title" style="font-size:24px">Rentabilidad por canal <span style="font-weight:400;color:var(--text-3);font-size:13px" title="Margen teórico = precio de lista − costo (MP+indirecto) − término % del canal. No pondera por ventas ni reparte los fríos mensuales. No usa el mes.">· teórico v1</span></div>
-      <div class="m3sub" style="margin-top:8px;font-size:13px">Ranking de canales por margen. Tocá una fila para el detalle.</div>
+      <div class="m3title" style="font-size:24px">Rentabilidad <span style="font-weight:400;color:var(--text-3);font-size:13px">· mockup — datos de ejemplo</span></div>
+      <div class="m3sub" style="margin-top:2px;font-size:13px">Cuánto le ganás a cada producto en cada canal, del mes: ganancia en ₡ (volumen × margen), con el % de margen abajo. Tocá un producto para ver su costo. Cifras de ejemplo para aprobar el diseño.</div>
     </div>
-    <div class="live-ind"><span class="live-dot"></span>conectado a Odoo · datos en vivo</div>
+    <div class="live-ind"><span class="live-dot" style="background:var(--text-3);animation:none"></span>datos de ejemplo</div>
   </div>
-  <div style="margin-top:26px"><button class="btn btn-sm" id="btnRent" onclick="cargarRentabilidad()">↻ Calcular rentabilidad</button></div>
-  <div id="repRent" style="margin-top:16px"><div class="muted">Tocá "Calcular rentabilidad" (usa el motor de Costos).</div></div>
+  <div class="card" style="margin-top:16px;padding:0;overflow:hidden"><div style="overflow-x:auto" id="rentaMatriz"></div></div>
+  <div id="rentaDetalle" style="margin-top:16px"></div>
 </div>
 
 <!-- SIMULADOR DE COSTOS (módulo Finanzas) — parte de Odoo real, hipótesis en el cliente. Solo lectura. -->
 <div id="vSimulador" class="hidden">
   <div class="faces">
-    <button class="face" onclick="irAFacturado()">Facturado por canal</button>
-    <button class="face" onclick="irACostos()">Costos por producto</button>
-    <button class="face" onclick="irARentabilidad()">Rentabilidad por canal</button>
-    <button class="face on">Simulador</button>
-    <button class="face" onclick="irACalcPrecios()">Calculadora</button>
     <button class="face" onclick="irAResultados()">Resultados</button>
+    <button class="face" onclick="irAVentas()">Ventas</button>
+    <button class="face" onclick="irARentabilidad()">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
+    <button class="face on">Precios</button>
+  </div>
+  <div class="m3nav" style="margin-top:12px">
+    <button class="m3tab on" onclick="irASimulador()">Simulador</button>
+    <button class="m3tab" onclick="irACalcPrecios()">Calculadora</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1166,13 +1192,15 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- CALCULADORA DE PRECIOS DE VENTA (módulo Finanzas) — hipótesis en el cliente, solo lectura -->
 <div id="vCalcPrecios" class="hidden">
   <div class="faces">
-    <button class="face" onclick="irAFacturado()">Facturado por canal</button>
-    <button class="face" onclick="irACostos()">Costos por producto</button>
-    <button class="face" onclick="irARentabilidad()">Rentabilidad por canal</button>
-    <button class="face" onclick="irASimulador()">Simulador</button>
-    <button class="face on">Calculadora</button>
     <button class="face" onclick="irAResultados()">Resultados</button>
+    <button class="face" onclick="irAVentas()">Ventas</button>
+    <button class="face" onclick="irARentabilidad()">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
+    <button class="face on">Precios</button>
+  </div>
+  <div class="m3nav" style="margin-top:12px">
+    <button class="m3tab" onclick="irASimulador()">Simulador</button>
+    <button class="m3tab on" onclick="irACalcPrecios()">Calculadora</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1249,13 +1277,11 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- M11 · RESULTADOS (módulo Finanzas) — FASE 1: MOCKUP con datos de ejemplo. No lee Odoo todavía. -->
 <div id="vResultados" class="hidden">
   <div class="faces">
-    <button class="face" onclick="irAFacturado()">Facturado por canal</button>
-    <button class="face" onclick="irACostos()">Costos por producto</button>
-    <button class="face" onclick="irARentabilidad()">Rentabilidad por canal</button>
-    <button class="face" onclick="irASimulador()">Simulador</button>
-    <button class="face" onclick="irACalcPrecios()">Calculadora</button>
     <button class="face on">Resultados</button>
+    <button class="face" onclick="irAVentas()">Ventas</button>
+    <button class="face" onclick="irARentabilidad()">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
+    <button class="face" onclick="irAPrecios()">Precios</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1305,13 +1331,11 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- COBROS Y PAGOS (módulo Finanzas) — SOLO LECTURA. Cartera con saldo pendiente. -->
 <div id="vCobros" class="hidden">
   <div class="faces">
-    <button class="face" onclick="irAFacturado()">Facturado por canal</button>
-    <button class="face" onclick="irACostos()">Costos por producto</button>
-    <button class="face" onclick="irARentabilidad()">Rentabilidad por canal</button>
-    <button class="face" onclick="irASimulador()">Simulador</button>
-    <button class="face" onclick="irACalcPrecios()">Calculadora</button>
     <button class="face" onclick="irAResultados()">Resultados</button>
+    <button class="face" onclick="irAVentas()">Ventas</button>
+    <button class="face" onclick="irARentabilidad()">Rentabilidad</button>
     <button class="face on">Cobros y Pagos</button>
+    <button class="face" onclick="irAPrecios()">Precios</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1885,7 +1909,7 @@ function crumbSet(area,cur){
   const d=document.querySelector('.crumb-dot'); if(d)d.style.background=COL[area]||'#378ADD';
 }
 // Entradas desde el HOME (una por módulo).
-function abrirFinanzas(){ irAFacturado(); }                  // Finanzas → 1ª sub-pestaña
+function abrirFinanzas(){ irAResultados(); }                 // Finanzas → 1ª pestaña (Resultados)
 function abrirOperaciones(){ irAProduccion(); }              // Operaciones → 1ª sub-pestaña
 function abrirContabilidad(){ abrirFinanzas(); }             // alias histórico
 function entrarHerramienta(){ abrirFinanzas(); }             // alias histórico
@@ -3457,18 +3481,20 @@ async function uomFactor(uomId){
 // Cambian SIN recargar (show/hide de vistas); cada una carga sus datos la 1ª vez que se abre.
 let _loaded={fac:false,costos:false,rent:false,sim:false,calc:false,prod:false,merm:false,inv:false,cob:false,res:false,plan:false};
 // Finanzas
-function irAFacturado(){
-  _modShow('vFacturado'); crumbSet('Finanzas','Facturado por canal');
-  if(!_loaded.fac){ _loaded.fac=true; cargarFacturado(); }
+function irAVentas(){
+  _modShow('vFacturado'); crumbSet('Finanzas','Ventas');   // vFacturado repurposada a Ventas
+  if(!_loaded.fac){ _loaded.fac=true; cargarVentas(); }
 }
+function irAFacturado(){ irAVentas(); }   // alias histórico
 function irACostos(){
   _modShow('vCostos'); crumbSet('Finanzas','Costos por producto');
   if(!_loaded.costos){ _loaded.costos=true; calcularCostos(); }
 }
 function irARentabilidad(){
-  _modShow('vRentabilidad'); crumbSet('Finanzas','Rentabilidad por canal');
-  if(!_loaded.rent){ _loaded.rent=true; cargarRentabilidad(); }
+  _modShow('vRentabilidad'); crumbSet('Finanzas','Rentabilidad');
+  rentaMatrizInit();   // Fase 1: matriz producto × canal (mockup en el cliente)
 }
+function irAPrecios(){ irASimulador(); }   // Precios = Simulador + Calculadora (sub-pestañas)
 function irASimulador(){
   _modShow('vSimulador'); crumbSet('Finanzas','Simulador');
   if(!_loaded.sim){ _loaded.sim=true; cargarSimulador(); }
@@ -3982,6 +4008,126 @@ function renderCanal(el,d,label){
   el.innerHTML=h;
 }
 function toggleFacDet(){ const d=document.getElementById('facDet'); if(d) d.classList.toggle('hidden'); }
+
+// ════════════════════════════════════════════════════════════════════════
+// VENTAS (Finanzas) — "¿cuánto vendí y a quiénes?". Evoluciona de Facturado por
+// canal: drill-down canal → clientes → facturas. Neto = out_invoice − out_refund
+// (amount_total con IVA). Cliente: nombre comercial (commercial_name) + razón social.
+// SOLO LECTURA.
+// ════════════════════════════════════════════════════════════════════════
+async function cargarVentas(){
+  const ym=_mesDe('mesFac'); if(!ym)return; const {D1,D2,label}=mesRango(ym);
+  _spin('facStatus',true,label); setRep('repCanal','<div class="muted">Cargando…</div>');
+  try{ const d=await reporteVentas(D1,D2).catch(e=>({error:e&&e.message||String(e)})); renderVentas(d,label); }
+  catch(e){ console.error('cargarVentas:',e); setRep('repCanal','<div class="status s-err">No pude cargar: '+esc(e&&e.message||e)+'</div>'); }
+  finally{ _spin('facStatus',false); }
+}
+async function reporteVentas(D1,D2){
+  const base=t=>[['move_type','=',t],['state','=','posted'],['invoice_date','>=',D1],['invoice_date','<=',D2]];
+  const [invs,refs]=await Promise.all([
+    odooCall('account.move','search_read',[base('out_invoice')],{fields:['name','invoice_date','amount_total','partner_id'],limit:5000}),
+    odooCall('account.move','search_read',[base('out_refund')], {fields:['name','invoice_date','amount_total','partner_id'],limit:5000}),
+  ]);
+  const pids=[...new Set([...invs,...refs].map(m=>m.partner_id&&m.partner_id[0]).filter(Boolean))];
+  const parts=pids.length?await odooCall('res.partner','read',[pids],{fields:['team_id','commercial_name','name']}):[];
+  const pI={}; parts.forEach(p=>pI[p.id]={team:p.team_id||null, com:(typeof p.commercial_name==='string'&&p.commercial_name)?p.commercial_name:null, razon:p.name});
+  const canales={};
+  const push=(m,sign)=>{
+    const pid=m.partner_id&&m.partner_id[0]; const info=pI[pid]||{};
+    const t=info.team, ck=t?('t'+t[0]):'_none';
+    const c=canales[ck]||(canales[ck]={id:t?t[0]:null, nombre:t?t[1]:'(sin canal)', neto:0, clientes:{}});
+    c.neto+=sign*(m.amount_total||0);
+    const cl=c.clientes[pid]||(c.clientes[pid]={com:info.com, razon:info.razon||(m.partner_id&&m.partner_id[1])||'—', neto:0, facturas:[]});
+    cl.neto+=sign*(m.amount_total||0);
+    cl.facturas.push({name:m.name, fecha:m.invoice_date, monto:sign*(m.amount_total||0), sign});
+  };
+  invs.forEach(m=>push(m,1)); refs.forEach(m=>push(m,-1));
+  const filas=Object.values(canales).map(c=>{
+    c.clientesArr=Object.values(c.clientes).map(cl=>{ cl.facturas.sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))); return cl; }).sort((a,b)=>b.neto-a.neto);
+    return c;
+  }).sort((a,b)=>b.neto-a.neto);
+  return {filas, total:filas.reduce((s,c)=>s+c.neto,0)};
+}
+function ventToggle(key){ const row=document.getElementById('vent-'+key); if(!row)return; row.classList.toggle('hidden');
+  const prev=row.previousElementSibling; if(prev) prev.classList.toggle('open', !row.classList.contains('hidden')); }
+function renderVentas(d,label){
+  const el=document.getElementById('repCanal'); if(!el) return;
+  if(d&&d.error){ el.innerHTML='<div class="status s-err">No pude leer ventas: '+esc(d.error)+'</div>'; return; }
+  if(!d.filas.length){ el.innerHTML='<div class="muted">Sin ventas en '+esc(label)+'.</div>'; return; }
+  let h='<div style="overflow-x:auto"><table class="cob-tbl"><tr><th>Canal</th><th style="text-align:right">Clientes</th><th style="text-align:right">Facturado neto</th></tr>';
+  d.filas.forEach((c,ci)=>{
+    h+='<tr class="prod-row" onclick="ventToggle(\'c'+ci+'\')"><td><span class="pcaret">▸</span> '+esc(c.nombre)+(c.id==null?' <span class="muted" style="font-size:11px">⚠ sin canal</span>':'')+'</td>'
+      +'<td style="text-align:right">'+c.clientesArr.length+'</td><td style="text-align:right"><strong>'+cM(c.neto)+'</strong></td></tr>';
+    let sub='<tr class="hidden" id="vent-c'+ci+'"><td colspan="3"><div class="vent-sub">';
+    c.clientesArr.forEach((cl,clj)=>{
+      const key='c'+ci+'-'+clj;
+      const nombre = cl.com ? esc(cl.com)+' <span class="muted" style="font-size:11px">· '+esc(cl.razon)+'</span>' : esc(cl.razon);
+      sub+='<div class="vent-cli" onclick="ventToggle(\''+key+'\')"><span class="pcaret">▸</span> <span>'+nombre+'</span><span class="vent-monto">'+cM(cl.neto)+'</span></div>';
+      sub+='<div class="hidden vent-fac" id="vent-'+key+'"><table><tr><th>Fecha</th><th>Documento</th><th style="text-align:right">Monto</th></tr>';
+      cl.facturas.forEach(f=>{ sub+='<tr><td>'+_fD(f.fecha)+'</td><td class="nm">'+esc(f.name||'—')+(f.sign<0?' <span class="cob-venc">NC</span>':'')+'</td><td style="text-align:right">'+cM(f.monto)+'</td></tr>'; });
+      sub+='</table></div>';
+    });
+    h+=sub+'</div></td></tr>';
+  });
+  el.innerHTML=h+'</table></div>';
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// RENTABILIDAD (Finanzas) — FASE 1 MOCKUP. Matriz producto × canal: ganancia ₡
+// del mes (volumen × margen unitario) + % de margen. Totales por fila y columna.
+// Clic en producto → desglose de costo (Fase 2 reemplaza "Costos por producto").
+// Fase 2: TODO del motor de costos real; muere el "teórico v1".
+// ════════════════════════════════════════════════════════════════════════
+const RENTA_PROD=[
+  {key:'blanco',  label:'Pan Blanco',      color:'#378ADD', costo:2267, unidad:'por unidad',       mp:805,  ind:1462},
+  {key:'semillas',label:'Pan de Semillas', color:'#84BD00', costo:2442, unidad:'por unidad',       mp:980,  ind:1462},
+  {key:'frances', label:'Pan Francés',     color:'#D4537E', costo:2980, unidad:'por paquete de 4', mp:1180, ind:1800},
+  {key:'buns',    label:'Buns',            color:'#7F77DD', costo:3120, unidad:'por paquete de 4', mp:1260, ind:1860},
+  {key:'pizza',   label:'Pizza Crust',     color:'#FF751F', costo:3492, unidad:'por paquete de 2', mp:1422, ind:2070},
+  {key:'galletas',label:'Cookie Dough',    color:'#ED93B1', costo:3050, unidad:'por unidad',       mp:1300, ind:1750},
+];
+const RENTA_CANAL=['Automercado','Walmart','BM','Compre Bien','HORECA'];
+// [margen unitario ₡, volumen del mes] por canal (orden RENTA_CANAL); [0,0] = no se vende ahí.
+const RENTA_MOCK={
+  blanco:  [[820,420],[760,180],[900,90],[880,60],[1100,40]],
+  semillas:[[900,260],[840,120],[980,70],[0,0],[1200,35]],
+  frances: [[1150,210],[1050,90],[1250,50],[1200,40],[0,0]],
+  buns:    [[1180,150],[0,0],[1300,45],[1250,35],[1500,30]],
+  pizza:   [[980,120],[900,80],[0,0],[0,0],[1300,60]],
+  galletas:[[1250,90],[0,0],[1400,25],[0,0],[1600,45]],
+};
+let _rentaBuilt=false;
+function rentaMatrizInit(){ if(_rentaBuilt) return; _rentaBuilt=true; rentaRender(); }
+function rentaRender(){
+  const el=document.getElementById('rentaMatriz'); if(!el) return;
+  const colTot=RENTA_CANAL.map(()=>0); let gran=0;
+  let h='<table class="renta-tbl"><thead><tr><th>Producto</th>'+RENTA_CANAL.map(c=>'<th>'+esc(c)+'</th>').join('')+'<th>Total producto</th></tr></thead><tbody>';
+  RENTA_PROD.forEach(P=>{
+    const mk=RENTA_MOCK[P.key]||[]; let rowTot=0;
+    let cells='';
+    mk.forEach((cell,ci)=>{
+      const mg=cell[0], vol=cell[1], gan=mg*vol;
+      if(!gan){ cells+='<td class="renta-na">—</td>'; return; }
+      rowTot+=gan; colTot[ci]+=gan; gran+=gan;
+      const precio=P.costo+mg, pct=precio?mg/precio*100:0;
+      cells+='<td class="renta-cell"><div class="rg">'+cM(gan)+'</div><div class="rp">'+_pct(pct)+'</div></td>';
+    });
+    h+='<tr class="renta-prow" onclick="rentaDetalle(\''+P.key+'\')"><td><span class="renta-prod"><span class="pdot" style="background:'+P.color+'"></span>'+esc(P.label)+'</span></td>'
+      +cells+'<td class="renta-cell renta-rowtot"><div class="rg">'+cM(rowTot)+'</div></td></tr>';
+  });
+  h+='</tbody><tfoot><tr><td>Total canal</td>'+colTot.map(t=>'<td class="renta-cell renta-coltot"><div class="rg">'+cM(t)+'</div></td>').join('')
+    +'<td class="renta-cell renta-grand"><div class="rg">'+cM(gran)+'</div></td></tr></tfoot></table>';
+  el.innerHTML=h;
+}
+function rentaDetalle(key){
+  const P=RENTA_PROD.find(p=>p.key===key), el=document.getElementById('rentaDetalle'); if(!P||!el) return;
+  el.innerHTML='<div class="card"><div class="card-title"><span class="pdot" style="background:'+P.color+'"></span> Costo de '+esc(P.label)+' <span class="muted" style="font-weight:400;font-size:12px">· '+esc(P.unidad)+'</span></div>'
+    +'<div style="overflow-x:auto"><table class="cob-tbl" style="max-width:440px"><tr><td>Materia prima</td><td style="text-align:right">'+cM(P.mp)+'</td></tr>'
+    +'<tr><td>Indirecto (planilla, alquiler, servicios…)</td><td style="text-align:right">'+cM(P.ind)+'</td></tr>'
+    +'<tr style="border-top:1px solid var(--border-strong)"><td><strong>Costo total</strong></td><td style="text-align:right"><strong>'+cM(P.costo)+'</strong></td></tr></table></div>'
+    +'<div class="m3sub" style="margin-top:8px;font-size:11px;color:var(--text-3)">Mockup — en Fase 2 este desglose sale del motor real de Costos (reemplaza "Costos por producto").</div></div>';
+  el.scrollIntoView({block:'nearest'});
+}
 // Sub-pestañas dentro de Producción y Mermas (Producto terminado | Premezclas).
 function repTab(grupo,btn,cual){
   btn.parentNode.querySelectorAll('.m3tab').forEach(b=>b.classList.remove('on')); btn.classList.add('on');
@@ -4334,6 +4480,13 @@ async function cobLoad(which){
   }
   // Orden por vencimiento asc; las sin vencimiento van al final.
   rows.sort((a,b)=>{ const x=a.invoice_date_due||'9999-99-99', y=b.invoice_date_due||'9999-99-99'; return x<y?-1:x>y?1:0; });
+  // Nombre comercial (parejo con Ventas): commercial_name por partner.
+  const pids=[...new Set(rows.map(r=>r.partner_id&&r.partner_id[0]).filter(Boolean))];
+  if(pids.length){
+    const parts=await odooCall('res.partner','read',[pids],{fields:['commercial_name']});
+    const comDe={}; parts.forEach(p=>{ if(typeof p.commercial_name==='string'&&p.commercial_name) comDe[p.id]=p.commercial_name; });
+    rows.forEach(r=>{ const pid=r.partner_id&&r.partner_id[0]; if(pid&&comDe[pid]) r._com=comDe[pid]; });
+  }
   return rows;
 }
 async function cobTab(which){
@@ -4372,6 +4525,8 @@ function renderCob(){
   if(!d.length){ el.innerHTML='<div class="muted">Sin facturas vencidas.</div>'; return; }
   if(_cobModo==='cliente') renderCobCliente(which,d,el); else renderCobFactura(which,d,el);
 }
+// Cliente/proveedor: nombre comercial + razón social (parejo con Ventas).
+function _cobPartner(r){ const razon=(r.partner_id&&r.partner_id[1])||'—'; return r._com ? esc(r._com)+' <span class="muted" style="font-size:11px">· '+esc(razon)+'</span>' : esc(razon); }
 // Fila de una factura (reusada en modo factura y en el detalle del modo cliente). conPartner=incluir columna cliente.
 function _cobFilaFactura(r,conPartner){
   const dv=_diasVencida(r.invoice_date_due);
@@ -4380,7 +4535,7 @@ function _cobFilaFactura(r,conPartner){
   const fe = r.number_electronic ? ' <span class="cob-fe" title="Comprobante electrónico: '+esc(r.number_electronic)+'">FE</span>' : '';
   return '<tr><td>'+_fD(r.invoice_date)+'</td><td>'+_fD(r.invoice_date_due)+'</td>'
     +'<td style="text-align:right">'+diasCell+'</td>'
-    +(conPartner?'<td>'+esc((r.partner_id&&r.partner_id[1])||'—')+'</td>':'')
+    +(conPartner?'<td>'+_cobPartner(r)+'</td>':'')
     +'<td>'+esc(r.name||'—')+refDist+fe+'</td>'
     +'<td style="text-align:right"><strong>'+cM(r.amount_residual||0)+'</strong></td></tr>';
 }
@@ -4393,7 +4548,7 @@ function renderCobFactura(which,d,el){
 function renderCobCliente(which,d,el){
   const groups={};
   d.forEach(r=>{ const pid=(r.partner_id&&r.partner_id[0])||0, pn=(r.partner_id&&r.partner_id[1])||'—';
-    const g=groups[pid]||(groups[pid]={nombre:pn,rows:[],total:0,maxVenc:null});
+    const g=groups[pid]||(groups[pid]={razon:pn,com:r._com||null,rows:[],total:0,maxVenc:null});
     g.rows.push(r); g.total+=r.amount_residual||0;
     const dv=_diasVencida(r.invoice_date_due);
     if(dv!=null && (g.maxVenc==null || dv>g.maxVenc)) g.maxVenc=dv;
@@ -4408,8 +4563,10 @@ function renderCobCliente(which,d,el){
     const venc = g.maxVenc!=null && g.maxVenc>0;
     const vencCell = venc ? '<span class="cob-venc">'+g.maxVenc+' d</span>' : '<span class="muted">—</span>';
     const btnCopiar = (which==='cobrar' && venc) ? ' <button class="cob-copy" onclick="cobCopiar('+i+',event)">Copiar recordatorio</button>' : '';
+    const primary = g.com ? esc(g.com) : esc(g.razon);
+    const sec = g.com ? ' <span class="muted" style="font-size:11px">· '+esc(g.razon)+'</span>' : '';
     h+='<tr class="prod-row" onclick="cobToggleGrupo('+i+')"><td><span class="pcaret">▸</span> '
-      +(venc?'<span class="cob-venc">'+esc(g.nombre)+'</span>':esc(g.nombre))+btnCopiar+'</td>'
+      +(venc?'<span class="cob-venc">'+primary+'</span>':primary)+sec+btnCopiar+'</td>'
       +'<td style="text-align:right">'+g.rows.length+'</td>'
       +'<td style="text-align:right"><strong>'+cM(g.total)+'</strong></td>'
       +'<td style="text-align:right">'+vencCell+'</td></tr>';
