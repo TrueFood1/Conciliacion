@@ -1318,6 +1318,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   </div>
   <div id="cobStatus" class="status s-info hidden" style="margin-top:14px"></div>
   <div id="cobTotal" style="margin-top:14px"></div>
+  <div class="sim-seg" id="cobModo" style="max-width:320px;margin-top:14px">
+    <button data-m="factura" class="on" onclick="cobSetModo('factura')">Por factura</button>
+    <button data-m="cliente" onclick="cobSetModo('cliente')">Por cliente</button>
+  </div>
   <div class="card" style="margin-top:14px" id="cobTabla"></div>
 </div>
 
@@ -3946,14 +3950,14 @@ function renderCanal(el,d,label){
     if(nSin){
       h+='<div style="font-size:12px;color:var(--text-2);font-weight:600;margin-bottom:4px">Facturas sin canal — asigná el Equipo de ventas en Odoo</div>';
       h+='<div style="overflow-x:auto"><table><tr><th>Fecha</th><th>Factura</th><th>Cliente</th><th style="text-align:right">Neto</th></tr>';
-      d.sinCanal.forEach(f=>{ h+='<tr><td>'+esc(f.invoice_date||'')+'</td><td>'+esc(f.name||'')+'</td><td>'+esc((f.partner_id&&f.partner_id[1])||'')+'</td><td style="text-align:right">'+cM(f.amount_total||0)+'</td></tr>'; });
+      d.sinCanal.forEach(f=>{ h+='<tr><td>'+_fD(f.invoice_date)+'</td><td>'+esc(f.name||'')+'</td><td>'+esc((f.partner_id&&f.partner_id[1])||'')+'</td><td style="text-align:right">'+cM(f.amount_total||0)+'</td></tr>'; });
       h+='</table></div>';
     }
     if(nBm){
       h+='<div style="font-size:12px;color:var(--text-2);font-weight:600;margin:12px 0 4px">Notas de crédito de BM — revisá contra junio</div>';
       h+='<div style="font-size:11px;color:var(--text-3);margin-bottom:6px">BM por nombre del cliente ("BM"): '+esc(d.bmNombres.join(' · ')||'—')+'. Ya restadas del neto; se listan para tu revisión.</div>';
       h+='<div style="overflow-x:auto"><table><tr><th>Fecha</th><th>Nota de crédito</th><th>Cliente</th><th style="text-align:right">Monto</th></tr>';
-      d.bmNc.forEach(f=>{ h+='<tr><td>'+esc(f.invoice_date||'')+'</td><td>'+esc(f.name||'')+'</td><td>'+esc((f.partner_id&&f.partner_id[1])||'')+'</td><td style="text-align:right">'+cM(f.amount_total||0)+'</td></tr>'; });
+      d.bmNc.forEach(f=>{ h+='<tr><td>'+_fD(f.invoice_date)+'</td><td>'+esc(f.name||'')+'</td><td>'+esc((f.partner_id&&f.partner_id[1])||'')+'</td><td style="text-align:right">'+cM(f.amount_total||0)+'</td></tr>'; });
       h+='</table></div>';
     }
     h+='</div>';
@@ -4320,6 +4324,10 @@ async function cobTab(which){
   }
   renderCob();
 }
+// Fecha es-CR: 'YYYY-MM-DD' → 'DD/MM/YYYY'.
+function _fD(s){ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):(s?esc(s):'—'); }
+let _cobModo='factura';
+function cobSetModo(m){ _cobModo=m; document.querySelectorAll('#cobModo button').forEach(b=>b.classList.toggle('on',b.dataset.m===m)); renderCob(); }
 function renderCob(){
   const which=_cobTab, d=_cobData[which];
   const el=document.getElementById('cobTabla'), tot=document.getElementById('cobTotal');
@@ -4333,22 +4341,56 @@ function renderCob(){
     +'<div class="sim-stat"><div class="k">Vencido</div><div class="val">'+cM(vencTot)+'</div><div class="note">'+venc.length+' factura'+(venc.length===1?'':'s')+' vencida'+(venc.length===1?'':'s')+'</div></div>'
     +'</div>'
     +'<div class="m3sub" style="margin-top:8px;font-size:11px;color:var(--text-3)">Solo facturas de 2026 en adelante'+(which==='pagar'?' · excluye Gastos Adicionales (compensación de IVA, cuenta 640103)':'')+'. El total es sobre lo visible.</div>';
+  if(_cobModo==='cliente') renderCobCliente(which,d,el); else renderCobFactura(which,d,el);
+}
+// Fila de una factura (reusada en modo factura y en el detalle del modo cliente). conPartner=incluir columna cliente.
+function _cobFilaFactura(r,conPartner){
+  const dv=_diasVencida(r.invoice_date_due);
+  const diasCell = dv>0 ? '<span class="cob-venc">'+dv+' d</span>' : '<span class="muted">—</span>';
+  const refDist = r.ref && r.ref!==r.name ? ' <span class="muted" style="font-size:11px">· '+esc(r.ref)+'</span>' : '';
+  const fe = r.number_electronic ? ' <span class="cob-fe" title="Comprobante electrónico: '+esc(r.number_electronic)+'">FE</span>' : '';
+  return '<tr><td>'+_fD(r.invoice_date)+'</td><td>'+_fD(r.invoice_date_due)+'</td>'
+    +'<td style="text-align:right">'+diasCell+'</td>'
+    +(conPartner?'<td>'+esc((r.partner_id&&r.partner_id[1])||'—')+'</td>':'')
+    +'<td>'+esc(r.name||'—')+refDist+fe+'</td>'
+    +'<td style="text-align:right"><strong>'+cM(r.amount_residual||0)+'</strong></td></tr>';
+}
+function renderCobFactura(which,d,el){
   const cliLbl=which==='cobrar'?'Cliente':'Proveedor';
   let h='<div style="overflow-x:auto"><table class="cob-tbl"><tr><th>Fecha</th><th>Vence</th><th style="text-align:right">Días</th><th>'+esc(cliLbl)+'</th><th>Documento</th><th style="text-align:right">Pendiente</th></tr>';
-  d.forEach(r=>{
-    const dv=_diasVencida(r.invoice_date_due);
-    const diasCell = dv>0 ? '<span class="cob-venc">'+dv+' d</span>' : '<span class="muted">—</span>';
-    const refDist = r.ref && r.ref!==r.name ? ' <span class="muted" style="font-size:11px">· '+esc(r.ref)+'</span>' : '';
-    const fe = r.number_electronic ? ' <span class="cob-fe" title="Comprobante electrónico: '+esc(r.number_electronic)+'">FE</span>' : '';
-    h+='<tr><td>'+esc(r.invoice_date||'—')+'</td><td>'+esc(r.invoice_date_due||'—')+'</td>'
-      +'<td style="text-align:right">'+diasCell+'</td>'
-      +'<td>'+esc((r.partner_id&&r.partner_id[1])||'—')+'</td>'
-      +'<td>'+esc(r.name||'—')+refDist+fe+'</td>'
-      +'<td style="text-align:right"><strong>'+cM(r.amount_residual||0)+'</strong></td></tr>';
-  });
-  h+='</table></div>';
-  el.innerHTML=h;
+  d.forEach(r=>{ h+=_cobFilaFactura(r,true); });
+  el.innerHTML=h+'</table></div>';
 }
+function renderCobCliente(which,d,el){
+  const groups={};
+  d.forEach(r=>{ const pid=(r.partner_id&&r.partner_id[0])||0, pn=(r.partner_id&&r.partner_id[1])||'—';
+    const g=groups[pid]||(groups[pid]={nombre:pn,rows:[],total:0,maxVenc:null});
+    g.rows.push(r); g.total+=r.amount_residual||0;
+    const dv=_diasVencida(r.invoice_date_due);
+    if(dv!=null && (g.maxVenc==null || dv>g.maxVenc)) g.maxVenc=dv;
+  });
+  const arr=Object.values(groups).sort((a,b)=>b.total-a.total);   // el que más debe, arriba
+  const cliLbl=which==='cobrar'?'Cliente':'Proveedor';
+  let h='<div style="overflow-x:auto"><table class="cob-tbl"><tr><th>'+esc(cliLbl)+'</th><th style="text-align:right">Facturas</th><th style="text-align:right">Pendiente</th><th style="text-align:right">Más vencida</th></tr>';
+  arr.forEach((g,i)=>{
+    // rows ordenadas por vencimiento asc dentro del grupo
+    g.rows.sort((a,b)=>{ const x=a.invoice_date_due||'9999-99-99', y=b.invoice_date_due||'9999-99-99'; return x<y?-1:x>y?1:0; });
+    const venc = g.maxVenc!=null && g.maxVenc>0;
+    const vencCell = venc ? '<span class="cob-venc">'+g.maxVenc+' d</span>' : '<span class="muted">—</span>';
+    h+='<tr class="prod-row" onclick="cobToggleGrupo('+i+')"><td><span class="pcaret">▸</span> '
+      +(venc?'<span class="cob-venc">'+esc(g.nombre)+'</span>':esc(g.nombre))+'</td>'
+      +'<td style="text-align:right">'+g.rows.length+'</td>'
+      +'<td style="text-align:right"><strong>'+cM(g.total)+'</strong></td>'
+      +'<td style="text-align:right">'+vencCell+'</td></tr>';
+    let dt='<tr class="hidden" id="cobg-'+i+'"><td colspan="4"><div class="prod-det-wrap"><table>'
+      +'<tr><th>Fecha</th><th>Vence</th><th style="text-align:right">Días</th><th>Documento</th><th style="text-align:right">Pendiente</th></tr>';
+    g.rows.forEach(r=>{ dt+=_cobFilaFactura(r,false); });
+    h+=dt+'</table></div></td></tr>';
+  });
+  el.innerHTML=h+'</table></div>';
+}
+function cobToggleGrupo(i){ const row=document.getElementById('cobg-'+i); if(!row)return; row.classList.toggle('hidden');
+  const prev=row.previousElementSibling; if(prev) prev.classList.toggle('open', !row.classList.contains('hidden')); }
 
 // ════════════════════════════════════════════════════════════════════════
 // REPORTE — RENTABILIDAD POR CANAL (teórico v1). SOLO LECTURA.
