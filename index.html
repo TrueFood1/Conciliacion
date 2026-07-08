@@ -168,6 +168,14 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .cob-tbl tr:last-child td{border-bottom:none}
 .cob-venc{color:var(--red);font-variant-numeric:tabular-nums}
 .cob-fe{font-size:9px;letter-spacing:.05em;color:var(--text-3);border:1px solid var(--border-strong);border-radius:4px;padding:1px 4px;margin-left:6px;cursor:help;vertical-align:middle}
+
+/* ── Plan de producción (Bloque 3) ── */
+.plan-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.plan-tbl th{font-size:11px;font-weight:400;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+.plan-tbl th[style*="right"]{text-align:right}
+.plan-tbl td{padding:10px 12px;color:var(--text);border:none;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums;white-space:nowrap}
+.plan-tbl tr:last-child td{border-bottom:none}
+.plan-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;vertical-align:middle}
 .res-frow{display:grid;grid-template-columns:16px 1fr 130px 64px;gap:10px;align-items:baseline;padding:12px 6px;border-bottom:1px solid var(--border);cursor:pointer}
 .res-frow:last-of-type{border-bottom:none}
 .res-frow .car{color:var(--text-3);font-size:11px;transition:transform .15s;display:inline-block}
@@ -985,6 +993,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face on">Producción</button>
     <button class="face" onclick="irAMermas()">Mermas</button>
     <button class="face" onclick="irAInventario()">Inventario</button>
+    <button class="face" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1014,6 +1023,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irAProduccion()">Producción</button>
     <button class="face on">Mermas</button>
     <button class="face" onclick="irAInventario()">Inventario</button>
+    <button class="face" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1307,6 +1317,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irAProduccion()">Producción</button>
     <button class="face" onclick="irAMermas()">Mermas</button>
     <button class="face on">Inventario</button>
+    <button class="face" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1339,6 +1350,26 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="btn btn-sm" onclick="exportarHistorial()">Exportar historial</button>
     <span id="invHistInfo" class="muted" style="font-size:12px;cursor:pointer;text-decoration:underline" onclick="abrirHistorial()" title="Ver historial"></span>
   </div>
+</div>
+
+<!-- PLAN DE PRODUCCIÓN (módulo Operaciones) — tablero congelador vs curva al 18-dic. SOLO LECTURA. -->
+<div id="vPlan" class="hidden">
+  <div class="faces faces-ops">
+    <button class="face" onclick="irAProduccion()">Producción</button>
+    <button class="face" onclick="irAMermas()">Mermas</button>
+    <button class="face" onclick="irAInventario()">Inventario</button>
+    <button class="face on">Plan</button>
+  </div>
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <div class="m3title" style="font-size:24px">Plan de producción <span style="font-weight:400;color:var(--text-3);font-size:13px">· congelador al 18-dic</span></div>
+      <div class="m3sub" style="margin-top:2px;font-size:13px">¿Vamos bien para diciembre? Stock de hoy (Odoo) contra la curva esperada de esta semana. Solo lectura.</div>
+    </div>
+    <div class="live-ind"><span class="live-dot"></span>conectado a Odoo · datos en vivo</div>
+  </div>
+  <div class="m3sub" style="margin-top:8px;font-size:12px;color:var(--text-3)">Blanco · Francés · Pizza · Galletas: planos jul–set, rampa 1-oct→18-dic. Buns y Semillas drenan hacia su meta (rojo solo si caen bajo la meta). Verde en curva, amarillo −5%, rojo −10% o peor.</div>
+  <div id="planStatus" class="status s-info hidden" style="margin-top:14px"></div>
+  <div class="card" style="margin-top:14px" id="planTabla"></div>
 </div>
 
 <!-- RESULTS -->
@@ -1809,7 +1840,7 @@ function aplicarModoProduccion(){
   });
 }
 // Vistas de módulo (Contabilidad + Conciliación + Operaciones). Muestra UNA, oculta el resto.
-const _MOD_VIEWS=['vUpload','vFacturado','vProduccion','vMermas','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vInventario','vResults'];
+const _MOD_VIEWS=['vUpload','vFacturado','vProduccion','vMermas','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vInventario','vPlan','vResults'];
 function _modShow(id){
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.toggle('hidden', v!==id); });
   document.getElementById('vLobby').classList.add('hidden');
@@ -3393,7 +3424,7 @@ async function uomFactor(uomId){
 
 // ── Sub-pestañas de Finanzas y Operaciones ──────────────────────────────
 // Cambian SIN recargar (show/hide de vistas); cada una carga sus datos la 1ª vez que se abre.
-let _loaded={fac:false,costos:false,rent:false,sim:false,calc:false,prod:false,merm:false,inv:false,cob:false,res:false};
+let _loaded={fac:false,costos:false,rent:false,sim:false,calc:false,prod:false,merm:false,inv:false,cob:false,res:false,plan:false};
 // Finanzas
 function irAFacturado(){
   _modShow('vFacturado'); crumbSet('Finanzas','Facturado por canal');
@@ -3433,6 +3464,10 @@ function irAProduccion(){
 function irAMermas(){
   _modShow('vMermas'); crumbSet('Operaciones','Mermas');
   if(!_loaded.merm){ _loaded.merm=true; cargarMermas(); cargarMermasTendencia(); }   // tendencia: independiente del mes, se carga una vez
+}
+function irAPlan(){
+  _modShow('vPlan'); crumbSet('Operaciones','Plan');
+  if(!_loaded.plan){ _loaded.plan=true; cargarPlan(); }
 }
 function irAInventario(){
   _modShow('vInventario'); crumbSet('Operaciones','Inventario');
@@ -4084,6 +4119,76 @@ function renderMermTend(){
   ca.innerHTML=_tendTabla(d.porCausa,d.meses,_CAUSA_ORDEN);
   pr.classList.toggle('hidden', _mermTendTab!=='prod');
   ca.classList.toggle('hidden', _mermTendTab!=='causa');
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// PLAN DE PRODUCCIÓN (Operaciones) — congelador vs curva al 18-dic. SOLO LECTURA.
+// Curva por producto (unidades individuales), nodos confirmados por Andrea:
+//  · Blanco/Francés/Pizza/Galletas: plano jul→30-set (arranque), sube al
+//    checkpoint del 30-oct y llega a la meta el 18-dic (pasa por los checkpoints).
+//  · Buns: plano ~1.700 (ya arriba de meta 1.600) · Semillas: drena 749→600.
+// Semáforo rampa: verde ≥ curva−5%, amarillo −5..−10%, rojo < −10%.
+// Semáforo drena (Buns/Semillas): verde si ≥ meta, rojo si < meta.
+// ════════════════════════════════════════════════════════════════════════
+const PLAN_PROD=[
+  {id:451,label:'Pan Blanco',      tipo:'rampa', meta:930,  nodos:[['2026-07-06',487],['2026-09-30',487],['2026-10-30',700],['2026-12-18',930]]},
+  {id:453,label:'Pan Francés',     tipo:'rampa', meta:2300, nodos:[['2026-07-06',1660],['2026-09-30',1660],['2026-10-30',2000],['2026-12-18',2300]]},
+  {id:472,label:'Pizza Crust',     tipo:'rampa', meta:450,  nodos:[['2026-07-06',364],['2026-09-30',364],['2026-10-30',410],['2026-12-18',450]]},
+  {id:519,label:'Cookie Dough',    tipo:'rampa', meta:300,  nodos:[['2026-07-06',228],['2026-09-30',228],['2026-10-30',265],['2026-12-18',300]]},
+  {id:503,label:'Buns',            tipo:'drena', meta:1600, nodos:[['2026-07-06',1700],['2026-12-18',1700]]},
+  {id:452,label:'Pan de Semillas', tipo:'drena', meta:600,  nodos:[['2026-07-06',749],['2026-12-18',600]]},
+];
+const PLAN_CHK=[['2026-09-15','15-set'],['2026-10-30','30-oct']];
+function _diaNum(s){ const p=String(s).split('-').map(Number); return Date.UTC(p[0],p[1]-1,p[2])/86400000; }
+function _hoyISO(){ const n=new Date(),p=x=>String(x).padStart(2,'0'); return n.getFullYear()+'-'+p(n.getMonth()+1)+'-'+p(n.getDate()); }
+// Interpola linealmente entre nodos [fecha,valor]; plano fuera del rango.
+function planCurva(nodos,fecha){
+  const x=_diaNum(fecha), n=nodos;
+  if(x<=_diaNum(n[0][0])) return n[0][1];
+  if(x>=_diaNum(n[n.length-1][0])) return n[n.length-1][1];
+  for(let i=1;i<n.length;i++){ const x0=_diaNum(n[i-1][0]), x1=_diaNum(n[i][0]);
+    if(x<=x1){ const t=(x1-x0)?(x-x0)/(x1-x0):0; return n[i-1][1]+(n[i][1]-n[i-1][1])*t; } }
+  return n[n.length-1][1];
+}
+function planSem(p,stock){
+  if(p.tipo==='drena') return stock>=p.meta ? {k:'verde',txt:'en meta'} : {k:'rojo',txt:'bajo la meta'};
+  const curva=planCurva(p.nodos,_hoyISO()), r=curva?stock/curva:1;
+  if(r>=0.95) return {k:'verde',txt:'en curva'};
+  if(r>=0.90) return {k:'amarillo',txt:'−5% bajo curva'};
+  return {k:'rojo',txt:'−10% o peor'};
+}
+async function cargarPlan(){
+  _spin('planStatus',true,'plan de producción');
+  document.getElementById('planTabla').innerHTML='<div class="muted">Cargando…</div>';
+  try{
+    const ids=PLAN_PROD.map(p=>p.id);
+    const q=await odooCall('stock.quant','read_group',[[['product_id','in',ids],['location_id.usage','=','internal']],['quantity'],['product_id']],{lazy:false});
+    const oh={}; q.forEach(r=>{ const pid=r.product_id&&r.product_id[0]; if(pid) oh[pid]=(oh[pid]||0)+(r.quantity||0); });
+    const rows=[];
+    for(const p of PLAN_PROD){ const stock=(oh[p.id]||0)/(await prodUomFactor(p.id)); rows.push(Object.assign({},p,{stock})); }   // a unidades individuales
+    renderPlan(rows);
+  }catch(e){ console.error('cargarPlan:',e); document.getElementById('planTabla').innerHTML='<div class="status s-err">No pude leer el stock: '+esc(e&&e.message||e)+'</div>'; }
+  finally{ _spin('planStatus',false); }
+}
+const _PLAN_DOT={verde:'#84BD00',amarillo:'#FF751F',rojo:'#FF6B6B'};
+function renderPlan(rows){
+  const hoy=_hoyISO();
+  let h='<div style="overflow-x:auto"><table class="plan-tbl"><tr><th>Producto</th><th style="text-align:right">Stock hoy</th><th style="text-align:right">En curva</th><th style="text-align:right">Δ</th><th>Semáforo</th><th style="text-align:right">15-set</th><th style="text-align:right">30-oct</th><th style="text-align:right">Meta 18-dic</th></tr>';
+  rows.forEach(p=>{
+    const curva=planCurva(p.nodos,hoy), dif=p.stock-curva, s=planSem(p,p.stock), dot=_PLAN_DOT[s.k];
+    const chk=PLAN_CHK.map(c=>fmtN(Math.round(planCurva(p.nodos,c[0]))));
+    h+='<tr><td>'+esc(p.label)+' <span class="muted" style="font-size:11px">'+(p.tipo==='drena'?'drena':'rampa')+'</span></td>'
+      +'<td style="text-align:right"><strong>'+fmtN(Math.round(p.stock))+'</strong></td>'
+      +'<td style="text-align:right">'+fmtN(Math.round(curva))+'</td>'
+      +'<td style="text-align:right">'+(dif>=0?'+':'−')+fmtN(Math.round(Math.abs(dif)))+'</td>'
+      +'<td><span class="plan-dot" style="background:'+dot+'"></span>'+esc(s.txt)+'</td>'
+      +'<td style="text-align:right" class="muted">'+chk[0]+'</td>'
+      +'<td style="text-align:right" class="muted">'+chk[1]+'</td>'
+      +'<td style="text-align:right"><strong>'+fmtN(p.meta)+'</strong></td></tr>';
+  });
+  h+='</table></div>';
+  h+='<div class="m3sub" style="margin-top:10px;font-size:11px;color:var(--text-3)">Curva de hoy ('+esc(hoy)+'). Stock en unidades individuales (potes para galletas). Checkpoints = valor objetivo de la curva en esa fecha.</div>';
+  document.getElementById('planTabla').innerHTML=h;
 }
 
 // ════════════════════════════════════════════════════════════════════════
