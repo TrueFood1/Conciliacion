@@ -145,6 +145,19 @@ td[align="right"],td[style*="right"]{font-variant-numeric:tabular-nums}
 .res-strip .val{font-size:26px}
 .res-parcial{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);border:1px solid var(--border-strong);border-radius:999px;padding:3px 10px}
 .res-noop{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);border:1px solid var(--border);border-radius:999px;padding:2px 7px;margin-left:8px;white-space:nowrap}
+
+/* ── Drill-down de producción (Bloque 1) ── */
+tr.prod-row{cursor:pointer}
+tr.prod-row:hover td{background:rgba(255,255,255,.02)}
+tr.prod-row .pcaret{color:var(--text-3);font-size:10px;display:inline-block;width:11px;transition:transform .15s}
+tr.prod-row.open .pcaret{transform:rotate(90deg)}
+.prod-det-wrap{padding:6px 0 12px 18px}
+.prod-det-wrap .pdcap{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);margin-bottom:7px}
+.prod-det-wrap table{width:auto;min-width:320px;border-collapse:collapse}
+.prod-det-wrap th{font-size:10px;font-weight:400;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);padding:4px 16px 6px 0;text-align:left;border:none}
+.prod-det-wrap th[style*="right"]{text-align:right}
+.prod-det-wrap td{font-size:12.5px;color:var(--text);padding:4px 16px 4px 0;font-variant-numeric:tabular-nums;border:none}
+.prod-det-wrap td.nm{color:var(--text-2)}
 .res-frow{display:grid;grid-template-columns:16px 1fr 130px 64px;gap:10px;align-items:baseline;padding:12px 6px;border-bottom:1px solid var(--border);cursor:pointer}
 .res-frow:last-of-type{border-bottom:none}
 .res-frow .car{color:var(--text-3);font-size:11px;transition:transform .15s;display:inline-block}
@@ -3723,19 +3736,23 @@ async function reporteProduccion(D1,D2){
   const idsT=new Set(PROD_TERM.map(p=>p.id)), idsP=new Set(PROD_PREMEZ.map(p=>p.id));
   const mos=await odooCall('mrp.production','search_read',
     [[['state','=','done'],['date_start','>=',D1],['date_start','<=',D2+' 23:59:59']]],
-    {fields:['product_id','qty_produced','product_uom_id','date_start'],limit:3000});
-  const acc={};   // pid → {qty (UoM producto), indiv (unidades individuales), dias:Set de días distintos}
+    {fields:['name','product_id','qty_produced','product_uom_id','date_start'],limit:3000});
+  const acc={};   // pid → {qty (UoM producto), indiv (unidades individuales), dias:Set de días distintos, ordenes:[]}
   for(const o of mos){
     const pid=o.product_id&&o.product_id[0]; if(!pid||(!idsT.has(pid)&&!idsP.has(pid)))continue;
     const facMO=await uomFactor(o.product_uom_id&&o.product_uom_id[0]);
     const facProd=await prodUomFactor(pid);
     const qp=o.qty_produced||0;
-    const t=acc[pid]||(acc[pid]={qty:0,indiv:0,dias:new Set()});
-    t.qty += qp*facProd/facMO;   // en UoM del producto (= pivot nativo)
+    const cantMO=qp*facProd/facMO;   // cantidad del MO en la UoM del producto
+    const t=acc[pid]||(acc[pid]={qty:0,indiv:0,dias:new Set(),ordenes:[]});
+    t.qty += cantMO;             // en UoM del producto (= pivot nativo)
     t.indiv += qp/facMO;         // unidades individuales (para la derivación)
     const d=(o.date_start||'').slice(0,10); if(d) t.dias.add(d);   // DÍAS distintos, no órdenes (varias tandas/día)
+    t.ordenes.push({fecha:o.date_start||'', cant:cantMO, ref:o.name||''});   // detalle para el drill-down (Bloque 1)
   }
-  const build=cfg=>cfg.map(c=>{ const a=acc[c.id]; return Object.assign({},c,a?{qty:a.qty,indiv:a.indiv,dias:a.dias.size}:{qty:0,indiv:0,dias:0}); })
+  const build=cfg=>cfg.map(c=>{ const a=acc[c.id]; return Object.assign({},c,a
+      ?{qty:a.qty,indiv:a.indiv,dias:a.dias.size,ordenes:a.ordenes.slice().sort((x,y)=>String(y.fecha).localeCompare(String(x.fecha)))}
+      :{qty:0,indiv:0,dias:0,ordenes:[]}); })
                       .filter(r=>r.dias>0).sort((a,b)=>b.qty-a.qty);
   return {terminados:build(PROD_TERM), premezclas:build(PROD_PREMEZ)};
 }
@@ -3844,10 +3861,34 @@ function toggleRepValid(){
   const b=document.getElementById('repValidBody'), btn=document.getElementById('btnRepValid'); if(!b)return;
   const oc=b.classList.toggle('hidden'); if(btn)btn.textContent=oc?'Ver derivación (validar contra el pivot de Odoo) ▾':'Ocultar derivación ▴';
 }
+// 'YYYY-MM-DD HH:MM:SS' (UTC de Odoo) → 'DD/MM · HH:MM' en hora Costa Rica (UTC−6, sin DST).
+function _fechaCR(s){
+  const m=String(s||'').match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  if(!m) return esc(String(s||'').slice(0,16));
+  const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5])-6*3600*1000), p=n=>String(n).padStart(2,'0');
+  return p(d.getUTCDate())+'/'+p(d.getUTCMonth()+1)+' · '+p(d.getUTCHours())+':'+p(d.getUTCMinutes());
+}
+// Drill-down (Bloque 1): despliega/oculta la lista de órdenes de un producto.
+function toggleProdDet(key){
+  const row=document.getElementById('pdet-'+key); if(!row) return;
+  row.classList.toggle('hidden');
+  const prev=row.previousElementSibling; if(prev) prev.classList.toggle('open', !row.classList.contains('hidden'));
+}
 function tablaProd(rows,label,esTerm){
   if(!rows.length) return '<div class="muted">Sin '+(esTerm?'producción terminada':'premezclas producidas')+' en '+esc(label)+'.</div>';
+  const pfx=esTerm?'t':'p';
   let h='<div style="overflow-x:auto"><table><tr><th>'+(esTerm?'Producto terminado':'Premezcla')+'</th><th style="text-align:right">Producción</th><th>Unidad</th><th style="text-align:right">Días de producción</th></tr>';
-  rows.forEach(r=>{ h+='<tr><td>'+esc(r.label)+'</td><td style="text-align:right"><strong>'+fmtN(r.qty)+'</strong></td><td>'+esc(esTerm?(r.unidad||'unidades'):'batches')+'</td><td style="text-align:right">'+r.dias+'</td></tr>'; });
+  rows.forEach(r=>{
+    const uni=esc(esTerm?(r.unidad||'unidades'):'batches'), n=(r.ordenes&&r.ordenes.length)||0;
+    h+='<tr class="prod-row" onclick="toggleProdDet(\''+pfx+r.id+'\')" title="Ver órdenes de producción del mes">'
+      +'<td><span class="pcaret">▸</span> '+esc(r.label)+'</td><td style="text-align:right"><strong>'+fmtN(r.qty)+'</strong></td>'
+      +'<td>'+uni+'</td><td style="text-align:right">'+r.dias+'</td></tr>';
+    let dt='<tr class="hidden" id="pdet-'+pfx+r.id+'"><td colspan="4"><div class="prod-det-wrap">'
+      +'<div class="pdcap">'+n+' orden'+(n===1?'':'es')+' de producción · hora Costa Rica</div>'
+      +'<table><tr><th>Fecha</th><th style="text-align:right">Cantidad</th><th>Unidad</th><th>Referencia</th></tr>';
+    (r.ordenes||[]).forEach(o=>{ dt+='<tr><td>'+_fechaCR(o.fecha)+'</td><td style="text-align:right">'+fmtN(o.cant)+'</td><td class="nm">'+uni+'</td><td class="nm">'+esc(o.ref)+'</td></tr>'; });
+    h+=dt+'</table></div></td></tr>';
+  });
   h+='</table></div>';
   return h;
 }
