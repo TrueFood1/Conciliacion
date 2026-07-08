@@ -1251,10 +1251,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
-      <div class="m3title" style="font-size:24px">Resultados <span style="font-weight:400;color:var(--text-3);font-size:13px">· mockup — datos de ejemplo</span></div>
-      <div class="m3sub" style="margin-top:2px;font-size:13px">Cómo va el negocio: ingresos, gastos por familia y resultado. Cifras inventadas para aprobar el diseño — todavía no lee Odoo.</div>
+      <div class="m3title" style="font-size:24px">Resultados</div>
+      <div class="m3sub" style="margin-top:2px;font-size:13px">Cómo va el negocio: ingresos, gastos por familia y resultado. Devengado (asientos posteados de Odoo), no caja. Solo lectura.</div>
     </div>
-    <div class="live-ind"><span class="live-dot" style="background:var(--text-3);animation:none"></span>datos de ejemplo</div>
+    <div class="live-ind"><span class="live-dot"></span>conectado a Odoo · datos en vivo</div>
   </div>
   <div class="sim-seg" id="resSeg" style="max-width:440px;margin-top:18px">
     <button data-v="mes" class="on">El mes</button>
@@ -4851,81 +4851,116 @@ function calcRender(){
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// M11 · RESULTADOS (Finanzas) — FASE 1: MOCKUP. Todas las cifras son de EJEMPLO,
-// inventadas en el cliente; nada sale de Odoo. La estructura (resMeses + RES_FAM)
-// imita lo que devolverá el motor real de Fase 2: ingresos de account.move.line
-// posteadas con display_type='product' (NUNCA sumar las líneas cogs — triplican),
-// gastos de cuentas 6xxxxx agrupadas por familia (mapeo cuenta→familia del plan
-// de cuentas real), todo vía el proxy de solo lectura.
-// Fase 2 — notas acordadas con Andrea:
-//  · Ingresos = SIN IVA (suma de price_subtotal de las líneas); el "facturado
-//    con IVA" sale de amount_total de las facturas. Se muestran ambos.
-//  · "Gastos adicionales" = facturas para compensar IVA, NO gasto operativo.
-//    El mapeo cuenta→familia debe identificar su(s) cuenta(s) en el plan real
-//    para separarlas limpio. El resultado grande las EXCLUYE (operativo); el
-//    contable (con adicionales) va debajo en terciario.
+// M11 · RESULTADOS (Finanzas) — FASE 2: MOTOR REAL. Estado de resultados
+// DEVENGADO (asientos posteados), desde Odoo producción por el proxy de lectura.
+//  · Ingresos = SIN IVA: price_subtotal de líneas display_type='product' de
+//    facturas de cliente (out_invoice − out_refund). NUNCA sumar líneas 'cogs'
+//    (triplican). "Facturado con IVA" = amount_total de las facturas.
+//  · Costo de lo vendido = COGS (5101030) + Materia Prima (6400006).
+//  · Gastos operativos = cuentas 6xxxx por familia (mapeo confirmado). El % de
+//    cada familia se calcula sobre el gasto operativo total.
+//  · Depreciaciones (6102001/2/3) EXCLUIDAS del resumen.
+//  · Gastos Adicionales (640103) = facturas para compensar IVA, NO operativo:
+//    van apartadas; el resultado grande las EXCLUYE, el contable las suma.
+//  · Fechas: invoice_date / date son campos Date (sin hora) → sin conversión CR.
 // ════════════════════════════════════════════════════════════════════════
-// Familias operativas. share = proporción de ejemplo para las cuentas de adentro
-// (en Fase 2 cada cuenta trae su monto real y las shares desaparecen).
+// Mapeo cuenta→familia (confirmado con Andrea). 'otros' = resto de 6xxxx no
+// clasificado (ni COGS, ni Adicionales, ni Depreciaciones).
 const RES_FAM = [
-  {key:'planilla',  label:'Planilla y cargas',         cuentas:[['6101001','Sueldos y salarios',.74],['6101003','Cargas patronales',.19],['6101009','Provisión de aguinaldo y cesantía',.07]]},
-  {key:'mp',        label:'Materia prima',             cuentas:[['5101030','Costo de ventas — materiales directos',1]]},
-  {key:'alquiler',  label:'Alquiler',                  cuentas:[['6102001','Alquiler de planta',1]]},
-  {key:'elec',      label:'Electricidad y servicios',  cuentas:[['6106001','Electricidad',.70],['6106006','Agua',.12],['6106008','Internet y telefonía',.18]]},
-  {key:'cedi',      label:'Distribución y delivery',   cuentas:[['6400003','Gasto de envíos',.64],['6400005','Servicio del centro de distribución',.36]]},
-  {key:'comisiones',label:'Comisiones de cadenas',     cuentas:[['6105002','Comisiones sobre ventas',1]]},
-  {key:'frio',      label:'Frío',                      cuentas:[['6103002','Alquiler de congeladores',1]]},
-  {key:'bancarios', label:'Bancarios',                 cuentas:[['6109001','Comisiones bancarias',.78],['6109003','Comisiones de transferencias',.22]]},
-  {key:'dieta',     label:'Dieta socios',              cuentas:[['6104007','Dieta socios',1]]},
-  {key:'otros',     label:'Otros',                     cuentas:[['6110002','Mantenimiento y repuestos',.48],['6110005','Papelería y limpieza',.27],['6199001','Gastos varios',.25]]},
-  // No operativo: facturas para compensar IVA. Va apartada al final; el resultado grande la excluye.
-  // Fase 2: identificar su(s) cuenta(s) reales en el plan de cuentas (el código de abajo es de ejemplo).
-  {key:'adicionales', label:'Gastos adicionales', noOper:true, cuentas:[['6199009','Facturas de compensación de impuesto — cuenta por identificar',1]]},
+  {key:'planilla',  label:'Planilla y cargas',                  codes:['6101001','6101002','6101003','6101004','6101005','6101006','6101007','6101008','6101009','6101010']},
+  {key:'alquiler',  label:'Alquiler',                           codes:['6106021']},
+  {key:'servicios', label:'Electricidad y servicios',           codes:['6106005','6106006','6106003','6106004','6106007','6104005']},
+  {key:'cedi',      label:'Distribución y delivery',            codes:['6106014','6400003','6400004','6103003','6103001','6103002']},
+  {key:'comisiones',label:'Comisiones y descuentos de cadenas', codes:['6106015','6106018']},
+  {key:'frio',      label:'Frío',                               codes:['6106013','6106028']},
+  {key:'bancarios', label:'Bancarios',                          codes:['6200001','6200002','6106019']},
+  {key:'dieta',     label:'Dieta socios',                       codes:['6104007']},
+  {key:'mercadeo',  label:'Mercadeo',                           codes:['6104003','6106008','6106017']},
+  {key:'otros',     label:'Otros',                              codes:'*'},
+  {key:'adicionales', label:'Gastos adicionales', noOper:true,  codes:['640103']},
 ];
-// 12 meses de ejemplo (₡): [label, parcial, ingresos SIN IVA, gastos por familia en el orden
-// de RES_FAM (la última cifra = gastos adicionales, no operativos)]. Verosímil: diciembre alto
-// + aguinaldo en planilla; julio en curso = parcial (alquiler y frío se asientan al inicio del
-// mes, la dieta al final — por eso el parcial luce desbalanceado).
-const RES_MESES_DEF = [
-  ['ago 25', false,  8420000, [2780000,1950000,950000,372000,352000,398000,342000, 82000,400000,231000,180000]],
-  ['set 25', false,  8760000, [2780000,2010000,950000,381000,361000,412000,342000, 84000,400000,246000,195000]],
-  ['oct 25', false,  9150000, [2810000,2110000,950000,368000,378000,438000,342000, 88000,400000,238000,210000]],
-  ['nov 25', false,  9680000, [2840000,2230000,950000,395000,401000,467000,342000, 93000,400000,262000,240000]],
-  ['dic 25', false, 11540000, [5040000,2650000,950000,441000,486000,589000,342000,112000,400000,341000,320000]],
-  ['ene 26', false,  8240000, [2840000,1900000,950000,362000,340000,381000,342000, 79000,400000,224000,150000]],
-  ['feb 26', false,  8510000, [2840000,1960000,950000,371000,352000,394000,342000, 81000,400000,235000,165000]],
-  ['mar 26', false,  8930000, [2840000,2050000,950000,384000,368000,417000,342000, 86000,400000,248000,190000]],
-  ['abr 26', false,  9210000, [2840000,2120000,950000,391000,381000,432000,342000, 89000,400000,257000,205000]],
-  ['may 26', false,  8870000, [2840000,2040000,950000,377000,367000,411000,342000, 85000,400000,243000,185000]],
-  ['jun 26', false,  9480000, [2840000,2150000,950000,397000,398000,462000,342000, 96000,400000,271000,220000]],
-  ['jul 26', true,   2130000, [ 710000, 490000,950000, 88000, 92000,101000,342000, 21000,     0, 54000, 45000]],
-];
-// Margen por producto (pie de la vista 1). Costos reales conocidos como ejemplo; en Fase 2
-// esta línea sale del MISMO motor que Costos/Rentabilidad (un producto, un costo, un margen).
+const RES_COGS_CODES=['5101030','6400006'];            // Costo de lo vendido
+const RES_EXCLUIR=['6102001','6102002','6102003'];     // Depreciaciones — fuera del resumen
+const _RES_CODE2FAM={};
+RES_FAM.forEach(f=>{ if(Array.isArray(f.codes)) f.codes.forEach(c=>_RES_CODE2FAM[c]=f.key); });
+function _resFamDe(code){
+  if(RES_COGS_CODES.indexOf(code)>=0) return 'cogs';
+  if(RES_EXCLUIR.indexOf(code)>=0) return null;        // excluida (depreciación)
+  return _RES_CODE2FAM[code] || 'otros';
+}
+// Motor real: arma los 12 meses (terminando en el mes en curso, marcado parcial)
+// leyendo asientos posteados de Odoo. Bucketea por mes calendario (campos Date).
+async function reporteResultados(){
+  const pad=x=>String(x).padStart(2,'0'), now=new Date(), meses=[];
+  for(let i=11;i>=0;i--){ const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    meses.push({ym:d.getFullYear()+'-'+pad(d.getMonth()+1), label:_MESNOM[d.getMonth()].slice(0,3)+' '+String(d.getFullYear()).slice(2), parcial:(i===0)}); }
+  const mesSet=new Set(meses.map(m=>m.ym)), D1=meses[0].ym+'-01';
+  const by={}; meses.forEach(m=>by[m.ym]={ingresos:0,facturado:0,cogs:0,fam:{},famDet:{}});
+  const addGasto=(ym,fk,code,name,monto)=>{ const b=by[ym]; if(!b)return;
+    if(fk==='cogs'){ b.cogs+=monto; return; }
+    b.fam[fk]=(b.fam[fk]||0)+monto;
+    const d=(b.famDet[fk]=b.famDet[fk]||{}); (d[code]=d[code]||{code,name,monto:0}).monto+=monto; };
+  // 1) Gastos 6xxxx (balance = débito − crédito)
+  const g=await odooCall('account.move.line','search_read',
+    [[['parent_state','=','posted'],['account_id.code','=like','6%'],['date','>=',D1]]],
+    {fields:['account_id','balance','date'],limit:50000});
+  g.forEach(l=>{ const ym=(l.date||'').slice(0,7); if(!mesSet.has(ym))return;
+    const disp=(l.account_id&&l.account_id[1])||'', code=disp.split(' ')[0], name=disp.slice(code.length+1);
+    const fk=_resFamDe(code); if(fk===null)return; addGasto(ym,fk,code,name,l.balance||0); });
+  // 2) COGS 5101030
+  const c=await odooCall('account.move.line','search_read',
+    [[['parent_state','=','posted'],['account_id.code','=','5101030'],['date','>=',D1]]],
+    {fields:['balance','date'],limit:50000});
+  c.forEach(l=>{ const ym=(l.date||'').slice(0,7); if(mesSet.has(ym)) by[ym].cogs+=l.balance||0; });
+  // 3) Ingresos SIN IVA (líneas product, out_invoice − out_refund)
+  for(const [mt,sg] of [['out_invoice',1],['out_refund',-1]]){
+    const inc=await odooCall('account.move.line','search_read',
+      [[['parent_state','=','posted'],['move_id.move_type','=',mt],['display_type','=','product'],['date','>=',D1]]],
+      {fields:['price_subtotal','date'],limit:50000});
+    inc.forEach(l=>{ const ym=(l.date||'').slice(0,7); if(mesSet.has(ym)) by[ym].ingresos+=sg*(l.price_subtotal||0); });
+  }
+  // 4) Facturado con IVA (amount_total de facturas)
+  for(const [mt,sg] of [['out_invoice',1],['out_refund',-1]]){
+    const mv=await odooCall('account.move','search_read',
+      [[['state','=','posted'],['move_type','=',mt],['invoice_date','>=',D1]]],
+      {fields:['amount_total','invoice_date'],limit:50000});
+    mv.forEach(m=>{ const ym=(m.invoice_date||'').slice(0,7); if(mesSet.has(ym)) by[ym].facturado+=sg*(m.amount_total||0); });
+  }
+  return meses.map(mm=>{ const b=by[mm.ym];
+    const famDet={}; Object.keys(b.famDet).forEach(k=>famDet[k]=Object.values(b.famDet[k]).sort((a,z)=>z.monto-a.monto));
+    const adic=b.fam.adicionales||0;
+    const gastoOper=RES_FAM.filter(f=>!f.noOper).reduce((s,f)=>s+(b.fam[f.key]||0),0);
+    return {label:mm.label, parcial:mm.parcial, ingresos:b.ingresos, facturado:b.facturado, cogs:b.cogs,
+            fam:b.fam, famDet, gastoOper, adicionales:adic,
+            resultado:b.ingresos-b.cogs-gastoOper, resultadoContable:b.ingresos-b.cogs-gastoOper-adic}; });
+}
+// Pie de la vista 1: costo real por producto, del MISMO motor que "Costos por producto"
+// (computeCostos). Carga async, no bloquea el P&L. El margen por canal vive en Rentabilidad.
 const RES_PROD = [
-  {label:'Pan Blanco',      color:'#378ADD', costo:2267, unidad:'por unidad',       margen:34.2},
-  {label:'Pan de Semillas', color:'#84BD00', costo:2410, unidad:'por unidad',       margen:36.8},
-  {label:'Pan Francés',     color:'#D4537E', costo:2980, unidad:'por paquete de 4', margen:29.4},
-  {label:'Buns',            color:'#7F77DD', costo:3120, unidad:'por paquete de 4', margen:27.6},
-  {label:'Pizza Crust',     color:'#FF751F', costo:3492, unidad:'por paquete de 2', margen:24.1},
-  {label:'Cookie Dough',    color:'#ED93B1', costo:3050, unidad:'por unidad',       margen:38.5},
+  {key:'blanco',  label:'Pan Blanco',      color:'#378ADD'},
+  {key:'semillas',label:'Pan de Semillas', color:'#84BD00'},
+  {key:'frances', label:'Pan Francés',     color:'#D4537E'},
+  {key:'buns',    label:'Buns',            color:'#7F77DD'},
+  {key:'pizza',   label:'Pizza Crust',     color:'#FF751F'},
+  {key:'galletas',label:'Cookie Dough',    color:'#ED93B1'},
 ];
+async function resProdFooter(){
+  const el=document.getElementById('resProdLinea'); if(!el) return;
+  el.innerHTML=RES_PROD.map(p=>'<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</div><div class="mg muted" style="font-size:13px">…</div></div>').join('');
+  try{
+    const {prods}=await computeCostos(); const byKey={}; prods.forEach(p=>byKey[p.key]=p);
+    el.innerHTML=RES_PROD.map(p=>{ const d=byKey[p.key], costo=d?Math.round((d.total||0)*(d.pack||1)):0, uni=(d&&d.unidad)||'';
+      return '<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</div>'
+        +'<div class="mg">'+cM(costo)+'</div><div class="cu">costo real'+(uni?' · '+esc(uni):'')+'</div></div>'; }).join('');
+  }catch(e){ el.innerHTML='<div class="muted" style="font-size:12px;padding:8px 4px">No pude leer los costos ('+esc(e&&e.message||e)+'). El detalle está en la pestaña Costos.</div>'; }
+}
 let resMeses=[], _resBuilt=false;
-const RES_STATE={mes:RES_MESES_DEF.length-1, comp:[]};
+const RES_STATE={mes:0, comp:[]};
 const cMs = n => (n<0?'−':'')+cM(Math.abs(n));   // colones con signo tipográfico (−, no guion)
-function resInit(){
+async function resInit(){
   if(_resBuilt) return;
   _resBuilt=true;
-  resMeses = RES_MESES_DEF.map(([label,parcial,ingresos,g])=>{
-    const fam={}; RES_FAM.forEach((f,i)=>fam[f.key]=g[i]);
-    const gasto=g.reduce((a,b)=>a+b,0);              // total contable (incluye adicionales)
-    const gastoOper=gasto-(fam.adicionales||0);       // gasto operativo real
-    return {label,parcial,ingresos,fam,gasto,gastoOper,
-            facturado:Math.round(ingresos*1.13),      // ejemplo; Fase 2: amount_total vs price_subtotal
-            resultado:ingresos-gastoOper,             // resultado OPERATIVO (excluye adicionales)
-            resultadoContable:ingresos-gasto};
-  });
-  // selector de vista
+  // wiring del selector de vista (una vez)
   document.querySelectorAll('#resSeg button').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('#resSeg button').forEach(x=>x.classList.toggle('on',x===b));
     const v=b.dataset.v;
@@ -4933,43 +4968,41 @@ function resInit(){
     document.getElementById('resVistaDoce').classList.toggle('hidden',v!=='doce');
     document.getElementById('resVistaComp').classList.toggle('hidden',v!=='comp');
   });
-  // selector de mes (vista 1)
+  const strip=document.getElementById('resStrip');
+  if(strip) strip.innerHTML='<div class="sim-stat" style="grid-column:1/-1"><div class="k"><span class="spin"></span> Leyendo Odoo…</div><div class="note">estado de resultados en vivo (devengado)</div></div>';
+  try{ resMeses=await reporteResultados(); }
+  catch(e){ _resBuilt=false; if(strip) strip.innerHTML='<div class="status s-err" style="grid-column:1/-1">No pude leer el estado de resultados: '+esc(e&&e.message||e)+'</div>'; return; }
+  RES_STATE.mes=resMeses.length-1;
   const sel=document.getElementById('resMesSel');
   sel.innerHTML=resMeses.map((m,i)=>'<option value="'+i+'"'+(i===RES_STATE.mes?' selected':'')+'>'+esc(m.label)+(m.parcial?' · parcial':'')+'</option>').join('');
   sel.onchange=e=>{ RES_STATE.mes=+e.target.value; resRenderMes(); };
-  resRenderMes(); resRender12(); resBuildComp();
+  resRenderMes(); resRender12(); resBuildComp(); resProdFooter();
 }
 function resRenderMes(){
   const m=resMeses[RES_STATE.mes];
   document.getElementById('resParcial').classList.toggle('hidden',!m.parcial);
   document.getElementById('resParcialNote').classList.toggle('hidden',!m.parcial);
-  const opex=m.gastoOper-m.fam.mp, margen=m.ingresos?m.resultado/m.ingresos*100:0;
+  const margen=m.ingresos?m.resultado/m.ingresos*100:0;
   document.getElementById('resStrip').innerHTML=
      '<div class="sim-stat"><div class="k">Ingresos</div><div class="val">'+cMs(m.ingresos)+'</div><div class="note">sin impuesto · facturado con IVA: '+cMs(m.facturado)+'</div></div>'
-    +'<div class="sim-stat"><div class="k">Costo de lo vendido</div><div class="val">'+cMs(m.fam.mp)+'</div><div class="note">materia prima consumida</div></div>'
-    +'<div class="sim-stat"><div class="k">Gastos operativos</div><div class="val">'+cMs(opex)+'</div><div class="note">con gastos adicionales: '+cMs(opex+m.fam.adicionales)+'</div></div>'
+    +'<div class="sim-stat"><div class="k">Costo de lo vendido</div><div class="val">'+cMs(m.cogs)+'</div><div class="note">COGS + materia prima</div></div>'
+    +'<div class="sim-stat"><div class="k">Gastos operativos</div><div class="val">'+cMs(m.gastoOper)+'</div><div class="note">con gastos adicionales: '+cMs(m.gastoOper+m.adicionales)+'</div></div>'
     +'<div class="sim-stat"><div class="k">Resultado del mes</div><div class="val">'+cMs(m.resultado)
       +' <span style="font-size:13px;color:var(--text-2)">'+(m.resultado<0?'−':'')+_pct(Math.abs(margen))+'</span></div>'
       +'<div class="note">operativo · contable (con gastos adicionales): '+cMs(m.resultadoContable)+'</div></div>';
   // familias operativas (orden: de mayor a menor gasto del mes) + adicionales apartada al final
   let h='';
-  RES_FAM.filter(f=>!f.noOper).sort((a,b)=>m.fam[b.key]-m.fam[a.key]).concat(RES_FAM.filter(f=>f.noOper)).forEach(f=>{
-    const val=m.fam[f.key], pct=m.gastoOper?val/m.gastoOper*100:0;
+  RES_FAM.filter(f=>!f.noOper).sort((a,b)=>(m.fam[b.key]||0)-(m.fam[a.key]||0)).concat(RES_FAM.filter(f=>f.noOper)).forEach(f=>{
+    const val=m.fam[f.key]||0, pct=m.gastoOper?val/m.gastoOper*100:0;
     h+='<div class="res-frow" id="resFr-'+f.key+'" onclick="resToggleFam(\''+f.key+'\')">'
       +'<span class="car">▸</span><span class="fam">'+esc(f.label)+(f.noOper?' <span class="res-noop">no operativo</span>':'')+'</span>'
       +'<span class="monto">'+cMs(val)+'</span><span class="pct">'+(f.noOper?'—':_pct(pct))+'</span></div>';
-    // cuentas de adentro (la última absorbe el redondeo para que la familia cierre exacta)
-    let acum=0;
-    h+='<div class="res-facc hidden" id="resAcc-'+f.key+'">'+f.cuentas.map((c,i)=>{
-      const monto=(i===f.cuentas.length-1)?val-acum:Math.round(val*c[2]); acum+=monto;
-      return '<div class="res-arow"><span></span><span class="nm"><span class="code">'+c[0]+'</span> &nbsp;'+esc(c[1])+'</span>'
-        +'<span class="monto">'+cMs(monto)+'</span><span></span></div>';
-    }).join('')+'</div>';
+    const det=(m.famDet&&m.famDet[f.key])||[];   // cuentas reales con movimiento ese mes
+    h+='<div class="res-facc hidden" id="resAcc-'+f.key+'">'+(det.length?det.map(c=>
+      '<div class="res-arow"><span></span><span class="nm"><span class="code">'+esc(c.code)+'</span> &nbsp;'+esc(c.name)+'</span><span class="monto">'+cMs(c.monto)+'</span><span></span></div>').join('')
+      :'<div class="res-arow"><span></span><span class="nm" style="color:var(--text-3)">sin movimientos este mes</span><span></span><span></span></div>')+'</div>';
   });
   document.getElementById('resFamTabla').innerHTML=h;
-  document.getElementById('resProdLinea').innerHTML=RES_PROD.map(p=>
-    '<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</div>'
-    +'<div class="mg">'+_pct(p.margen)+'</div><div class="cu">costo '+cM(p.costo)+' '+esc(p.unidad)+'</div></div>').join('');
 }
 function resToggleFam(key){
   document.getElementById('resAcc-'+key).classList.toggle('hidden');
@@ -4978,7 +5011,8 @@ function resToggleFam(key){
 function resRender12(){
   let h='<thead><tr><th></th>'+resMeses.map(m=>'<th>'+esc(m.label)+(m.parcial?'<span class="thp">parcial</span>':'')+'</th>').join('')+'</tr></thead><tbody>';
   h+='<tr class="res-ing"><td>Ingresos</td>'+resMeses.map(m=>'<td>'+cMs(m.ingresos)+'</td>').join('')+'</tr>';
-  RES_FAM.forEach(f=>{ h+='<tr><td>'+esc(f.label)+(f.noOper?' <span class="res-noop">no operativo</span>':'')+'</td>'+resMeses.map(m=>'<td>'+cMs(m.fam[f.key])+'</td>').join('')+'</tr>'; });
+  h+='<tr><td>Costo de lo vendido</td>'+resMeses.map(m=>'<td>'+cMs(m.cogs)+'</td>').join('')+'</tr>';
+  RES_FAM.forEach(f=>{ h+='<tr><td>'+esc(f.label)+(f.noOper?' <span class="res-noop">no operativo</span>':'')+'</td>'+resMeses.map(m=>'<td>'+cMs(m.fam[f.key]||0)+'</td>').join('')+'</tr>'; });
   h+='<tr class="res-sum"><td>Resultado</td>'+resMeses.map(m=>'<td>'+cMs(m.resultado)+'</td>').join('')+'</tr></tbody>';
   document.getElementById('resTbl12').innerHTML=h;
 }
@@ -5007,7 +5041,8 @@ function resRenderComp(){
     +ms.map(m=>'<th>'+esc(m.label)+(m.parcial?'<span class="thp">parcial</span>':'')+'</th>').join('')
     +(dif?'<th>Diferencia</th>':'')+'</tr></thead><tbody>';
   h+=fila('Ingresos',ms.map(m=>m.ingresos),'res-ing');
-  RES_FAM.forEach(f=>{ h+=fila(esc(f.label)+(f.noOper?' <span class="res-noop">no operativo</span>':''),ms.map(m=>m.fam[f.key])); });
+  h+=fila('Costo de lo vendido',ms.map(m=>m.cogs));
+  RES_FAM.forEach(f=>{ h+=fila(esc(f.label)+(f.noOper?' <span class="res-noop">no operativo</span>':''),ms.map(m=>m.fam[f.key]||0)); });
   h+=fila('Resultado',ms.map(m=>m.resultado),'res-sum');
   out.innerHTML=h+'</tbody></table></div></div>';
 }
