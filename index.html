@@ -4290,9 +4290,20 @@ function _diasVencida(due){
 }
 async function cobLoad(which){
   const mt=_COB_MT[which];
-  const rows=await odooCall('account.move','search_read',
-    [[['move_type','=',mt],['state','=','posted'],['amount_residual','>',0]]],
+  // Corte por año: solo facturas de 2026 en adelante (las viejas incobrables ensucian e inflan el total).
+  let rows=await odooCall('account.move','search_read',
+    [[['move_type','=',mt],['state','=','posted'],['amount_residual','>',0],['invoice_date','>=','2026-01-01']]],
     {fields:['name','ref','number_electronic','invoice_date','invoice_date_due','amount_residual','partner_id'],limit:5000});
+  if(which==='pagar'){
+    // Excluir Gastos Adicionales (cuenta 640103 = compensación de IVA, NO pagos reales de Andrea).
+    // Criterio robusto = la cuenta (no la referencia): captura las que traen ref con número de
+    // documento y descarta gastos reales mal etiquetados "adicional".
+    const adic=await odooCall('account.move.line','search_read',
+      [[['account_id.code','=','640103'],['parent_state','=','posted'],['move_id.move_type','=','in_invoice']]],
+      {fields:['move_id'],limit:20000});
+    const adicSet=new Set(adic.map(l=>l.move_id&&l.move_id[0]).filter(Boolean));
+    rows=rows.filter(r=>!adicSet.has(r.id));
+  }
   // Orden por vencimiento asc; las sin vencimiento van al final.
   rows.sort((a,b)=>{ const x=a.invoice_date_due||'9999-99-99', y=b.invoice_date_due||'9999-99-99'; return x<y?-1:x>y?1:0; });
   return rows;
@@ -4320,7 +4331,8 @@ function renderCob(){
   tot.innerHTML='<div class="cob-strip">'
     +'<div class="sim-stat"><div class="k">Total '+(which==='cobrar'?'por cobrar':'por pagar')+'</div><div class="val">'+cM(total)+'</div><div class="note">'+d.length+' factura'+(d.length===1?'':'s')+' con saldo</div></div>'
     +'<div class="sim-stat"><div class="k">Vencido</div><div class="val">'+cM(vencTot)+'</div><div class="note">'+venc.length+' factura'+(venc.length===1?'':'s')+' vencida'+(venc.length===1?'':'s')+'</div></div>'
-    +'</div>';
+    +'</div>'
+    +'<div class="m3sub" style="margin-top:8px;font-size:11px;color:var(--text-3)">Solo facturas de 2026 en adelante'+(which==='pagar'?' · excluye Gastos Adicionales (compensación de IVA, cuenta 640103)':'')+'. El total es sobre lo visible.</div>';
   const cliLbl=which==='cobrar'?'Cliente':'Proveedor';
   let h='<div style="overflow-x:auto"><table class="cob-tbl"><tr><th>Fecha</th><th>Vence</th><th style="text-align:right">Días</th><th>'+esc(cliLbl)+'</th><th>Documento</th><th style="text-align:right">Pendiente</th></tr>';
   d.forEach(r=>{
