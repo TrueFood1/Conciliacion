@@ -174,6 +174,7 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 
 /* ── Ventas: drill-down canal → cliente → factura (rediseño Finanzas) ── */
 .vent-sub{padding:2px 0 8px 20px}
+.vent-total td{border-top:2px solid var(--border-strong);border-bottom:none}
 .vent-cli{display:flex;align-items:center;gap:8px;padding:8px 4px;font-size:13px;color:var(--text-2);cursor:pointer;border-bottom:1px solid var(--border)}
 .vent-cli:hover{color:var(--text)}
 .vent-cli .pcaret{color:var(--text-3);font-size:10px;display:inline-block;width:11px;transition:transform .15s}
@@ -4050,7 +4051,9 @@ async function reporteVentas(D1,D2){
     c.clientesArr=Object.values(c.clientes).map(cl=>{ cl.facturas.sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))); return cl; }).sort((a,b)=>b.neto-a.neto);
     return c;
   }).sort((a,b)=>b.neto-a.neto);
-  return {filas, total:filas.reduce((s,c)=>s+c.neto,0)};
+  // Total del mes (para la fila Total): facturado bruto − NC restadas = neto
+  const bruto=invs.reduce((s,m)=>s+(m.amount_total||0),0), nc=refs.reduce((s,m)=>s+(m.amount_total||0),0);
+  return {filas, total:filas.reduce((s,c)=>s+c.neto,0), bruto, nc};
 }
 function ventToggle(key){ const row=document.getElementById('vent-'+key); if(!row)return; row.classList.toggle('hidden');
   const prev=row.previousElementSibling; if(prev) prev.classList.toggle('open', !row.classList.contains('hidden')); }
@@ -4073,6 +4076,12 @@ function renderVentas(d,label){
     });
     h+=sub+'</div></td></tr>';
   });
+  // Fila Total del mes: neto (facturado bruto − NC restadas), como la vieja "Facturado por canal".
+  const nCli=d.filas.reduce((s,c)=>s+c.clientesArr.length,0);
+  const sub=(d.nc?('facturado '+cM(d.bruto)+' · NC −'+cM(d.nc)):'sin NC en el mes');
+  h+='<tr class="vent-total"><td><strong>Total</strong></td><td style="text-align:right">'+nCli+'</td>'
+    +'<td style="text-align:right"><strong>'+cM(d.total)+'</strong>'
+    +'<div class="muted" style="font-size:11px;font-weight:400">'+esc(sub)+'</div></td></tr>';
   el.innerHTML=h+'</table></div>';
 }
 
