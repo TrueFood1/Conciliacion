@@ -94,7 +94,6 @@ td[align="right"],td[style*="right"]{font-variant-numeric:tabular-nums}
 #vFacturado .card table,#vProduccion .card table,#vMermas .card table,.rdetail table{max-width:480px}
 #vInventario .card table{max-width:620px}   /* inventario: más columnas + inputs → algo más ancho */
 .valid-box{max-width:660px}
-#repRent{max-width:560px}   /* rentabilidad contenida: filas compactas, no de borde a borde */
 .rlist{max-width:520px}
 .rrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid var(--border);cursor:pointer}
 .rrow:hover{background:var(--surface-2)}
@@ -199,6 +198,7 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .renta-cell .rg{color:var(--text);font-variant-numeric:tabular-nums}
 .renta-cell .rp{color:var(--text-3);font-size:11px;font-variant-numeric:tabular-nums;margin-top:2px}
 .renta-na{color:var(--text-3)}
+.renta-cell .rg.rneg{color:var(--red)}   /* ganancia negativa: señal, no decoración */
 .renta-rowtot .rg,.renta-coltot .rg,.renta-grand .rg{font-weight:600}
 .renta-tbl tfoot td{border-top:1px solid var(--border-strong);border-bottom:none;color:var(--text)}
 .renta-tbl tfoot td:first-child{text-align:left;color:var(--text-2)}
@@ -1119,11 +1119,15 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
-      <div class="m3title" style="font-size:24px">Rentabilidad <span style="font-weight:400;color:var(--text-3);font-size:13px">· mockup — datos de ejemplo</span></div>
-      <div class="m3sub" style="margin-top:2px;font-size:13px">Cuánto le ganás a cada producto en cada canal, del mes: ganancia en ₡ (volumen × margen), con el % de margen abajo. Tocá un producto para ver su costo. Cifras de ejemplo para aprobar el diseño.</div>
+      <div class="m3title" style="font-size:24px">Rentabilidad</div>
+      <div class="m3sub" style="margin-top:2px;font-size:13px">Cuánto le ganás a cada producto en cada canal, del mes: ganancia en ₡ (neto sin IVA − costo de producir − costo de canal), con el % de margen abajo. Tocá un producto para ver su costo real. En vivo de Odoo, solo lectura.</div>
     </div>
-    <div class="live-ind"><span class="live-dot" style="background:var(--text-3);animation:none"></span>datos de ejemplo</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <select id="mesRenta" onchange="cargarRenta()" class="mes-select"></select>
+      <div class="live-ind"><span class="live-dot"></span>conectado a Odoo · datos en vivo</div>
+    </div>
   </div>
+  <div id="rentaStatus" class="status hidden" style="margin-top:12px"></div>
   <div class="card" style="margin-top:16px;padding:0;overflow:hidden"><div style="overflow-x:auto" id="rentaMatriz"></div></div>
   <div id="rentaDetalle" style="margin-top:16px"></div>
 </div>
@@ -3492,7 +3496,7 @@ function irACostos(){
 }
 function irARentabilidad(){
   _modShow('vRentabilidad'); crumbSet('Finanzas','Rentabilidad');
-  rentaMatrizInit();   // Fase 1: matriz producto × canal (mockup en el cliente)
+  rentaInit();   // Fase 2: matriz producto × canal, motor REAL (hereda computeCostos)
 }
 function irAPrecios(){ irASimulador(); }   // Precios = Simulador + Calculadora (sub-pestañas)
 function irASimulador(){
@@ -4073,60 +4077,175 @@ function renderVentas(d,label){
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// RENTABILIDAD (Finanzas) — FASE 1 MOCKUP. Matriz producto × canal: ganancia ₡
-// del mes (volumen × margen unitario) + % de margen. Totales por fila y columna.
-// Clic en producto → desglose de costo (Fase 2 reemplaza "Costos por producto").
-// Fase 2: TODO del motor de costos real; muere el "teórico v1".
+// RENTABILIDAD (Finanzas) — FASE 2: MOTOR REAL. Matriz producto × canal.
+// Celda = ganancia ₡ del mes = neto sin IVA − costo de producir − costo de canal.
+// · Costo de producir: HEREDADO de computeCostos (mismo motor que Costos y M11);
+//   costo por unidad de venta = total × pack. No se recalcula acá.
+// · Volumen: líneas display_type='product' (NUNCA COGS), convertidas a la unidad
+//   de venta del producto con el factor real de Odoo (_conv, misma UoM que el costo).
+// · Canal: por PARTNER (commercial_name / razón social), NO por tarifa — dos
+//   clientes con la misma lista de precios pueden ser canales distintos.
+// · Costo de canal, pegado a la cadena NOMBRADA (Andrea, jul-2026):
+//     - % descuento de cadena sobre el neto (comisión).
+//     - frío fijo mensual ₡, repartido por las unidades de venta del canal ese mes
+//       (monto ÷ unidades = frío/u; poco volumen → pesa más, es correcto).
+//   Compartir tarifa NO implica compartir costo de canal.
+// Clic en un producto → desglose de costo real (reemplaza "Costos por producto").
+// Muere el "teórico v1": un producto, un costo, un margen en toda pantalla.
 // ════════════════════════════════════════════════════════════════════════
-const RENTA_PROD=[
-  {key:'blanco',  label:'Pan Blanco',      color:'#378ADD', costo:2267, unidad:'por unidad',       mp:805,  ind:1462},
-  {key:'semillas',label:'Pan de Semillas', color:'#84BD00', costo:2442, unidad:'por unidad',       mp:980,  ind:1462},
-  {key:'frances', label:'Pan Francés',     color:'#D4537E', costo:2980, unidad:'por paquete de 4', mp:1180, ind:1800},
-  {key:'buns',    label:'Buns',            color:'#7F77DD', costo:3120, unidad:'por paquete de 4', mp:1260, ind:1860},
-  {key:'pizza',   label:'Pizza Crust',     color:'#FF751F', costo:3492, unidad:'por paquete de 2', mp:1422, ind:2070},
-  {key:'galletas',label:'Cookie Dough',    color:'#ED93B1', costo:3050, unidad:'por unidad',       mp:1300, ind:1750},
+// key casa con computeCostos. pid = product.product (facturas + UoM de referencia).
+const RENTA_PROD = [
+  {key:'blanco',  pid:451, label:'Pan Blanco',      color:'#378ADD'},
+  {key:'semillas',pid:452, label:'Pan de Semillas', color:'#84BD00'},
+  {key:'frances', pid:453, label:'Pan Francés',     color:'#D4537E'},
+  {key:'buns',    pid:503, label:'Buns',            color:'#7F77DD'},
+  {key:'pizza',   pid:472, label:'Pizza Crust',     color:'#FF751F'},
+  {key:'galletas',pid:519, label:'Cookie Dough',    color:'#ED93B1'},
 ];
-const RENTA_CANAL=['Automercado','Walmart','BM','Compre Bien','HORECA'];
-// [margen unitario ₡, volumen del mes] por canal (orden RENTA_CANAL); [0,0] = no se vende ahí.
-const RENTA_MOCK={
-  blanco:  [[820,420],[760,180],[900,90],[880,60],[1100,40]],
-  semillas:[[900,260],[840,120],[980,70],[0,0],[1200,35]],
-  frances: [[1150,210],[1050,90],[1250,50],[1200,40],[0,0]],
-  buns:    [[1180,150],[0,0],[1300,45],[1250,35],[1500,30]],
-  pizza:   [[980,120],[900,80],[0,0],[0,0],[1300,60]],
-  galletas:[[1250,90],[0,0],[1400,25],[0,0],[1600,45]],
-};
-let _rentaBuilt=false;
-function rentaMatrizInit(){ if(_rentaBuilt) return; _rentaBuilt=true; rentaRender(); }
-function rentaRender(){
-  const el=document.getElementById('rentaMatriz'); if(!el) return;
-  const colTot=RENTA_CANAL.map(()=>0); let gran=0;
-  let h='<table class="renta-tbl"><thead><tr><th>Producto</th>'+RENTA_CANAL.map(c=>'<th>'+esc(c)+'</th>').join('')+'<th>Total producto</th></tr></thead><tbody>';
-  RENTA_PROD.forEach(P=>{
-    const mk=RENTA_MOCK[P.key]||[]; let rowTot=0;
-    let cells='';
-    mk.forEach((cell,ci)=>{
-      const mg=cell[0], vol=cell[1], gan=mg*vol;
-      if(!gan){ cells+='<td class="renta-na">—</td>'; return; }
-      rowTot+=gan; colTot[ci]+=gan; gran+=gan;
-      const precio=P.costo+mg, pct=precio?mg/precio*100:0;
-      cells+='<td class="renta-cell"><div class="rg">'+cM(gan)+'</div><div class="rp">'+_pct(pct)+'</div></td>';
+// Canales (columnas, en orden). pct = descuento sobre neto; frio = ₡ fijo/mes del
+// canal. AJUSTAR ACÁ cuando Andrea cambie un término (fuente entre paréntesis).
+const RENTA_CANALES = [
+  {key:'auto',   label:'Automercado',           pct:0,      frio:612912},  // frío ₡612.912/mes (Andrea, jul-2026)
+  {key:'walmart',label:'Walmart / Más x Menos', pct:0.0643, frio:0},       // descuento 6,43% (incluye todo)
+  {key:'mega',   label:'MegaSuper',             pct:0.065,  frio:0},       // descuento 6,5%
+  {key:'compre', label:'Compre Bien',           pct:0,      frio:34386},   // frío ₡34.386/mes
+  {key:'bm',     label:'BM',                    pct:0,      frio:0},       // sin descuento
+  {key:'negro',  label:'Super Negro',           pct:0,      frio:0},       // sin descuento
+  {key:'horeca', label:'HORECA',                pct:0,      frio:0},       // sin descuento
+  {key:'retail', label:'Retail',                pct:0,      frio:0},       // sin descuento (incluye Abner)
+  {key:'otros',  label:'Otros',                 pct:0,      frio:0},       // supermercados sin columna propia + resto
+];
+// Partner → canal. Por banner (commercial_name); razón social de respaldo. NUNCA por
+// tarifa: otros clientes pueden compartir la lista de precios de una cadena sin serlo
+// (comparten precio, NO el frío ni el descuento) → esos caen en "Otros".
+function clasificarCanal(p){
+  const com=(p&&typeof p.commercial_name==='string')?p.commercial_name:'';
+  const nm=(p&&p.name)||'', s=com+' '+nm, team=p&&p.team_id&&p.team_id[0];
+  if(com==='Automercado') return 'auto';
+  if(com==='Walmart' || /supermercados unidos/i.test(nm)) return 'walmart';
+  if(/mega\s*super|megasuper/i.test(com)) return 'mega';
+  if(/compre\s*bien/i.test(s)) return 'compre';
+  if(/^b\.?\s*m\b/i.test(com) || /\bb\.?\s*m\b|bmquepos|arrendadora bm/i.test(nm)) return 'bm';
+  if(/super\s*negro|supernegro/i.test(s)) return 'negro';
+  if(team===6) return 'horeca';
+  if(team===5) return 'retail';
+  return 'otros';
+}
+let _rentaData=null, _rentaInit=false;   // _rentaData.byKey = costos del último cálculo (para el detalle)
+async function reporteRenta(D1,D2){
+  const {prods}=await computeCostos();            // HEREDA el motor real de costos
+  const byKey={}; prods.forEach(p=>byKey[p.key]=p);
+  const costoDe={}; RENTA_PROD.forEach(P=>{ const d=byKey[P.key]; costoDe[P.key]=d?(d.total||0)*(d.pack||1):0; });
+  _rentaData={byKey};
+  // UoM de referencia (unidad de venta) por producto — para convertir el volumen
+  const pids=RENTA_PROD.map(P=>P.pid), keyDe={}; RENTA_PROD.forEach(P=>keyDe[P.pid]=P.key);
+  const pinfo=await odooCall('product.product','read',[pids],{fields:['id','uom_id']});
+  const refUom={}; pinfo.forEach(p=>{ refUom[keyDe[p.id]]=p.uom_id&&p.uom_id[0]; });
+  // Líneas de venta (product, NUNCA COGS): out_invoice − out_refund
+  const lines=[];
+  for(const [mt,sg] of [['out_invoice',1],['out_refund',-1]]){
+    const rows=await odooCall('account.move.line','search_read',
+      [[['parent_state','=','posted'],['move_id.move_type','=',mt],['display_type','=','product'],
+        ['date','>=',D1],['date','<=',D2],['product_id','in',pids]]],
+      {fields:['product_id','quantity','price_subtotal','product_uom_id','partner_id'],limit:20000});
+    rows.forEach(r=>{ r._sg=sg; lines.push(r); });
+  }
+  // Partner → canal (el canal vive en el cliente, no en la factura)
+  const partIds=[...new Set(lines.map(l=>l.partner_id&&l.partner_id[0]).filter(Boolean))];
+  const parts=partIds.length?await odooCall('res.partner','read',[partIds],{fields:['id','name','commercial_name','team_id']}):[];
+  const pI={}; parts.forEach(p=>pI[p.id]=p);
+  // Agregar por (canal, producto): neto y volumen (en unidad de venta)
+  const cell={}, chVol={};
+  for(const l of lines){
+    const p=pI[l.partner_id&&l.partner_id[0]]||{};
+    const ch=clasificarCanal(p), key=keyDe[l.product_id[0]];
+    const vol=await _conv(l._sg*(l.quantity||0), l.product_uom_id&&l.product_uom_id[0], refUom[key]);
+    const ck=ch+'|'+key, c=cell[ck]||(cell[ck]={neto:0,vol:0});
+    c.neto+=l._sg*(l.price_subtotal||0); c.vol+=vol;
+    chVol[ch]=(chVol[ch]||0)+vol;
+  }
+  // Frío por unidad del canal (₡ fijo ÷ unidades del canal ese mes)
+  const frioUnit={}; RENTA_CANALES.forEach(c=>{ frioUnit[c.key]=(c.frio&&chVol[c.key])?c.frio/chVol[c.key]:0; });
+  // Solo columnas con ventas ese mes
+  const canalesActivos=RENTA_CANALES.filter(c=>RENTA_PROD.some(P=>{ const x=cell[c.key+'|'+P.key]; return x&&Math.abs(x.vol)>1e-6; }));
+  const filas=RENTA_PROD.map(P=>{
+    const costo=costoDe[P.key];
+    const celdas=canalesActivos.map(c=>{
+      const x=cell[c.key+'|'+P.key]; if(!x||Math.abs(x.vol)<1e-6) return null;
+      const desc=x.neto*(c.pct||0), frio=(frioUnit[c.key]||0)*x.vol, cprod=costo*x.vol;
+      const gan=x.neto-cprod-desc-frio;
+      return {neto:x.neto, vol:x.vol, cprod, desc, frio, gan, pct: x.neto?gan/x.neto:0};
     });
-    h+='<tr class="renta-prow" onclick="rentaDetalle(\''+P.key+'\')"><td><span class="renta-prod"><span class="pdot" style="background:'+P.color+'"></span>'+esc(P.label)+'</span></td>'
-      +cells+'<td class="renta-cell renta-rowtot"><div class="rg">'+cM(rowTot)+'</div></td></tr>';
+    return {P, celdas, rowTot:celdas.reduce((s,x)=>s+(x?x.gan:0),0)};
   });
-  h+='</tbody><tfoot><tr><td>Total canal</td>'+colTot.map(t=>'<td class="renta-cell renta-coltot"><div class="rg">'+cM(t)+'</div></td>').join('')
-    +'<td class="renta-cell renta-grand"><div class="rg">'+cM(gran)+'</div></td></tr></tfoot></table>';
+  const colTot=canalesActivos.map((c,ci)=>filas.reduce((s,f)=>s+(f.celdas[ci]?f.celdas[ci].gan:0),0));
+  const gran=colTot.reduce((s,x)=>s+x,0);
+  const netoTot=filas.reduce((s,f)=>s+f.celdas.reduce((a,x)=>a+(x?x.neto:0),0),0);
+  return {canalesActivos, filas, colTot, gran, netoTot, frioUnit, chVol};
+}
+async function cargarRenta(){
+  const sel=document.getElementById('mesRenta'), ym=sel&&sel.value; if(!ym) return;
+  const {D1,D2,label}=mesRango(ym);
+  const st=document.getElementById('rentaStatus'), det=document.getElementById('rentaDetalle');
+  if(det) det.innerHTML='';
+  if(st){ st.className='status s-info'; st.classList.remove('hidden'); st.innerHTML='<span class="spin"></span>Leyendo Odoo y calculando la rentabilidad de '+esc(label)+'… (usa el motor de costos, puede tardar)'; }
+  try{
+    const R=await reporteRenta(D1,D2);
+    if(st) st.classList.add('hidden');
+    rentaRender(R, label);
+  }catch(e){ console.error('cargarRenta:',e); const mtx=document.getElementById('rentaMatriz'); if(mtx) mtx.innerHTML=''; if(st){ st.className='status s-err'; st.innerHTML='No pude calcular la rentabilidad: '+esc(e&&e.message||e); } }
+}
+function rentaRender(R, label){
+  const el=document.getElementById('rentaMatriz'); if(!el) return;
+  if(!R.canalesActivos.length){ el.innerHTML='<div class="muted" style="padding:16px">Sin ventas de producto terminado en '+esc(label)+'.</div>'; return; }
+  let h='<table class="renta-tbl"><thead><tr><th>Producto</th>'
+    +R.canalesActivos.map(c=>'<th>'+esc(c.label)+'</th>').join('')+'<th>Total producto</th></tr></thead><tbody>';
+  R.filas.forEach(f=>{
+    let cells='';
+    f.celdas.forEach(x=>{
+      if(!x){ cells+='<td class="renta-na">—</td>'; return; }
+      cells+='<td class="renta-cell"><div class="rg'+(x.gan<0?' rneg':'')+'">'+cMs(x.gan)+'</div><div class="rp">'+_pct(x.pct*100)+'</div></td>';
+    });
+    h+='<tr class="renta-prow" onclick="rentaDetalle(\''+f.P.key+'\')"><td><span class="renta-prod"><span class="pdot" style="background:'+f.P.color+'"></span>'+esc(f.P.label)+'</span></td>'
+      +cells+'<td class="renta-cell renta-rowtot"><div class="rg'+(f.rowTot<0?' rneg':'')+'">'+cMs(f.rowTot)+'</div></td></tr>';
+  });
+  h+='</tbody><tfoot><tr><td>Total canal</td>'
+    +R.colTot.map(t=>'<td class="renta-cell renta-coltot"><div class="rg'+(t<0?' rneg':'')+'">'+cMs(t)+'</div></td>').join('')
+    +'<td class="renta-cell renta-grand"><div class="rg">'+cMs(R.gran)+'</div></td></tr></tfoot></table>';
+  // Conciliación + costos de canal aplicados
+  let foot='Ganancia = neto sin IVA − costo de producir (motor) − costo de canal. '
+    +'Ganancia total del mes: <strong style="color:var(--text)">'+cMs(R.gran)+'</strong> sobre neto '+cM(R.netoTot)+'. Tocá un producto para ver su costo real.';
+  const notas=R.canalesActivos.filter(c=>c.pct||c.frio).map(c=>{
+    if(c.pct) return esc(c.label)+' −'+_pct(c.pct*100)+' sobre neto';
+    return esc(c.label)+' frío '+cM(c.frio)+'/mes ÷ '+fmtN(Math.round(R.chVol[c.key]||0))+' u = '+cM(R.frioUnit[c.key])+'/u';
+  });
+  if(notas.length) foot+='<br>Costos de canal: '+notas.join(' · ')+'.';
+  h+='<div style="padding:10px 12px;font-size:11px;color:var(--text-3);border-top:1px solid var(--border)">'+foot+'</div>';
   el.innerHTML=h;
 }
 function rentaDetalle(key){
-  const P=RENTA_PROD.find(p=>p.key===key), el=document.getElementById('rentaDetalle'); if(!P||!el) return;
-  el.innerHTML='<div class="card"><div class="card-title"><span class="pdot" style="background:'+P.color+'"></span> Costo de '+esc(P.label)+' <span class="muted" style="font-weight:400;font-size:12px">· '+esc(P.unidad)+'</span></div>'
-    +'<div style="overflow-x:auto"><table class="cob-tbl" style="max-width:440px"><tr><td>Materia prima</td><td style="text-align:right">'+cM(P.mp)+'</td></tr>'
-    +'<tr><td>Indirecto (planilla, alquiler, servicios…)</td><td style="text-align:right">'+cM(P.ind)+'</td></tr>'
-    +'<tr style="border-top:1px solid var(--border-strong)"><td><strong>Costo total</strong></td><td style="text-align:right"><strong>'+cM(P.costo)+'</strong></td></tr></table></div>'
-    +'<div class="m3sub" style="margin-top:8px;font-size:11px;color:var(--text-3)">Mockup — en Fase 2 este desglose sale del motor real de Costos (reemplaza "Costos por producto").</div></div>';
-  el.scrollIntoView({block:'nearest'});
+  const P=RENTA_PROD.find(p=>p.key===key), el=document.getElementById('rentaDetalle');
+  const d=_rentaData&&_rentaData.byKey&&_rentaData.byKey[key];
+  if(!P||!el||!d) return;
+  const pack=d.pack||1, mp=((d.mp&&d.mp.mpUnit)||0)*pack, ind=(d.indUnit||0)*pack, tot=(d.total||0)*pack;
+  let h='<div class="card"><div class="card-title"><span class="pdot" style="background:'+P.color+'"></span> Costo real de '+esc(P.label)
+    +' <span class="muted" style="font-weight:400;font-size:12px">· '+esc(d.unidad||'')+'</span></div>';
+  h+='<div style="overflow-x:auto"><table class="cob-tbl" style="max-width:460px">';
+  ((d.mp&&d.mp.desglose)||[]).slice(0,14).forEach(x=>{ h+='<tr><td>'+esc(x.name)+'</td><td style="text-align:right">'+cM(x.perUnit*pack)+'</td></tr>'; });
+  h+='<tr style="font-weight:600;border-top:1px solid var(--border)"><td>Materia prima</td><td style="text-align:right">'+cM(mp)+'</td></tr>';
+  h+='<tr><td>Indirecto ('+fmtN(Math.round(d.dias||0))+' días/mes · '+((d.pct||0)*100).toFixed(1)+'% del pool)</td><td style="text-align:right">'+cM(ind)+'</td></tr>';
+  h+='<tr style="border-top:1px solid var(--border-strong)"><td><strong>Costo total</strong></td><td style="text-align:right"><strong>'+cM(tot)+'</strong></td></tr>';
+  h+='</table></div><div class="m3sub" style="margin-top:8px;font-size:11px;color:var(--text-3)">Del motor real de Costos (promedio de los últimos meses cerrados). Reemplaza "Costos por producto".</div></div>';
+  el.innerHTML=h; el.scrollIntoView({block:'nearest'});
+}
+function rentaInit(){
+  const sel=document.getElementById('mesRenta');
+  if(sel && !sel.options.length){
+    buildMes(sel);
+    const prev=new Date(new Date().getFullYear(), new Date().getMonth()-1, 1);   // default: mes anterior (último completo)
+    sel.value=prev.getFullYear()+'-'+String(prev.getMonth()+1).padStart(2,'0');
+  }
+  if(!_rentaInit){ _rentaInit=true; cargarRenta(); }
 }
 // Sub-pestañas dentro de Producción y Mermas (Producto terminado | Premezclas).
 function repTab(grupo,btn,cual){
@@ -4599,10 +4718,10 @@ function cobCopiar(i,ev){
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// REPORTE — RENTABILIDAD POR CANAL (teórico v1). SOLO LECTURA.
-// Margen = Precio de lista − Costo (MP+indirecto, motor de Costos) − Término%×Precio.
-// Precio: fixed_price de product.pricelist.item por tarifa (canal). Costo por unidad de venta.
-// Fuera de v1: ponderar por ventas; repartir fríos mensuales (Automercado/Compre Bien/MegaSuper).
+// TARIFAS POR CANAL (para Precios: Simulador + Calculadora). SOLO LECTURA.
+// El "teórico v1" de Rentabilidad murió: Rentabilidad ahora es el motor REAL de arriba
+// (ventas reales × costo real − costo de canal). Estas constantes SIGUEN VIVAS porque
+// la Calculadora/Simulador de Precios las usa (tarifa → precio de lista + término %).
 // ════════════════════════════════════════════════════════════════════════
 // canal → tarifa (plId) + término % directo. Algunos canales comparten tarifa (Super Negro [5]).
 const RENT_CANALES = [
@@ -4627,69 +4746,6 @@ const RENT_PROD = [
   {key:'galletas',label:'Cookie Dough',    pid:519},
 ];
 const _pct = n => (Number(n)||0).toLocaleString('es-CR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
-
-async function reporteRentabilidad(){
-  // 1) Costo por unidad de venta (reusa el motor de Costos; total × pack = costo por unidad vendida,
-  //    misma unidad que el precio de tarifa: Francés/Buns por paquete de 4, Pizza por paquete de 2).
-  const {prods}=await computeCostos();
-  const costoDe={}; prods.forEach(p=>{ costoDe[p.key]=(p.total||0)*(p.pack||1); });
-  // 2) Precios: fixed_price de product.pricelist.item por (template, tarifa).
-  const pids=RENT_PROD.map(p=>p.pid);
-  const info=await odooCall('product.product','read',[pids],{fields:['id','product_tmpl_id']});
-  const tmplDe={}; info.forEach(p=>{ tmplDe[p.id]=p.product_tmpl_id&&p.product_tmpl_id[0]; });
-  const tmpls=Object.values(tmplDe).filter(Boolean);
-  const plIds=[...new Set(RENT_CANALES.map(c=>c.plId))];
-  const items=await odooCall('product.pricelist.item','search_read',
-    [[['pricelist_id','in',plIds],['product_tmpl_id','in',tmpls],['compute_price','=','fixed'],['applied_on','=','1_product']]],
-    {fields:['pricelist_id','product_tmpl_id','fixed_price'],limit:1000});
-  const precio={};   // `${plId}:${tmplId}` → fixed_price
-  items.forEach(it=>{ precio[it.pricelist_id[0]+':'+it.product_tmpl_id[0]]=it.fixed_price; });
-  // 3) Matriz canal × producto
-  const canales=RENT_CANALES.map(c=>{
-    const filas=RENT_PROD.map(P=>{
-      const pr=precio[c.plId+':'+tmplDe[P.pid]];
-      if(pr==null || pr===0) return {label:P.label, precio:null};   // no aplica en esta tarifa
-      const costo=costoDe[P.key]||0, termMonto=pr*c.termino, margen=pr-costo-termMonto;
-      return {label:P.label, precio:pr, costo, termMonto, margen, margenPct: pr?margen/pr:0};
-    });
-    const conP=filas.filter(f=>f.precio!=null);
-    return Object.assign({}, c, {filas, nProd:conP.length,
-      margenPctProm: conP.length? conP.reduce((s,f)=>s+f.margenPct,0)/conP.length : null});
-  }).filter(c=>c.nProd>0).sort((a,b)=>(b.margenPctProm||-9)-(a.margenPctProm||-9));
-  return {canales};
-}
-async function cargarRentabilidad(){
-  const cont=document.getElementById('repRent'); if(!cont) return;
-  const btn=document.getElementById('btnRent'); if(btn) btn.disabled=true;
-  cont.innerHTML='<div class="status s-info"><span class="spin"></span>Calculando rentabilidad (usa el motor de Costos, puede tardar)…</div>';
-  try{
-    const {canales}=await reporteRentabilidad();
-    renderRentabilidad(cont, canales);
-  }catch(e){ console.error('cargarRentabilidad:',e); cont.innerHTML='<div class="status s-err">No pude calcular la rentabilidad: '+esc(e&&e.message||e)+'</div>'; }
-  finally{ if(btn) btn.disabled=false; }
-}
-function renderRentabilidad(cont, canales){
-  if(!canales.length){ cont.innerHTML='<div class="muted">Sin datos de precios para calcular.</div>'; return; }
-  // Fila compacta: nombre a la izquierda, % a la derecha. Se toca para expandir el detalle por producto.
-  let h='<div class="rlist">';
-  canales.forEach((c,i)=>{
-    const pct=c.margenPctProm!=null?_pct(c.margenPctProm*100):'—';
-    const notas=[]; if(c.termino>0) notas.push('término '+_pct(c.termino*100)); if(c.frio) notas.push('sin frío mensual');
-    const nota = notas.length ? '<span class="rrow-note">'+esc(notas.join(' · '))+'</span>' : '';
-    h+='<div class="rrow" id="rrow'+i+'" onclick="toggleRent('+i+')"><div class="rrow-l"><span class="rrow-name">'+esc(c.canal)+'</span>'+nota+'</div><span class="rrow-pct">'+pct+'</span></div>';
-    h+='<div class="rdetail hidden" id="rdet'+i+'">';
-    if(c.frio) h+='<div style="font-size:11px;color:var(--text-3);margin:2px 0 6px">Margen sin frío mensual ('+esc(c.frio)+'). Se completa en fase real.</div>';
-    h+='<table><tr><th>Producto</th><th style="text-align:right">Precio</th><th style="text-align:right">Costo</th><th style="text-align:right">Margen</th><th style="text-align:right">Margen %</th></tr>';
-    c.filas.forEach(f=>{
-      if(f.precio==null){ h+='<tr style="color:var(--text-3)"><td>'+esc(f.label)+'</td><td colspan="4" style="text-align:right">no aplica en esta tarifa</td></tr>'; return; }
-      h+='<tr><td>'+esc(f.label)+'</td><td style="text-align:right">'+cM(f.precio)+'</td><td style="text-align:right">'+cM(f.costo)+'</td><td style="text-align:right"><strong>'+cM(f.margen)+'</strong></td><td style="text-align:right"><strong>'+_pct(f.margenPct*100)+'</strong></td></tr>';
-    });
-    h+='</table></div>';
-  });
-  h+='</div>';
-  cont.innerHTML=h;
-}
-function toggleRent(i){ const d=document.getElementById('rdet'+i); if(d) d.classList.toggle('hidden'); const r=document.getElementById('rrow'+i); if(r) r.classList.toggle('open'); }
 
 // ════════════════════════════════════════════════════════════════════════
 // SIMULADOR DE COSTOS (Finanzas) — parte del motor REAL (computeCostos): MP, días y
