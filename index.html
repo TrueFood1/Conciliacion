@@ -1036,6 +1036,22 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <div id="repMermasTerm"><div class="muted">Elegí un mes.</div></div>
     <div id="repMermasPremez" class="hidden" style="margin-top:12px"></div>
   </div>
+
+  <div class="card-title" style="margin-top:24px">Por causa <span style="font-weight:400;color:var(--text-3);font-size:12px">· mes seleccionado</span></div>
+  <div class="m3sub" style="margin-top:2px">Causa leída del campo de referencia del scrap (convención QUEMADO · CAÍDA · VENCIDO · EMPAQUE · OTRO). Los que no la traen quedan en "sin causa". Producto terminado, unidades individuales.</div>
+  <div class="card" style="margin-top:10px" id="repMermasCausa"><div class="muted">Elegí un mes.</div></div>
+
+  <div class="card-title" style="margin-top:24px">Tendencia mensual <span style="font-weight:400;color:var(--text-3);font-size:12px">· últimos 6 meses</span></div>
+  <div class="m3sub" style="margin-top:2px">Merma de producto terminado (unidades individuales) mes a mes, por producto o por causa.</div>
+  <div id="mermTendStatus" class="status s-info hidden" style="margin-top:12px"></div>
+  <div class="m3nav" style="margin-top:12px">
+    <button class="m3tab on" onclick="mermTendTab('prod',this)">Por producto</button>
+    <button class="m3tab" onclick="mermTendTab('causa',this)">Por causa</button>
+  </div>
+  <div class="card" style="margin-top:10px">
+    <div id="repMermTendProd"><div class="muted">Cargando…</div></div>
+    <div id="repMermTendCausa" class="hidden"></div>
+  </div>
 </div>
 
 <!-- RENTABILIDAD POR CANAL (cara 3 del módulo Contabilidad) — teórico, NO depende del mes -->
@@ -3416,7 +3432,7 @@ function irAProduccion(){
 }
 function irAMermas(){
   _modShow('vMermas'); crumbSet('Operaciones','Mermas');
-  if(!_loaded.merm){ _loaded.merm=true; cargarMermas(); }
+  if(!_loaded.merm){ _loaded.merm=true; cargarMermas(); cargarMermasTendencia(); }   // tendencia: independiente del mes, se carga una vez
 }
 function irAInventario(){
   _modShow('vInventario'); crumbSet('Operaciones','Inventario');
@@ -3811,8 +3827,9 @@ async function reporteMermas(D1,D2){
   const idsP=new Set(PROD_PREMEZ.map(p=>p.id)); const labP={}; PROD_PREMEZ.forEach(p=>labP[p.id]=p.label);
   const s=await odooCall('stock.scrap','search_read',
     [[['state','=','done'],['date_done','>=',D1],['date_done','<=',D2+' 23:59:59']]],
-    {fields:['product_id','scrap_qty','product_uom_id'],limit:2000});
+    {fields:['name','origin','product_id','scrap_qty','product_uom_id'],limit:2000});
   const bucket={term:{},premez:{},otros:{}};
+  const causaMes={};   // causa → {cant (unidades individuales de terminado), n}  (Bloque 5)
   for(const o of s){
     const pid=o.product_id&&o.product_id[0]; if(!pid)continue;
     const indiv=(o.scrap_qty||0)/await uomFactor(o.product_uom_id&&o.product_uom_id[0]);   // unidades individuales
@@ -3820,6 +3837,8 @@ async function reporteMermas(D1,D2){
       const cant=indiv*await prodUomFactor(pid);
       const t=bucket.term[pid]||(bucket.term[pid]={nombre:termCfg[pid].label,unidad:termCfg[pid].unidad,cant:0,n:0});
       t.cant+=cant; t.n++;
+      const ca=_causaScrap(o.name,o.origin);   // causa en unidades individuales (comparable entre productos)
+      const cc=causaMes[ca]||(causaMes[ca]={cant:0,n:0}); cc.cant+=indiv; cc.n++;
     } else {            // premezcla / otros (materia prima) → unidad base (individual)
       const grp=idsP.has(pid)?'premez':'otros';
       const nombre=grp==='premez'?labP[pid]:((o.product_id&&o.product_id[1])||'');
@@ -3828,7 +3847,8 @@ async function reporteMermas(D1,D2){
     }
   }
   const ord=o=>Object.values(o).sort((a,b)=>b.cant-a.cant);
-  return {terminados:ord(bucket.term), premezclas:ord(bucket.premez), otros:ord(bucket.otros)};
+  const causaRows=_CAUSA_ORDEN.filter(k=>causaMes[k]).map(k=>Object.assign({causa:k},causaMes[k]));
+  return {terminados:ord(bucket.term), premezclas:ord(bucket.premez), otros:ord(bucket.otros), causa:causaRows};
 }
 
 // Escribe innerHTML solo si el contenedor existe (evita que un ID desalineado tumbe toda la carga).
@@ -3915,6 +3935,30 @@ function _fechaCR(s){
   const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5])-6*3600*1000), p=n=>String(n).padStart(2,'0');
   return p(d.getUTCDate())+'/'+p(d.getUTCMonth()+1)+' · '+p(d.getUTCHours())+':'+p(d.getUTCMinutes());
 }
+// Mermas con causa (Bloque 5). Convención que Andrea instruye a Keylor en el
+// campo de referencia del scrap (origin / Source Document). Robusto: busca en
+// origin + name. Sin acentos y tolerante a variantes. Los que no traen → "sin causa".
+const _CAUSAS=[
+  {key:'QUEMADO', rx:/quemad/i},
+  {key:'CAÍDA',   rx:/ca[ií]d/i},
+  {key:'VENCIDO', rx:/vencid/i},
+  {key:'EMPAQUE', rx:/empaqu/i},
+  {key:'OTRO',    rx:/\botro\b/i},
+];
+const _CAUSA_ORDEN=['QUEMADO','CAÍDA','VENCIDO','EMPAQUE','OTRO','sin causa'];
+function _causaScrap(name,origin){
+  const s=(origin||'')+' '+(name||'');
+  for(const c of _CAUSAS){ if(c.rx.test(s)) return c.key; }
+  return 'sin causa';
+}
+// 'YYYY-MM-DD HH:MM:SS' (UTC) → 'YYYY-MM' en hora CR (UTC−6).
+function _ymCR(s){
+  const m=String(s||'').match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  if(!m) return String(s||'').slice(0,7);
+  const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5])-6*3600*1000);
+  return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0');
+}
+function _ymLabel(ym){ const p=String(ym).split('-'); const mi=(+p[1])-1; return (_MESNOM[mi]||'').slice(0,3)+' '+String(p[0]).slice(2); }
 // Drill-down (Bloque 1): despliega/oculta la lista de órdenes de un producto.
 function toggleProdDet(key){
   const row=document.getElementById('pdet-'+key); if(!row) return;
@@ -3967,15 +4011,79 @@ function tablaMermas(rows,label,conUnidad){
   return h;
 }
 function renderMermasAll(data,label){
-  const t=document.getElementById('repMermasTerm'), p=document.getElementById('repMermasPremez');
+  const t=document.getElementById('repMermasTerm'), p=document.getElementById('repMermasPremez'), c=document.getElementById('repMermasCausa');
   if(!t||!p){ console.warn('Reportes: faltan contenedores de Mermas'); return; }
-  if(data&&data.error){ t.innerHTML='<div class="status s-err">No pude leer mermas: '+esc(data.error)+'</div>'; p.innerHTML=''; return; }
+  if(data&&data.error){ t.innerHTML='<div class="status s-err">No pude leer mermas: '+esc(data.error)+'</div>'; p.innerHTML=''; if(c)c.innerHTML=''; return; }
   let ht=tablaMermas(data.terminados,label,true);
   if(data.otros&&data.otros.length){   // materia prima u otros: se muestran (unidad base), no se ocultan
     ht+='<div style="margin-top:12px;font-size:12px;font-weight:600;color:var(--text-2)">Otros (materia prima u otros productos) · unidad base</div>'+tablaMermas(data.otros,label,false);
   }
   t.innerHTML=ht;
   p.innerHTML=tablaMermas(data.premezclas,label,false);
+  if(c) c.innerHTML=tablaCausa(data.causa,label);
+}
+// Mermas por causa del mes (terminados, unidades individuales — comparable entre productos).
+function tablaCausa(rows,label){
+  if(!rows||!rows.length) return '<div class="muted">Sin mermas de producto terminado en '+esc(label)+'.</div>';
+  const tot=rows.reduce((s,r)=>s+r.cant,0), totN=rows.reduce((s,r)=>s+r.n,0);
+  let h='<div style="overflow-x:auto"><table><tr><th>Causa</th><th style="text-align:right">Unidades</th><th style="text-align:right">% del total</th><th style="text-align:right">Registros</th></tr>';
+  rows.forEach(r=>{ const pct=tot?r.cant/tot*100:0;
+    h+='<tr><td>'+esc(r.causa)+'</td><td style="text-align:right"><strong>'+fmtN(r.cant)+'</strong></td><td style="text-align:right" class="muted">'+_pct(pct)+'</td><td style="text-align:right">'+r.n+'</td></tr>'; });
+  h+='<tr style="border-top:1px solid var(--border)"><td>Total</td><td style="text-align:right"><strong>'+fmtN(tot)+'</strong></td><td></td><td style="text-align:right">'+totN+'</td></tr></table></div>';
+  return h;
+}
+// Tendencia de mermas de terminado (unidades individuales) por producto y por causa, últimos N meses.
+async function reporteMermasTendencia(nMeses){
+  const termCfg={}; PROD_TERM.forEach(p=>termCfg[p.id]=p);
+  const hoy=new Date(), meses=[];
+  for(let i=nMeses-1;i>=0;i--){ const d=new Date(hoy.getFullYear(),hoy.getMonth()-i,1); meses.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
+  const s=await odooCall('stock.scrap','search_read',
+    [[['state','=','done'],['date_done','>=',meses[0]+'-01 00:00:00']]],
+    {fields:['name','origin','product_id','scrap_qty','product_uom_id','date_done'],limit:5000});
+  const mesSet=new Set(meses), porProducto={}, porCausa={};
+  for(const o of s){
+    const pid=o.product_id&&o.product_id[0]; if(!pid||!termCfg[pid])continue;
+    const ym=_ymCR(o.date_done); if(!mesSet.has(ym))continue;
+    const indiv=(o.scrap_qty||0)/await uomFactor(o.product_uom_id&&o.product_uom_id[0]);
+    const lbl=termCfg[pid].label, ca=_causaScrap(o.name,o.origin);
+    porProducto[lbl]=porProducto[lbl]||{}; porProducto[lbl][ym]=(porProducto[lbl][ym]||0)+indiv;
+    porCausa[ca]=porCausa[ca]||{};       porCausa[ca][ym]=(porCausa[ca][ym]||0)+indiv;
+  }
+  return {meses, porProducto, porCausa};
+}
+function _tendTabla(map,meses,ordenKeys){
+  const keys = ordenKeys ? ordenKeys.filter(k=>map[k]) :
+    Object.keys(map).sort((a,b)=>meses.reduce((s,m)=>s+(map[b][m]||0),0)-meses.reduce((s,m)=>s+(map[a][m]||0),0));
+  if(!keys.length) return '<div class="muted">Sin mermas de terminado en el período.</div>';
+  let h='<div style="overflow-x:auto"><table class="res-tbl"><thead><tr><th></th>'+meses.map(m=>'<th>'+esc(_ymLabel(m))+'</th>').join('')+'<th>Total</th></tr></thead><tbody>';
+  keys.forEach(k=>{ const tot=meses.reduce((s,m)=>s+(map[k][m]||0),0);
+    h+='<tr><td>'+esc(k)+'</td>'+meses.map(m=>'<td>'+(map[k][m]?fmtN(map[k][m]):'—')+'</td>').join('')+'<td><strong>'+fmtN(tot)+'</strong></td></tr>'; });
+  h+='</tbody></table></div>';
+  return h;
+}
+let _mermTend=null, _mermTendTab='prod';
+async function cargarMermasTendencia(){
+  if(_mermTend){ renderMermTend(); return; }
+  const st=document.getElementById('mermTendStatus');
+  if(st){ st.className='status s-info'; st.classList.remove('hidden'); st.innerHTML='<span class="spin"></span>Leyendo tendencia de mermas (6 meses)…'; }
+  try{ _mermTend=await reporteMermasTendencia(6); }
+  catch(e){ _mermTend={error:e&&e.message||String(e)}; }
+  finally{ if(st) st.classList.add('hidden'); }
+  renderMermTend();
+}
+function mermTendTab(which,btn){
+  _mermTendTab=which;
+  if(btn){ btn.parentNode.querySelectorAll('.m3tab').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
+  renderMermTend();
+}
+function renderMermTend(){
+  const pr=document.getElementById('repMermTendProd'), ca=document.getElementById('repMermTendCausa'); if(!pr||!ca) return;
+  const d=_mermTend; if(!d) return;
+  if(d.error){ pr.innerHTML='<div class="status s-err">No pude leer la tendencia: '+esc(d.error)+'</div>'; ca.innerHTML=''; return; }
+  pr.innerHTML=_tendTabla(d.porProducto,d.meses,null);
+  ca.innerHTML=_tendTabla(d.porCausa,d.meses,_CAUSA_ORDEN);
+  pr.classList.toggle('hidden', _mermTendTab!=='prod');
+  ca.classList.toggle('hidden', _mermTendTab!=='causa');
 }
 
 // ════════════════════════════════════════════════════════════════════════
