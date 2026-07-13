@@ -1544,16 +1544,19 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-prep .rz-sh{margin-bottom:4px}
 #vResumen .rz-pwk{margin-top:14px}
 #vResumen .rz-pwk+.rz-pwk{border-top:.5px solid #232329;padding-top:14px}
-#vResumen .rz-pwtag{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--text-3);margin-bottom:8px}
-#vResumen .rz-pnow .rz-pwtag{color:#D4537E}
-#vResumen .rz-pg{margin-top:11px}
+#vResumen .rz-pwtag{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:#D4537E;margin-bottom:8px}   /* ambas semanas en rosa */
+#vResumen .rz-pg{margin-top:14px}
 #vResumen .rz-pg:first-of-type{margin-top:0}
-#vResumen .rz-pgh{display:flex;align-items:center;gap:7px;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);font-weight:600}
-#vResumen .rz-pico{width:14px;height:14px;color:#9A988F;flex:none}
-#vResumen .rz-pl{list-style:none;margin:6px 0 0;padding:0}
+#vResumen .rz-pg+.rz-pg{margin-top:16px;border-top:.5px solid #232329;padding-top:15px}   /* separación clara fabricar / comprar */
+#vResumen .rz-pgh{display:flex;align-items:center;gap:7px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text);font-weight:600}   /* header en negrita, brillante */
+#vResumen .rz-pico{width:15px;height:15px;color:#9A988F;flex:none}
+#vResumen .rz-pl{list-style:none;margin:8px 0 0;padding:0}
 #vResumen .rz-pl li{font-size:13px;color:var(--text-2);padding:3px 0;line-height:1.35}
 #vResumen .rz-pl li b{color:var(--text);font-weight:600}
 #vResumen .rz-pnone{font-size:12.5px;color:var(--text-3)}
+/* subtabla de premezclas en "Mis productos" */
+#vResumen .rz-tbl-prem{margin-top:22px}
+#vResumen .rz-subh{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);margin-bottom:9px}
 @media(max-width:760px){#vResumen .rz-top{grid-template-columns:1fr;gap:20px}}
 #vResumen .rz-foot{margin-top:20px;font-size:11px;color:var(--text-3);line-height:1.6}
 #vResumen .rz-foot b{color:var(--text-2);font-weight:600}
@@ -3895,6 +3898,7 @@ function nivLevel(ritmo, fin, cfg){
 // multi-tarea sin horno: limpieza base + picado (si hubo Semillas) + galletas (si toca)
 // + derrame (bread que no cupo). Muta stock: suma lo producido, resta el consumo de la semana.
 const NIV_HORNO=[451,452,453,503,472];
+const NIV_DERRAME_MIN=1;   // semanas: umbral de RIESGO de quiebre para permitir pan el viernes (derrame)
 function _weekLayout(stock, ritmo, colDe, H){
   H=H||NIV_CFG_DEF.horizonte;
   const dias=[];
@@ -3918,7 +3922,10 @@ function _weekLayout(stock, ritmo, colDe, H){
   // VIERNES (ninguna tarea usa horno, conviven):
   const picado = semillas>0;                                             // Semillas jueves ⇒ picado viernes
   let galletas=0; { const p=519, r=ritmo[p]||0; if(r>0){ const c=(stock[p]-r)/r; if(c<colDe(p)){ const I=NIV_INFO[p]; stock[p]+=I.cap*I.rend; galletas=I.cap; } } }
-  let derrame=null; { let peor=null,pc=1e9; for(const p of NIV_HORNO){ if(p===452)continue; const r=ritmo[p]||0; if(r<=0)continue; const c=(stock[p]-r)/r; if(c<colDe(p)&&c<pc){pc=c;peor=p;} }
+  // DERRAME de pan al viernes: NO es día base. Solo dispara ante RIESGO REAL de quiebre
+  // (cobertura < NIV_DERRAME_MIN sem), es decir un pan que no cupo en lun–jue y se agotaría.
+  // Estar bajo el colchón NO basta (eso es relleno de buffer, y lo maneja lun–jue / la semana siguiente).
+  let derrame=null; { let peor=null,pc=1e9; for(const p of NIV_HORNO){ if(p===452)continue; const r=ritmo[p]||0; if(r<=0)continue; const c=(stock[p]-r)/r; if(c<NIV_DERRAME_MIN&&c<pc){pc=c;peor=p;} }
     if(peor!==null){ const I=NIV_INFO[peor]; stock[peor]+=I.cap*I.rend; derrame={p:peor, batches:I.cap}; } }
   NIV_PROD.forEach(p=>stock[p]-=(ritmo[p]||0));    // consumo de la semana
   return {otros, semillas, viernes:{picado, galletas, derrame}};
@@ -4138,6 +4145,13 @@ function rzRender(){
       +'<td class="rz-sem'+(r.prod>0?' rz-amber':'')+'">'+_rzN(r.cov,1)+' sem</td>'
       +'<td>'+(r.prod>0?'<span class="rz-prod">'+r.prod+' batches</span>':'<span class="rz-gray">—</span>')+'</td></tr>').join('')
     +'</tbody></table></div>';
+  // ── TABLA "PREMEZCLAS" (stock de las 6, en batches; 1 unidad Odoo = 1 batch) ──
+  const prem='<div class="rz-tblwrap rz-tbl-prem"><div class="rz-subh">Premezclas</div>'
+    +'<table class="rz-tbl"><thead><tr><th>Premezcla</th><th>En stock</th></tr></thead><tbody>'
+    +NIV_PROD.map(p=>{ const b=Math.round((stock.premOh||{})[NIV_INFO[p].prem]||0);
+        return '<tr><td class="rz-pnm">'+esc(_nomCorto(p))+'</td>'
+          +'<td>'+(b>0?('<span class="rz-prod">'+_rzN(b)+'</span> batch'+(b===1?'':'es')):'<span class="rz-gray">—</span>')+'</td></tr>'; }).join('')
+    +'</tbody></table></div>';
   // ── PANEL "PARA PODER PRODUCIR" (lo que falta ALISTAR, semana actual + próxima) ──
   function prepWk(a, esActual){
     const grupos=[];
@@ -4156,7 +4170,7 @@ function rzRender(){
   body.innerHTML=''
     +(c.cfg.sembrado?'':'<div class="rz-warn">plan_config no sembrado — usando defaults (ritmo 6 · colchón 3). Sembrá el seed en Supabase para activar temporada.</div>')
     +'<div class="rz-top">'
-      +'<div class="rz-sec rz-sec-tbl"><div class="rz-sh"><span class="rz-st">Mis productos</span></div>'+tabla+'</div>'
+      +'<div class="rz-sec rz-sec-tbl"><div class="rz-sh"><span class="rz-st">Mis productos</span></div>'+tabla+prem+'</div>'
       +panel
       +'</div>'
     +'<div class="rz-sec"><div class="rz-sh"><span class="rz-st">Calendario de producción</span>'
@@ -4244,7 +4258,8 @@ async function rzVolverPlan(offset){
 async function rzPersist(filas){
   const c=sbClient(); if(!c){ alert('Sin conexión con la base — el cambio no se guardó. Reintentá.'); return; }
   let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
-  const payload=filas.map(r=>({fecha:r.fecha, producto_id:r.producto_id, batches:r.batches, tipo:r.tipo, usuario:email||null}));
+  const payload=filas.map(r=>({fecha:r.fecha, producto_id:r.producto_id, batches:r.batches, tipo:r.tipo,
+    semana_iso:_isoWk(new Date(r.fecha+'T00:00:00')), usuario:email||null}));
   try{ const {error}=await c.from('plan_overrides').insert(payload);
     if(error) alert('No se pudo guardar el cambio del plan: '+error.message); }
   catch(e){ alert('No se pudo guardar el cambio del plan: '+(e&&e.message||e)); }
