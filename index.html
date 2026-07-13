@@ -1445,6 +1445,8 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vPlan .pl-d-real .pl-dp{color:#7A7A72}
 #vPlan .pl-d-pend{border-color:rgba(233,162,59,.4)}
 #vPlan .pl-d-clean .pl-dp{color:var(--text-2)}
+#vPlan .pl-d-fer{border-color:rgba(233,162,59,.4);background:rgba(233,162,59,.06)} #vPlan .pl-d-fer .pl-dp{color:#E9A23B}
+#vPlan .pl-cierre{font-size:11px;color:#D4537E;margin-top:6px;font-weight:600}
 </style>
 <div id="vPlan" class="hidden">
   <div class="faces faces-ops">
@@ -1502,6 +1504,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-day.rz-miss{border-color:rgba(233,162,59,.4)} #vResumen .rz-day.rz-miss .rz-ds{color:#E9A23B}
 #vResumen .rz-day.rz-plan .rz-ds{color:var(--text-3)}
 #vResumen .rz-day.rz-clean .rz-dp{color:var(--text-2);font-weight:500} #vResumen .rz-day.rz-clean .rz-ds{color:var(--text-3)}
+#vResumen .rz-day.rz-fer{border-color:rgba(233,162,59,.4);background:rgba(233,162,59,.06)} #vResumen .rz-day.rz-fer .rz-dp{color:#E9A23B} #vResumen .rz-day.rz-fer .rz-ds{color:#E9A23B}
 #vResumen .rz-legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;font-size:11px;color:var(--text-3)}
 #vResumen .rz-legend span{display:inline-flex;align-items:center;gap:6px}
 #vResumen .rz-legend i{width:9px;height:9px;border-radius:3px;display:inline-block}
@@ -3729,6 +3732,21 @@ const NIV_INFO={
 const NIV_CFG_DEF={ritmoVentana:6, colchon:3, colchonTemporada:4, horizonte:6};
 const _rzN=(n,d=0)=>(Number(n)||0).toLocaleString('es-CR',{minimumFractionDigits:d,maximumFractionDigits:d});
 
+// ── CALENDARIO REAL DE LA OPERACIÓN (feriados + cierre duro) ──
+// Feriados 2026 SIN traslado (cada uno en su fecha natural). Solo importan los que
+// caen en día de producción (lun–jue): ese día NO se produce y su carga se corre al
+// viernes de la misma semana (regla de fábrica: "se cubre el viernes", ej. 15-set → vie 18).
+const FERIADOS={
+  '2026-08-31':'Persona Negra',       // lunes
+  '2026-09-15':'Independencia',       // martes → se cubre vie 18
+  '2026-12-01':'Abolición del Ejército', // martes
+};
+function _esFeriado(ds){ return FERIADOS[ds]||''; }
+// Cierre duro: el viernes 18-dic es el ÚLTIMO día productivo; la fábrica reabre el
+// lunes 11-ene-2027. NO se planifica NINGUNA producción después del 18-dic; las
+// semanas del 21-dic al 8-ene no existen en el plan.
+const CIERRE='2026-12-18', REAPERTURA='2027-01-11';
+
 function _isoWk(dt){
   const t=new Date(Date.UTC(dt.getFullYear(),dt.getMonth(),dt.getDate()));
   const day=t.getUTCDay()||7; t.setUTCDate(t.getUTCDate()+4-day);
@@ -3813,68 +3831,78 @@ function nivLevel(ritmo, fin, cfg){
     return t?cfg.colchonTemporada:(cfg.colchon[pid]||3); };
   const stock={}; NIV_PROD.forEach(p=>stock[p]=fin[p]||0);
   const weeks=[];
-  for(let w=0;w<H;w++) weeks.push(_weekLayout(stock, ritmo, colDe));   // {lunJue, viernes}; muta stock
+  for(let w=0;w<H;w++) weeks.push(_weekLayout(stock, ritmo, colDe));   // {otros, semillas, viernes}; muta stock
   return {w0:_semanaBatches(weeks[0]), weeks};
 }
-// batches por producto → lista de DÍAS LLENOS, un producto por día, agrupados y
-// ordenados por urgencia (menor cobertura primero). Nunca mezcla productos en un día.
-function _agruparDias(batchesWk, cov0){
-  const dList=[];
-  Object.keys(batchesWk).map(Number).sort((a,b)=>cov0[a]-cov0[b]).forEach(p=>{
-    const nd=Math.round(batchesWk[p]/NIV_INFO[p].cap);
-    for(let k=0;k<nd;k++) dList.push({p, batches:NIV_INFO[p].cap});
-  });
-  return dList;
-}
-// Layout de UNA semana de producción: hasta 4 días LUN–JUE (horno, agrupados por
-// urgencia) + VIERNES flexible (galletas > picado > derrame > limpieza). Muta stock
-// (suma lo producido, resta el consumo de la semana). Galletas montan el viernes.
+// Layout de UNA semana: decide QUÉ se produce (no en qué día del calendario — eso lo
+// hace _celdasSemana con feriados). Hasta 4 días LUN–JUE por horno/urgencia; SEMILLAS
+// se aparta al JUEVES fijo (no por urgencia). VIERNES multi-tarea sin horno: limpieza
+// base + picado (si hubo Semillas) + galletas (si toca) + derrame (bread que no cupo).
+// Muta stock: suma lo producido, resta el consumo de la semana.
 const NIV_HORNO=[451,452,453,503,472];
 function _weekLayout(stock, ritmo, colDe){
-  const cov0={}; NIV_PROD.forEach(p=>cov0[p]=(ritmo[p]>0)?stock[p]/ritmo[p]:999);
-  const batchesWk={}; let dias=0;
-  while(dias<4){                                   // 4 días productivos lun–jue
+  // 4 días productivos lun–jue: el más urgente del horno primero, un producto por día.
+  const dias=[];
+  while(dias.length<4){
     let peor=null, pc=1e9;
     for(const p of NIV_HORNO){ const r=ritmo[p]||0; if(r<=0)continue; const c=(stock[p]-r)/r; if(c<colDe(p)&&c<pc){pc=c;peor=p;} }
     if(peor===null)break;
-    const I=NIV_INFO[peor]; stock[peor]+=I.cap*I.rend; batchesWk[peor]=(batchesWk[peor]||0)+I.cap; dias++;
+    const I=NIV_INFO[peor]; stock[peor]+=I.cap*I.rend; dias.push({p:peor, batches:I.cap});
   }
-  const lunJue=_agruparDias(batchesWk, cov0);
-  let gall=0; { const p=519, r=ritmo[p]||0; if(r>0){ const c=(stock[p]-r)/r; if(c<colDe(p)){ const I=NIV_INFO[p]; stock[p]+=I.cap*I.rend; gall=I.cap; } } }
-  let derrame=null; { let peor=null,pc=1e9; for(const p of NIV_HORNO){ const r=ritmo[p]||0; if(r<=0)continue; const c=(stock[p]-r)/r; if(c<colDe(p)&&c<pc){pc=c;peor=p;} }
-    if(peor!==null) derrame={p:peor, batches:NIV_INFO[peor].cap}; }
-  let viernes;
-  if(gall>0) viernes={tipo:'galletas', batches:gall};                    // 1) galletas
-  else if(derrame){ const I=NIV_INFO[derrame.p]; stock[derrame.p]+=I.cap*I.rend; viernes={tipo:'derrame', p:derrame.p, batches:derrame.batches}; }  // 3) derrame (2 picado: sin fuente)
-  else viernes={tipo:'limpieza'};                                        // 4) limpieza
+  // SEMILLAS → jueves fijo: se aparta de la cola; el resto queda en orden de urgencia.
+  const semDias=dias.filter(d=>d.p===452), otros=dias.filter(d=>d.p!==452);
+  const semillas=semDias.reduce((a,d)=>a+d.batches,0);
+  // VIERNES (ninguna tarea usa horno, conviven):
+  const picado = semillas>0;                                             // Semillas jueves ⇒ picado viernes
+  let galletas=0; { const p=519, r=ritmo[p]||0; if(r>0){ const c=(stock[p]-r)/r; if(c<colDe(p)){ const I=NIV_INFO[p]; stock[p]+=I.cap*I.rend; galletas=I.cap; } } }
+  let derrame=null; { let peor=null,pc=1e9; for(const p of NIV_HORNO){ if(p===452)continue; const r=ritmo[p]||0; if(r<=0)continue; const c=(stock[p]-r)/r; if(c<colDe(p)&&c<pc){pc=c;peor=p;} }
+    if(peor!==null){ const I=NIV_INFO[peor]; stock[peor]+=I.cap*I.rend; derrame={p:peor, batches:I.cap}; } }
   NIV_PROD.forEach(p=>stock[p]-=(ritmo[p]||0));    // consumo de la semana
-  return {lunJue, viernes};
+  return {otros, semillas, viernes:{picado, galletas, derrame}};
 }
 function _semanaBatches(layout){
-  const b={}; (layout.lunJue||[]).forEach(d=>b[d.p]=(b[d.p]||0)+d.batches);
-  const v=layout.viernes; if(v&&v.tipo==='galletas') b[519]=(b[519]||0)+v.batches;
-  else if(v&&v.tipo==='derrame') b[v.p]=(b[v.p]||0)+v.batches;
+  const b={}; (layout.otros||[]).forEach(d=>b[d.p]=(b[d.p]||0)+d.batches);
+  if(layout.semillas) b[452]=(b[452]||0)+layout.semillas;
+  const v=layout.viernes||{};
+  if(v.galletas) b[519]=(b[519]||0)+v.galletas;
+  if(v.derrame) b[v.derrame.p]=(b[v.derrame.p]||0)+v.derrame.batches;
   return b;
 }
 // "Esta semana" = semana de PRODUCCIÓN vigente. En fin de semana → arranca el lunes próximo.
 function _mondayProd(dt){ const d=new Date(dt), dow=d.getDay();
   if(dow===0) d.setDate(d.getDate()+1); else if(dow===6) d.setDate(d.getDate()+2); else d.setDate(d.getDate()-(dow-1));
   d.setHours(0,0,0,0); return d; }
-// 5 celdas lun–vie de una semana: real (Odoo, días pasados) o propuesta (plan).
+// 5 celdas lun–vie: coloca la producción en días REALES del calendario. Semillas al
+// jueves; el resto lun→mié (jueves si Semillas no va). Feriado lun–jue = sin producción,
+// su carga se corre al viernes. Viernes = lista multi-tarea. Días pasados = realidad Odoo.
+function _nomCorto(p){ return NIV_INFO[p].nom.replace(/^Pan /,''); }
 function _celdasSemana(monday, layout, real, hoyStr){
-  return _weekDays(monday).map((day,i)=>{
+  const days=_weekDays(monday);
+  const otros=(layout.otros||[]).slice(), semB=layout.semillas||0, v=layout.viernes||{};
+  // Colocación ideal lun–jue: Semillas en jueves (idx 3); otros llenan los libres desde el lunes.
+  const slot=[null,null,null,null];
+  if(semB>0) slot[3]={p:452, batches:semB};
+  for(let i=0;i<4 && otros.length;i++){ if(!slot[i]) slot[i]=otros.shift(); }
+  const corridos=otros.slice();                    // no cupo en lun–jue (raro) → viernes
+  // Feriados lun–jue: sacan su carga (se corre al viernes) y marcan el día.
+  for(let i=0;i<4;i++){ const f=_esFeriado(days[i].ds); if(f){ if(slot[i]&&slot[i].p) corridos.push(slot[i]); slot[i]={feriado:f}; } }
+  return days.map((day,i)=>{
     const realDay=(real&&real[day.ds])||null, past=day.ds<hoyStr, isHoy=day.ds===hoyStr;
-    let prodNom=null, bt='';
-    if(i<4){ const e=(layout.lunJue||[])[i]; if(e){ prodNom=NIV_INFO[e.p].nom.replace(/^Pan /,''); bt=e.batches+' batches'; } }
-    else { const v=layout.viernes||{tipo:'limpieza'};
-      if(v.tipo==='galletas'){ prodNom='Galletas'; bt=v.batches+' batches'; }
-      else if(v.tipo==='derrame'){ prodNom=NIV_INFO[v.p].nom.replace(/^Pan /,''); bt=v.batches+' batches'; }
-      else if(v.tipo==='picado') prodNom='Picado'; }
-    let prod, kind;
-    if(realDay){ kind='real'; bt=''; prod=Object.keys(realDay).map(pp=>NIV_INFO[+pp].nom.replace(/^Pan /,'')+' '+Math.round(realDay[pp]/NIV_INFO[+pp].rend)+'b').join(' + '); }
-    else if(prodNom){ prod=prodNom; kind=isHoy?'today':(past?'pend':'prop'); }
-    else { prod='Limpieza'; bt=''; kind=isHoy?'today':'clean'; }
-    return {dow:day.dow, dnum:day.dnum, prod, bt, kind};
+    if(realDay) return {dow:day.dow, dnum:day.dnum, kind:'real', bt:'',
+      prod:Object.keys(realDay).map(pp=>_nomCorto(+pp)+' '+Math.round(realDay[pp]/NIV_INFO[+pp].rend)+'b').join(' + ')};
+    if(i<4){
+      const e=slot[i];
+      if(e&&e.feriado) return {dow:day.dow, dnum:day.dnum, prod:'Feriado', bt:e.feriado, kind:'feriado'};
+      if(e&&e.p) return {dow:day.dow, dnum:day.dnum, prod:_nomCorto(e.p), bt:e.batches+' batches', kind:isHoy?'today':(past?'pend':'prop')};
+      return {dow:day.dow, dnum:day.dnum, prod:'—', bt:'', kind:isHoy?'today':'libre'};
+    }
+    // VIERNES multi-tarea: limpieza base + picado + galletas + derrame + corridos por feriado.
+    const parts=['Limpieza'];
+    if(v.picado) parts.push('Picado');
+    if(v.galletas) parts.push('Galletas '+v.galletas+'b');
+    if(v.derrame) parts.push(_nomCorto(v.derrame.p)+' '+v.derrame.batches+'b');
+    corridos.forEach(c=>parts.push(_nomCorto(c.p)+' '+c.batches+'b'));
+    return {dow:day.dow, dnum:day.dnum, prod:parts.join(' · '), bt:'', kind:isHoy?'today':(parts.length>1?'prop':'clean')};
   });
 }
 
@@ -3956,8 +3984,8 @@ function renderResumen(d){
   // ── CALENDARIO 2 SEMANAS ──
   function semanaHtml(offset, esActual){
     const mon=_mondayProd(hoy); mon.setDate(mon.getDate()+offset*7);
-    const RZ={real:['rz-done','Hecho'], today:['rz-today','En curso'], pend:['rz-miss','Sin registrar en Odoo'], prop:['rz-plan','Propuesto'], clean:['rz-clean','—']};
-    const cards=_celdasSemana(mon, weeks[offset]||{lunJue:[],viernes:{tipo:'limpieza'}}, real.byDate, hoyStr).map(c=>{
+    const RZ={real:['rz-done','Hecho'], today:['rz-today','En curso'], pend:['rz-miss','Sin registrar en Odoo'], prop:['rz-plan','Propuesto'], clean:['rz-clean','—'], feriado:['rz-fer','Feriado'], libre:['rz-clean','Libre']};
+    const cards=_celdasSemana(mon, weeks[offset]||{otros:[],semillas:0,viernes:{}}, real.byDate, hoyStr).map(c=>{
       const m=RZ[c.kind]||RZ.clean;
       return '<div class="rz-day '+m[0]+'"><div class="rz-dd">'+c.dow+' '+c.dnum+'</div>'
         +'<div class="rz-dp">'+esc(c.prod)+'</div>'+(c.bt?'<div class="rz-db">'+c.bt+'</div>':'')
@@ -4174,19 +4202,22 @@ function irAConteo(){
 // (pasado = realidad de Odoo; futuro = propuesta del nivelador). No inventa nada.
 // ════════════════════════════════════════════════════════════════════════
 const PLAN_FASE={6:'Crucero',7:'Crucero',8:'Crucero',9:'Rampa',10:'Rampa',11:'Pico'};
-const PLAN_FERIADO={8:'Feriado 15 — Independencia (se cubre vie 18)', 11:'Feriado 1 — Abolición (diciembre al filo)'};
+// Feriados por mes (0-index): ago=7, set=8, dic=11. En 2026 sin traslados.
+const PLAN_FERIADO={7:'Feriado lun 31 — Persona Negra', 8:'Feriado mar 15 — Independencia (cubre vie 18)', 11:'Feriado mar 1 — Abolición del Ejército'};
 const _MESNOM2=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
 // Proyección: simula nWeeks desde esta semana; colchón según la temporada de CADA semana.
 function nivProyeccion(ritmo, fin, cfg, nWeeks){
   const mon0=_mondayProd(new Date());
+  const stopMon=_mondayProd(new Date(2026,11,18)).getTime();   // semana del cierre (lun 14-dic)
   const stock={}; NIV_PROD.forEach(p=>stock[p]=fin[p]||0);
   const out=[];
   for(let w=0;w<nWeeks;w++){
     const mon=new Date(mon0); mon.setDate(mon.getDate()+w*7); const wk=_isoWk(mon);
+    if(mon.getTime()>stopMon) break;   // CIERRE DURO: nada se planifica después del 18-dic
     const colDe=pid=>{ const t=(cfg.ventanas||[]).some(v=>+v.producto_id===pid && wk>=v.desde && wk<=v.hasta); return t?cfg.colchonTemporada:(cfg.colchon[pid]||3); };
-    const layout=_weekLayout(stock, ritmo, colDe);   // muta stock; {lunJue, viernes}
-    out.push({monday:mon, lunJue:layout.lunJue, viernes:layout.viernes});
+    const layout=_weekLayout(stock, ritmo, colDe);   // muta stock; {otros, semillas, viernes}
+    out.push({monday:mon, otros:layout.otros, semillas:layout.semillas, viernes:layout.viernes});
   }
   return out;
 }
@@ -4209,7 +4240,8 @@ async function cargarPlanMeses(){
   try{
     const cfg=await nivConfig(), ritmo=await nivRitmo(cfg.ritmoVentana), stk=await nivStock();
     const hoy=new Date();
-    const semDic=Math.min(30, Math.max(1, Math.ceil((new Date(hoy.getFullYear(),11,31)-_mondayProd(hoy))/(7*86400000))+1));
+    // Semanas hasta el cierre duro (lun 14-dic, viernes 18-dic incluido). nivProyeccion vuelve a cortar por seguridad.
+    const semDic=Math.max(0, Math.round((_mondayProd(new Date(2026,11,18))-_mondayProd(hoy))/(7*86400000))+1);
     _planProj=nivProyeccion(ritmo, stk.fin, cfg, semDic);
     _planReal=await nivRealRango(hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-01', _ymd(hoy));
     st.classList.add('hidden');
@@ -4230,15 +4262,16 @@ function planRenderMeses(){
       +'<div class="pl-mh"><span class="pl-mnom">'+_MESNOM2[m]+'</span><span class="'+faseCls+'">'+esc(fase)+'</span></div>'
       +'<div class="pl-bat">'+esc(prods)+'</div>'
       +(fer?'<div class="pl-fer">'+esc(fer)+'</div>':'')
+      +(m===11?'<div class="pl-cierre">Cierre vie 18-dic · reabre lun 11-ene</div>':'')
       +'<div class="pl-ver">Ver detalle →</div></div>';
   }
   document.getElementById('planBody').innerHTML=
     '<div class="pl-grid">'+cards+'</div><div id="planDetalle"></div>'
     +'<div class="pl-notas"><div class="pl-nt">Cómo se lee este plan</div><ul>'
     +'<li>jul–set: crucero (ritmo normal).</li><li>oct–nov: rampa (se sube para diciembre).</li>'
-    +'<li>1–18 dic: pico (cierre del año).</li><li>Checkpoints: 15-set y 30-oct.</li></ul>'
-    +'<div class="pl-nt" style="margin-top:12px">Feriados que afectan producción</div><ul>'
-    +'<li>mar 15 set — Independencia (se cubre el viernes 18).</li><li>mar 1 dic — Abolición del Ejército (diciembre al filo).</li></ul></div>';
+    +'<li>1–18 dic: pico (cierre del año).</li><li>Cierre duro: el vie 18-dic es el último día productivo; se reabre el lun 11-ene. No se planifica nada entre medio.</li></ul>'
+    +'<div class="pl-nt" style="margin-top:12px">Feriados que afectan producción (no se produce; la carga se corre al viernes)</div><ul>'
+    +'<li>lun 31 ago — Día de la Persona Negra.</li><li>mar 15 set — Independencia (se cubre el viernes 18).</li><li>mar 1 dic — Abolición del Ejército.</li></ul></div>';
 }
 
 function planVerDetalle(m){
@@ -4246,7 +4279,7 @@ function planVerDetalle(m){
   const hoyStr=_ymd(new Date());
   const wks=_planProj.filter(wk=>wk.monday.getMonth()===m);
   let html='<div class="pl-det"><div class="pl-det-h"><span>Detalle de '+_MESNOM2[m]+'</span><button class="pl-volver" onclick="planVolver()">‹ volver a los meses</button></div>';
-  const PLK={real:'pl-d-real', today:'pl-d-prop', pend:'pl-d-pend', prop:'pl-d-prop', clean:'pl-d-clean'};
+  const PLK={real:'pl-d-real', today:'pl-d-prop', pend:'pl-d-pend', prop:'pl-d-prop', clean:'pl-d-clean', feriado:'pl-d-fer', libre:'pl-d-clean'};
   wks.forEach(wk=>{
     html+='<div class="pl-wk"><div class="pl-wr">'+_rangeLbl(wk.monday)+'</div><div class="pl-days">';
     _celdasSemana(wk.monday, wk, _planReal, hoyStr).forEach(c=>{
