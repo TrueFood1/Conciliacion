@@ -447,7 +447,7 @@ tr.r-ing td{background:#eff6ff}
 /* ── ACENTO POR MÓDULO ── el color sigue al módulo vía --mod (heredado por la vista) */
 /* --accent/--blue/--blue-l siguen al módulo → todo acento interno hereda el color correcto (adiós morado viejo) */
 #vFacturado,#vCostos,#vRentabilidad,#vSimulador,#vCalcPrecios,#vResultados{--mod:#378ADD;--accent:#378ADD;--blue:#378ADD;--blue-l:rgba(55,138,221,.15)}   /* Finanzas = azul */
-#vProduccion,#vMermas,#vInventario{--mod:#D4537E;--accent:#D4537E;--blue:#D4537E;--blue-l:rgba(212,83,126,.15)}                          /* Operaciones = rosa francés */
+#vProduccion,#vMermas,#vInventario,#vResumen,#vConteo,#vPlan{--mod:#D4537E;--accent:#D4537E;--blue:#D4537E;--blue-l:rgba(212,83,126,.15)}                          /* Operaciones = rosa francés */
 #vUpload{--mod:#84BD00;--accent:#84BD00;--blue:#84BD00;--blue-l:rgba(132,189,0,.15)}                                                     /* Conciliación = verde */
 .faces .face.on{color:var(--text);border-bottom-color:var(--mod)}
 .m3nav .m3tab.on{background:transparent;color:var(--mod);border-bottom-color:var(--mod)}
@@ -1036,9 +1036,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- PRODUCCIÓN (módulo Operaciones) -->
 <div id="vProduccion" class="hidden">
   <div class="faces faces-ops">
+    <button class="face" onclick="irAResumen()">Resumen</button>
     <button class="face on">Producción</button>
     <button class="face" onclick="irAMermas()">Mermas</button>
-    <button class="face" onclick="irAInventario()">Inventario</button>
+    <button class="face" onclick="irAConteo()">Ajuste inv.</button>
     <button class="face" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
@@ -1066,9 +1067,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- MERMAS (módulo Operaciones) -->
 <div id="vMermas" class="hidden">
   <div class="faces faces-ops">
+    <button class="face" onclick="irAResumen()">Resumen</button>
     <button class="face" onclick="irAProduccion()">Producción</button>
     <button class="face on">Mermas</button>
-    <button class="face" onclick="irAInventario()">Inventario</button>
+    <button class="face" onclick="irAConteo()">Ajuste inv.</button>
     <button class="face" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
@@ -1372,6 +1374,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- INVENTARIO (módulo Operaciones) -->
 <div id="vInventario" class="hidden">
   <div class="faces faces-ops">
+    <button class="face" onclick="irAResumen()">Resumen</button>
     <button class="face" onclick="irAProduccion()">Producción</button>
     <button class="face" onclick="irAMermas()">Mermas</button>
     <button class="face on">Inventario</button>
@@ -1411,24 +1414,193 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 </div>
 
 <!-- PLAN DE PRODUCCIÓN (módulo Operaciones) — tablero congelador vs curva al 18-dic. SOLO LECTURA. -->
+<style>
+#vPlan .pl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:640px;margin:16px auto 0 0}
+@media(max-width:640px){#vPlan .pl-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:440px){#vPlan .pl-grid{grid-template-columns:1fr}}
+#vPlan .pl-mes{background:var(--surface);border:.5px solid var(--border);border-radius:11px;padding:13px 14px;cursor:pointer;transition:border-color .12s}
+#vPlan .pl-mes:hover{border-color:var(--border-m)}
+#vPlan .pl-mes-now{border-color:#D4537E;box-shadow:0 0 0 1px rgba(212,83,126,.35)}
+#vPlan .pl-mh{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px}
+#vPlan .pl-mnom{font-size:15px;font-weight:600;color:var(--text);text-transform:capitalize}
+#vPlan .pl-fase{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3)}
+#vPlan .pl-fase-amber{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:#E9A23B;font-weight:600}
+#vPlan .pl-bat{font-size:12px;color:var(--text-2);line-height:1.5}
+#vPlan .pl-fer{font-size:11px;color:#E9A23B;margin-top:6px}
+#vPlan .pl-ver{font-size:11.5px;color:#D4537E;margin-top:9px}
+#vPlan .pl-notas{max-width:640px;margin:20px auto 0 0;font-size:12px;color:var(--text-3)}
+#vPlan .pl-nt{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);font-weight:600;margin-bottom:5px}
+#vPlan .pl-notas ul{margin:0 0 0 16px;line-height:1.7} #vPlan .pl-notas li{color:var(--text-2)}
+#vPlan .pl-det{max-width:640px;margin:16px auto 0 0;background:var(--surface);border:.5px solid var(--border);border-radius:11px;padding:14px 16px}
+#vPlan .pl-det-h{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px}
+#vPlan .pl-volver{background:none;border:none;color:var(--text-2);font-size:12px;cursor:pointer}
+#vPlan .pl-wk{margin-top:10px}
+#vPlan .pl-wr{font-size:11px;color:var(--text-3);margin-bottom:5px}
+#vPlan .pl-days{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+@media(max-width:520px){#vPlan .pl-days{grid-auto-flow:column;grid-auto-columns:92px;grid-template-columns:none;overflow-x:auto}}
+#vPlan .pl-d{background:var(--surface-2);border:.5px solid var(--border);border-radius:8px;padding:7px 7px 8px;min-height:64px}
+#vPlan .pl-dd{font-size:10px;color:var(--text-3);text-transform:uppercase}
+#vPlan .pl-dp{font-size:11.5px;color:var(--text);margin-top:4px;line-height:1.25}
+#vPlan .pl-dtag{font-size:9.5px;color:#E9A23B;margin-top:3px}
+#vPlan .pl-d-real .pl-dp{color:#7A7A72}
+#vPlan .pl-d-pend{border-color:rgba(233,162,59,.4)}
+#vPlan .pl-d-clean .pl-dp{color:var(--text-2)}
+</style>
 <div id="vPlan" class="hidden">
   <div class="faces faces-ops">
+    <button class="face" onclick="irAResumen()">Resumen</button>
     <button class="face" onclick="irAProduccion()">Producción</button>
     <button class="face" onclick="irAMermas()">Mermas</button>
-    <button class="face" onclick="irAInventario()">Inventario</button>
+    <button class="face" onclick="irAConteo()">Ajuste inv.</button>
     <button class="face on">Plan</button>
+  </div>
+  <div>
+    <div class="m3title" style="font-size:24px">Plan de producción</div>
+    <div class="m3sub" style="margin-top:9px;font-size:13px;max-width:560px">El camino hasta cerrar diciembre. Cada mes muestra cuántos batches se producen; hacé clic para ver el detalle semana por semana.</div>
+  </div>
+  <div id="planStatus" class="status s-info hidden" style="margin-top:14px"></div>
+  <div id="planBody"></div>
+</div>
+
+<!-- RESUMEN (módulo Operaciones / Inventario) — portada del Planificador. SOLO LECTURA. -->
+<style>
+#vResumen .rz-load,#vResumen .rz-err{padding:22px 4px;color:var(--text-2);font-size:14px}
+#vResumen .rz-err{color:#E24B4A}
+#vResumen .rz-warn{margin-top:14px;background:rgba(226,75,74,.08);border:.5px solid rgba(226,75,74,.35);border-radius:9px;padding:9px 12px;font-size:12px;color:#E7A6A6}
+#vResumen .rz-sec{margin-top:22px}
+#vResumen .rz-sh{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+#vResumen .rz-st{font-size:13px;font-weight:600;color:var(--text)}
+#vResumen .rz-tblwrap{max-width:640px;margin-right:auto}
+#vResumen .rz-tbl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+#vResumen .rz-tbl th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);padding:0 12px 8px 0;border-bottom:.5px solid var(--border)}
+#vResumen .rz-tbl th:last-child,#vResumen .rz-tbl td:last-child{text-align:right;padding-right:0}
+#vResumen .rz-tbl td{padding:11px 12px 11px 0;border-bottom:.5px solid #1A1A1E;font-size:13.5px;color:var(--text)}
+#vResumen .rz-tbl tbody tr:last-child td{border-bottom:none}
+#vResumen .rz-pnm{font-weight:500}
+#vResumen .rz-gray{color:var(--text-3);font-size:12px;margin-left:5px}
+#vResumen .rz-sem{color:var(--text-2)}
+#vResumen .rz-sem.rz-amber{color:#E9A23B;font-weight:600}
+#vResumen .rz-prod{color:var(--text)}
+#vResumen .rz-cal{display:flex;flex-direction:column;gap:16px;max-width:640px;margin-right:auto}
+#vResumen .rz-wk-next .rz-day{background:#131316;border-color:#1F1F24}
+#vResumen .rz-wk-next .rz-dp{color:#9A988F;font-weight:500}
+#vResumen .rz-wk-next .rz-dd,#vResumen .rz-wk-next .rz-db{color:#6E6C68}
+#vResumen .rz-whead{display:flex;align-items:baseline;gap:9px;margin-bottom:9px}
+#vResumen .rz-wtag{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--text-3);background:var(--surface-2);border:.5px solid var(--border);border-radius:5px;padding:2px 7px}
+#vResumen .rz-wtag.rz-wnow{color:#D4537E;border-color:rgba(212,83,126,.5)}
+#vResumen .rz-wrange{font-size:12px;color:var(--text-2)}
+#vResumen .rz-days{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+@media(max-width:520px){#vResumen .rz-days{grid-auto-flow:column;grid-auto-columns:104px;grid-template-columns:none;overflow-x:auto;padding-bottom:6px}}
+#vResumen .rz-day{background:var(--surface-2);border:.5px solid var(--border);border-radius:9px;padding:9px 8px 10px;min-height:96px;display:flex;flex-direction:column}
+#vResumen .rz-dd{font-size:10.5px;color:var(--text-3);text-transform:uppercase;letter-spacing:.03em}
+#vResumen .rz-dp{font-size:13px;font-weight:600;color:var(--text);margin-top:6px;line-height:1.25}
+#vResumen .rz-db{font-size:11px;color:var(--text-2);margin-top:2px}
+#vResumen .rz-gnote{font-size:10px;color:#E9A23B;margin-top:3px}
+#vResumen .rz-ds{margin-top:auto;font-size:11px;font-weight:600;padding-top:8px}
+#vResumen .rz-day.rz-done{border-color:var(--border)} #vResumen .rz-day.rz-done .rz-ds{color:#7A7A72}
+#vResumen .rz-day.rz-today{border-color:#D4537E;box-shadow:0 0 0 1px rgba(212,83,126,.4)} #vResumen .rz-day.rz-today .rz-ds{color:#D4537E}
+#vResumen .rz-day.rz-miss{border-color:rgba(233,162,59,.4)} #vResumen .rz-day.rz-miss .rz-ds{color:#E9A23B}
+#vResumen .rz-day.rz-plan .rz-ds{color:var(--text-3)}
+#vResumen .rz-day.rz-clean .rz-dp{color:var(--text-2);font-weight:500} #vResumen .rz-day.rz-clean .rz-ds{color:var(--text-3)}
+#vResumen .rz-legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;font-size:11px;color:var(--text-3)}
+#vResumen .rz-legend span{display:inline-flex;align-items:center;gap:6px}
+#vResumen .rz-legend i{width:9px;height:9px;border-radius:3px;display:inline-block}
+#vResumen .rz-buy{margin-top:22px;background:var(--surface);border:.5px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+#vResumen .rz-bl{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+#vResumen .rz-bt{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3);font-weight:600}
+#vResumen .rz-bd{color:var(--text-2);font-size:13px}
+#vResumen .rz-go{color:#E9FE60;font-size:12.5px;font-weight:600;white-space:nowrap;cursor:pointer}
+#vResumen .rz-foot{margin-top:20px;font-size:11px;color:var(--text-3);line-height:1.6}
+#vResumen .rz-foot b{color:var(--text-2);font-weight:600}
+</style>
+<div id="vResumen" class="hidden">
+  <div class="faces faces-ops">
+    <button class="face on">Resumen</button>
+    <button class="face" onclick="irAProduccion()">Producción</button>
+    <button class="face" onclick="irAMermas()">Mermas</button>
+    <button class="face" onclick="irAConteo()">Ajuste inv.</button>
+    <button class="face" onclick="irAPlan()">Plan</button>
+  </div>
+  <div id="rzBody" style="margin-top:6px"></div>
+</div>
+
+<!-- AJUSTE DE INVENTARIO / CONTEO (Operaciones / Inventario). SOLO LECTURA sobre Odoo. -->
+<style>
+#vConteo .cn-head-sub{color:var(--text-2);font-size:12.5px;margin-top:2px}
+#vConteo .cn-rezago{margin-top:16px;background:var(--surface);border:.5px solid var(--border);border-radius:11px;padding:14px 16px;max-width:640px;margin-right:auto}
+#vConteo #cn-mp,#vConteo #cn-premez,#vConteo #cn-term{max-width:640px;margin-right:auto}
+#vConteo .cn-alerta{max-width:640px;margin:14px auto 0 0;background:var(--surface-2);border:.5px solid var(--border);border-left:3px solid #E9A23B;border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--text-2)}
+#vConteo .cn-alerta.cn-alerta-on{border-left-color:#E24B4A;color:var(--text)}
+#vConteo .cn-rq{font-size:12.5px;color:var(--text);font-weight:600;margin-bottom:9px}
+#vConteo .cn-rz-grp{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-bottom:9px}
+#vConteo .cn-rz-lbl{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);min-width:118px}
+#vConteo .cn-rz-grp label{font-size:12.5px;color:var(--text-2);display:inline-flex;align-items:center;gap:5px;cursor:pointer}
+#vConteo input[type=radio]{accent-color:#D4537E}
+#vConteo #cn-planbox{margin-top:4px;border-top:.5px solid var(--border);padding-top:10px}
+#vConteo #cn-planbox .cn-ph{font-size:12px;color:var(--text-2);margin-bottom:8px}
+#vConteo #cn-planrows{display:flex;flex-wrap:wrap;gap:8px 16px}
+#vConteo .cn-planrow{font-size:12px;color:var(--text-2);display:inline-flex;align-items:center;gap:6px}
+#vConteo #cn-tabs{display:flex;gap:6px;margin:18px 0 10px}
+#vConteo .cn-tab{background:var(--surface-2);border:.5px solid var(--border);color:var(--text-2);font-size:12.5px;padding:7px 14px;border-radius:8px;cursor:pointer}
+#vConteo .cn-tab.on{color:var(--text);border-color:var(--mod);background:rgba(212,83,126,.08)}
+#vConteo .cn-tbl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+#vConteo .cn-tbl th{text-align:left;font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);padding:0 10px 8px 0;border-bottom:.5px solid var(--border)}
+#vConteo .cn-tbl th.r,#vConteo .cn-tbl td.r{text-align:right}
+#vConteo .cn-tbl td{padding:9px 10px 9px 0;border-bottom:.5px solid #1A1A1E;font-size:13px;color:var(--text);vertical-align:middle}
+#vConteo .cn-tbl tbody tr:last-child td{border-bottom:none}
+#vConteo .cn-nm{font-weight:500}
+#vConteo .cn-odoo{color:var(--text-2);white-space:nowrap}
+#vConteo .cn-aj{color:#E9A23B;font-size:11px}
+#vConteo .cn-count{white-space:nowrap}
+#vConteo .cn-in{width:52px;background:var(--surface-2);border:.5px solid var(--border-m);border-radius:6px;color:var(--text);font-size:13px;padding:5px 7px;text-align:right}
+#vConteo .cn-in:focus{outline:none;border-color:var(--mod)}
+#vConteo .cn-lbl{color:var(--text-3);font-size:11px;margin:0 8px 0 4px}
+#vConteo .cn-diff{white-space:nowrap}
+#vConteo .cn-diff.cn-ok,#vConteo .cn-sem.cn-ok{color:#84BD00}
+#vConteo .cn-diff.cn-warn,#vConteo .cn-sem.cn-warn{color:#E9A23B}
+#vConteo .cn-diff.cn-bad,#vConteo .cn-sem.cn-bad{color:#E24B4A}
+#vConteo .cn-sem.cn-none,#vConteo .cn-diff.cn-none{color:var(--text-3)}
+#vConteo .cn-sem{font-size:12px;font-weight:600;white-space:nowrap}
+#vConteo .cn-bar{margin-top:18px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;border-top:.5px solid var(--border);padding-top:14px}
+#vConteo .cn-resumen{font-size:13px;color:var(--text-2)} #vConteo .cn-resumen b{color:var(--text)}
+#vConteo .cn-btns{display:flex;gap:10px}
+#vConteo .cn-btn{background:var(--surface-2);border:.5px solid var(--border);color:var(--text-2);font-size:12.5px;padding:9px 16px;border-radius:8px;cursor:pointer}
+#vConteo .cn-guardar{background:#E9FE60;color:#1A1A1A;border:none;font-weight:600}
+</style>
+<div id="vConteo" class="hidden">
+  <div class="faces faces-ops">
+    <button class="face" onclick="irAResumen()">Resumen</button>
+    <button class="face" onclick="irAProduccion()">Producción</button>
+    <button class="face" onclick="irAMermas()">Mermas</button>
+    <button class="face on">Ajuste inv.</button>
+    <button class="face" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
-      <div class="m3title" style="font-size:24px">Plan de producción <span style="font-weight:400;color:var(--text-3);font-size:13px">· congelador al 18-dic</span></div>
-      <div class="m3sub" style="margin-top:2px;font-size:13px">¿Vamos bien para diciembre? Stock de hoy (Odoo) contra la curva esperada de esta semana. Solo lectura.</div>
+      <div class="m3title" style="font-size:24px">Ajuste de inventario</div>
+      <div class="cn-head-sub">Contá el físico del congelador y la despensa; Truefie lo compara contra Odoo. Conteo completo. Solo lectura sobre Odoo.</div>
     </div>
     <div class="live-ind"><span class="live-dot"></span>conectado a Odoo · datos en vivo</div>
   </div>
-  <div class="m3sub" style="margin-top:8px;font-size:12px;color:var(--text-3)">Blanco · Francés · Pizza · Galletas: planos jul–set, rampa 1-oct→18-dic. Buns y Semillas drenan hacia su meta (rojo solo si caen bajo la meta). Verde en curva, amarillo −5%, rojo −10% o peor.</div>
-  <div id="planStatus" class="status s-info hidden" style="margin-top:14px"></div>
-  <div class="card" style="margin-top:14px" id="planTabla"></div>
+  <div id="cnStatus" class="status s-info hidden" style="margin-top:14px"></div>
+  <div id="cn-alerta" class="cn-alerta">Antes de contar, las producciones del día deben estar registradas en Odoo.</div>
+  <div id="cn-tabs">
+    <button class="cn-tab on" data-t="mp" onclick="cnTab('mp')">Materia prima</button>
+    <button class="cn-tab" data-t="premez" onclick="cnTab('premez')">Premezclas</button>
+    <button class="cn-tab" data-t="term" onclick="cnTab('term')">Producto terminado</button>
+  </div>
+  <div id="cn-mp"></div>
+  <div id="cn-premez" style="display:none"></div>
+  <div id="cn-term" style="display:none"></div>
+  <div class="cn-bar">
+    <span class="cn-resumen" id="cn-resumen"></span>
+    <div class="cn-btns">
+      <button class="cn-btn" onclick="abrirHistorial()">Ver historial</button>
+      <button class="cn-btn cn-guardar" onclick="cnGuardar()">Guardar conteo</button>
+    </div>
+  </div>
 </div>
+
 
 <!-- RESULTS -->
 <div id="vResults" class="hidden">
@@ -1495,7 +1667,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 8 jul 2026';
+const BUILD = 'v 12 jul 2026';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -1899,7 +2071,7 @@ function aplicarModoProduccion(){
   });
 }
 // Vistas de módulo (Contabilidad + Conciliación + Operaciones). Muestra UNA, oculta el resto.
-const _MOD_VIEWS=['vUpload','vFacturado','vProduccion','vMermas','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vInventario','vPlan','vResults'];
+const _MOD_VIEWS=['vUpload','vFacturado','vProduccion','vMermas','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vInventario','vPlan','vResumen','vConteo','vResults'];
 function _modShow(id){
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.toggle('hidden', v!==id); });
   document.getElementById('vLobby').classList.add('hidden');
@@ -1916,7 +2088,7 @@ function crumbSet(area,cur){
 }
 // Entradas desde el HOME (una por módulo).
 function abrirFinanzas(){ irAResultados(); }                 // Finanzas → 1ª pestaña (Resultados)
-function abrirOperaciones(){ irAProduccion(); }              // Operaciones → 1ª sub-pestaña
+function abrirOperaciones(){ irAResumen(); }              // Operaciones → 1ª sub-pestaña
 function abrirContabilidad(){ abrirFinanzas(); }             // alias histórico
 function entrarHerramienta(){ abrirFinanzas(); }             // alias histórico
 function abrirConciliacion(){                                // módulo Conciliación (candado de 3 capas intacto)
@@ -3452,11 +3624,12 @@ const cM = n => '₡'+Math.round(Number(n)||0).toLocaleString('es-CR');   // col
 // unitsPer = unidades individuales por cost-unit (paq de 2 → 2, paq de 4 → 4).
 // pack     = multiplicador de presentación para mostrar (×N). unidad = etiqueta visible.
 const COSTOS_PROD = [
-  {key:'blanco',  label:'Pan Blanco',      kw:'Pan Blanco', rx:/pan\s*blanco/i,    batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#378ADD', chkMP:805, chkInd:1462, chkTot:2267},
-  {key:'semillas',label:'Pan de Semillas', kw:'Semillas',   rx:/semillas/i,        batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#84BD00', chkMP:980, chkInd:1462, chkTot:2442},
-  {key:'pizza',   label:'Pizza Crust',     kw:'Pizza',      rx:/pizza/i,           batch:10,  unitsPer:2, pack:1, batchOverride:10, unidad:'por paquete de 2',  color:'#FF751F', chkMP:422, chkInd:3070, chkTot:3492},
-  {key:'frances', label:'Pan Francés',     kw:'Franc',      rx:/franc[eé]s/i,      batch:15,  unitsPer:4, pack:1, unidad:'por paquete de 4',  color:'#D4537E'},
-  {key:'buns',    label:'Buns',            kw:'Bun',        rx:/buns?|hamburgues/i,batch:75,  unitsPer:1, pack:4, unidad:'por paquete de 4',  color:'#7F77DD'},
+  // prodId FIJO por producto — búsqueda por ID, nunca por nombre (trampa 517/519 "Prueba Galletas"). kw/rx quedan solo informativos.
+  {key:'blanco',  label:'Pan Blanco',      prodId:451, kw:'Pan Blanco', rx:/pan\s*blanco/i,    batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#378ADD', chkMP:805, chkInd:1462, chkTot:2267},
+  {key:'semillas',label:'Pan de Semillas', prodId:452, kw:'Semillas',   rx:/semillas/i,        batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#84BD00', chkMP:980, chkInd:1462, chkTot:2442},
+  {key:'pizza',   label:'Pizza Crust',     prodId:472, kw:'Pizza',      rx:/pizza/i,           batch:10,  unitsPer:2, pack:1, batchOverride:10, unidad:'por paquete de 2',  color:'#FF751F', chkMP:422, chkInd:3070, chkTot:3492},
+  {key:'frances', label:'Pan Francés',     prodId:453, kw:'Franc',      rx:/franc[eé]s/i,      batch:15,  unitsPer:4, pack:1, unidad:'por paquete de 4',  color:'#D4537E'},
+  {key:'buns',    label:'Buns',            prodId:503, kw:'Bun',        rx:/buns?|hamburgues/i,batch:75,  unitsPer:1, pack:4, unidad:'por paquete de 4',  color:'#7F77DD'},
   // Galletas = product.product 519 en PRODUCCIÓN (es_CR "Cookie Dough" / en_US "Prueba Galletas"; template 705, BOM18 con chocolate, rinde 160, 353 on-hand). El 529 era id del demo.
   {key:'galletas',label:'Galletas',        prodId:519, kw:'cookie dough',rx:/cookie\s*dough|cookie/i, batch:160, unitsPer:1, pack:1, unidad:'por unidad',        color:'#ED93B1'},
 ];
@@ -3530,13 +3703,563 @@ function irAMermas(){
 }
 function irAPlan(){
   _modShow('vPlan'); crumbSet('Operaciones','Plan');
-  if(!_loaded.plan){ _loaded.plan=true; cargarPlan(); }
+  cargarPlanMeses();
 }
 function irAInventario(){
   _modShow('vInventario'); crumbSet('Operaciones','Inventario');
   if(!_loaded.inv){ _loaded.inv=true; cargarInventario(); }
   if(hayBorrador()) document.getElementById('vBorrador').classList.remove('hidden');
 }
+
+// ════════════════════════════════════════════════════════════════════════
+// PLANIFICADOR · pestaña RESUMEN (portada) — motor NIVELADOR DE CARGA.
+// Solo lectura, por ID (nunca por nombre). Reusa expandirReceta / odooCall /
+// uomFactor / prodUomFactor. El motor calcula en UDS SUELTAS y se MUESTRA en
+// unidad de venta natural + cajas. Datos vivos de Odoo; config de Supabase.
+// ════════════════════════════════════════════════════════════════════════
+const NIV_PROD=[451,452,453,503,472,519];
+const NIV_INFO={
+  451:{nom:'Pan Blanco',  prem:468, rend:21,  cap:8,  cajaU:6,  presDiv:1, presLbl:'uds'},
+  452:{nom:'Pan Semillas',prem:469, rend:21,  cap:10, cajaU:6,  presDiv:1, presLbl:'uds'},
+  453:{nom:'Pan Francés', prem:470, rend:60,  cap:10, cajaU:24, presDiv:4, presLbl:'paq'},
+  503:{nom:'Buns',        prem:502, rend:75,  cap:10, cajaU:24, presDiv:4, presLbl:'paq'},
+  472:{nom:'Pizza',       prem:473, rend:20,  cap:12, cajaU:12, presDiv:2, presLbl:'paq'},
+  519:{nom:'Galletas',    prem:517, rend:160, cap:1,  cajaU:12, presDiv:1, presLbl:'uds'},
+};
+const NIV_CFG_DEF={ritmoVentana:6, colchon:3, colchonTemporada:4, horizonte:6};
+const _rzN=(n,d=0)=>(Number(n)||0).toLocaleString('es-CR',{minimumFractionDigits:d,maximumFractionDigits:d});
+
+function _isoWk(dt){
+  const t=new Date(Date.UTC(dt.getFullYear(),dt.getMonth(),dt.getDate()));
+  const day=t.getUTCDay()||7; t.setUTCDate(t.getUTCDate()+4-day);
+  const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));
+  const wk=Math.ceil((((t-y0)/86400000)+1)/7);
+  return t.getUTCFullYear()+'-W'+String(wk).padStart(2,'0');
+}
+function _ymd(dt){ return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
+// date_finished de Odoo viene en UTC; a fecha CR (UTC−6) antes de agrupar por día (trampa CLAUDE.md).
+function _crDate(dt){ if(!dt) return ''; const d=new Date(String(dt).replace(' ','T')+'Z'); return new Date(d.getTime()-6*3600000).toISOString().slice(0,10); }
+
+// ── plan_config (Supabase; fila más reciente por clave manda). Fallback a defaults. ──
+async function nivConfig(){
+  const cfg={ritmoVentana:NIV_CFG_DEF.ritmoVentana, colchonTemporada:NIV_CFG_DEF.colchonTemporada,
+             horizonte:NIV_CFG_DEF.horizonte, colchon:{}, ventanas:[], sembrado:false};
+  NIV_PROD.forEach(p=>cfg.colchon[p]=NIV_CFG_DEF.colchon);
+  try{
+    const c=sbClient(); if(!c) return cfg;
+    const {data,error}=await c.from('plan_config').select('clave,valor,creado_en').order('creado_en',{ascending:false});
+    if(error||!data||!data.length) return cfg;
+    cfg.sembrado=true; const seen={};
+    for(const r of data){ if(seen[r.clave])continue; seen[r.clave]=1; const v=r.valor;
+      if(r.clave==='ritmo_ventana') cfg.ritmoVentana=+v||cfg.ritmoVentana;
+      else if(r.clave==='colchon_temporada') cfg.colchonTemporada=+v||cfg.colchonTemporada;
+      else if(r.clave==='colchon_semanas' && v && typeof v==='object'){ for(const k in v) cfg.colchon[+k]=+v[k]; }
+      else if(r.clave==='ventanas_estacionales' && Array.isArray(v)) cfg.ventanas=v;
+    }
+  }catch(e){ /* tabla no sembrada aún → defaults */ }
+  return cfg;
+}
+
+// ── RITMO base: ventas netas (aml posteadas) → uds sueltas por uom_id → promedio N sem ISO ──
+async function nivRitmo(N){
+  const hoy=new Date(); const desde=new Date(hoy); desde.setDate(desde.getDate()-(N+2)*7);
+  const aml=await odooCall('account.move.line','search_read',
+    [[['parent_state','=','posted'],['move_id.move_type','in',['out_invoice','out_refund']],
+      ['display_type','=','product'],['product_id','in',NIV_PROD],
+      ['date','>=',_ymd(desde)],['date','<=',_ymd(hoy)]]],
+    {fields:['product_id','quantity','product_uom_id','date','move_id'],limit:20000});
+  const mids=[...new Set(aml.map(l=>l.move_id&&l.move_id[0]).filter(Boolean))];
+  const moves=mids.length?await odooCall('account.move','read',[mids],{fields:['move_type']}):[];
+  const mt={}; moves.forEach(m=>mt[m.id]=m.move_type);
+  for(const u of [...new Set(aml.map(l=>l.product_uom_id&&l.product_uom_id[0]).filter(Boolean))]) await uomFactor(u);
+  const net={}; NIV_PROD.forEach(p=>net[p]={});
+  for(const l of aml){
+    const pid=l.product_id[0], f=await uomFactor(l.product_uom_id[0]);
+    const uds=l.quantity/(f||1), wk=_isoWk(new Date(l.date+'T00:00:00'));
+    const s=mt[l.move_id[0]]==='out_refund'?-1:1;
+    net[pid][wk]=(net[pid][wk]||0)+uds*s;
+  }
+  const cur=_isoWk(hoy);
+  const wks=[...new Set(NIV_PROD.flatMap(p=>Object.keys(net[p])))].filter(w=>w<cur).sort();
+  const win=wks.slice(-N), ritmo={};
+  NIV_PROD.forEach(p=>{ let s=0; win.forEach(w=>s+=net[p][w]||0); ritmo[p]=win.length?s/win.length:0; });
+  return ritmo;
+}
+
+// ── STOCK: terminado (uds), premezcla (u), MP hoja (uom base) ──
+async function nivStock(){
+  const prem=NIV_PROD.map(p=>NIV_INFO[p].prem), hoja={};
+  for(const p of NIV_PROD){ const r=await expandirReceta(p,1,{excluirAgua:true}); if(r) for(const k in r.hojas) hoja[k]=1; }
+  const ids=[...NIV_PROD, ...prem, ...Object.keys(hoja).map(Number)];
+  const q=await odooCall('stock.quant','search_read',
+    [[['product_id','in',ids],['location_id.usage','=','internal']]],{fields:['product_id','quantity']});
+  const oh={}; q.forEach(r=>{const p=r.product_id[0]; oh[p]=(oh[p]||0)+r.quantity;});
+  const fin={}; for(const p of NIV_PROD) fin[p]=(oh[p]||0)/(await prodUomFactor(p));
+  const premOh={}; prem.forEach(p=>premOh[p]=oh[p]||0);
+  const mpOh={}; Object.keys(hoja).forEach(k=>mpOh[+k]=oh[+k]||0);
+  // nombres + unidad de cada hoja MP (para la tarjeta)
+  const leafIds=Object.keys(hoja).map(Number), meta={};
+  if(leafIds.length){ const pr=await odooCall('product.product','read',[leafIds],{fields:['id','name','uom_id']});
+    pr.forEach(x=>meta[x.id]={name:(x.name||('id '+x.id)).replace(/^\[[^\]]*\]\s*/,''), uom:x.uom_id?x.uom_id[1]:''}); }
+  return {fin, premOh, mpOh, meta};
+}
+
+// ── NIVELADOR: sim rolling H sem, un producto/día lleno, urgencia.
+// Devuelve w0 (batches por producto de la semana 0) y weeks (lista ordenada de
+// días de producción {p,batches} por semana, para el calendario de 2 semanas). ──
+function nivLevel(ritmo, fin, cfg){
+  const H=cfg.horizonte||6, cur=_isoWk(new Date());
+  const colDe=pid=>{ const t=(cfg.ventanas||[]).some(v=>+v.producto_id===pid && cur>=v.desde && cur<=v.hasta);
+    return t?cfg.colchonTemporada:(cfg.colchon[pid]||3); };
+  const stock={}; NIV_PROD.forEach(p=>stock[p]=fin[p]||0);
+  const weeks=[];
+  for(let w=0;w<H;w++) weeks.push(_weekLayout(stock, ritmo, colDe));   // {lunJue, viernes}; muta stock
+  return {w0:_semanaBatches(weeks[0]), weeks};
+}
+// batches por producto → lista de DÍAS LLENOS, un producto por día, agrupados y
+// ordenados por urgencia (menor cobertura primero). Nunca mezcla productos en un día.
+function _agruparDias(batchesWk, cov0){
+  const dList=[];
+  Object.keys(batchesWk).map(Number).sort((a,b)=>cov0[a]-cov0[b]).forEach(p=>{
+    const nd=Math.round(batchesWk[p]/NIV_INFO[p].cap);
+    for(let k=0;k<nd;k++) dList.push({p, batches:NIV_INFO[p].cap});
+  });
+  return dList;
+}
+// Layout de UNA semana de producción: hasta 4 días LUN–JUE (horno, agrupados por
+// urgencia) + VIERNES flexible (galletas > picado > derrame > limpieza). Muta stock
+// (suma lo producido, resta el consumo de la semana). Galletas montan el viernes.
+const NIV_HORNO=[451,452,453,503,472];
+function _weekLayout(stock, ritmo, colDe){
+  const cov0={}; NIV_PROD.forEach(p=>cov0[p]=(ritmo[p]>0)?stock[p]/ritmo[p]:999);
+  const batchesWk={}; let dias=0;
+  while(dias<4){                                   // 4 días productivos lun–jue
+    let peor=null, pc=1e9;
+    for(const p of NIV_HORNO){ const r=ritmo[p]||0; if(r<=0)continue; const c=(stock[p]-r)/r; if(c<colDe(p)&&c<pc){pc=c;peor=p;} }
+    if(peor===null)break;
+    const I=NIV_INFO[peor]; stock[peor]+=I.cap*I.rend; batchesWk[peor]=(batchesWk[peor]||0)+I.cap; dias++;
+  }
+  const lunJue=_agruparDias(batchesWk, cov0);
+  let gall=0; { const p=519, r=ritmo[p]||0; if(r>0){ const c=(stock[p]-r)/r; if(c<colDe(p)){ const I=NIV_INFO[p]; stock[p]+=I.cap*I.rend; gall=I.cap; } } }
+  let derrame=null; { let peor=null,pc=1e9; for(const p of NIV_HORNO){ const r=ritmo[p]||0; if(r<=0)continue; const c=(stock[p]-r)/r; if(c<colDe(p)&&c<pc){pc=c;peor=p;} }
+    if(peor!==null) derrame={p:peor, batches:NIV_INFO[peor].cap}; }
+  let viernes;
+  if(gall>0) viernes={tipo:'galletas', batches:gall};                    // 1) galletas
+  else if(derrame){ const I=NIV_INFO[derrame.p]; stock[derrame.p]+=I.cap*I.rend; viernes={tipo:'derrame', p:derrame.p, batches:derrame.batches}; }  // 3) derrame (2 picado: sin fuente)
+  else viernes={tipo:'limpieza'};                                        // 4) limpieza
+  NIV_PROD.forEach(p=>stock[p]-=(ritmo[p]||0));    // consumo de la semana
+  return {lunJue, viernes};
+}
+function _semanaBatches(layout){
+  const b={}; (layout.lunJue||[]).forEach(d=>b[d.p]=(b[d.p]||0)+d.batches);
+  const v=layout.viernes; if(v&&v.tipo==='galletas') b[519]=(b[519]||0)+v.batches;
+  else if(v&&v.tipo==='derrame') b[v.p]=(b[v.p]||0)+v.batches;
+  return b;
+}
+// "Esta semana" = semana de PRODUCCIÓN vigente. En fin de semana → arranca el lunes próximo.
+function _mondayProd(dt){ const d=new Date(dt), dow=d.getDay();
+  if(dow===0) d.setDate(d.getDate()+1); else if(dow===6) d.setDate(d.getDate()+2); else d.setDate(d.getDate()-(dow-1));
+  d.setHours(0,0,0,0); return d; }
+// 5 celdas lun–vie de una semana: real (Odoo, días pasados) o propuesta (plan).
+function _celdasSemana(monday, layout, real, hoyStr){
+  return _weekDays(monday).map((day,i)=>{
+    const realDay=(real&&real[day.ds])||null, past=day.ds<hoyStr, isHoy=day.ds===hoyStr;
+    let prodNom=null, bt='';
+    if(i<4){ const e=(layout.lunJue||[])[i]; if(e){ prodNom=NIV_INFO[e.p].nom.replace(/^Pan /,''); bt=e.batches+' batches'; } }
+    else { const v=layout.viernes||{tipo:'limpieza'};
+      if(v.tipo==='galletas'){ prodNom='Galletas'; bt=v.batches+' batches'; }
+      else if(v.tipo==='derrame'){ prodNom=NIV_INFO[v.p].nom.replace(/^Pan /,''); bt=v.batches+' batches'; }
+      else if(v.tipo==='picado') prodNom='Picado'; }
+    let prod, kind;
+    if(realDay){ kind='real'; bt=''; prod=Object.keys(realDay).map(pp=>NIV_INFO[+pp].nom.replace(/^Pan /,'')+' '+Math.round(realDay[pp]/NIV_INFO[+pp].rend)+'b').join(' + '); }
+    else if(prodNom){ prod=prodNom; kind=isHoy?'today':(past?'pend':'prop'); }
+    else { prod='Limpieza'; bt=''; kind=isHoy?'today':'clean'; }
+    return {dow:day.dow, dnum:day.dnum, prod, bt, kind};
+  });
+}
+
+// ── MP necesaria de la semana (2 grupos), en uom base por hoja ──
+async function nivMP(w0, premOh){
+  const need={}, add=(pid,q)=>need[pid]=(need[pid]||0)+q;
+  for(const p of NIV_PROD){
+    const b=w0[p]||0; if(b<=0)continue; const I=NIV_INFO[p];
+    const mk=Math.max(0, b-(premOh[I.prem]||0));                 // (a) premezclas por hacer
+    if(mk>0){ const r=await expandirReceta(I.prem, mk); if(r) for(const k in r.hojas) add(+k, r.hojas[k].qty); }
+    const bom=await _bomDe(p);                                    // (b) directos de etapa final
+    if(bom) for(const ln of bom.lines){
+      if(ln.pid===I.prem || ln.pid===AGUA_PID) continue;
+      const sub=await _bomDe(ln.pid); if(sub && sub.lines.length) continue;
+      const info=await _prodInfo(ln.pid);
+      add(ln.pid, await _conv(ln.qty*b, ln.uom, info.uom));
+    }
+  }
+  return need;
+}
+
+// ── Producción real de la semana en curso, por fecha (para el calendario) ──
+async function nivSemana(){
+  const hoy=new Date(), d=_mondayProd(hoy);   // lunes de la semana de producción vigente
+  const mos=await odooCall('mrp.production','search_read',
+    [[['state','=','done'],['product_id','in',NIV_PROD],['date_finished','>=',_ymd(d),],['date_finished','<=',_ymd(hoy)+' 23:59:59']]],
+    {fields:['product_id','qty_produced','product_uom_id','date_finished']});
+  const byDate={}, doneU={}; NIV_PROD.forEach(p=>doneU[p]=0);
+  for(const m of mos){ const p=m.product_id[0], ds=_crDate(m.date_finished);
+    // qty_produced viene en la uom de la ORDEN (Buns = Units, no Dozens) → usar esa uom, no la del producto
+    const u=(m.qty_produced||0)/((await uomFactor(m.product_uom_id&&m.product_uom_id[0]))||1);
+    doneU[p]+=u; (byDate[ds]=byDate[ds]||{})[p]=((byDate[ds]||{})[p]||0)+u; }
+  return {doneU, byDate};
+}
+
+// ── Helpers de calendario y unidad de compra ──
+const _DOW=['dom','lun','mar','mié','jue','vie','sáb'];
+const _MESAB=['ene','feb','mar','abr','may','jun','jul','ago','set','oct','nov','dic'];
+function _mondayOf(dt){ const d=new Date(dt), dow=d.getDay()||7; d.setDate(d.getDate()-(dow-1)); d.setHours(0,0,0,0); return d; }
+function _weekDays(mon){ const out=[]; for(let i=0;i<5;i++){ const d=new Date(mon); d.setDate(d.getDate()+i);
+    out.push({ds:_ymd(d), dow:_DOW[d.getDay()], dnum:d.getDate()}); } return out; }
+function _rangeLbl(mon){ const b=new Date(mon); b.setDate(b.getDate()+4);   // lun–vie
+    return mon.getDate()+' al '+b.getDate()+' '+_MESAB[b.getMonth()]; }
+const NIV_COMPRA={520:{div:30, lbl:'cartones', sing:'cartón'}};   // huevos: 30 u/cartón
+function _compraUnidad(pid, faltaBase, uom){
+  const c=NIV_COMPRA[pid];
+  if(c){ const n=Math.ceil(faltaBase/c.div); return n+' '+(n===1?c.sing:c.lbl); }
+  const dec=(uom==='kg'||uom==='L'||/gal/.test(uom))?1:0; return _rzN(faltaBase,dec)+' '+uom;
+}
+
+// ════════════════════════════════ RENDER ════════════════════════════════
+async function cargarResumen(){
+  const body=document.getElementById('rzBody');
+  body.innerHTML='<div class="rz-load">Leyendo Odoo y nivelando la semana…</div>';
+  try{
+    const cfg=await nivConfig();
+    const ritmo=await nivRitmo(cfg.ritmoVentana);
+    const stock=await nivStock();
+    const {w0, weeks}=nivLevel(ritmo, stock.fin, cfg);
+    const mp=await nivMP(w0, stock.premOh);
+    const real=await nivSemana();
+    body.innerHTML=renderResumen({cfg, ritmo, stock, w0, weeks, mp, real});
+  }catch(e){ body.innerHTML='<div class="rz-err">No pude cargar el resumen: '+esc(e&&e.message||e)+'</div>'; }
+}
+
+function renderResumen(d){
+  const {cfg,ritmo,stock,w0,weeks,mp,real}=d;
+  const hoy=new Date(), hoyStr=_ymd(hoy);
+  // ── TABLA "MIS PRODUCTOS" ──
+  const rows=NIV_PROD.map(p=>{ const I=NIV_INFO[p], uds=stock.fin[p]||0;
+    return {p, nom:I.nom, cajas:Math.floor(uds/I.cajaU), nat:Math.round(uds/I.presDiv), natLbl:I.presLbl,
+            cov:ritmo[p]>0?uds/ritmo[p]:99, prod:w0[p]||0}; });
+  const tabla='<div class="rz-tblwrap"><table class="rz-tbl"><thead><tr><th>Producto</th><th>Congelador</th><th>Cobertura</th><th>Esta semana</th></tr></thead><tbody>'
+    +rows.map(r=>'<tr><td class="rz-pnm">'+esc(r.nom)+'</td>'
+      +'<td>'+_rzN(r.cajas)+' cj</td>'
+      +'<td class="rz-sem'+(r.prod>0?' rz-amber':'')+'">'+_rzN(r.cov,1)+' sem</td>'
+      +'<td>'+(r.prod>0?'<span class="rz-prod">'+r.prod+' batches</span>':'<span class="rz-gray">—</span>')+'</td></tr>').join('')
+    +'</tbody></table></div>';
+  // ── CALENDARIO 2 SEMANAS ──
+  function semanaHtml(offset, esActual){
+    const mon=_mondayProd(hoy); mon.setDate(mon.getDate()+offset*7);
+    const RZ={real:['rz-done','Hecho'], today:['rz-today','En curso'], pend:['rz-miss','Sin registrar en Odoo'], prop:['rz-plan','Propuesto'], clean:['rz-clean','—']};
+    const cards=_celdasSemana(mon, weeks[offset]||{lunJue:[],viernes:{tipo:'limpieza'}}, real.byDate, hoyStr).map(c=>{
+      const m=RZ[c.kind]||RZ.clean;
+      return '<div class="rz-day '+m[0]+'"><div class="rz-dd">'+c.dow+' '+c.dnum+'</div>'
+        +'<div class="rz-dp">'+esc(c.prod)+'</div>'+(c.bt?'<div class="rz-db">'+c.bt+'</div>':'')
+        +'<div class="rz-ds">'+m[1]+'</div></div>';
+    }).join('');
+    return '<div class="rz-wk'+(esActual?'':' rz-wk-next')+'">'
+      +'<div class="rz-whead">'+(esActual?'<span class="rz-wtag rz-wnow">ESTA SEMANA</span>':'<span class="rz-wtag">SIGUIENTE</span>')
+      +'<span class="rz-wrange">'+_rangeLbl(mon)+'</span></div><div class="rz-days">'+cards+'</div></div>';
+  }
+  // ── COMPRAS (MP que el nivelador necesita y no alcanza, en unidad de compra) ──
+  const meta=stock.meta||{};
+  const bajos=Object.keys(mp).map(k=>({pid:+k, need:mp[k], have:stock.mpOh[+k]||0})).filter(x=>x.have<x.need-0.0001);
+  const compras = bajos.length
+    ? 'Comprar para la producción: '+bajos.map(x=>{ const nm=(meta[x.pid]&&meta[x.pid].name)||('id '+x.pid), uom=(meta[x.pid]&&meta[x.pid].uom)||'';
+        return esc(nm.toLowerCase())+' — '+_compraUnidad(x.pid, x.need-x.have, uom); }).join(' · ')
+    : 'La materia prima alcanza para la producción de la semana. Sin pedidos pendientes.';
+  return ''
+  +(cfg.sembrado?'':'<div class="rz-warn">plan_config no sembrado — usando defaults (ritmo 6 · colchón 3). Sembrá el seed en Supabase para activar temporada.</div>')
+  +'<div class="rz-sec"><div class="rz-sh"><span class="rz-st">Mis productos</span></div>'+tabla+'</div>'
+  +'<div class="rz-sec"><div class="rz-sh"><span class="rz-st">Calendario de producción</span></div>'
+    +'<div class="rz-cal">'+semanaHtml(0,true)+semanaHtml(1,false)+'</div>'
+    +'</div>'
+  +'<div class="rz-buy"><div class="rz-bl"><span class="rz-bt">Compras</span><span class="rz-bd">'+compras+'</span></div>'
+    +'<span class="rz-go">Ver compras →</span></div>';
+}
+
+// entrada a la pestaña
+function irAResumen(){
+  _modShow('vResumen'); crumbSet('Operaciones','Resumen');
+  cargarResumen();   // auto-refresh al entrar (siempre fresco)
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// CONTEO · pestaña "Ajuste de inventario" (Operaciones/Inventario). Solo lectura
+// sobre Odoo; guarda en Supabase `conteos`. Reusa listaMP/fisicoMP/PESO_EMPAQUE.
+// TRES secciones: Materia prima · Premezclas · Producto terminado. Por ID.
+// La producción del día debe estar registrada en Odoo ANTES de contar (alerta fija).
+// ════════════════════════════════════════════════════════════════════════
+const CONTEO_TOL={
+  mp_kgL:{verde:0.5, amarillo:1.5},   // kg o L: verde ≤500 g/mL
+  mp_g:{verde:500, amarillo:1500},    // stock en g (levadura, sal marina, tapa dulce)
+  mp_u:{verde:0, amarillo:1},         // unidades sueltas
+  huevo:{verde:0, amarillo:2},        // huevos: 1 = amarillo
+  term:{verde:1, amarillo:2},         // terminado/premezcla: caja/unidad/batch
+};
+const MP_USO_ORDEN=[/avena/i,/almid[oó]n.*ma[ií]z/i,/almid[oó]n.*yuca/i,/huevos/i,/aceite/i,
+  /harina.*arroz/i,/harina.*garbanzo/i,/az[uú]car/i,/^sal$/i,/levadura/i,/xant|goma/i,
+  /calabaza/i,/girasol/i,/linaza/i,/chocolate/i,/tapa\s*dulce|panela/i,/sal\s*marina/i,
+  /vainilla/i,/bicarb/i,/huevo\s*l[ií]quido/i];
+function _mpRank(name){ for(let i=0;i<MP_USO_ORDEN.length;i++) if(MP_USO_ORDEN[i].test(name)) return i; return 99; }
+
+function cnDraft(){ try{return JSON.parse(localStorage.getItem('tf_conteo_draft')||'{}');}catch(e){return {};} }
+function cnSave(d){ localStorage.setItem('tf_conteo_draft', JSON.stringify(d)); }
+let _cnMP=[], _cnPremez=[], _cnTerm=[];
+
+// ── Semáforo de 3 niveles ──
+function _tolMP(m){
+  if(/huevos/i.test(m.name)) return CONTEO_TOL.huevo;
+  if(m.uom==='kg'||m.uom==='L') return CONTEO_TOL.mp_kgL;
+  if(m.uom==='g'||/gal/.test(m.uom)) return CONTEO_TOL.mp_g;
+  return CONTEO_TOL.mp_u;
+}
+function sem3(diff, tol, vacio){
+  if(vacio) return {cls:'cn-none', txt:'—'};
+  const a=Math.abs(diff);
+  if(a<=tol.verde) return {cls:'cn-ok', txt:'Cuadra'};
+  if(a<=tol.amarillo) return {cls:'cn-warn', txt:'Diferencia chica'};
+  return {cls:'cn-bad', txt:'Descuadre'};
+}
+
+// ── Escritura de campos (recompute vivo) ──
+function cnMpEmp(pid,v){ const d=cnDraft(); d.mp=d.mp||{}; d.mp[pid]=d.mp[pid]||{}; d.mp[pid].emp=v; cnSave(d); cnRecMP(pid); }
+function cnMpSue(pid,v){ const d=cnDraft(); d.mp=d.mp||{}; d.mp[pid]=d.mp[pid]||{}; d.mp[pid].sue=v; cnSave(d); cnRecMP(pid); }
+function cnPremez(id,v){ const d=cnDraft(); d.premez=d.premez||{}; d.premez[id]=v; cnSave(d); cnRecPremez(id); }
+function cnTermCajas(id,v){ const d=cnDraft(); d.term=d.term||{}; d.term[id]=d.term[id]||{}; d.term[id].cajas=v; cnSave(d); cnRecTerm(id); }
+function cnTermSue(id,v){ const d=cnDraft(); d.term=d.term||{}; d.term[id]=d.term[id]||{}; d.term[id].sue=v; cnSave(d); cnRecTerm(id); }
+
+function cnRecMP(pid){
+  const m=_cnMP.find(x=>x.pid===pid); if(!m)return;
+  const dr=(cnDraft().mp||{})[pid]||{}; const {fis,vacio}=fisicoMP(m,dr);
+  const diff=fis-m.qty, s=sem3(diff,_tolMP(m),vacio);
+  const de=document.getElementById('cn-mdif'+pid), se=document.getElementById('cn-msem'+pid);
+  if(de){ de.textContent=vacio?'—':fmtDiff(diff)+' '+m.uom; de.className='cn-diff r '+(vacio?'':s.cls); }
+  if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
+  cnResumen();
+}
+function cnRecPremez(id){
+  const p=_cnPremez.find(x=>x.id===id); if(!p)return;
+  const dr=(cnDraft().premez||{})[id]; const vacio=(dr==null||dr==='');
+  const fis=parseFloat(dr)||0, diff=fis-p.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
+  const de=document.getElementById('cn-pdif'+id), se=document.getElementById('cn-psem'+id);
+  if(de){ de.textContent=vacio?'—':fmtDiff(diff)+' batch'; de.className='cn-diff r '+(vacio?'':s.cls); }
+  if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
+  cnResumen();
+}
+function cnRecTerm(id){
+  const t=_cnTerm.find(x=>x.id===id); if(!t)return;
+  const dr=(cnDraft().term||{})[id]||{};
+  const vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
+  const cajas=parseFloat(dr.cajas)||0, sue=parseFloat(dr.sue)||0, fis=cajas*t.factor+sue;
+  const diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
+  const de=document.getElementById('cn-tdif'+id), se=document.getElementById('cn-tsem'+id);
+  if(de){ de.textContent=vacio?'—':fmtDiff(diff)+' u'; de.className='cn-diff r '+(vacio?'':s.cls); }
+  if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
+  cnResumen();
+}
+
+function cnResumen(){
+  let desc=0, sin=0;
+  for(const m of _cnMP){ const dr=(cnDraft().mp||{})[m.pid]||{}; const {fis,vacio}=fisicoMP(m,dr);
+    if(vacio){ sin++; continue; } if(Math.abs(fis-m.qty)>_tolMP(m).verde) desc++; }
+  for(const p of _cnPremez){ const dr=(cnDraft().premez||{})[p.id]; const vacio=(dr==null||dr==='');
+    if(vacio){ sin++; continue; } if(Math.abs((parseFloat(dr)||0)-p.odoo)>CONTEO_TOL.term.verde) desc++; }
+  for(const t of _cnTerm){ const dr=(cnDraft().term||{})[t.id]||{};
+    const vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
+    if(vacio){ sin++; continue; } const fis=(parseFloat(dr.cajas)||0)*t.factor+(parseFloat(dr.sue)||0);
+    if(Math.abs(fis-t.odoo)>CONTEO_TOL.term.verde) desc++; }
+  const el=document.getElementById('cn-resumen'); if(el) el.innerHTML=
+    '<b>'+desc+'</b> descuadre'+(desc===1?'':'s')+' · <b>'+sin+'</b> sin contar';
+}
+
+// ── Pregunta de rezago: informativa (la tool NO adivina; el ajuste real se hace
+// registrando en Odoo antes de contar). Guarda la respuesta en el conteo. ──
+function cnSetRezago(sec, val){ const d=cnDraft(); d.rezago=d.rezago||{}; d.rezago[sec]=val; cnSave(d);
+  const anyFalta = (d.rezago.mp==='falta')||(d.rezago.premez==='falta')||(d.rezago.term==='falta');
+  const al=document.getElementById('cn-alerta'); if(al) al.classList.toggle('cn-alerta-on', anyFalta); }
+
+// ── Tabs ──
+function cnTab(which){
+  ['mp','premez','term'].forEach(k=>{ const el=document.getElementById('cn-'+k); if(el) el.style.display=(k===which)?'block':'none'; });
+  document.querySelectorAll('#cn-tabs .cn-tab').forEach(b=>b.classList.toggle('on', b.dataset.t===which));
+}
+
+// ── Carga ──
+async function cargarConteo(){
+  const st=document.getElementById('cnStatus'); st.className='status s-info'; st.classList.remove('hidden');
+  st.innerHTML='<span class="spin"></span>Leyendo inventario de Odoo (solo lectura)…';
+  try{
+    _cnMP=(await listaMP()).sort((a,b)=>_mpRank(a.name)-_mpRank(b.name) || a.name.localeCompare(b.name,'es'));
+    const ids=INV_TERM.map(t=>t.id).concat(INV_PREMEZ.map(p=>p.id));
+    const q=await odooCall('stock.quant','read_group',[[['product_id','in',ids],['location_id.usage','=','internal']],['quantity'],['product_id']],{lazy:false});
+    const oh={}; q.forEach(r=>{ const pid=r.product_id&&r.product_id[0]; if(pid) oh[pid]=(oh[pid]||0)+(r.quantity||0); });
+    _cnTerm=await Promise.all(INV_TERM.map(async t=>Object.assign({},t,{odoo:(oh[t.id]||0)/(await prodUomFactor(t.id))})));
+    _cnPremez=INV_PREMEZ.map(p=>Object.assign({},p,{odoo:oh[p.id]||0}));   // premezcla: 1 unidad Odoo = 1 batch
+    st.classList.add('hidden');
+    cnRender();
+  }catch(e){ st.className='status s-err'; st.innerHTML='No pude leer el inventario: '+esc(e&&e.message||e); }
+}
+
+function cnRender(){
+  const d=cnDraft(), rez=d.rezago||{};
+  // MATERIA PRIMA
+  let mp='<table class="cn-tbl"><thead><tr><th>Ingrediente</th><th>Odoo dice</th><th>Conteo físico</th><th class="r">Diferencia</th><th class="r">Semáforo</th></tr></thead><tbody>';
+  for(const m of _cnMP){
+    const pe=PESO_EMPAQUE.find(x=>x.rx.test(m.name)), dr=(d.mp||{})[m.pid]||{};
+    const {fis,vacio}=fisicoMP(m,dr), diff=fis-m.qty, s=sem3(diff,_tolMP(m),vacio);
+    const empIn = pe ? '<input class="cn-in" inputmode="numeric" value="'+(dr.emp!=null?esc(dr.emp):'')+'" oninput="cnMpEmp('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(pe.lab)+' ×'+fmtN(pe.peso)+pe.unidad+'</span>' : '';
+    const sueLab=(pe&&pe.sueltoUnit)?pe.sueltoUnit:m.uom;
+    const sueIn = (pe&&pe.noSuelto) ? '<span class="cn-lbl">sin suelto</span>'
+      : '<input class="cn-in" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnMpSue('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(sueLab)+'</span>';
+    mp+='<tr><td class="cn-nm">'+esc(m.name)+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
+      +'<td class="cn-count">'+empIn+(empIn&&!(pe&&pe.noSuelto)?' + ':'')+sueIn+'</td>'
+      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-mdif'+m.pid+'">'+(vacio?'—':fmtDiff(diff)+' '+m.uom)+'</td>'
+      +'<td class="cn-sem r '+s.cls+'" id="cn-msem'+m.pid+'">'+s.txt+'</td></tr>';
+  }
+  document.getElementById('cn-mp').innerHTML=mp+'</tbody></table>';
+  // PREMEZCLAS (# batches directo, sin suelto)
+  let pm='<table class="cn-tbl"><thead><tr><th>Premezcla</th><th>Odoo dice</th><th>Conteo físico</th><th class="r">Diferencia</th><th class="r">Semáforo</th></tr></thead><tbody>';
+  for(const p of _cnPremez){
+    const dr=(d.premez||{})[p.id], vacio=(dr==null||dr===''); const fis=parseFloat(dr)||0, diff=fis-p.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
+    pm+='<tr><td class="cn-nm">'+esc(p.label)+'</td><td class="cn-odoo">'+fmtN(p.odoo)+' batches</td>'
+      +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr!=null?esc(dr):'')+'" oninput="cnPremez('+p.id+',this.value)" placeholder="0"><span class="cn-lbl">batches</span></td>'
+      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-pdif'+p.id+'">'+(vacio?'—':fmtDiff(diff)+' batch')+'</td>'
+      +'<td class="cn-sem r '+s.cls+'" id="cn-psem'+p.id+'">'+s.txt+'</td></tr>';
+  }
+  document.getElementById('cn-premez').innerHTML=pm+'</tbody></table>';
+  // PRODUCTO TERMINADO
+  let tm='<table class="cn-tbl"><thead><tr><th>Producto</th><th>Odoo dice</th><th>Conteo físico</th><th class="r">Diferencia</th><th class="r">Semáforo</th></tr></thead><tbody>';
+  for(const t of _cnTerm){
+    const dr=(d.term||{})[t.id]||{}, vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
+    const fis=(parseFloat(dr.cajas)||0)*t.factor+(parseFloat(dr.sue)||0), diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
+    tm+='<tr><td class="cn-nm">'+esc(t.label)+' <span class="cn-lbl">caja ×'+t.factor+'</span></td><td class="cn-odoo">'+fmtN(t.odoo)+' u</td>'
+      +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr.cajas!=null?esc(dr.cajas):'')+'" oninput="cnTermCajas('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">cajas</span> + '
+      +'<input class="cn-in" inputmode="numeric" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnTermSue('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">sueltas</span></td>'
+      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-tdif'+t.id+'">'+(vacio?'—':fmtDiff(diff)+' u')+'</td>'
+      +'<td class="cn-sem r '+s.cls+'" id="cn-tsem'+t.id+'">'+s.txt+'</td></tr>';
+  }
+  document.getElementById('cn-term').innerHTML=tm+'</tbody></table>';
+  cnResumen();
+}
+
+async function cnGuardar(){
+  const d=cnDraft(), snap={fecha:new Date().toISOString().slice(0,16), rezago:d.rezago||{}, mp:{}, premez:{}, term:{}};
+  _cnMP.forEach(m=>{ const dr=(d.mp||{})[m.pid]||{}; const {pe,fis,vacio}=fisicoMP(m,dr);
+    snap.mp[m.pid]={name:m.name, uom:m.uom, empaques:dr.emp!=null&&dr.emp!==''?parseFloat(dr.emp)||0:null, suelto:dr.sue!=null&&dr.sue!==''?parseFloat(dr.sue)||0:null, fisicoBase:vacio?null:fis, odoo:m.qty, diff:vacio?null:fis-m.qty}; });
+  _cnPremez.forEach(p=>{ const dr=(d.premez||{})[p.id]; const vac=(dr==null||dr===''); const fis=parseFloat(dr)||0; snap.premez[p.id]={label:p.label, batches:vac?null:fis, odoo:p.odoo, diff:vac?null:fis-p.odoo}; });
+  _cnTerm.forEach(t=>{ const dr=(d.term||{})[t.id]||{}; const cajas=parseFloat(dr.cajas)||0, sue=parseFloat(dr.sue)||0, fis=cajas*t.factor+sue;
+    const vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue===''); snap.term[t.id]={label:t.label, cajas, sueltas:sue, fisicoBase:vacio?null:fis, odoo:t.odoo, diff:vacio?null:fis-t.odoo}; });
+  const c=sbClient(); if(!c){ alert('Sin conexión con la base. Reintentá.'); return; }
+  let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
+  const { error } = await c.from('conteos').insert({ usuario: email||null, data: snap });
+  if(error){ alert('No se pudo guardar: '+error.message); return; }
+  alert('Conteo guardado en la base — lo ven Andrea y Lorena.');
+}
+
+function irAConteo(){
+  _modShow('vConteo'); crumbSet('Operaciones','Ajuste de inventario');
+  cargarConteo();
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// PLAN por MESES — proyección del nivelador hasta diciembre. Solo lectura, por ID.
+// Cada mes = batches proyectados por producto; clic → detalle día por día
+// (pasado = realidad de Odoo; futuro = propuesta del nivelador). No inventa nada.
+// ════════════════════════════════════════════════════════════════════════
+const PLAN_FASE={6:'Crucero',7:'Crucero',8:'Crucero',9:'Rampa',10:'Rampa',11:'Pico'};
+const PLAN_FERIADO={8:'Feriado 15 — Independencia (se cubre vie 18)', 11:'Feriado 1 — Abolición (diciembre al filo)'};
+const _MESNOM2=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+// Proyección: simula nWeeks desde esta semana; colchón según la temporada de CADA semana.
+function nivProyeccion(ritmo, fin, cfg, nWeeks){
+  const mon0=_mondayProd(new Date());
+  const stock={}; NIV_PROD.forEach(p=>stock[p]=fin[p]||0);
+  const out=[];
+  for(let w=0;w<nWeeks;w++){
+    const mon=new Date(mon0); mon.setDate(mon.getDate()+w*7); const wk=_isoWk(mon);
+    const colDe=pid=>{ const t=(cfg.ventanas||[]).some(v=>+v.producto_id===pid && wk>=v.desde && wk<=v.hasta); return t?cfg.colchonTemporada:(cfg.colchon[pid]||3); };
+    const layout=_weekLayout(stock, ritmo, colDe);   // muta stock; {lunJue, viernes}
+    out.push({monday:mon, lunJue:layout.lunJue, viernes:layout.viernes});
+  }
+  return out;
+}
+// Producción real por fecha en un rango (días pasados del detalle).
+async function nivRealRango(D1,D2){
+  const mos=await odooCall('mrp.production','search_read',
+    [[['state','=','done'],['product_id','in',NIV_PROD],['date_finished','>=',D1],['date_finished','<=',D2+' 23:59:59']]],
+    {fields:['product_id','qty_produced','product_uom_id','date_finished']});
+  const by={};
+  for(const m of mos){ const p=m.product_id[0], ds=_crDate(m.date_finished);
+    const u=(m.qty_produced||0)/((await uomFactor(m.product_uom_id&&m.product_uom_id[0]))||1);
+    (by[ds]=by[ds]||{})[p]=((by[ds]||{})[p]||0)+u; }
+  return by;
+}
+
+let _planProj=[], _planReal={};
+async function cargarPlanMeses(){
+  const st=document.getElementById('planStatus'); st.className='status s-info'; st.classList.remove('hidden');
+  st.innerHTML='<span class="spin"></span>Proyectando el plan con el nivelador (solo lectura)…';
+  try{
+    const cfg=await nivConfig(), ritmo=await nivRitmo(cfg.ritmoVentana), stk=await nivStock();
+    const hoy=new Date();
+    const semDic=Math.min(30, Math.max(1, Math.ceil((new Date(hoy.getFullYear(),11,31)-_mondayProd(hoy))/(7*86400000))+1));
+    _planProj=nivProyeccion(ritmo, stk.fin, cfg, semDic);
+    _planReal=await nivRealRango(hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-01', _ymd(hoy));
+    st.classList.add('hidden');
+    planRenderMeses();
+  }catch(e){ st.className='status s-err'; st.innerHTML='No pude proyectar el plan: '+esc(e&&e.message||e); }
+}
+
+function planRenderMeses(){
+  const hoy=new Date(), mesHoy=hoy.getMonth();
+  const porMes={};
+  _planProj.forEach(wk=>{ const m=wk.monday.getMonth(); porMes[m]=porMes[m]||{}; const b=_semanaBatches(wk); Object.keys(b).forEach(p=>porMes[m][p]=(porMes[m][p]||0)+b[p]); });
+  let cards='';
+  for(let m=mesHoy;m<=11;m++){
+    const bat=porMes[m]||{}, esHoy=(m===mesHoy), fase=PLAN_FASE[m]||'', fer=PLAN_FERIADO[m];
+    const prods=NIV_PROD.filter(p=>(bat[p]||0)>0).map(p=>NIV_INFO[p].nom.replace(/^Pan /,'')+' '+bat[p]).join(' · ') || '—';
+    const faseCls=(fase==='Rampa'||fase==='Pico')?'pl-fase-amber':'pl-fase';
+    cards+='<div class="pl-mes'+(esHoy?' pl-mes-now':'')+'" onclick="planVerDetalle('+m+')">'
+      +'<div class="pl-mh"><span class="pl-mnom">'+_MESNOM2[m]+'</span><span class="'+faseCls+'">'+esc(fase)+'</span></div>'
+      +'<div class="pl-bat">'+esc(prods)+'</div>'
+      +(fer?'<div class="pl-fer">'+esc(fer)+'</div>':'')
+      +'<div class="pl-ver">Ver detalle →</div></div>';
+  }
+  document.getElementById('planBody').innerHTML=
+    '<div class="pl-grid">'+cards+'</div><div id="planDetalle"></div>'
+    +'<div class="pl-notas"><div class="pl-nt">Cómo se lee este plan</div><ul>'
+    +'<li>jul–set: crucero (ritmo normal).</li><li>oct–nov: rampa (se sube para diciembre).</li>'
+    +'<li>1–18 dic: pico (cierre del año).</li><li>Checkpoints: 15-set y 30-oct.</li></ul>'
+    +'<div class="pl-nt" style="margin-top:12px">Feriados que afectan producción</div><ul>'
+    +'<li>mar 15 set — Independencia (se cubre el viernes 18).</li><li>mar 1 dic — Abolición del Ejército (diciembre al filo).</li></ul></div>';
+}
+
+function planVerDetalle(m){
+  const el=document.getElementById('planDetalle'); if(!el)return;
+  const hoyStr=_ymd(new Date());
+  const wks=_planProj.filter(wk=>wk.monday.getMonth()===m);
+  let html='<div class="pl-det"><div class="pl-det-h"><span>Detalle de '+_MESNOM2[m]+'</span><button class="pl-volver" onclick="planVolver()">‹ volver a los meses</button></div>';
+  const PLK={real:'pl-d-real', today:'pl-d-prop', pend:'pl-d-pend', prop:'pl-d-prop', clean:'pl-d-clean'};
+  wks.forEach(wk=>{
+    html+='<div class="pl-wk"><div class="pl-wr">'+_rangeLbl(wk.monday)+'</div><div class="pl-days">';
+    _celdasSemana(wk.monday, wk, _planReal, hoyStr).forEach(c=>{
+      const txt=c.prod+(c.bt?' '+c.bt.replace(' batches','b'):'');
+      const tag=(c.kind==='pend')?'<div class="pl-dtag">sin registrar</div>':'';
+      html+='<div class="pl-d '+(PLK[c.kind]||'pl-d-clean')+'"><div class="pl-dd">'+c.dow+' '+c.dnum+'</div><div class="pl-dp">'+esc(txt)+'</div>'+tag+'</div>';
+    });
+    html+='</div></div>';
+  });
+  el.innerHTML=html+'</div>'; el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function planVolver(){ const el=document.getElementById('planDetalle'); if(el) el.innerHTML=''; }
+
 
 // Total de batches terminados del mes (todos los productos, sin prueba/premezcla).
 async function batchesDelMes(D1,D2){
@@ -3584,13 +4307,24 @@ async function _conv(qty, fromUom, toUom){
   if(!fromUom||!toUom||fromUom===toUom) return qty;
   return qty * (await uomFactor(toUom)) / (await uomFactor(fromUom));
 }
-// Cantidad de cada ingrediente hoja para UN batch del producto top (bajando premezclas).
-// Convierte cada cantidad a la unidad BASE del precio (uom_id del producto) antes de costear.
-async function _hojasParaBatch(topPid){
+// ── EXPANSOR DE RECETAS (módulo COMPARTIDO) ──────────────────────────────
+// Dado un producto y una cantidad de batches, expande la BOM anidada BAJANDO
+// A INGREDIENTES HOJA (producto → premezcla → crudos). Única fuente de verdad
+// para DOS consumidores: el motor de costos (colones = qty×precio de la hoja)
+// y el planificador (cantidades por ingrediente). NUNCA usa el standard_price
+// de una premezcla — siempre baja a la hoja. La premezcla de Galletas [517]
+// tiene standard_price ₡0: por eso esta expansión es la que protege el costo de
+// Galletas y NO debe revertirse jamás.
+// Devuelve {hojas:{pid:{pid,name,price,qty,uom}}, indivPorBatch, batchCost}:
+//   hojas.qty = cantidad del ingrediente (en la unidad base de su precio) para
+//   `batches` batches; batchCost = colones de MP de esos batches;
+//   indivPorBatch = unidades individuales que rinde 1 batch del producto.
+const AGUA_PID = 474;   // Agua Potable: sin costo (std ₡0) y sin control de inventario.
+async function expandirReceta(topPid, batches=1, opts={}){
   const top=await _bomDe(topPid);
   if(!top) return null;
   const hojas={};
-  // need: cantidad `amount` (en `amountUom`) del producto pid para 1 batch del top
+  // cantidad `amount` (en `amountUom`) del producto pid para `batches` batches del top
   async function rec(pid, amount, amountUom, depth){
     const bom = depth<8 ? await _bomDe(pid) : null;
     if(!bom || !bom.lines.length){   // ingrediente hoja → convertir a la unidad del standard_price
@@ -3599,33 +4333,28 @@ async function _hojasParaBatch(topPid){
       const t=hojas[pid]||(hojas[pid]={pid:pid, name:info.name, price:info.price, qty:0, uom:info.uom});
       t.qty += qtyBase; return;
     }
-    // premezcla: expresar `amount` en la unidad de salida de su BOM → fracción de un batch suyo
+    // premezcla (tiene BOM propia): expresar `amount` en la unidad de salida de su BOM → fracción de un batch suyo
     const amountOut = await _conv(amount, amountUom, bom.uom);
     const frac = amountOut/(bom.product_qty||1);
     for(const ln of bom.lines){ await rec(ln.pid, frac*ln.qty, ln.uom, depth+1); }
   }
-  for(const ln of top.lines){ await rec(ln.pid, ln.qty, ln.uom, 1); }   // top.lines son por 1 batch
+  for(const ln of top.lines){ await rec(ln.pid, ln.qty*batches, ln.uom, 1); }   // top.lines por 1 batch × batches
+  if(opts.excluirAgua) delete hojas[AGUA_PID];   // planificador: agua sin control de inventario
   const indivPorBatch = top.product_qty / await uomFactor(top.uom);
-  return {hojas, indivPorBatch};
+  let batchCost=0; Object.values(hojas).forEach(t=>batchCost+=t.qty*t.price);
+  return {hojas, indivPorBatch, batchCost};
 }
 
 // MP por cost-unit, vía BOM recursivo. Devuelve mpUnit + rastro de ingredientes hoja.
 async function mpPorUnidad(P){
-  let prod;
-  if(P.prodId){   // id fijo (p. ej. Galletas → Cookie Dough id 529), sin búsqueda por nombre
-    const r=await odooCall('product.product','read',[[P.prodId]],{fields:['id','name','product_tmpl_id']});
-    prod=r&&r[0];
-    if(!prod)throw new Error(P.label+': no existe el producto id '+P.prodId);
-  } else {
-    const cands=await odooCall('product.product','search_read',[[['name','ilike',P.kw]]],{fields:['id','name'],limit:20});
-    prod=cands.find(p=>P.rx.test(p.name)&&!COSTOS_EXCL.test(p.name))||cands.find(p=>P.rx.test(p.name))||cands[0];
-    if(!prod)throw new Error('no encontré el producto '+P.label);
-  }
-  const r=await _hojasParaBatch(prod.id);
+  // Búsqueda por ID FIJO (nunca por nombre): evita la trampa 517/519 "Prueba Galletas".
+  if(!P.prodId) throw new Error(P.label+': falta prodId (búsqueda por ID obligatoria)');
+  const rp=await odooCall('product.product','read',[[P.prodId]],{fields:['id','name','product_tmpl_id']});
+  const prod=rp&&rp[0];
+  if(!prod)throw new Error(P.label+': no existe el producto id '+P.prodId);
+  const r=await expandirReceta(prod.id);   // 1 batch — mismo expansor compartido que usará el planificador
   if(!r)throw new Error(P.label+': sin BOM');
-  const {hojas, indivPorBatch}=r;
-  // costo de UN batch (recetas por batch, premezclas expandidas y convertidas a su unidad base)
-  let batchCost=0; Object.values(hojas).forEach(t=>batchCost+=t.qty*t.price);
+  const {hojas, indivPorBatch, batchCost}=r;   // batchCost = colones de MP de 1 batch (Σ qty×precio de la hoja)
   // cost-unidades que rinde el batch: override (BOM poco fiable, p.ej. Pizza) o derivado del BOM REAL
   const cuBatch = (P.batchOverride!=null) ? P.batchOverride
                 : (indivPorBatch ? indivPorBatch/(P.unitsPer||1) : (P.batch||1));
