@@ -1415,23 +1415,26 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <!-- PLAN DE PRODUCCIÓN (módulo Operaciones) — tablero congelador vs curva al 18-dic. SOLO LECTURA. -->
 <style>
-#vPlan .pl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:640px;margin:16px auto 0 0}
-@media(max-width:640px){#vPlan .pl-grid{grid-template-columns:1fr 1fr}}
-@media(max-width:440px){#vPlan .pl-grid{grid-template-columns:1fr}}
-#vPlan .pl-mes{background:var(--surface);border:.5px solid var(--border);border-radius:11px;padding:13px 14px;cursor:pointer;transition:border-color .12s}
+/* Plan: los 6 meses en UNA fila (ancho completo). Tarjeta compacta: nombre + batches/producto. */
+#vPlan .pl-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:16px 0 0}
+@media(max-width:900px){#vPlan .pl-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:520px){#vPlan .pl-grid{grid-template-columns:1fr 1fr}}
+#vPlan .pl-mes{background:var(--surface);border:.5px solid var(--border);border-radius:11px;padding:11px 12px;cursor:pointer;transition:border-color .12s;min-height:96px}
 #vPlan .pl-mes:hover{border-color:var(--border-m)}
 #vPlan .pl-mes-now{border-color:#D4537E;box-shadow:0 0 0 1px rgba(212,83,126,.35)}
-#vPlan .pl-mh{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px}
-#vPlan .pl-mnom{font-size:15px;font-weight:600;color:var(--text);text-transform:capitalize}
-#vPlan .pl-fase{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3)}
-#vPlan .pl-fase-amber{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:#E9A23B;font-weight:600}
-#vPlan .pl-bat{font-size:12px;color:var(--text-2);line-height:1.5}
-#vPlan .pl-fer{font-size:11px;color:#E9A23B;margin-top:6px}
-#vPlan .pl-ver{font-size:11.5px;color:#D4537E;margin-top:9px}
-#vPlan .pl-notas{max-width:640px;margin:20px auto 0 0;font-size:12px;color:var(--text-3)}
+#vPlan .pl-mnom{font-size:14px;font-weight:600;color:var(--text);text-transform:capitalize}
+#vPlan .pl-hoy{font-size:10.5px;color:#D4537E;font-weight:600;text-transform:none}
+#vPlan .pl-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+#vPlan .pl-tag{font-size:9.5px;font-weight:600;letter-spacing:.02em;border-radius:4px;padding:1px 6px}
+#vPlan .pl-tag-fer{color:#E9A23B;background:rgba(233,162,59,.12)}
+#vPlan .pl-tag-cierre{color:#D4537E;background:rgba(212,83,126,.12)}
+#vPlan .pl-bat{margin-top:8px;display:flex;flex-direction:column;gap:2px}
+#vPlan .pl-bl{font-size:11.5px;color:var(--text-2);line-height:1.35;font-variant-numeric:tabular-nums}
+#vPlan .pl-b0{color:var(--text-3)}
+#vPlan .pl-notas{max-width:720px;margin:22px auto 0 0;font-size:12px;color:var(--text-3)}
 #vPlan .pl-nt{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);font-weight:600;margin-bottom:5px}
 #vPlan .pl-notas ul{margin:0 0 0 16px;line-height:1.7} #vPlan .pl-notas li{color:var(--text-2)}
-#vPlan .pl-det{max-width:640px;margin:16px auto 0 0;background:var(--surface);border:.5px solid var(--border);border-radius:11px;padding:14px 16px}
+#vPlan .pl-det{margin:16px 0 0;background:var(--surface);border:.5px solid var(--border);border-radius:11px;padding:14px 16px}
 #vPlan .pl-det-h{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px}
 #vPlan .pl-volver{background:none;border:none;color:var(--text-2);font-size:12px;cursor:pointer}
 #vPlan .pl-wk{margin-top:10px}
@@ -1521,6 +1524,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-grip:active{cursor:grabbing}
 #vResumen .rz-day.rz-edited{border-color:rgba(233,162,59,.5)}
 #vResumen .rz-day.rz-edited .rz-ds{color:#E9A23B}
+#vResumen .rz-day.rz-autofill{border-style:dashed;border-color:#3E3E46}   /* provisional: lo agrega el sistema para la meta */
+#vResumen .rz-day.rz-autofill .rz-ds{color:var(--text-3)}
+#vResumen .rz-leftnote{margin-top:12px;max-width:640px;font-size:12px;color:#E9A23B;background:rgba(233,162,59,.08);border:.5px solid rgba(233,162,59,.3);border-radius:8px;padding:8px 12px}
 #vResumen .rz-edtag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;color:#E9A23B}
 #vResumen .rz-edtag svg{width:12px;height:12px}
 #vResumen .rz-revert{background:none;border:.5px solid var(--border);color:var(--text-2);font-size:10.5px;border-radius:5px;padding:2px 8px;cursor:pointer}
@@ -3946,6 +3952,8 @@ function _mondayProd(dt){ const d=new Date(dt), dow=d.getDay();
 // jueves; el resto lun→mié (jueves si Semillas no va). Feriado lun–jue = sin producción,
 // su carga se corre al viernes. Viernes = lista multi-tarea. Días pasados = realidad Odoo.
 function _nomCorto(p){ return NIV_INFO[p].nom.replace(/^Pan /,''); }
+// Formato único de producción en TODO el módulo: número + producto ("12 Francés"). Sin "b".
+function _rzBP(batches, pid){ return _rzN(batches)+' '+_nomCorto(pid); }
 function _celdasSemana(monday, layout, real, hoyStr){
   const days=_weekDays(monday);
   const otros=(layout.otros||[]).slice(), semB=layout.semillas||0, v=layout.viernes||{};
@@ -3959,19 +3967,19 @@ function _celdasSemana(monday, layout, real, hoyStr){
   return days.map((day,i)=>{
     const realDay=(real&&real[day.ds])||null, past=day.ds<hoyStr, isHoy=day.ds===hoyStr;
     if(realDay) return {dow:day.dow, dnum:day.dnum, kind:'real', bt:'',
-      prod:Object.keys(realDay).map(pp=>_nomCorto(+pp)+' '+Math.round(realDay[pp]/NIV_INFO[+pp].rend)+'b').join(' + ')};
+      prod:Object.keys(realDay).map(pp=>_rzBP(Math.round(realDay[pp]/NIV_INFO[+pp].rend), +pp)).join(' + ')};
     if(i<4){
       const e=slot[i];
       if(e&&e.feriado) return {dow:day.dow, dnum:day.dnum, prod:'Feriado', bt:e.feriado, kind:'feriado'};
-      if(e&&e.p) return {dow:day.dow, dnum:day.dnum, prod:_nomCorto(e.p), bt:e.batches+' batches', kind:isHoy?'today':(past?'pend':'prop')};
+      if(e&&e.p) return {dow:day.dow, dnum:day.dnum, prod:_rzBP(e.batches, e.p), bt:'', kind:isHoy?'today':(past?'pend':'prop')};
       return {dow:day.dow, dnum:day.dnum, prod:'—', bt:'', kind:isHoy?'today':'libre'};
     }
     // VIERNES multi-tarea: limpieza base + picado + galletas + derrame + corridos por feriado.
     const parts=['Limpieza'];
     if(v.picado) parts.push('Picado');
-    if(v.galletas) parts.push('Galletas '+v.galletas+'b');
-    if(v.derrame) parts.push(_nomCorto(v.derrame.p)+' '+v.derrame.batches+'b');
-    corridos.forEach(c=>parts.push(_nomCorto(c.p)+' '+c.batches+'b'));
+    if(v.galletas) parts.push(_rzBP(v.galletas, 519));
+    if(v.derrame) parts.push(_rzBP(v.derrame.batches, v.derrame.p));
+    corridos.forEach(c=>parts.push(_rzBP(c.batches, c.p)));
     return {dow:day.dow, dnum:day.dnum, prod:parts.join(' · '), bt:'', kind:isHoy?'today':(parts.length>1?'prop':'clean')};
   });
 }
@@ -4055,6 +4063,8 @@ let _rzOverrides={};             // {ds:{producto_id,batches,tipo}} — la fila 
 let _rzAlistar=[{premez:[],compras:[]},{premez:[],compras:[]}];
 let _rzEdit=null;                // ds de la celda en modo edición (o null)
 let _rzDrag=null;                // ds de la celda que se está arrastrando
+let _rzAuto={};                  // auto-relleno derivado {ds:[{pid,batches}]} (opción 2: cubre el faltante de la meta)
+let _rzAutoLeft=[];              // faltante que NO cupo en las 2 semanas (para nota)
 
 async function cargarResumen(){
   const body=document.getElementById('rzBody');
@@ -4105,33 +4115,63 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
     const ov=overrides&&overrides[ds];
     const c={dow:day.dow, dnum:day.dnum, ds:ds, prods:{}};
     if(realDay){ c.kind='real'; c.editable=false; c.nav=true;
-      c.prod=Object.keys(realDay).map(function(pp){return _nomCorto(+pp)+' '+Math.round(realDay[pp]/NIV_INFO[+pp].rend)+'b';}).join(' + '); return c; }
+      c.prod=Object.keys(realDay).map(function(pp){return _rzBP(Math.round(realDay[pp]/NIV_INFO[+pp].rend), +pp);}).join(' + '); return c; }
     if(i<4 && slot[i] && slot[i].feriado){ c.kind='feriado'; c.editable=false; c.prod='Feriado'; c.bt=slot[i].feriado; return c; }
     if(ov && fut){ c.editable=true; c.edited=true; c.swappable=true;
       if(ov.producto_id==null || !(ov.batches>0)){ c.kind='edit-empty'; c.prod='—'; c.bt=''; return c; }
-      c.kind='edit'; c.pid=ov.producto_id; c.batches=ov.batches; c.prods[ov.producto_id]=ov.batches; c.prod=_nomCorto(ov.producto_id); c.bt=ov.batches+' batches'; return c; }
+      c.kind='edit'; c.pid=ov.producto_id; c.batches=ov.batches; c.prods[ov.producto_id]=ov.batches; c.prod=_rzBP(ov.batches, ov.producto_id); c.bt=''; return c; }
     if(i<4){
       const e=slot[i];
-      if(e&&e.p){ c.kind=fut?'prop':(past?'pend':'prop'); c.editable=fut; c.swappable=fut; c.pid=e.p; c.batches=e.batches; c.prods[e.p]=e.batches; c.prod=_nomCorto(e.p); c.bt=e.batches+' batches'; c.today=ds===hoyStr; return c; }
+      if(e&&e.p){ c.kind=fut?'prop':(past?'pend':'prop'); c.editable=fut; c.swappable=fut; c.pid=e.p; c.batches=e.batches; c.prods[e.p]=e.batches; c.prod=_rzBP(e.batches, e.p); c.bt=''; c.today=ds===hoyStr; return c; }
       c.kind='libre'; c.editable=fut; c.swappable=fut; c.prod='—'; c.bt=''; return c;
     }
     // VIERNES multi-tarea: editable (clic) pero NO swappable (es lista de tareas, no un producto)
     const parts=['Limpieza']; if(v.picado)parts.push('Picado');
-    if(v.galletas){ parts.push('Galletas '+v.galletas+'b'); c.prods[519]=(c.prods[519]||0)+v.galletas; }
-    if(v.derrame){ parts.push(_nomCorto(v.derrame.p)+' '+v.derrame.batches+'b'); c.prods[v.derrame.p]=(c.prods[v.derrame.p]||0)+v.derrame.batches; }
-    corridos.forEach(function(x){ parts.push(_nomCorto(x.p)+' '+x.batches+'b'); c.prods[x.p]=(c.prods[x.p]||0)+x.batches; });
+    if(v.galletas){ parts.push(_rzBP(v.galletas, 519)); c.prods[519]=(c.prods[519]||0)+v.galletas; }
+    if(v.derrame){ parts.push(_rzBP(v.derrame.batches, v.derrame.p)); c.prods[v.derrame.p]=(c.prods[v.derrame.p]||0)+v.derrame.batches; }
+    corridos.forEach(function(x){ parts.push(_rzBP(x.batches, x.p)); c.prods[x.p]=(c.prods[x.p]||0)+x.batches; });
     c.kind='viernes'; c.editable=fut; c.swappable=false; c.prod=parts.join(' · '); c.bt=''; return c;
   });
 }
-// Suma prods de las celdas editables de la semana (lo que falta ALISTAR).
-function _rzFutBatches(cells){ const b={}; cells.forEach(function(c){ if(!c.editable)return; const pr=c.prods||{}; for(const k in pr) b[+k]=(b[+k]||0)+pr[k]; }); return b; }
+// Suma prods de las celdas de producción de la semana (editables o auto-relleno).
+function _rzFutBatches(cells){ const b={}; cells.forEach(function(c){ if(!c.editable && !c.auto)return; const pr=c.prods||{}; for(const k in pr) b[+k]=(b[+k]||0)+pr[k]; }); return b; }
 function _rzMonday(offset){ const mon=new Date(_rzCtx.mon0); mon.setDate(mon.getDate()+offset*7); return mon; }
 function _rzCells(offset){ return rzCeldas(_rzMonday(offset), _rzCtx.weeks[offset]||{otros:[],semillas:0,viernes:{}}, _rzCtx.real.byDate, _rzCtx.hoyStr, _rzOverrides); }
-function rzWeekBatches(offset){ return _rzFutBatches(_rzCells(offset)); }
-function _rzMismoTotal(a,b){ const ks={}; Object.keys(a).forEach(k=>ks[k]=1); Object.keys(b).forEach(k=>ks[k]=1); for(const k in ks){ if((a[k]||0)!==(b[k]||0)) return false; } return true; }
-function _rzTotales(){ return {a:rzWeekBatches(0), b:rzWeekBatches(1)}; }
-function _rzTotalesIguales(x,y){ return _rzMismoTotal(x.a,y.a) && _rzMismoTotal(x.b,y.b); }
-async function rzRecalcAlistar(){ _rzAlistar=await nivAlistar([rzWeekBatches(0), rzWeekBatches(1)], _rzCtx.stock); }
+// META de la semana = propuesta del motor (layout sin editar). Es lo que NO se debe romper.
+function _rzMeta(offset){ return _semanaBatches(_rzCtx.weeks[offset]||{otros:[],semillas:0,viernes:{}}); }
+// OPCIÓN 2 — auto-relleno: al editar y romper la meta, cubre SOLO el FALTANTE (meta − actual)
+// en un día disponible (día libre lun–jue → viernes → semana siguiente), SIN pisar la edición.
+// Derivado en cada render (no se persiste). Devuelve {auto:{ds:[{pid,batches}]}, left:[{pid,batches}]}.
+function _rzAutoFill(){
+  const auto={}, left=[], slots=[];
+  for(let o=0;o<2;o++){ const cells=_rzCells(o);
+    cells.forEach(function(cc,i){ if(cc.ds<_rzCtx.hoyStr) return; if(i<4 && cc.kind==='libre') slots.push({ds:cc.ds, ord:o*10+i, viernes:false}); });
+    const vc=cells[4]; if(vc && vc.ds>=_rzCtx.hoyStr && vc.kind==='viernes') slots.push({ds:vc.ds, ord:o*10+5, viernes:true});
+  }
+  slots.sort(function(a,b){ return a.ord-b.ord; });
+  const usados={};
+  for(let o=0;o<2;o++){ const meta=_rzMeta(o), cur=_rzFutBatches(_rzCells(o));
+    for(const p of NIV_PROD){ let falta=(meta[p]||0)-(cur[p]||0); if(falta<=0.0001) continue; const cap=NIV_INFO[p].cap;
+      for(const s of slots){ if(falta<=0.0001) break; if(s.ord < o*10) continue; if(!s.viernes && usados[s.ds]) continue;
+        const put=s.viernes? falta : Math.min(falta, cap);
+        (auto[s.ds]=auto[s.ds]||[]).push({pid:+p, batches:Math.round(put)});
+        if(!s.viernes) usados[s.ds]=1; falta-=put; }
+      if(falta>0.0001) left.push({pid:+p, batches:Math.round(falta)});
+    } }
+  return {auto:auto, left:left};
+}
+function _rzRecalcAuto(){ const r=_rzAutoFill(); _rzAuto=r.auto; _rzAutoLeft=r.left; }
+// Celdas de la semana con el auto-relleno superpuesto (para render y para alistar).
+function _rzCellsFull(offset){ const cells=_rzCells(offset), auto=_rzAuto||{};
+  return cells.map(function(c){ const a=auto[c.ds]; if(!a||!a.length) return c;
+    const nc=Object.assign({}, c); nc.prods=Object.assign({}, c.prods||{});
+    a.forEach(function(x){ nc.prods[x.pid]=(nc.prods[x.pid]||0)+x.batches; });
+    const txt=a.map(function(x){ return _rzBP(x.batches, x.pid); }).join(' · ');
+    if(c.kind==='viernes'){ nc.prod=(c.prod?c.prod+' · ':'')+txt; nc.auto=true; return nc; }
+    nc.kind='auto'; nc.auto=true; nc.editable=false; nc.swappable=false; nc.pid=a[0].pid; nc.batches=a[0].batches; nc.prod=txt; nc.bt=''; return nc; });
+}
+function rzWeekBatchesFull(offset){ return _rzFutBatches(_rzCellsFull(offset)); }
+async function rzRecalcAlistar(){ _rzRecalcAuto(); _rzAlistar=await nivAlistar([rzWeekBatchesFull(0), rzWeekBatchesFull(1)], _rzCtx.stock); }
 
 function rzRender(){
   const body=document.getElementById('rzBody'); if(!body||!_rzCtx) return;
@@ -4176,10 +4216,12 @@ function rzRender(){
     +'<div class="rz-sec"><div class="rz-sh"><span class="rz-st">Calendario de producción</span>'
       +'<span class="rz-hint">Tocá un día futuro para editarlo · arrastrá para intercambiar</span></div>'
       +'<div class="rz-cal">'+rzWeekHtml(0)+rzWeekHtml(1)+'</div>'
+      +((_rzAutoLeft&&_rzAutoLeft.length)?'<div class="rz-leftnote">Para cumplir la meta falta agendar '
+        +_rzAutoLeft.map(function(x){return _rzBP(x.batches,x.pid);}).join(' · ')+' — no cupo en estas 2 semanas, se produce después.</div>':'')
       +'</div>';
 }
 function rzWeekHtml(offset){
-  const mon=_rzMonday(offset), esActual=offset===0, cells=_rzCells(offset);
+  const mon=_rzMonday(offset), esActual=offset===0, cells=_rzCellsFull(offset);
   const edited=cells.some(x=>x.edited);
   let tag=esActual?'<span class="rz-wtag rz-wnow">ESTA SEMANA</span>':'<span class="rz-wtag">SIGUIENTE</span>';
   if(edited) tag+='<span class="rz-edtag" title="Editada por vos">'+_SVG_PENCIL+'editada por vos</span>'
@@ -4189,15 +4231,15 @@ function rzWeekHtml(offset){
     +'<div class="rz-days">'+cells.map(rzCellHtml).join('')+'</div></div>';
 }
 function rzCellHtml(cell){
-  const RZ={real:['rz-done','Hecho'], today:['rz-today','En curso'], pend:['rz-miss','Sin registrar en Odoo'], prop:['rz-plan','Propuesto'], libre:['rz-clean','Libre'], feriado:['rz-fer','Feriado'], viernes:['rz-clean','—'], edit:['rz-plan','Editado'], 'edit-empty':['rz-clean','Editado']};
+  const RZ={real:['rz-done','Hecho'], today:['rz-today','En curso'], pend:['rz-miss','Sin registrar en Odoo'], prop:['rz-plan','Propuesto'], libre:['rz-clean','Libre'], feriado:['rz-fer','Feriado'], viernes:['rz-clean','—'], edit:['rz-plan','Editado'], 'edit-empty':['rz-clean','Editado'], auto:['rz-plan','Se agrega · meta']};
   const ds=cell.ds;
   if(_rzEdit===ds && cell.editable) return rzFormHtml(cell);
   const m=RZ[cell.kind]||RZ.libre;
   const dd='<div class="rz-dd">'+cell.dow+' '+cell.dnum+'</div>';
   const dp='<div class="rz-dp">'+esc(cell.prod)+'</div>';
   const db=cell.bt?('<div class="rz-db">'+esc(cell.bt)+'</div>'):'';
-  const st='<div class="rz-ds">'+m[1]+(cell.edited?' · editado':'')+'</div>';
-  const cls=m[0]+(cell.editable?' rz-ed':'')+(cell.edited?' rz-edited':'');
+  const st='<div class="rz-ds">'+(cell.auto&&cell.kind==='viernes'?'Se agrega · meta':m[1])+(cell.edited?' · editado':'')+'</div>';
+  const cls=m[0]+(cell.editable?' rz-ed':'')+(cell.edited?' rz-edited':'')+(cell.auto?' rz-autofill':'');
   if(cell.editable){
     const grip=cell.swappable?('<span class="rz-grip" draggable="true" title="Arrastrar para intercambiar" onclick="event.stopPropagation()" ondragstart="rzDragStart(event,\''+ds+'\')" ondragend="rzDragEnd()">'+_SVG_GRIP+'</span>'):'';
     const drop=cell.swappable?' ondragover="rzDragOver(event)" ondrop="rzDrop(event,\''+ds+'\')"':'';
@@ -4224,11 +4266,10 @@ async function rzSaveEdit(ds){
   const pid=sel&&sel.value?+sel.value:null;
   const batches=(bt&&bt.value!=='')?Math.max(0,Math.round(+bt.value)):0;
   const val=(pid&&batches>0)?{producto_id:pid, batches:batches}:{producto_id:null, batches:0};
-  const before=_rzTotales();
   _rzOverrides[ds]={producto_id:val.producto_id, batches:val.batches, tipo:'edicion'};
-  _rzEdit=null; rzRender();                                   // pinta ya (optimista)
+  _rzEdit=null; _rzRecalcAuto(); rzRender();                  // pinta ya (con re-agendado del faltante)
   rzPersist([{fecha:ds, producto_id:val.producto_id, batches:val.batches, tipo:'edicion'}]);
-  if(!_rzTotalesIguales(before,_rzTotales())){ await rzRecalcAlistar(); rzRender(); }   // recalc solo si cambian totales
+  await rzRecalcAlistar(); rzRender();                        // recalcula MP/premezclas sobre la meta
 }
 function rzDragStart(e,ds){ _rzDrag=ds; try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',ds); }catch(_){}}
 function rzDragEnd(){ _rzDrag=null; }
@@ -4238,22 +4279,20 @@ function _rzCellByDs(ds){ for(let o=0;o<2;o++){ const hit=_rzCells(o).find(x=>x.
 async function rzSwap(fromDs, toDs){
   const a=_rzCellByDs(fromDs), b=_rzCellByDs(toDs);
   if(!a||!b||!a.swappable||!b.swappable) return;              // solo entre días futuros intercambiables
-  const before=_rzTotales();
   _rzOverrides[fromDs]={producto_id:b.pid||null, batches:b.batches||0, tipo:'swap'};
   _rzOverrides[toDs]  ={producto_id:a.pid||null, batches:a.batches||0, tipo:'swap'};
-  rzRender();
+  _rzRecalcAuto(); rzRender();
   rzPersist([{fecha:fromDs, producto_id:b.pid||null, batches:b.batches||0, tipo:'swap'},
              {fecha:toDs,   producto_id:a.pid||null, batches:a.batches||0, tipo:'swap'}]);
-  if(!_rzTotalesIguales(before,_rzTotales())){ await rzRecalcAlistar(); rzRender(); }   // swap normal: iguales → no recalc
+  await rzRecalcAlistar(); rzRender();                        // swap conserva la meta → premezclas/MP no cambian
 }
 async function rzVolverPlan(offset){
   const dss=_weekDays(_rzMonday(offset)).map(d=>d.ds).filter(ds=>ds>=_rzCtx.hoyStr && _rzOverrides[ds]);
   if(!dss.length) return;
-  const before=_rzTotales();
   dss.forEach(ds=>{ delete _rzOverrides[ds]; });
-  rzRender();
+  _rzRecalcAuto(); rzRender();
   rzPersist(dss.map(ds=>({fecha:ds, producto_id:null, batches:0, tipo:'anulacion'})));   // fila de anulación, no delete
-  if(!_rzTotalesIguales(before,_rzTotales())){ await rzRecalcAlistar(); rzRender(); }
+  await rzRecalcAlistar(); rzRender();
 }
 async function rzPersist(filas){
   const c=sbClient(); if(!c){ alert('Sin conexión con la base — el cambio no se guardó. Reintentá.'); return; }
@@ -4508,17 +4547,18 @@ function planRenderMeses(){
   const hoy=new Date(), mesHoy=hoy.getMonth();
   const porMes={};
   _planProj.forEach(wk=>{ const m=wk.monday.getMonth(); porMes[m]=porMes[m]||{}; const b=_semanaBatches(wk); Object.keys(b).forEach(p=>porMes[m][p]=(porMes[m][p]||0)+b[p]); });
+  // Etiqueta SOLO si el mes pide atención (feriado / cierre). Sin fases (crucero/rampa).
+  const FERCORTO={7:'Feriado 31', 8:'Feriado 15', 11:'Feriado 1'};
   let cards='';
   for(let m=mesHoy;m<=11;m++){
-    const bat=porMes[m]||{}, esHoy=(m===mesHoy), fase=PLAN_FASE[m]||'', fer=PLAN_FERIADO[m];
-    const prods=NIV_PROD.filter(p=>(bat[p]||0)>0).map(p=>NIV_INFO[p].nom.replace(/^Pan /,'')+' '+bat[p]).join(' · ') || '—';
-    const faseCls=(fase==='Rampa'||fase==='Pico')?'pl-fase-amber':'pl-fase';
+    const bat=porMes[m]||{}, esHoy=(m===mesHoy);
+    const filas=NIV_PROD.filter(p=>(bat[p]||0)>0).map(p=>'<div class="pl-bl">'+esc(_rzBP(bat[p], p))+'</div>').join('') || '<div class="pl-bl pl-b0">—</div>';
+    const tags=(m===11?'<span class="pl-tag pl-tag-cierre">Cierre 18-dic</span>':'')
+      +(FERCORTO[m]?'<span class="pl-tag pl-tag-fer">'+esc(FERCORTO[m])+'</span>':'');
     cards+='<div class="pl-mes'+(esHoy?' pl-mes-now':'')+'" onclick="planVerDetalle('+m+')">'
-      +'<div class="pl-mh"><span class="pl-mnom">'+_MESNOM2[m]+'</span><span class="'+faseCls+'">'+esc(fase)+'</span></div>'
-      +'<div class="pl-bat">'+esc(prods)+'</div>'
-      +(fer?'<div class="pl-fer">'+esc(fer)+'</div>':'')
-      +(m===11?'<div class="pl-cierre">Cierre vie 18-dic · reabre lun 11-ene</div>':'')
-      +'<div class="pl-ver">Ver detalle →</div></div>';
+      +'<div class="pl-mnom">'+_MESNOM2[m]+(esHoy?' <span class="pl-hoy">· ahora</span>':'')+'</div>'
+      +(tags?'<div class="pl-tags">'+tags+'</div>':'')
+      +'<div class="pl-bat">'+filas+'</div></div>';
   }
   document.getElementById('planBody').innerHTML=
     '<div class="pl-grid">'+cards+'</div><div id="planDetalle"></div>'
@@ -4538,7 +4578,7 @@ function planVerDetalle(m){
   wks.forEach(wk=>{
     html+='<div class="pl-wk"><div class="pl-wr">'+_rangeLbl(wk.monday)+'</div><div class="pl-days">';
     _celdasSemana(wk.monday, wk, _planReal, hoyStr).forEach(c=>{
-      const txt=c.prod+(c.bt?' '+c.bt.replace(' batches','b'):'');
+      const txt=c.prod+(c.bt?' '+c.bt:'');
       const tag=(c.kind==='pend')?'<div class="pl-dtag">sin registrar</div>':'';
       html+='<div class="pl-d '+(PLK[c.kind]||'pl-d-clean')+'"><div class="pl-dd">'+c.dow+' '+c.dnum+'</div><div class="pl-dp">'+esc(txt)+'</div>'+tag+'</div>';
     });
