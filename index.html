@@ -1538,6 +1538,14 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-day.rz-today{border-color:#D4537E;box-shadow:0 0 0 1px rgba(212,83,126,.4)}
 #vResumen .rz-day.rz-today .rz-dd{color:#D4537E}
 #vResumen .rz-grip.rz-grabbing{opacity:1;color:#D4537E}
+/* chip de capacidad por personas (marca manual de la semana) */
+#vResumen .rz-chip,#vPlan .rz-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text-2);background:var(--surface-2);border:.5px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;white-space:nowrap}
+#vResumen .rz-chip:hover,#vPlan .rz-chip:hover{border-color:#3A3A42}
+#vResumen .rz-chip-amber,#vPlan .rz-chip-amber{color:#E9A23B;border-color:rgba(233,162,59,.5);background:rgba(233,162,59,.08)}
+#vResumen .rz-chip-x,#vPlan .rz-chip-x{font-size:10px;font-weight:500;color:var(--text-3);text-decoration:underline}
+#vResumen .rz-note2p{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:var(--text-3)}
+#vResumen .rz-note2p svg{width:14px;height:14px;color:var(--text-3);flex:none}
+#vPlan .pl-note2p{margin-left:8px;font-size:10.5px;color:var(--text-3)}
 /* 2 · Premezclas por medir */
 #vResumen .rz-medir{margin-top:16px;font-size:13px;color:var(--text-2);background:var(--surface);border:.5px solid var(--border);border-radius:9px;padding:10px 14px;line-height:1.5}
 #vResumen .rz-medlbl{color:var(--text-3);font-size:11px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;margin-right:6px}
@@ -3841,6 +3849,20 @@ const NIV_INFO={
 };
 const NIV_CFG_DEF={ritmoVentana:6, colchon:3, colchonTemporada:4, horizonte:6};
 const _rzN=(n,d=0)=>(Number(n)||0).toLocaleString('es-CR',{minimumFractionDigits:d,maximumFractionDigits:d});
+// ── CAPACIDAD por Nº de personas (batches/día). Adelanto del futuro módulo RRHH. ──
+// El motor usa la tabla según cuánta gente hay esa semana (marca manual por semana ISO).
+const NIV_CAP={
+  3:{451:8, 452:10, 453:10, 503:10, 472:12, 519:1},   // 3 personas (por defecto)
+  2:{451:6, 452:8,  453:6,  503:8,  472:8,  519:1},    // 2 personas (rinde menos → aprieta)
+};
+function _capDe(pid, personas){ const t=NIV_CAP[personas]||NIV_CAP[3]; return t[pid]!=null?t[pid]:(NIV_CAP[3][pid]||1); }
+// Personas de una semana ISO: Supabase (marca manual) → semilla del 20-jul (demo) → 3.
+let _rzPersonas={};   // {semana_iso: 2|3} desde Supabase
+function _personasDe(iso){
+  if(_rzPersonas && _rzPersonas[iso]!=null) return _rzPersonas[iso];
+  if(iso===_isoWk(new Date(2026,6,20))) return 2;   // demo: semana del 20-jul, sin Daniel
+  return 3;
+}
 
 // ── CALENDARIO REAL DE LA OPERACIÓN (feriados + cierre duro) ──
 // Feriados 2026 SIN traslado (cada uno en su fecha natural). Solo importan los que
@@ -3936,12 +3958,13 @@ async function nivStock(){
 // Devuelve w0 (batches por producto de la semana 0) y weeks (lista ordenada de
 // días de producción {p,batches} por semana, para el calendario de 2 semanas). ──
 function nivLevel(ritmo, fin, cfg){
-  const H=cfg.horizonte||6, cur=_isoWk(new Date());
+  const H=cfg.horizonte||6, cur=_isoWk(new Date()), mon0=_mondayProd(new Date());
   const colDe=pid=>{ const t=(cfg.ventanas||[]).some(v=>+v.producto_id===pid && cur>=v.desde && cur<=v.hasta);
     return t?cfg.colchonTemporada:(cfg.colchon[pid]||3); };
   const stock={}; NIV_PROD.forEach(p=>stock[p]=fin[p]||0);
   const weeks=[];
-  for(let w=0;w<H;w++) weeks.push(_weekLayout(stock, ritmo, colDe, H));   // {otros, semillas, viernes}; muta stock
+  for(let w=0;w<H;w++){ const mon=new Date(mon0); mon.setDate(mon.getDate()+w*7);
+    weeks.push(_weekLayout(stock, ritmo, colDe, H, _personasDe(_isoWk(mon)))); }   // capacidad por semana; muta stock
   return {w0:_semanaBatches(weeks[0]), weeks};
 }
 // Layout de UNA semana: decide QUÉ se produce (no en qué día del calendario — eso lo
@@ -3955,8 +3978,8 @@ function nivLevel(ritmo, fin, cfg){
 // + derrame (bread que no cupo). Muta stock: suma lo producido, resta el consumo de la semana.
 const NIV_HORNO=[451,452,453,503,472];
 const NIV_DERRAME_MIN=1;   // semanas: umbral de RIESGO de quiebre para permitir pan el viernes (derrame)
-function _weekLayout(stock, ritmo, colDe, H){
-  H=H||NIV_CFG_DEF.horizonte;
+function _weekLayout(stock, ritmo, colDe, H, personas){
+  H=H||NIV_CFG_DEF.horizonte; personas=personas||3;
   const dias=[];
   while(dias.length<4){
     // 1) el más urgente (cobertura < colchón) gana; 2) si ninguno urge, jala el de menor
@@ -3970,28 +3993,32 @@ function _weekLayout(stock, ritmo, colDe, H){
       if((u&&!urge) || (u===urge && c<pc)){ pc=c; peor=p; urge=u; }
     }
     if(peor===null)break;
-    const I=NIV_INFO[peor]; stock[peor]+=I.cap*I.rend; dias.push({p:peor, batches:I.cap});
+    const cap=_capDe(peor,personas); stock[peor]+=cap*NIV_INFO[peor].rend; dias.push({p:peor, batches:cap});
   }
   // SEMILLAS → jueves fijo: se aparta de la cola; el resto queda en orden de urgencia.
   const semDias=dias.filter(d=>d.p===452), otros=dias.filter(d=>d.p!==452);
   const semillas=semDias.reduce((a,d)=>a+d.batches,0);
-  // VIERNES (ninguna tarea usa horno, conviven):
-  const picado = semillas>0;                                             // Semillas jueves ⇒ picado viernes
-  let galletas=0; { const p=519, r=ritmo[p]||0; if(r>0){ const c=(stock[p]-r)/r; if(c<colDe(p)){ const I=NIV_INFO[p]; stock[p]+=I.cap*I.rend; galletas=I.cap; } } }
-  // DERRAME de pan al viernes: NO es día base. Solo dispara ante RIESGO REAL de quiebre
-  // (cobertura < NIV_DERRAME_MIN sem), es decir un pan que no cupo en lun–jue y se agotaría.
-  // Estar bajo el colchón NO basta (eso es relleno de buffer, y lo maneja lun–jue / la semana siguiente).
-  let derrame=null; { let peor=null,pc=1e9; for(const p of NIV_HORNO){ if(p===452)continue; const r=ritmo[p]||0; if(r<=0)continue; const c=(stock[p]-r)/r; if(c<NIV_DERRAME_MIN&&c<pc){pc=c;peor=p;} }
-    if(peor!==null){ const I=NIV_INFO[peor]; stock[peor]+=I.cap*I.rend; derrame={p:peor, batches:I.cap}; } }
+  // ── VIERNES: día de capacidad limitada donde las cosas compiten por tiempo.
+  // (1) PICADO: solo si hubo Semillas el jueves (Blanco pica el MISMO día, no acá).
+  const picado = semillas>0;
+  // (2) PRODUCCIÓN POR URGENCIA: galletas O pan (NO Semillas), lo MÁS corto de stock. Sin prioridad
+  //     fija para galletas. Umbral: 2 personas APRIETA (mete el viernes para cubrir el plan → colchón);
+  //     3 personas solo ante riesgo real de quiebre (NIV_DERRAME_MIN). Un solo producto en el día.
+  let prod=null; { let peor=null,pc=1e9;
+    for(const p of [451,453,503,472,519]){ const r=ritmo[p]||0; if(r<=0)continue; const c=(stock[p]-r)/r;
+      const th = personas<3 ? colDe(p) : NIV_DERRAME_MIN;
+      if(c<th && c<pc){ pc=c; peor=p; } }
+    if(peor!==null){ const cap=_capDe(peor,personas); stock[peor]+=cap*NIV_INFO[peor].rend; prod={p:peor, batches:cap}; } }
+  // (3) LIMPIEZA PROFUNDA: solo si el viernes NO quedó cargado (lo decide _celdasSemana/rzCeldas al
+  //     armar la etiqueta: si no hay picado ni producción ni corridos → "Limpieza").
   NIV_PROD.forEach(p=>stock[p]-=(ritmo[p]||0));    // consumo de la semana
-  return {otros, semillas, viernes:{picado, galletas, derrame}};
+  return {otros, semillas, viernes:{picado, prod}, personas};
 }
 function _semanaBatches(layout){
   const b={}; (layout.otros||[]).forEach(d=>b[d.p]=(b[d.p]||0)+d.batches);
   if(layout.semillas) b[452]=(b[452]||0)+layout.semillas;
   const v=layout.viernes||{};
-  if(v.galletas) b[519]=(b[519]||0)+v.galletas;
-  if(v.derrame) b[v.derrame.p]=(b[v.derrame.p]||0)+v.derrame.batches;
+  if(v.prod) b[v.prod.p]=(b[v.prod.p]||0)+v.prod.batches;
   return b;
 }
 // "Esta semana" = semana de PRODUCCIÓN vigente. En fin de semana → arranca el lunes próximo.
@@ -4134,6 +4161,7 @@ const _SVG_FLASK='<svg class="rz-pico" viewBox="0 0 24 24" fill="none" stroke="c
 const _SVG_CART='<svg class="rz-pico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/><path d="M3 4h2l2.4 11.4a1.5 1.5 0 0 0 1.5 1.2h7.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6"/></svg>';
 const _SVG_GRIP='<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg>';
 const _SVG_PENCIL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17.2 4 20z"/><path d="M13.5 6.5l4 4"/></svg>';
+const _SVG_PPL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0M16 5.5a3 3 0 0 1 0 5.8M18 20a5.5 5.5 0 0 0-3-4.9"/></svg>';
 
 // Estado vivo del Resumen (para re-renderizar sin volver a Odoo en cada edición).
 let _rzCtx=null;                 // {cfg,ritmo,stock,w0,weeks,real,hoyStr,mon0}
@@ -4153,6 +4181,7 @@ async function cargarResumen(){
     const cfg=await nivConfig();
     const ritmo=await nivRitmo(cfg.ritmoVentana);
     const stock=await nivStock();
+    _rzPersonas=await nivPersonas();            // marca manual de personas por semana (antes de nivelar)
     const {w0, weeks}=nivLevel(ritmo, stock.fin, cfg);
     const real=await nivSemana();
     const hoy=new Date();
@@ -4180,6 +4209,34 @@ async function nivOverrides(){
       ov[f]={producto_id:r.producto_id, batches:r.batches, tipo:r.tipo}; }
     return ov;
   }catch(e){ return {}; }   // tabla no creada aún → sin overrides (degradación limpia, como plan_config)
+}
+// ── Personas por semana (Supabase semana_capacidad; append-only, la fila más reciente por ISO manda) ──
+async function nivPersonas(){
+  const c=sbClient(); if(!c) return {};
+  try{
+    const {data,error}=await c.from('semana_capacidad').select('semana_iso,personas,creado_en').order('creado_en',{ascending:false});
+    if(error||!data) return {};
+    const seen={}, out={};
+    for(const r of data){ if(!r.semana_iso||seen[r.semana_iso])continue; seen[r.semana_iso]=1; out[r.semana_iso]=+r.personas||3; }
+    return out;
+  }catch(e){ return {}; }   // tabla no creada aún → sin marcas (default 3 + semilla del 20-jul)
+}
+async function rzPersistPersonas(iso, n){
+  const c=sbClient(); if(!c){ alert('Sin conexión con la base — no se guardó la capacidad.'); return; }
+  let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
+  try{ const {error}=await c.from('semana_capacidad').insert({semana_iso:iso, personas:n, usuario:email||null});
+    if(error) alert('No se pudo guardar la capacidad: '+error.message); }
+  catch(e){ alert('No se pudo guardar la capacidad: '+(e&&e.message||e)); }
+}
+// Alterna 2↔3 personas de una semana ISO: re-nivela (Resumen) y/o re-proyecta (Plan) sin volver a Odoo.
+function rzTogglePersonas(iso){
+  const next=_personasDe(iso)===2?3:2;
+  _rzPersonas[iso]=next;
+  if(_rzCtx){ const lvl=nivLevel(_rzCtx.ritmo, _rzCtx.stock.fin, _rzCtx.cfg); _rzCtx.weeks=lvl.weeks; _rzCtx.w0=lvl.w0;
+    _rzRecalcAuto(); rzRender(); rzRecalcAlistar().then(rzRender); }
+  if(_planInputs){ const sem=Math.max(0, Math.round((_mondayProd(new Date(2026,11,18))-_mondayProd(new Date()))/(7*86400000))+1);
+    _planProj=nivProyeccion(_planInputs.ritmo, _planInputs.fin, _planInputs.cfg, sem); if(document.getElementById('planBody')) planRenderMeses(); }
+  rzPersistPersonas(iso, next);
 }
 
 // ── Celdas de UNA semana con overrides + metadatos de interacción (Resumen editable) ──
@@ -4211,11 +4268,13 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
       if(e&&e.p){ c.kind=fut?'prop':(past?'pend':'prop'); c.editable=fut; c.swappable=fut; c.pid=e.p; c.batches=e.batches; c.prods[e.p]=e.batches; c.prod=_rzBP(e.batches, e.p); c.bt=''; c.today=ds===hoyStr; return c; }
       c.kind='libre'; c.editable=fut; c.swappable=fut; c.prod='—'; c.bt=''; return c;
     }
-    // VIERNES multi-tarea: editable (clic) pero NO swappable (es lista de tareas, no un producto)
-    const parts=['Limpieza']; if(v.picado)parts.push('Picado');
-    if(v.galletas){ parts.push(_rzBP(v.galletas, 519)); c.prods[519]=(c.prods[519]||0)+v.galletas; }
-    if(v.derrame){ parts.push(_rzBP(v.derrame.batches, v.derrame.p)); c.prods[v.derrame.p]=(c.prods[v.derrame.p]||0)+v.derrame.batches; }
+    // VIERNES: picado (si Semillas jueves) + producción por urgencia + corridos por feriado; la
+    // LIMPIEZA PROFUNDA solo si el día NO quedó cargado. Editable pero NO swappable (no es un producto).
+    const parts=[];
+    if(v.picado) parts.push('Picado');
+    if(v.prod){ parts.push(_rzBP(v.prod.batches, v.prod.p)); c.prods[v.prod.p]=(c.prods[v.prod.p]||0)+v.prod.batches; }
     corridos.forEach(function(x){ parts.push(_rzBP(x.batches, x.p)); c.prods[x.p]=(c.prods[x.p]||0)+x.batches; });
+    if(!parts.length) parts.push('Limpieza');   // día no cargado → limpieza profunda
     c.kind='viernes'; c.editable=fut; c.swappable=false; c.prod=parts.join(' · '); c.bt=''; return c;
   });
 }
@@ -4283,15 +4342,22 @@ function rzRender(){
     + '<div class="rz-sec"><div class="rz-sh"><span class="rz-st">Inventario</span></div>'+rzInvHtml()+'</div>';
 }
 // ── 1 · PENDIENTE DE FABRICAR: tira horizontal HOY → próximo lunes, editable + touch ──
+function _rzChipPersonas(iso, personas){
+  return '<span class="rz-chip'+(personas===2?' rz-chip-amber':'')+'" onclick="rzTogglePersonas(\''+iso+'\')" title="Cambiar cuántas personas hay esa semana">'
+    +personas+' persona'+(personas===1?'':'s')+' <span class="rz-chip-x">cambiar</span></span>';
+}
 function rzStripHtml(){
   const cells=_rzVisibles(), edited=cells.some(c=>c.edited);
-  let head='<div class="rz-sh"><span class="rz-st">Pendiente de fabricar</span>';
+  const w0=_rzCtx.weeks[0]||{}, iso0=_isoWk(_rzCtx.mon0), pers0=w0.personas||_personasDe(iso0);
+  let head='<div class="rz-sh"><span class="rz-st">Pendiente de fabricar</span>'+_rzChipPersonas(iso0, pers0);
   if(edited) head+='<span class="rz-edtag" title="Editado por vos">'+_SVG_PENCIL+'editado</span>'
     +'<button class="rz-revert" onclick="rzVolverPlanStrip()">Volver al plan</button>';
   head+='<span class="rz-hint">tocá un día para editar · arrastrá para mover</span></div>';
   const leftnote=(_rzAutoLeft&&_rzAutoLeft.length)?'<div class="rz-leftnote">Para cumplir la meta falta agendar '
     +_rzAutoLeft.map(function(x){return _rzBP(x.batches,x.pid);}).join(' · ')+' — no cupo en la ventana, se produce después.</div>':'';
-  return '<div class="rz-sec">'+head+'<div class="rz-strip">'+cells.map(rzCellHtml).join('')+'</div>'+leftnote+'</div>';
+  // Aviso minimalista: 2 personas + viernes productivo (algo cambió por la menor capacidad).
+  const aviso=(pers0===2 && w0.viernes && w0.viernes.prod)?'<div class="rz-note2p">'+_SVG_PPL+'Semana de 2 personas: el viernes entra a producir para cubrir el plan.</div>':'';
+  return '<div class="rz-sec">'+head+'<div class="rz-strip">'+cells.map(rzCellHtml).join('')+'</div>'+aviso+leftnote+'</div>';
 }
 // ── 2 · PREMEZCLAS POR MEDIR (tira de una línea) ──
 function rzMedirHtml(){
@@ -4300,12 +4366,18 @@ function rzMedirHtml(){
   const txt=pm.map(function(x){ return x.n+' '+x.prod.replace(/^Pan /,''); }).join(' · ');
   return '<div class="rz-medir"><span class="rz-medlbl">Premezclas por medir esta semana:</span> '+esc(txt)+'</div>';
 }
+// Faltante en unidad de compra: sacos (PESO_EMPAQUE: avena 22,68 · resto 25 kg), cartones (huevos), o kg/L.
+function _faltaCompra(it){
+  const pe=PESO_EMPAQUE.find(function(x){ return x.rx.test(it.nombre); });
+  if(pe && pe.lab==='sacos'){ const n=Math.max(1, Math.round(it.falta/pe.peso)); return n+' saco'+(n===1?'':'s'); }
+  return _compraUnidad(it.pid, it.falta, it.uom);
+}
 // ── 3 · COMPRAR: 2 tarjetas de ancho fijo (premezclas · producción) ──
 function rzComprasHtml(){
   function card(icon, titulo, data){
     const items=data.items.length ? data.items.map(function(it){
       return '<div class="rz-ci"><div class="rz-cin">'+esc(it.nombre.toLowerCase())+'</div>'
-        +'<div class="rz-cf">falta <b>'+esc(_compraUnidad(it.pid, it.falta, it.uom))+'</b> '
+        +'<div class="rz-cf">falta <b>'+esc(_faltaCompra(it))+'</b> '
           +'<span class="rz-cst">('+_rzN(Math.round(it.have))+'/'+_rzN(Math.round(it.need))+(it.uom?(' '+esc(it.uom)):'')+')</span></div>'
         +'<div class="rz-ca">'+esc(it.accion)+'</div></div>';
     }).join('') : '<div class="rz-cnone">Alcanza — nada que comprar.</div>';
@@ -4642,8 +4714,8 @@ function nivProyeccion(ritmo, fin, cfg, nWeeks){
     const mon=new Date(mon0); mon.setDate(mon.getDate()+w*7); const wk=_isoWk(mon);
     if(mon.getTime()>stopMon) break;   // CIERRE DURO: nada se planifica después del 18-dic
     const colDe=pid=>{ const t=(cfg.ventanas||[]).some(v=>+v.producto_id===pid && wk>=v.desde && wk<=v.hasta); return t?cfg.colchonTemporada:(cfg.colchon[pid]||3); };
-    const layout=_weekLayout(stock, ritmo, colDe, cfg.horizonte||NIV_CFG_DEF.horizonte);   // muta stock; {otros, semillas, viernes}
-    out.push({monday:mon, otros:layout.otros, semillas:layout.semillas, viernes:layout.viernes});
+    const layout=_weekLayout(stock, ritmo, colDe, cfg.horizonte||NIV_CFG_DEF.horizonte, _personasDe(wk));   // muta stock
+    out.push({monday:mon, otros:layout.otros, semillas:layout.semillas, viernes:layout.viernes, personas:layout.personas});
   }
   return out;
 }
@@ -4659,13 +4731,15 @@ async function nivRealRango(D1,D2){
   return by;
 }
 
-let _planProj=[], _planReal={};
+let _planProj=[], _planReal={}, _planInputs=null;
 async function cargarPlanMeses(){
   const st=document.getElementById('planStatus'); st.className='status s-info'; st.classList.remove('hidden');
   st.innerHTML='<span class="spin"></span>Proyectando el plan con el nivelador (solo lectura)…';
   try{
     const cfg=await nivConfig(), ritmo=await nivRitmo(cfg.ritmoVentana), stk=await nivStock();
     const hoy=new Date();
+    _rzPersonas=await nivPersonas();        // marca de personas por semana (antes de proyectar)
+    _planInputs={ritmo:ritmo, fin:stk.fin, cfg:cfg};   // para re-proyectar al cambiar personas sin volver a Odoo
     // Semanas hasta el cierre duro (lun 14-dic, viernes 18-dic incluido). nivProyeccion vuelve a cortar por seguridad.
     const semDic=Math.max(0, Math.round((_mondayProd(new Date(2026,11,18))-_mondayProd(hoy))/(7*86400000))+1);
     _planProj=nivProyeccion(ritmo, stk.fin, cfg, semDic);
@@ -4711,7 +4785,9 @@ function planVerDetalle(m){
   // MISMA verdad que el Resumen: motor + overrides (ediciones) + auto-relleno de la meta.
   const PLK={real:'pl-d-real', today:'pl-d-prop', pend:'pl-d-pend', prop:'pl-d-prop', edit:'pl-d-prop', auto:'pl-d-prop', clean:'pl-d-clean', 'edit-empty':'pl-d-clean', viernes:'pl-d-clean', feriado:'pl-d-fer', libre:'pl-d-clean'};
   wks.forEach(wk=>{
-    html+='<div class="pl-wk"><div class="pl-wr">'+_rangeLbl(wk.monday)+'</div><div class="pl-days">';
+    const iso=_isoWk(wk.monday), pers=wk.personas||_personasDe(iso);
+    html+='<div class="pl-wk"><div class="pl-wr">'+_rangeLbl(wk.monday)+' '+_rzChipPersonas(iso, pers)
+      +(pers===2 && wk.viernes && wk.viernes.prod?'<span class="pl-note2p">2 personas · viernes productivo</span>':'')+'</div><div class="pl-days">';
     _rzOverlayAuto(rzCeldas(wk.monday, wk, _planReal, hoyStr, _rzOverrides), _rzAuto).forEach(c=>{
       const txt=c.prod+(c.bt?' '+c.bt:'');
       const tag=(c.kind==='pend')?'<div class="pl-dtag">sin registrar</div>':(c.edited?'<div class="pl-dtag pl-dtag-ed">editado</div>':(c.auto?'<div class="pl-dtag pl-dtag-auto">meta</div>':''));
