@@ -1530,6 +1530,49 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-day.rz-autofill{border-style:dashed;border-color:#3E3E46}   /* provisional: lo agrega el sistema para la meta */
 #vResumen .rz-day.rz-autofill .rz-ds{color:var(--text-3)}
 #vResumen .rz-leftnote{margin-top:12px;max-width:640px;font-size:12px;color:#E9A23B;background:rgba(233,162,59,.08);border:.5px solid rgba(233,162,59,.3);border-radius:8px;padding:8px 12px}
+/* ═══ REDISEÑO mobile-first del Resumen ═══ */
+/* 1 · Pendiente de fabricar (tira horizontal, scroll en móvil) */
+#vResumen .rz-strip{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity}
+#vResumen .rz-strip .rz-day{flex:0 0 118px;scroll-snap-align:start}
+#vResumen .rz-day.rz-nextmon{opacity:.55}
+#vResumen .rz-day.rz-today{border-color:#D4537E;box-shadow:0 0 0 1px rgba(212,83,126,.4)}
+#vResumen .rz-day.rz-today .rz-dd{color:#D4537E}
+#vResumen .rz-grip.rz-grabbing{opacity:1;color:#D4537E}
+/* 2 · Premezclas por medir */
+#vResumen .rz-medir{margin-top:16px;font-size:13px;color:var(--text-2);background:var(--surface);border:.5px solid var(--border);border-radius:9px;padding:10px 14px;line-height:1.5}
+#vResumen .rz-medlbl{color:var(--text-3);font-size:11px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;margin-right:6px}
+/* 3 · Comprar — tarjetas de ancho fijo, NO se estiran */
+#vResumen .rz-cards{display:flex;flex-wrap:wrap;gap:14px}
+#vResumen .rz-card{flex:0 0 290px;max-width:290px;background:#141417;border:.5px solid #2C2C33;border-radius:12px;padding:14px 16px}
+#vResumen .rz-ch{display:flex;align-items:center;gap:7px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text);font-weight:600}
+#vResumen .rz-ch svg{width:15px;height:15px;color:#9A988F;flex:none}
+#vResumen .rz-cfecha{font-size:11px;font-weight:600;color:#D4537E;margin:3px 0 10px}
+#vResumen .rz-ci{padding:8px 0;border-top:.5px solid #232329}
+#vResumen .rz-ci:first-of-type{border-top:none;padding-top:2px}
+#vResumen .rz-cin{font-size:13px;color:var(--text);font-weight:500}
+#vResumen .rz-cf{font-size:12.5px;color:#E9A23B;margin-top:2px}
+#vResumen .rz-cf b{color:#E9A23B;font-weight:600}
+#vResumen .rz-cst{color:var(--text-3);font-size:11px;font-weight:400}
+#vResumen .rz-ca{font-size:11px;color:var(--text-3);margin-top:2px}
+#vResumen .rz-cnone{font-size:12.5px;color:var(--text-3);padding-top:2px}
+/* 4 · Últimas producciones */
+#vResumen .rz-urow{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:9px 0;border-bottom:.5px solid #1A1A1E}
+#vResumen .rz-urow:last-child{border-bottom:none}
+#vResumen .rz-ud{font-size:12px;color:var(--text-3);min-width:74px}
+#vResumen .rz-up{font-size:13px;color:var(--text);flex:1}
+#vResumen .rz-ue{font-size:12px;font-weight:600}
+#vResumen .rz-uok .rz-ue{color:#84BD00}
+#vResumen .rz-udif .rz-ue{color:#E9A23B}
+#vResumen .rz-usin .rz-ue{color:var(--text-3)} #vResumen .rz-usin .rz-up{color:var(--text-2)}
+/* 5 · Inventario — 3 tarjetas de ancho natural, lado a lado */
+#vResumen .rz-inv{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
+#vResumen .rz-icard{flex:0 0 240px;background:#161619;border:.5px solid #26262C;border-radius:11px;padding:12px 14px}
+#vResumen .rz-icard-sm{flex:0 0 180px}
+#vResumen .rz-ith{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);font-weight:600;margin-bottom:8px}
+#vResumen .rz-ir{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:4px 0;font-size:13px}
+#vResumen .rz-irn{color:var(--text-2);text-transform:capitalize}
+#vResumen .rz-irv{color:var(--text);font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+#vResumen .rz-vermas{margin-top:8px;background:none;border:none;color:#D4537E;font-size:12px;cursor:pointer;padding:0}
 #vResumen .rz-edtag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;color:#E9A23B}
 #vResumen .rz-edtag svg{width:12px;height:12px}
 #vResumen .rz-revert{background:none;border:.5px solid var(--border);color:var(--text-2);font-size:10.5px;border-radius:5px;padding:2px 8px;cursor:pointer}
@@ -3997,6 +4040,65 @@ async function nivAlistar(batchMaps, stock){
   return out;
 }
 
+// ── COMPRAS por tipo de MP (reglas reales de Andrea) ──
+// SACOS (avena/almidón/harina): premezclas de la PRÓXIMA semana; pedir jueves, llega viernes.
+// AZÚCAR (súper): premezclas de ESTA semana; lunes antes de medir.
+// HUEVOS (proveedor): producción de esta semana + próximo lunes; el lunes al llegar.
+// ACEITE y otros de súper (producción): ventana +2 días.
+function _mpTipo(name){ const n=(name||'').toLowerCase();
+  if(/az[uú]car/.test(n)) return 'azucar';
+  if(/avena|almid[oó]n|harina/.test(n)) return 'saco';
+  if(/huevo/.test(n)) return 'huevo';
+  if(/aceite/.test(n)) return 'aceite';
+  return 'otro'; }
+// Necesidad de MP hoja para un mapa de batches: separa premezcla-MP de directos de producción.
+async function _mpNeeds(batchMap){
+  const prem={}, direct={};
+  for(const p of NIV_PROD){ const b=(batchMap&&batchMap[p])||0; if(b<=0)continue; const I=NIV_INFO[p];
+    const r=await expandirReceta(I.prem, b); if(r) for(const k in r.hojas) prem[+k]=(prem[+k]||0)+r.hojas[k].qty;
+    const bom=await _bomDe(p); if(bom) for(const ln of bom.lines){ if(ln.pid===I.prem||ln.pid===AGUA_PID)continue;
+      const sub=await _bomDe(ln.pid); if(sub&&sub.lines.length)continue; const info=await _prodInfo(ln.pid);
+      direct[ln.pid]=(direct[ln.pid]||0)+await _conv(ln.qty*b, ln.uom, info.uom); } }
+  return {prem, direct}; }
+// Dos tarjetas: PARA PREMEZCLAS (sacos + azúcar) y PARA PRODUCCIÓN (huevos + aceite/otros).
+async function nivCompras(stock){
+  const mpOh=stock.mpOh||{}, meta=stock.meta||{};
+  const perDate=_rzPerDate();                                  // plan futuro por fecha (con ediciones + auto)
+  const nextMon=new Date(_rzCtx.mon0); nextMon.setDate(nextMon.getDate()+7); const nextMonStr=_ymd(nextMon);
+  const lim2=new Date(_rzCtx.hoyStr+'T00:00:00'); lim2.setDate(lim2.getDate()+2); const lim2Str=_ymd(lim2);
+  const sumWin=pred=>{ const m={}; for(const ds in perDate){ if(ds<_rzCtx.hoyStr||!pred(ds)) continue; const t=perDate[ds]; for(const k in t) m[+k]=(m[+k]||0)+t[k]; } return m; };
+  const thisWeek=sumWin(ds=>ds<nextMonStr), nextWeek=sumWin(ds=>ds>=nextMonStr),
+        thisPlusMon=sumWin(ds=>ds<=nextMonStr), plus2=sumWin(ds=>ds<=lim2Str);
+  const nSaco=(await _mpNeeds(nextWeek)).prem, nAzucar=(await _mpNeeds(thisWeek)).prem,
+        nHuevo=(await _mpNeeds(thisPlusMon)).direct, nAceite=(await _mpNeeds(plus2)).direct;
+  function items(need, tipos, accion){ const out=[];
+    for(const k in need){ const pid=+k, nm=(meta[pid]&&meta[pid].name)||('id '+pid);
+      if(tipos.indexOf(_mpTipo(nm))<0) continue;
+      const nq=need[pid], have=mpOh[pid]||0, falta=nq-have; if(falta<=0.0001) continue;
+      out.push({pid, nombre:nm, uom:(meta[pid]&&meta[pid].uom)||'', need:nq, have:have, falta:falta, accion:accion}); }
+    return out; }
+  const lunLbl='lun '+nextMon.getDate();
+  return {
+    premezclas:{fecha:'medir '+lunLbl, items:items(nSaco,['saco'],'pedir antes del jueves · llega viernes').concat(items(nAzucar,['azucar'],'súper · lunes antes de medir'))},
+    produccion:{fecha:'semana + '+lunLbl, items:items(nHuevo,['huevo'],'al proveedor, el lunes al llegar').concat(items(nAceite,['aceite','otro'],'súper · 2 días'))}
+  };
+}
+// ÚLTIMAS producciones pasadas (chequeo de Keylor): plan del motor vs real Odoo.
+function nivUltimas(planPorDia, realByDate, hoyStr){
+  const dias=Object.keys(planPorDia).filter(ds=>ds<hoyStr).sort();
+  const out=[];
+  for(let i=dias.length-1; i>=0 && out.length<2; i--){ const ds=dias[i], plan=planPorDia[ds]||{};
+    if(!Object.keys(plan).length) continue;                   // viernes/libre no es "producción"
+    const real=(realByDate&&realByDate[ds])||null;
+    if(!real){ out.push({ds:ds, kind:'sin', plan:plan}); continue; }
+    const realB={}; for(const k in real) realB[+k]=Math.round(real[k]/NIV_INFO[+k].rend);
+    const pids={}; Object.keys(plan).forEach(p=>pids[p]=1); Object.keys(realB).forEach(p=>pids[p]=1);
+    const exacta=Object.keys(pids).every(p=>Math.round(plan[p]||0)===Math.round(realB[p]||0));
+    out.push({ds:ds, kind:exacta?'exacta':'difiere', plan:plan, real:realB});
+  }
+  return out;
+}
+
 // ── Producción real de la semana en curso, por fecha (para el calendario) ──
 async function nivSemana(){
   const hoy=new Date(), d=_mondayProd(hoy);   // lunes de la semana de producción vigente
@@ -4041,6 +4143,8 @@ let _rzEdit=null;                // ds de la celda en modo edición (o null)
 let _rzDrag=null;                // ds de la celda que se está arrastrando
 let _rzAuto={};                  // auto-relleno derivado {ds:[{pid,batches}]} (opción 2: cubre el faltante de la meta)
 let _rzAutoLeft=[];              // faltante que NO cupo en las 2 semanas (para nota)
+let _rzCompras={premezclas:{fecha:'',items:[]}, produccion:{fecha:'',items:[]}};   // 2 tarjetas de compra
+let _rzUltimas=[];               // últimas 2 producciones pasadas (chequeo de Keylor)
 
 async function cargarResumen(){
   const body=document.getElementById('rzBody');
@@ -4055,7 +4159,10 @@ async function cargarResumen(){
     _rzCtx={cfg, ritmo, stock, w0, weeks, real, hoyStr:_ymd(hoy), mon0:_mondayProd(hoy)};
     _rzEdit=null; _rzDrag=null;
     _rzOverrides=await nivOverrides();          // ediciones futuras guardadas en Supabase
-    await rzRecalcAlistar();
+    // ÚLTIMAS producciones: plan del motor (sin real, sin override) de la semana vs Odoo real.
+    const planW0={}; rzCeldas(_rzCtx.mon0, weeks[0], {}, _rzCtx.hoyStr, {}).forEach(function(cc){ if(cc.prods&&Object.keys(cc.prods).length) planW0[cc.ds]=cc.prods; });
+    _rzUltimas=nivUltimas(planW0, real.byDate, _rzCtx.hoyStr);
+    await rzRecalcAlistar();                     // alistar + compras (usa _rzCtx)
     rzRender();
   }catch(e){ body.innerHTML='<div class="rz-err">No pude cargar el resumen: '+esc(e&&e.message||e)+'</div>'; }
 }
@@ -4153,66 +4260,103 @@ function _rzOverlayAuto(cells, auto){ auto=auto||{};
 // Celdas de la semana del Resumen con el auto-relleno superpuesto (para render y para alistar).
 function _rzCellsFull(offset){ return _rzOverlayAuto(_rzCells(offset), _rzAuto); }
 function rzWeekBatchesFull(offset){ return _rzFutBatches(_rzCellsFull(offset)); }
-async function rzRecalcAlistar(){ _rzRecalcAuto(); _rzAlistar=await nivAlistar([rzWeekBatchesFull(0), rzWeekBatchesFull(1)], _rzCtx.stock); }
+// Producción planeada por fecha (2 semanas, con ediciones + auto) → base de la lógica de compras.
+function _rzPerDate(){ const m={}; for(let o=0;o<2;o++){ _rzCellsFull(o).forEach(function(c){ const pr=c.prods||{}; if(!Object.keys(pr).length) return; const t=m[c.ds]=m[c.ds]||{}; for(const k in pr) t[+k]=(t[+k]||0)+pr[k]; }); } return m; }
+// Celdas VISIBLES del calendario "Pendiente de fabricar": de HOY al PRÓXIMO LUNES inclusive.
+function _rzVisibles(){ const out=[], hoyStr=_rzCtx.hoyStr;
+  _rzCellsFull(0).forEach(function(c){ if(c.ds>=hoyStr) out.push(c); });
+  const w1=_rzCellsFull(1); if(w1[0]){ const m=Object.assign({}, w1[0]); m.nextMon=true; out.push(m); }
+  return out; }
+async function rzRecalcAlistar(){ _rzRecalcAuto();
+  _rzAlistar=await nivAlistar([rzWeekBatchesFull(0), rzWeekBatchesFull(1)], _rzCtx.stock);
+  _rzCompras=await nivCompras(_rzCtx.stock); }
 
 function rzRender(){
   const body=document.getElementById('rzBody'); if(!body||!_rzCtx) return;
-  const c=_rzCtx, stock=c.stock, meta=stock.meta||{};
-  // ── TABLA "MIS PRODUCTOS" (cobertura del congelador; "esta semana" = propuesta del motor) ──
-  const rows=NIV_PROD.map(p=>{ const I=NIV_INFO[p], uds=stock.fin[p]||0;
-    return {p, nom:I.nom, cajas:Math.floor(uds/I.cajaU), cov:c.ritmo[p]>0?uds/c.ritmo[p]:99, prod:c.w0[p]||0}; });
-  const tabla='<div class="rz-tblwrap"><table class="rz-tbl"><thead><tr><th>Producto</th><th>Congelador</th><th>Cobertura</th><th>Esta semana</th></tr></thead><tbody>'
-    +rows.map(r=>'<tr><td class="rz-pnm">'+esc(r.nom)+'</td>'
-      +'<td>'+_rzN(r.cajas)+' cj</td>'
-      +'<td class="rz-sem'+(r.prod>0?' rz-amber':'')+'">'+_rzN(r.cov,1)+' sem</td>'
-      +'<td>'+(r.prod>0?'<span class="rz-prod">'+r.prod+' batches</span>':'<span class="rz-gray">—</span>')+'</td></tr>').join('')
-    +'</tbody></table></div>';
-  // ── TABLA "PREMEZCLAS" (stock de las 6, en batches; 1 unidad Odoo = 1 batch) ──
-  const prem='<div class="rz-tblwrap">'
-    +'<table class="rz-tbl"><thead><tr><th>Premezcla</th><th>En stock</th></tr></thead><tbody>'
-    +NIV_PROD.map(p=>{ const b=Math.round((stock.premOh||{})[NIV_INFO[p].prem]||0);
-        return '<tr><td class="rz-pnm">'+esc(_nomCorto(p))+'</td>'
-          +'<td>'+(b>0?('<span class="rz-prod">'+_rzN(b)+'</span> batch'+(b===1?'':'es')):'<span class="rz-gray">—</span>')+'</td></tr>'; }).join('')
-    +'</tbody></table></div>';
-  // ── PANEL "PARA PODER PRODUCIR" (lo que falta ALISTAR, semana actual + próxima) ──
-  function prepWk(a, esActual){
-    const grupos=[];
-    if(a && a.premez.length) grupos.push(
-      '<div class="rz-pg"><div class="rz-pgh">'+_SVG_FLASK+'<span>Fabricar premezclas</span></div>'
-      +'<ul class="rz-pl">'+a.premez.map(x=>'<li><b>'+x.n+'</b> premezcla'+(x.n===1?'':'s')+' de '+esc(x.prod)+'</li>').join('')+'</ul></div>');
-    if(a && a.compras.length) grupos.push(
-      '<div class="rz-pg"><div class="rz-pgh">'+_SVG_CART+'<span>Comprar materia prima</span></div>'
-      +'<ul class="rz-pl">'+a.compras.map(x=>{ const nm=(meta[x.pid]&&meta[x.pid].name)||('id '+x.pid), uom=(meta[x.pid]&&meta[x.pid].uom)||'';
-          return '<li><b>'+esc(_compraUnidad(x.pid, x.falta, uom))+'</b> de '+esc(nm.toLowerCase())+'</li>'; }).join('')+'</ul></div>');
-    const cuerpo = grupos.length ? grupos.join('') : '<div class="rz-pnone">Todo alistado — sin pendientes.</div>';
-    return '<div class="rz-pwk'+(esActual?' rz-pnow':'')+'"><div class="rz-pwtag">'+(esActual?'ESTA SEMANA':'PRÓXIMA SEMANA')+'</div>'+cuerpo+'</div>';
-  }
-  const panel='<div class="rz-prep"><div class="rz-sh"><span class="rz-st">Para poder producir</span></div>'
-    +prepWk(_rzAlistar[0], true)+prepWk(_rzAlistar[1], false)+'</div>';
-  // Orden: ARRIBA qué producir y cuándo (calendario + panel), ABAJO el inventario (terminado + premezclas).
-  const cal='<div class="rz-sec"><div class="rz-sh"><span class="rz-st">Calendario de producción</span>'
-    +'<span class="rz-hint">Tocá un día futuro para editarlo · arrastrá para intercambiar</span></div>'
-    +'<div class="rz-cal">'+rzWeekHtml(0)+rzWeekHtml(1)+'</div>'
-    +((_rzAutoLeft&&_rzAutoLeft.length)?'<div class="rz-leftnote">Para cumplir la meta falta agendar '
-      +_rzAutoLeft.map(function(x){return _rzBP(x.batches,x.pid);}).join(' · ')+' — no cupo en estas 2 semanas, se produce después.</div>':'')
-    +'</div>';
+  // Orden mobile-first: 1 pendiente de fabricar · 2 premezclas por medir · 3 comprar ·
+  // 4 últimas producciones · 5 inventario.
   body.innerHTML=''
-    +(c.cfg.sembrado?'':'<div class="rz-warn">plan_config no sembrado — usando defaults (ritmo 6 · colchón 3). Sembrá el seed en Supabase para activar temporada.</div>')
-    +'<div class="rz-top">'+cal+panel+'</div>'
-    +'<div class="rz-bottom">'
-      +'<div class="rz-sec"><div class="rz-sh"><span class="rz-st">Producto terminado</span></div>'+tabla+'</div>'
-      +'<div class="rz-sec"><div class="rz-sh"><span class="rz-st">Premezclas</span></div>'+prem+'</div>'
-      +'</div>';
+    + rzStripHtml()
+    + rzMedirHtml()
+    + '<div class="rz-sec"><div class="rz-sh"><span class="rz-st">Comprar</span></div>'+rzComprasHtml()+'</div>'
+    + rzUltimasHtml()
+    + '<div class="rz-sec"><div class="rz-sh"><span class="rz-st">Inventario</span></div>'+rzInvHtml()+'</div>';
 }
-function rzWeekHtml(offset){
-  const mon=_rzMonday(offset), esActual=offset===0, cells=_rzCellsFull(offset);
-  const edited=cells.some(x=>x.edited);
-  let tag=esActual?'<span class="rz-wtag rz-wnow">ESTA SEMANA</span>':'<span class="rz-wtag">SIGUIENTE</span>';
-  if(edited) tag+='<span class="rz-edtag" title="Editada por vos">'+_SVG_PENCIL+'editada por vos</span>'
-    +'<button class="rz-revert" onclick="rzVolverPlan('+offset+')">Volver al plan</button>';
-  return '<div class="rz-wk'+(esActual?'':' rz-wk-next')+'">'
-    +'<div class="rz-whead">'+tag+'<span class="rz-wrange">'+_rangeLbl(mon)+'</span></div>'
-    +'<div class="rz-days">'+cells.map(rzCellHtml).join('')+'</div></div>';
+// ── 1 · PENDIENTE DE FABRICAR: tira horizontal HOY → próximo lunes, editable + touch ──
+function rzStripHtml(){
+  const cells=_rzVisibles(), edited=cells.some(c=>c.edited);
+  let head='<div class="rz-sh"><span class="rz-st">Pendiente de fabricar</span>';
+  if(edited) head+='<span class="rz-edtag" title="Editado por vos">'+_SVG_PENCIL+'editado</span>'
+    +'<button class="rz-revert" onclick="rzVolverPlanStrip()">Volver al plan</button>';
+  head+='<span class="rz-hint">tocá un día para editar · arrastrá para mover</span></div>';
+  const leftnote=(_rzAutoLeft&&_rzAutoLeft.length)?'<div class="rz-leftnote">Para cumplir la meta falta agendar '
+    +_rzAutoLeft.map(function(x){return _rzBP(x.batches,x.pid);}).join(' · ')+' — no cupo en la ventana, se produce después.</div>':'';
+  return '<div class="rz-sec">'+head+'<div class="rz-strip">'+cells.map(rzCellHtml).join('')+'</div>'+leftnote+'</div>';
+}
+// ── 2 · PREMEZCLAS POR MEDIR (tira de una línea) ──
+function rzMedirHtml(){
+  const pm=(_rzAlistar[0]&&_rzAlistar[0].premez)||[];
+  if(!pm.length) return '<div class="rz-medir"><span class="rz-medlbl">Premezclas por medir esta semana:</span> ya están todas medidas.</div>';
+  const txt=pm.map(function(x){ return x.n+' '+x.prod.replace(/^Pan /,''); }).join(' · ');
+  return '<div class="rz-medir"><span class="rz-medlbl">Premezclas por medir esta semana:</span> '+esc(txt)+'</div>';
+}
+// ── 3 · COMPRAR: 2 tarjetas de ancho fijo (premezclas · producción) ──
+function rzComprasHtml(){
+  function card(icon, titulo, data){
+    const items=data.items.length ? data.items.map(function(it){
+      return '<div class="rz-ci"><div class="rz-cin">'+esc(it.nombre.toLowerCase())+'</div>'
+        +'<div class="rz-cf">falta <b>'+esc(_compraUnidad(it.pid, it.falta, it.uom))+'</b> '
+          +'<span class="rz-cst">('+_rzN(Math.round(it.have))+'/'+_rzN(Math.round(it.need))+(it.uom?(' '+esc(it.uom)):'')+')</span></div>'
+        +'<div class="rz-ca">'+esc(it.accion)+'</div></div>';
+    }).join('') : '<div class="rz-cnone">Alcanza — nada que comprar.</div>';
+    return '<div class="rz-card"><div class="rz-ch">'+icon+'<span>'+titulo+'</span></div>'
+      +'<div class="rz-cfecha">'+esc(data.fecha)+'</div>'+items+'</div>';
+  }
+  return '<div class="rz-cards">'
+    +card(_SVG_FLASK,'Para premezclas', _rzCompras.premezclas)
+    +card(_SVG_CART,'Para producción', _rzCompras.produccion)+'</div>';
+}
+// ── 4 · ÚLTIMAS PRODUCCIONES (chequeo de Keylor) ──
+function rzUltimasHtml(){
+  if(!_rzUltimas.length) return '';
+  const rows=_rzUltimas.map(function(u){
+    const d=new Date(u.ds+'T00:00:00'), fecha=_DOW[d.getDay()]+' '+d.getDate()+' '+_MESAB[d.getMonth()];
+    const planTxt=Object.keys(u.plan).map(function(p){ return _rzBP(u.plan[p], +p); }).join(' + ');
+    let cls, estado;
+    if(u.kind==='exacta'){ cls='rz-uok'; estado='exacta ✓'; }
+    else if(u.kind==='difiere'){ cls='rz-udif'; estado='Odoo: '+Object.keys(u.plan).map(function(p){ return Math.round(u.real[p]||0)+' de '+Math.round(u.plan[p])+' '+_nomCorto(+p); }).join(' · '); }
+    else { cls='rz-usin'; estado='sin registrar'; }
+    return '<div class="rz-urow '+cls+'"><div class="rz-ud">'+fecha+'</div><div class="rz-up">'+esc(planTxt)+'</div><div class="rz-ue">'+esc(estado)+'</div></div>';
+  }).join('');
+  return '<div class="rz-sec"><div class="rz-sh"><span class="rz-st">Últimas producciones</span><span class="rz-hint">chequeo del registro en Odoo</span></div>'+rows+'</div>';
+}
+// ── 5 · INVENTARIO: 3 tarjetas individuales (materia prima · premezclas · terminado) ──
+function rzInvHtml(){
+  const stock=_rzCtx.stock, meta=stock.meta||{};
+  const mp=Object.keys(stock.mpOh||{}).map(function(k){ const pid=+k, m=meta[pid]||{}; return {pid:pid, name:(m.name||('id '+pid)), uom:m.uom||'', qty:stock.mpOh[pid]||0}; })
+    .sort(function(a,b){ return _mpRank(a.name)-_mpRank(b.name); });
+  function mpRow(x){ const dec=(x.uom==='kg'||x.uom==='L'||/gal/.test(x.uom))?1:0;
+    return '<div class="rz-ir"><span class="rz-irn">'+esc(x.name.toLowerCase())+'</span><span class="rz-irv">'+_rzN(x.qty,dec)+(x.uom?(' '+esc(x.uom)):'')+'</span></div>'; }
+  const NPRIN=6, prin=mp.slice(0,NPRIN).map(mpRow).join(''), resto=mp.slice(NPRIN);
+  const restoHtml=resto.length?('<div id="rzMpMas" class="hidden">'+resto.map(mpRow).join('')+'</div><button class="rz-vermas" onclick="rzToggleMp(this)">Ver los '+mp.length+' ▾</button>'):'';
+  const cMP='<div class="rz-icard"><div class="rz-ith">Materia prima</div>'+(prin||'<div class="rz-ir rz-gray">sin datos</div>')+restoHtml+'</div>';
+  const cPR='<div class="rz-icard rz-icard-sm"><div class="rz-ith">Premezclas</div>'
+    +NIV_PROD.map(function(p){ const b=Math.round((stock.premOh||{})[NIV_INFO[p].prem]||0);
+      return '<div class="rz-ir"><span class="rz-irn">'+esc(_nomCorto(p))+'</span><span class="rz-irv">'+(b>0?_rzN(b):'—')+'</span></div>'; }).join('')+'</div>';
+  const cTE='<div class="rz-icard"><div class="rz-ith">Producto terminado</div>'
+    +NIV_PROD.map(function(p){ const I=NIV_INFO[p], cajas=Math.floor((stock.fin[p]||0)/I.cajaU);
+      return '<div class="rz-ir"><span class="rz-irn">'+esc(_nomCorto(p))+'</span><span class="rz-irv">'+_rzN(cajas)+' cj</span></div>'; }).join('')+'</div>';
+  return '<div class="rz-inv">'+cMP+cPR+cTE+'</div>';
+}
+function rzToggleMp(btn){ const e=document.getElementById('rzMpMas'); if(!e)return; const h=e.classList.toggle('hidden'); if(btn) btn.textContent = h ? btn.textContent.replace('▴','▾') : btn.textContent.replace('▾','▴'); }
+// "Volver al plan" de la ventana visible: descarta TODOS los overrides futuros (fila de anulación).
+async function rzVolverPlanStrip(){
+  const dss=Object.keys(_rzOverrides).filter(function(ds){ return ds>=_rzCtx.hoyStr; });
+  if(!dss.length) return;
+  dss.forEach(function(ds){ delete _rzOverrides[ds]; });
+  _rzRecalcAuto(); rzRender();
+  rzPersist(dss.map(function(ds){ return {fecha:ds, producto_id:null, batches:0, tipo:'anulacion'}; }));
+  await rzRecalcAlistar(); rzRender();
 }
 function rzCellHtml(cell){
   const RZ={real:['rz-done','Hecho'], today:['rz-today','En curso'], pend:['rz-miss','Sin registrar en Odoo'], prop:['rz-plan','Propuesto'], libre:['rz-clean','Libre'], feriado:['rz-fer','Feriado'], viernes:['rz-clean','—'], edit:['rz-plan','Editado'], 'edit-empty':['rz-clean','Editado'], auto:['rz-plan','Se agrega · meta']};
@@ -4223,9 +4367,12 @@ function rzCellHtml(cell){
   const dp='<div class="rz-dp">'+esc(cell.prod)+'</div>';
   const db=cell.bt?('<div class="rz-db">'+esc(cell.bt)+'</div>'):'';
   const st='<div class="rz-ds">'+(cell.auto&&cell.kind==='viernes'?'Se agrega · meta':m[1])+(cell.edited?' · editado':'')+'</div>';
-  const cls=m[0]+(cell.editable?' rz-ed':'')+(cell.edited?' rz-edited':'')+(cell.auto?' rz-autofill':'');
+  const cls=m[0]+(cell.editable?' rz-ed':'')+(cell.edited?' rz-edited':'')+(cell.auto?' rz-autofill':'')
+    +(cell.today?' rz-today':'')+(cell.nextMon?' rz-nextmon':'');
   if(cell.editable){
-    const grip=cell.swappable?('<span class="rz-grip" draggable="true" title="Arrastrar para intercambiar" onclick="event.stopPropagation()" ondragstart="rzDragStart(event,\''+ds+'\')" ondragend="rzDragEnd()">'+_SVG_GRIP+'</span>'):'';
+    const grip=cell.swappable?('<span class="rz-grip" draggable="true" title="Arrastrar para mover" onclick="event.stopPropagation()"'
+      +' ondragstart="rzDragStart(event,\''+ds+'\')" ondragend="rzDragEnd()"'
+      +' ontouchstart="rzTouchStart(event,\''+ds+'\')" ontouchmove="rzTouchMove(event)" ontouchend="rzTouchEnd(event)">'+_SVG_GRIP+'</span>'):'';
     const drop=cell.swappable?' ondragover="rzDragOver(event)" ondrop="rzDrop(event,\''+ds+'\')"':'';
     return '<div class="rz-day '+cls+'" data-ds="'+ds+'" onclick="rzOpenEdit(\''+ds+'\')"'+drop+'>'+grip+dd+dp+db+st+'</div>';
   }
@@ -4259,6 +4406,15 @@ function rzDragStart(e,ds){ _rzDrag=ds; try{ e.dataTransfer.effectAllowed='move'
 function rzDragEnd(){ _rzDrag=null; }
 function rzDragOver(e){ if(_rzDrag){ e.preventDefault(); try{ e.dataTransfer.dropEffect='move'; }catch(_){}} }
 function rzDrop(e, toDs){ if(e&&e.preventDefault)e.preventDefault(); const fromDs=_rzDrag; _rzDrag=null; if(fromDs&&fromDs!==toDs) rzSwap(fromDs, toDs); }
+// TÁCTIL (móvil): el HTML5 drag no anda en touch → gesto propio con elementFromPoint.
+let _rzTouchDs=null;
+function rzTouchStart(e,ds){ _rzTouchDs=ds; _rzDrag=ds; const g=e.currentTarget; if(g&&g.classList)g.classList.add('rz-grabbing'); if(e.cancelable)e.preventDefault(); }
+function rzTouchMove(e){ if(_rzTouchDs && e.cancelable) e.preventDefault(); }   // evita el scroll mientras se arrastra el handle
+function rzTouchEnd(e){ if(!_rzTouchDs) return; const from=_rzTouchDs; _rzTouchDs=null; _rzDrag=null;
+  const t=e.changedTouches&&e.changedTouches[0]; let toDs=null;
+  if(t){ const el=document.elementFromPoint(t.clientX,t.clientY); const day=el&&el.closest?el.closest('.rz-day'):null; if(day) toDs=day.getAttribute('data-ds'); }
+  const g=e.currentTarget; if(g&&g.classList)g.classList.remove('rz-grabbing');
+  if(toDs && from && toDs!==from) rzSwap(from, toDs); }
 function _rzCellByDs(ds){ for(let o=0;o<2;o++){ const hit=_rzCells(o).find(x=>x.ds===ds); if(hit) return hit; } return null; }
 async function rzSwap(fromDs, toDs){
   const a=_rzCellByDs(fromDs), b=_rzCellByDs(toDs);
@@ -4269,14 +4425,6 @@ async function rzSwap(fromDs, toDs){
   rzPersist([{fecha:fromDs, producto_id:b.pid||null, batches:b.batches||0, tipo:'swap'},
              {fecha:toDs,   producto_id:a.pid||null, batches:a.batches||0, tipo:'swap'}]);
   await rzRecalcAlistar(); rzRender();                        // swap conserva la meta → premezclas/MP no cambian
-}
-async function rzVolverPlan(offset){
-  const dss=_weekDays(_rzMonday(offset)).map(d=>d.ds).filter(ds=>ds>=_rzCtx.hoyStr && _rzOverrides[ds]);
-  if(!dss.length) return;
-  dss.forEach(ds=>{ delete _rzOverrides[ds]; });
-  _rzRecalcAuto(); rzRender();
-  rzPersist(dss.map(ds=>({fecha:ds, producto_id:null, batches:0, tipo:'anulacion'})));   // fila de anulación, no delete
-  await rzRecalcAlistar(); rzRender();
 }
 async function rzPersist(filas){
   const c=sbClient(); if(!c){ alert('Sin conexión con la base — el cambio no se guardó. Reintentá.'); return; }
