@@ -1546,6 +1546,12 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-note2p{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:var(--text-3)}
 #vResumen .rz-note2p svg{width:14px;height:14px;color:var(--text-3);flex:none}
 #vPlan .pl-note2p{margin-left:8px;font-size:10.5px;color:var(--text-3)}
+/* barra de confirmación del cambio manual de personas */
+#vResumen .rz-confirm,#vPlan .rz-confirm{margin-top:12px;background:rgba(212,83,126,.08);border:.5px solid rgba(212,83,126,.35);border-radius:9px;padding:10px 14px;font-size:13px;color:var(--text-2);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#vResumen .rz-confirm b,#vPlan .rz-confirm b{color:var(--text)}
+#vResumen .rz-cbtn,#vPlan .rz-cbtn{border:none;border-radius:6px;padding:5px 12px;font-size:12.5px;font-weight:600;cursor:pointer}
+#vResumen .rz-cok,#vPlan .rz-cok{background:#D4537E;color:#fff}
+#vResumen .rz-cno,#vPlan .rz-cno{background:var(--surface-2);color:var(--text-2);border:.5px solid var(--border)}
 /* 2 · Premezclas por medir */
 #vResumen .rz-medir{margin-top:16px;font-size:13px;color:var(--text-2);background:var(--surface);border:.5px solid var(--border);border-radius:9px;padding:10px 14px;line-height:1.5}
 #vResumen .rz-medlbl{color:var(--text-3);font-size:11px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;margin-right:6px}
@@ -3858,6 +3864,7 @@ const NIV_CAP={
 function _capDe(pid, personas){ const t=NIV_CAP[personas]||NIV_CAP[3]; return t[pid]!=null?t[pid]:(NIV_CAP[3][pid]||1); }
 // Personas de una semana ISO: Supabase (marca manual) → semilla del 20-jul (demo) → 3.
 let _rzPersonas={};   // {semana_iso: 2|3} desde Supabase
+let _rzPersonasPend=null;   // {iso,prev,next} — cambio manual esperando confirmación (preview)
 function _personasDe(iso){
   if(_rzPersonas && _rzPersonas[iso]!=null) return _rzPersonas[iso];
   if(iso===_isoWk(new Date(2026,6,20))) return 2;   // demo: semana del 20-jul, sin Daniel
@@ -4228,15 +4235,40 @@ async function rzPersistPersonas(iso, n){
     if(error) alert('No se pudo guardar la capacidad: '+error.message); }
   catch(e){ alert('No se pudo guardar la capacidad: '+(e&&e.message||e)); }
 }
-// Alterna 2↔3 personas de una semana ISO: re-nivela (Resumen) y/o re-proyecta (Plan) sin volver a Odoo.
-function rzTogglePersonas(iso){
-  const next=_personasDe(iso)===2?3:2;
-  _rzPersonas[iso]=next;
-  if(_rzCtx){ const lvl=nivLevel(_rzCtx.ritmo, _rzCtx.stock.fin, _rzCtx.cfg); _rzCtx.weeks=lvl.weeks; _rzCtx.w0=lvl.w0;
-    _rzRecalcAuto(); rzRender(); rzRecalcAlistar().then(rzRender); }
+// Re-nivela el Resumen y re-proyecta el Plan desde _rzPersonas (sin volver a Odoo).
+function _rzRenivelar(){
+  if(_rzCtx){ const lvl=nivLevel(_rzCtx.ritmo, _rzCtx.stock.fin, _rzCtx.cfg); _rzCtx.weeks=lvl.weeks; _rzCtx.w0=lvl.w0; _rzRecalcAuto(); }
   if(_planInputs){ const sem=Math.max(0, Math.round((_mondayProd(new Date(2026,11,18))-_mondayProd(new Date()))/(7*86400000))+1);
-    _planProj=nivProyeccion(_planInputs.ritmo, _planInputs.fin, _planInputs.cfg, sem); if(document.getElementById('planBody')) planRenderMeses(); }
-  rzPersistPersonas(iso, next);
+    _planProj=nivProyeccion(_planInputs.ritmo, _planInputs.fin, _planInputs.cfg, sem); }
+}
+function _rzRepintar(){ if(_rzCtx && document.getElementById('rzBody')) rzRender(); if(_planProj.length && document.getElementById('planBody')) planRenderMeses(); }
+// Cambio MANUAL de personas: NO recalcula/guarda de una. Primero PREVISUALIZA y pide confirmar.
+// (Si la semana ya venía marcada desde Supabase, se muestra directo — esto es solo el toggle a mano.)
+function rzTogglePersonas(iso){
+  if(_rzPersonasPend) return;                              // ya hay un cambio a confirmar
+  const prev=_personasDe(iso), next=prev===2?3:2;
+  _rzPersonasPend={iso:iso, prev:prev, next:next};
+  _rzPersonas[iso]=next;                                    // aplica TEMPORAL solo para previsualizar
+  _rzRenivelar();
+  if(_rzCtx) rzRecalcAlistar().then(_rzRepintar);           // preview también de panel/compras
+  _rzRepintar();
+}
+async function rzConfirmPersonas(){
+  if(!_rzPersonasPend) return; const iso=_rzPersonasPend.iso, next=_rzPersonasPend.next; _rzPersonasPend=null;
+  rzPersistPersonas(iso, next);                             // recién ahora guarda en Supabase
+  _rzRepintar();
+}
+function rzCancelPersonas(){
+  if(!_rzPersonasPend) return; const iso=_rzPersonasPend.iso, prev=_rzPersonasPend.prev; _rzPersonas[iso]=prev; _rzPersonasPend=null;
+  _rzRenivelar(); if(_rzCtx) rzRecalcAlistar().then(_rzRepintar); _rzRepintar();
+}
+// Barra de confirmación (solo para la semana con cambio pendiente).
+function _rzConfirmBar(iso){
+  if(!_rzPersonasPend || _rzPersonasPend.iso!==iso) return '';
+  const n=_rzPersonasPend.next;
+  return '<div class="rz-confirm">Así quedaría la producción con <b>'+n+' persona'+(n===1?'':'s')+'</b>. ¿Confirmás este cambio en la producción? '
+    +'<button class="rz-cbtn rz-cok" onclick="rzConfirmPersonas()">Confirmar</button>'
+    +'<button class="rz-cbtn rz-cno" onclick="rzCancelPersonas()">Cancelar</button></div>';
 }
 
 // ── Celdas de UNA semana con overrides + metadatos de interacción (Resumen editable) ──
@@ -4357,7 +4389,7 @@ function rzStripHtml(){
     +_rzAutoLeft.map(function(x){return _rzBP(x.batches,x.pid);}).join(' · ')+' — no cupo en la ventana, se produce después.</div>':'';
   // Aviso minimalista: 2 personas + viernes productivo (algo cambió por la menor capacidad).
   const aviso=(pers0===2 && w0.viernes && w0.viernes.prod)?'<div class="rz-note2p">'+_SVG_PPL+'Semana de 2 personas: el viernes entra a producir para cubrir el plan.</div>':'';
-  return '<div class="rz-sec">'+head+'<div class="rz-strip">'+cells.map(rzCellHtml).join('')+'</div>'+aviso+leftnote+'</div>';
+  return '<div class="rz-sec">'+head+'<div class="rz-strip">'+cells.map(rzCellHtml).join('')+'</div>'+_rzConfirmBar(iso0)+aviso+leftnote+'</div>';
 }
 // ── 2 · PREMEZCLAS POR MEDIR (tira de una línea) ──
 function rzMedirHtml(){
@@ -4793,7 +4825,7 @@ function planVerDetalle(m){
       const tag=(c.kind==='pend')?'<div class="pl-dtag">sin registrar</div>':(c.edited?'<div class="pl-dtag pl-dtag-ed">editado</div>':(c.auto?'<div class="pl-dtag pl-dtag-auto">meta</div>':''));
       html+='<div class="pl-d '+(PLK[c.kind]||'pl-d-clean')+(c.edited?' pl-d-ed':'')+'"><div class="pl-dd">'+c.dow+' '+c.dnum+'</div><div class="pl-dp">'+esc(txt)+'</div>'+tag+'</div>';
     });
-    html+='</div></div>';
+    html+='</div>'+_rzConfirmBar(iso)+'</div>';
   });
   el.innerHTML=html+'</div>'; el.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
