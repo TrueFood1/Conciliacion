@@ -4495,6 +4495,78 @@ function _cierreEntrega(byDate, centro, canales, radio){
   return {vacio:false, D1:D1, D2:D2, pico:pico, segundo:seg, porDia:w.porDia, porProd:solo.porProd};
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// PICO REAL DE CONGELADOR (paso 1b) — SOLO CÁLCULO, no toca el motor.
+//
+// La meta (966 cj) NUNCA está junta en el congelador: la producción de la ÚLTIMA
+// SEMANA (lun 14 → vie 18) entra y sale casi al mismo tiempo (se produce y se
+// despacha), no se acumula. El pico FÍSICO es el cierre del viernes 11-dic, antes
+// de la primera entrega grande del lunes 14.
+//        PICO REAL = meta − producción de la última semana
+//
+// Restricción física (no obvia): el bloque 1 (Auto+WM, sale el LUNES 14) NO puede
+// producirse esa semana — tiene que estar congelado el viernes 11. La producción de
+// la última semana solo puede servir al bloque 2 (sale el vie 18) y al colchón.
+// ════════════════════════════════════════════════════════════════════════
+
+// Días productivos de la última semana: lunes → fecha de la última entrega (máx lun–vie),
+// sin feriados. Reglas del motor: un producto/día · Semillas SOLO jueves · viernes sin Semillas.
+function _picoDias(dsResto){
+  const fin=dsResto<CIERRE?dsResto:CIERRE, mon=_mondayProd(new Date(fin+'T00:00:00'));
+  const out=[];
+  for(let i=0;i<5;i++){ const d=new Date(mon); d.setDate(d.getDate()+i); const ds=_ymd(d);
+    if(ds>fin) break;
+    out.push({ds:ds, dow:d.getDay(), fer:_esFeriado(ds)}); }
+  return out;
+}
+// Reparte los días entre los productos que esa semana PUEDE servir (needU = uds del
+// bloque 2 + colchón). Cada día: UN producto a su capacidad de batches.
+// Qué producto: reparto PROPORCIONAL a la necesidad (D'Hondt — necesidad en cajas ÷
+// días ya dados + 1), así los 5 días copian la forma de la demanda en vez de apilarse
+// en el producto más grande. Semillas solo puede caer en jueves (regla dura del motor).
+// Solo se acredita lo que cubre necesidad real de la meta (no se produce de más).
+function _picoAsignar(dias, personas, needU){
+  const need0={}, rest={}, dados={};
+  NIV_PROD.forEach(function(p){ need0[p]=Math.max(0, needU[p]||0); rest[p]=need0[p]; dados[p]=0; });
+  const prodU={}, plan=[];
+  dias.forEach(function(d){
+    const c=Object.assign({}, d);
+    if(d.fer){ c.pid=null; c.nota=d.fer+' (feriado)'; plan.push(c); return; }
+    let p=null;
+    if(d.dow===4 && rest[452]>0) p=452;                     // jueves: el único día que admite Semillas
+    else { let mejor=-1;
+      NIV_PROD.forEach(function(q){ if(q===452 || rest[q]<=0) return;
+        const v=(need0[q]/NIV_INFO[q].cajaU)/(dados[q]+1);
+        if(v>mejor){ mejor=v; p=q; } }); }
+    if(p===null){ c.pid=null; c.nota='nada que servir esa semana'; plan.push(c); return; }
+    const I=NIV_INFO[p], cap=_capDe(p,personas);
+    const bt=Math.min(cap, Math.ceil(rest[p]/I.rend));      // batches enteros, sin pasarse de la necesidad
+    const uds=Math.min(bt*I.rend, rest[p]);                  // solo cuenta lo que sirve a la meta
+    rest[p]-=uds; dados[p]++; prodU[p]=(prodU[p]||0)+uds;
+    c.pid=p; c.batches=bt; c.uds=uds; c.tope=(bt<cap); plan.push(c);
+  });
+  return {plan:plan, prodU:prodU};
+}
+// TECHO teórico de la última semana, en cajas: el mix MÁS rendidor posible, ignorando qué
+// se necesita (Semillas al jueves + el producto de más cajas/día el resto). Sirve para ver
+// si la conclusión aguanta con CUALQUIER mezcla: ni en el mejor caso el pico baja de esto.
+function _picoTecho(dias, personas){
+  const cjDia=function(p){ return _capDe(p,personas)*NIV_INFO[p].rend/NIV_INFO[p].cajaU; };
+  const mejor=NIV_PROD.filter(function(p){ return p!==452; })
+    .sort(function(a,b){ return cjDia(b)-cjDia(a); })[0];
+  let t=0; dias.forEach(function(d){ if(d.fer) return; t+=cjDia(d.dow===4?452:mejor); });
+  return Math.round(t);
+}
+// Pico por producto y total, en cajas (hacia arriba, igual que la meta).
+function _picoTotales(metaU, prodU){
+  const porProd={}; let meta=0, prod=0, pico=0;
+  NIV_PROD.forEach(function(p){ const I=NIV_INFO[p];
+    const m=Math.max(0,metaU[p]||0), pr=Math.min(m, prodU[p]||0), pk=m-pr;
+    porProd[p]={metaU:m, prodU:pr, picoU:pk, metaCj:Math.ceil(m/I.cajaU), prodCj:Math.ceil(pr/I.cajaU), picoCj:Math.ceil(pk/I.cajaU)};
+    meta+=porProd[p].metaCj; prod+=porProd[p].prodCj; pico+=porProd[p].picoCj; });
+  return {porProd:porProd, metaCj:meta, prodCj:prod, picoCj:pico};
+}
+
 async function rzDiagCierre(body){
   body.innerHTML='<div class="rz-load">Leyendo las entregas reales del cierre pasado por canal…</div>';
   try{
@@ -4519,27 +4591,128 @@ async function rzDiagCierre(body){
     if(!e1.vacio && e1.segundo && e1.pico.uds < e1.segundo.uds*1.5) avisos.push('Auto+Walmart: no se ve un pico claro — la entrega pudo partirse en varios días. Confirmá el día tomado.');
     if(!e2.vacio && e2.segundo && e2.pico.uds < e2.segundo.uds*1.5) avisos.push('Resto de canales: no se ve un pico claro — pudo partirse en varios días.');
 
+    // Colchón acumulado a k semanas (k=0..4) — para ver cuánto colchón aguanta el congelador.
+    const b3k=[{porProd:{}}];
+    for(let k=1;k<=CIERRE_COLCHON_SEM;k++)
+      b3k.push(primerEne?_cierreSuma(vEne, primerEne, _cierreShift(primerEne,k*7-1), null):{porProd:{}});
+
     const estim={};   // productos sin historia → estimados con ritmo actual
-    const filas=NIV_PROD.map(function(p){
-      const I=NIV_INFO[p], cj=function(u){ return Math.ceil(u/I.cajaU); };
-      let b1=Math.max(0,(e1.porProd||{})[p]||0);
-      let b2=Math.max(0,(e2.porProd||{})[p]||0);
-      let b3p=Math.max(0,(b3.porProd||{})[p]||0);
-      let nota='';
-      if(b1<=0 && (ritmo[p]||0)>0){ b1=ritmo[p]; estim[p]=1; nota=' *'; }        // ej. Galletas: nuevo, sin dic pasado → ritmo actual
-      if(b3p<=0 && (ritmo[p]||0)>0){ b3p=(ritmo[p]||0)*CIERRE_COLCHON_SEM; estim[p]=1; nota=' *'; }
-      const meta=b1+b2+b3p;
-      return '<tr><td style="color:var(--text)">'+esc(_nomCorto(p))+(nota?'<span style="color:#C99A4E">'+nota+'</span>':'')+'</td>'
-        +'<td style="text-align:right;color:var(--text-2)">'+_rzN(b1)+'</td><td style="text-align:right;color:var(--text-3)">'+_rzN(cj(b1))+'</td>'
-        +'<td style="text-align:right;color:var(--text-2);padding-left:18px">'+_rzN(b2)+'</td><td style="text-align:right;color:var(--text-3)">'+_rzN(cj(b2))+'</td>'
-        +'<td style="text-align:right;color:var(--text-2);padding-left:18px">'+_rzN(b3p)+'</td><td style="text-align:right;color:var(--text-3)">'+_rzN(cj(b3p))+'</td>'
-        +'<td style="text-align:right;color:var(--text);font-weight:700;padding-left:18px">'+_rzN(cj(meta))+'</td></tr>'; }).join('');
-    const total=NIV_PROD.reduce(function(a,p){ const I=NIV_INFO[p];
-      let b1=Math.max(0,(e1.porProd||{})[p]||0); if(b1<=0) b1=ritmo[p]||0;
+    // Modelo por producto, UNA sola vez: los 3 bloques en uds sueltas. De acá salen la
+    // tabla de la meta, el total y el pico real (antes el total repetía esta misma cuenta).
+    const M=NIV_PROD.map(function(p){
+      const r=ritmo[p]||0;
+      let b1=Math.max(0,(e1.porProd||{})[p]||0), b1e=false;
       const b2=Math.max(0,(e2.porProd||{})[p]||0);
-      let b3p=Math.max(0,(b3.porProd||{})[p]||0); if(b3p<=0) b3p=(ritmo[p]||0)*CIERRE_COLCHON_SEM;
-      return a+Math.ceil((b1+b2+b3p)/I.cajaU); },0);
+      let b3p=Math.max(0,(b3.porProd||{})[p]||0), b3e=false;
+      if(b1<=0 && r>0){ b1=r; b1e=true; estim[p]=1; }        // ej. Galletas: nuevo, sin dic pasado → ritmo actual
+      if(b3p<=0 && r>0){ b3p=r*CIERRE_COLCHON_SEM; b3e=true; estim[p]=1; }
+      // colchón de k semanas: si es estimado escala con el ritmo, si no es la venta real acumulada
+      const b3De=function(k){ return b3e ? r*k : Math.max(0,((b3k[k]||{porProd:{}}).porProd||{})[p]||0); };
+      return {p:p, I:NIV_INFO[p], b1:b1, b2:b2, b3:b3p, r:r, b3De:b3De, nota:(b1e||b3e)?' *':''};
+    });
+    const filas=M.map(function(m){
+      const cj=function(u){ return Math.ceil(u/m.I.cajaU); }, meta=m.b1+m.b2+m.b3;
+      return '<tr><td style="color:var(--text)">'+esc(_nomCorto(m.p))+(m.nota?'<span style="color:#C99A4E">'+m.nota+'</span>':'')+'</td>'
+        +'<td style="text-align:right;color:var(--text-2)">'+_rzN(m.b1)+'</td><td style="text-align:right;color:var(--text-3)">'+_rzN(cj(m.b1))+'</td>'
+        +'<td style="text-align:right;color:var(--text-2);padding-left:18px">'+_rzN(m.b2)+'</td><td style="text-align:right;color:var(--text-3)">'+_rzN(cj(m.b2))+'</td>'
+        +'<td style="text-align:right;color:var(--text-2);padding-left:18px">'+_rzN(m.b3)+'</td><td style="text-align:right;color:var(--text-3)">'+_rzN(cj(m.b3))+'</td>'
+        +'<td style="text-align:right;color:var(--text);font-weight:700;padding-left:18px">'+_rzN(cj(meta))+'</td></tr>'; }).join('');
+    const total=M.reduce(function(a,m){ return a+Math.ceil((m.b1+m.b2+m.b3)/m.I.cajaU); },0);
     if(Object.keys(estim).length) avisos.push('Marcados con * : sin historia en ese bloque → estimados con el ritmo actual (ej. Galletas, producto nuevo). Confirmá si te hacen sentido.');
+
+    // ── PICO REAL: meta − lo que la última semana produce Y despacha ──
+    const pDias=_picoDias(fc.resto), pIso=_isoWk(new Date(fc.resto+'T00:00:00')), pPers=_personasDe(pIso);
+    const metaU={}, needU={};
+    M.forEach(function(m){ metaU[m.p]=m.b1+m.b2+m.b3; needU[m.p]=m.b2+m.b3; });   // b1 sale el lun 14 → NO se puede producir esa semana
+    const pA=_picoAsignar(pDias, pPers, needU), pT=_picoTotales(metaU, pA.prodU);
+    const pTecho=_picoTecho(pDias, pPers);          // mix más rendidor posible → pico más bajo alcanzable
+    const pPicoMin=Math.max(0, total-pTecho);
+    const pExceso=pT.picoCj-CONGELADOR_CJ;
+    const pB1Cj=M.reduce(function(a,m){ return a+Math.ceil(m.b1/m.I.cajaU); },0);   // espacio que libera la entrega del 14
+    if(_isoWk(new Date(fc.autowm+'T00:00:00'))!==pIso)
+      avisos.push('Las dos entregas caen en semanas distintas: el pico se calcula contra la semana de la última entrega ('+fc.resto+'). Revisá las fechas.');
+    if(!pDias.length)
+      avisos.push('La última entrega ('+fc.resto+') cae en fin de semana: esa semana no tiene días productivos, así que el pico sale igual a la meta. Poné un día lun–vie.');
+    // Sensibilidad: ¿cuánto colchón aguanta el congelador? (mismo cálculo con k semanas)
+    const pSens=[]; for(let k=0;k<=CIERRE_COLCHON_SEM;k++){
+      const mU={}, nU={};
+      M.forEach(function(m){ const b3v=m.b3De(k); mU[m.p]=m.b1+m.b2+b3v; nU[m.p]=m.b2+b3v; });
+      const t=_picoTotales(mU, _picoAsignar(pDias, pPers, nU).prodU);
+      pSens.push({k:k, meta:t.metaCj, pico:t.picoCj, cabe:t.picoCj<=CONGELADOR_CJ}); }
+    const pMaxK=pSens.filter(function(s){ return s.cabe; }).map(function(s){ return s.k; }).pop();
+
+    // ── HTML del pico real ──
+    const pPicoDs=_cierreShift(pDias.length?pDias[0].ds:fc.resto,-3);   // viernes anterior al lunes de la última semana
+    const pOK=pT.picoCj<=CONGELADOR_CJ;
+    const pCol=pOK?'#7E8C5A':'#C99A4E';
+    const pFilasDia=pA.plan.map(function(d){
+      const txt=d.pid?_rzBP(d.batches,d.pid):('<span style="color:var(--text-3)">'+esc(d.nota||'sin producción')+'</span>');
+      const I=d.pid?NIV_INFO[d.pid]:null;
+      return '<tr><td style="padding:5px 16px 5px 0;color:var(--text-2)">'+esc(_fechaCorta(d.ds))+'</td>'
+        +'<td style="padding-right:16px;color:var(--text)">'+txt+(d.tope?'<span style="color:var(--text-3)"> · tope de la meta</span>':'')+'</td>'
+        +'<td style="text-align:right;color:var(--text-2)">'+(d.pid?_rzN(d.uds):'—')+'</td>'
+        +'<td style="text-align:right;color:var(--text);padding-left:16px">'+(d.pid?_rzN(Math.ceil(d.uds/I.cajaU)):'—')+'</td></tr>'; }).join('');
+    const pFilasProd=M.map(function(m){ const x=pT.porProd[m.p];
+      return '<tr><td style="padding:4px 16px 4px 0;color:var(--text)">'+esc(_nomCorto(m.p))+'</td>'
+        +'<td style="text-align:right;color:var(--text-2)">'+_rzN(x.metaCj)+'</td>'
+        +'<td style="text-align:right;color:var(--text-2);padding-left:18px">'+(x.prodCj?('−'+_rzN(x.prodCj)):'—')+'</td>'
+        +'<td style="text-align:right;color:var(--text);font-weight:600;padding-left:18px">'+_rzN(x.picoCj)+'</td></tr>'; }).join('');
+    const pFilasSens=pSens.map(function(s){
+      return '<tr><td style="padding:4px 16px 4px 0;color:var(--text-2)">'+(s.k===0?'sin colchón':(s.k+' semana'+(s.k>1?'s':'')))+(s.k===CIERRE_COLCHON_SEM?'<span style="color:var(--text-3)"> · plan actual</span>':'')+'</td>'
+        +'<td style="text-align:right;color:var(--text-3)">'+_rzN(s.meta)+'</td>'
+        +'<td style="text-align:right;color:var(--text);padding-left:18px">'+_rzN(s.pico)+'</td>'
+        +'<td style="padding-left:18px;color:'+(s.cabe?'#7E8C5A':'#C99A4E')+'">'+(s.cabe?'entra':'no entra · +'+_rzN(s.pico-CONGELADOR_CJ)+' cj')+'</td></tr>'; }).join('');
+    const picoHtml='<div style="margin-top:26px;border-top:.5px solid var(--border);padding-top:18px">'
+      +'<h3 style="color:var(--text);font-size:15px;margin:0 0 4px">Pico real de congelador — el número que manda para el espacio</h3>'
+      +'<div style="color:var(--text-3);margin-bottom:16px;max-width:730px">Las '+_rzN(total)+' cj de la meta <b style="color:var(--text-2)">nunca están juntas</b> en el congelador: lo que se produce la última semana ('+esc(_fechaCorta(pDias.length?pDias[0].ds:fc.resto))+' → '+esc(_fechaCorta(fc.resto))+') entra y sale casi al mismo tiempo — se produce y se despacha, no se acumula. El pico físico es el cierre del <b style="color:var(--accent)">'+esc(_fechaLarga(pPicoDs))+'</b>, justo antes de la primera entrega grande.</div>'
+      +'<div style="color:var(--text);font-weight:600;margin-bottom:4px">Última semana · '+_rzN(pPers)+' personas</div>'
+      +'<div style="color:var(--text-3);font-size:11.5px;margin-bottom:8px;max-width:730px">Un producto por día a su capacidad · Semillas solo el jueves · los días se reparten en proporción a lo que falta de cada producto. El bloque 1 (Auto+WM) NO entra acá: sale el '+esc(_fechaCorta(fc.autowm))+', o sea que tiene que estar congelado desde el viernes anterior. Esta semana solo alcanza a servir al bloque 2 y al colchón.</div>'
+      +'<table style="border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;margin-bottom:18px">'
+        +'<thead><tr style="color:var(--text-3);text-align:left;border-bottom:.5px solid var(--border)">'
+          +'<th style="padding:6px 16px 6px 0">Día</th><th style="padding-right:16px">Se produce</th>'
+          +'<th style="text-align:right">uds</th><th style="text-align:right;padding-left:16px">cj</th></tr></thead>'
+        +'<tbody>'+pFilasDia
+        +'<tr style="border-top:.5px solid var(--border)"><td style="padding-top:7px;color:var(--text);font-weight:600" colspan="3">Produce y despacha esa semana</td>'
+        +'<td style="text-align:right;color:var(--text);font-weight:700;padding:7px 0 0 16px">'+_rzN(pT.prodCj)+'</td></tr></tbody></table>'
+      +'<div style="background:#141417;border:.5px solid #26262C;border-radius:9px;padding:14px 18px;max-width:430px;font-variant-numeric:tabular-nums">'
+        +'<div style="display:flex;justify-content:space-between;color:var(--text-2);padding:3px 0"><span>Meta total al '+esc(_fechaCorta(fc.resto))+'</span><span>'+_rzN(total)+' cj</span></div>'
+        +'<div style="display:flex;justify-content:space-between;color:var(--text-2);padding:3px 0;border-bottom:.5px solid #26262C;padding-bottom:8px"><span>− produce y despacha la última semana</span><span>−'+_rzN(pT.prodCj)+' cj</span></div>'
+        +'<div style="display:flex;justify-content:space-between;color:var(--text);font-weight:700;padding:9px 0 3px"><span>PICO REAL · cierre del '+esc(_fechaCorta(pPicoDs))+'</span><span style="color:var(--accent);font-size:15px">'+_rzN(pT.picoCj)+' cj</span></div>'
+        +'<div style="display:flex;justify-content:space-between;color:var(--text-3);padding:3px 0"><span>Congelador</span><span>'+_rzN(CONGELADOR_CJ)+' cj</span></div>'
+        +'<div style="margin-top:9px;padding-top:9px;border-top:.5px solid #26262C;color:'+pCol+';font-weight:600">'
+          +(pOK?('Entra · sobran '+_rzN(CONGELADOR_CJ-pT.picoCj)+' cj de espacio'):('No entra · sobran '+_rzN(pExceso)+' cj (necesita '+(pT.picoCj/CONGELADOR_CJ).toLocaleString('es-CR',{minimumFractionDigits:1,maximumFractionDigits:1})+'× el congelador de hoy)'))
+        +'</div></div>'
+      +'<div style="color:var(--text);font-weight:600;margin:20px 0 6px">Pico por producto</div>'
+      +'<table style="border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums">'
+        +'<thead><tr style="color:var(--text-3);text-align:left;border-bottom:.5px solid var(--border)">'
+          +'<th style="padding:6px 16px 6px 0">Producto</th><th style="text-align:right">Meta cj</th>'
+          +'<th style="text-align:right;padding-left:18px">Última sem.</th><th style="text-align:right;padding-left:18px">Pico cj</th></tr></thead>'
+        +'<tbody>'+pFilasProd
+        +'<tr style="border-top:.5px solid var(--border)"><td style="padding-top:7px;color:var(--text);font-weight:600">TOTAL</td>'
+        +'<td style="text-align:right;color:var(--text-2);padding-top:7px">'+_rzN(total)+'</td>'
+        +'<td style="text-align:right;color:var(--text-2);padding:7px 0 0 18px">−'+_rzN(pT.prodCj)+'</td>'
+        +'<td style="text-align:right;color:var(--accent);font-weight:700;padding:7px 0 0 18px">'+_rzN(pT.picoCj)+'</td></tr></tbody></table>'
+      +(pOK?'':('<div style="margin-top:24px"><div style="color:var(--text);font-weight:600;margin-bottom:6px">No cabe — qué mueve la aguja</div>'
+        +'<div style="color:var(--text-2);max-width:730px;line-height:1.65;font-size:12.5px">'
+          +'<b style="color:var(--text)">1 · Secuenciar ya está al máximo.</b> Producir parte del colchón en la última semana es exactamente lo que descuenta el cálculo de arriba ('+_rzN(pT.prodCj)+' cj). Son 5 días y ya están todos ocupados. Con el mix MÁS rendidor posible (Semillas el jueves + '+_rzN(pTecho)+' cj en total) el pico bajaría a <b>'+_rzN(pPicoMin)+' cj</b> — '+(pPicoMin>CONGELADOR_CJ?'sigue sin caber. La mezcla de productos no cambia la conclusión.':'ahí sí entraría, pero exige el mix perfecto.')+'<br>'
+          +'<b style="color:var(--text)">2 · El espacio que libera la entrega del '+esc(_fechaCorta(fc.autowm))+' llega tarde.</b> Libera '+_rzN(pB1Cj)+' cj, pero el pico es 3 días ANTES (el '+esc(_fechaCorta(pPicoDs))+'). Ese espacio no existe todavía cuando el congelador está más lleno.<br>'
+          +'<b style="color:var(--text)">3 · Frío extra:</b> hacen falta <b style="color:#C99A4E">'+_rzN(pExceso)+' cj</b> más de congelador para la meta completa.<br>'
+          +'<b style="color:var(--text)">4 · O bajar el colchón</b> (lo único que baja el pico sin fierros nuevos):'
+        +'</div>'
+        +'<table style="border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;margin-top:10px">'
+          +'<thead><tr style="color:var(--text-3);text-align:left;border-bottom:.5px solid var(--border)">'
+            +'<th style="padding:6px 16px 6px 0">Colchón de enero</th><th style="text-align:right">Meta cj</th>'
+            +'<th style="text-align:right;padding-left:18px">Pico cj</th><th style="padding-left:18px">vs '+_rzN(CONGELADOR_CJ)+' cj</th></tr></thead>'
+          +'<tbody>'+pFilasSens+'</tbody></table>'
+        +'<div style="margin-top:8px;color:'+(pMaxK?'var(--text-3)':'#C99A4E')+';font-size:12px;max-width:730px">'
+          +(pMaxK==null?'Ni siquiera sin colchón entra: solo las dos entregas de diciembre ya pasan el congelador. El cierre completo no cabe con el frío de hoy.'
+            :pMaxK===0?'Con el congelador de hoy solo entra <b style="color:var(--text-2)">sin nada de colchón</b> — es decir, produciendo apenas las dos entregas de diciembre y arrancando enero en cero, que es justo lo que salió mal el año pasado. El plan pide '+CIERRE_COLCHON_SEM+' semanas.'
+            :('Con el congelador de hoy aguanta hasta <b style="color:var(--text-2)">'+pMaxK+' semana'+(pMaxK>1?'s':'')+'</b> de colchón. El plan pide '+CIERRE_COLCHON_SEM+'.'))
+        +'</div></div>'))
+      +'<div style="color:var(--text-3);margin-top:16px;font-size:12px;max-width:730px">'
+        +'· Congelador '+_rzN(CONGELADOR_CJ)+' cj = referencia de hoy (el stock actual). <b style="color:#C99A4E">Falta confirmar la capacidad MÁXIMA real</b> — si es mayor, el veredicto cambia.<br>'
+        +'· Paso 1b: SOLO cálculo. Nada conectado al motor.'
+      +'</div></div>';
 
     function detalle(e,lbl){ if(e.vacio) return '<div style="color:#C99A4E">'+lbl+': sin datos en '+esc(e.D1)+' → '+esc(e.D2)+'</div>';
       return '<div style="margin-bottom:3px"><b style="color:var(--text)">'+lbl+'</b> — pico: <b style="color:var(--accent)">'+esc(_fechaLarga(e.pico.ds))+'</b> ('+_rzN(e.pico.uds)+' uds)</div>'
@@ -4549,6 +4722,9 @@ async function rzDiagCierre(body){
     console.log('DIAG CIERRE · bloque2 resto:', e2.porProd, '· pico:', e2.pico);
     console.log('DIAG CIERRE · bloque3 colchón 4 sem enero:', b3.porProd, '· desde', primerEne, 'hasta', finEne);
     console.log('DIAG CIERRE · TOTAL cajas:', total, '· congelador ref:', CONGELADOR_CJ);
+    console.log('DIAG PICO · última semana', pIso, '·', pPers, 'personas ·', pA.plan.map(function(d){ return d.ds+':'+(d.pid?_nomCorto(d.pid)+'×'+d.batches:'—'); }).join(' '));
+    console.log('DIAG PICO · meta', total, 'cj − última semana', pT.prodCj, 'cj = PICO REAL', pT.picoCj, 'cj · congelador', CONGELADOR_CJ, '· techo semana', pTecho, 'cj → pico mínimo', pPicoMin);
+    console.log('DIAG PICO · por producto:', pT.porProd, '· sensibilidad colchón:', pSens);
 
     body.innerHTML='<div class="rz-wrap" style="font-size:13px;color:var(--text-2);line-height:1.6">'
       +'<h3 style="color:var(--text);font-size:15px;margin:0 0 4px">Meta de cierre al 18-dic — 3 bloques, con datos reales del cierre pasado</h3>'
@@ -4579,17 +4755,15 @@ async function rzDiagCierre(body){
         +'<tr style="border-top:.5px solid var(--border)"><td style="color:var(--text);font-weight:600;padding-top:9px">TOTAL cajas</td>'
         +'<td colspan="6"></td><td style="text-align:right;color:var(--accent);font-weight:700;font-size:14px;padding-top:9px;padding-left:18px">'+_rzN(total)+'</td></tr>'
         +'</tbody></table>'
-      +'<div style="margin-top:14px;font-size:12.5px;color:'+(total>CONGELADOR_CJ?'#C99A4E':'#7E8C5A')+'">'
-        +'Congelador hoy ≈ '+_rzN(CONGELADOR_CJ)+' cj · meta '+_rzN(total)+' cj → '
-        +(total>CONGELADOR_CJ?('<b>faltan '+_rzN(total-CONGELADOR_CJ)+' cj de capacidad</b> (o hay que bajar algún bloque).'):'<b>entra</b>.')
-      +'</div>'
+      +'<div style="margin-top:10px;font-size:12px;color:var(--text-3)">Las '+_rzN(total)+' cj de la meta NO son el número del congelador: nunca están juntas. El que importa está abajo.</div>'
       +(avisos.length?('<div style="margin-top:14px;font-size:12px;color:#C99A4E;max-width:730px">'+avisos.map(function(a){ return '⚠ '+esc(a); }).join('<br>')+'</div>'):'')
       +'<div style="color:var(--text-3);margin-top:16px;font-size:12px;max-width:730px">'
         +'· Bloques 1 y 2 = el DÍA PICO de cada ventana (±3 días de la fecha configurada, del año pasado). El detalle diario está arriba.<br>'
         +'· Canal por PARTNER (la misma clasificación de Finanzas/Rentabilidad). "Resto" = MegaSuper · Compre Bien · BM · Super Negro · HORECA · Retail (incluye Abner) · Otros.<br>'
-        +'· Cajas hacia arriba (Blanco/Semillas ÷6 · Francés/Buns ÷24 · Pizza/Galletas ÷12). Ventas netas (out_invoice − out_refund), por ID y uom_id.<br>'
-        +'· Paso 1: SOLO lectura. Nada conectado al motor todavía.'
-      +'</div></div>';
+        +'· Cajas hacia arriba (Blanco/Semillas ÷6 · Francés/Buns ÷24 · Pizza/Galletas ÷12). Ventas netas (out_invoice − out_refund), por ID y uom_id.'
+      +'</div>'
+      +picoHtml
+      +'</div>';
   }catch(e){ body.innerHTML='<div class="rz-err">No pude calcular la meta de cierre: '+esc(e&&e.message||e)+'</div>'; }
 }
 // ── Overrides guardados (Supabase plan_overrides; append-only, la fila más reciente por fecha manda) ──
