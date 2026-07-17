@@ -4170,28 +4170,40 @@ function _weekLayout(stock, ritmo, colDe, H, personas, rampa){
   // SEMILLAS → jueves fijo: se aparta de la cola; el resto queda en orden de urgencia.
   const semDias=dias.filter(d=>d.p===452), otros=dias.filter(d=>d.p!==452);
   const semillas=semDias.reduce((a,d)=>a+d.batches,0);
-  // ── VIERNES: día de capacidad limitada donde las cosas compiten por tiempo.
+  // ── VIERNES: día productivo para PAN (Blanco, Francés, Buns, Pizza) y Galletas —
+  // TODO menos Semillas (su picado cae en sábado, que no se trabaja). La única regla:
+  // producción y limpieza profunda NO caben el mismo día.
   // (1) PICADO: solo si hubo Semillas el jueves (Blanco pica el MISMO día, no acá).
   const picado = semillas>0;
-  // (2) PRODUCCIÓN POR URGENCIA: galletas O pan (NO Semillas), lo MÁS corto de stock. Sin prioridad
-  //     fija para galletas. Umbral: 2 personas APRIETA (mete el viernes para cubrir el plan → colchón);
-  //     3 personas solo ante riesgo real de quiebre (NIV_DERRAME_MIN). Un solo producto en el día.
-  //     Con la RAMPA encendida el viernes también empuja hacia la meta: gana el que más días le
-  //     debe. Es el ÚNICO día en que Galletas puede producirse (no está en NIV_HORNO), así que sin
-  //     esto la rampa nunca las alcanzaría.
-  //     `rampa.vie===false` reserva el viernes para LIMPIEZA: la rampa no lo reclama y solo
-  //     produce el quiebre real (la regla de siempre). Ausente/true = motor de hoy, que con la
-  //     rampa encendida se come TODOS los viernes. Lo usa el reporte de escenarios (?diag=escenarios).
+  // (2) PRODUCCIÓN. El viernes es un 5º día de producción, no un día exclusivo de Galletas.
+  //   · Viernes PRODUCTIVO (vieRampa): MISMA selección que lun–jue sobre el set del viernes —
+  //     quiebre (cobertura < colchón) > deuda de rampa > jalar del horizonte (cobertura < H).
+  //     El rank-0 "jalar del horizonte" es la clave: sin él, el pan se saltaba el viernes porque
+  //     ya cubría su cuota semanal lun–jue y le quedaba deuda 0, y solo las Galletas (que no van
+  //     lun–jue) tomaban el día. Con él, el pan aprovecha cada viernes productivo.
+  //   · Viernes de LIMPIEZA (no productivo): solo produce ante riesgo real de quiebre; si no, limpia.
+  //     Es el motor de SIEMPRE (2 personas aprieta con el colchón; 3 personas, NIV_DERRAME_MIN).
+  //   `rampa.vie===false` fuerza limpieza (reporte de escenarios); ausente/true = productivo si la
+  //   rampa está encendida.
   const vieRampa = rOn && rampa.vie!==false;
-  let prod=null; { let peor=null, pc=1e9, mejorRank=-1, mejorDebe=0;
-    for(const p of [451,453,503,472,519]){ const r=ritmo[p]||0; if(r<=0)continue;
-      const c=(stock[p]-r)/r, debe=vieRampa?_debe(p):0;
-      const th = personas<3 ? colDe(p) : NIV_DERRAME_MIN, u = c<th;
-      if(!u && debe<=0) continue;                       // sin rampa esto deja SOLO los urgentes (motor de siempre)
-      const rank=u?2:1;                                 // mismo orden que lun–jue: quiebre > rampa
+  const vieCand = [451,453,503,472,519];   // pan + Galletas · nunca Semillas (452)
+  let prod=null;
+  if(vieRampa){
+    let peor=null, pc=1e9, mejorRank=-1, mejorDebe=0;
+    for(const p of vieCand){ const r=ritmo[p]||0; if(r<=0)continue;
+      const c=(stock[p]-r)/r, u=c<colDe(p), debe=_debe(p);
+      if(!u && debe<=0 && c>=H) continue;               // ni urge, ni debe a la meta, ni hay que jalar
+      const rank=u?2:(debe>0?1:0);                       // mismo orden que lun–jue
       const gana=(rank>mejorRank) || (rank===mejorRank && (rank===1 ? debe>mejorDebe : c<pc));
       if(gana){ mejorRank=rank; mejorDebe=debe; pc=c; peor=p; } }
-    if(peor!==null){ const cap=_capDe(peor,personas); stock[peor]+=cap*NIV_INFO[peor].rend; prod={p:peor, batches:cap}; asign[peor]=(asign[peor]||0)+1; } }
+    if(peor!==null){ const cap=_capDe(peor,personas); stock[peor]+=cap*NIV_INFO[peor].rend; prod={p:peor, batches:cap}; asign[peor]=(asign[peor]||0)+1; }
+  } else {
+    let peor=null, pc=1e9;                               // motor de siempre: viernes solo ante quiebre
+    for(const p of vieCand){ const r=ritmo[p]||0; if(r<=0)continue; const c=(stock[p]-r)/r;
+      const th = personas<3 ? colDe(p) : NIV_DERRAME_MIN;
+      if(c<th && c<pc){ pc=c; peor=p; } }
+    if(peor!==null){ const cap=_capDe(peor,personas); stock[peor]+=cap*NIV_INFO[peor].rend; prod={p:peor, batches:cap}; asign[peor]=(asign[peor]||0)+1; }
+  }
   // (3) LIMPIEZA PROFUNDA: solo si el viernes NO quedó cargado (lo decide _celdasSemana/rzCeldas al
   //     armar la etiqueta: si no hay picado ni producción ni corridos → "Limpieza").
   NIV_PROD.forEach(p=>stock[p]-=(ritmo[p]||0));    // consumo de la semana
@@ -4826,13 +4838,15 @@ async function rzDiagEscenarios(body){
     });
     const A=res[0], B=res[1], HOY=res[2];
     const semTxt=function(s){ return s==null?'—':_rzN(s,1); };
-    // ¿La palanca del viernes hace algo? A y B salen iguales cuando las Galletas ya se llevaban
-    // esos viernes por urgencia (su tanda rinde ~2 semanas → caen bajo el umbral cada 2 viernes,
-    // justo la cadencia del "uno sí y uno no").
-    const igualAB=Math.abs((B.C.sem||0)-(A.C.sem||0))<0.05 && B.vieProd===A.vieProd;
-    const veredicto = igualAB
-      ? '<b style="color:#E8D3AC">El viernes alterno no cambia nada: A y B dan el mismo plan.</b> Esos viernes ya se los llevaban las Galletas por urgencia — una tanda les rinde unas 2 semanas, así que caen bajo el umbral de quiebre cada 2 viernes, exactamente la cadencia de "uno sí y uno no". La alternancia cae encima de los días que ya se usaban.'
-      : '<b style="color:#E8D3AC">El viernes alterno suma '+_rzN((B.C.sem||0)-(A.C.sem||0),1)+' semanas de colchón</b> sobre el escenario A.';
+    // Colchón de PAN (Blanco + Francés + Buns) por escenario, y viernes que fueron a pan vs Galletas.
+    const PAN_IDS=[451,453,503];
+    const panSem=function(x){ return PAN_IDS.reduce(function(a,p){ return a+(x.C.porProd[p].sem||0); },0); };
+    const panDias=function(x){ return x.vieProd - x.galDias; };   // viernes que produjeron PAN
+    const panA=panSem(A), panB=panSem(B), panHOY=panSem(HOY);
+    const panSube = panHOY > panA + 0.1;
+    const veredicto = panSube
+      ? '<b style="color:#E8D3AC">El viernes productivo suma PAN.</b> El viernes es un día de producción más para el pan (Blanco, Francés, Buns, Pizza) y para Galletas — todo menos Semillas. El colchón de pan (Blanco + Francés + Buns) pasa de <b>'+_rzN(panA,1)+'</b> semanas con viernes de limpieza (A) a <b>'+_rzN(panHOY,1)+'</b> con todos productivos (HOY)'+(Math.abs(panB-panA)>0.1?', y <b>'+_rzN(panB,1)+'</b> con alternos (B)':'')+'. Cada viernes productivo es un día extra de pan.'
+      : '<b style="color:#E8D3AC">Con este ritmo, el viernes productivo casi no mueve el pan.</b> Las Galletas se llevan casi todos los viernes (solo pueden hacerse ese día y vienen muy cortas de stock), así que al pan le quedan pocos: el colchón de pan pasa de '+_rzN(panA,1)+' a '+_rzN(panHOY,1)+' semanas. Con más viernes libres de Galletas, el pan subiría más.';
     const col=function(s){ return s==null?'var(--text-3)':(s>=CIERRE_COLCHON_SEM?'#7E8C5A':(s>=CIERRE_COLCHON_SEM*0.6?'#C99A4E':'#C0564E')); };
 
     // Tarjeta grande por escenario
@@ -4865,16 +4879,15 @@ async function rzDiagEscenarios(body){
       return '<td style="text-align:right;color:'+col(x.C.sem)+';font-weight:700;padding:10px 0 0'+(pad?' 22px':'')+'">'+semTxt(x.C.sem)+'</td>'
         +'<td style="text-align:right;color:var(--text-3);font-size:11.5px;padding-top:10px">'+_rzN(x.C.cj)+' cj</td>'; };
 
-    // Galletas: solo pueden producirse el viernes → el escenario A las deja sin ningún día.
-    const soloGal=(A.vieProd===A.galDias && B.vieProd===B.galDias && HOY.vieProd===HOY.galDias);
+    // El viernes se REPARTE entre pan y Galletas por urgencia (Galletas solo pueden ese día).
+    const split=function(x){ return '<b>'+panDias(x)+'</b> a pan · <b>'+x.galDias+'</b> a Galletas'; };
     const avisoGal='<div style="margin-top:20px;background:rgba(201,154,78,.09);border:.5px solid rgba(201,154,78,.35);border-radius:9px;padding:12px 15px;font-size:12.5px;color:#D9BE8C;line-height:1.6;max-width:900px">'
       +veredicto+'<br><br>'
-      +'<b style="color:#E8D3AC">El viernes no es una palanca para el pan: es una palanca para las Galletas.</b> '
-      +'Galletas no están en la lista del horno — el viernes es el único día en que pueden producirse, y viven al borde del quiebre, así que se llevan '
-      +(soloGal?'<b>todos</b> los viernes productivos':'casi todos los viernes productivos')
-      +' en los tres escenarios (A: '+A.galDias+' de '+A.vieProd+' · B: '+B.galDias+' de '+B.vieProd+' · HOY: '+HOY.galDias+' de '+HOY.vieProd+'). '
-      +'El pan (Blanco, Semillas, Francés, Buns) se hace solo lun–jue y esos 4 días ya están llenos: <b>ningún viernes le suma nada al pan</b>. '
-      +'Si al pan le falta, el viernes no lo arregla — hay que mirar gente, arrancar antes o bajar la meta.'
+      +'<b style="color:#E8D3AC">El viernes se reparte entre pan y Galletas.</b> '
+      +'Es un día productivo para todo menos Semillas; gana el más urgente por stock. Galletas solo pueden hacerse el viernes '
+      +'(no van al horno lun–jue), así que compiten con el pan por ese día — cuando están cubiertas, el viernes va al pan. Reparto de los viernes productivos: '
+      +'A ('+split(A)+') · B ('+split(B)+') · HOY ('+split(HOY)+'). '
+      +'Semillas nunca va el viernes (su picado cae en sábado, que no se trabaja).'
     +'</div>';
 
     res.forEach(function(x){ console.log('DIAG ESCENARIOS · '+x.k+' ('+x.tit+'): colchón', x.C.sem, 'sem ·', x.C.cj, 'cj · viernes prod', x.vieProd, '· de Galletas', x.galDias, '· arranca', x.arranque?_ymd(x.arranque):'nunca', x.C.porProd); });
