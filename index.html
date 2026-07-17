@@ -4179,9 +4179,13 @@ function _weekLayout(stock, ritmo, colDe, H, personas, rampa){
   //     Con la RAMPA encendida el viernes también empuja hacia la meta: gana el que más días le
   //     debe. Es el ÚNICO día en que Galletas puede producirse (no está en NIV_HORNO), así que sin
   //     esto la rampa nunca las alcanzaría.
+  //     `rampa.vie===false` reserva el viernes para LIMPIEZA: la rampa no lo reclama y solo
+  //     produce el quiebre real (la regla de siempre). Ausente/true = motor de hoy, que con la
+  //     rampa encendida se come TODOS los viernes. Lo usa el reporte de escenarios (?diag=escenarios).
+  const vieRampa = rOn && rampa.vie!==false;
   let prod=null; { let peor=null, pc=1e9, mejorRank=-1, mejorDebe=0;
     for(const p of [451,453,503,472,519]){ const r=ritmo[p]||0; if(r<=0)continue;
-      const c=(stock[p]-r)/r, debe=_debe(p);
+      const c=(stock[p]-r)/r, debe=vieRampa?_debe(p):0;
       const th = personas<3 ? colDe(p) : NIV_DERRAME_MIN, u = c<th;
       if(!u && debe<=0) continue;                       // sin rampa esto deja SOLO los urgentes (motor de siempre)
       const rank=u?2:1;                                 // mismo orden que lun–jue: quiebre > rampa
@@ -4447,6 +4451,7 @@ async function cargarResumen(){
   if(/[?&]diag=prod/.test(location.search)){ return rzDiagProduccion(body); }   // diagnóstico de lectura de Odoo
   if(/[?&]diag=plan/.test(location.search)){ return rzDiagPlan(body); }          // diagnóstico del razonamiento por semana
   if(/[?&]diag=cierre/.test(location.search)){ return rzDiagCierre(body); }      // rampa paso 1: meta de cierre 4 vs 5 semanas
+  if(/[?&]diag=escenarios/.test(location.search)){ return rzDiagEscenarios(body); }  // palancas: mes de arranque + viernes productivos
   body.innerHTML='<div class="rz-load">Leyendo Odoo y nivelando la semana…</div>';
   try{ await _rzSetup(); rzRender(); }
   catch(e){ body.innerHTML='<div class="rz-err">No pude cargar el resumen: '+esc(e&&e.message||e)+'</div>'; }
@@ -4732,6 +4737,59 @@ async function cierreMeta(cfg, ritmo){
   return data;
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// ESCENARIOS DE COLCHÓN (index.html?diag=escenarios) — SOLO CALCULA Y MUESTRA.
+// No conecta nada al motor: corre el MISMO _weekLayout (para que no pueda divergir) con
+// palancas de caller — mes de arranque de la rampa y política del viernes.
+//
+// COLCHÓN = lo que queda el 11-ene, cuando la fábrica reabre:
+//     colchón[p] = stock al 18-dic − entrega Auto+WM − entrega del resto
+// (entre el 18-dic y el 11-ene no se produce NI se vende → el stock no se mueve).
+// En semanas: ÷ (colchón de la meta ÷ 4) = el ritmo real de venta de enero, no el de julio.
+// Si la rampa cumple la meta, da exactamente 4 semanas.
+// ════════════════════════════════════════════════════════════════════════
+// opt = {mesDesde:0-11 · vie:'limpieza'|'alterno'|'todos' · personas:3|null}
+function escSim(ritmo, fin, cfg, meta, opt){
+  const stock={}; NIV_PROD.forEach(function(p){ stock[p]=fin[p]||0; });
+  const mon0=_mondayProd(new Date()), stop=_mondayProd(new Date(CIERRE+'T00:00:00')).getTime();
+  const H=cfg.horizonte||NIV_CFG_DEF.horizonte;
+  const sem=[]; let on=false, vieN=0;
+  for(let w=0; w<60; w++){
+    const mon=new Date(mon0); mon.setDate(mon.getDate()+w*7);
+    if(mon.getTime()>stop) break;                       // cierre duro: nada después del 18-dic
+    const wk=_isoWk(mon);
+    const colDe=function(pid){ const t=(cfg.ventanas||[]).some(function(v){ return +v.producto_id===pid && wk>=v.desde && wk<=v.hasta; });
+      return t?cfg.colchonTemporada:(cfg.colchon[pid]||3); };
+    let R=null;
+    if(meta && mon.getMonth()>=opt.mesDesde){           // la rampa NO puede arrancar antes de ese mes
+      const k=Math.round((stop-mon.getTime())/(7*86400000))+1;
+      if(k>0){
+        on = on || _rampaEstado(stock, ritmo, meta, k).on;   // latch, igual que el motor
+        const vie = opt.vie==='limpieza' ? false : (opt.vie==='alterno' ? (vieN%2===0) : true);
+        R={meta:meta, k:k, on:on, vie:vie};
+        if(on && opt.vie==='alterno') vieN++;           // alterna solo cuando la rampa corre
+      }
+    }
+    const pers=opt.personas || _personasDe(wk);
+    const L=_weekLayout(stock, ritmo, colDe, H, pers, R);   // muta stock
+    sem.push({mon:mon, L:L, on:!!(R&&R.on), vie:!!(R&&R.vie), personas:pers});
+  }
+  return {stock:stock, sem:sem};
+}
+// Colchón por producto y total, en semanas de venta de enero + cajas.
+function escColchon(stockCierre, M){
+  const porProd={}; let cjTot=0, cjSem=0;
+  M.forEach(function(m){
+    const sale=m.b1+m.b2;                                // las dos entregas de diciembre
+    const queda=Math.max(0, (stockCierre[m.p]||0) - sale);
+    const porSem=m.b3/CIERRE_COLCHON_SEM;                // ritmo REAL de enero (el colchón de la meta ÷ 4)
+    porProd[m.p]={uds:queda, cj:Math.floor(queda/m.I.cajaU), sem:porSem>0?queda/porSem:null,
+                  faltaCj:Math.max(0, Math.ceil((m.b3-queda)/m.I.cajaU))};
+    cjTot+=queda/m.I.cajaU; cjSem+=porSem/m.I.cajaU;
+  });
+  return {porProd:porProd, cj:Math.floor(cjTot), sem:cjSem>0?cjTot/cjSem:null};
+}
+
 // Carga la meta y se la entrega al MOTOR (rampa) y al panel del Plan. Si Odoo falla, deja
 // la rampa apagada: el motor vuelve al comportamiento de siempre en vez de inventar una meta.
 let _planCierre=null;    // resultado completo de cierreMeta() — lo usa el panel META vs HOY
@@ -4740,6 +4798,116 @@ async function cierreCargarMeta(cfg, ritmo){
   try{ const R=await cierreMeta(cfg, ritmo); _planCierre=R; _rzCierreMeta=R.porProd; return R; }
   catch(e){ console.warn('Meta de cierre no disponible → motor sin rampa:', e && e.message || e);
     _planCierre=null; _rzCierreMeta=null; return null; }
+}
+
+const ESC_MES_RAMPA=7;    // agosto (julio sigue en certificaciones) — arranque realista de la rampa
+async function rzDiagEscenarios(body){
+  body.innerHTML='<div class="rz-load">Simulando los escenarios contra el ritmo y el stock reales de Odoo…</div>';
+  try{
+    const cfg=await nivConfig();
+    const R=await cierreMeta(cfg);
+    const ritmo=R.ritmo, stk=await nivStock();
+    const ESC=[
+      {k:'A', tit:'Viernes de limpieza', sub:'La rampa solo usa lun–jue. El viernes queda para limpieza profunda; solo produce si hay riesgo real de quiebre (la regla de siempre).', vie:'limpieza'},
+      {k:'B', tit:'Viernes alternos', sub:'Un viernes sí y uno no: el productivo empuja la rampa, el siguiente mantiene la limpieza profunda.', vie:'alterno'},
+      {k:'HOY', tit:'Todos los viernes', sub:'Lo que el Plan asume HOY: con la rampa encendida el motor se lleva todos los viernes — o sea, sin limpieza profunda de agosto a diciembre.', vie:'todos'},
+    ];
+    const res=ESC.map(function(e){
+      const S=escSim(ritmo, stk.fin, cfg, R.porProd, {mesDesde:ESC_MES_RAMPA, vie:e.vie, personas:3});
+      const C=escColchon(S.stock, R.M);
+      // viernes productivos y días de Galletas (519 solo puede ir el viernes)
+      let vieProd=0, galDias=0, arranque=null;
+      S.sem.forEach(function(x){
+        if(x.on && !arranque) arranque=x.mon;
+        const pr=x.L.viernes&&x.L.viernes.prod;
+        if(pr){ vieProd++; if(pr.p===519) galDias++; }
+      });
+      return Object.assign({}, e, {S:S, C:C, vieProd:vieProd, galDias:galDias, arranque:arranque});
+    });
+    const A=res[0], B=res[1], HOY=res[2];
+    const semTxt=function(s){ return s==null?'—':_rzN(s,1); };
+    // ¿La palanca del viernes hace algo? A y B salen iguales cuando las Galletas ya se llevaban
+    // esos viernes por urgencia (su tanda rinde ~2 semanas → caen bajo el umbral cada 2 viernes,
+    // justo la cadencia del "uno sí y uno no").
+    const igualAB=Math.abs((B.C.sem||0)-(A.C.sem||0))<0.05 && B.vieProd===A.vieProd;
+    const veredicto = igualAB
+      ? '<b style="color:#E8D3AC">El viernes alterno no cambia nada: A y B dan el mismo plan.</b> Esos viernes ya se los llevaban las Galletas por urgencia — una tanda les rinde unas 2 semanas, así que caen bajo el umbral de quiebre cada 2 viernes, exactamente la cadencia de "uno sí y uno no". La alternancia cae encima de los días que ya se usaban.'
+      : '<b style="color:#E8D3AC">El viernes alterno suma '+_rzN((B.C.sem||0)-(A.C.sem||0),1)+' semanas de colchón</b> sobre el escenario A.';
+    const col=function(s){ return s==null?'var(--text-3)':(s>=CIERRE_COLCHON_SEM?'#7E8C5A':(s>=CIERRE_COLCHON_SEM*0.6?'#C99A4E':'#C0564E')); };
+
+    // Tarjeta grande por escenario
+    const tarjeta=function(x){
+      const ok=x.C.sem!=null && x.C.sem>=CIERRE_COLCHON_SEM;
+      return '<div style="flex:1;min-width:290px;background:#141417;border:.5px solid '+(ok?'#3A4A2E':'#2C2C33')+';border-radius:11px;padding:15px 18px">'
+        +'<div style="font-size:11px;letter-spacing:.05em;color:var(--text-3);text-transform:uppercase">Escenario '+x.k+'</div>'
+        +'<div style="font-size:14px;font-weight:600;color:var(--text);margin-top:3px">'+esc(x.tit)+'</div>'
+        +'<div style="font-size:11.5px;color:var(--text-3);margin-top:5px;line-height:1.5;min-height:48px">'+esc(x.sub)+'</div>'
+        +'<div style="margin-top:12px;padding-top:12px;border-top:.5px solid #26262C;display:flex;align-items:baseline;gap:8px">'
+          +'<span style="font-size:30px;font-weight:700;color:'+col(x.C.sem)+';font-variant-numeric:tabular-nums;line-height:1">'+semTxt(x.C.sem)+'</span>'
+          +'<span style="font-size:12px;color:var(--text-3)">semanas de colchón · '+_rzN(x.C.cj)+' cj</span>'
+        +'</div>'
+        +'<div style="font-size:11.5px;color:'+(ok?'#7E8C5A':'#C99A4E')+';margin-top:6px">'
+          +(ok?'Llega a las '+CIERRE_COLCHON_SEM+' semanas.':'Corto: faltan '+semTxt(CIERRE_COLCHON_SEM-(x.C.sem||0))+' semanas para las '+CIERRE_COLCHON_SEM+'.')+'</div>'
+        +'<div style="font-size:11.5px;color:var(--text-3);margin-top:9px">Rampa arranca '+(x.arranque?esc(_fechaLarga(_ymd(x.arranque))):'nunca')
+          +' · '+x.vieProd+' viernes productivos · '+x.galDias+' de Galletas</div>'
+      +'</div>';
+    };
+
+    const celda=function(x,pid,pad){ const v=x.C.porProd[pid];
+      return '<td style="text-align:right;color:'+col(v.sem)+';font-weight:600'+(pad?';padding-left:22px':'')+'">'+semTxt(v.sem)+'</td>'
+        +'<td style="text-align:right;color:var(--text-3);font-size:11.5px">'+_rzN(v.cj)+' cj</td>'; };
+    const filas=R.M.map(function(m){
+      return '<tr>'
+        +'<td style="padding:11px 16px 11px 0;color:var(--text)">'+esc(_nomCorto(m.p))+(R.estim[m.p]?'<span style="color:#C99A4E;font-size:10px;margin-left:6px">estimado</span>':'')+'</td>'
+        +celda(A,m.p,false)+celda(B,m.p,true)+celda(HOY,m.p,true)
+      +'</tr>'; }).join('');
+    const totCelda=function(x,pad){
+      return '<td style="text-align:right;color:'+col(x.C.sem)+';font-weight:700;padding:10px 0 0'+(pad?' 22px':'')+'">'+semTxt(x.C.sem)+'</td>'
+        +'<td style="text-align:right;color:var(--text-3);font-size:11.5px;padding-top:10px">'+_rzN(x.C.cj)+' cj</td>'; };
+
+    // Galletas: solo pueden producirse el viernes → el escenario A las deja sin ningún día.
+    const soloGal=(A.vieProd===A.galDias && B.vieProd===B.galDias && HOY.vieProd===HOY.galDias);
+    const avisoGal='<div style="margin-top:20px;background:rgba(201,154,78,.09);border:.5px solid rgba(201,154,78,.35);border-radius:9px;padding:12px 15px;font-size:12.5px;color:#D9BE8C;line-height:1.6;max-width:900px">'
+      +veredicto+'<br><br>'
+      +'<b style="color:#E8D3AC">El viernes no es una palanca para el pan: es una palanca para las Galletas.</b> '
+      +'Galletas no están en la lista del horno — el viernes es el único día en que pueden producirse, y viven al borde del quiebre, así que se llevan '
+      +(soloGal?'<b>todos</b> los viernes productivos':'casi todos los viernes productivos')
+      +' en los tres escenarios (A: '+A.galDias+' de '+A.vieProd+' · B: '+B.galDias+' de '+B.vieProd+' · HOY: '+HOY.galDias+' de '+HOY.vieProd+'). '
+      +'El pan (Blanco, Semillas, Francés, Buns) se hace solo lun–jue y esos 4 días ya están llenos: <b>ningún viernes le suma nada al pan</b>. '
+      +'Si al pan le falta, el viernes no lo arregla — hay que mirar gente, arrancar antes o bajar la meta.'
+    +'</div>';
+
+    res.forEach(function(x){ console.log('DIAG ESCENARIOS · '+x.k+' ('+x.tit+'): colchón', x.C.sem, 'sem ·', x.C.cj, 'cj · viernes prod', x.vieProd, '· de Galletas', x.galDias, '· arranca', x.arranque?_ymd(x.arranque):'nunca', x.C.porProd); });
+
+    body.innerHTML='<div class="rz-wrap" style="font-size:13px;color:var(--text-2);line-height:1.6">'
+      +'<h3 style="color:var(--text);font-size:15px;margin:0 0 4px">Escenarios de colchón — con cuánto abre enero</h3>'
+      +'<div style="color:var(--text-3);margin-bottom:16px;max-width:900px">Los tres con <b style="color:var(--text-2)">3 personas</b> y la rampa arrancando en <b style="color:var(--text-2)">agosto</b> (julio sigue en certificaciones). Cambia solo la política del viernes. El colchón es lo que queda el <b style="color:var(--text-2)">11-ene</b>, después de las dos entregas de diciembre — entre el 18-dic y el 11-ene no se produce ni se vende, así que el stock no se mueve. Medido en <b style="color:var(--text-2)">semanas de venta de enero</b> (el ritmo real del arranque, no el de julio). La meta pide '+CIERRE_COLCHON_SEM+'.</div>'
+      +'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px">'+tarjeta(A)+tarjeta(B)+tarjeta(HOY)+'</div>'
+      +'<div style="color:var(--text);font-weight:600;margin-bottom:6px">Colchón por producto</div>'
+      +'<table style="border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;max-width:900px;width:100%">'
+        +'<thead><tr style="color:var(--text-3);text-align:left">'
+          +'<th rowspan="2" style="padding:0 16px 8px 0;vertical-align:bottom;font-size:11px;letter-spacing:.05em;text-transform:uppercase">Producto</th>'
+          +'<th colspan="2" style="text-align:center;padding:0 0 4px;border-bottom:.5px solid var(--border);font-size:11px;letter-spacing:.05em;text-transform:uppercase">A · limpieza</th>'
+          +'<th colspan="2" style="text-align:center;padding:0 0 4px 22px;border-bottom:.5px solid var(--border);font-size:11px;letter-spacing:.05em;text-transform:uppercase">B · alternos</th>'
+          +'<th colspan="2" style="text-align:center;padding:0 0 4px 22px;border-bottom:.5px solid var(--border);font-size:11px;letter-spacing:.05em;text-transform:uppercase">Hoy · todos</th></tr>'
+        +'<tr style="color:var(--text-3);font-weight:400;font-size:11px">'
+          +'<th style="text-align:right;padding:5px 0 8px">semanas</th><th style="text-align:right;padding:5px 0 8px">cajas</th>'
+          +'<th style="text-align:right;padding:5px 0 8px 22px">semanas</th><th style="text-align:right;padding:5px 0 8px">cajas</th>'
+          +'<th style="text-align:right;padding:5px 0 8px 22px">semanas</th><th style="text-align:right;padding:5px 0 8px">cajas</th></tr></thead>'
+        +'<tbody>'+filas
+        +'<tr style="border-top:.5px solid var(--border)">'
+          +'<td style="padding-top:10px;color:var(--text);font-weight:600">TOTAL</td>'
+          +totCelda(A,false)+totCelda(B,true)+totCelda(HOY,true)+'</tr>'
+        +'</tbody></table>'
+      +avisoGal
+      +(R.avisos.length?('<div style="margin-top:16px;font-size:12px;color:#C99A4E;max-width:900px">'+R.avisos.map(function(a){ return '⚠ '+esc(a); }).join('<br>')+'</div>'):'')
+      +'<div style="color:var(--text-3);margin-top:18px;font-size:12px;max-width:900px">'
+        +'· Mismo motor del Plan (mismas reglas duras: un producto/día · Semillas solo jueves · Galletas solo viernes · feriados · cierre 18-dic). Lo único que cambia es la política del viernes.<br>'
+        +'· Semanas = colchón ÷ (colchón de la meta ÷ '+CIERRE_COLCHON_SEM+'), o sea contra el ritmo real de enero. Si la rampa cumpliera la meta darían '+CIERRE_COLCHON_SEM+',0.<br>'
+        +'· Los tres ignoran las marcas de personas y fuerzan 3, para aislar la palanca del viernes.<br>'
+        +'· Solo cálculo: nada de esto está conectado al motor.'
+      +'</div></div>';
+  }catch(e){ body.innerHTML='<div class="rz-err">No pude calcular los escenarios: '+esc(e&&e.message||e)+'</div>'; }
 }
 
 async function rzDiagCierre(body){
