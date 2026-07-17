@@ -1472,6 +1472,17 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vPlan .pl-d-pend{border-color:rgba(233,162,59,.4)}
 #vPlan .pl-d-clean .pl-dp{color:var(--text-2)}
 #vPlan .pl-d-fer{border-color:rgba(233,162,59,.4);background:rgba(233,162,59,.06)} #vPlan .pl-d-fer .pl-dp{color:#E9A23B}
+/* Edición completa del Plan (mismo gesto que el Resumen): día futuro clickeable → mini-form. */
+#vPlan .pl-d-editable{cursor:pointer;transition:border-color .12s}
+#vPlan .pl-d-editable:hover{border-color:var(--border-m)}
+#vPlan .pl-d-editing{display:flex;flex-direction:column;border-color:#C77DA0;box-shadow:0 0 0 1px rgba(199,125,160,.35)}
+#vPlan .pl-fsel,#vPlan .pl-fbt{width:100%;background:#0E0E11;border:.5px solid var(--border);color:var(--text);border-radius:6px;padding:4px 6px;font-size:12px;font-family:inherit;margin-top:5px}
+#vPlan .pl-frow{display:flex;gap:5px;margin-top:6px}
+#vPlan .pl-fok,#vPlan .pl-fx{flex:1;border:none;border-radius:6px;padding:4px 0;font-size:13px;cursor:pointer;font-weight:600}
+#vPlan .pl-fok{background:#7E8C5A;color:#0E0E11} #vPlan .pl-fx{background:var(--surface-2);color:var(--text-2);border:.5px solid var(--border)}
+#vPlan .pl-edithint{font-size:11px;color:var(--text-3);margin:0 0 10px}
+#vPlan .pl-impacto{margin:2px 0 14px;background:rgba(201,154,78,.09);border:.5px solid rgba(201,154,78,.32);border-radius:8px;padding:9px 13px;font-size:12px;color:#D9BE8C;line-height:1.55;max-width:940px}
+#vPlan .pl-impacto b{color:#E8D3AC}
 #vPlan .pl-cierre{font-size:11px;color:#D4537E;margin-top:6px;font-weight:600}
 </style>
 <div id="vPlan" class="hidden">
@@ -4464,6 +4475,7 @@ async function cargarResumen(){
   if(/[?&]diag=plan/.test(location.search)){ return rzDiagPlan(body); }          // diagnóstico del razonamiento por semana
   if(/[?&]diag=cierre/.test(location.search)){ return rzDiagCierre(body); }      // rampa paso 1: meta de cierre 4 vs 5 semanas
   if(/[?&]diag=escenarios/.test(location.search)){ return rzDiagEscenarios(body); }  // palancas: mes de arranque + viernes productivos
+  if(/[?&]diag=lotes/.test(location.search)){ return rzDiagLotes(body); }         // Entregas Etapa 1: cobertura del extractor de lote v2
   body.innerHTML='<div class="rz-load">Leyendo Odoo y nivelando la semana…</div>';
   try{ await _rzSetup(); rzRender(); }
   catch(e){ body.innerHTML='<div class="rz-err">No pude cargar el resumen: '+esc(e&&e.message||e)+'</div>'; }
@@ -4813,114 +4825,342 @@ async function cierreCargarMeta(cfg, ritmo){
 }
 
 const ESC_MES_RAMPA=7;    // agosto (julio sigue en certificaciones) — arranque realista de la rampa
+// Cálculo PURO de los 3 escenarios de colchón (A limpieza · B alternos · HOY todos). Sin I/O:
+// recibe cfg, la meta (cierreMeta → R) y el stock fin de HOY. Lo usan el reporte ?diag=escenarios
+// y la sección del Plan → una sola verdad, mismos números.
+function escenariosCalc(cfg, R, fin, ritmo){
+  ritmo=ritmo||R.ritmo;
+  const ESC=[
+    {k:'A', tit:'Viernes de limpieza', sub:'La rampa solo usa lun–jue. El viernes queda para limpieza profunda; solo produce si hay riesgo real de quiebre (la regla de siempre).', vie:'limpieza'},
+    {k:'B', tit:'Viernes alternos', sub:'Un viernes sí y uno no: el productivo empuja la rampa, el siguiente mantiene la limpieza profunda.', vie:'alterno'},
+    {k:'HOY', tit:'Todos los viernes', sub:'Lo que el Plan asume HOY: con la rampa encendida el motor se lleva todos los viernes — o sea, sin limpieza profunda de agosto a diciembre.', vie:'todos'},
+  ];
+  const res=ESC.map(function(e){
+    const S=escSim(ritmo, fin, cfg, R.porProd, {mesDesde:ESC_MES_RAMPA, vie:e.vie, personas:3});
+    const C=escColchon(S.stock, R.M);
+    // viernes productivos y días de Galletas (519 solo puede ir el viernes)
+    let vieProd=0, galDias=0, arranque=null;
+    S.sem.forEach(function(x){
+      if(x.on && !arranque) arranque=x.mon;
+      const pr=x.L.viernes&&x.L.viernes.prod;
+      if(pr){ vieProd++; if(pr.p===519) galDias++; }
+    });
+    return Object.assign({}, e, {S:S, C:C, vieProd:vieProd, galDias:galDias, arranque:arranque});
+  });
+  return {res:res, A:res[0], B:res[1], HOY:res[2]};
+}
+
+// CUERPO HTML compartido de los escenarios (intro + aclaración del colchón + tarjetas + tabla
+// META vs colchón por producto + veredicto del viernes + notas). Autocontenido con estilos
+// inline (~940px, grises del módulo). El caller pone su propio encabezado.
+function escenariosCuerpoHTML(R, calc){
+  const A=calc.A, B=calc.B, HOY=calc.HOY, res=calc.res;
+  const semTxt=function(s){ return s==null?'—':_rzN(s,1); };
+  // Colchón de PAN (Blanco + Francés + Buns) por escenario, y viernes que fueron a pan vs Galletas.
+  const PAN_IDS=[451,453,503];
+  const panSem=function(x){ return PAN_IDS.reduce(function(a,p){ return a+(x.C.porProd[p].sem||0); },0); };
+  const panDias=function(x){ return x.vieProd - x.galDias; };   // viernes que produjeron PAN
+  const panA=panSem(A), panB=panSem(B), panHOY=panSem(HOY);
+  const panSube = panHOY > panA + 0.1;
+  const veredicto = panSube
+    ? '<b style="color:#E8D3AC">El viernes productivo suma PAN.</b> El viernes es un día de producción más para el pan (Blanco, Francés, Buns, Pizza) y para Galletas — todo menos Semillas. El colchón de pan (Blanco + Francés + Buns) pasa de <b>'+_rzN(panA,1)+'</b> semanas con viernes de limpieza (A) a <b>'+_rzN(panHOY,1)+'</b> con todos productivos (HOY)'+(Math.abs(panB-panA)>0.1?', y <b>'+_rzN(panB,1)+'</b> con alternos (B)':'')+'. Cada viernes productivo es un día extra de pan.'
+    : '<b style="color:#E8D3AC">Con este ritmo, el viernes productivo casi no mueve el pan.</b> Las Galletas se llevan casi todos los viernes (solo pueden hacerse ese día y vienen muy cortas de stock), así que al pan le quedan pocos: el colchón de pan pasa de '+_rzN(panA,1)+' a '+_rzN(panHOY,1)+' semanas. Con más viernes libres de Galletas, el pan subiría más.';
+  const col=function(s){ return s==null?'var(--text-3)':(s>=CIERRE_COLCHON_SEM?'#7E8C5A':(s>=CIERRE_COLCHON_SEM*0.6?'#C99A4E':'#C0564E')); };
+
+  // Tarjeta grande por escenario
+  const tarjeta=function(x){
+    const ok=x.C.sem!=null && x.C.sem>=CIERRE_COLCHON_SEM;
+    return '<div style="flex:1;min-width:270px;background:#141417;border:.5px solid '+(ok?'#3A4A2E':'#2C2C33')+';border-radius:11px;padding:15px 18px">'
+      +'<div style="font-size:11px;letter-spacing:.05em;color:var(--text-3);text-transform:uppercase">Escenario '+x.k+'</div>'
+      +'<div style="font-size:14px;font-weight:600;color:var(--text);margin-top:3px">'+esc(x.tit)+'</div>'
+      +'<div style="font-size:11.5px;color:var(--text-3);margin-top:5px;line-height:1.5;min-height:48px">'+esc(x.sub)+'</div>'
+      +'<div style="margin-top:12px;padding-top:12px;border-top:.5px solid #26262C;display:flex;align-items:baseline;gap:8px">'
+        +'<span style="font-size:30px;font-weight:700;color:'+col(x.C.sem)+';font-variant-numeric:tabular-nums;line-height:1">'+semTxt(x.C.sem)+'</span>'
+        +'<span style="font-size:12px;color:var(--text-3)">semanas de colchón · '+_rzN(x.C.cj)+' cj</span>'
+      +'</div>'
+      +'<div style="font-size:11.5px;color:'+(ok?'#7E8C5A':'#C99A4E')+';margin-top:6px">'
+        +(ok?'Llega a las '+CIERRE_COLCHON_SEM+' semanas.':'Corto: faltan '+semTxt(CIERRE_COLCHON_SEM-(x.C.sem||0))+' semanas para las '+CIERRE_COLCHON_SEM+'.')+'</div>'
+      +'<div style="font-size:11.5px;color:var(--text-3);margin-top:9px">Rampa arranca '+(x.arranque?esc(_fechaLarga(_ymd(x.arranque))):'nunca')
+        +' · '+x.vieProd+' viernes productivos · '+x.galDias+' de Galletas</div>'
+    +'</div>';
+  };
+
+  const celda=function(x,pid,pad){ const v=x.C.porProd[pid];
+    return '<td style="text-align:right;color:'+col(v.sem)+';font-weight:600'+(pad?';padding-left:22px':'')+'">'+semTxt(v.sem)+'</td>'
+      +'<td style="text-align:right;color:var(--text-3);font-size:11.5px">'+_rzN(v.cj)+' cj</td>'; };
+  // META por producto: a dónde hay que llegar. Siempre CIERRE_COLCHON_SEM semanas; en cajas = colchón meta (b3) ÷ caja.
+  const metaCj=function(m){ return Math.ceil(m.b3/m.I.cajaU); };
+  const metaCelda=function(m,pad){
+    return '<td style="text-align:right;color:var(--text-2);font-weight:600'+(pad?';padding-left:22px':'')+'">'+_rzN(CIERRE_COLCHON_SEM,1)+'</td>'
+      +'<td style="text-align:right;color:var(--text-3);font-size:11.5px">'+_rzN(metaCj(m))+' cj</td>'; };
+  const filas=R.M.map(function(m){
+    return '<tr>'
+      +'<td style="padding:11px 16px 11px 0;color:var(--text)">'+esc(_nomCorto(m.p))+(R.estim[m.p]?'<span style="color:#C99A4E;font-size:10px;margin-left:6px">estimado</span>':'')+'</td>'
+      +metaCelda(m,false)+celda(A,m.p,true)+celda(B,m.p,true)+celda(HOY,m.p,true)
+    +'</tr>'; }).join('');
+  const metaTotCj=R.M.reduce(function(a,m){ return a+metaCj(m); },0);
+  const metaTotCelda='<td style="text-align:right;color:var(--text-2);font-weight:700;padding:10px 0 0">'+_rzN(CIERRE_COLCHON_SEM,1)+'</td>'
+      +'<td style="text-align:right;color:var(--text-3);font-size:11.5px;padding-top:10px">'+_rzN(metaTotCj)+' cj</td>';
+  const totCelda=function(x,pad){
+    return '<td style="text-align:right;color:'+col(x.C.sem)+';font-weight:700;padding:10px 0 0'+(pad?' 22px':'')+'">'+semTxt(x.C.sem)+'</td>'
+      +'<td style="text-align:right;color:var(--text-3);font-size:11.5px;padding-top:10px">'+_rzN(x.C.cj)+' cj</td>'; };
+
+  // El viernes se REPARTE entre pan y Galletas por urgencia (Galletas solo pueden ese día).
+  const split=function(x){ return '<b>'+panDias(x)+'</b> a pan · <b>'+x.galDias+'</b> a Galletas'; };
+  const avisoGal='<div style="margin-top:20px;background:rgba(201,154,78,.09);border:.5px solid rgba(201,154,78,.35);border-radius:9px;padding:12px 15px;font-size:12.5px;color:#D9BE8C;line-height:1.6;max-width:940px">'
+    +veredicto+'<br><br>'
+    +'<b style="color:#E8D3AC">El viernes se reparte entre pan y Galletas.</b> '
+    +'Es un día productivo para todo menos Semillas; gana el más urgente por stock. Galletas solo pueden hacerse el viernes '
+    +'(no van al horno lun–jue), así que compiten con el pan por ese día — cuando están cubiertas, el viernes va al pan. Reparto de los viernes productivos: '
+    +'A ('+split(A)+') · B ('+split(B)+') · HOY ('+split(HOY)+'). '
+    +'Semillas nunca va el viernes (su picado cae en sábado, que no se trabaja).'
+  +'</div>';
+
+  res.forEach(function(x){ console.log('ESCENARIOS · '+x.k+' ('+x.tit+'): colchón', x.C.sem, 'sem ·', x.C.cj, 'cj · viernes prod', x.vieProd, '· de Galletas', x.galDias, '· arranca', x.arranque?_ymd(x.arranque):'nunca', x.C.porProd); });
+
+  return ''
+    +'<div style="color:var(--text-3);margin-bottom:14px;max-width:940px">Los tres con <b style="color:var(--text-2)">3 personas</b> y la rampa arrancando en <b style="color:var(--text-2)">agosto</b> (julio sigue en certificaciones). Cambia solo la política del viernes.</div>'
+    +'<div style="background:#141417;border:.5px solid #2C2C33;border-radius:9px;padding:12px 15px;margin-bottom:20px;max-width:940px;font-size:12px;color:var(--text-2);line-height:1.65">'
+      +'<b style="color:var(--text)">Qué es el colchón.</b> Es el stock que queda el <b style="color:var(--text)">11-ene al ABRIR la fábrica, ANTES de la primera entrega de reapertura</b>: el stock del cierre (18-dic) menos las dos entregas de diciembre. Entre el 18-dic y el 11-ene no se produce ni se vende, así que ese stock no se mueve — es exactamente con lo que se abre.<br>'
+      +'<b style="color:var(--text)">La meta son las primeras '+CIERRE_COLCHON_SEM+' semanas de venta de enero</b>, y el arranque fuerte del 11-ene YA está adentro de esas '+CIERRE_COLCHON_SEM+' semanas (no se suma aparte). Por eso el colchón se mide en <b style="color:var(--text)">semanas de venta de enero</b> (el ritmo del arranque, no el de julio): si la rampa cumple la meta, el stock de apertura cubre exactas '+CIERRE_COLCHON_SEM+' semanas.'
+    +'</div>'
+    +'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px">'+tarjeta(A)+tarjeta(B)+tarjeta(HOY)+'</div>'
+    +'<div style="color:var(--text);font-weight:600;margin-bottom:6px">Colchón por producto — meta vs alcanzado</div>'
+    +'<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;max-width:940px;width:100%">'
+      +'<thead><tr style="color:var(--text-3);text-align:left">'
+        +'<th rowspan="2" style="padding:0 16px 8px 0;vertical-align:bottom;font-size:11px;letter-spacing:.05em;text-transform:uppercase">Producto</th>'
+        +'<th colspan="2" style="text-align:center;padding:0 0 4px;border-bottom:.5px solid var(--border);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-2)">Meta</th>'
+        +'<th colspan="2" style="text-align:center;padding:0 0 4px 22px;border-bottom:.5px solid var(--border);font-size:11px;letter-spacing:.05em;text-transform:uppercase">A · limpieza</th>'
+        +'<th colspan="2" style="text-align:center;padding:0 0 4px 22px;border-bottom:.5px solid var(--border);font-size:11px;letter-spacing:.05em;text-transform:uppercase">B · alternos</th>'
+        +'<th colspan="2" style="text-align:center;padding:0 0 4px 22px;border-bottom:.5px solid var(--border);font-size:11px;letter-spacing:.05em;text-transform:uppercase">Hoy · todos</th></tr>'
+      +'<tr style="color:var(--text-3);font-weight:400;font-size:11px">'
+        +'<th style="text-align:right;padding:5px 0 8px">semanas</th><th style="text-align:right;padding:5px 0 8px">cajas</th>'
+        +'<th style="text-align:right;padding:5px 0 8px 22px">semanas</th><th style="text-align:right;padding:5px 0 8px">cajas</th>'
+        +'<th style="text-align:right;padding:5px 0 8px 22px">semanas</th><th style="text-align:right;padding:5px 0 8px">cajas</th>'
+        +'<th style="text-align:right;padding:5px 0 8px 22px">semanas</th><th style="text-align:right;padding:5px 0 8px">cajas</th></tr></thead>'
+      +'<tbody>'+filas
+      +'<tr style="border-top:.5px solid var(--border)">'
+        +'<td style="padding-top:10px;color:var(--text);font-weight:600">TOTAL</td>'
+        +metaTotCelda+totCelda(A,true)+totCelda(B,true)+totCelda(HOY,true)+'</tr>'
+      +'</tbody></table></div>'
+    +avisoGal
+    +(R.avisos.length?('<div style="margin-top:16px;font-size:12px;color:#C99A4E;max-width:940px">'+R.avisos.map(function(a){ return '⚠ '+esc(a); }).join('<br>')+'</div>'):'')
+    +'<div style="color:var(--text-3);margin-top:18px;font-size:12px;max-width:940px">'
+      +'· Mismo motor del Plan (mismas reglas duras: un producto/día · Semillas solo jueves · Galletas solo viernes · feriados · cierre 18-dic). Lo único que cambia es la política del viernes.<br>'
+      +'· Semanas = colchón ÷ (colchón de la meta ÷ '+CIERRE_COLCHON_SEM+'), o sea contra el ritmo real de enero. Si la rampa cumpliera la meta darían '+CIERRE_COLCHON_SEM+',0.<br>'
+      +'· Los tres ignoran las marcas de personas y fuerzan 3, para aislar la palanca del viernes.<br>'
+      +'· Solo cálculo: nada de esto está conectado al motor.'
+    +'</div>';
+}
+
 async function rzDiagEscenarios(body){
   body.innerHTML='<div class="rz-load">Simulando los escenarios contra el ritmo y el stock reales de Odoo…</div>';
   try{
     const cfg=await nivConfig();
     const R=await cierreMeta(cfg);
-    const ritmo=R.ritmo, stk=await nivStock();
-    const ESC=[
-      {k:'A', tit:'Viernes de limpieza', sub:'La rampa solo usa lun–jue. El viernes queda para limpieza profunda; solo produce si hay riesgo real de quiebre (la regla de siempre).', vie:'limpieza'},
-      {k:'B', tit:'Viernes alternos', sub:'Un viernes sí y uno no: el productivo empuja la rampa, el siguiente mantiene la limpieza profunda.', vie:'alterno'},
-      {k:'HOY', tit:'Todos los viernes', sub:'Lo que el Plan asume HOY: con la rampa encendida el motor se lleva todos los viernes — o sea, sin limpieza profunda de agosto a diciembre.', vie:'todos'},
-    ];
-    const res=ESC.map(function(e){
-      const S=escSim(ritmo, stk.fin, cfg, R.porProd, {mesDesde:ESC_MES_RAMPA, vie:e.vie, personas:3});
-      const C=escColchon(S.stock, R.M);
-      // viernes productivos y días de Galletas (519 solo puede ir el viernes)
-      let vieProd=0, galDias=0, arranque=null;
-      S.sem.forEach(function(x){
-        if(x.on && !arranque) arranque=x.mon;
-        const pr=x.L.viernes&&x.L.viernes.prod;
-        if(pr){ vieProd++; if(pr.p===519) galDias++; }
-      });
-      return Object.assign({}, e, {S:S, C:C, vieProd:vieProd, galDias:galDias, arranque:arranque});
-    });
-    const A=res[0], B=res[1], HOY=res[2];
-    const semTxt=function(s){ return s==null?'—':_rzN(s,1); };
-    // Colchón de PAN (Blanco + Francés + Buns) por escenario, y viernes que fueron a pan vs Galletas.
-    const PAN_IDS=[451,453,503];
-    const panSem=function(x){ return PAN_IDS.reduce(function(a,p){ return a+(x.C.porProd[p].sem||0); },0); };
-    const panDias=function(x){ return x.vieProd - x.galDias; };   // viernes que produjeron PAN
-    const panA=panSem(A), panB=panSem(B), panHOY=panSem(HOY);
-    const panSube = panHOY > panA + 0.1;
-    const veredicto = panSube
-      ? '<b style="color:#E8D3AC">El viernes productivo suma PAN.</b> El viernes es un día de producción más para el pan (Blanco, Francés, Buns, Pizza) y para Galletas — todo menos Semillas. El colchón de pan (Blanco + Francés + Buns) pasa de <b>'+_rzN(panA,1)+'</b> semanas con viernes de limpieza (A) a <b>'+_rzN(panHOY,1)+'</b> con todos productivos (HOY)'+(Math.abs(panB-panA)>0.1?', y <b>'+_rzN(panB,1)+'</b> con alternos (B)':'')+'. Cada viernes productivo es un día extra de pan.'
-      : '<b style="color:#E8D3AC">Con este ritmo, el viernes productivo casi no mueve el pan.</b> Las Galletas se llevan casi todos los viernes (solo pueden hacerse ese día y vienen muy cortas de stock), así que al pan le quedan pocos: el colchón de pan pasa de '+_rzN(panA,1)+' a '+_rzN(panHOY,1)+' semanas. Con más viernes libres de Galletas, el pan subiría más.';
-    const col=function(s){ return s==null?'var(--text-3)':(s>=CIERRE_COLCHON_SEM?'#7E8C5A':(s>=CIERRE_COLCHON_SEM*0.6?'#C99A4E':'#C0564E')); };
-
-    // Tarjeta grande por escenario
-    const tarjeta=function(x){
-      const ok=x.C.sem!=null && x.C.sem>=CIERRE_COLCHON_SEM;
-      return '<div style="flex:1;min-width:290px;background:#141417;border:.5px solid '+(ok?'#3A4A2E':'#2C2C33')+';border-radius:11px;padding:15px 18px">'
-        +'<div style="font-size:11px;letter-spacing:.05em;color:var(--text-3);text-transform:uppercase">Escenario '+x.k+'</div>'
-        +'<div style="font-size:14px;font-weight:600;color:var(--text);margin-top:3px">'+esc(x.tit)+'</div>'
-        +'<div style="font-size:11.5px;color:var(--text-3);margin-top:5px;line-height:1.5;min-height:48px">'+esc(x.sub)+'</div>'
-        +'<div style="margin-top:12px;padding-top:12px;border-top:.5px solid #26262C;display:flex;align-items:baseline;gap:8px">'
-          +'<span style="font-size:30px;font-weight:700;color:'+col(x.C.sem)+';font-variant-numeric:tabular-nums;line-height:1">'+semTxt(x.C.sem)+'</span>'
-          +'<span style="font-size:12px;color:var(--text-3)">semanas de colchón · '+_rzN(x.C.cj)+' cj</span>'
-        +'</div>'
-        +'<div style="font-size:11.5px;color:'+(ok?'#7E8C5A':'#C99A4E')+';margin-top:6px">'
-          +(ok?'Llega a las '+CIERRE_COLCHON_SEM+' semanas.':'Corto: faltan '+semTxt(CIERRE_COLCHON_SEM-(x.C.sem||0))+' semanas para las '+CIERRE_COLCHON_SEM+'.')+'</div>'
-        +'<div style="font-size:11.5px;color:var(--text-3);margin-top:9px">Rampa arranca '+(x.arranque?esc(_fechaLarga(_ymd(x.arranque))):'nunca')
-          +' · '+x.vieProd+' viernes productivos · '+x.galDias+' de Galletas</div>'
-      +'</div>';
-    };
-
-    const celda=function(x,pid,pad){ const v=x.C.porProd[pid];
-      return '<td style="text-align:right;color:'+col(v.sem)+';font-weight:600'+(pad?';padding-left:22px':'')+'">'+semTxt(v.sem)+'</td>'
-        +'<td style="text-align:right;color:var(--text-3);font-size:11.5px">'+_rzN(v.cj)+' cj</td>'; };
-    const filas=R.M.map(function(m){
-      return '<tr>'
-        +'<td style="padding:11px 16px 11px 0;color:var(--text)">'+esc(_nomCorto(m.p))+(R.estim[m.p]?'<span style="color:#C99A4E;font-size:10px;margin-left:6px">estimado</span>':'')+'</td>'
-        +celda(A,m.p,false)+celda(B,m.p,true)+celda(HOY,m.p,true)
-      +'</tr>'; }).join('');
-    const totCelda=function(x,pad){
-      return '<td style="text-align:right;color:'+col(x.C.sem)+';font-weight:700;padding:10px 0 0'+(pad?' 22px':'')+'">'+semTxt(x.C.sem)+'</td>'
-        +'<td style="text-align:right;color:var(--text-3);font-size:11.5px;padding-top:10px">'+_rzN(x.C.cj)+' cj</td>'; };
-
-    // El viernes se REPARTE entre pan y Galletas por urgencia (Galletas solo pueden ese día).
-    const split=function(x){ return '<b>'+panDias(x)+'</b> a pan · <b>'+x.galDias+'</b> a Galletas'; };
-    const avisoGal='<div style="margin-top:20px;background:rgba(201,154,78,.09);border:.5px solid rgba(201,154,78,.35);border-radius:9px;padding:12px 15px;font-size:12.5px;color:#D9BE8C;line-height:1.6;max-width:900px">'
-      +veredicto+'<br><br>'
-      +'<b style="color:#E8D3AC">El viernes se reparte entre pan y Galletas.</b> '
-      +'Es un día productivo para todo menos Semillas; gana el más urgente por stock. Galletas solo pueden hacerse el viernes '
-      +'(no van al horno lun–jue), así que compiten con el pan por ese día — cuando están cubiertas, el viernes va al pan. Reparto de los viernes productivos: '
-      +'A ('+split(A)+') · B ('+split(B)+') · HOY ('+split(HOY)+'). '
-      +'Semillas nunca va el viernes (su picado cae en sábado, que no se trabaja).'
-    +'</div>';
-
-    res.forEach(function(x){ console.log('DIAG ESCENARIOS · '+x.k+' ('+x.tit+'): colchón', x.C.sem, 'sem ·', x.C.cj, 'cj · viernes prod', x.vieProd, '· de Galletas', x.galDias, '· arranca', x.arranque?_ymd(x.arranque):'nunca', x.C.porProd); });
-
+    const stk=await nivStock();
+    const calc=escenariosCalc(cfg, R, stk.fin, R.ritmo);
     body.innerHTML='<div class="rz-wrap" style="font-size:13px;color:var(--text-2);line-height:1.6">'
       +'<h3 style="color:var(--text);font-size:15px;margin:0 0 4px">Escenarios de colchón — con cuánto abre enero</h3>'
-      +'<div style="color:var(--text-3);margin-bottom:16px;max-width:900px">Los tres con <b style="color:var(--text-2)">3 personas</b> y la rampa arrancando en <b style="color:var(--text-2)">agosto</b> (julio sigue en certificaciones). Cambia solo la política del viernes. El colchón es lo que queda el <b style="color:var(--text-2)">11-ene</b>, después de las dos entregas de diciembre — entre el 18-dic y el 11-ene no se produce ni se vende, así que el stock no se mueve. Medido en <b style="color:var(--text-2)">semanas de venta de enero</b> (el ritmo real del arranque, no el de julio). La meta pide '+CIERRE_COLCHON_SEM+'.</div>'
-      +'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px">'+tarjeta(A)+tarjeta(B)+tarjeta(HOY)+'</div>'
-      +'<div style="color:var(--text);font-weight:600;margin-bottom:6px">Colchón por producto</div>'
-      +'<table style="border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;max-width:900px;width:100%">'
-        +'<thead><tr style="color:var(--text-3);text-align:left">'
-          +'<th rowspan="2" style="padding:0 16px 8px 0;vertical-align:bottom;font-size:11px;letter-spacing:.05em;text-transform:uppercase">Producto</th>'
-          +'<th colspan="2" style="text-align:center;padding:0 0 4px;border-bottom:.5px solid var(--border);font-size:11px;letter-spacing:.05em;text-transform:uppercase">A · limpieza</th>'
-          +'<th colspan="2" style="text-align:center;padding:0 0 4px 22px;border-bottom:.5px solid var(--border);font-size:11px;letter-spacing:.05em;text-transform:uppercase">B · alternos</th>'
-          +'<th colspan="2" style="text-align:center;padding:0 0 4px 22px;border-bottom:.5px solid var(--border);font-size:11px;letter-spacing:.05em;text-transform:uppercase">Hoy · todos</th></tr>'
-        +'<tr style="color:var(--text-3);font-weight:400;font-size:11px">'
-          +'<th style="text-align:right;padding:5px 0 8px">semanas</th><th style="text-align:right;padding:5px 0 8px">cajas</th>'
-          +'<th style="text-align:right;padding:5px 0 8px 22px">semanas</th><th style="text-align:right;padding:5px 0 8px">cajas</th>'
-          +'<th style="text-align:right;padding:5px 0 8px 22px">semanas</th><th style="text-align:right;padding:5px 0 8px">cajas</th></tr></thead>'
-        +'<tbody>'+filas
-        +'<tr style="border-top:.5px solid var(--border)">'
-          +'<td style="padding-top:10px;color:var(--text);font-weight:600">TOTAL</td>'
-          +totCelda(A,false)+totCelda(B,true)+totCelda(HOY,true)+'</tr>'
-        +'</tbody></table>'
-      +avisoGal
-      +(R.avisos.length?('<div style="margin-top:16px;font-size:12px;color:#C99A4E;max-width:900px">'+R.avisos.map(function(a){ return '⚠ '+esc(a); }).join('<br>')+'</div>'):'')
-      +'<div style="color:var(--text-3);margin-top:18px;font-size:12px;max-width:900px">'
-        +'· Mismo motor del Plan (mismas reglas duras: un producto/día · Semillas solo jueves · Galletas solo viernes · feriados · cierre 18-dic). Lo único que cambia es la política del viernes.<br>'
-        +'· Semanas = colchón ÷ (colchón de la meta ÷ '+CIERRE_COLCHON_SEM+'), o sea contra el ritmo real de enero. Si la rampa cumpliera la meta darían '+CIERRE_COLCHON_SEM+',0.<br>'
-        +'· Los tres ignoran las marcas de personas y fuerzan 3, para aislar la palanca del viernes.<br>'
-        +'· Solo cálculo: nada de esto está conectado al motor.'
-      +'</div></div>';
+      +escenariosCuerpoHTML(R, calc)
+      +'</div>';
   }catch(e){ body.innerHTML='<div class="rz-err">No pude calcular los escenarios: '+esc(e&&e.message||e)+'</div>'; }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// MÓDULO DE ENTREGAS · ETAPA 1 — EXTRACTOR DE LOTE v2 + LISTA DE LOTES ACTIVOS
+// (desde ESPEC §4.2/§4.3 — NO re-diagnostica; construye desde el plano.)
+//
+// El lote vive en el CHATTER de mrp.production (comentario de Keylor):
+//   mrp.production → message_ids → mail.message (message_type='comment') → body.
+// Formato de 4 campos:  DDD [C] / M AA
+//   · DDD = día juliano de PRODUCCIÓN (2-3 díg)
+//   · C   = código de producto (OPCIONAL): Blanco 2·Semillas 4·Francés 1·Buns 3·Pizza 5
+//   · M/AA = fecha de VENCIMIENTO (producción + ~6 meses) → AA LLEGA A 27 (confirmado 17-jul).
+// El año de PRODUCCIÓN se ancla en date_finished de la orden (dato duro), NO en AA.
+// Separadores inconsistentes (/ - espacio y mezclas), prefijo "Lote:" opcional.
+// Regla de oro: 0-lote / ambiguo / año-inválido van EXPLÍCITOS, nunca se asumen.
+// SOLO LECTURA de Odoo (candado intacto). Nada escribe acá.
+// ════════════════════════════════════════════════════════════════════════
+const ENT_PROD=[451,452,453,503,472,519];                     // los 6 productos
+const ENT_COD={451:2,452:4,453:1,503:3,472:5,519:null};       // código en el lote (Cookie Dough: sin confirmar)
+const ENT_ANIO_OK=new Set([24,25,26,27]);                     // AA de VENCIMIENTO válido (regla NUEVA, aprobada)
+const ENT_ANIO_ESPEC=new Set([24,25,26]);                     // regla VIEJA de la ESPEC (solo para comparar cobertura)
+
+// Chatter (HTML) → texto limpio para parsear.
+function _entLimpiarChatter(html){
+  let t=String(html||'').replace(/<[^>]+>/g,' ')
+    .replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+  t=t.replace(/WH\/MO\/\d+/gi,' ');                 // orden de la premezcla usada, NO el lote (§4)
+  t=t.replace(/lote\s*bolsa\s*:?\s*\d{4,}/gi,' ');  // "Lote Bolsa:" (6 díg) = OTRO dato (§4)
+  return t.replace(/\s+/g,' ').trim();
+}
+// Día juliano (1..366) de 'YYYY-MM-DD' o Date.
+function _julian(d){ const dt=(d instanceof Date)?d:new Date(String(d).slice(0,10)+'T00:00:00');
+  const ini=new Date(dt.getFullYear(),0,0); return Math.floor((dt-ini)/86400000); }
+// Parsea el chatter → candidatos válidos + estado. prodYear/prodJulian anclan la PRODUCCIÓN.
+// anioSet elige la regla (nueva 24-27 vs vieja ESPEC 24-26) → sirve para comparar cobertura.
+function _entParseLote(chatterTxt, prodYear, prodJulian, anioSet){
+  anioSet=anioSet||ENT_ANIO_OK;
+  const t=_entLimpiarChatter(chatterTxt);
+  // DDD [C] sep M sep AA — código opcional (1 díg), separadores flexibles, ancla opcional "Lote:".
+  // (?!\d) al final rechaza el año de 4 díg (una fecha DD/MM/AAAA no se cuela como lote).
+  const rx=/(?:lote\s*:?\s*)?\b(\d{1,3})\s*([1-5])?\s*[\/.\-]\s*(\d{1,2})\s*[\/.\-\s]\s*(\d{2})(?!\d)/gi;
+  const vistos={}, cands=[]; let m;
+  while((m=rx.exec(t))){
+    const ddd=+m[1], cod=m[2]?+m[2]:null, mesV=+m[3], anioV=+m[4];
+    if(ddd<1||ddd>366) continue;                   // día juliano fuera de rango → no es lote
+    if(mesV<1||mesV>12) continue;                  // mes inválido → no es lote
+    const canon=ddd+' / '+mesV+'-'+String(anioV).padStart(2,'0');   // la clave NO depende del código
+    if(vistos[canon]) continue; vistos[canon]=1;
+    cands.push({ddd,cod,mesV,anioV,canon,anioOK:anioSet.has(anioV)});
+  }
+  const validos=cands.filter(c=>c.anioOK);
+  const coincideJul = prodJulian!=null ? validos.some(c=>Math.abs(c.ddd-prodJulian)<=3) : null;
+  let estado, lote=null;
+  if(validos.length===1){ estado='ok'; lote=Object.assign({}, validos[0], {prodYear, key:prodYear+'-'+validos[0].ddd}); }
+  else if(validos.length>1) estado='ambiguo';       // dos lotes distintos en el chatter → no se asume
+  else if(cands.length>0) estado='anio_invalido';   // parseó algo lote-forma pero el año no valida
+  else estado='sin_lote';
+  return {estado, lote, cands, validos, coincideJul};
+}
+
+// ── Lectura CRUDA de Odoo: órdenes done desde `desdeYmd` + su chatter (comentarios). Solo lectura.
+async function entLeerCrudo(desdeYmd){
+  const mos=await odooCall('mrp.production','search_read',
+    [[['state','=','done'],['product_id','in',ENT_PROD],['date_finished','>=',desdeYmd]]],
+    {fields:['id','name','product_id','qty_produced','product_uom_id','date_finished'],limit:5000,order:'date_finished desc'});
+  const ids=mos.map(o=>o.id);
+  // el lote está en comentarios (message_type='comment') ligados a la orden por res_id
+  const msgs = ids.length ? await odooCall('mail.message','search_read',
+    [[['model','=','mrp.production'],['res_id','in',ids],['message_type','=','comment']]],
+    {fields:['res_id','body'],limit:20000}) : [];
+  const chatBy={}; msgs.forEach(function(mm){ const r=mm.res_id&&(mm.res_id[0]||mm.res_id);
+    (chatBy[r]=chatBy[r]||[]).push(mm.body||''); });
+  return mos.map(function(o){ const pf=_crDate(o.date_finished);
+    return {orden:o.name, ordenId:o.id, producto:o.product_id[0], fecha:pf,
+            py:+pf.slice(0,4), pj:_julian(pf), cmts:(chatBy[o.id]||[]).join(' \n '),
+            capMsgs:msgs.length>=20000, capMos:mos.length>=5000}; });
+}
+// ── LISTA DE LOTES ACTIVOS (Pieza 1): órdenes done de los últimos `meses`, agrupadas por lote OK.
+// Devuelve {lotes:{key:{...ordenes}}, buckets:{sin_lote,ambiguo,anio_invalido}}. Alimenta el
+// selector de Daniel Y el conteo inicial. Casos raros SIEMPRE explícitos (nunca se asumen).
+async function entLotesActivos(meses, anioSet){
+  meses=meses||3; anioSet=anioSet||ENT_ANIO_OK;
+  const d=new Date(); d.setMonth(d.getMonth()-meses);
+  const crudo=await entLeerCrudo(_ymd(d));
+  return _entAgrupar(crudo, anioSet);
+}
+function _entAgrupar(crudo, anioSet){
+  const lotes={}, buckets={sin_lote:[], ambiguo:[], anio_invalido:[]};
+  crudo.forEach(function(o){
+    const r=_entParseLote(o.cmts, o.py, o.pj, anioSet);
+    const rec={orden:o.orden, ordenId:o.ordenId, producto:o.producto, fecha:o.fecha, r:r};
+    if(r.estado==='ok'){ const k=r.lote.key;
+      const L=lotes[k]=lotes[k]||{key:k, canon:r.lote.canon, producto:o.producto, prodYear:o.py, ddd:r.lote.ddd, ordenes:[]};
+      L.ordenes.push(rec); }
+    else buckets[r.estado].push(rec);
+  });
+  return {lotes, buckets};
+}
+
+// ── VALIDACIÓN (index.html?diag=lotes): cobertura del extractor con las DOS reglas. Solo lectura.
+async function rzDiagLotes(body){
+  body.innerHTML='<div class="rz-load">Leyendo órdenes y chatter de Odoo (solo lectura)…</div>';
+  try{
+    const crudo=await entLeerCrudo('2025-01-01');   // ventana de validación: 2025 en adelante (ESPEC §4.3)
+    if(!crudo.length){ body.innerHTML='<div class="rz-err">Odoo no devolvió órdenes done desde 2025-01-01.</div>'; return; }
+    const capado = crudo[0].capMos || crudo[0].capMsgs;
+    // cobertura por año de producción, con cada regla
+    const reglas=[{k:'nueva', set:ENT_ANIO_OK, lbl:'Nueva (venc. 24–27)'},{k:'espec', set:ENT_ANIO_ESPEC, lbl:'ESPEC vieja (24–26)'}];
+    const porAnio={};   // {py:{total, nueva:{ok}, espec:{ok}}}
+    const estNueva={ok:0, sin_lote:0, ambiguo:0, anio_invalido:0};
+    crudo.forEach(function(o){
+      porAnio[o.py]=porAnio[o.py]||{total:0, nueva:0, espec:0}; porAnio[o.py].total++;
+      reglas.forEach(function(rg){ const r=_entParseLote(o.cmts,o.py,o.pj,rg.set); if(r.estado==='ok') porAnio[o.py][rg.k]++; });
+      estNueva[_entParseLote(o.cmts,o.py,o.pj,ENT_ANIO_OK).estado]++;
+    });
+    const total=crudo.length;
+    const okNueva=Object.values(porAnio).reduce((a,y)=>a+y.nueva,0);
+    const okEspec=Object.values(porAnio).reduce((a,y)=>a+y.espec,0);
+    const pct=(n)=>total?_rzN(n/total*100,1):'0';
+    const anios=Object.keys(porAnio).map(Number).sort();
+
+    // muestra de lotes OK (regla nueva) + un vistazo a cada bucket
+    const g=_entAgrupar(crudo, ENT_ANIO_OK);
+    const nomP=(pid)=>NIV_INFO[pid]?NIV_INFO[pid].nom:('id '+pid);
+    const lotesArr=Object.values(g.lotes).sort((a,b)=>a.key<b.key?1:-1);
+    const muestraOk=lotesArr.slice(0,14).map(function(L){
+      return '<tr><td style="padding:5px 14px 5px 0;color:var(--ent)">'+esc(L.canon)+'</td>'
+        +'<td style="color:var(--text-2)">'+esc(nomP(L.producto))+'</td>'
+        +'<td style="color:var(--text-3)">prod '+L.prodYear+' · día '+L.ddd+'</td>'
+        +'<td style="text-align:right;color:var(--text-3)">'+L.ordenes.length+' ord</td></tr>'; }).join('');
+    const bucketRow=function(nom, arr, col){
+      const sample=arr.slice(0,4).map(x=>esc(x.orden)+' ('+esc(nomP(x.producto).replace(/^Pan /,''))+')').join(' · ');
+      return '<tr><td style="padding:5px 14px 5px 0;color:'+col+'">'+nom+'</td>'
+        +'<td style="text-align:right;color:var(--text);font-weight:600">'+arr.length+'</td>'
+        +'<td style="color:var(--text-3);padding-left:14px">'+(sample||'—')+(arr.length>4?' …':'')+'</td></tr>'; };
+
+    const barra=function(n){ const p=total?n/total*100:0; return '<div style="height:7px;background:#26262C;border-radius:4px;overflow:hidden;margin-top:4px"><div style="height:100%;width:'+p.toFixed(1)+'%;background:var(--ent)"></div></div>'; };
+
+    body.innerHTML='<div class="rz-wrap" style="font-size:13px;color:var(--text-2);line-height:1.6">'
+      +'<style>.rz-wrap{--ent:#7F77DD}</style>'
+      +'<h3 style="color:var(--text);font-size:15px;margin:0 0 4px">Extractor de lote v2 — cobertura (validación Etapa 1)</h3>'
+      +'<div style="color:var(--text-3);margin-bottom:16px;max-width:900px">Órdenes <b style="color:var(--text-2)">done</b> de los 6 productos desde <b style="color:var(--text-2)">2025-01-01</b>. El lote se lee del chatter (comentario de Keylor) con la regla v2. El año de PRODUCCIÓN se ancla en <code>date_finished</code>; <b style="color:var(--text-2)">M/AA es la fecha de vencimiento</b> (producción + ~6 meses). Solo lectura de Odoo.'+(capado?' <b style="color:#C99A4E">⚠ lectura tope: hay más datos de los leídos, la cobertura es aproximada.</b>':'')+'</div>'
+
+      // las dos reglas, lado a lado
+      +'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:20px">'
+        +'<div style="flex:1;min-width:260px;background:#141417;border:.5px solid #3A3A55;border-radius:11px;padding:15px 18px">'
+          +'<div style="font-size:11px;letter-spacing:.05em;color:var(--text-3);text-transform:uppercase">Regla nueva · vencimiento 24–27</div>'
+          +'<div style="font-size:30px;font-weight:700;color:var(--ent);font-variant-numeric:tabular-nums;line-height:1.1;margin-top:4px">'+pct(okNueva)+'%</div>'
+          +'<div style="font-size:11.5px;color:var(--text-3)">'+_rzN(okNueva)+' de '+_rzN(total)+' órdenes con lote</div>'+barra(okNueva)
+        +'</div>'
+        +'<div style="flex:1;min-width:260px;background:#141417;border:.5px solid #2C2C33;border-radius:11px;padding:15px 18px">'
+          +'<div style="font-size:11px;letter-spacing:.05em;color:var(--text-3);text-transform:uppercase">Regla vieja ESPEC · 24–26</div>'
+          +'<div style="font-size:30px;font-weight:700;color:var(--text-2);font-variant-numeric:tabular-nums;line-height:1.1;margin-top:4px">'+pct(okEspec)+'%</div>'
+          +'<div style="font-size:11.5px;color:var(--text-3)">'+_rzN(okEspec)+' de '+_rzN(total)+' órdenes con lote</div>'+barra(okEspec)
+        +'</div>'
+      +'</div>'
+      +'<div style="margin-bottom:20px;font-size:12.5px;color:'+(okNueva>okEspec?'#7E8C5A':'var(--text-3)')+'">'
+        +(okNueva>okEspec
+          ? 'La regla nueva rescata <b>'+_rzN(okNueva-okEspec)+'</b> órdenes que la vieja rechazaría — son los lotes con vencimiento en <b>2027</b> (producción de 2026). Justo lo que pasaba con los lotes de 1/27 del congelador.'
+          : 'Las dos reglas dan igual en esta ventana (todavía no hay vencimientos 2027 en los datos leídos).')
+      +'</div>'
+
+      // cobertura por año (como ESPEC §4.3)
+      +'<div style="color:var(--text);font-weight:600;margin-bottom:6px">Cobertura por año de producción</div>'
+      +'<table style="border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;margin-bottom:22px">'
+        +'<thead><tr style="color:var(--text-3);text-align:left;border-bottom:.5px solid var(--border)">'
+          +'<th style="padding:5px 20px 6px 0">Año prod.</th><th style="text-align:right">Órdenes</th>'
+          +'<th style="text-align:right;padding-left:20px">Con lote (nueva)</th><th style="text-align:right;padding-left:20px">Con lote (vieja)</th></tr></thead>'
+        +'<tbody>'+anios.map(function(y){ const Y=porAnio[y];
+          return '<tr><td style="padding:6px 20px 6px 0;color:var(--text)">'+y+'</td>'
+            +'<td style="text-align:right;color:var(--text-2)">'+_rzN(Y.total)+'</td>'
+            +'<td style="text-align:right;color:var(--ent);padding-left:20px;font-weight:600">'+_rzN(Y.total?Y.nueva/Y.total*100:0,0)+'% <span style="color:var(--text-3);font-weight:400">('+Y.nueva+')</span></td>'
+            +'<td style="text-align:right;color:var(--text-2);padding-left:20px">'+_rzN(Y.total?Y.espec/Y.total*100:0,0)+'% <span style="color:var(--text-3)">('+Y.espec+')</span></td></tr>'; }).join('')
+        +'</tbody></table>'
+
+      // los tres buckets (regla de oro: explícitos, nunca asumidos)
+      +'<div style="color:var(--text);font-weight:600;margin-bottom:6px">Los que NO dieron lote (regla nueva) — explícitos, no se asumen</div>'
+      +'<table style="border-collapse:collapse;font-size:12.5px;margin-bottom:22px;max-width:900px">'
+        +'<tbody>'
+        +bucketRow('Sin lote en el chatter', g.buckets.sin_lote, '#C99A4E')
+        +bucketRow('Ambiguo (2+ lotes distintos)', g.buckets.ambiguo, '#C0564E')
+        +bucketRow('Año de venc. inválido', g.buckets.anio_invalido, '#C0564E')
+        +'</tbody></table>'
+
+      // muestra de lotes activos parseados
+      +'<div style="color:var(--text);font-weight:600;margin-bottom:6px">Muestra de lotes leídos ('+_rzN(lotesArr.length)+' lotes distintos)</div>'
+      +'<table style="border-collapse:collapse;font-size:12.5px"><tbody>'+(muestraOk||'<tr><td>—</td></tr>')+'</tbody></table>'
+      +(lotesArr.length>14?'<div style="color:var(--text-3);font-size:11.5px;margin-top:6px">… y '+(lotesArr.length-14)+' lotes más.</div>':'')
+
+      +'<div style="color:var(--text-3);margin-top:18px;font-size:12px;max-width:900px">'
+        +'· Etapa 1 del Módulo de Entregas: extractor + lista de lotes activos. SOLO lectura de Odoo (candado intacto), nada se escribe.<br>'
+        +'· El parser se probó aislado (18 casos: formatos §4.2, ruido WH/MO y Lote Bolsa, años inválidos, ambigüedad). Acá se mide su cobertura real.<br>'
+        +'· "día" = día juliano de producción; la señal DDD≈día se usa para detectar mis-parseos, no para rechazar.'
+      +'</div></div>';
+    console.log('DIAG LOTES · total', total, '· ok nueva', okNueva, '('+pct(okNueva)+'%) · ok espec', okEspec, '('+pct(okEspec)+'%) · buckets', {sin_lote:g.buckets.sin_lote.length, ambiguo:g.buckets.ambiguo.length, anio_invalido:g.buckets.anio_invalido.length}, '· por año', porAnio);
+  }catch(e){ body.innerHTML='<div class="rz-err">No pude validar el extractor: '+esc(e&&e.message||e)+'</div>'; }
 }
 
 async function rzDiagCierre(body){
@@ -5183,12 +5423,20 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
       if(e&&e.p){ c.kind=fut?'prop':(past?'pend':'prop'); c.editable=fut; c.swappable=fut; c.pid=e.p; c.batches=e.batches; c.prods[e.p]=e.batches; c.prod=_rzBP(e.batches, e.p); c.bt=''; c.today=ds===hoyStr; return c; }
       c.kind='libre'; c.editable=fut; c.swappable=fut; c.prod='—'; c.bt=''; return c;
     }
-    // VIERNES: picado (si Semillas jueves) + producción por urgencia + corridos por feriado; la
+    // VIERNES: picado (si Semillas jueves) + UN pan/galletas + corridos por feriado; la
     // LIMPIEZA PROFUNDA solo si el día NO quedó cargado. Editable pero NO swappable (no es un producto).
-    const parts=[];
+    // REGLA DURA — un producto por día vale TAMBIÉN el viernes: máximo UN pan. Un feriado lun–jue
+    // corre su pan a este día (corrido, producción ya comprometida); si además la rampa quería
+    // meter otro pan (v.prod), NO cabe → se cae del viernes. Su faltante lo detecta _rzAutoFill y
+    // lo re-agenda a un día LIBRE (deriva a la semana siguiente): una semana con feriado tiene 3
+    // días productivos, no puede con 5 producciones. Galletas [519] y el picado SÍ coexisten con
+    // el pan (otro proceso/otra tarea), nunca cuentan como "segundo pan".
+    const PAN_VIE=new Set([451,452,453,503,472]);   // panes (Semillas nunca cae acá; va por completitud)
+    const parts=[]; let panEnVie=false;
     if(v.picado) parts.push('Picado');
-    if(v.prod){ parts.push(_rzBP(v.prod.batches, v.prod.p)); c.prods[v.prod.p]=(c.prods[v.prod.p]||0)+v.prod.batches; }
-    corridos.forEach(function(x){ parts.push(_rzBP(x.batches, x.p)); c.prods[x.p]=(c.prods[x.p]||0)+x.batches; });
+    corridos.forEach(function(x){ parts.push(_rzBP(x.batches, x.p)); c.prods[x.p]=(c.prods[x.p]||0)+x.batches; if(PAN_VIE.has(x.p)) panEnVie=true; });
+    if(v.prod && !(panEnVie && v.prod.p!==519)){   // el v.prod-pan se cae si ya hay un pan corrido; Galletas [519] siempre entra
+      parts.push(_rzBP(v.prod.batches, v.prod.p)); c.prods[v.prod.p]=(c.prods[v.prod.p]||0)+v.prod.batches; if(PAN_VIE.has(v.prod.p)) panEnVie=true; }
     if(!parts.length) parts.push('Limpieza');   // día no cargado → limpieza profunda
     c.kind='viernes'; c.editable=fut; c.swappable=false; c.prod=parts.join(' · '); c.bt=''; return c;
   });
@@ -5804,6 +6052,7 @@ async function nivRealRango(D1,D2){
 }
 
 let _planProj=[], _planReal={}, _planInputs=null;
+let _planEdit=null, _planEditMes=null;   // edición inline del Plan (ds en edición · mes abierto)
 async function cargarPlanMeses(){
   const st=document.getElementById('planStatus'); st.className='status s-info'; st.classList.remove('hidden');
   st.innerHTML='<span class="spin"></span>Proyectando el plan con el nivelador (solo lectura)…';
@@ -5871,6 +6120,21 @@ function planPanelMeta(){
     +'</div>';
 }
 
+// Sección de ESCENARIOS dentro del Plan, debajo del panel META vs HOY (van juntos: la meta dice
+// cuánto falta, los escenarios qué palanca del viernes acerca). Reusa el cálculo del reporte
+// ?diag=escenarios con los mismos insumos ya cargados (_planCierre + _planInputs) → mismos números.
+// Es estable frente a las marcas de personas (fuerza 3), así que se recalcula sin costo en cada render.
+function planEscenariosSeccion(){
+  if(!_planCierre || !_planInputs) return '';
+  const R=_planCierre;
+  const calc=escenariosCalc(_planInputs.cfg, R, _planInputs.fin, R.ritmo);
+  return '<div style="max-width:940px;margin:26px 0 4px">'
+    +'<div class="pm-t" style="margin-bottom:2px">Escenarios de colchón — qué palanca del viernes acerca la meta</div>'
+    +'<div class="pm-sub" style="max-width:640px;margin-bottom:14px">La meta de arriba dice cuánto falta; esto dice qué política del viernes acerca ese colchón de reapertura.</div>'
+    +escenariosCuerpoHTML(R, calc)
+    +'</div>';
+}
+
 function planRenderMeses(){
   const hoy=new Date(), mesHoy=hoy.getMonth();
   const porMes={}, rampaMes={};
@@ -5896,6 +6160,7 @@ function planRenderMeses(){
   const mesesRampa=rMs.length ? (_MESNOM2[rMs[0]]+(rMs.length>1?' a '+_MESNOM2[rMs[rMs.length-1]]:'')) : '';
   document.getElementById('planBody').innerHTML=
     planPanelMeta()
+    +planEscenariosSeccion()
     +'<div class="pl-grid">'+cards+'</div><div id="planDetalle"></div>'
     +'<div class="pl-notas"><div class="pl-nt">Cómo se lee este plan</div><ul>'
     +'<li>Crucero: se produce al ritmo normal, para no llenar el congelador meses antes de tiempo.</li>'
@@ -5905,11 +6170,14 @@ function planRenderMeses(){
     +'<li>lun 31 ago — Día de la Persona Negra.</li><li>mar 15 set — Independencia (se cubre el viernes 18).</li><li>mar 1 dic — Abolición del Ejército.</li></ul></div>';
 }
 
-function planVerDetalle(m){
+function planVerDetalle(m, noScroll){
   const el=document.getElementById('planDetalle'); if(!el)return;
+  _planEditMes=m;
   const hoyStr=_ymd(new Date());
   const wks=_planProj.filter(wk=>wk.monday.getMonth()===m);
   let html='<div class="pl-det"><div class="pl-det-h"><span>Detalle de '+_MESNOM2[m]+'</span><button class="pl-volver" onclick="planVolver()">‹ volver a los meses</button></div>';
+  html+='<div class="pl-edithint">Tocá cualquier día futuro para editarlo: producto y batches, o dejá el producto en “limpieza / nada”. La edición manda y el motor reconcilia; se guarda en el plan.</div>';
+  html+=planColchonAviso();   // impacto de las ediciones sobre el colchón (motor reconciliado)
   // MISMA verdad que el Resumen: motor + overrides (ediciones) + auto-relleno de la meta.
   const PLK={real:'pl-d-real', today:'pl-d-prop', pend:'pl-d-pend', prop:'pl-d-prop', edit:'pl-d-prop', auto:'pl-d-prop', clean:'pl-d-clean', 'edit-empty':'pl-d-clean', viernes:'pl-d-clean', feriado:'pl-d-fer', libre:'pl-d-clean'};
   wks.forEach(wk=>{
@@ -5917,15 +6185,91 @@ function planVerDetalle(m){
     html+='<div class="pl-wk"><div class="pl-wr">'+_rangeLbl(wk.monday)+' '+_rzChipPersonas(iso, pers)
       +(pers===2 && wk.viernes && wk.viernes.prod?'<span class="pl-note2p">2 personas · viernes productivo</span>':'')+'</div><div class="pl-days">';
     _rzOverlayAuto(rzCeldas(wk.monday, wk, _planReal, hoyStr, _rzOverrides), _rzAuto).forEach(c=>{
+      if(_planEdit===c.ds && c.editable){ html+=planFormHtml(c); return; }   // día en edición → mini-form
       const txt=c.prod+(c.bt?' '+c.bt:'');
       const tag=(c.kind==='pend')?'<div class="pl-dtag">sin registrar</div>':(c.edited?'<div class="pl-dtag pl-dtag-ed">editado</div>':(c.auto?'<div class="pl-dtag pl-dtag-auto">meta</div>':''));
-      html+='<div class="pl-d '+(PLK[c.kind]||'pl-d-clean')+(c.edited?' pl-d-ed':'')+'"><div class="pl-dd">'+c.dow+' '+c.dnum+'</div><div class="pl-dp">'+esc(txt)+'</div>'+tag+'</div>';
+      const cls='pl-d '+(PLK[c.kind]||'pl-d-clean')+(c.edited?' pl-d-ed':'')+(c.editable?' pl-d-editable':'');
+      const click=c.editable?(' onclick="planOpenEdit(\''+c.ds+'\')"'):'';
+      html+='<div class="'+cls+'" data-ds="'+c.ds+'"'+click+'><div class="pl-dd">'+c.dow+' '+c.dnum+'</div><div class="pl-dp">'+esc(txt)+'</div>'+tag+'</div>';
     });
     html+='</div>'+_rzConfirmBar(iso)+'</div>';
   });
-  el.innerHTML=html+'</div>'; el.scrollIntoView({behavior:'smooth',block:'nearest'});
+  el.innerHTML=html+'</div>'; if(!noScroll) el.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
-function planVolver(){ const el=document.getElementById('planDetalle'); if(el) el.innerHTML=''; }
+function planVolver(){ _planEdit=null; const el=document.getElementById('planDetalle'); if(el) el.innerHTML=''; }
+
+// ── Edición inline del Plan (mismo gesto y misma fuente de overrides que el Resumen) ──
+function planFormHtml(cell){
+  const opts=NIV_PROD.map(p=>'<option value="'+p+'"'+(cell.pid===p?' selected':'')+'>'+esc(NIV_INFO[p].nom)+'</option>').join('');
+  return '<div class="pl-d pl-d-editing" data-ds="'+cell.ds+'">'
+    +'<div class="pl-dd">'+cell.dow+' '+cell.dnum+'</div>'
+    +'<select class="pl-fsel" id="planFsel"><option value="">— limpieza / nada</option>'+opts+'</select>'
+    +'<input class="pl-fbt" id="planFbt" type="number" min="0" step="1" placeholder="batches" value="'+(cell.batches||'')+'">'
+    +'<div class="pl-frow"><button class="pl-fok" title="Guardar" onclick="planSaveEdit(\''+cell.ds+'\')">✓</button>'
+    +'<button class="pl-fx" title="Cancelar" onclick="planCancelEdit()">✕</button></div></div>';
+}
+function planOpenEdit(ds){ if(_planEdit===ds) return; _planEdit=ds; planVerDetalle(_planEditMes, true); const s=document.getElementById('planFsel'); if(s)s.focus(); }
+function planCancelEdit(){ _planEdit=null; planVerDetalle(_planEditMes, true); }
+async function planSaveEdit(ds){
+  const sel=document.getElementById('planFsel'), bt=document.getElementById('planFbt');
+  const pid=sel&&sel.value?+sel.value:null;
+  const batches=(bt&&bt.value!=='')?Math.max(0,Math.round(+bt.value)):0;
+  const val=(pid&&batches>0)?{producto_id:pid, batches:batches}:{producto_id:null, batches:0};   // sin producto o 0 batches = limpieza
+  _rzOverrides[ds]={producto_id:val.producto_id, batches:val.batches, tipo:'edicion'};
+  _planEdit=null;
+  if(_rzCtx) _rzRecalcAuto();                    // el Resumen comparte overrides → mantené su auto-relleno coherente
+  planVerDetalle(_planEditMes, true);            // repinta el detalle (rzCeldas honra el override) + recomputa el aviso de colchón
+  rzPersist([{fecha:ds, producto_id:val.producto_id, batches:val.batches, tipo:'edicion'}]);   // persiste en plan_overrides
+  if(_rzCtx && document.getElementById('rzBody')) rzRender();   // si el Resumen está montado, refrescalo también
+}
+
+// Proyección override-aware hasta el cierre (18-dic): corre el MISMO motor semana a semana pero
+// la producción real de cada semana se toma de las celdas ya colocadas honrando los overrides
+// (día en limpieza = 0 producción ese día; el motor de las semanas siguientes ve el stock más bajo
+// y la rampa reacciona sola). Devuelve el colchón resultante (escColchon). Puro, no muta nada global.
+function planColchonOv(overrides){
+  if(!_planCierre || !_planInputs) return null;
+  const R=_planCierre, cfg=_planInputs.cfg, ritmo=R.ritmo, fin=_planInputs.fin;
+  const hoyStr=_ymd(new Date());
+  const mon0=_mondayProd(new Date()), stop=_mondayProd(new Date(CIERRE+'T00:00:00')).getTime();
+  const H=cfg.horizonte||NIV_CFG_DEF.horizonte;
+  const stock={}; NIV_PROD.forEach(p=>stock[p]=fin[p]||0);
+  let rampaOn=false;
+  for(let w=0; w<80; w++){
+    const mon=new Date(mon0); mon.setDate(mon.getDate()+w*7); if(mon.getTime()>stop) break;
+    const wk=_isoWk(mon);
+    const colDe=pid=>{ const t=(cfg.ventanas||[]).some(v=>+v.producto_id===pid && wk>=v.desde && wk<=v.hasta); return t?cfg.colchonTemporada:(cfg.colchon[pid]||3); };
+    const pers=_personasDe(wk), Rr=_rampaDe(mon);
+    if(Rr){ rampaOn=rampaOn||_rampaEstado(stock, ritmo, Rr.meta, Rr.k).on; Rr.on=rampaOn; }
+    const pre={}; NIV_PROD.forEach(p=>pre[p]=stock[p]);
+    const L=_weekLayout(stock, ritmo, colDe, H, pers, Rr);           // decide la semana con el stock de inicio (muta stock: se descarta)
+    const cells=rzCeldas(mon, L, {}, hoyStr, overrides);             // colocación en días honrando overrides
+    const prodB={}; cells.forEach(c=>{ const pr=c.prods||{}; for(const k in pr) prodB[+k]=(prodB[+k]||0)+pr[k]; });
+    NIV_PROD.forEach(p=>{ stock[p]=pre[p]+(prodB[p]||0)*NIV_INFO[p].rend-(ritmo[p]||0); });   // consumo = ritmo (fijo)
+  }
+  return escColchon(stock, R.M);
+}
+// Aviso discreto del impacto en el colchón de las ediciones futuras (solo si hay ediciones).
+function planColchonAviso(){
+  if(!_planCierre || !_planInputs) return '';
+  const hoyStr=_ymd(new Date());
+  const futOv=Object.keys(_rzOverrides).filter(function(ds){ return ds>=hoyStr; });
+  if(!futOv.length) return '';
+  const base=planColchonOv({}), ed=planColchonOv(_rzOverrides);
+  if(!base || !ed) return '';
+  const nLimp=futOv.filter(function(ds){ const o=_rzOverrides[ds]; return !o.producto_id || !(o.batches>0); }).length;
+  const nProd=futOv.length-nLimp;
+  const partes=[];
+  if(nLimp) partes.push('<b>'+nLimp+'</b> '+(nLimp>1?'limpiezas':'limpieza'));
+  if(nProd) partes.push('<b>'+nProd+'</b> '+(nProd>1?'cambios de producción':'cambio de producción'));
+  const bt=function(v){ return v==null?'—':_rzN(v,1); };
+  const b=base.sem, e=ed.sem;
+  let cuerpo;
+  if(b!=null && e!=null && e < b-0.05) cuerpo='el colchón <b>baja de '+bt(b)+' a '+bt(e)+' semanas</b> (meta '+CIERRE_COLCHON_SEM+'). Cada día sin producir en la rampa cuesta colchón.';
+  else if(b!=null && e!=null && e > b+0.05) cuerpo='el colchón <b>sube a '+bt(e)+' semanas</b> (meta '+CIERRE_COLCHON_SEM+').';
+  else cuerpo='el colchón <b>se mantiene en '+bt(e)+' semanas</b> (meta '+CIERRE_COLCHON_SEM+') — la producción se reacomodó sin costo.';
+  return '<div class="pl-impacto">Con '+partes.join(' · ')+' en la rampa, '+cuerpo+'</div>';
+}
 
 
 // Total de batches terminados del mes (todos los productos, sin prueba/premezcla).
