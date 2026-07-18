@@ -1435,6 +1435,19 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vPlan .pm-corto{margin-top:12px;background:rgba(233,162,59,.10);border:.5px solid rgba(233,162,59,.35);border-radius:8px;padding:9px 12px;font-size:12px;color:#E9A23B;line-height:1.55}
 #vPlan .pm-corto b{color:#F0B45C}
 #vPlan .pm-foot{font-size:11.5px;color:var(--text-3);padding:9px 0 10px;line-height:1.55}
+#vPlan .dm-toggle-wrap{max-width:940px;margin:10px 0 0}
+#vPlan .dm-toggle{background:none;border:none;color:var(--text-3);font-family:inherit;font-size:12px;padding:2px 0;cursor:pointer;letter-spacing:.01em}
+#vPlan .dm-toggle:hover{color:#C77DA0}
+#vPlan .dm{max-width:940px;margin:10px 0 4px;background:var(--surface);border:.5px solid var(--border);border-radius:11px;padding:14px 18px 4px}
+#vPlan .dm-tab{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;margin-top:12px}
+#vPlan .dm-tab th{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);font-weight:600;text-align:right;padding:0 0 7px 14px;border-bottom:.5px solid var(--border);vertical-align:bottom}
+#vPlan .dm-tab th:first-child{text-align:left;padding-left:0}
+#vPlan .dm-tab th span{display:block;text-transform:none;letter-spacing:0;font-weight:400;color:var(--text-3);font-size:10px;margin-top:3px;opacity:.8}
+#vPlan .dm-tab td{padding:11px 0 11px 14px;text-align:right;color:var(--text-2);border-bottom:.5px solid #1A1A1E}
+#vPlan .dm-tab td:first-child{text-align:left;padding-left:0;color:var(--text)}
+#vPlan .dm-tab tbody tr:last-child td{border-bottom:.5px solid var(--border)}
+#vPlan .dm-tab tfoot td{padding:10px 0 10px 14px;color:var(--text-2);font-weight:600;border-bottom:none}
+#vPlan .dm-tab tfoot td:first-child{color:var(--text-3);font-weight:400;text-transform:uppercase;font-size:11px;letter-spacing:.04em}
 #vPlan .pl-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:16px 0 0}
 @media(max-width:900px){#vPlan .pl-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:520px){#vPlan .pl-grid{grid-template-columns:1fr 1fr}}
@@ -1495,7 +1508,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   </div>
   <div>
     <div class="m3title" style="font-size:24px">Plan de producción</div>
-    <div class="m3sub" style="margin-top:9px;font-size:13px;max-width:560px">El camino hasta cerrar diciembre. Cada mes muestra cuántos batches se producen; hacé clic para ver el detalle semana por semana.</div>
   </div>
   <div id="planStatus" class="status s-info hidden" style="margin-top:14px"></div>
   <div id="planBody"></div>
@@ -1773,6 +1785,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vConteo .cn-in{width:52px;background:var(--surface-2);border:.5px solid var(--border-m);border-radius:6px;color:var(--text);font-size:13px;padding:5px 7px;text-align:right}
 #vConteo .cn-in:focus{outline:none;border-color:var(--mod)}
 #vConteo .cn-lbl{color:var(--text-3);font-size:11px;margin:0 8px 0 4px}
+#vConteo .cn-ttot{color:var(--text-2);font-size:11.5px;font-variant-numeric:tabular-nums;margin-left:2px;white-space:nowrap}
 #vConteo .cn-diff{white-space:nowrap}
 #vConteo .cn-diff.cn-ok,#vConteo .cn-sem.cn-ok{color:#84BD00}
 #vConteo .cn-diff.cn-warn,#vConteo .cn-sem.cn-warn{color:#E9A23B}
@@ -1885,7 +1898,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 17 jul 2026';
+const BUILD = 'v 17 jul 2026 · WIP';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -4556,24 +4569,27 @@ const CONGELADOR_CJ=888;                  // capacidad MÁXIMA del congelador, c
 
 // Config de fechas (plan_config; la fila más reciente por clave manda).
 async function cierreConfig(){
-  const out={autowm:CIERRE_DEF_AUTOWM, resto:CIERRE_DEF_RESTO};
+  const out={autowm:CIERRE_DEF_AUTOWM, resto:CIERRE_DEF_RESTO, galDicCj:null};   // galDicCj: override manual de galletas en la entrega grande de dic (cajas)
   try{ const c=sbClient(); if(!c) return out;
     const {data,error}=await c.from('plan_config').select('clave,valor,creado_en').order('creado_en',{ascending:false});
     if(error||!data) return out;
     const seen={};
     for(const r of data){ if(seen[r.clave])continue; seen[r.clave]=1;
       if(r.clave==='cierre_fecha_autowm' && r.valor) out.autowm=String(r.valor).slice(0,10);
-      if(r.clave==='cierre_fecha_resto'  && r.valor) out.resto =String(r.valor).slice(0,10); }
+      if(r.clave==='cierre_fecha_resto'  && r.valor) out.resto =String(r.valor).slice(0,10);
+      if(r.clave==='cierre_galletas_dic_cj'){ const n=parseFloat(r.valor); out.galDicCj=(isFinite(n)&&n>0)?n:null; } }
   }catch(e){}
   return out;
 }
 async function cierreGuardarFechas(){
-  const a=document.getElementById('cierreFAutowm'), r=document.getElementById('cierreFResto');
+  const a=document.getElementById('cierreFAutowm'), r=document.getElementById('cierreFResto'), g=document.getElementById('cierreGalDicCj');
   const c=sbClient(); if(!c){ alert('Sin conexión con la base — no se guardó.'); return; }
   let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
+  const galVal=(g&&g.value!=='' && parseFloat(g.value)>0)?String(parseFloat(g.value)):'';   // vacío/0 = sin override (galletas vuelven al ritmo)
   try{ const {error}=await c.from('plan_config').insert([
       {clave:'cierre_fecha_autowm', valor:a.value, usuario:email||null},
-      {clave:'cierre_fecha_resto',  valor:r.value, usuario:email||null}]);
+      {clave:'cierre_fecha_resto',  valor:r.value, usuario:email||null},
+      {clave:'cierre_galletas_dic_cj', valor:galVal, usuario:email||null}]);
     if(error){ alert('No se pudo guardar: '+error.message); return; }
     _cierreCache=null;                                          // fechas nuevas → meta nueva → rampa nueva
     rzDiagCierre(document.getElementById('rzBody'));            // recalcula con las nuevas fechas
@@ -4711,7 +4727,7 @@ let _cierreCache=null;
 async function cierreMeta(cfg, ritmo){
   cfg=cfg||await nivConfig();
   const fc=await cierreConfig();
-  const key=fc.autowm+'|'+fc.resto+'|'+(cfg.ritmoVentana||0);
+  const key=fc.autowm+'|'+fc.resto+'|'+(fc.galDicCj||0)+'|'+(cfg.ritmoVentana||0);
   if(_cierreCache && _cierreCache.key===key) return _cierreCache.data;
   ritmo=ritmo||await nivRitmo(cfg.ritmoVentana);
   const lyA=_cierreLY(fc.autowm), lyR=_cierreLY(fc.resto);          // mismas fechas, año pasado
@@ -4725,6 +4741,9 @@ async function cierreMeta(cfg, ritmo){
   const primerEne=diasEne.length?diasEne[0]:null;
   const finEne=primerEne?_cierreShift(primerEne, CIERRE_COLCHON_SEM*7-1):null;
   const b3=primerEne?_cierreSuma(vEne, primerEne, finEne, null):{porProd:{},porDia:[]};
+  // SALIDA de reapertura (11-ene): el día PICO de venta al reabrir. Separa lo que SALE ese día de
+  // lo que queda como colchón para operar las semanas siguientes. porProd = entrega del día pico.
+  const eEne=primerEne?_cierreEntrega(vEne, primerEne, null, 3):{vacio:true, porProd:{}};
 
   const avisos=[];
   if(e1.vacio) avisos.push('Sin ventas de Auto+Walmart en '+e1.D1+' → '+e1.D2+' (bloque 1 queda en 0).');
@@ -4741,16 +4760,22 @@ async function cierreMeta(cfg, ritmo){
   const estim={};   // productos sin historia → estimados con ritmo actual
   // Modelo por producto, UNA sola vez: los 3 bloques en uds sueltas. De acá salen la
   // tabla de la meta, el total, el pico real, la rampa del motor y el panel del Plan.
+  const galDicU=(fc.galDicCj>0)?fc.galDicCj*NIV_INFO[519].cajaU:null;   // override manual: galletas en la entrega grande de dic (cj → uds)
   const M=NIV_PROD.map(function(p){
     const r=ritmo[p]||0;
     let b1=Math.max(0,(e1.porProd||{})[p]||0), b1e=false;
     const b2=Math.max(0,(e2.porProd||{})[p]||0);
     let b3p=Math.max(0,(b3.porProd||{})[p]||0), b3e=false;
-    if(b1<=0 && r>0){ b1=r; b1e=true; estim[p]=1; }        // ej. Galletas: nuevo, sin dic pasado → ritmo actual
+    if(p===519 && galDicU!=null){ b1=galDicU; b1e=true; estim[p]=1; }   // galletas dic = número manual de Andrea (antojo navideño), no ritmo
+    else if(b1<=0 && r>0){ b1=r; b1e=true; estim[p]=1; }                // ej. Galletas sin override: nuevo, sin dic pasado → ritmo actual
     if(b3p<=0 && r>0){ b3p=r*CIERRE_COLCHON_SEM; b3e=true; estim[p]=1; }
     // colchón de k semanas: si es estimado escala con el ritmo, si no es la venta real acumulada
     const b3De=function(k){ return b3e ? r*k : Math.max(0,((b3k[k]||{porProd:{}}).porProd||{})[p]||0); };
-    return {p:p, I:NIV_INFO[p], b1:b1, b2:b2, b3:b3p, r:r, b3De:b3De, nota:(b1e||b3e)?' *':''};
+    // separar la SALIDA de reapertura (11-ene) del colchón restante. Estimado (sin historia): ~1 semana de ritmo.
+    let b3s = b3e ? r : Math.max(0,(eEne.porProd||{})[p]||0);
+    b3s = Math.min(b3s, b3p);
+    const b3r = Math.max(0, b3p - b3s);
+    return {p:p, I:NIV_INFO[p], b1:b1, b2:b2, b3:b3p, b3s:b3s, b3r:b3r, r:r, b3De:b3De, nota:(b1e||b3e)?' *':''};
   });
   const porProd={};   // META por producto en UDS — lo que consume el motor
   M.forEach(function(m){ porProd[m.p]=m.b1+m.b2+m.b3; });
@@ -5294,6 +5319,9 @@ async function rzDiagCierre(body){
         +'<input id="cierreFAutowm" type="date" value="'+esc(fc.autowm)+'" style="background:#0E0E11;border:.5px solid #26262C;color:var(--text);border-radius:6px;padding:4px 8px;font-family:inherit;font-size:12px">'
         +'<span style="color:var(--text-3);font-size:11.5px">· resto + HORECA + Abner</span>'
         +'<input id="cierreFResto" type="date" value="'+esc(fc.resto)+'" style="background:#0E0E11;border:.5px solid #26262C;color:var(--text);border-radius:6px;padding:4px 8px;font-family:inherit;font-size:12px">'
+        +'<span style="color:var(--text-3);font-size:11.5px">· Galletas 14-dic (antojo)</span>'
+        +'<input id="cierreGalDicCj" type="number" min="0" step="1" value="'+(fc.galDicCj?esc(String(fc.galDicCj)):'')+'" placeholder="cj" title="Override manual de galletas en la entrega grande de dic, en cajas. Vacío = ritmo actual." style="width:56px;background:#0E0E11;border:.5px solid #26262C;color:var(--text);border-radius:6px;padding:4px 8px;font-family:inherit;font-size:12px">'
+        +'<span style="color:var(--text-3);font-size:11.5px">cj</span>'
         +'<button onclick="cierreGuardarFechas()" style="background:none;border:.5px solid #2C2C33;color:var(--text-2);font-size:11.5px;border-radius:6px;padding:4px 12px;cursor:pointer">Guardar y recalcular</button>'
       +'</div>'
       +'<div style="margin-bottom:8px">'+detalle(e1,'Bloque 1 · entrega Auto + Walmart (dic pasado)')+'</div>'
@@ -5898,9 +5926,11 @@ function cnRecTerm(id){
   const t=_cnTerm.find(x=>x.id===id); if(!t)return;
   const dr=(cnDraft().term||{})[id]||{};
   const vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
-  const cajas=parseFloat(dr.cajas)||0, sue=parseFloat(dr.sue)||0, fis=cajas*t.factor+sue;
+  const cajas=parseFloat(dr.cajas)||0, sue=parseFloat(dr.sue)||0;
+  const fis=cajas*t.factor+sue*t.presDiv;          // cajas (uds indiv) + sueltos en unidad de venta → uds individuales
   const diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
-  const de=document.getElementById('cn-tdif'+id), se=document.getElementById('cn-tsem'+id);
+  const de=document.getElementById('cn-tdif'+id), se=document.getElementById('cn-tsem'+id), to=document.getElementById('cn-ttot'+id);
+  if(to){ to.textContent=vacio?'':'= '+fmtN(fis)+' u'; }
   if(de){ de.textContent=vacio?'—':fmtDiff(diff)+' u'; de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
   cnResumen();
@@ -5914,7 +5944,7 @@ function cnResumen(){
     if(vacio){ sin++; continue; } if(Math.abs((parseFloat(dr)||0)-p.odoo)>CONTEO_TOL.term.verde) desc++; }
   for(const t of _cnTerm){ const dr=(cnDraft().term||{})[t.id]||{};
     const vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
-    if(vacio){ sin++; continue; } const fis=(parseFloat(dr.cajas)||0)*t.factor+(parseFloat(dr.sue)||0);
+    if(vacio){ sin++; continue; } const fis=(parseFloat(dr.cajas)||0)*t.factor+(parseFloat(dr.sue)||0)*t.presDiv;
     if(Math.abs(fis-t.odoo)>CONTEO_TOL.term.verde) desc++; }
   const el=document.getElementById('cn-resumen'); if(el) el.innerHTML=
     '<b>'+desc+'</b> descuadre'+(desc===1?'':'s')+' · <b>'+sin+'</b> sin contar';
@@ -5975,14 +6005,17 @@ function cnRender(){
       +'<td class="cn-sem r '+s.cls+'" id="cn-psem'+p.id+'">'+s.txt+'</td></tr>';
   }
   document.getElementById('cn-premez').innerHTML=pm+'</tbody></table>';
-  // PRODUCTO TERMINADO
-  let tm='<table class="cn-tbl"><thead><tr><th>Producto</th><th>Odoo dice</th><th>Conteo físico</th><th class="r">Diferencia</th><th class="r">Semáforo</th></tr></thead><tbody>';
+  // PRODUCTO TERMINADO — se cuenta en la UNIDAD DE VENTA (Francés/Buns por paq de 4, Pizza por paq de 2,
+  // resto por unidad). Caja = factor/presDiv unidades de venta (6 salvo Galletas 12). Total mostrado en uds.
+  let tm='<table class="cn-tbl"><thead><tr><th>Producto</th><th>Odoo dice</th><th>Conteo físico (unidad de venta)</th><th class="r">Diferencia</th><th class="r">Semáforo</th></tr></thead><tbody>';
   for(const t of _cnTerm){
     const dr=(d.term||{})[t.id]||{}, vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
-    const fis=(parseFloat(dr.cajas)||0)*t.factor+(parseFloat(dr.sue)||0), diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
-    tm+='<tr><td class="cn-nm">'+esc(t.label)+' <span class="cn-lbl">caja ×'+t.factor+'</span></td><td class="cn-odoo">'+fmtN(t.odoo)+' u</td>'
+    const fis=(parseFloat(dr.cajas)||0)*t.factor+(parseFloat(dr.sue)||0)*t.presDiv, diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
+    const cajaV=t.factor/t.presDiv, cajaU=(t.presDiv===1?'u':'paq');   // caja en unidad de venta
+    tm+='<tr><td class="cn-nm">'+esc(t.label)+' <span class="cn-lbl">caja = '+cajaV+' '+cajaU+'</span></td><td class="cn-odoo">'+fmtN(t.odoo)+' u</td>'
       +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr.cajas!=null?esc(dr.cajas):'')+'" oninput="cnTermCajas('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">cajas</span> + '
-      +'<input class="cn-in" inputmode="numeric" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnTermSue('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">sueltas</span></td>'
+      +'<input class="cn-in" inputmode="numeric" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnTermSue('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(t.venta)+'</span>'
+      +'<span class="cn-ttot" id="cn-ttot'+t.id+'">'+(vacio?'':'= '+fmtN(fis)+' u')+'</span></td>'
       +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-tdif'+t.id+'">'+(vacio?'—':fmtDiff(diff)+' u')+'</td>'
       +'<td class="cn-sem r '+s.cls+'" id="cn-tsem'+t.id+'">'+s.txt+'</td></tr>';
   }
@@ -5995,8 +6028,8 @@ async function cnGuardar(){
   _cnMP.forEach(m=>{ const dr=(d.mp||{})[m.pid]||{}; const {pe,fis,vacio}=fisicoMP(m,dr);
     snap.mp[m.pid]={name:m.name, uom:m.uom, empaques:dr.emp!=null&&dr.emp!==''?parseFloat(dr.emp)||0:null, suelto:dr.sue!=null&&dr.sue!==''?parseFloat(dr.sue)||0:null, fisicoBase:vacio?null:fis, odoo:m.qty, diff:vacio?null:fis-m.qty}; });
   _cnPremez.forEach(p=>{ const dr=(d.premez||{})[p.id]; const vac=(dr==null||dr===''); const fis=parseFloat(dr)||0; snap.premez[p.id]={label:p.label, batches:vac?null:fis, odoo:p.odoo, diff:vac?null:fis-p.odoo}; });
-  _cnTerm.forEach(t=>{ const dr=(d.term||{})[t.id]||{}; const cajas=parseFloat(dr.cajas)||0, sue=parseFloat(dr.sue)||0, fis=cajas*t.factor+sue;
-    const vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue===''); snap.term[t.id]={label:t.label, cajas, sueltas:sue, fisicoBase:vacio?null:fis, odoo:t.odoo, diff:vacio?null:fis-t.odoo}; });
+  _cnTerm.forEach(t=>{ const dr=(d.term||{})[t.id]||{}; const cajas=parseFloat(dr.cajas)||0, sue=parseFloat(dr.sue)||0, fis=cajas*t.factor+sue*t.presDiv;
+    const vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue===''); snap.term[t.id]={label:t.label, cajas, sueltas:sue, sueltasUnidad:t.venta, fisicoBase:vacio?null:fis, odoo:t.odoo, diff:vacio?null:fis-t.odoo}; });
   const c=sbClient(); if(!c){ alert('Sin conexión con la base. Reintentá.'); return; }
   let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
   const { error } = await c.from('conteos').insert({ usuario: email||null, data: snap });
@@ -6108,7 +6141,6 @@ function planPanelMeta(){
   return '<div class="pm">'
     +'<div class="pm-h"><div>'
       +'<div class="pm-t">Meta de cierre — 18 dic</div>'
-      +'<div class="pm-sub">A dónde hay que llegar: entrega Auto+Walmart del '+esc(_fechaCorta(R.fc.autowm))+', entrega del resto del '+esc(_fechaCorta(R.fc.resto))+' y colchón de '+CIERRE_COLCHON_SEM+' semanas para arrancar enero.</div>'
     +'</div><div>'
       +'<div class="pm-tot">'+_rzN(metaCj)+'<span>cajas</span></div>'
       +'<div class="pm-sem">'+_rzN(sem,1)+' semanas de venta</div>'
@@ -6116,8 +6148,58 @@ function planPanelMeta(){
     +'<table class="pm-tab"><thead><tr><th>Producto</th><th>Meta (cj)</th><th>Hoy (cj)</th></tr></thead>'
     +'<tbody>'+filas+'</tbody></table>'
     +aviso
-    +'<div class="pm-foot">Hoy = stock de Odoo en vivo, en cajas completas. "Estimado" = sin historia del dic pasado, calculado con el ritmo actual.</div>'
     +'</div>';
+}
+
+// ── Desglose de la meta por BLOQUES de entrega — para planificar las entregas con clientes.
+// Reusa R.M (los bloques que ya calculó cierreMeta / ?diag=cierre): b1 = entrega Auto+WM (14-dic),
+// b2 = entrega resto+HORECA+Abner (18-dic), y el colchón de enero partido en b3s (salida de reapertura
+// 11-ene) + b3r (lo que queda para operar). En CAJAS por producto. Los 4 bloques se reparten con resto
+// mayor (Hamilton) sobre la meta en cajas del panel de arriba (ceil del total en uds), así SUMAN EXACTO
+// la meta y no aparecen descuadres de redondeo.
+function _bloquesCj(m){
+  const caja=m.I.cajaU;
+  const b3s=m.b3s||0, b3r=(m.b3r!=null?m.b3r:Math.max(0,m.b3-b3s));
+  const parts=[m.b1, m.b2, b3s, b3r];               // total = b1+b2+b3 (b3s+b3r=b3) → misma meta que el panel
+  const meta=Math.ceil(parts.reduce(function(a,b){ return a+b; },0)/caja);
+  const raw=parts.map(function(v){ return v/caja; });
+  const cj=raw.map(Math.floor);
+  let rem=meta-cj.reduce(function(a,b){ return a+b; },0);
+  raw.map(function(v,i){ return {i:i, f:v-Math.floor(v)}; })
+     .sort(function(a,b){ return b.f-a.f; })
+     .forEach(function(o){ if(rem>0){ cj[o.i]++; rem--; } });
+  while(rem>0){ cj[0]++; rem--; }        // guarda: si el ceil del total dejó resto tras repartir
+  return {b1:cj[0], b2:cj[1], b3s:cj[2], b3r:cj[3], meta:meta};
+}
+function planDesgloseMeta(){
+  if(!_planCierre) return '';
+  const R=_planCierre;
+  let t1=0,t2=0,ts=0,tr=0,tm=0;
+  const filas=R.M.map(function(m){
+    const b=_bloquesCj(m); t1+=b.b1; t2+=b.b2; ts+=b.b3s; tr+=b.b3r; tm+=b.meta;
+    return '<tr><td>'+esc(_nomCorto(m.p))+(R.estim[m.p]?'<span class="pm-est">estimado</span>':'')+'</td>'
+      +'<td>'+_rzN(b.b1)+'</td><td>'+_rzN(b.b2)+'</td><td>'+_rzN(b.b3s)+'</td><td>'+_rzN(b.b3r)+'</td>'
+      +'<td class="pm-meta">'+_rzN(b.meta)+'</td></tr>';
+  }).join('');
+  return '<div class="dm">'
+    +'<table class="dm-tab"><thead><tr>'
+      +'<th>Producto</th>'
+      +'<th>'+esc(_fechaCorta(R.fc.autowm))+'<span>Auto + Walmart</span></th>'
+      +'<th>'+esc(_fechaCorta(R.fc.resto))+'<span>resto + HORECA + Abner</span></th>'
+      +'<th>Salida 11-ene<span>reapertura</span></th>'
+      +'<th>Colchón<span>queda tras 11-ene</span></th>'
+      +'<th>Meta<span>suma de los 4</span></th>'
+    +'</tr></thead><tbody>'+filas+'</tbody>'
+    +'<tfoot><tr><td>Total cajas</td><td>'+_rzN(t1)+'</td><td>'+_rzN(t2)+'</td><td>'+_rzN(ts)+'</td><td>'+_rzN(tr)+'</td><td class="pm-meta">'+_rzN(tm)+'</td></tr></tfoot>'
+    +'</table>'
+    +'<div class="pm-foot">Cajas hacia arriba, de las ventas reales del año pasado (mismas fechas). "Estimado" = sin historia del año pasado (ej. Galletas): ritmo actual, salvo el override manual de la entrega grande de dic.</div>'
+    +'</div>';
+}
+// Desglose plegado: se despliega al clic (de entrada solo META vs HOY).
+function planToggleDesglose(){
+  const w=document.getElementById('dmWrap'), b=document.getElementById('dmToggle'); if(!w) return;
+  const abrir=(w.style.display==='none'); w.style.display=abrir?'block':'none';
+  if(b) b.textContent=abrir?'Ocultar desglose de entregas':'Ver desglose por entrega — qué sale cada fecha';
 }
 
 // Sección de ESCENARIOS dentro del Plan, debajo del panel META vs HOY (van juntos: la meta dice
@@ -6137,37 +6219,29 @@ function planEscenariosSeccion(){
 
 function planRenderMeses(){
   const hoy=new Date(), mesHoy=hoy.getMonth();
-  const porMes={}, rampaMes={};
+  const porMes={};
   _planProj.forEach(wk=>{ const m=wk.monday.getMonth(); porMes[m]=porMes[m]||{}; const b=_semanaBatches(wk);
-    if(wk.rampa) rampaMes[m]=(rampaMes[m]||0)+1;
     Object.keys(b).forEach(p=>porMes[m][p]=(porMes[m][p]||0)+b[p]); });
-  // Etiqueta SOLO si el mes pide atención: feriado, cierre, o RAMPA (el motor subiendo hacia
-  // la meta). La rampa NO está cableada por mes — sale de en qué semanas la encendió el motor.
+  // Etiquetas SOLO de lo que cambia la producción y vale marcar: FERIADOS y CIERRE 18-dic.
+  // (Las fases crucero/rampa/pico no se marcan: marcaban casi todos los meses → ruido, no señal.)
   const FERCORTO={7:'Feriado 31', 8:'Feriado 15', 11:'Feriado 1'};
   let cards='';
   for(let m=mesHoy;m<=11;m++){
     const bat=porMes[m]||{}, esHoy=(m===mesHoy);
     const filas=NIV_PROD.filter(p=>(bat[p]||0)>0).map(p=>'<div class="pl-bl">'+esc(_rzBP(bat[p], p))+'</div>').join('') || '<div class="pl-bl pl-b0">—</div>';
-    const tags=(rampaMes[m]?'<span class="pl-tag pl-tag-rampa">Rampa</span>':'')
-      +(m===11?'<span class="pl-tag pl-tag-cierre">Cierre 18-dic</span>':'')
+    const tags=(m===11?'<span class="pl-tag pl-tag-cierre">Cierre 18-dic</span>':'')
       +(FERCORTO[m]?'<span class="pl-tag pl-tag-fer">'+esc(FERCORTO[m])+'</span>':'');
     cards+='<div class="pl-mes'+(esHoy?' pl-mes-now':'')+'" onclick="planVerDetalle('+m+')">'
       +'<div class="pl-mnom">'+_MESNOM2[m]+(esHoy?' <span class="pl-hoy">· ahora</span>':'')+'</div>'
       +(tags?'<div class="pl-tags">'+tags+'</div>':'')
       +'<div class="pl-bat">'+filas+'</div></div>';
   }
-  const rMs=Object.keys(rampaMes).map(Number).sort(function(a,b){ return a-b; });
-  const mesesRampa=rMs.length ? (_MESNOM2[rMs[0]]+(rMs.length>1?' a '+_MESNOM2[rMs[rMs.length-1]]:'')) : '';
   document.getElementById('planBody').innerHTML=
     planPanelMeta()
+    +'<div class="dm-toggle-wrap"><button class="dm-toggle" id="dmToggle" onclick="planToggleDesglose()">Ver desglose por entrega — qué sale cada fecha</button></div>'
+    +'<div id="dmWrap" style="display:none">'+planDesgloseMeta()+'</div>'
     +planEscenariosSeccion()
-    +'<div class="pl-grid">'+cards+'</div><div id="planDetalle"></div>'
-    +'<div class="pl-notas"><div class="pl-nt">Cómo se lee este plan</div><ul>'
-    +'<li>Crucero: se produce al ritmo normal, para no llenar el congelador meses antes de tiempo.</li>'
-    +'<li><b>Rampa</b>'+(mesesRampa?' ('+esc(mesesRampa)+')':'')+': el motor sube la producción para llegar al 18-dic con la meta de cierre cubierta. Arranca lo más tarde posible — cuando los días que quedan ya no alcanzan para lo que falta.</li>'
-    +'<li>Cierre duro: el vie 18-dic es el último día productivo; se reabre el lun 11-ene. No se planifica nada entre medio.</li></ul>'
-    +'<div class="pl-nt" style="margin-top:12px">Feriados que afectan producción (no se produce; la carga se corre al viernes)</div><ul>'
-    +'<li>lun 31 ago — Día de la Persona Negra.</li><li>mar 15 set — Independencia (se cubre el viernes 18).</li><li>mar 1 dic — Abolición del Ejército.</li></ul></div>';
+    +'<div class="pl-grid">'+cards+'</div><div id="planDetalle"></div>';
 }
 
 function planVerDetalle(m, noScroll){
@@ -8145,16 +8219,20 @@ function resRenderComp(){
 // Sección 2: producto terminado (conteo cajas+sueltos vs stock.quant, semáforo).
 // Conteo y historial: localStorage (no se escribe en Odoo).
 // ════════════════════════════════════════════════════════════════════════
-// Terminados: id de prod + factor caja→UNIDADES INDIVIDUALES (confirmados por Andrea).
-// Blanco/Semillas: caja de 6 · Galletas: caja de 12 potes · Francés/Buns: 24 u/caja (6 paq de 4) · Pizza: 12 u/caja (6 paq de 2).
-// El campo "sueltos" es en unidades individuales; el on-hand de Odoo se convierte a unidades individuales (÷ factor UoM) para comparar en la misma unidad.
+// Terminados: id de prod (confirmados por Andrea). El conteo se hace en la UNIDAD DE VENTA:
+//   · factor  = uds INDIVIDUALES por CAJA  (Blanco/Semillas 6 · Galletas 12 · Francés/Buns 24 · Pizza 12).
+//   · presDiv = uds individuales por UNIDAD DE VENTA (Francés/Buns paq de 4 · Pizza paq de 2 · resto suelta = 1).
+//   · venta   = etiqueta de la unidad de venta (lo que se escribe en el campo de sueltos).
+// Caja en unidad de venta = factor/presDiv → 6 para todos MENOS Galletas (12). Físico = cajas×factor + sueltos×presDiv.
+// Odoo llega en uds individuales (stock.quant ÷ prodUomFactor: Francés/Buns/Pizza vienen en paquetes) → todo se
+// compara en uds individuales, sin mezclar unidades.
 const INV_TERM = [
-  {id:451, label:'Pan Blanco',      factor:6},
-  {id:452, label:'Pan de Semillas', factor:6},
-  {id:453, label:'Pan Francés',     factor:24},
-  {id:472, label:'Pizza Crust',     factor:12},
-  {id:503, label:'Buns',            factor:24},
-  {id:519, label:'Galletas',        factor:12},
+  {id:451, label:'Pan Blanco',      factor:6,  presDiv:1, venta:'uds'},
+  {id:452, label:'Pan de Semillas', factor:6,  presDiv:1, venta:'uds'},
+  {id:453, label:'Pan Francés',     factor:24, presDiv:4, venta:'paq de 4'},
+  {id:472, label:'Pizza Crust',     factor:12, presDiv:2, venta:'paq de 2'},
+  {id:503, label:'Buns',            factor:24, presDiv:4, venta:'paq de 4'},
+  {id:519, label:'Galletas',        factor:12, presDiv:1, venta:'uds'},
 ];
 // Premezclas (producto intermedio). Odoo las lleva en Units; 1 unidad = 1 batch. Conteo directo en batches.
 // Galletas: id 517 (es_CR "Premezcla Galletas"; en_US la confunde con "Prueba Galletas" = el terminado 519).
@@ -8339,22 +8417,23 @@ function recomputeTerm(id){
   const dr=(invDraft().term||{})[id]||{};
   const vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sueltos==null||dr.sueltos==='');
   const cajas=parseFloat(dr.cajas)||0, sueltos=parseFloat(dr.sueltos)||0;
-  const fis=cajas*t.factor+sueltos, diff=fis-t.odoo, s=semTerm(diff,vacio);
+  const fis=cajas*t.factor+sueltos*t.presDiv, diff=fis-t.odoo, s=semTerm(diff,vacio);   // sueltos en unidad de venta → uds indiv
   const fe=document.getElementById('tfis'+id), de=document.getElementById('tdif'+id), se=document.getElementById('tsem'+id);
   if(fe)fe.textContent=fmtN(fis); if(de)de.textContent=vacio?'—':fmtDiff(diff);
   if(se){ se.textContent=s.txt; se.className=s.cls; }
 }
 function renderTerm(){
   const d=invDraft().term||{};
-  let h='<table class="inv-tbl"><tr><th>Producto</th><th>Cajas</th><th>Sueltos</th><th style="text-align:right">Físico</th><th style="text-align:right">Odoo</th><th style="text-align:right">Δ</th><th>Semáforo</th></tr>';
+  let h='<table class="inv-tbl"><tr><th>Producto</th><th>Cajas</th><th>Sueltos (unidad de venta)</th><th style="text-align:right">Físico (u)</th><th style="text-align:right">Odoo (u)</th><th style="text-align:right">Δ</th><th>Semáforo</th></tr>';
   for(const t of (window._invTerm||[])){
     const dr=d[t.id]||{};
     const vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sueltos==null||dr.sueltos==='');
     const cajas=parseFloat(dr.cajas)||0, sueltos=parseFloat(dr.sueltos)||0;
-    const fis=cajas*t.factor+sueltos, diff=fis-t.odoo, s=semTerm(diff,vacio);
-    h+='<tr><td>'+esc(t.label)+' <span class="muted" style="font-size:11px">×'+t.factor+'</span></td>'
+    const fis=cajas*t.factor+sueltos*t.presDiv, diff=fis-t.odoo, s=semTerm(diff,vacio);   // sueltos en unidad de venta → uds indiv
+    const cajaV=t.factor/t.presDiv, cajaU=(t.presDiv===1?'u':'paq');
+    h+='<tr><td>'+esc(t.label)+' <span class="muted" style="font-size:11px">caja = '+cajaV+' '+cajaU+'</span></td>'
       +'<td><input class="inv-in inv-in-sm" inputmode="numeric" value="'+(dr.cajas!=null?esc(dr.cajas):'')+'" oninput="invTermCajas('+t.id+',this.value)" placeholder="0"></td>'
-      +'<td><input class="inv-in inv-in-sm" inputmode="numeric" value="'+(dr.sueltos!=null?esc(dr.sueltos):'')+'" oninput="invTermSueltos('+t.id+',this.value)" placeholder="0"></td>'
+      +'<td><input class="inv-in inv-in-sm" inputmode="numeric" value="'+(dr.sueltos!=null?esc(dr.sueltos):'')+'" oninput="invTermSueltos('+t.id+',this.value)" placeholder="0"> <span class="muted" style="font-size:11px">'+esc(t.venta)+'</span></td>'
       +'<td style="text-align:right" id="tfis'+t.id+'">'+fmtN(fis)+'</td>'
       +'<td style="text-align:right">'+fmtN(t.odoo)+'</td>'
       +'<td style="text-align:right" id="tdif'+t.id+'">'+(vacio?'—':fmtDiff(diff))+'</td>'
@@ -8424,7 +8503,7 @@ async function guardarConteo(){
   const d=invDraft(); const snap={fecha:new Date().toISOString().slice(0,16), mp:{}, premez:{}, term:{}};
   (window._invMP||[]).forEach(m=>{ const dr=(d.mp&&d.mp[m.pid])||{}; const {pe,fis,vacio}=fisicoMP(m,dr); snap.mp[m.pid]={name:m.name, uom:m.uom, empaque:pe?pe.lab:null, empaques:dr.emp!=null&&dr.emp!==''?parseFloat(dr.emp)||0:null, suelto:dr.sue!=null&&dr.sue!==''?parseFloat(dr.sue)||0:null, fisicoBase:vacio?null:fis, odoo:m.qty, diff:vacio?null:fis-m.qty}; });
   (window._invPremez||[]).forEach(p=>{ const dr=(d.premez&&d.premez[p.id]); const vac=(dr==null||dr===''); const fis=parseFloat(dr)||0; snap.premez[p.id]={label:p.label, batches:vac?null:fis, odoo:p.odoo, diff:vac?null:fis-p.odoo}; });
-  (window._invTerm||[]).forEach(t=>{ const dr=(d.term&&d.term[t.id])||{}; const cajas=parseFloat(dr.cajas)||0, sueltos=parseFloat(dr.sueltos)||0; const fis=cajas*t.factor+sueltos; snap.term[t.id]={label:t.label, cajas, sueltos, fisicoBase:fis, odoo:t.odoo, diff:fis-t.odoo}; });
+  (window._invTerm||[]).forEach(t=>{ const dr=(d.term&&d.term[t.id])||{}; const cajas=parseFloat(dr.cajas)||0, sueltos=parseFloat(dr.sueltos)||0; const fis=cajas*t.factor+sueltos*t.presDiv; snap.term[t.id]={label:t.label, cajas, sueltos, sueltosUnidad:t.venta, fisicoBase:fis, odoo:t.odoo, diff:fis-t.odoo}; });
   const c=sbClient(); if(!c){ alert('No hay conexión con la base. Reintentá.'); return; }
   let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
   const { error } = await c.from('conteos').insert({ usuario: email||null, data: snap });
