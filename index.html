@@ -1778,7 +1778,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vConteo .cn-tbl th.r,#vConteo .cn-tbl td.r{text-align:right}
 #vConteo .cn-tbl td{padding:9px 10px 9px 0;border-bottom:.5px solid #1A1A1E;font-size:13px;color:var(--text);vertical-align:middle}
 #vConteo .cn-tbl tbody tr:last-child td{border-bottom:none}
-#vConteo .cn-nm{font-weight:500}
+#vConteo .cn-nm{font-weight:500;min-width:132px}
+#vConteo .cn-pnom{display:block;white-space:nowrap}
+#vConteo .cn-pcaja{display:block;white-space:nowrap;color:var(--text-3);font-size:11px;font-weight:400;margin-top:2px}
 #vConteo .cn-odoo{color:var(--text-2);white-space:nowrap}
 #vConteo .cn-aj{color:#E9A23B;font-size:11px}
 #vConteo .cn-count{white-space:nowrap}
@@ -1898,7 +1900,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 17 jul 2026 · WIP';
+const BUILD = 'v 27 jul 2026 · WIP';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -5922,6 +5924,18 @@ function cnRecPremez(id){
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
   cnResumen();
 }
+// Texto de un TOTAL en la unidad de venta. Productos por paquete → SOLO paquetes (uds ÷ presDiv),
+// sin el "· X u" individual. Blanco/Semillas/Galletas (presDiv=1) → unidades. Coma decimal es-CR.
+function _cnVentaTxt(t, uds){
+  if(t.presDiv>1) return fmtN(uds/t.presDiv)+' '+t.venta;
+  return fmtN(uds)+' u';
+}
+// Texto de la DIFERENCIA en la unidad de venta. Por paquete → paquetes (fraccionado si no llena uno);
+// resto → unidades. El semáforo se evalúa aparte (en unidad de venta), no depende de este texto.
+function _cnDiffTxt(t, diff){
+  if(t.presDiv>1) return fmtDiff(diff/t.presDiv)+' paq';
+  return fmtDiff(diff)+' u';
+}
 function cnRecTerm(id){
   const t=_cnTerm.find(x=>x.id===id); if(!t)return;
   const dr=(cnDraft().term||{})[id]||{};
@@ -5930,8 +5944,8 @@ function cnRecTerm(id){
   const fis=cajas*t.factor+sue*t.presDiv;          // cajas (uds indiv) + sueltos en unidad de venta → uds individuales
   const diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
   const de=document.getElementById('cn-tdif'+id), se=document.getElementById('cn-tsem'+id), to=document.getElementById('cn-ttot'+id);
-  if(to){ to.textContent=vacio?'':'= '+fmtN(fis)+' u'; }
-  if(de){ de.textContent=vacio?'—':fmtDiff(diff)+' u'; de.className='cn-diff r '+(vacio?'':s.cls); }
+  if(to){ to.textContent=vacio?'':'= '+_cnVentaTxt(t,fis); }
+  if(de){ de.textContent=vacio?'—':_cnDiffTxt(t,diff); de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
   cnResumen();
 }
@@ -6012,11 +6026,11 @@ function cnRender(){
     const dr=(d.term||{})[t.id]||{}, vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
     const fis=(parseFloat(dr.cajas)||0)*t.factor+(parseFloat(dr.sue)||0)*t.presDiv, diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
     const cajaV=t.factor/t.presDiv, cajaU=(t.presDiv===1?'u':'paq');   // caja en unidad de venta
-    tm+='<tr><td class="cn-nm">'+esc(t.label)+' <span class="cn-lbl">caja = '+cajaV+' '+cajaU+'</span></td><td class="cn-odoo">'+fmtN(t.odoo)+' u</td>'
+    tm+='<tr><td class="cn-nm"><span class="cn-pnom">'+esc(t.label)+'</span><span class="cn-pcaja">caja = '+cajaV+' '+cajaU+'</span></td><td class="cn-odoo">'+_cnVentaTxt(t,t.odoo)+'</td>'
       +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr.cajas!=null?esc(dr.cajas):'')+'" oninput="cnTermCajas('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">cajas</span> + '
       +'<input class="cn-in" inputmode="numeric" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnTermSue('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(t.venta)+'</span>'
-      +'<span class="cn-ttot" id="cn-ttot'+t.id+'">'+(vacio?'':'= '+fmtN(fis)+' u')+'</span></td>'
-      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-tdif'+t.id+'">'+(vacio?'—':fmtDiff(diff)+' u')+'</td>'
+      +'<span class="cn-ttot" id="cn-ttot'+t.id+'">'+(vacio?'':'= '+_cnVentaTxt(t,fis))+'</span></td>'
+      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-tdif'+t.id+'">'+(vacio?'—':_cnDiffTxt(t,diff))+'</td>'
       +'<td class="cn-sem r '+s.cls+'" id="cn-tsem'+t.id+'">'+s.txt+'</td></tr>';
   }
   document.getElementById('cn-term').innerHTML=tm+'</tbody></table>';
