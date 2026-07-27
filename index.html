@@ -828,7 +828,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
       <div class="home-live"><span class="live-dot-home"></span><span class="t">conectado a Odoo · datos en vivo</span></div>
     </div>
     <div class="home-center">
-    <div class="home-hi">Hola Andrea.</div>
+    <div class="home-hi" id="homeHi">Hola.</div>
     <div class="home-soon">
       <div class="home-search">
         <input placeholder="¿Qué querés consultar?" disabled>
@@ -2282,10 +2282,20 @@ async function authEntrar(){
   await entrarProd();   // conecta a producción (solo lectura, por el proxy con el JWT) y muestra el lobby
   if(SESSION && SESSION.uid){
     document.getElementById('vAuth').classList.add('hidden');   // conectado → recién ahora dejamos ver el lobby
+    setSaludo();                                                // saluda a quien está autenticado (no un nombre fijo)
   }else if(msg){
     msg.style.color='#FF8A8A'; msg.textContent='No pude conectar a producción. Reintentá.';
     document.getElementById('btnSalir').classList.add('hidden');
   }
+}
+// Saludo por usuario autenticado: lee el email de la sesión de Supabase y lo mapea a un nombre.
+// Sin mapeo → "Hola" sin nombre. Nada hardcodeado: cambia solo al entrar con otra cuenta.
+const SALUDO_NOMBRES={'andrea@truefoodcr.com':'Andrea', 'lorena@truefoodcr.com':'Lorena'};
+async function setSaludo(){
+  const el=document.getElementById('homeHi'); if(!el) return;
+  let email=''; try{ const {data}=await sbClient().auth.getUser(); email=((data&&data.user&&data.user.email)||'').trim().toLowerCase(); }catch(e){}
+  const nom=SALUDO_NOMBRES[email];
+  el.textContent=nom ? ('Hola '+nom+'.') : 'Hola.';
 }
 async function authLogout(){ try{ await sbClient().auth.signOut(); }catch(e){} location.reload(); }
 window.addEventListener('DOMContentLoaded', authInit);
