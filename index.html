@@ -1778,6 +1778,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vConteo .cn-tbl th.r,#vConteo .cn-tbl td.r{text-align:right}
 #vConteo .cn-tbl td{padding:9px 10px 9px 0;border-bottom:.5px solid #1A1A1E;font-size:13px;color:var(--text);vertical-align:middle}
 #vConteo .cn-tbl tbody tr:last-child td{border-bottom:none}
+#vConteo #cn-pending:empty{display:none}
+#vConteo .cn-chip{display:inline-flex;align-items:center;gap:10px;margin-top:12px;background:var(--surface-2);border:.5px solid var(--border);border-left:3px solid var(--mod);border-radius:8px;padding:8px 12px;font-size:12.5px;color:var(--text-2)}
+#vConteo .cn-chip-btn{background:none;border:.5px solid var(--mod);color:var(--text);font-family:inherit;font-size:12px;border-radius:6px;padding:3px 12px;cursor:pointer}
+#vConteo .cn-chip-btn:hover{background:rgba(212,83,126,.10)}
 #vConteo .cn-nm{font-weight:500;min-width:132px}
 #vConteo .cn-pnom{display:block;white-space:nowrap}
 #vConteo .cn-pcaja{display:block;white-space:nowrap;color:var(--text-3);font-size:11px;font-weight:400;margin-top:2px}
@@ -1817,6 +1821,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   </div>
   <div id="cnStatus" class="status s-info hidden" style="margin-top:14px"></div>
   <div id="cn-alerta" class="cn-alerta">Antes de contar, las producciones del día deben estar registradas en Odoo.</div>
+  <div id="cn-pending"></div>
   <div id="cn-tabs">
     <button class="cn-tab on" data-t="mp" onclick="cnTab('mp')">Materia prima</button>
     <button class="cn-tab" data-t="premez" onclick="cnTab('premez')">Premezclas</button>
@@ -5882,6 +5887,10 @@ function _mpRank(name){ for(let i=0;i<MP_USO_ORDEN.length;i++) if(MP_USO_ORDEN[i
 
 function cnDraft(){ try{return JSON.parse(localStorage.getItem('tf_conteo_draft')||'{}');}catch(e){return {};} }
 function cnSave(d){ localStorage.setItem('tf_conteo_draft', JSON.stringify(d)); }
+// Borrador APARTADO: un conteo que se empezó y no se guardó, que NO se carga de entrada
+// (el ajuste arranca siempre vacío) pero se puede retomar desde el chip.
+function cnDraftPending(){ try{return JSON.parse(localStorage.getItem('tf_conteo_draft_pending')||'null');}catch(e){return null;} }
+function _cnAlgunValor(d){ return !!d && (_algunValor(d.mp)||_algunValor(d.premez)||_algunValor(d.term)); }
 let _cnMP=[], _cnPremez=[], _cnTerm=[];
 
 // ── Semáforo de 3 niveles ──
@@ -5987,9 +5996,27 @@ async function cargarConteo(){
     const oh={}; q.forEach(r=>{ const pid=r.product_id&&r.product_id[0]; if(pid) oh[pid]=(oh[pid]||0)+(r.quantity||0); });
     _cnTerm=await Promise.all(INV_TERM.map(async t=>Object.assign({},t,{odoo:(oh[t.id]||0)/(await prodUomFactor(t.id))})));
     _cnPremez=INV_PREMEZ.map(p=>Object.assign({},p,{odoo:oh[p.id]||0}));   // premezcla: 1 unidad Odoo = 1 batch
+    // Arranca SIEMPRE vacío: si quedó un borrador local sin guardar, apartalo (no lo cargues) y ofrecé
+    // retomarlo con un chip. Los conteos guardados viven en el historial (Supabase), no se cargan de entrada.
+    const d0=cnDraft();
+    if(_cnAlgunValor(d0)) localStorage.setItem('tf_conteo_draft_pending', JSON.stringify(d0));
+    localStorage.removeItem('tf_conteo_draft');
     st.classList.add('hidden');
     cnRender();
+    cnRenderPending();
   }catch(e){ st.className='status s-err'; st.innerHTML='No pude leer el inventario: '+esc(e&&e.message||e); }
+}
+// Chip discreto: hay un conteo sin guardar apartado → ofrecer retomarlo (o dejarlo y contar de cero).
+function cnRenderPending(){
+  const el=document.getElementById('cn-pending'); if(!el) return;
+  el.innerHTML=_cnAlgunValor(cnDraftPending())
+    ? '<div class="cn-chip"><span>Quedó un conteo sin guardar.</span><button class="cn-chip-btn" onclick="cnRetomar()">retomar</button></div>'
+    : '';
+}
+function cnRetomar(){
+  const p=localStorage.getItem('tf_conteo_draft_pending');
+  if(p){ localStorage.setItem('tf_conteo_draft', p); localStorage.removeItem('tf_conteo_draft_pending'); }
+  cnRender(); cnRenderPending();
 }
 
 function cnRender(){
@@ -6048,6 +6075,9 @@ async function cnGuardar(){
   let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
   const { error } = await c.from('conteos').insert({ usuario: email||null, data: snap });
   if(error){ alert('No se pudo guardar: '+error.message); return; }
+  // Guardado → va al historial. Limpiar borradores y dejar la pantalla en blanco.
+  localStorage.removeItem('tf_conteo_draft'); localStorage.removeItem('tf_conteo_draft_pending');
+  cnRender(); cnRenderPending();
   alert('Conteo guardado en la base — lo ven Andrea y Lorena.');
 }
 
