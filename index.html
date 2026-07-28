@@ -1850,6 +1850,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   <div class="cn-bar">
     <span class="cn-resumen" id="cn-resumen"></span>
     <div class="cn-btns">
+      <button class="cn-btn" onclick="cnReset()">Vaciar conteo</button>
       <button class="cn-btn" onclick="abrirHistorial()">Ver historial</button>
       <button class="cn-btn cn-guardar" onclick="cnGuardar()">Guardar conteo</button>
     </div>
@@ -6044,6 +6045,15 @@ function cnRetomar(){
   const p=localStorage.getItem('tf_conteo_draft_pending');
   if(p){ localStorage.setItem('tf_conteo_draft', p); localStorage.removeItem('tf_conteo_draft_pending'); }
   cnRender(); cnRenderPending();
+}
+// Vaciar el conteo: limpia SOLO los campos en pantalla + el borrador local (guardado y sin guardar).
+// NO toca el historial de Supabase (los conteos guardados siguen ahí). El chip "sin guardar" se retira.
+function cnReset(){
+  if(!confirm('¿Vaciar el conteo? Se borran los campos en pantalla; el historial guardado no se toca.')) return;
+  localStorage.removeItem('tf_conteo_draft');
+  localStorage.removeItem('tf_conteo_draft_pending');
+  cnRender();          // campos en blanco
+  cnRenderPending();   // el chip "conteo sin guardar" no queda colgado
 }
 
 function cnRender(){
