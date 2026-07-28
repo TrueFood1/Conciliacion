@@ -1464,6 +1464,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vPlan .dm-tab tbody tr:last-child td{border-bottom:.5px solid var(--border)}
 #vPlan .dm-tab tfoot td{padding:10px 0 10px 14px;color:var(--text-2);font-weight:600;border-bottom:none}
 #vPlan .dm-tab tfoot td:first-child{color:var(--text-3);font-weight:400;text-transform:uppercase;font-size:11px;letter-spacing:.04em}
+#vPlan .dm-tab td.dm-meta{color:#D4537E;font-weight:600}
 #vPlan .pl-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:16px 0 0}
 @media(max-width:900px){#vPlan .pl-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:520px){#vPlan .pl-grid{grid-template-columns:1fr 1fr}}
@@ -1921,7 +1922,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 27 jul 2026';
+const BUILD = 'v 28 jul 2026';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -6252,8 +6253,7 @@ function planRefreshReaco(){ const el=document.getElementById('planReacoWrap'); 
 // la meta y no aparecen descuadres de redondeo.
 function _bloquesCj(m){
   const caja=m.I.cajaU;
-  const b3s=m.b3s||0, b3r=(m.b3r!=null?m.b3r:Math.max(0,m.b3-b3s));
-  const parts=[m.b1, m.b2, b3s, b3r];               // total = b1+b2+b3 (b3s+b3r=b3) → misma meta que el panel
+  const parts=[m.b1, m.b2, m.b3];                   // Colchón enero = b3 completo (salida 11-ene + resto unificados)
   const meta=Math.ceil(parts.reduce(function(a,b){ return a+b; },0)/caja);
   const raw=parts.map(function(v){ return v/caja; });
   const cj=raw.map(Math.floor);
@@ -6262,30 +6262,30 @@ function _bloquesCj(m){
      .sort(function(a,b){ return b.f-a.f; })
      .forEach(function(o){ if(rem>0){ cj[o.i]++; rem--; } });
   while(rem>0){ cj[0]++; rem--; }        // guarda: si el ceil del total dejó resto tras repartir
-  return {b1:cj[0], b2:cj[1], b3s:cj[2], b3r:cj[3], meta:meta};
+  return {b1:cj[0], b2:cj[1], b3:cj[2], meta:meta};   // 3 bloques suman EXACTO la meta
 }
 function planDesgloseMeta(){
   if(!_planCierre) return '';
   const R=_planCierre;
-  let t1=0,t2=0,ts=0,tr=0,tm=0;
+  const dm=function(ds){ const d=new Date(ds+'T00:00:00'); return d.getDate()+' '+_MESAB[d.getMonth()]; };   // "14 dic"
+  let t1=0,t2=0,tc=0,tm=0;
   const filas=R.M.map(function(m){
-    const b=_bloquesCj(m); t1+=b.b1; t2+=b.b2; ts+=b.b3s; tr+=b.b3r; tm+=b.meta;
+    const b=_bloquesCj(m); t1+=b.b1; t2+=b.b2; tc+=b.b3; tm+=b.meta;
     return '<tr><td>'+esc(_nomCorto(m.p))+(R.estim[m.p]?'<span class="pm-est">estimado</span>':'')+'</td>'
-      +'<td>'+_rzN(b.b1)+'</td><td>'+_rzN(b.b2)+'</td><td>'+_rzN(b.b3s)+'</td><td>'+_rzN(b.b3r)+'</td>'
-      +'<td class="pm-meta">'+_rzN(b.meta)+'</td></tr>';
+      +'<td>'+_rzN(b.b1)+'</td><td>'+_rzN(b.b2)+'</td><td>'+_rzN(b.b3)+'</td>'
+      +'<td class="dm-meta">'+_rzN(b.meta)+'</td></tr>';
   }).join('');
   return '<div class="dm">'
     +'<table class="dm-tab"><thead><tr>'
       +'<th>Producto</th>'
-      +'<th>'+esc(_fechaCorta(R.fc.autowm))+'<span>Auto + Walmart</span></th>'
-      +'<th>'+esc(_fechaCorta(R.fc.resto))+'<span>resto + HORECA + Abner</span></th>'
-      +'<th>Salida 11-ene<span>reapertura</span></th>'
-      +'<th>Colchón<span>queda tras 11-ene</span></th>'
-      +'<th>Meta<span>suma de los 4</span></th>'
+      +'<th>Entrega '+esc(dm(R.fc.autowm))+'<span>Auto + Walmart</span></th>'
+      +'<th>Entrega '+esc(dm(R.fc.resto))+'<span>resto + HORECA + Abner</span></th>'
+      +'<th>Reapertura 11 ene<span>stock para arrancar enero</span></th>'
+      +'<th>Meta<span>suma</span></th>'
     +'</tr></thead><tbody>'+filas+'</tbody>'
-    +'<tfoot><tr><td>Total cajas</td><td>'+_rzN(t1)+'</td><td>'+_rzN(t2)+'</td><td>'+_rzN(ts)+'</td><td>'+_rzN(tr)+'</td><td class="pm-meta">'+_rzN(tm)+'</td></tr></tfoot>'
+    +'<tfoot><tr><td>Total cajas</td><td>'+_rzN(t1)+'</td><td>'+_rzN(t2)+'</td><td>'+_rzN(tc)+'</td><td class="dm-meta">'+_rzN(tm)+'</td></tr></tfoot>'
     +'</table>'
-    +'<div class="pm-foot">Cajas hacia arriba, de las ventas reales del año pasado (mismas fechas). "Estimado" = sin historia del año pasado (ej. Galletas): ritmo actual, salvo el override manual de la entrega grande de dic.</div>'
+    +'<div class="pm-foot">Cajas calculadas de las ventas reales del año pasado, mismas fechas. "Estimado" (Galletas): sin historia del año pasado, va por ritmo actual + el antojo de diciembre puesto a mano.</div>'
     +'</div>';
 }
 // Desglose plegado: se despliega al clic (de entrada solo META vs HOY).
