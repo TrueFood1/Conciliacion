@@ -1422,19 +1422,35 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vPlan .pm-h{display:flex;align-items:baseline;justify-content:space-between;gap:14px;flex-wrap:wrap}
 #vPlan .pm-t{font-size:13px;font-weight:600;color:var(--text)}
 #vPlan .pm-sub{font-size:11.5px;color:var(--text-3);margin-top:3px;max-width:520px;line-height:1.5}
-#vPlan .pm-tot{font-size:22px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;line-height:1}
-#vPlan .pm-tot span{font-size:11.5px;font-weight:400;color:var(--text-3);margin-left:5px}
-#vPlan .pm-sem{font-size:11.5px;color:var(--text-3);text-align:right;margin-top:4px}
+#vPlan .pm-falta-tot{text-align:right;font-variant-numeric:tabular-nums}
+#vPlan .pm-falta-tot b{font-size:14px;font-weight:700;color:var(--mod)}
+#vPlan .pm-falta-tot span{font-size:11.5px;font-weight:400;color:var(--text-3);margin-left:6px}
 #vPlan .pm-tab{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;margin-top:12px}
 #vPlan .pm-tab th{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);font-weight:600;text-align:right;padding:0 0 6px;border-bottom:.5px solid var(--border)}
 #vPlan .pm-tab th:first-child{text-align:left}
 #vPlan .pm-tab td{padding:11px 0;text-align:right;color:var(--text-2)}
 #vPlan .pm-tab td:first-child{text-align:left;color:var(--text)}
-#vPlan .pm-meta{color:var(--text);font-weight:600}
+#vPlan .pm-tab tfoot td{padding-top:10px;border-top:.5px solid var(--border);color:var(--text-2);font-weight:600}
+#vPlan .pm-tab tfoot td:first-child{color:var(--text-3);font-weight:400;text-transform:uppercase;font-size:11px;letter-spacing:.04em}
+#vPlan .pm-falta{color:var(--mod);font-weight:600}
+#vPlan .pm-cumpl{color:#84BD00;font-weight:500}
 #vPlan .pm-est{font-size:10px;color:#C99A4E;margin-left:6px;letter-spacing:.02em}
 #vPlan .pm-corto{margin-top:12px;background:rgba(233,162,59,.10);border:.5px solid rgba(233,162,59,.35);border-radius:8px;padding:9px 12px;font-size:12px;color:#E9A23B;line-height:1.55}
 #vPlan .pm-corto b{color:#F0B45C}
 #vPlan .pm-foot{font-size:11.5px;color:var(--text-3);padding:9px 0 10px;line-height:1.55}
+#vPlan .pl-reaco{max-width:940px;margin:14px 0 2px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:rgba(199,125,160,.08);border:.5px solid rgba(199,125,160,.30);border-radius:9px;padding:11px 14px}
+#vPlan .pl-reaco-txt{font-size:12.5px;color:var(--text-2);line-height:1.5;flex:1;min-width:220px}
+#vPlan .pl-reaco-btn{background:var(--mod);border:none;color:#fff;font-family:inherit;font-size:12.5px;font-weight:600;border-radius:8px;padding:9px 16px;cursor:pointer;white-space:nowrap}
+#vPlan .pl-reaco-btn:hover{filter:brightness(1.08)}
+#vPlan .pl-mas{max-width:940px;margin:24px 0 0;display:flex;gap:24px;border-top:.5px solid var(--border);padding-top:14px}
+#planNivelModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:400;align-items:center;justify-content:center}
+#planNivelModal .pn-box{background:var(--surface);border:.5px solid var(--border-m);border-radius:12px;padding:20px 22px;max-width:440px;width:calc(100% - 40px);box-shadow:0 12px 40px rgba(0,0,0,.4)}
+#planNivelModal .pn-t{font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px}
+#planNivelModal .pn-msg{font-size:12.5px;color:var(--text-2);line-height:1.55}
+#planNivelModal .pn-lista{margin:12px 0 4px;padding-left:18px;font-size:12.5px;color:var(--text);line-height:1.7}
+#planNivelModal .pn-btns{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+#planNivelModal .pn-btn{background:var(--surface-2);border:.5px solid var(--border);color:var(--text-2);font-family:inherit;font-size:12.5px;border-radius:8px;padding:8px 16px;cursor:pointer}
+#planNivelModal .pn-ok{background:var(--mod);border-color:var(--mod);color:#fff;font-weight:600}
 #vPlan .dm-toggle-wrap{max-width:940px;margin:10px 0 0}
 #vPlan .dm-toggle{background:none;border:none;color:var(--text-3);font-family:inherit;font-size:12px;padding:2px 0;cursor:pointer;letter-spacing:.01em}
 #vPlan .dm-toggle:hover{color:#C77DA0}
@@ -1905,7 +1921,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 27 jul 2026 · WIP';
+const BUILD = 'v 27 jul 2026';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -6152,32 +6168,36 @@ async function cargarPlanMeses(){
     _planInputs={ritmo:ritmo, fin:stk.fin, cfg:cfg};   // para re-proyectar al cambiar personas sin volver a Odoo
     // Semanas hasta el cierre duro (lun 14-dic, viernes 18-dic incluido). nivProyeccion vuelve a cortar por seguridad.
     const semDic=Math.max(0, Math.round((_mondayProd(new Date(2026,11,18))-_mondayProd(hoy))/(7*86400000))+1);
-    _planProj=nivProyeccion(ritmo, stk.fin, cfg, semDic);
+    _rzOverrides=await nivOverrides();     // ediciones ANTES de proyectar (MISMA fuente que el Resumen)
+    const hoyStr0=_ymd(hoy), hayEd=Object.keys(_rzOverrides).some(function(d){ return d>=hoyStr0; });
+    // Plan RECALCULADO (no pegado): si hay ediciones guardadas, la proyección de carga las honra y ya queda
+    // NIVELADA hacia la meta; si no, la proyección cruda del motor. Así al recargar el plan ya está nivelado
+    // desde las ediciones (el aviso de "reacomodar" no reaparece), sin guardar ningún plan aparte.
+    _planProj = hayEd ? planProyeccionOv(_rzOverrides) : nivProyeccion(ritmo, stk.fin, cfg, semDic);
     _planReal=await nivRealRango(hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-01', _ymd(hoy));
-    _rzOverrides=await nivOverrides();     // MISMA fuente de verdad que el Resumen (ediciones de Andrea)
     if(_rzCtx) _rzRecalcAuto();             // si el Resumen ya corrió, refresca el auto-relleno de la meta
     st.classList.add('hidden');
     planRenderMeses();
   }catch(e){ st.className='status s-err'; st.innerHTML='No pude proyectar el plan: '+esc(e&&e.message||e); }
 }
 
-// ── Panel META vs HOY: a dónde hay que llegar el 18-dic contra lo que hay hoy en Odoo.
-// Sin columna "falta": la brecha se lee comparando las dos columnas. Cajas por producto
-// (META hacia arriba, igual que el reporte; HOY en cajas COMPLETAS).
+// ── Panel Meta de cierre: por producto META · HOY · FALTA (META − HOY). El titular es la FALTA
+// total (peso, no tamaño). "cumplido" en verde cuando HOY ya alcanza la meta. Cajas por producto.
 function planPanelMeta(){
   if(!_planCierre || !_planStock) return '';
   const R=_planCierre;
-  let metaCj=0, hoyCj=0, ritmoCj=0;
+  let metaCj=0, hoyCj=0, faltaCj=0, ritmoCj=0;
   const filas=R.M.map(function(m){
     const meta=Math.ceil((m.b1+m.b2+m.b3)/m.I.cajaU);
     const hoyP=Math.floor((_planStock[m.p]||0)/m.I.cajaU);
-    metaCj+=meta; hoyCj+=hoyP; ritmoCj+=(m.r||0)/m.I.cajaU;
+    const falta=meta-hoyP;
+    metaCj+=meta; hoyCj+=hoyP; if(falta>0) faltaCj+=falta; ritmoCj+=(m.r||0)/m.I.cajaU;
+    const faltaCell=falta>0 ? '<td class="pm-falta">'+_rzN(falta)+'</td>' : '<td class="pm-cumpl">cumplido</td>';
     return '<tr><td>'+esc(_nomCorto(m.p))+(R.estim[m.p]?'<span class="pm-est">estimado</span>':'')+'</td>'
-      +'<td class="pm-meta">'+_rzN(meta)+'</td><td>'+_rzN(hoyP)+'</td></tr>'; }).join('');
-  const sem=ritmoCj>0 ? metaCj/ritmoCj : 0;
+      +'<td>'+_rzN(meta)+'</td><td>'+_rzN(hoyP)+'</td>'+faltaCell+'</tr>'; }).join('');
+  const semFalta=ritmoCj>0 ? faltaCj/ritmoCj : 0;
   // ¿La rampa LLEGA? Rehace la cuenta del motor: stock de hoy + todo lo proyectado − consumo.
-  // Si no llega hay que decirlo: quedarse corto en silencio es exactamente lo que pasó el año
-  // pasado. La fábrica tiene techo (Semillas solo el jueves, Galletas solo el viernes).
+  // Si no llega hay que decirlo: quedarse corto en silencio es exactamente lo que pasó el año pasado.
   const cortos=[];
   if(_planProj && _planProj.length){
     const prod={};
@@ -6193,17 +6213,36 @@ function planPanelMeta(){
       +esc(cortos.join(' · '))+'. La fábrica tiene techo (un producto por día, Semillas solo el jueves, Galletas solo el viernes): hay que bajar algún bloque de la meta, sumar gente o arrancar antes.</div>'
     : '';
   return '<div class="pm">'
-    +'<div class="pm-h"><div>'
+    +'<div class="pm-h">'
       +'<div class="pm-t">Meta de cierre — 18 dic</div>'
-    +'</div><div>'
-      +'<div class="pm-tot">'+_rzN(metaCj)+'<span>cajas</span></div>'
-      +'<div class="pm-sem">'+_rzN(sem,1)+' semanas de venta</div>'
-    +'</div></div>'
-    +'<table class="pm-tab"><thead><tr><th>Producto</th><th>Meta (cj)</th><th>Hoy (cj)</th></tr></thead>'
-    +'<tbody>'+filas+'</tbody></table>'
+      +'<div class="pm-falta-tot"><b>'+_rzN(faltaCj)+'</b><span>cajas por producir · '+_rzN(semFalta,1)+' semanas</span></div>'
+    +'</div>'
+    +'<table class="pm-tab"><thead><tr><th>Producto</th><th>Meta (cj)</th><th>Hoy (cj)</th><th>Falta (cj)</th></tr></thead>'
+    +'<tbody>'+filas+'</tbody>'
+    +'<tfoot><tr><td>Total</td><td>'+_rzN(metaCj)+'</td><td>'+_rzN(hoyCj)+'</td><td class="pm-falta">'+_rzN(faltaCj)+'</td></tr></tfoot>'
+    +'</table>'
     +aviso
     +'</div>';
 }
+// Aviso contextual: aparece SOLO si el re-nivelado CAMBIARÍA algo (hay descuadre real entre las
+// ediciones y el plan actual). Misma condición que dispara "ya está nivelado" en planValidarCambios:
+// si no hay nada que reacomodar, el aviso no se muestra (se retira solo tras reacomodar o al recargar).
+function planReacomodarAviso(){
+  const hoyStr=_ymd(new Date());
+  const eds=Object.keys(_rzOverrides||{}).filter(function(ds){ return ds>=hoyStr; });
+  if(!eds.length) return '';
+  const dif=planReNivelDiff();
+  if(!dif.cambian.length) return '';   // ya nivelado con las ediciones → sin descuadre → sin aviso
+  const mons={}; eds.forEach(function(ds){ const mon=_mondayProd(new Date(ds+'T00:00:00')); mons[mon.getTime()]=mon; });
+  const rangos=Object.keys(mons).sort().map(function(t){ return _rangeLbl(mons[t]); });
+  const plural=rangos.length>1;
+  return '<div class="pl-reaco">'
+    +'<div class="pl-reaco-txt">Editaste '+(plural?'estas semanas':'esta semana')+' ('+esc(rangos.join(' · '))+'). El resto del plan todavía no compensa '+(plural?'esos cambios':'ese cambio')+'.</div>'
+    +'<button class="pl-reaco-btn" onclick="planValidarCambios()">Reacomodar a la meta</button>'
+    +'</div>';
+}
+// Refresca SOLO el aviso (sin colapsar el detalle abierto) — lo usa planSaveEdit tras una edición.
+function planRefreshReaco(){ const el=document.getElementById('planReacoWrap'); if(el) el.innerHTML=planReacomodarAviso(); }
 
 // ── Desglose de la meta por BLOQUES de entrega — para planificar las entregas con clientes.
 // Reusa R.M (los bloques que ya calculó cierreMeta / ?diag=cierre): b1 = entrega Auto+WM (14-dic),
@@ -6253,7 +6292,7 @@ function planDesgloseMeta(){
 function planToggleDesglose(){
   const w=document.getElementById('dmWrap'), b=document.getElementById('dmToggle'); if(!w) return;
   const abrir=(w.style.display==='none'); w.style.display=abrir?'block':'none';
-  if(b) b.textContent=abrir?'Ocultar desglose de entregas':'Ver desglose por entrega — qué sale cada fecha';
+  if(b) b.textContent=abrir?'Ocultar entregas':'Ver qué sale cada entrega';
 }
 
 // Sección de ESCENARIOS dentro del Plan, debajo del panel META vs HOY (van juntos: la meta dice
@@ -6292,10 +6331,19 @@ function planRenderMeses(){
   }
   document.getElementById('planBody').innerHTML=
     planPanelMeta()
-    +'<div class="dm-toggle-wrap"><button class="dm-toggle" id="dmToggle" onclick="planToggleDesglose()">Ver desglose por entrega — qué sale cada fecha</button></div>'
+    +'<div id="planReacoWrap">'+planReacomodarAviso()+'</div>'
+    +'<div class="pl-grid">'+cards+'</div><div id="planDetalle"></div>'
+    +'<div class="pl-mas">'
+      +'<button class="dm-toggle" id="dmToggle" onclick="planToggleDesglose()">Ver qué sale cada entrega</button>'
+      +'<button class="dm-toggle" id="escToggle" onclick="planToggleEsc()">Análisis de viernes</button>'
+    +'</div>'
     +'<div id="dmWrap" style="display:none">'+planDesgloseMeta()+'</div>'
-    +planEscenariosSeccion()
-    +'<div class="pl-grid">'+cards+'</div><div id="planDetalle"></div>';
+    +'<div id="escWrap" style="display:none">'+planEscenariosSeccion()+'</div>';
+}
+function planToggleEsc(){
+  const w=document.getElementById('escWrap'), b=document.getElementById('escToggle'); if(!w) return;
+  const abrir=(w.style.display==='none'); w.style.display=abrir?'block':'none';
+  if(b) b.textContent=abrir?'Ocultar análisis de viernes':'Análisis de viernes';
 }
 
 function planVerDetalle(m, noScroll){
@@ -6347,6 +6395,7 @@ async function planSaveEdit(ds){
   _planEdit=null;
   if(_rzCtx) _rzRecalcAuto();                    // el Resumen comparte overrides → mantené su auto-relleno coherente
   planVerDetalle(_planEditMes, true);            // repinta el detalle (rzCeldas honra el override) + recomputa el aviso de colchón
+  planRefreshReaco();                            // el aviso "reacomodar" aparece si esta edición dejó un descuadre (sin colapsar el detalle)
   rzPersist([{fecha:ds, producto_id:val.producto_id, batches:val.batches, tipo:'edicion'}]);   // persiste en plan_overrides
   if(_rzCtx && document.getElementById('rzBody')) rzRender();   // si el Resumen está montado, refrescalo también
 }
@@ -6398,6 +6447,76 @@ function planColchonAviso(){
   else cuerpo='el colchón <b>se mantiene en '+bt(e)+' semanas</b> (meta '+CIERRE_COLCHON_SEM+') — la producción se reacomodó sin costo.';
   return '<div class="pl-impacto">Con '+partes.join(' · ')+' en la rampa, '+cuerpo+'</div>';
 }
+
+// ── VALIDAR CAMBIOS: re-nivela el plan tomando las ediciones manuales como FIJAS ──────────
+// Envoltura sobre el MISMO motor de planColchonOv: corre una vez, semana a semana hasta el 18-dic,
+// honrando los overrides (ediciones de Andrea) y dejando que la rampa reacomode los días NO editados
+// hacia la meta. Devuelve los layouts por semana (misma forma que nivProyeccion) → reemplazan _planProj.
+// El re-nivelado es DETERMINISTA a partir de las ediciones (ya persistidas), no se guarda nada nuevo.
+function planProyeccionOv(fixedOv){
+  if(!_planInputs) return [];
+  const cfg=_planInputs.cfg, ritmo=_planInputs.ritmo, fin=_planInputs.fin, hoyStr=_ymd(new Date());
+  const mon0=_mondayProd(new Date()), stop=_mondayProd(new Date(2026,11,18)).getTime();
+  const H=cfg.horizonte||NIV_CFG_DEF.horizonte;
+  const stock={}; NIV_PROD.forEach(p=>stock[p]=fin[p]||0);
+  const out=[]; let rampaOn=false;
+  for(let w=0; w<80; w++){
+    const mon=new Date(mon0); mon.setDate(mon.getDate()+w*7); if(mon.getTime()>stop) break;
+    const wk=_isoWk(mon);
+    const colDe=pid=>{ const t=(cfg.ventanas||[]).some(v=>+v.producto_id===pid && wk>=v.desde && wk<=v.hasta); return t?cfg.colchonTemporada:(cfg.colchon[pid]||3); };
+    const pers=_personasDe(wk), R=_rampaDe(mon);
+    if(R){ rampaOn=rampaOn||_rampaEstado(stock, ritmo, R.meta, R.k).on; R.on=rampaOn; }
+    const pre={}; NIV_PROD.forEach(p=>pre[p]=stock[p]);
+    const L=_weekLayout(stock, ritmo, colDe, H, pers, R);              // decide la semana (muta stock, se descarta)
+    out.push({monday:mon, otros:L.otros, semillas:L.semillas, viernes:L.viernes, personas:L.personas, rampa:L.rampaOn});
+    const cells=rzCeldas(mon, L, {}, hoyStr, fixedOv);                 // coloca honrando las ediciones fijas
+    const prodB={}; cells.forEach(c=>{ const pr=c.prods||{}; for(const k in pr) prodB[+k]=(prodB[+k]||0)+pr[k]; });
+    NIV_PROD.forEach(p=>{ stock[p]=pre[p]+(prodB[p]||0)*NIV_INFO[p].rend-(ritmo[p]||0); });   // stock = honra overrides → la rampa reacciona
+  }
+  return out;
+}
+// Clave de comparación de una semana (producción por producto) para detectar qué semanas cambian.
+function _planSemKey(wk){ const b=_semanaBatches(wk); return NIV_PROD.map(function(p){ return p+':'+(b[p]||0); }).join('|'); }
+// Diff del re-nivelado vs el plan actual: {projOv, cambian}. Fuente ÚNICA de la condición "hay algo que
+// reacomodar" — la comparten el aviso contextual (mostrar/ocultar) y planValidarCambios (modal / "ya nivelado").
+function planReNivelDiff(){
+  if(!_planProj || !_planProj.length || !_planInputs) return {projOv:[], cambian:[]};
+  const projOv=planProyeccionOv(_rzOverrides);
+  const curByMon={}; _planProj.forEach(function(wk){ curByMon[wk.monday.getTime()]=_planSemKey(wk); });
+  const cambian=projOv.filter(function(wk){ return curByMon[wk.monday.getTime()]!==_planSemKey(wk); });
+  return {projOv:projOv, cambian:cambian};
+}
+
+let _planNivelPend=null;   // proyección re-nivelada esperando confirmación
+function planValidarCambios(){
+  if(!_planProj || !_planProj.length || !_planInputs){ return; }
+  const dif=planReNivelDiff(), projOv=dif.projOv, cambian=dif.cambian;
+  if(!cambian.length){
+    planNivelarModal('<div class="pn-msg">El plan ya está nivelado con tus ediciones — no hay semanas que reacomodar.</div>',
+      '<button class="pn-btn" onclick="planNivelarCancelar()">Entendido</button>');
+    return;
+  }
+  _planNivelPend=projOv;
+  const lista=cambian.map(function(wk){ return '<li>'+esc(_MESNOM2[wk.monday.getMonth()])+' · '+esc(_rangeLbl(wk.monday))+'</li>'; }).join('');
+  planNivelarModal(
+    '<div class="pn-t">Reacomodar el plan</div>'
+    +'<div class="pn-msg">Tus ediciones manuales quedan fijas. El motor reacomoda los días no editados hacia la meta. Se van a modificar estas semanas:</div>'
+    +'<ul class="pn-lista">'+lista+'</ul>',
+    '<button class="pn-btn pn-ok" onclick="planNivelarConfirmar()">Reacomodar</button>'
+    +'<button class="pn-btn" onclick="planNivelarCancelar()">Cancelar</button>');
+}
+function planNivelarConfirmar(){
+  if(_planNivelPend){ _planProj=_planNivelPend; _planNivelPend=null; planRenderMeses(); }   // el aviso "no llega a la meta" se recalcula solo en planPanelMeta
+  planNivelarCerrar();
+}
+function planNivelarCancelar(){ _planNivelPend=null; planNivelarCerrar(); }
+function planNivelarModal(cuerpo, botones){
+  let ov=document.getElementById('planNivelModal');
+  if(!ov){ ov=document.createElement('div'); ov.id='planNivelModal'; document.body.appendChild(ov); }
+  ov.innerHTML='<div class="pn-box">'+cuerpo+'<div class="pn-btns">'+botones+'</div></div>';
+  ov.style.display='flex';
+}
+function planNivelarCerrar(){ const ov=document.getElementById('planNivelModal'); if(ov) ov.style.display='none'; }
 
 
 // Total de batches terminados del mes (todos los productos, sin prueba/premezcla).
