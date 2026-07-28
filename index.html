@@ -387,6 +387,10 @@ tr.r-ing td{background:#eff6ff}
 .hist-sec{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#8FBF6A;font-weight:600;margin:16px 0 4px}
 .hist-muted{color:#6E6C68;font-size:13px;padding:10px 0}
 .hist-volver{background:none;border:none;color:#A8A6A0;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;padding:0 0 10px}
+.hist-cargar-wrap{margin-top:18px;padding-top:14px;border-top:.5px solid #26262C;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.hist-cargar{background:rgba(212,83,126,.14);border:.5px solid #D4537E;color:#F5F4F0;font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:600;border-radius:8px;padding:8px 16px;cursor:pointer}
+.hist-cargar:hover{background:rgba(212,83,126,.22)}
+.hist-cargar-sub{font-size:11.5px;color:#6E6C68}
 /* ── Aviso de borrador a medias (modal oscuro) ── */
 #vBorrador{position:fixed;inset:0;z-index:170;background:rgba(8,8,10,.72);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'DM Sans',sans-serif}
 .brdr-box{background:#161619;border:.5px solid #2C2C33;border-radius:14px;width:100%;max-width:400px;padding:22px;color:#F5F4F0;box-sizing:border-box}
@@ -5920,6 +5924,7 @@ function cnSave(d){ localStorage.setItem('tf_conteo_draft', JSON.stringify(d)); 
 function cnDraftPending(){ try{return JSON.parse(localStorage.getItem('tf_conteo_draft_pending')||'null');}catch(e){return null;} }
 function _cnAlgunValor(d){ return !!d && (_algunValor(d.mp)||_algunValor(d.premez)||_algunValor(d.term)); }
 let _cnMP=[], _cnPremez=[], _cnTerm=[];
+let _cnHistView=null;   // snapshot del historial que se está VIENDO (solo lectura; no toca el borrador hasta "Cargar")
 
 // ── Semáforo de 3 niveles ──
 function _tolMP(m){
@@ -6054,6 +6059,25 @@ function cnReset(){
   localStorage.removeItem('tf_conteo_draft_pending');
   cnRender();          // campos en blanco
   cnRenderPending();   // el chip "conteo sin guardar" no queda colgado
+}
+// Mapea un snapshot del historial (formato de cnGuardar) al formato del borrador de trabajo.
+function cnDraftDesdeSnap(snap){
+  const d={mp:{}, premez:{}, term:{}, rezago:(snap&&snap.rezago)||{}};
+  const mp=(snap&&snap.mp)||{}; for(const k in mp){ const it=mp[k]||{}; d.mp[k]={};
+    if(it.empaques!=null) d.mp[k].emp=it.empaques; if(it.suelto!=null) d.mp[k].sue=it.suelto; }
+  const pm=(snap&&snap.premez)||{}; for(const k in pm){ const it=pm[k]||{}; if(it.batches!=null) d.premez[k]=it.batches; }
+  const tm=(snap&&snap.term)||{}; for(const k in tm){ const it=tm[k]||{}; d.term[k]={};
+    if(it.cajas!=null) d.term[k].cajas=it.cajas; if(it.sueltas!=null) d.term[k].sue=it.sueltas; }
+  return d;
+}
+// Carga EXPLÍCITA de un conteo del historial al borrador (reemplaza lo que se está contando). Con confirmación.
+function cnCargarHistConfirm(){
+  if(!_cnHistView) return;
+  if(!confirm('¿Cargar este conteo? Reemplaza lo que estás contando ahora.')) return;
+  cnSave(cnDraftDesdeSnap(_cnHistView));
+  localStorage.removeItem('tf_conteo_draft_pending');   // el borrador anterior se reemplazó a propósito
+  cerrarHistorial();
+  cnRender(); cnRenderPending();
 }
 
 function cnRender(){
@@ -8724,12 +8748,15 @@ async function verConteoDetalle(id){
   const c=sbClient(); if(!c)return;
   const { data, error } = await c.from('conteos').select('*').eq('id',id).single();
   if(error||!data){ body.innerHTML='<div class="hist-muted">No pude abrir el conteo.</div>'; return; }
+  _cnHistView=data.data||null;   // guardar el snapshot VISTO (solo lectura); el borrador NO se toca hasta "Cargar"
   document.getElementById('histTitulo').textContent='Conteo · '+fmtFechaHora(data.creado_en);
   body.innerHTML='<button class="hist-volver" onclick="abrirHistorial()">‹ volver a la lista</button>'
-    +'<div class="hist-muted" style="padding:0 0 6px">Guardado por '+esc(data.usuario||'')+'</div>'
+    +'<div class="hist-muted" style="padding:0 0 6px">Guardado por '+esc(data.usuario||'')+' · solo lectura</div>'
     +seccionDetalle('Materia prima', data.data&&data.data.mp, 'mp')
     +seccionDetalle('Premezclas', data.data&&data.data.premez, 'premez')
-    +seccionDetalle('Producto terminado', data.data&&data.data.term, 'term');
+    +seccionDetalle('Producto terminado', data.data&&data.data.term, 'term')
+    +'<div class="hist-cargar-wrap"><button class="hist-cargar" onclick="cnCargarHistConfirm()">Cargar este conteo</button>'
+    +'<span class="hist-cargar-sub">Reemplaza lo que estás contando ahora.</span></div>';
 }
 function seccionDetalle(titulo, obj, tipo){
   if(!obj) return '';
