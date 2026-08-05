@@ -5950,7 +5950,7 @@ function sem3(diff, tol, vacio){
   const a=Math.abs(diff);
   if(a<=tol.verde) return {cls:'cn-ok', txt:'Cuadra'};
   if(a<=tol.amarillo) return {cls:'cn-warn', txt:'Diferencia chica'};
-  return {cls:'cn-bad', txt:'Descuadre'};
+  return {cls:'cn-bad', txt:''};   // sin palabra: el número en rojo ya lo comunica
 }
 
 // ── Escritura de campos (recompute vivo) ──
@@ -8536,14 +8536,14 @@ function fisicoMP(m, dr){
 function semMP(diff, vacio){
   if(vacio) return {cls:'muted', txt:'—'};
   if(Math.abs(diff) < 1) return {cls:'inv-ok', txt:'🟢 cuadra'};
-  return {cls:'inv-bad', txt:'🔴 descuadre'};
+  return {cls:'inv-bad', txt:''};   // sin palabra ni emoji: el número en rojo ya lo comunica
 }
 function recomputeMP(pid){
   const m=(window._invMP||[]).find(x=>x.pid===pid); if(!m)return;
   const dr=(invDraft().mp||{})[pid]||{};
   const {fis,vacio}=fisicoMP(m,dr), diff=fis-m.qty, s=semMP(diff,vacio);
   const fe=document.getElementById('mfis'+pid), de=document.getElementById('mdif'+pid), se=document.getElementById('msem'+pid);
-  if(fe)fe.textContent=vacio?'—':fmtN(fis); if(de)de.textContent=vacio?'—':fmtDiff(diff);
+  if(fe)fe.textContent=vacio?'—':fmtN(fis); if(de){ de.textContent=vacio?'—':fmtDiff(diff); de.className=(s.cls==='inv-bad'?'inv-bad':''); }
   if(se){ se.textContent=s.txt; se.className=s.cls; }
 }
 function invSetTerm(id,field,val){ const d=invDraft(); d.term=d.term||{}; d.term[id]=d.term[id]||{}; d.term[id][field]=val; invSaveDraft(d); recomputeTerm(id); }
@@ -8617,7 +8617,7 @@ function renderMP(){
       +'<td>'+empCell+'</td>'
       +'<td>'+sueCell+'</td>'
       +'<td style="text-align:right" id="mfis'+m.pid+'">'+(vacio?'—':fmtN(fis))+'</td>'
-      +'<td style="text-align:right" id="mdif'+m.pid+'">'+(vacio?'—':fmtDiff(diff))+'</td>'
+      +'<td style="text-align:right" class="'+(s.cls==='inv-bad'?'inv-bad':'')+'" id="mdif'+m.pid+'">'+(vacio?'—':fmtDiff(diff))+'</td>'
       +'<td id="msem'+m.pid+'" class="'+s.cls+'">'+s.txt+'</td>'
       +'<td>'+rc+'</td></tr>';
   }
@@ -8667,7 +8667,7 @@ function recomputePremez(id){
   const vacio=(dr==null||dr==='');
   const fis=parseFloat(dr)||0, diff=fis-p.odoo, s=semMP(diff,vacio);
   const fe=document.getElementById('pfis'+id), de=document.getElementById('pdif'+id), se=document.getElementById('psem'+id);
-  if(fe)fe.textContent=vacio?'—':fmtN(fis); if(de)de.textContent=vacio?'—':fmtDiff(diff);
+  if(fe)fe.textContent=vacio?'—':fmtN(fis); if(de){ de.textContent=vacio?'—':fmtDiff(diff); de.className=(s.cls==='inv-bad'?'inv-bad':''); }
   if(se){ se.textContent=s.txt; se.className=s.cls; }
 }
 function renderPremez(){
@@ -8680,7 +8680,7 @@ function renderPremez(){
       +'<td><input class="inv-in inv-in-sm" inputmode="numeric" value="'+(dr!=null?esc(dr):'')+'" oninput="invPremezBatches('+p.id+',this.value)" placeholder="0"> <span class="muted" style="font-size:11px">batches</span></td>'
       +'<td style="text-align:right" id="pfis'+p.id+'">'+(vacio?'—':fmtN(fis))+'</td>'
       +'<td style="text-align:right">'+fmtN(p.odoo)+'</td>'
-      +'<td style="text-align:right" id="pdif'+p.id+'">'+(vacio?'—':fmtDiff(diff))+'</td>'
+      +'<td style="text-align:right" class="'+(s.cls==='inv-bad'?'inv-bad':'')+'" id="pdif'+p.id+'">'+(vacio?'—':fmtDiff(diff))+'</td>'
       +'<td id="psem'+p.id+'" class="'+s.cls+'">'+s.txt+'</td></tr>';
   }
   document.getElementById('invPremezTabla').innerHTML=h+'</table>';
