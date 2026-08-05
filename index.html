@@ -62,6 +62,9 @@ body{font-family:var(--font);background:var(--bg2);color:var(--text);font-size:1
 .s-err{background:var(--red-l);color:var(--red)}
 .s-info{background:var(--blue-l);color:var(--blue)}
 .s-warn{background:var(--amber-l);color:var(--amber)}
+/* Tag visible de empaque incompleto (no un asterisco al pie): el que mira el número sabe que le falta empaque. */
+.emp-inc{display:inline-block;font-size:10.5px;font-weight:600;letter-spacing:.02em;color:#E9A23B;
+  border:.5px solid rgba(233,162,59,.45);border-radius:5px;padding:1px 6px;margin-left:8px;white-space:nowrap;vertical-align:middle;line-height:1.5}
 .progress{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-bottom:.5rem}
 .progress-fill{height:3px;background:var(--green);border-radius:2px;transition:width .4s}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:.75rem}
@@ -1191,13 +1194,13 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
       </div>
       <div class="card">
         <div class="card-title">Costo por unidad</div>
-        <div style="overflow-x:auto"><table><thead><tr><th>Producto</th><th style="text-align:right">Materia prima</th><th style="text-align:right">Indirecto</th><th style="text-align:right">Costo total</th><th style="text-align:right">Unid/mes</th></tr></thead><tbody id="simTbCosto"></tbody></table></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Producto</th><th style="text-align:right">Materia prima</th><th style="text-align:right">Indirecto</th><th style="text-align:right">Empaque</th><th style="text-align:right">Costo total</th><th style="text-align:right">Unid/mes</th></tr></thead><tbody id="simTbCosto"></tbody></table></div>
       </div>
       <div class="card">
         <div class="card-title">Margen en <span id="simMargTitle" style="color:var(--text-2);font-weight:400">—</span></div>
         <div style="overflow-x:auto"><table><thead><tr><th>Producto</th><th style="text-align:right">Precio</th><th style="text-align:right">Precio neto</th><th style="text-align:right">Costo total</th><th style="text-align:right">Margen ₡</th><th style="text-align:right">Margen %</th></tr></thead><tbody id="simTbMarg"></tbody></table></div>
       </div>
-      <div class="m3sub" style="font-size:12px;margin-top:4px">Indirecto: costo fijo del mes (según personas) ÷ días de producción = costo/día, repartido por día. Galletas comparte el día del pan (tajada por batches). MP y precios exactos de Odoo. Sin frío mensual (fase real). Solo lectura.</div>
+      <div class="m3sub" style="font-size:12px;margin-top:4px">Indirecto: costo fijo del mes (según personas) ÷ días de producción = costo/día, repartido por día. Galletas comparte el día del pan (tajada por batches). MP y precios exactos de Odoo. Costo total = MP + indirecto + empaque (empaque = constante del Excel de costos). Sin frío mensual (fase real). Solo lectura.</div>
     </div>
   </div>
 </div>
@@ -3885,16 +3888,41 @@ const cM = n => '₡'+Math.round(Number(n)||0).toLocaleString('es-CR');   // col
 // batch   = cost-unidades por batch (denominador de indirecto/u: avg ÷ batch).
 // unitsPer = unidades individuales por cost-unit (paq de 2 → 2, paq de 4 → 4).
 // pack     = multiplicador de presentación para mostrar (×N). unidad = etiqueta visible.
+// EMPAQUE (costo por unidad de venta). FUENTE ÚNICA en toda la herramienta: este campo `emp`.
+//   emp   = colones por unidad de venta, SIN IVA (misma unidad que la del MP; verificado, no se convierte);
+//           la caja master YA viene prorrateada dentro de cada total (no sumarla de nuevo). null = sin dato.
+//   empOK = true SOLO cuando el empaque está completo y validado contra el Excel de costos.
+//   empHold = razón por la que sigue INCOMPLETO aunque haya número (no se auto-completa al poner emp).
+// Fuente: Excel Analisis_Costos_TrueFood.xlsx, hoja "Costos de Empaque" (Colinas Alta Vista = cajas,
+//   Indelsa = bolsas PE, potes craft propios). Desglose por producto:
+//   Blanco 69,55 (bolsa 29,65 + caja 39,90) · Semillas 77,58 (37,68 + 39,90) · Francés 64,26 (24,37 + 39,90)
+//   · Buns 60,34 (20,44 + 39,90) · Galletas 412,66 (pote 394,84 + caja 17,82).
+// PIZZA: 215,28 = SOLO la caja individual; faltan bolsa plástica y caja master (sin factura) → empHold fijo.
+//   Tener el número NO significa que esté completo: la marca de "empaque incompleto" se queda hasta quitar el hold.
 const COSTOS_PROD = [
   // prodId FIJO por producto — búsqueda por ID, nunca por nombre (trampa 517/519 "Prueba Galletas"). kw/rx quedan solo informativos.
-  {key:'blanco',  label:'Pan Blanco',      prodId:451, kw:'Pan Blanco', rx:/pan\s*blanco/i,    batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#378ADD', chkMP:805, chkInd:1462, chkTot:2267},
-  {key:'semillas',label:'Pan de Semillas', prodId:452, kw:'Semillas',   rx:/semillas/i,        batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#84BD00', chkMP:980, chkInd:1462, chkTot:2442},
-  {key:'pizza',   label:'Pizza Crust',     prodId:472, kw:'Pizza',      rx:/pizza/i,           batch:10,  unitsPer:2, pack:1, batchOverride:10, unidad:'por paquete de 2',  color:'#FF751F', chkMP:422, chkInd:3070, chkTot:3492},
-  {key:'frances', label:'Pan Francés',     prodId:453, kw:'Franc',      rx:/franc[eé]s/i,      batch:15,  unitsPer:4, pack:1, unidad:'por paquete de 4',  color:'#D4537E'},
-  {key:'buns',    label:'Buns',            prodId:503, kw:'Bun',        rx:/buns?|hamburgues/i,batch:75,  unitsPer:1, pack:4, unidad:'por paquete de 4',  color:'#7F77DD'},
+  {key:'blanco',  label:'Pan Blanco',      prodId:451, kw:'Pan Blanco', rx:/pan\s*blanco/i,    batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#378ADD', chkMP:805, chkInd:1462, chkTot:2267, emp:69.55,  empOK:true},
+  {key:'semillas',label:'Pan de Semillas', prodId:452, kw:'Semillas',   rx:/semillas/i,        batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#84BD00', chkMP:980, chkInd:1462, chkTot:2442, emp:77.58,  empOK:true},
+  {key:'pizza',   label:'Pizza Crust',     prodId:472, kw:'Pizza',      rx:/pizza/i,           batch:10,  unitsPer:2, pack:1, batchOverride:10, unidad:'por paquete de 2',  color:'#FF751F', chkMP:422, chkInd:3070, chkTot:3492, emp:215.28, empOK:false, empHold:'sólo caja individual — faltan bolsa + caja master'},
+  {key:'frances', label:'Pan Francés',     prodId:453, kw:'Franc',      rx:/franc[eé]s/i,      batch:15,  unitsPer:4, pack:1, unidad:'por paquete de 4',  color:'#D4537E', emp:64.26,  empOK:true},
+  {key:'buns',    label:'Buns',            prodId:503, kw:'Bun',        rx:/buns?|hamburgues/i,batch:75,  unitsPer:1, pack:4, unidad:'por paquete de 4',  color:'#7F77DD', emp:60.34,  empOK:true},
   // Galletas = product.product 519 en PRODUCCIÓN (es_CR "Cookie Dough" / en_US "Prueba Galletas"; template 705, BOM18 con chocolate, rinde 160, 353 on-hand). El 529 era id del demo.
-  {key:'galletas',label:'Galletas',        prodId:519, kw:'cookie dough',rx:/cookie\s*dough|cookie/i, batch:160, unitsPer:1, pack:1, unidad:'por unidad',        color:'#ED93B1'},
+  {key:'galletas',label:'Galletas',        prodId:519, kw:'cookie dough',rx:/cookie\s*dough|cookie/i, batch:160, unitsPer:1, pack:1, unidad:'por unidad',        color:'#ED93B1', emp:412.66, empOK:true},
 ];
+// Estado del empaque de un producto de COSTOS_PROD. `emp`=colones/unidad de venta o null.
+// `completo` sólo si hay número, empOK y NO hay empHold (Pizza nunca completa hasta quitar el hold).
+function empInfo(P){
+  const emp = (typeof P.emp==='number') ? P.emp : null;
+  const completo = emp!=null && P.empOK===true && !P.empHold;
+  const razon = P.empHold ? P.empHold : (emp==null ? 'sin dato de empaque' : (!P.empOK ? 'empaque sin validar' : ''));
+  return {emp, completo, razon};
+}
+// Tag visible (no asterisco al pie) para una fila con empaque incompleto. '' si está completo.
+function empTag(p){
+  if(p && p.empCompleto) return '';
+  const r=(p&&p.empRazon)||'empaque incompleto';
+  return '<span class="emp-inc" title="'+esc(r)+'">empaque incompleto</span>';
+}
 const COSTOS_INCLUDE = ['6101001','6101003','6101005','6101007','6101010','6101011','6103003','6104002','6104005','6104006','6104007','6105001','6105002','6105003','6106004','6106005','6106006','6106008','6106011','6106012','6106021','6106024','6400003','640102','6200001'];
 // 6104002 "Contabilidad, Auditoría, Fiscal" agregada como seguro (hoy ₡0; blinda si el contador se postea ahí).
 // ── VENTANA ROLLING DE MESES CERRADOS ──────────────────────────────────
@@ -6757,7 +6785,10 @@ async function computeCostos(force){
     const indAsignado=poolAvg*pct;
     const indPerSales=unidades?indAsignado/unidades:0;   // por unidad de VENTA
     const indUnit=indPerSales/pack;                       // por cost-unit (×pack en display = indPerSales)
-    prods.push(Object.assign({},P,{mp,dias,unidades,pct,indAsignado,indPerSales,indUnit,total:mp.mpUnit+indUnit}));
+    const ei=empInfo(P);   // empaque por unidad de venta (fuente única COSTOS_PROD.emp)
+    // total = MP + indirecto por cost-unit. totalVenta = (MP+indirecto)×pack + empaque = costo total por unidad de venta.
+    prods.push(Object.assign({},P,{mp,dias,unidades,pct,indAsignado,indPerSales,indUnit,total:mp.mpUnit+indUnit,
+      emp:ei.emp, empCompleto:ei.completo, empRazon:ei.razon, totalVenta:(mp.mpUnit+indUnit)*pack+(ei.emp||0)}));
   }
   return _costosCache={ventana,meses,poolAvg,totalDias,prods};
 }
@@ -6785,10 +6816,10 @@ function renderValidacion(el,info,prods){
   h+='<tr style="font-weight:700"><td>Promedio</td><td>'+cM(poolAvg)+'</td></tr></table>';
   h+='<div style="margin-top:6px;font-size:11px;color:var(--text-3)">Total días de producción (promedio): <strong>'+fmtN(totalDias)+'</strong></div>';
   h+='<table style="margin-top:10px"><tr><th>Producto</th><th>Días/mes</th><th>Unid/mes</th><th>% asig.</th><th>Indir/u</th><th>MP/u</th><th>chk MP</th><th>Total/u</th></tr>';
-  prods.forEach(p=>{ const pack=p.pack||1; const mpU=p.mp.mpUnit*pack; const tot=mpU+p.indPerSales;
+  prods.forEach(p=>{ const pack=p.pack||1; const mpU=p.mp.mpUnit*pack; const tot=mpU+p.indPerSales+(p.emp||0);   // Total/u = MP + indirecto + empaque
     const tieneChk=p.chkMP!=null; const okMP=tieneChk&&tol(p.mp.mpUnit,p.chkMP,0.05);
     const chkMPcol=tieneChk?(cM(p.chkMP)+' '+(okMP?'<span class="ok-tag">✓</span>':'<span class="bad-tag">≠</span>')):'<span style="color:var(--text-3);font-size:11px">sin dato</span>';
-    h+='<tr><td>'+esc(p.label)+'</td><td>'+fmtN(p.dias)+'</td><td>'+fmtN(p.unidades)+'</td><td>'+(p.pct*100).toFixed(1)+'%</td><td>'+cM(p.indPerSales)+'</td><td>'+cM(mpU)+'</td><td>'+chkMPcol+'</td><td><strong>'+cM(tot)+'</strong></td></tr>'
+    h+='<tr><td>'+esc(p.label)+empTag(p)+'</td><td>'+fmtN(p.dias)+'</td><td>'+fmtN(p.unidades)+'</td><td>'+(p.pct*100).toFixed(1)+'%</td><td>'+cM(p.indPerSales)+'</td><td>'+cM(mpU)+'</td><td>'+chkMPcol+'</td><td><strong>'+cM(tot)+'</strong></td></tr>'
       +(p.mp.error?'<tr><td colspan="8" class="bad-tag" style="text-align:left">'+esc(p.label)+': '+esc(p.mp.error)+'</td></tr>':''); });
   h+='</table>';
   h+='<div style="font-size:11px;color:var(--text-3);margin-top:6px">Valores por unidad de venta (Pizza/paquete de 2, Francés y Buns/paquete de 4, resto por unidad). chk MP valida la materia prima. Números REALES de Odoo — no calzan exacto con el Excel (supuestos fijos), pero sí en el mismo orden de magnitud.</div></div>';
@@ -6806,15 +6837,16 @@ function renderTarjetas(el,prods){
   let h='';
   prods.forEach((p,i)=>{
     const pack=p.pack||1;
-    const mp=p.mp.mpUnit*pack, ind=p.indUnit*pack, tot=(p.total*pack)||1;
+    const mp=p.mp.mpUnit*pack, ind=p.indUnit*pack, emp=(p.emp!=null?p.emp:null), tot=(p.totalVenta)||1;
     // Color del producto SOLO en el puntito y el borde izquierdo 2px. El número va en blanco.
     h+='<div class="ccard" id="ccard'+i+'" onclick="toggleCard('+i+')" style="border-left:2px solid '+p.color+'">';
-    h+='<div class="ccard-name"><span class="ccard-swatch" style="background:'+p.color+'"></span>'+esc(p.label)+'</div>';
+    h+='<div class="ccard-name"><span class="ccard-swatch" style="background:'+p.color+'"></span>'+esc(p.label)+empTag(p)+'</div>';
     h+='<div class="ccard-total">'+cM(tot)+'</div>';
     h+='<div class="ccard-unit">costo total '+esc(p.unidad||'por unidad')+'</div>';
     h+='<div class="cmini-wrap">';
     h+='<div class="cmini"><span>Materia prima</span><span class="v">'+cM(mp)+'</span></div>';
     h+='<div class="cmini"><span>Indirecto</span><span class="v">'+cM(ind)+'</span></div>';
+    h+='<div class="cmini"><span>Empaque</span><span class="v">'+(emp!=null?cM(emp):'—')+'</span></div>';
     h+='</div>';
     h+='<button class="cbreak-btn" id="cbtn'+i+'" onclick="event.stopPropagation();toggleCard('+i+')">ver detalle ▾</button>';
     h+='<div class="cbreak">';
@@ -6823,6 +6855,9 @@ function renderTarjetas(el,prods){
     h+='<div class="cbreak-row" style="font-weight:600;border-top:1px solid var(--border);margin-top:4px;padding-top:4px"><span>Total MP</span><span>'+cM(mp)+'</span></div>';
     h+='<div class="cbreak-h">Indirecto '+esc(p.unidad||'por unidad')+'</div>';
     h+='<div class="cbreak-row"><span>Por días de producción ('+fmtN(p.dias||0)+' días/mes · '+((p.pct||0)*100).toFixed(1)+'% del pool)</span><span>'+cM(ind)+'</span></div>';
+    h+='<div class="cbreak-h">Empaque '+esc(p.unidad||'por unidad')+'</div>';
+    h+='<div class="cbreak-row"><span>Empaque'+(emp!=null&&!p.empCompleto?' (parcial)':'')+'</span><span>'+(emp!=null?cM(emp):'sin dato')+'</span></div>';
+    h+=(p.empCompleto?'':'<div class="cbreak-row" style="color:#E9A23B"><span>empaque incompleto</span><span>'+esc(p.empRazon||'')+'</span></div>');
     h+='<div class="cbreak-row" style="font-weight:700;border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span>Costo total</span><span>'+cM(tot)+'</span></div>';
     h+='</div></div>';
   });
@@ -7175,7 +7210,7 @@ let _rentaData=null, _rentaInit=false;   // _rentaData.byKey = costos del últim
 async function reporteRenta(D1,D2){
   const {prods}=await computeCostos();            // HEREDA el motor real de costos
   const byKey={}; prods.forEach(p=>byKey[p.key]=p);
-  const costoDe={}; RENTA_PROD.forEach(P=>{ const d=byKey[P.key]; costoDe[P.key]=d?(d.total||0)*(d.pack||1):0; });
+  const costoDe={}; RENTA_PROD.forEach(P=>{ const d=byKey[P.key]; costoDe[P.key]=d?(d.totalVenta||0):0; });   // costo por unidad de venta CON empaque (fuente única)
   _rentaData={byKey};
   // UoM de referencia (unidad de venta) por producto — para convertir el volumen
   const pids=RENTA_PROD.map(P=>P.pid), keyDe={}; RENTA_PROD.forEach(P=>keyDe[P.pid]=P.key);
@@ -7246,7 +7281,7 @@ function rentaRender(R, label){
       if(!x){ cells+='<td class="renta-na">—</td>'; return; }
       cells+='<td class="renta-cell"><div class="rg'+(x.gan<0?' rneg':'')+'">'+cMs(x.gan)+'</div><div class="rp">'+_pct(x.pct*100)+'</div></td>';
     });
-    h+='<tr class="renta-prow" onclick="rentaDetalle(\''+f.P.key+'\')"><td><span class="renta-prod"><span class="pdot" style="background:'+f.P.color+'"></span>'+esc(f.P.label)+'</span></td>'
+    h+='<tr class="renta-prow" onclick="rentaDetalle(\''+f.P.key+'\')"><td><span class="renta-prod"><span class="pdot" style="background:'+f.P.color+'"></span>'+esc(f.P.label)+'</span>'+empTag(_rentaData&&_rentaData.byKey&&_rentaData.byKey[f.P.key])+'</td>'
       +cells+'<td class="renta-cell renta-rowtot"><div class="rg'+(f.rowTot<0?' rneg':'')+'">'+cMs(f.rowTot)+'</div></td></tr>';
   });
   h+='</tbody><tfoot><tr><td>Total canal</td>'
@@ -7268,14 +7303,15 @@ function rentaDetalle(key){
   const P=RENTA_PROD.find(p=>p.key===key), el=document.getElementById('rentaDetalle');
   const d=_rentaData&&_rentaData.byKey&&_rentaData.byKey[key];
   if(!P||!el||!d) return;
-  const pack=d.pack||1, mp=((d.mp&&d.mp.mpUnit)||0)*pack, ind=(d.indUnit||0)*pack, tot=(d.total||0)*pack;
+  const pack=d.pack||1, mp=((d.mp&&d.mp.mpUnit)||0)*pack, ind=(d.indUnit||0)*pack, emp=(d.emp!=null?d.emp:null), tot=(d.totalVenta||0);
   let h='<div class="card"><div class="card-title"><span class="pdot" style="background:'+P.color+'"></span> Costo real de '+esc(P.label)
     +' <span class="muted" style="font-weight:400;font-size:12px">· '+esc(d.unidad||'')+'</span></div>';
   h+='<div style="overflow-x:auto"><table class="cob-tbl" style="max-width:460px">';
   ((d.mp&&d.mp.desglose)||[]).slice(0,14).forEach(x=>{ h+='<tr><td>'+esc(x.name)+'</td><td style="text-align:right">'+cM(x.perUnit*pack)+'</td></tr>'; });
   h+='<tr style="font-weight:600;border-top:1px solid var(--border)"><td>Materia prima</td><td style="text-align:right">'+cM(mp)+'</td></tr>';
   h+='<tr><td>Indirecto ('+fmtN(Math.round(d.dias||0))+' días/mes · '+((d.pct||0)*100).toFixed(1)+'% del pool)</td><td style="text-align:right">'+cM(ind)+'</td></tr>';
-  h+='<tr style="border-top:1px solid var(--border-strong)"><td><strong>Costo total</strong></td><td style="text-align:right"><strong>'+cM(tot)+'</strong></td></tr>';
+  h+='<tr><td>Empaque'+(emp!=null&&!d.empCompleto?' (parcial)':'')+(d.empCompleto?'':' — <span style="color:#E9A23B">'+esc(d.empRazon||'incompleto')+'</span>')+'</td><td style="text-align:right">'+(emp!=null?cM(emp):'sin dato')+'</td></tr>';
+  h+='<tr style="border-top:1px solid var(--border-strong)"><td><strong>Costo total</strong>'+empTag(d)+'</td><td style="text-align:right"><strong>'+cM(tot)+'</strong></td></tr>';
   h+='</table></div><div class="m3sub" style="margin-top:8px;font-size:11px;color:var(--text-3)">Del motor real de Costos (promedio de los últimos meses cerrados). Reemplaza "Costos por producto".</div></div>';
   el.innerHTML=h; el.scrollIntoView({block:'nearest'});
 }
@@ -7829,7 +7865,7 @@ const SIM_PROD = [
   {key:'pizza',   label:'Pizza Crust',     color:'#FF751F'},
   {key:'galletas',label:'Cookie Dough',    color:'#ED93B1', comparte:true},
 ];
-let simMP={}, simDiasReal={}, simUnidReal={}, simPoolAvg=0, simTotalDiasReal=0, simPrecios=[], SIM=null, simPrev={};
+let simMP={}, simDiasReal={}, simUnidReal={}, simEmp={}, simEmpP={}, simPoolAvg=0, simTotalDiasReal=0, simPrecios=[], SIM=null, simPrev={};
 
 async function cargarSimulador(){
   const st=document.getElementById('simStatus'), grid=document.getElementById('simGrid');
@@ -7844,6 +7880,8 @@ async function cargarSimulador(){
       simMP[sp.key]       = p ? (p.mp.mpUnit*(p.pack||1)) : 0;   // MP por unidad de venta
       simDiasReal[sp.key] = p ? (p.dias||0) : 0;                 // días reales FRACCIONALES (exactos, no redondeados)
       simUnidReal[sp.key] = p ? (p.unidades||0) : 0;             // unidades/mes reales (unidad de venta)
+      simEmp[sp.key]      = p ? (p.emp!=null?p.emp:0) : 0;       // empaque por unidad de venta (constante, misma fuente única)
+      simEmpP[sp.key]     = p ? {emp:p.emp, empCompleto:p.empCompleto, empRazon:p.empRazon} : null;
     });
     simPrecios = await simCargarPrecios();
     SIM = simEstadoBase(); simPrev={};
@@ -7884,7 +7922,7 @@ function simCalc(){
     const br = SIM_BATCHDIA[k] ? ((SIM.batchDia[k]||0)/SIM_BATCHDIA[k]) : 1;  // ratio de batches/día vs base
     const unid = (simUnidReal[k]||0) * dr * br;
     const indU = unid ? ((SIM.dias[k]||0)*costoDia)/unid : 0;                 // reparto por DÍAS
-    res[k]={dias:SIM.dias[k]||0, unid, mp:simMP[k]||0, indU, total:(simMP[k]||0)+indU};
+    res[k]={dias:SIM.dias[k]||0, unid, mp:simMP[k]||0, indU, emp:(simEmp[k]||0), total:(simMP[k]||0)+indU+(simEmp[k]||0)};   // total = MP + indirecto + empaque
   });
   res._diasTot=totalDias; res._costoDia=costoDia;
   res._unidTot=SIM_PROD.reduce((a,p)=>a+res[p.key].unid,0);
@@ -7901,9 +7939,10 @@ function simRender(){
   document.getElementById('simDiaNote').textContent=r._diasTot.toLocaleString('es-CR',{maximumFractionDigits:1})+' días de producción/mes';
   let h='';
   SIM_PROD.forEach(p=>{ const d=r[p.key];
-    h+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span></td>'
+    h+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+'</td>'
       +'<td style="text-align:right">'+cM(d.mp)+'</td>'
       +'<td style="text-align:right">'+cM(d.indU)+simDelta('ind_'+p.key,d.indU)+'</td>'
+      +'<td style="text-align:right">'+(d.emp?cM(d.emp):'—')+'</td>'
       +'<td style="text-align:right"><strong>'+cM(d.total)+'</strong></td>'
       +'<td style="text-align:right">'+Math.round(d.unid).toLocaleString('es-CR')+'</td></tr>';
     simPrev['ind_'+p.key]=d.indU;
@@ -7915,7 +7954,7 @@ function simRender(){
   SIM_PROD.forEach(p=>{ const precio=C.precios[p.key], d=r[p.key];
     if(precio==null){ mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span></td><td colspan="5" style="text-align:left;color:var(--text-3)">no se vende en este canal</td></tr>'; return; }
     const neto=precio*(1-C.termino), margC=neto-d.total, margP=precio?margC/precio*100:0; sum+=margP; n++;   // margen % SOBRE PRECIO DE LISTA (igual que Rentabilidad)
-    mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span></td>'
+    mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+'</td>'
       +'<td style="text-align:right">'+cM(precio)+'</td>'
       +'<td style="text-align:right">'+cM(neto)+'</td>'
       +'<td style="text-align:right">'+cM(d.total)+'</td>'
@@ -8331,8 +8370,8 @@ async function resProdFooter(){
   el.innerHTML=RES_PROD.map(p=>'<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</div><div class="mg muted" style="font-size:13px">…</div></div>').join('');
   try{
     const {prods}=await computeCostos(); const byKey={}; prods.forEach(p=>byKey[p.key]=p);
-    el.innerHTML=RES_PROD.map(p=>{ const d=byKey[p.key], costo=d?Math.round((d.total||0)*(d.pack||1)):0, uni=(d&&d.unidad)||'';
-      return '<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</div>'
+    el.innerHTML=RES_PROD.map(p=>{ const d=byKey[p.key], costo=d?Math.round(d.totalVenta||0):0, uni=(d&&d.unidad)||'';
+      return '<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+empTag(d)+'</div>'
         +'<div class="mg">'+cM(costo)+'</div><div class="cu">costo real'+(uni?' · '+esc(uni):'')+'</div></div>'; }).join('');
   }catch(e){ el.innerHTML='<div class="muted" style="font-size:12px;padding:8px 4px">No pude leer los costos ('+esc(e&&e.message||e)+'). El detalle está en la pestaña Costos.</div>'; }
 }
