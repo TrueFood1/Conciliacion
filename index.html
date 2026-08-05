@@ -8596,7 +8596,7 @@ function mpAlerta(m){
 
 function renderMP(){
   const d=invDraft().mp||{};
-  let h='<table class="inv-tbl"><tr><th>Ingrediente</th><th style="text-align:right">Stock Odoo</th><th>Empaques enteros</th><th>Suelto</th><th style="text-align:right">Físico</th><th style="text-align:right">Δ</th><th>Semáforo</th><th>Reorden</th></tr>';
+  let h='<table class="inv-tbl"><tr><th>Ingrediente</th><th style="text-align:right">Stock Odoo</th><th>Empaques enteros</th><th>Suelto</th><th style="text-align:right">Físico</th><th style="text-align:right">Δ</th><th>Reorden</th></tr>';
   for(const m of (window._invMP||[])){
     const dr=d[m.pid]||{};
     const {pe,fis,vacio}=fisicoMP(m,dr), diff=fis-m.qty, s=semMP(diff,vacio);
@@ -8618,7 +8618,6 @@ function renderMP(){
       +'<td>'+sueCell+'</td>'
       +'<td style="text-align:right" id="mfis'+m.pid+'">'+(vacio?'—':fmtN(fis))+'</td>'
       +'<td style="text-align:right" class="'+(s.cls==='inv-bad'?'inv-bad':'')+'" id="mdif'+m.pid+'">'+(vacio?'—':fmtDiff(diff))+'</td>'
-      +'<td id="msem'+m.pid+'" class="'+s.cls+'">'+s.txt+'</td>'
       +'<td>'+rc+'</td></tr>';
   }
   document.getElementById('invMpTabla').innerHTML=h+'</table>';
@@ -8627,7 +8626,7 @@ function renderMP(){
 function semTerm(diff, vacio){
   if(vacio) return {cls:'muted', txt:'—'};
   if(Math.abs(diff) < 1) return {cls:'inv-ok', txt:'🟢 cuadra'};
-  return {cls:'inv-bad', txt:'🔴 '+(diff<0?'Odoo inflado (¿entrega sin validar?)':'falta registrar producción')};
+  return {cls:'inv-bad', txt:(diff<0?'Odoo inflado (¿entrega sin validar?)':'falta registrar producción')};
 }
 function recomputeTerm(id){
   const t=(window._invTerm||[]).find(x=>x.id===id); if(!t)return;
@@ -8672,7 +8671,7 @@ function recomputePremez(id){
 }
 function renderPremez(){
   const d=invDraft().premez||{};
-  let h='<table class="inv-tbl"><tr><th>Premezcla</th><th># batches</th><th style="text-align:right">Físico</th><th style="text-align:right">Odoo</th><th style="text-align:right">Δ</th><th>Semáforo</th></tr>';
+  let h='<table class="inv-tbl"><tr><th>Premezcla</th><th># batches</th><th style="text-align:right">Físico</th><th style="text-align:right">Odoo</th><th style="text-align:right">Δ</th></tr>';
   for(const p of (window._invPremez||[])){
     const dr=d[p.id]; const vacio=(dr==null||dr==='');
     const fis=parseFloat(dr)||0, diff=fis-p.odoo, s=semMP(diff,vacio);
@@ -8681,7 +8680,7 @@ function renderPremez(){
       +'<td style="text-align:right" id="pfis'+p.id+'">'+(vacio?'—':fmtN(fis))+'</td>'
       +'<td style="text-align:right">'+fmtN(p.odoo)+'</td>'
       +'<td style="text-align:right" class="'+(s.cls==='inv-bad'?'inv-bad':'')+'" id="pdif'+p.id+'">'+(vacio?'—':fmtDiff(diff))+'</td>'
-      +'<td id="psem'+p.id+'" class="'+s.cls+'">'+s.txt+'</td></tr>';
+      +'</tr>';
   }
   document.getElementById('invPremezTabla').innerHTML=h+'</table>';
 }
