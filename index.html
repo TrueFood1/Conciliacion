@@ -7177,19 +7177,66 @@ const RENTA_PROD = [
   {key:'pizza',   pid:472, label:'Pizza Crust',     color:'#FF751F'},
   {key:'galletas',pid:519, label:'Cookie Dough',    color:'#ED93B1'},
 ];
-// Canales (columnas, en orden). pct = descuento sobre neto; frio = ₡ fijo/mes del
-// canal. AJUSTAR ACÁ cuando Andrea cambie un término (fuente entre paréntesis).
-const RENTA_CANALES = [
-  {key:'auto',   label:'Automercado',           pct:0,      frio:612912},  // frío ₡612.912/mes (Andrea, jul-2026)
-  {key:'walmart',label:'Walmart / Más x Menos', pct:0.0643, frio:0},       // descuento 6,43% (incluye todo)
-  {key:'mega',   label:'MegaSuper',             pct:0.065,  frio:0},       // descuento 6,5%
-  {key:'compre', label:'Compre Bien',           pct:0,      frio:34386},   // frío ₡34.386/mes
-  {key:'bm',     label:'BM',                    pct:0,      frio:0},       // sin descuento
-  {key:'negro',  label:'Super Negro',           pct:0,      frio:0},       // sin descuento
-  {key:'horeca', label:'HORECA',                pct:0,      frio:0},       // sin descuento
-  {key:'retail', label:'Retail',                pct:0,      frio:0},       // sin descuento (incluye Abner)
-  {key:'otros',  label:'Otros',                 pct:0,      frio:0},       // supermercados sin columna propia + resto
+// ════════════════════════════════════════════════════════════════════════
+// CANALES — FUENTE ÚNICA DE SUPUESTOS DE CANAL (rediseño Finanzas, fase 1).
+// Reemplaza a las dos tablas que se contradecían: RENTA_CANALES (Rentabilidad)
+// y RENT_CANALES (Simulador/Calculadora). UNA sola definición; si un supuesto
+// cambia, se cambia acá y lo ven TODAS las vistas.
+//
+//  key    → columna de la matriz de Rentabilidad (null = canal solo de precios)
+//  plId   → tarifa de Odoo (product.pricelist) para proyectar precios
+//  comision.enFactura → TRUE si la comisión ya viene aplicada como `discount` de
+//     la línea de la factura. Entonces `price_subtotal` YA está neto y Rentabilidad
+//     NO debe restarla otra vez (sería doble descuento). Las vistas de proyección
+//     sí la aplican sobre el precio de lista. Verificado en Odoo el 9-ago-2026.
+//  comision.intro → REGLA DE NEGOCIO: tarifa de introducción de producto nuevo.
+//     Automercado cobra 16,97% los primeros 3 meses de un producto y 12,6% desde
+//     el cuarto. Aplica a cada lanzamiento, no es promo. 1 − (0,874 × 0,95) =
+//     0,16970 exacto: por eso Cookie Dough facturó ₡2.820,45/u de abr a jul 2026
+//     (lista ₡3.396,90) y ₡2.968,89/u desde agosto, al cumplir los 3 meses.
+//  frio.monto → ₡ fijos/mes del canal. Se reparten por las unidades del canal
+//     (monto ÷ unidades = frío/u; poco volumen → pesa más, es correcto).
+// Cada supuesto lleva su fuente y fecha, y se muestran en la vista.
+// ════════════════════════════════════════════════════════════════════════
+const CANALES = [
+  {key:'auto',   label:'Automercado',           plId:4,
+   comision:{pct:0.126, enFactura:true, fuente:'acuerdo comercial · confirmado por Andrea, 9-ago-2026',
+             intro:{pct:0.1697, meses:3, motivo:'tarifa de introducción de producto nuevo'}},
+   frio:{monto:612912, fuente:'acuerdo comercial, jul-2026'}},
+  {key:'walmart',label:'Walmart / Más x Menos', plId:10,
+   comision:{pct:0.0654, enFactura:false, antes:0.0643, fuente:'acuerdo comercial (incluye todo), ago-2026'}, frio:null},
+  {key:'mega',   label:'MegaSuper',             plId:12,
+   comision:{pct:0.065,  enFactura:false, fuente:'acuerdo comercial, jul-2026'}, frio:null},
+  {key:'compre', label:'Compre Bien',           plId:5,
+   comision:null,
+   frio:{monto:51166.40, provisional:true, editable:true, antes:34386,
+         fuente:'dato real de facturas del portal (may–jun 2026) · pendiente confirmar tratamiento contable con la contadora',
+         nota:'Si el frío se capitaliza en la cuenta 111601 (activo prepagado) y se amortiza con otra periodicidad, el costo mensual real puede ser distinto. Editable hasta que responda Valery.'}},
+  {key:'bm',     label:'BM',                    plId:5,  comision:null, frio:null},
+  {key:'negro',  label:'Super Negro',           plId:5,  comision:null, frio:null},
+  {key:'horeca', label:'HORECA',                plId:2,  comision:null, frio:null},
+  {key:'retail', label:'Retail',                plId:3,  comision:null, frio:null},   // incluye Abner
+  {key:'otros',  label:'Otros',                 plId:null, comision:null, frio:null}, // supermercados sin columna + resto
+  // Canales SOLO de precios (no son columna de la matriz de Rentabilidad: caen en "Otros")
+  {key:null,     label:'Abner',                 plId:11, comision:null, frio:null},
+  {key:null,     label:'Quiznos',               plId:7,  comision:null, frio:null},
 ];
+const CANALES_MATRIZ = CANALES.filter(c=>c.key);      // columnas de Rentabilidad, en orden
+const CANALES_PRECIO = CANALES.filter(c=>c.plId);     // canales con tarifa en Odoo
+// Comisión que Rentabilidad debe RESTAR del neto facturado. Si va dentro de la
+// factura, el neto ya la trae → 0 (restarla sería doble descuento).
+const canalComRenta = c => (c.comision && !c.comision.enFactura) ? c.comision.pct : 0;
+// Comisión para PROYECTAR sobre precio de lista. intro=true → tarifa de producto nuevo.
+const canalComProy = (c,intro) => !c.comision ? 0 : ((intro && c.comision.intro) ? c.comision.intro.pct : c.comision.pct);
+const canalFrio = c => (c.frio && c.frio.monto) || 0;
+// Texto de fuente/fecha de un canal (tooltip). '' si el canal no tiene supuestos.
+function canalFuente(c){
+  const p=[];
+  if(c.comision) p.push('Comisión '+_pct(c.comision.pct*100)+(c.comision.enFactura?' (ya aplicada en la factura)':'')+' — '+c.comision.fuente
+    +(c.comision.intro?' · introducción '+_pct(c.comision.intro.pct*100)+' los primeros '+c.comision.intro.meses+' meses de un producto nuevo':''));
+  if(c.frio) p.push('Frío '+cM(c.frio.monto)+'/mes — '+c.frio.fuente);
+  return p.join('\n');
+}
 // Partner → canal. Por banner (commercial_name); razón social de respaldo. NUNCA por
 // tarifa: otros clientes pueden compartir la lista de precios de una cadena sin serlo
 // (comparten precio, NO el frío ni el descuento) → esos caen en "Otros".
@@ -7240,14 +7287,16 @@ async function reporteRenta(D1,D2){
     chVol[ch]=(chVol[ch]||0)+vol;
   }
   // Frío por unidad del canal (₡ fijo ÷ unidades del canal ese mes)
-  const frioUnit={}; RENTA_CANALES.forEach(c=>{ frioUnit[c.key]=(c.frio&&chVol[c.key])?c.frio/chVol[c.key]:0; });
+  const frioUnit={}; CANALES_MATRIZ.forEach(c=>{ const f=canalFrio(c); frioUnit[c.key]=(f&&chVol[c.key])?f/chVol[c.key]:0; });
   // Solo columnas con ventas ese mes
-  const canalesActivos=RENTA_CANALES.filter(c=>RENTA_PROD.some(P=>{ const x=cell[c.key+'|'+P.key]; return x&&Math.abs(x.vol)>1e-6; }));
+  const canalesActivos=CANALES_MATRIZ.filter(c=>RENTA_PROD.some(P=>{ const x=cell[c.key+'|'+P.key]; return x&&Math.abs(x.vol)>1e-6; }));
   const filas=RENTA_PROD.map(P=>{
     const costo=costoDe[P.key];
     const celdas=canalesActivos.map(c=>{
       const x=cell[c.key+'|'+P.key]; if(!x||Math.abs(x.vol)<1e-6) return null;
-      const desc=x.neto*(c.pct||0), frio=(frioUnit[c.key]||0)*x.vol, cprod=costo*x.vol;
+      // canalComRenta: 0 si la comisión ya viene aplicada en la factura (Automercado) → el
+      // neto ya está descontado y restarla acá sería doble descuento.
+      const desc=x.neto*canalComRenta(c), frio=(frioUnit[c.key]||0)*x.vol, cprod=costo*x.vol;
       const gan=x.neto-cprod-desc-frio;
       // % SIEMPRE sobre |neto|: un mes con más notas de crédito que facturas deja el neto NEGATIVO,
       // y gan/neto (negativo ÷ negativo) devolvía un % POSITIVO junto a una ganancia negativa.
@@ -7293,11 +7342,23 @@ function rentaRender(R, label){
   // la celda esquina (Total canal × Total producto). Acá solo el contexto de neto.
   let foot='Ganancia = neto sin IVA − costo de producir (motor) − costo de canal '
     +'(el total del mes está en la esquina de la tabla). Neto del mes: '+cM(R.netoTot)+'. Tocá un producto para ver su costo real.';
-  const notas=R.canalesActivos.filter(c=>c.pct||c.frio).map(c=>{
-    if(c.pct) return esc(c.label)+' −'+_pct(c.pct*100)+' sobre neto';
-    return esc(c.label)+' frío '+cM(c.frio)+'/mes ÷ '+fmtN(Math.round(R.chVol[c.key]||0))+' u = '+cM(R.frioUnit[c.key])+'/u';
+  const notas=R.canalesActivos.filter(c=>canalComRenta(c)||canalFrio(c)).map(c=>{
+    const t=' title="'+esc(canalFuente(c))+'"';
+    if(canalComRenta(c)) return '<span'+t+'>'+esc(c.label)+' −'+_pct(canalComRenta(c)*100)+' sobre neto</span>';
+    return '<span'+t+'>'+esc(c.label)+' frío '+cM(canalFrio(c))+'/mes ÷ '+fmtN(Math.round(R.chVol[c.key]||0))+' u = '
+      +cM(R.frioUnit[c.key])+'/u'+((c.frio&&c.frio.provisional)?' <em style="font-style:normal;color:#E9A23B">provisional</em>':'')+'</span>';
   });
   if(notas.length) foot+='<br>Costos de canal: '+notas.join(' · ')+'.';
+  // Cambio de supuestos VISIBLE (no silencioso): quien note que el margen de esos canales
+  // se movió tiene que poder entender por qué sin preguntar.
+  const cambiados=R.canalesActivos.filter(c=>(c.comision&&c.comision.antes!=null)||(c.frio&&c.frio.antes!=null));
+  if(cambiados.length){
+    foot+='<br><span style="color:var(--text-2)">Supuestos actualizados el 9-ago-2026: '
+      +cambiados.map(c=>{
+        if(c.frio&&c.frio.antes!=null) return esc(c.label)+' frío '+cM(c.frio.monto)+'/mes (antes '+cM(c.frio.antes)+', '+esc(c.frio.fuente)+')';
+        return esc(c.label)+' '+_pct(c.comision.pct*100)+' (antes '+_pct(c.comision.antes*100)+')';
+      }).join(' · ')+'.</span>';
+  }
   h+='<div style="padding:10px 12px;font-size:11px;color:var(--text-3);border-top:1px solid var(--border)">'+foot+'</div>';
   el.innerHTML=h;
 }
@@ -7821,25 +7882,11 @@ function cobCopiar(i,ev){
     .catch(()=>{ btn.textContent='No se pudo copiar'; btn.classList.add('err'); setTimeout(restore,1800); });
 }
 
-// ════════════════════════════════════════════════════════════════════════
-// TARIFAS POR CANAL (para Precios: Simulador + Calculadora). SOLO LECTURA.
-// El "teórico v1" de Rentabilidad murió: Rentabilidad ahora es el motor REAL de arriba
-// (ventas reales × costo real − costo de canal). Estas constantes SIGUEN VIVAS porque
-// la Calculadora/Simulador de Precios las usa (tarifa → precio de lista + término %).
-// ════════════════════════════════════════════════════════════════════════
-// canal → tarifa (plId) + término % directo. Algunos canales comparten tarifa (Super Negro [5]).
-const RENT_CANALES = [
-  {canal:'Automercado',           plId:4,  termino:0.13,   frio:'sin frío mensual (₡612.689,79/mes, descuento directo)'},
-  {canal:'Walmart / Más x Menos', plId:10, termino:0.0643},
-  {canal:'BM',                    plId:5,  termino:0},
-  {canal:'Compre Bien',           plId:5,  termino:0,      frio:'sin frío mensual (~₡34.386/mes, factura de proveedor)'},
-  {canal:'Super Negro',           plId:5,  termino:0},
-  {canal:'Abner',                 plId:11, termino:0},
-  {canal:'Quiznos',               plId:7,  termino:0},
-  {canal:'HORECA',                plId:2,  termino:0},
-  {canal:'Tiendas / Retail',      plId:3,  termino:0},
-  {canal:'MegaSuper',             plId:12, termino:0,      frio:'sin frío mensual (factura de proveedor)'},
-];
+// RENT_CANALES murió: las tarifas y términos por canal viven en la FUENTE ÚNICA
+// `CANALES` (arriba, junto a Rentabilidad). Tenía 13% para Automercado contra el 0%
+// de Rentabilidad y ₡34.386 de frío de Compre Bien — esa contradicción es justo la
+// que el rediseño de Finanzas viene a matar. Usar CANALES_PRECIO / canalComProy().
+
 // Los 6 terminados: key (casa con el costo del motor) + product.product id (para precios).
 const RENT_PROD = [
   {key:'blanco',  label:'Pan Blanco',      pid:451},
@@ -7891,19 +7938,20 @@ async function cargarSimulador(){
     st.classList.add('hidden'); grid.style.display='grid';
   }catch(e){ console.error('cargarSimulador:',e); st.className='status s-err'; st.innerHTML='No pude cargar el simulador: '+esc(e&&e.message||e); }
 }
-// Precios reales por canal (mismo origen que Rentabilidad: product.pricelist.item fixed_price + término RENT_CANALES).
+// Precios reales por canal: product.pricelist.item fixed_price + supuestos de la FUENTE ÚNICA `CANALES`.
+// Devuelve el canal entero (`c`) para que la vista pueda leer comisión de introducción, frío y fuentes.
 async function simCargarPrecios(){
   const pids=RENT_PROD.map(p=>p.pid);
   const info=await odooCall('product.product','read',[pids],{fields:['id','product_tmpl_id']});
   const tmplDe={}; info.forEach(p=>tmplDe[p.id]=p.product_tmpl_id&&p.product_tmpl_id[0]);
-  const plIds=[...new Set(RENT_CANALES.map(c=>c.plId))];
+  const plIds=[...new Set(CANALES_PRECIO.map(c=>c.plId))];
   const items=await odooCall('product.pricelist.item','search_read',
     [[['pricelist_id','in',plIds],['product_tmpl_id','in',Object.values(tmplDe).filter(Boolean)],['compute_price','=','fixed'],['applied_on','=','1_product']]],
     {fields:['pricelist_id','product_tmpl_id','fixed_price'],limit:1000});
   const pl={}; items.forEach(it=>pl[it.pricelist_id[0]+':'+it.product_tmpl_id[0]]=it.fixed_price);
-  return RENT_CANALES.map((c,i)=>{
+  return CANALES_PRECIO.map((c,i)=>{
     const precios={}; RENT_PROD.forEach(p=>{ const pr=pl[c.plId+':'+tmplDe[p.pid]]; if(pr) precios[p.key]=pr; });
-    return {key:'c'+i, label:c.canal, termino:c.termino, precios};
+    return {key:'c'+i, label:c.label, canal:c, termino:canalComProy(c,false), precios};
   });
 }
 function simEstadoBase(){
@@ -8082,7 +8130,7 @@ function calcBuildUI(){
 }
 // Estado en cero: sin producto, campos en blanco, receta vacía, switches en default (dir A, modo existente)
 function calcReset(){
-  const canales = RENT_CANALES.map(c=>({label:c.canal, mc:CALC_MC_DEFAULT, t:+(c.termino*100).toFixed(2)}));
+  const canales = CANALES_PRECIO.map(c=>({label:c.label, mc:CALC_MC_DEFAULT, t:+(canalComProy(c,false)*100).toFixed(2), canal:c}));
   CALC={dir:'A', mode:'existente', mpMode:'total', receta:{rinde:0, lines:[], rindeUnid:'individual'}, ref:'', mp:0, indMes:0, unid:0, gondola:0, margen:0, canales};
   const sel=document.getElementById('calcRef'); if(sel) sel.value='';
   const rinde=document.getElementById('calcRecRinde'); if(rinde) rinde.value='';
