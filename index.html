@@ -7249,7 +7249,9 @@ async function reporteRenta(D1,D2){
       const x=cell[c.key+'|'+P.key]; if(!x||Math.abs(x.vol)<1e-6) return null;
       const desc=x.neto*(c.pct||0), frio=(frioUnit[c.key]||0)*x.vol, cprod=costo*x.vol;
       const gan=x.neto-cprod-desc-frio;
-      return {neto:x.neto, vol:x.vol, cprod, desc, frio, gan, pct: x.neto?gan/x.neto:0};
+      // % SIEMPRE sobre |neto|: un mes con más notas de crédito que facturas deja el neto NEGATIVO,
+      // y gan/neto (negativo ÷ negativo) devolvía un % POSITIVO junto a una ganancia negativa.
+      return {neto:x.neto, vol:x.vol, cprod, desc, frio, gan, pct: x.neto?gan/Math.abs(x.neto):0};
     });
     return {P, celdas, rowTot:celdas.reduce((s,x)=>s+(x?x.gan:0),0)};
   });
@@ -7953,7 +7955,7 @@ function simRender(){
   let mh='', sum=0, n=0;
   SIM_PROD.forEach(p=>{ const precio=C.precios[p.key], d=r[p.key];
     if(precio==null){ mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span></td><td colspan="5" style="text-align:left;color:var(--text-3)">no se vende en este canal</td></tr>'; return; }
-    const neto=precio*(1-C.termino), margC=neto-d.total, margP=precio?margC/precio*100:0; sum+=margP; n++;   // margen % SOBRE PRECIO DE LISTA (igual que Rentabilidad)
+    const neto=precio*(1-C.termino), margC=neto-d.total, margP=precio?margC/precio*100:0; sum+=margP; n++;   // margen % sobre PRECIO DE LISTA bruto y SIN frío — NO es la base de Rentabilidad (que divide por el neto real y sí resta frío). Se unifica en el pendiente de canales.
     mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+'</td>'
       +'<td style="text-align:right">'+cM(precio)+'</td>'
       +'<td style="text-align:right">'+cM(neto)+'</td>'
