@@ -183,6 +183,42 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .cob-copy:hover{color:var(--text-2);border-color:var(--text-3)}
 .cob-copy.on{color:var(--green);border-color:var(--green)}
 .cob-copy.err{color:var(--red);border-color:var(--red)}
+.cob-wa{margin-left:10px;font-size:11px;color:var(--text-2);background:transparent;border:1px solid var(--border-strong);border-radius:6px;padding:2px 9px;cursor:pointer;font-family:inherit;vertical-align:middle}
+.cob-wa:hover{color:var(--text);border-color:var(--text-3)}
+/* Consecutivo del proveedor: los últimos 4 en mono, siempre visibles; el completo al lado. */
+.cob-cons{display:none;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--text)}
+.cob-consfull{color:var(--text-2)}
+.cob-movsuf{display:none}
+/* ══════════ COBROS Y PAGOS EN TELÉFONO ══════════
+   Las dos tablas (por cliente y por factura) se vuelven filas de dos líneas. Nunca tabla ancha. */
+@media(max-width:700px){
+  #vCobros .cob-strip{grid-template-columns:1fr 1fr;gap:10px}
+  #vCobros #cobModo,#vCobros #cobVenc{min-width:0;max-width:none}
+  #vCobros .cob-tbl{display:block}
+  #vCobros .cob-tbl tr{display:grid;grid-template-columns:1fr auto;column-gap:10px;row-gap:2px;
+    padding:11px 0;border-bottom:1px solid var(--border)}
+  #vCobros .cob-tbl td{display:block;border:none;padding:0;white-space:normal}
+  #vCobros .cob-tbl th{display:none}
+  #vCobros .cob-movsuf{display:inline}
+  /* Por cliente: nombre + total arriba; "N facturas" y lo vencido abajo. */
+  #vCobros .cob-tbl td.cob-g-nm{grid-column:1;grid-row:1;font-size:13.5px}
+  #vCobros .cob-tbl td.cob-g-tot{grid-column:2;grid-row:1;text-align:right;font-size:13.5px}
+  #vCobros .cob-tbl td.cob-g-fac{grid-column:1;grid-row:2;text-align:left;font-size:11px;color:var(--text-3)}
+  #vCobros .cob-tbl td.cob-g-venc{grid-column:2;grid-row:2;text-align:right;font-size:11px}
+  #vCobros .cob-tbl tr.cob-det>td{grid-column:1/-1}
+  /* Por factura: consecutivo + monto arriba; cliente · vence · días abajo. */
+  #vCobros .cob-tbl td.cob-f-doc{grid-column:1;grid-row:1;font-size:13px}
+  #vCobros .cob-tbl td.cob-f-tot{grid-column:2;grid-row:1;text-align:right}
+  #vCobros .cob-tbl td.cob-f-cli{grid-column:1;grid-row:2;font-size:11px;color:var(--text-3)}
+  #vCobros .cob-tbl td.cob-f-fecha{grid-column:1;grid-row:3;font-size:11px;color:var(--text-3)}
+  #vCobros .cob-tbl td.cob-f-vence{grid-column:2;grid-row:2;text-align:right;font-size:11px;color:var(--text-3)}
+  #vCobros .cob-tbl td.cob-f-dias{grid-column:2;grid-row:3;text-align:right;font-size:11px}
+  #vCobros .cob-cons{display:inline}            /* en el teléfono manda el "…4471" */
+  #vCobros .cob-consfull{display:none}          /* el consecutivo completo es de escritorio */
+  #vCobros .cob-wa,#vCobros .cob-copy{margin:6px 8px 0 0;padding:5px 12px;font-size:12px}
+  #vCobros .cob-tbl tr.cob-total{grid-template-columns:1fr auto}
+  #vCobros .cob-tbl tr.cob-total td:nth-child(2),#vCobros .cob-tbl tr.cob-total td:nth-child(4){display:none}
+}
 
 /* ── Ventas: drill-down canal → cliente → factura (rediseño Finanzas) ── */
 .vent-sub{padding:2px 0 8px 20px}
@@ -213,6 +249,36 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .renta-na{color:var(--text-3)}
 .renta-cell .rg.rneg{color:var(--red)}   /* ganancia negativa: señal, no decoración */
 .renta-rowtot .rg,.renta-coltot .rg,.renta-grand .rg{font-weight:600}
+/* ══════════ RENTABILIDAD EN TELÉFONO: un canal a la vez ══════════
+   La matriz producto × canal es de escritorio. En teléfono se elige el canal con píldoras
+   deslizables y los productos salen en lista de una línea. Las etiquetas van DEBAJO del
+   nombre, nunca montadas sobre el número. */
+.renta-mov{display:none}
+@media(max-width:700px){
+  #vRentabilidad .renta-tbl{display:none}
+  #vRentabilidad .renta-mov{display:block}
+  .rm-pills{display:flex;gap:7px;overflow-x:auto;padding:12px 12px 10px;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .rm-pills::-webkit-scrollbar{display:none}
+  .rm-pill{flex:none;background:var(--surface-2);border:.5px solid var(--border);color:var(--text-2);
+    font-family:inherit;font-size:12.5px;padding:7px 13px;border-radius:999px;cursor:pointer;white-space:nowrap}
+  .rm-pill.on{color:var(--text);border-color:var(--mod);background:rgba(55,138,221,.10)}
+  .rm-list{padding:0 12px 4px}
+  .rm-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+    padding:11px 0;border-top:.5px solid #1A1A1E}
+  .rm-row:first-child{border-top:none}
+  .rm-l{min-width:0;flex:1}
+  .rm-nm{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text)}
+  .rm-tags{margin-top:3px;line-height:1.35}
+  .rm-tags .emp-inc,.rm-tags .dias-cero{display:block;margin:0;font-size:10px;font-weight:500;
+    border:none;background:none;padding:0}
+  .rm-r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .rm-r .rg{font-size:14px;color:var(--text)} .rm-r .rg.rneg{color:var(--red)}
+  .rm-r .rp{font-size:11px;color:var(--text-3);margin-top:2px}
+  .rm-r.rm-na{color:var(--text-3)}
+  .rm-tot{border-top:.5px solid var(--border-strong);margin-top:2px}
+  .rm-tot .rm-nm,.rm-tot .rg{font-weight:600}
+}
 .renta-tbl tfoot td{border-top:1px solid var(--border-strong);border-bottom:none;color:var(--text)}
 .renta-tbl tfoot td:first-child{text-align:left;color:var(--text-2)}
 
@@ -264,6 +330,29 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .res-pcell .mg{font-size:20px;color:var(--text);margin-top:7px;font-variant-numeric:tabular-nums}
 .res-pcell .cu{font-size:11.5px;color:var(--text-3);margin-top:3px;font-variant-numeric:tabular-nums}
 @media(max-width:920px){.res-prod{grid-template-columns:repeat(2,1fr)}.res-pcell{border-bottom:1px solid var(--border)}}
+/* ══════════ FINANZAS EN TELÉFONO: mismo lenguaje que el resto ══════════
+   Métricas apiladas de a dos, listas de una línea, sin textos explicativos largos.
+   La descripción larga bajo cada título es de escritorio: en el teléfono ocupa media
+   pantalla y no aporta a quien ya sabe qué está mirando. */
+@media(max-width:700px){
+  #vResultados .m3sub,#vFacturado .m3sub,#vRentabilidad .m3sub,#vCobros .m3sub:not(.res-nota){display:none}
+  #vResultados .m3title,#vFacturado .m3title,#vRentabilidad .m3title,#vCobros .m3title{font-size:20px}
+  #vResultados .res-strip{grid-template-columns:1fr 1fr;gap:10px}
+  #vResultados .res-prod{grid-template-columns:1fr}
+  #vResultados .sim-seg{max-width:none}
+  /* Ventas: canal + facturado arriba, "N clientes" abajo. */
+  #vFacturado .cob-tbl{display:block}
+  #vFacturado .cob-tbl>tbody>tr,#vFacturado .cob-tbl>tr{display:grid;grid-template-columns:1fr auto;
+    column-gap:10px;row-gap:2px;padding:11px 0;border-bottom:1px solid var(--border)}
+  #vFacturado .cob-tbl>tbody>tr>td,#vFacturado .cob-tbl>tr>td{display:block;border:none;padding:0;white-space:normal}
+  #vFacturado .cob-tbl>tbody>tr>th,#vFacturado .cob-tbl>tr>th{display:none}
+  #vFacturado .cob-movsuf{display:inline}
+  #vFacturado td.vent-g-nm{grid-column:1;grid-row:1;font-size:13.5px}
+  #vFacturado td.vent-g-tot{grid-column:2;grid-row:1;text-align:right;font-size:13.5px}
+  #vFacturado td.vent-g-cli{grid-column:1;grid-row:2;text-align:left;font-size:11px;color:var(--text-3)}
+  #vFacturado tr.vent-det>td{grid-column:1/-1}
+  #vFacturado .vent-fac table{width:100%}
+}
 /* ── CALCULADORA DE PRECIOS (Finanzas) ── */
 .calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:760px){.calc-grid{grid-template-columns:1fr}}
@@ -7512,9 +7601,10 @@ function renderVentas(d,label){
   if(!d.filas.length){ el.innerHTML='<div class="muted">Sin ventas en '+esc(label)+'.</div>'; return; }
   let h='<div style="overflow-x:auto"><table class="cob-tbl"><tr><th>Canal</th><th style="text-align:right">Clientes</th><th style="text-align:right">Facturado neto</th></tr>';
   d.filas.forEach((c,ci)=>{
-    h+='<tr class="prod-row" onclick="ventToggle(\'c'+ci+'\')"><td><span class="pcaret">▸</span> '+esc(c.nombre)+(c.id==null?' <span class="muted" style="font-size:11px">⚠ sin canal</span>':'')+'</td>'
-      +'<td style="text-align:right">'+c.clientesArr.length+'</td><td style="text-align:right"><strong>'+cM(c.neto)+'</strong></td></tr>';
-    let sub='<tr class="hidden" id="vent-c'+ci+'"><td colspan="3"><div class="vent-sub">';
+    h+='<tr class="prod-row vent-gr" onclick="ventToggle(\'c'+ci+'\')"><td class="vent-g-nm"><span class="pcaret">▸</span> '+esc(c.nombre)+(c.id==null?' <span class="muted" style="font-size:11px">⚠ sin canal</span>':'')+'</td>'
+      +'<td class="vent-g-cli" style="text-align:right">'+c.clientesArr.length+'<span class="cob-movsuf"> clientes</span></td>'
+      +'<td class="vent-g-tot" style="text-align:right"><strong>'+cM(c.neto)+'</strong></td></tr>';
+    let sub='<tr class="hidden vent-det" id="vent-c'+ci+'"><td colspan="3"><div class="vent-sub">';
     c.clientesArr.forEach((cl,clj)=>{
       const key='c'+ci+'-'+clj;
       const nombre = cl.com ? esc(cl.com)+' <span class="muted" style="font-size:11px">· '+esc(cl.razon)+'</span>' : esc(cl.razon);
@@ -7743,7 +7833,47 @@ function rentaRender(R, label){
       }).join(' · ')+'.</span>';
   }
   h+='<div style="padding:10px 12px;font-size:11px;color:var(--text-3);border-top:1px solid var(--border)">'+foot+'</div>';
-  el.innerHTML=h;
+  _rentaR=R;                                  // el teléfono repinta su lista sin recalcular
+  el.innerHTML=_rentaMovHtml(R)+h;
+}
+// ── RENTABILIDAD EN TELÉFONO: un canal a la vez ──────────────────────────────
+// La matriz producto × canal no cabe en un teléfono sin volverse una tabla ancha. Acá se
+// elige el canal con píldoras deslizables y los productos salen en lista de una línea:
+// nombre a la izquierda, ganancia ₡ + margen % a la derecha. Las etiquetas ("empaque
+// incompleto", "sin días de producción propios…") van como línea tenue ámbar DEBAJO del
+// nombre — nunca como globo montado sobre el número, que es donde estorban.
+// Las etiquetas las siguen disparando los datos (empTag/diasTag), no una lista de IDs.
+let _rentaR=null, _rentaCanalMov=null;   // null = todavía sin elegir → arranca en Automercado
+function _rentaMovHtml(R){
+  if(_rentaCanalMov==null){
+    const i=R.canalesActivos.findIndex(c=>c.key==='auto');   // por clave del canal, no por rótulo
+    _rentaCanalMov = i>=0 ? i : 0;
+  }
+  const ci=Math.min(_rentaCanalMov, R.canalesActivos.length-1);
+  const pills=R.canalesActivos.map((c,i)=>'<button class="rm-pill'+(i===ci?' on':'')+'" onclick="rentaCanalMov('+i+')">'+esc(c.label)+'</button>').join('');
+  return '<div class="renta-mov"><div class="rm-pills">'+pills+'</div><div class="rm-list" id="rmList">'+_rentaMovLista(R,ci)+'</div></div>';
+}
+function _rentaMovLista(R, ci){
+  let out='';
+  R.filas.forEach(f=>{
+    const x=f.celdas[ci], d=_rentaData&&_rentaData.byKey&&_rentaData.byKey[f.P.key];
+    const tags=empTag(d)+diasTag(d);
+    out+='<div class="rm-row" onclick="rentaDetalle(\''+f.P.key+'\')">'
+      +'<div class="rm-l"><div class="rm-nm"><span class="pdot" style="background:'+f.P.color+'"></span>'+esc(f.P.label)+'</div>'
+      +(tags?('<div class="rm-tags">'+tags+'</div>'):'')+'</div>'
+      +(x ? ('<div class="rm-r"><div class="rg'+(x.gan<0?' rneg':'')+'">'+cMs(x.gan)+'</div><div class="rp">'+_pct(x.pct*100)+'</div></div>')
+          : '<div class="rm-r rm-na">—</div>')
+      +'</div>';
+  });
+  const t=R.colTot[ci];
+  out+='<div class="rm-row rm-tot"><div class="rm-l"><div class="rm-nm">Total del canal</div></div>'
+    +'<div class="rm-r"><div class="rg'+(t<0?' rneg':'')+'">'+cMs(t)+'</div></div></div>';
+  return out;
+}
+function rentaCanalMov(i){
+  _rentaCanalMov=i; if(!_rentaR) return;
+  const l=document.getElementById('rmList'); if(l) l.innerHTML=_rentaMovLista(_rentaR,i);
+  document.querySelectorAll('#rentaMatriz .rm-pill').forEach((b,k)=>b.classList.toggle('on',k===i));
 }
 function rentaDetalle(key){
   const P=RENTA_PROD.find(p=>p.key===key), el=document.getElementById('rentaDetalle');
@@ -8152,7 +8282,9 @@ async function cobTab(which){
 }
 // Fecha es-CR: 'YYYY-MM-DD' → 'DD/MM/YYYY'.
 function _fD(s){ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):(s?esc(s):'—'); }
-let _cobModo='factura', _cobVenc='todas';
+// En teléfono la vista por CLIENTE es la útil (nombre + total + vencido en una línea);
+// en escritorio sigue arrancando por factura. Es solo el valor inicial: el control manda.
+let _cobModo=(window.matchMedia&&matchMedia('(max-width:700px)').matches)?'cliente':'factura', _cobVenc='todas';
 function cobSetModo(m){ _cobModo=m; document.querySelectorAll('#cobModo button').forEach(b=>b.classList.toggle('on',b.dataset.m===m)); renderCob(); }
 function cobSetVenc(v){ _cobVenc=v; document.querySelectorAll('#cobVenc button').forEach(b=>b.classList.toggle('on',b.dataset.v===v)); renderCob(); }
 function renderCob(){
@@ -8172,6 +8304,7 @@ function renderCob(){
     +'</div>'
     +'<div class="m3sub" style="margin-top:8px;font-size:11px;color:var(--text-3)">Solo facturas de 2026 en adelante'+(which==='pagar'?' · excluye Gastos Adicionales (compensación de IVA, cuenta 640103)':'')+(soloVenc?' · solo vencidas':'')+'. El total es sobre lo visible.</div>';
   if(!d.length){ el.innerHTML='<div class="muted">Sin facturas vencidas.</div>'; return; }
+  document.querySelectorAll('#cobModo button').forEach(b=>b.classList.toggle('on',b.dataset.m===_cobModo));
   if(_cobModo==='cliente') renderCobCliente(which,d,el); else renderCobFactura(which,d,el);
 }
 // Cliente/proveedor: nombre comercial + razón social (parejo con Ventas).
@@ -8180,11 +8313,16 @@ function _cobPartner(r){ const razon=(r.partner_id&&r.partner_id[1])||'—'; ret
 // proveedor"), con el consecutivo interno de Odoo como referencia chica; si el
 // proveedor no trae número (~28%), cae al interno. En Por cobrar = nuestro nº de
 // factura (`name`) + ref/FE como secundario. (number_electronic no se usa en compras: 0% poblado.)
+// REGLA GENERAL (no por caso): en Por pagar manda el consecutivo del PROVEEDOR. El número
+// interno de Odoo nunca se muestra a secas — solo aparece como fallback cuando el proveedor
+// no trae consecutivo, y siempre rotulado "interno N".
+function _cobUlt4(s){ const t=String(s||'').replace(/\s+/g,''); return t?('…'+t.slice(-4)):''; }
 function _cobDoc(r){
   if(_cobTab==='pagar'){
     if(r.ref && String(r.ref).trim())
-      return esc(r.ref)+(r.name?' <span class="muted" style="font-size:11px">· interno '+esc(r.name)+'</span>':'');
-    return esc(r.name||'—')+' <span class="muted" style="font-size:11px">· sin nº de proveedor</span>';
+      return '<span class="cob-cons">'+esc(_cobUlt4(r.ref))+'</span> <span class="cob-consfull">'+esc(r.ref)+'</span>'
+        +(r.name?' <span class="muted" style="font-size:11px">· interno '+esc(r.name)+'</span>':'');
+    return '<span class="muted" style="font-size:11px">sin nº de proveedor · </span>interno '+esc(r.name||'—');
   }
   const refDist = r.ref && r.ref!==r.name ? ' <span class="muted" style="font-size:11px">· '+esc(r.ref)+'</span>' : '';
   const fe = r.number_electronic ? ' <span class="cob-fe" title="Comprobante electrónico: '+esc(r.number_electronic)+'">FE</span>' : '';
@@ -8194,11 +8332,11 @@ function _cobDoc(r){
 function _cobFilaFactura(r,conPartner){
   const dv=_diasVencida(r.invoice_date_due);
   const diasCell = dv>0 ? '<span class="cob-venc">'+dv+' d</span>' : '<span class="muted">—</span>';
-  return '<tr><td>'+_fD(r.invoice_date)+'</td><td>'+_fD(r.invoice_date_due)+'</td>'
-    +'<td style="text-align:right">'+diasCell+'</td>'
-    +(conPartner?'<td>'+_cobPartner(r)+'</td>':'')
-    +'<td>'+_cobDoc(r)+'</td>'
-    +'<td style="text-align:right"><strong>'+cM(r.amount_residual||0)+'</strong></td></tr>';
+  return '<tr class="cob-fr"><td class="cob-f-fecha">'+_fD(r.invoice_date)+'</td><td class="cob-f-vence">'+_fD(r.invoice_date_due)+'</td>'
+    +'<td class="cob-f-dias" style="text-align:right">'+diasCell+'</td>'
+    +(conPartner?'<td class="cob-f-cli">'+_cobPartner(r)+'</td>':'')
+    +'<td class="cob-f-doc">'+_cobDoc(r)+'</td>'
+    +'<td class="cob-f-tot" style="text-align:right"><strong>'+cM(r.amount_residual||0)+'</strong></td></tr>';
 }
 function renderCobFactura(which,d,el){
   const cliLbl=which==='cobrar'?'Cliente':'Proveedor';
@@ -8226,15 +8364,18 @@ function renderCobCliente(which,d,el){
     g.rows.sort((a,b)=>{ const x=a.invoice_date_due||'9999-99-99', y=b.invoice_date_due||'9999-99-99'; return x<y?-1:x>y?1:0; });
     const venc = g.maxVenc!=null && g.maxVenc>0;
     const vencCell = venc ? '<span class="cob-venc">'+g.maxVenc+' d</span>' : '<span class="muted">—</span>';
-    const btnCopiar = (which==='cobrar' && venc) ? ' <button class="cob-copy" onclick="cobCopiar('+i+',event)">Copiar recordatorio</button>' : '';
+    // WhatsApp es la acción principal (abre el chat con el mensaje escrito); copiar queda de apoyo.
+    const btnCopiar = (which==='cobrar' && venc)
+      ? ' <button class="cob-wa" onclick="cobWhatsApp('+i+',event)">WhatsApp</button>'
+        +' <button class="cob-copy" onclick="cobCopiar('+i+',event)">Copiar recordatorio</button>' : '';
     const primary = g.com ? esc(g.com) : esc(g.razon);
     const sec = g.com ? ' <span class="muted" style="font-size:11px">· '+esc(g.razon)+'</span>' : '';
-    h+='<tr class="prod-row" onclick="cobToggleGrupo('+i+')"><td><span class="pcaret">▸</span> '
+    h+='<tr class="prod-row cob-gr" onclick="cobToggleGrupo('+i+')"><td class="cob-g-nm"><span class="pcaret">▸</span> '
       +(venc?'<span class="cob-venc">'+primary+'</span>':primary)+sec+btnCopiar+'</td>'
-      +'<td style="text-align:right">'+g.rows.length+'</td>'
-      +'<td style="text-align:right"><strong>'+cM(g.total)+'</strong></td>'
-      +'<td style="text-align:right">'+vencCell+'</td></tr>';
-    let dt='<tr class="hidden" id="cobg-'+i+'"><td colspan="4"><div class="prod-det-wrap"><table>'
+      +'<td class="cob-g-fac" style="text-align:right">'+g.rows.length+'<span class="cob-movsuf"> facturas</span></td>'
+      +'<td class="cob-g-tot" style="text-align:right"><strong>'+cM(g.total)+'</strong></td>'
+      +'<td class="cob-g-venc" style="text-align:right">'+vencCell+'</td></tr>';
+    let dt='<tr class="hidden cob-det" id="cobg-'+i+'"><td colspan="4"><div class="prod-det-wrap"><table>'
       +'<tr><th>Fecha</th><th>Vence</th><th style="text-align:right">Días</th><th>Documento</th><th style="text-align:right">Pendiente</th></tr>';
     g.rows.forEach(r=>{ dt+=_cobFilaFactura(r,false); });
     h+=dt+'</table></div></td></tr>';
@@ -8250,19 +8391,33 @@ function _copiarTexto(txt){
   if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt);
   return new Promise((res,rej)=>{ try{ const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); res(); }catch(e){ rej(e); } });
 }
-// Recordatorio de WhatsApp con SOLO las facturas vencidas del cliente (Por cobrar).
-function cobCopiar(i,ev){
-  ev.stopPropagation();
-  const btn=ev.currentTarget, g=(window._cobGrupos||[])[i]; if(!g) return;
+// Texto del recordatorio: UNA sola fuente para el botón de copiar y para el de WhatsApp,
+// así los dos mandan exactamente el mismo mensaje.
+function _cobMensaje(g){
   const venc=g.rows.filter(r=>(_diasVencida(r.invoice_date_due)||0)>0);
-  if(!venc.length) return;
+  if(!venc.length) return '';
   let txt='Hola! Espero que estés muy bien. Te paso un resumen de las facturas pendientes de pago:\n';
   venc.forEach(r=>{ txt+='• Factura ...'+String(r.name||'').slice(-4)+' — '+_fD(r.invoice_date)+' — '+cM(r.amount_residual||0)+'\n'; });
   txt+='Total pendiente: '+cM(venc.reduce((s,r)=>s+(r.amount_residual||0),0))+'\n';
   txt+='Les agradecemos mucho el pago. ¡Gracias!';
+  return txt;
+}
+// Recordatorio de WhatsApp con SOLO las facturas vencidas del cliente (Por cobrar).
+function cobCopiar(i,ev){
+  ev.stopPropagation();
+  const btn=ev.currentTarget, g=(window._cobGrupos||[])[i]; if(!g) return;
+  const txt=_cobMensaje(g); if(!txt) return;
   const restore=()=>{ btn.textContent='Copiar recordatorio'; btn.classList.remove('on','err'); };
   _copiarTexto(txt).then(()=>{ btn.textContent='Copiado ✓'; btn.classList.add('on'); setTimeout(restore,1600); })
     .catch(()=>{ btn.textContent='No se pudo copiar'; btn.classList.add('err'); setTimeout(restore,1800); });
+}
+// Abre WhatsApp con el mensaje ya escrito. SIN número: wa.me/?text= deja que el usuario elija
+// el contacto en WhatsApp — la app no guarda teléfonos de clientes y no los inventa.
+function cobWhatsApp(i,ev){
+  ev.stopPropagation();
+  const g=(window._cobGrupos||[])[i]; if(!g) return;
+  const txt=_cobMensaje(g); if(!txt) return;
+  window.open('https://wa.me/?text='+encodeURIComponent(txt), '_blank', 'noopener');
 }
 
 // RENT_CANALES murió: las tarifas y términos por canal viven en la FUENTE ÚNICA
