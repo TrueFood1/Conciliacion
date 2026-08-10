@@ -1908,6 +1908,43 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vConteo .cn-btns{display:flex;gap:10px}
 #vConteo .cn-btn{background:var(--surface-2);border:.5px solid var(--border);color:var(--text-2);font-size:12.5px;padding:9px 16px;border-radius:8px;cursor:pointer}
 #vConteo .cn-guardar{background:#E9FE60;color:#1A1A1A;border:none;font-weight:600}
+#vConteo .cn-sub,#vConteo .cn-lblm,#vConteo .cn-tmov{display:none}   /* piezas de teléfono */
+/* ══════════ CONTEO EN TELÉFONO ══════════
+   La tabla de 4 columnas se vuelve una lista: cada fila es un renglón de dos líneas
+   (nombre arriba, existencia Odoo + presentación abajo) con los campos a la derecha,
+   separadas por hairline. Sin tarjetas y sin tabla ancha. */
+@media(max-width:700px){
+  #vConteo .cn-tabs,#vConteo #cn-tabs{gap:5px;margin:14px 0 6px}
+  #vConteo .cn-tab{padding:7px 11px;font-size:12px}
+  #vConteo .cn-tdesk{display:none} #vConteo .cn-tmov{display:inline}
+  #vConteo #cn-mp,#vConteo #cn-premez,#vConteo #cn-term{max-width:none}
+  #vConteo .cn-tbl{display:block}
+  #vConteo .cn-tbl thead{display:none}
+  #vConteo .cn-tbl tbody{display:block}
+  #vConteo .cn-tbl tr{display:grid;grid-template-columns:1fr auto;align-items:center;
+    column-gap:10px;row-gap:1px;padding:9px 0;border-bottom:.5px solid #1A1A1E}
+  #vConteo .cn-tbl tbody tr:last-child{border-bottom:none}
+  #vConteo .cn-tbl td{display:block;border:none;padding:0}
+  /* `td.` en el selector para ganarle a la regla genérica `#vConteo .cn-tbl td` de arriba. */
+  #vConteo .cn-tbl td.cn-nm{grid-column:1;grid-row:1;font-size:13px;min-width:0;font-weight:500}
+  #vConteo .cn-pcaja{display:none}                       /* va en la segunda línea, junto al Odoo */
+  #vConteo .cn-tbl td.cn-sub{display:block;grid-column:1;grid-row:2;font-size:10px;color:var(--text-3);
+    font-variant-numeric:tabular-nums}
+  #vConteo .cn-tbl td.cn-count{grid-column:2;grid-row:1/span 2;white-space:nowrap;text-align:right}
+  #vConteo .cn-tbl td.cn-odoo,#vConteo .cn-tbl td.cn-diff{display:none}
+  #vConteo .cn-ttot{display:none}
+  /* Campos: centrados, 15px, y la etiqueta mínima al lado. Vacíos con placeholder "0" —
+     nunca value="0", que con teclado numérico termina en "05". */
+  #vConteo .cn-in{width:52px;font-size:15px;text-align:center;padding:7px 4px}
+  #vConteo .cn-lbl{display:none} #vConteo .cn-lblm{display:inline;color:var(--text-3);font-size:10px;margin:0 5px 0 3px}
+  /* Botonera: el resumen arriba, Guardar como único botón con peso, el resto texto tenue. */
+  #vConteo .cn-bar{flex-direction:column;align-items:stretch;gap:11px;
+    padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+  #vConteo .cn-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px}
+  #vConteo .cn-guardar{grid-column:1/-1;order:-1;padding:13px;font-size:15px;border-radius:10px}
+  #vConteo .cn-btn:not(.cn-guardar){background:none;border:none;padding:0;color:var(--text-3);
+    font-size:12.5px;text-decoration:underline;text-align:center}
+}
 </style>
 <div id="vConteo" class="hidden">
   <div class="faces faces-ops">
@@ -1927,7 +1964,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   <div id="cn-tabs">
     <button class="cn-tab on" data-t="mp" onclick="cnTab('mp')">Materia prima</button>
     <button class="cn-tab" data-t="premez" onclick="cnTab('premez')">Premezclas</button>
-    <button class="cn-tab" data-t="term" onclick="cnTab('term')">Producto terminado</button>
+    <button class="cn-tab" data-t="term" onclick="cnTab('term')"><span class="cn-tdesk">Producto terminado</span><span class="cn-tmov">Terminado</span></button>
   </div>
   <div id="cn-mp"></div>
   <div id="cn-premez" style="display:none"></div>
@@ -6357,6 +6394,12 @@ function cnCargarHistConfirm(){
   cnRender(); cnRenderPending();
 }
 
+// ── Piezas que solo se ven en teléfono (el CSS decide; el HTML es uno solo) ──
+// .cn-sub  = segunda línea de la fila: "existencia Odoo · presentación" ("669 u · caja 6").
+// .cn-lblm = etiqueta mínima del campo ("caj", "u", "paq") — la larga es de escritorio.
+const _CN_SING={sacos:'saco', cajas:'caja', bolsas:'bolsa', cartones:'cartón', potes:'pote'};
+function _cnPresLbl(pe){ return pe ? (_CN_SING[pe.lab]||pe.lab) : ''; }
+function _cnPresCorto(pe){ return pe ? (_CN_SING[pe.lab]||pe.lab).slice(0,3) : ''; }
 function cnRender(){
   const d=cnDraft(), rez=d.rezago||{};
   // MATERIA PRIMA
@@ -6364,11 +6407,14 @@ function cnRender(){
   for(const m of _cnMP){
     const pe=PESO_EMPAQUE.find(x=>x.rx.test(m.name)), dr=(d.mp||{})[m.pid]||{};
     const {fis,vacio}=fisicoMP(m,dr), diff=fis-m.qty, s=sem3(diff,_tolMP(m),vacio);
-    const empIn = pe ? '<input class="cn-in" inputmode="decimal" value="'+(dr.emp!=null?esc(dr.emp):'')+'" oninput="cnMpEmp('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(pe.lab)+' ×'+fmtN(pe.peso)+pe.unidad+'</span>' : '';
+    // empaques enteros → teclado numérico; el suelto lleva decimales (22,68 kg) → decimal.
+    const empIn = pe ? '<input class="cn-in" inputmode="numeric" value="'+(dr.emp!=null?esc(dr.emp):'')+'" oninput="cnMpEmp('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(pe.lab)+' ×'+fmtN(pe.peso)+pe.unidad+'</span><span class="cn-lblm">'+esc(_cnPresCorto(pe))+'</span>' : '';
     const sueLab=(pe&&pe.sueltoUnit)?pe.sueltoUnit:m.uom;
     const sueIn = (pe&&pe.noSuelto) ? '<span class="cn-lbl">sin suelto</span>'
-      : '<input class="cn-in" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnMpSue('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(sueLab)+'</span>';
+      : '<input class="cn-in" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnMpSue('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(sueLab)+'</span><span class="cn-lblm">'+esc(sueLab)+'</span>';
+    const subMP=fmtN(m.qty)+' '+esc(m.uom)+(pe?(' · '+esc(_cnPresLbl(pe))+' '+fmtN(pe.peso)):'');
     mp+='<tr><td class="cn-nm">'+esc(nombreCortoMP(m.name))+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
+      +'<td class="cn-sub">'+subMP+'</td>'
       +'<td class="cn-count">'+empIn+(empIn&&!(pe&&pe.noSuelto)?' + ':'')+sueIn+'</td>'
       +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-mdif'+m.pid+'">'+(vacio?'—':fmtDiff(diff)+' '+m.uom)+'</td></tr>';
   }
@@ -6378,7 +6424,8 @@ function cnRender(){
   for(const p of _cnPremez){
     const dr=(d.premez||{})[p.id], vacio=(dr==null||dr===''); const fis=parseFloat(dr)||0, diff=fis-p.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
     pm+='<tr><td class="cn-nm">'+esc(p.label)+'</td><td class="cn-odoo">'+fmtN(p.odoo)+' batches</td>'
-      +'<td class="cn-count"><input class="cn-in" inputmode="decimal" value="'+(dr!=null?esc(dr):'')+'" oninput="cnPremez('+p.id+',this.value)" placeholder="0"><span class="cn-lbl">batches</span></td>'
+      +'<td class="cn-sub">'+fmtN(p.odoo)+' batches</td>'
+      +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr!=null?esc(dr):'')+'" oninput="cnPremez('+p.id+',this.value)" placeholder="0"><span class="cn-lbl">batches</span><span class="cn-lblm">bat</span></td>'
       +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-pdif'+p.id+'">'+(vacio?'—':fmtDiff(diff)+' batch')+'</td></tr>';
   }
   document.getElementById('cn-premez').innerHTML=pm+'</tbody></table>';
@@ -6390,8 +6437,9 @@ function cnRender(){
     const fis=(parseFloat(dr.cajas)||0)*t.factor+(parseFloat(dr.sue)||0)*t.presDiv, diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
     const cajaV=t.factor/t.presDiv, cajaU=(t.presDiv===1?'u':'paq');   // caja en unidad de venta
     tm+='<tr><td class="cn-nm"><span class="cn-pnom">'+esc(t.label)+'</span><span class="cn-pcaja">caja = '+cajaV+' '+cajaU+'</span></td><td class="cn-odoo">'+_cnVentaTxt(t,t.odoo)+'</td>'
-      +'<td class="cn-count"><input class="cn-in" inputmode="decimal" value="'+(dr.cajas!=null?esc(dr.cajas):'')+'" oninput="cnTermCajas('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">cajas</span> + '
-      +'<input class="cn-in" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnTermSue('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(t.venta)+'</span>'
+      +'<td class="cn-sub">'+_cnVentaTxt(t,t.odoo)+' · caja '+cajaV+' '+cajaU+'</td>'
+      +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr.cajas!=null?esc(dr.cajas):'')+'" oninput="cnTermCajas('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">cajas</span><span class="cn-lblm">caj</span> + '
+      +'<input class="cn-in" inputmode="numeric" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnTermSue('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(t.venta)+'</span><span class="cn-lblm">'+esc(t.venta)+'</span>'
       +'<span class="cn-ttot" id="cn-ttot'+t.id+'">'+(vacio?'':'= '+_cnVentaTxt(t,fis))+'</span></td>'
       +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-tdif'+t.id+'">'+(vacio?'—':_cnDiffTxt(t,diff))+'</td></tr>';
   }
