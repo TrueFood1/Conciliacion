@@ -183,6 +183,42 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .cob-copy:hover{color:var(--text-2);border-color:var(--text-3)}
 .cob-copy.on{color:var(--green);border-color:var(--green)}
 .cob-copy.err{color:var(--red);border-color:var(--red)}
+.cob-wa{margin-left:10px;font-size:11px;color:var(--text-2);background:transparent;border:1px solid var(--border-strong);border-radius:6px;padding:2px 9px;cursor:pointer;font-family:inherit;vertical-align:middle}
+.cob-wa:hover{color:var(--text);border-color:var(--text-3)}
+/* Consecutivo del proveedor: los últimos 4 en mono, siempre visibles; el completo al lado. */
+.cob-cons{display:none;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--text)}
+.cob-consfull{color:var(--text-2)}
+.cob-movsuf{display:none}
+/* ══════════ COBROS Y PAGOS EN TELÉFONO ══════════
+   Las dos tablas (por cliente y por factura) se vuelven filas de dos líneas. Nunca tabla ancha. */
+@media(max-width:700px){
+  #vCobros .cob-strip{grid-template-columns:1fr 1fr;gap:10px}
+  #vCobros #cobModo,#vCobros #cobVenc{min-width:0;max-width:none}
+  #vCobros .cob-tbl{display:block}
+  #vCobros .cob-tbl tr{display:grid;grid-template-columns:1fr auto;column-gap:10px;row-gap:2px;
+    padding:11px 0;border-bottom:1px solid var(--border)}
+  #vCobros .cob-tbl td{display:block;border:none;padding:0;white-space:normal}
+  #vCobros .cob-tbl th{display:none}
+  #vCobros .cob-movsuf{display:inline}
+  /* Por cliente: nombre + total arriba; "N facturas" y lo vencido abajo. */
+  #vCobros .cob-tbl td.cob-g-nm{grid-column:1;grid-row:1;font-size:13.5px}
+  #vCobros .cob-tbl td.cob-g-tot{grid-column:2;grid-row:1;text-align:right;font-size:13.5px}
+  #vCobros .cob-tbl td.cob-g-fac{grid-column:1;grid-row:2;text-align:left;font-size:11px;color:var(--text-3)}
+  #vCobros .cob-tbl td.cob-g-venc{grid-column:2;grid-row:2;text-align:right;font-size:11px}
+  #vCobros .cob-tbl tr.cob-det>td{grid-column:1/-1}
+  /* Por factura: consecutivo + monto arriba; cliente · vence · días abajo. */
+  #vCobros .cob-tbl td.cob-f-doc{grid-column:1;grid-row:1;font-size:13px}
+  #vCobros .cob-tbl td.cob-f-tot{grid-column:2;grid-row:1;text-align:right}
+  #vCobros .cob-tbl td.cob-f-cli{grid-column:1;grid-row:2;font-size:11px;color:var(--text-3)}
+  #vCobros .cob-tbl td.cob-f-fecha{grid-column:1;grid-row:3;font-size:11px;color:var(--text-3)}
+  #vCobros .cob-tbl td.cob-f-vence{grid-column:2;grid-row:2;text-align:right;font-size:11px;color:var(--text-3)}
+  #vCobros .cob-tbl td.cob-f-dias{grid-column:2;grid-row:3;text-align:right;font-size:11px}
+  #vCobros .cob-cons{display:inline}            /* en el teléfono manda el "…4471" */
+  #vCobros .cob-consfull{display:none}          /* el consecutivo completo es de escritorio */
+  #vCobros .cob-wa,#vCobros .cob-copy{margin:6px 8px 0 0;padding:5px 12px;font-size:12px}
+  #vCobros .cob-tbl tr.cob-total{grid-template-columns:1fr auto}
+  #vCobros .cob-tbl tr.cob-total td:nth-child(2),#vCobros .cob-tbl tr.cob-total td:nth-child(4){display:none}
+}
 
 /* ── Ventas: drill-down canal → cliente → factura (rediseño Finanzas) ── */
 .vent-sub{padding:2px 0 8px 20px}
@@ -213,6 +249,36 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .renta-na{color:var(--text-3)}
 .renta-cell .rg.rneg{color:var(--red)}   /* ganancia negativa: señal, no decoración */
 .renta-rowtot .rg,.renta-coltot .rg,.renta-grand .rg{font-weight:600}
+/* ══════════ RENTABILIDAD EN TELÉFONO: un canal a la vez ══════════
+   La matriz producto × canal es de escritorio. En teléfono se elige el canal con píldoras
+   deslizables y los productos salen en lista de una línea. Las etiquetas van DEBAJO del
+   nombre, nunca montadas sobre el número. */
+.renta-mov{display:none}
+@media(max-width:700px){
+  #vRentabilidad .renta-tbl{display:none}
+  #vRentabilidad .renta-mov{display:block}
+  .rm-pills{display:flex;gap:7px;overflow-x:auto;padding:12px 12px 10px;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .rm-pills::-webkit-scrollbar{display:none}
+  .rm-pill{flex:none;background:var(--surface-2);border:.5px solid var(--border);color:var(--text-2);
+    font-family:inherit;font-size:12.5px;padding:7px 13px;border-radius:999px;cursor:pointer;white-space:nowrap}
+  .rm-pill.on{color:var(--text);border-color:var(--mod);background:rgba(55,138,221,.10)}
+  .rm-list{padding:0 12px 4px}
+  .rm-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+    padding:11px 0;border-top:.5px solid #1A1A1E}
+  .rm-row:first-child{border-top:none}
+  .rm-l{min-width:0;flex:1}
+  .rm-nm{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text)}
+  .rm-tags{margin-top:3px;line-height:1.35}
+  .rm-tags .emp-inc,.rm-tags .dias-cero{display:block;margin:0;font-size:10px;font-weight:500;
+    border:none;background:none;padding:0}
+  .rm-r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .rm-r .rg{font-size:14px;color:var(--text)} .rm-r .rg.rneg{color:var(--red)}
+  .rm-r .rp{font-size:11px;color:var(--text-3);margin-top:2px}
+  .rm-r.rm-na{color:var(--text-3)}
+  .rm-tot{border-top:.5px solid var(--border-strong);margin-top:2px}
+  .rm-tot .rm-nm,.rm-tot .rg{font-weight:600}
+}
 .renta-tbl tfoot td{border-top:1px solid var(--border-strong);border-bottom:none;color:var(--text)}
 .renta-tbl tfoot td:first-child{text-align:left;color:var(--text-2)}
 
@@ -264,6 +330,29 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .res-pcell .mg{font-size:20px;color:var(--text);margin-top:7px;font-variant-numeric:tabular-nums}
 .res-pcell .cu{font-size:11.5px;color:var(--text-3);margin-top:3px;font-variant-numeric:tabular-nums}
 @media(max-width:920px){.res-prod{grid-template-columns:repeat(2,1fr)}.res-pcell{border-bottom:1px solid var(--border)}}
+/* ══════════ FINANZAS EN TELÉFONO: mismo lenguaje que el resto ══════════
+   Métricas apiladas de a dos, listas de una línea, sin textos explicativos largos.
+   La descripción larga bajo cada título es de escritorio: en el teléfono ocupa media
+   pantalla y no aporta a quien ya sabe qué está mirando. */
+@media(max-width:700px){
+  #vResultados .m3sub,#vFacturado .m3sub,#vRentabilidad .m3sub,#vCobros .m3sub:not(.res-nota){display:none}
+  #vResultados .m3title,#vFacturado .m3title,#vRentabilidad .m3title,#vCobros .m3title{font-size:20px}
+  #vResultados .res-strip{grid-template-columns:1fr 1fr;gap:10px}
+  #vResultados .res-prod{grid-template-columns:1fr}
+  #vResultados .sim-seg{max-width:none}
+  /* Ventas: canal + facturado arriba, "N clientes" abajo. */
+  #vFacturado .cob-tbl{display:block}
+  #vFacturado .cob-tbl>tbody>tr,#vFacturado .cob-tbl>tr{display:grid;grid-template-columns:1fr auto;
+    column-gap:10px;row-gap:2px;padding:11px 0;border-bottom:1px solid var(--border)}
+  #vFacturado .cob-tbl>tbody>tr>td,#vFacturado .cob-tbl>tr>td{display:block;border:none;padding:0;white-space:normal}
+  #vFacturado .cob-tbl>tbody>tr>th,#vFacturado .cob-tbl>tr>th{display:none}
+  #vFacturado .cob-movsuf{display:inline}
+  #vFacturado td.vent-g-nm{grid-column:1;grid-row:1;font-size:13.5px}
+  #vFacturado td.vent-g-tot{grid-column:2;grid-row:1;text-align:right;font-size:13.5px}
+  #vFacturado td.vent-g-cli{grid-column:1;grid-row:2;text-align:left;font-size:11px;color:var(--text-3)}
+  #vFacturado tr.vent-det>td{grid-column:1/-1}
+  #vFacturado .vent-fac table{width:100%}
+}
 /* ── CALCULADORA DE PRECIOS (Finanzas) ── */
 .calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:760px){.calc-grid{grid-template-columns:1fr}}
@@ -340,6 +429,25 @@ tr.r-ing td{background:#eff6ff}
 .conf-act{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
 /* ── Dashboard de Costos (cara 1) ── */
 .faces{display:flex;gap:6px;margin-bottom:15px;border-bottom:1px solid var(--border)}
+/* ══════════════ MÓVIL ══════════════
+   Una sola base de código: TODO lo móvil vive detrás de @media(max-width:700px).
+   A ancho de escritorio nada de esto aplica, así que el escritorio no cambia. */
+/* Pestañas que no se muestran en teléfono (Operaciones: Producción · Mermas · Plan ·
+   Finanzas: Precios). Es SOLO visual — no hay roles todavía, la vista sigue accesible
+   por URL o desde escritorio. */
+@media(max-width:700px){
+  .face-desk{display:none}
+  /* Barra de pestañas: si no caben, se desliza. Nunca se corta una etiqueta a la mitad
+     ni se parte en dos renglones (flex-wrap era lo que dejaba "Cobros y / Pagos"). */
+  .faces{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;
+    scrollbar-width:none;gap:2px}
+  .faces::-webkit-scrollbar{display:none}
+  .face{flex:none;white-space:nowrap;padding:8px 10px}
+  /* El pie (BUILD) no puede quedar debajo de la barra del navegador. */
+  .main{padding:.75rem 1rem calc(28px + env(safe-area-inset-bottom))}
+  /* Ninguna tabla ancha empuja la página: si algo se pasa, se desliza adentro de su caja. */
+  body{overflow-x:hidden}
+}
 .face{appearance:none;background:none;border:none;border-bottom:2px solid transparent;padding:8px 12px;font:600 13px/1 'DM Sans',sans-serif;color:var(--text-2);cursor:pointer}
 .face.on{color:#1A1A1A;border-bottom-color:#C964CF}
 .face.dis{color:#C5C2BA;cursor:not-allowed}
@@ -450,6 +558,23 @@ tr.r-ing td{background:#eff6ff}
 .home-sep{border-top:.5px solid #26262C;width:100%;margin:0}
 .home-modlabel{font-size:12px;font-weight:500;color:#6E6C68;letter-spacing:.5px;width:100%;margin:1.5rem 0 .9rem;text-align:left}
 .home-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;width:100%;max-width:760px}
+/* El sello de versión iba con estilo en línea; vive acá para que el @media pueda darle
+   el respiro del safe-area en teléfono (el estilo en línea le ganaba a la hoja). */
+.home-build{text-align:center;color:#6E6C68;font-size:11px;letter-spacing:.03em;padding:16px 0 6px}
+/* ── LOBBY en teléfono: módulos apilados en 2 columnas (la fila de 5 se cortaba) y
+   menos aire muerto entre el saludo y los módulos. ── */
+@media(max-width:700px){
+  .home-wrap{padding:2vh 1.1rem calc(3vh + env(safe-area-inset-bottom))}
+  .home-live{margin-right:0}
+  .home-live .t{font-size:11px}
+  .home-center{flex:0 0 auto;margin:22px 0 4px}
+  .home-hi{font-size:22px}
+  .home-soon{margin-top:1.1rem}
+  .home-modlabel{margin:1.1rem 0 .7rem}
+  .home-grid{grid-template-columns:1fr 1fr}
+  .home-mod{padding:14px}
+  .home-build{padding-bottom:calc(10px + env(safe-area-inset-bottom))}   /* el pie no queda bajo la barra del navegador */
+}
 /* Preguntas sugeridas: lista fina apilada, no botones */
 .home-qlist{width:100%;max-width:440px;margin-top:22px}
 .home-qrow{display:flex;justify-content:space-between;align-items:center;padding:12px 2px;border-bottom:1px solid #1C1C20;color:#9A988F;font-size:14px;cursor:default}
@@ -882,7 +1007,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
       </div>
     </div>
     </div><!-- /home-bottom -->
-    <div class="home-build" id="homeBuild" style="text-align:center;color:#6E6C68;font-size:11px;letter-spacing:.03em;padding:16px 0 6px"></div>
+    <div class="home-build" id="homeBuild"></div>
   </div>
 </div>
 
@@ -1007,7 +1132,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irAVentas()">Ventas</button>
     <button class="face on">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
-    <button class="face" onclick="irAPrecios()">Precios</button>
+    <button class="face face-desk" onclick="irAPrecios()">Precios</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1029,7 +1154,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face on">Ventas</button>
     <button class="face" onclick="irARentabilidad()">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
-    <button class="face" onclick="irAPrecios()">Precios</button>
+    <button class="face face-desk" onclick="irAPrecios()">Precios</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1050,10 +1175,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <div id="vProduccion" class="hidden">
   <div class="faces faces-ops">
     <button class="face" onclick="irAResumen()">Resumen</button>
-    <button class="face on">Producción</button>
-    <button class="face" onclick="irAMermas()">Mermas</button>
+    <button class="face on face-desk">Producción</button>
+    <button class="face face-desk" onclick="irAMermas()">Mermas</button>
     <button class="face" onclick="irAConteo()">Inventario</button>
-    <button class="face" onclick="irAPlan()">Plan</button>
+    <button class="face face-desk" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1080,10 +1205,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <div id="vMermas" class="hidden">
   <div class="faces faces-ops">
     <button class="face" onclick="irAResumen()">Resumen</button>
-    <button class="face" onclick="irAProduccion()">Producción</button>
-    <button class="face on">Mermas</button>
+    <button class="face face-desk" onclick="irAProduccion()">Producción</button>
+    <button class="face on face-desk">Mermas</button>
     <button class="face" onclick="irAConteo()">Inventario</button>
-    <button class="face" onclick="irAPlan()">Plan</button>
+    <button class="face face-desk" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1130,7 +1255,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irAVentas()">Ventas</button>
     <button class="face on">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
-    <button class="face" onclick="irAPrecios()">Precios</button>
+    <button class="face face-desk" onclick="irAPrecios()">Precios</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1153,7 +1278,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irAVentas()">Ventas</button>
     <button class="face" onclick="irARentabilidad()">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
-    <button class="face on">Precios</button>
+    <button class="face on face-desk">Precios</button>
   </div>
   <div class="m3nav" style="margin-top:12px">
     <button class="m3tab on" onclick="irASimulador()">Simulador</button>
@@ -1214,7 +1339,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irAVentas()">Ventas</button>
     <button class="face" onclick="irARentabilidad()">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
-    <button class="face on">Precios</button>
+    <button class="face on face-desk">Precios</button>
   </div>
   <div class="m3nav" style="margin-top:12px">
     <button class="m3tab" onclick="irASimulador()">Simulador</button>
@@ -1299,7 +1424,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irAVentas()">Ventas</button>
     <button class="face" onclick="irARentabilidad()">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
-    <button class="face" onclick="irAPrecios()">Precios</button>
+    <button class="face face-desk" onclick="irAPrecios()">Precios</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1349,7 +1474,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irAVentas()">Ventas</button>
     <button class="face" onclick="irARentabilidad()">Rentabilidad</button>
     <button class="face on">Cobros y Pagos</button>
-    <button class="face" onclick="irAPrecios()">Precios</button>
+    <button class="face face-desk" onclick="irAPrecios()">Precios</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1380,10 +1505,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <div id="vInventario" class="hidden">
   <div class="faces faces-ops">
     <button class="face" onclick="irAResumen()">Resumen</button>
-    <button class="face" onclick="irAProduccion()">Producción</button>
-    <button class="face" onclick="irAMermas()">Mermas</button>
+    <button class="face face-desk" onclick="irAProduccion()">Producción</button>
+    <button class="face face-desk" onclick="irAMermas()">Mermas</button>
     <button class="face on">Inventario</button>
-    <button class="face" onclick="irAPlan()">Plan</button>
+    <button class="face face-desk" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1522,10 +1647,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <div id="vPlan" class="hidden">
   <div class="faces faces-ops">
     <button class="face" onclick="irAResumen()">Resumen</button>
-    <button class="face" onclick="irAProduccion()">Producción</button>
-    <button class="face" onclick="irAMermas()">Mermas</button>
+    <button class="face face-desk" onclick="irAProduccion()">Producción</button>
+    <button class="face face-desk" onclick="irAMermas()">Mermas</button>
     <button class="face" onclick="irAConteo()">Inventario</button>
-    <button class="face on">Plan</button>
+    <button class="face on face-desk">Plan</button>
   </div>
   <div>
     <div class="m3title" style="font-size:24px">Plan de producción</div>
@@ -1569,6 +1694,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-db{font-size:11px;color:var(--text-2);margin-top:2px}
 #vResumen .rz-gnote{font-size:10px;color:#C99A4E;margin-top:3px}
 #vResumen .rz-ds{margin-top:auto;font-size:11px;font-weight:600;padding-top:8px}
+#vResumen .rz-dsm{display:none}   /* estado en una palabra: solo teléfono (ver @media 700px) */
 #vResumen .rz-day.rz-done{border-color:var(--border)} #vResumen .rz-day.rz-done .rz-ds{color:#7A7A72}
 #vResumen .rz-day.rz-today{border-color:#C77DA0;box-shadow:0 0 0 1px rgba(199,125,160,.4)} #vResumen .rz-day.rz-today .rz-ds{color:#C77DA0}
 #vResumen .rz-day.rz-miss{border-color:rgba(201,154,78,.4)} #vResumen .rz-day.rz-miss .rz-ds{color:#C99A4E}
@@ -1773,14 +1899,67 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vResumen .rz-cal2 .rz-wk:first-child{padding-right:0;border-right:none}
   #vResumen .rz-cal2 .rz-wk:last-child{padding-left:0}
 }
+/* ══════════ RESUMEN EN TELÉFONO ══════════
+   Los cinco días entran en pantalla en cuadrícula 3+2 (lun-mar-mié / jue-vie), sin scroll
+   lateral. La grilla es de 6 columnas: los tres de arriba ocupan 2 cada uno y los dos de
+   abajo, 3 — así las dos filas cierran contra el mismo borde. */
+@media(max-width:700px){
+  #vResumen .rz-wrap{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+  #vResumen .rz-cal2 .rz-days{grid-auto-flow:row;grid-template-columns:repeat(6,1fr);
+    grid-auto-columns:auto;overflow-x:visible;gap:7px;padding-bottom:0}
+  #vResumen .rz-cal2 .rz-days>*{grid-column:span 2}
+  #vResumen .rz-cal2 .rz-days>*:nth-child(4),#vResumen .rz-cal2 .rz-days>*:nth-child(5){grid-column:span 3}
+  /* Tarjeta de día compacta: día chiquito arriba, producto 14px, estado en una palabra. */
+  #vResumen .rz-day{min-height:0;padding:8px 9px 9px}
+  #vResumen .rz-dd{font-size:9.5px}
+  #vResumen .rz-dp{font-size:14px;margin-top:4px}
+  #vResumen .rz-db{font-size:10.5px}
+  #vResumen .rz-ds{display:none}                 /* el estado largo es de escritorio */
+  #vResumen .rz-dsm{display:block;margin-top:auto;padding-top:6px;font-size:10.5px;font-weight:600;color:var(--text-3)}
+  #vResumen .rz-day.rz-today .rz-dsm,#vResumen .rz-day.rz-sel .rz-dsm{color:#C77DA0}
+  #vResumen .rz-day.rz-miss .rz-dsm,#vResumen .rz-day.rz-edited .rz-dsm,
+  #vResumen .rz-day.rz-fer .rz-dsm{color:#C99A4E}
+  /* El lápiz mantiene su blanco táctil de 44×44 aunque la tarjeta sea más baja. */
+  #vResumen .rz-pen{top:0;right:0}
+  /* Encabezado de semana en UNA línea de texto, sin píldora con caja.
+     Queda "Esta semana · 10 al 14 ago · [2 personas]" — el chip de personas conserva su
+     caja porque es lo único tocable de la línea. */
+  #vResumen .rz-whead{gap:5px;margin-bottom:8px;flex-wrap:nowrap;align-items:center}
+  #vResumen .rz-wtag{background:none;border:none;padding:0;border-radius:0;font-size:12px;
+    font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)}
+  #vResumen .rz-wtag::after{content:' ·';color:var(--text-3)}
+  #vResumen .rz-wrange{font-size:12px;white-space:nowrap}
+  #vResumen .rz-whead .rz-chip{margin-left:auto;padding:2px 7px}
+  #vResumen .rz-whead .rz-chip-x{display:none}
+  /* "Ver próxima semana": línea divisoria de ancho completo con chevron, colapsada por defecto. */
+  #vResumen .rz-vernext{display:flex;width:100%;align-items:center;justify-content:space-between;
+    margin-top:14px;padding:11px 2px 0;border:none;border-top:.5px solid var(--border);
+    border-radius:0;background:none;color:var(--text-2);font-size:12.5px;text-align:left}
+  #vResumen .rz-vernext::after{content:'⌄';color:var(--text-3);font-size:14px;line-height:1}
+  #vResumen .rz-vernext.rz-abierto::after{content:'⌃'}
+  #vResumen .rz-cal2 .rz-wk-next{opacity:1}
+  #vResumen .rz-cal2 .rz-wk-next .rz-day{background:var(--surface-2);border-style:solid}
+  /* Fuera del teléfono: el aviso de meta (derrame) y el bloque de Inventario, que vive en
+     su propia pestaña. */
+  #vResumen .rz-leftnote{display:none}
+  #vResumen .rz-invsec{display:none}
+  /* Tarjetas 2×2 — fila 1: Por medir · Comprar·medir | fila 2: Producciones · Comprar·producir */
+  #vResumen .rz-cards4{gap:10px;margin-top:20px;align-items:start}   /* sin estirar: nada de cajas medio vacías */
+  #vResumen .rz-c4h{font-size:10px;letter-spacing:.03em;line-height:1.3}
+  #vResumen .rz-c4-medir{order:1} #vResumen .rz-c4-cmedir{order:2}
+  #vResumen .rz-c4-prod{order:3}  #vResumen .rz-c4-cprod{order:4}
+  /* En "Comprar · para producir" la cantidad va DEBAJO del nombre, no al lado. */
+  #vResumen .rz-c4-cprod .rz-c4item{flex-direction:column;align-items:flex-start;gap:1px}
+  #vResumen .rz-c4-cprod .rz-c4in{line-height:1.25}
+}
 </style>
 <div id="vResumen" class="hidden">
   <div class="faces faces-ops">
     <button class="face on">Resumen</button>
-    <button class="face" onclick="irAProduccion()">Producción</button>
-    <button class="face" onclick="irAMermas()">Mermas</button>
+    <button class="face face-desk" onclick="irAProduccion()">Producción</button>
+    <button class="face face-desk" onclick="irAMermas()">Mermas</button>
     <button class="face" onclick="irAConteo()">Inventario</button>
-    <button class="face" onclick="irAPlan()">Plan</button>
+    <button class="face face-desk" onclick="irAPlan()">Plan</button>
   </div>
   <div id="rzBody" style="margin-top:6px"></div>
 </div>
@@ -1834,14 +2013,58 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vConteo .cn-btns{display:flex;gap:10px}
 #vConteo .cn-btn{background:var(--surface-2);border:.5px solid var(--border);color:var(--text-2);font-size:12.5px;padding:9px 16px;border-radius:8px;cursor:pointer}
 #vConteo .cn-guardar{background:#E9FE60;color:#1A1A1A;border:none;font-weight:600}
+#vConteo .cn-sub,#vConteo .cn-lblm,#vConteo .cn-tmov,#vConteo .cn-dot{display:none}   /* piezas de teléfono */
+/* ══════════ CONTEO EN TELÉFONO ══════════
+   La tabla de 4 columnas se vuelve una lista: cada fila es un renglón de dos líneas
+   (nombre arriba, existencia Odoo + presentación abajo) con los campos a la derecha,
+   separadas por hairline. Sin tarjetas y sin tabla ancha. */
+@media(max-width:700px){
+  #vConteo .cn-tabs,#vConteo #cn-tabs{gap:5px;margin:14px 0 6px}
+  #vConteo .cn-tab{padding:7px 11px;font-size:12px}
+  #vConteo .cn-tdesk{display:none} #vConteo .cn-tmov{display:inline}
+  #vConteo #cn-mp,#vConteo #cn-premez,#vConteo #cn-term{max-width:none}
+  #vConteo .cn-tbl{display:block}
+  #vConteo .cn-tbl thead{display:none}
+  #vConteo .cn-tbl tbody{display:block}
+  #vConteo .cn-tbl tr{display:grid;grid-template-columns:1fr auto;align-items:center;
+    column-gap:10px;row-gap:1px;padding:9px 0;border-bottom:.5px solid #1A1A1E}
+  #vConteo .cn-tbl tbody tr:last-child{border-bottom:none}
+  #vConteo .cn-tbl td{display:block;border:none;padding:0}
+  /* `td.` en el selector para ganarle a la regla genérica `#vConteo .cn-tbl td` de arriba. */
+  #vConteo .cn-tbl td.cn-nm{grid-column:1;grid-row:1;font-size:13px;min-width:0;font-weight:500}
+  /* Punto de descuadre: solo cuando el físico no calza. Inline al lado del nombre, 7px, sin
+     texto; la fila que calza (o que todavía no se contó) queda limpia. No toca la altura:
+     va en la misma línea del nombre con vertical-align. */
+  #vConteo .cn-dot.cn-warn,#vConteo .cn-dot.cn-bad{display:inline-block;width:7px;height:7px;
+    border-radius:50%;margin-left:7px;vertical-align:middle;flex:none}
+  #vConteo .cn-dot.cn-warn{background:#E9A23B}
+  #vConteo .cn-dot.cn-bad{background:#E24B4A}
+  #vConteo .cn-pcaja{display:none}                       /* va en la segunda línea, junto al Odoo */
+  #vConteo .cn-tbl td.cn-sub{display:block;grid-column:1;grid-row:2;font-size:10px;color:var(--text-3);
+    font-variant-numeric:tabular-nums}
+  #vConteo .cn-tbl td.cn-count{grid-column:2;grid-row:1/span 2;white-space:nowrap;text-align:right}
+  #vConteo .cn-tbl td.cn-odoo,#vConteo .cn-tbl td.cn-diff{display:none}
+  #vConteo .cn-ttot{display:none}
+  /* Campos: centrados, 15px, y la etiqueta mínima al lado. Vacíos con placeholder "0" —
+     nunca value="0", que con teclado numérico termina en "05". */
+  #vConteo .cn-in{width:52px;font-size:15px;text-align:center;padding:7px 4px}
+  #vConteo .cn-lbl{display:none} #vConteo .cn-lblm{display:inline;color:var(--text-3);font-size:10px;margin:0 5px 0 3px}
+  /* Botonera: el resumen arriba, Guardar como único botón con peso, el resto texto tenue. */
+  #vConteo .cn-bar{flex-direction:column;align-items:stretch;gap:11px;
+    padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+  #vConteo .cn-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px}
+  #vConteo .cn-guardar{grid-column:1/-1;order:-1;padding:13px;font-size:15px;border-radius:10px}
+  #vConteo .cn-btn:not(.cn-guardar){background:none;border:none;padding:0;color:var(--text-3);
+    font-size:12.5px;text-decoration:underline;text-align:center}
+}
 </style>
 <div id="vConteo" class="hidden">
   <div class="faces faces-ops">
     <button class="face" onclick="irAResumen()">Resumen</button>
-    <button class="face" onclick="irAProduccion()">Producción</button>
-    <button class="face" onclick="irAMermas()">Mermas</button>
+    <button class="face face-desk" onclick="irAProduccion()">Producción</button>
+    <button class="face face-desk" onclick="irAMermas()">Mermas</button>
     <button class="face on">Inventario</button>
-    <button class="face" onclick="irAPlan()">Plan</button>
+    <button class="face face-desk" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1853,7 +2076,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   <div id="cn-tabs">
     <button class="cn-tab on" data-t="mp" onclick="cnTab('mp')">Materia prima</button>
     <button class="cn-tab" data-t="premez" onclick="cnTab('premez')">Premezclas</button>
-    <button class="cn-tab" data-t="term" onclick="cnTab('term')">Producto terminado</button>
+    <button class="cn-tab" data-t="term" onclick="cnTab('term')"><span class="cn-tdesk">Producto terminado</span><span class="cn-tmov">Terminado</span></button>
   </div>
   <div id="cn-mp"></div>
   <div id="cn-premez" style="display:none"></div>
@@ -5740,13 +5963,13 @@ function rzVaSemanaCard(){
     const m=meta[p]||0, r=real[p]||0, done=r>=m;
     return '<div class="rz-vsrow"><span class="rz-vsn">'+esc(_nomCorto(p))+'</span>'
       +'<span class="rz-vsv'+(done?' rz-ok':'')+'">'+_rzN(r)+'/'+_rzN(m)+(done?' ✓':'')+'</span></div>'; }).join('');
-  return '<div class="rz-card4"><div class="rz-c4h">Producciones registradas</div>'+(rows||'<div class="rz-c4none">sin meta esta semana</div>')+'</div>';
+  return '<div class="rz-card4 rz-c4-prod"><div class="rz-c4h">Producciones registradas</div>'+(rows||'<div class="rz-c4none">sin meta esta semana</div>')+'</div>';
 }
 // TARJETA "Por medir": una línea (oliva si ya está todo).
 function rzMedirCard(){
   const pm=(_rzAlistar[0]&&_rzAlistar[0].premez)||[];
   const txt=pm.length?pm.map(function(x){return x.n+' '+x.prod.replace(/^Pan /,'');}).join(' · '):'ya está todo ✓';
-  return '<div class="rz-card4"><div class="rz-c4h">Por medir</div><div class="rz-c4line'+(pm.length?'':' rz-ok')+'">'+esc(txt)+'</div></div>';
+  return '<div class="rz-card4 rz-c4-medir"><div class="rz-c4h">Por medir</div><div class="rz-c4line'+(pm.length?'':' rz-ok')+'">'+esc(txt)+'</div></div>';
 }
 // TARJETAS "Comprar": LISTA COMPLETA, siempre. Fecha objetivo en rosa apagado.
 // Sin "+N más": es la lista de compra real de Lorena y un ítem escondido es un ítem que no se
@@ -5759,15 +5982,15 @@ function rzComprasCards(){
       +'<div class="rz-c4item"><span class="rz-c4in">'+esc(it.nombre.toLowerCase())+'</span>'
       +'<span class="rz-c4falta">falta '+esc(_faltaCompra(it))+'</span></div>'
       +(it.nota?('<div class="rz-c4nota">'+esc(it.nota)+'</div>'):'')+'</div>'; }
-  function card(titulo, data){
+  function card(titulo, data, extra){
     const items=(data.items||[]).slice().sort(function(a,b){ return (b.falta/(b.need||1))-(a.falta/(a.need||1)); });   // más urgente primero
     const cuerpo=items.length ? items.map(itemHtml).join('')
                               : '<div class="rz-c4line rz-ok">alcanza — nada que comprar</div>';
-    return '<div class="rz-card4"><div class="rz-c4h">'+titulo+'</div>'
+    return '<div class="rz-card4 '+extra+'"><div class="rz-c4h">'+titulo+'</div>'
       +'<div class="rz-c4fecha">'+esc(data.fecha)+'</div>'+cuerpo+'</div>';
   }
-  return card('Comprar · para medir premezclas', _rzCompras.premezclas)
-       + card('Comprar · para producir', _rzCompras.produccion);
+  return card('Comprar · para medir premezclas', _rzCompras.premezclas, 'rz-c4-cmedir')
+       + card('Comprar · para producir', _rzCompras.produccion, 'rz-c4-cprod');
 }
 // ── 1 · PENDIENTE DE FABRICAR: tira horizontal HOY → próximo lunes, editable + touch ──
 function _rzChipPersonas(iso, personas){
@@ -5776,7 +5999,9 @@ function _rzChipPersonas(iso, personas){
 }
 function rzToggleNext(btn){ const c=document.querySelector('#vResumen .rz-cal2'); if(!c)return;
   _rzShowNext=!_rzShowNext; c.classList.toggle('rz-shownext', _rzShowNext);
-  if(btn) btn.textContent = _rzShowNext ? 'Ocultar próxima semana' : 'Ver próxima semana'; }
+  // El chevron lo pone el CSS (::after) porque textContent borraría cualquier hijo del botón.
+  if(btn){ btn.textContent = _rzShowNext ? 'Ocultar próxima semana' : 'Ver próxima semana';
+           btn.classList.toggle('rz-abierto', _rzShowNext); } }
 // Un bloque de semana (lun–vie completo): cabecera con etiqueta + rango + chip de personas, y las 5 celdas.
 function _rzWeekBlock(offset){
   const mon=_rzMonday(offset), iso=_isoWk(mon), w=_rzCtx.weeks[offset]||{}, pers=w.personas||_personasDe(iso);
@@ -5836,7 +6061,8 @@ function rzStripHtml(){
     +right+'</div>';
   const leftnote=_rzDerrameNota();
   const cal='<div class="rz-cal2'+(_rzShowNext?' rz-shownext':'')+'">'+_rzWeekBlock(0)+_rzWeekBlock(1)+'</div>';
-  const verbtn='<button class="rz-vernext" onclick="rzToggleNext(this)">'+(_rzShowNext?'Ocultar próxima semana':'Ver próxima semana')+'</button>';
+  const verbtn='<button class="rz-vernext'+(_rzShowNext?' rz-abierto':'')+'" onclick="rzToggleNext(this)">'
+    +(_rzShowNext?'Ocultar próxima semana':'Ver próxima semana')+'</button>';
   // Motivo de un intercambio bloqueado (nunca falla en silencio) — se va al tocar otro día.
   const aviso=_rzAviso?('<div class="rz-aviso">'+esc(_rzAviso)+'</div>'):'';
   return '<div class="rz-sec">'+head+_rzAlertaHtml()+aviso+cal+verbtn+leftnote+'</div>';
@@ -5908,7 +6134,7 @@ function rzInvHtml(){
   const cPR=card('rzInvPr', 'Premezclas', nPrem+' con stock', NIV_PROD.map(function(p){ const b=Math.round((stock.premOh||{})[NIV_INFO[p].prem]||0); return row(_nomCorto(p), b>0?_rzN(b):'—'); }).join(''));
   const totalCj=NIV_PROD.reduce(function(a,p){ return a+Math.floor((stock.fin[p]||0)/NIV_INFO[p].cajaU); },0);
   const cTE=card('rzInvTe', 'Producto terminado', _rzN(totalCj)+' cajas', NIV_PROD.map(function(p){ const cajas=Math.floor((stock.fin[p]||0)/NIV_INFO[p].cajaU); return row(_nomCorto(p), _rzN(cajas)+' cj'); }).join(''));
-  return '<div class="rz-sec"><div class="rz-sh"><span class="rz-st">Inventario</span></div><div class="rz-inv3">'+cMP+cPR+cTE+'</div></div>';
+  return '<div class="rz-sec rz-invsec"><div class="rz-sh"><span class="rz-st">Inventario</span></div><div class="rz-inv3">'+cMP+cPR+cTE+'</div></div>';
 }
 function rzToggleMp(btn){ const e=document.getElementById('rzMpMas'); if(!e)return; const h=e.classList.toggle('hidden'); if(btn) btn.textContent = h ? btn.textContent.replace('▴','▾') : btn.textContent.replace('▾','▴'); }
 // "Volver al plan" de la ventana visible: descarta TODOS los overrides futuros (fila de anulación).
@@ -5919,6 +6145,17 @@ async function rzVolverPlanStrip(){
   _rzRecalcAuto(); rzRender();
   rzPersist(dss.map(function(ds){ return {fecha:ds, producto_id:null, batches:0, tipo:'anulacion'}; }));
   await rzRecalcAlistar(); rzRender();
+}
+// Estado del día en UNA palabra minúscula (tarjeta compacta de teléfono). "editado" gana sobre
+// el estado base: en escritorio se lee "Editado · editado", acá tiene que decirlo una sola vez.
+const _RZ_CORTO={real:'hecho', pend:'sin registrar', prop:'propuesto', libre:'libre',
+                 feriado:'feriado', viernes:'libre', edit:'editado', 'edit-empty':'editado',
+                 auto:'para la meta'};
+function _rzEstadoCorto(cell, sel){
+  if(sel) return 'seleccionado';
+  if(cell.edited) return 'editado';
+  if(cell.auto) return 'para la meta';
+  return _RZ_CORTO[cell.kind]||'';
 }
 function rzCellHtml(cell){
   // 'pend' = día pasado con plan y sin registro en Odoo → se ASUME hecho según el plan
@@ -5933,7 +6170,10 @@ function rzCellHtml(cell){
   const sel=_rzSel===ds;
   const estado=(cell.auto&&cell.kind==='viernes'?'Para cumplir la meta':m[1])+(cell.edited?' · editado':'')
     +(sel?' · seleccionado':'');
-  const st='<div class="rz-ds">'+estado+'</div>';
+  // En teléfono el estado va en UNA palabra minúscula. Se emiten los dos textos y el CSS
+  // muestra el que corresponde al ancho: así no hay rama por viewport en JS (que se rompería
+  // al rotar el teléfono) y el HTML es el mismo para las dos pantallas.
+  const st='<div class="rz-ds">'+estado+'</div><div class="rz-dsm">'+_rzEstadoCorto(cell, sel)+'</div>';
   const cls=m[0]+(cell.editable?' rz-ed':'')+(cell.edited?' rz-edited':'')+(cell.auto?' rz-autofill':'')
     +(cell.today?' rz-today':'')+(sel?' rz-sel':'');
   // El lápiz sigue EXACTAMENTE la misma regla que el día: solo se dibuja si cell.editable.
@@ -6139,6 +6379,7 @@ function cnRecMP(pid){
   const dr=(cnDraft().mp||{})[pid]||{}; const {fis,vacio}=fisicoMP(m,dr);
   const diff=fis-m.qty, s=sem3(diff,_tolMP(m),vacio);
   const de=document.getElementById('cn-mdif'+pid), se=document.getElementById('cn-msem'+pid);
+  const dot=document.getElementById('cn-mdot'+pid); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
   if(de){ de.textContent=vacio?'—':fmtDiff(diff)+' '+m.uom; de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
   cnResumen();
@@ -6148,6 +6389,7 @@ function cnRecPremez(id){
   const dr=(cnDraft().premez||{})[id]; const vacio=(dr==null||dr==='');
   const fis=parseFloat(dr)||0, diff=fis-p.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
   const de=document.getElementById('cn-pdif'+id), se=document.getElementById('cn-psem'+id);
+  const dot=document.getElementById('cn-pdot'+id); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
   if(de){ de.textContent=vacio?'—':fmtDiff(diff)+' batch'; de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
   cnResumen();
@@ -6172,6 +6414,7 @@ function cnRecTerm(id){
   const fis=cajas*t.factor+sue*t.presDiv;          // cajas (uds indiv) + sueltos en unidad de venta → uds individuales
   const diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
   const de=document.getElementById('cn-tdif'+id), se=document.getElementById('cn-tsem'+id), to=document.getElementById('cn-ttot'+id);
+  const dot=document.getElementById('cn-tdot'+id); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
   if(to){ to.textContent=vacio?'':'= '+_cnVentaTxt(t,fis); }
   if(de){ de.textContent=vacio?'—':_cnDiffTxt(t,diff); de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
@@ -6266,6 +6509,18 @@ function cnCargarHistConfirm(){
   cnRender(); cnRenderPending();
 }
 
+// ── Piezas que solo se ven en teléfono (el CSS decide; el HTML es uno solo) ──
+// .cn-sub  = segunda línea de la fila: "existencia Odoo · presentación" ("669 u · caja 6").
+// .cn-lblm = etiqueta mínima del campo ("caj", "u", "paq") — la larga es de escritorio.
+const _CN_SING={sacos:'saco', cajas:'caja', bolsas:'bolsa', cartones:'cartón', potes:'pote'};
+// Punto de descuadre (solo teléfono): la fila cuyo físico NO calza con Odoo lleva un punto del
+// color del semáforo, sin texto. Lo que calza y lo que todavía no se contó quedan limpios —
+// por eso la clase sale vacía salvo en cn-warn/cn-bad. Se pinta al escribir, sin guardar:
+// las funciones cnRec* lo mantienen al día igual que a la celda de diferencia.
+function _cnDotCls(vacio, s){ return (!vacio && s && (s.cls==='cn-warn'||s.cls==='cn-bad')) ? s.cls : ''; }
+function _cnDot(pre, id, vacio, s){ return '<span class="cn-dot '+_cnDotCls(vacio,s)+'" id="cn-'+pre+'dot'+id+'"></span>'; }
+function _cnPresLbl(pe){ return pe ? (_CN_SING[pe.lab]||pe.lab) : ''; }
+function _cnPresCorto(pe){ return pe ? (_CN_SING[pe.lab]||pe.lab).slice(0,3) : ''; }
 function cnRender(){
   const d=cnDraft(), rez=d.rezago||{};
   // MATERIA PRIMA
@@ -6273,11 +6528,14 @@ function cnRender(){
   for(const m of _cnMP){
     const pe=PESO_EMPAQUE.find(x=>x.rx.test(m.name)), dr=(d.mp||{})[m.pid]||{};
     const {fis,vacio}=fisicoMP(m,dr), diff=fis-m.qty, s=sem3(diff,_tolMP(m),vacio);
-    const empIn = pe ? '<input class="cn-in" inputmode="decimal" value="'+(dr.emp!=null?esc(dr.emp):'')+'" oninput="cnMpEmp('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(pe.lab)+' ×'+fmtN(pe.peso)+pe.unidad+'</span>' : '';
+    // empaques enteros → teclado numérico; el suelto lleva decimales (22,68 kg) → decimal.
+    const empIn = pe ? '<input class="cn-in" inputmode="numeric" value="'+(dr.emp!=null?esc(dr.emp):'')+'" oninput="cnMpEmp('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(pe.lab)+' ×'+fmtN(pe.peso)+pe.unidad+'</span><span class="cn-lblm">'+esc(_cnPresCorto(pe))+'</span>' : '';
     const sueLab=(pe&&pe.sueltoUnit)?pe.sueltoUnit:m.uom;
     const sueIn = (pe&&pe.noSuelto) ? '<span class="cn-lbl">sin suelto</span>'
-      : '<input class="cn-in" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnMpSue('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(sueLab)+'</span>';
-    mp+='<tr><td class="cn-nm">'+esc(nombreCortoMP(m.name))+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
+      : '<input class="cn-in" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnMpSue('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(sueLab)+'</span><span class="cn-lblm">'+esc(sueLab)+'</span>';
+    const subMP=fmtN(m.qty)+' '+esc(m.uom)+(pe?(' · '+esc(_cnPresLbl(pe))+' '+fmtN(pe.peso)):'');
+    mp+='<tr><td class="cn-nm">'+esc(nombreCortoMP(m.name))+_cnDot('m',m.pid,vacio,s)+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
+      +'<td class="cn-sub">'+subMP+'</td>'
       +'<td class="cn-count">'+empIn+(empIn&&!(pe&&pe.noSuelto)?' + ':'')+sueIn+'</td>'
       +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-mdif'+m.pid+'">'+(vacio?'—':fmtDiff(diff)+' '+m.uom)+'</td></tr>';
   }
@@ -6286,8 +6544,9 @@ function cnRender(){
   let pm='<table class="cn-tbl"><thead><tr><th>Premezcla</th><th>Odoo dice</th><th>Conteo físico</th><th class="r">Diferencia</th></tr></thead><tbody>';
   for(const p of _cnPremez){
     const dr=(d.premez||{})[p.id], vacio=(dr==null||dr===''); const fis=parseFloat(dr)||0, diff=fis-p.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
-    pm+='<tr><td class="cn-nm">'+esc(p.label)+'</td><td class="cn-odoo">'+fmtN(p.odoo)+' batches</td>'
-      +'<td class="cn-count"><input class="cn-in" inputmode="decimal" value="'+(dr!=null?esc(dr):'')+'" oninput="cnPremez('+p.id+',this.value)" placeholder="0"><span class="cn-lbl">batches</span></td>'
+    pm+='<tr><td class="cn-nm">'+esc(p.label)+_cnDot('p',p.id,vacio,s)+'</td><td class="cn-odoo">'+fmtN(p.odoo)+' batches</td>'
+      +'<td class="cn-sub">'+fmtN(p.odoo)+' batches</td>'
+      +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr!=null?esc(dr):'')+'" oninput="cnPremez('+p.id+',this.value)" placeholder="0"><span class="cn-lbl">batches</span><span class="cn-lblm">bat</span></td>'
       +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-pdif'+p.id+'">'+(vacio?'—':fmtDiff(diff)+' batch')+'</td></tr>';
   }
   document.getElementById('cn-premez').innerHTML=pm+'</tbody></table>';
@@ -6298,9 +6557,10 @@ function cnRender(){
     const dr=(d.term||{})[t.id]||{}, vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
     const fis=(parseFloat(dr.cajas)||0)*t.factor+(parseFloat(dr.sue)||0)*t.presDiv, diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
     const cajaV=t.factor/t.presDiv, cajaU=(t.presDiv===1?'u':'paq');   // caja en unidad de venta
-    tm+='<tr><td class="cn-nm"><span class="cn-pnom">'+esc(t.label)+'</span><span class="cn-pcaja">caja = '+cajaV+' '+cajaU+'</span></td><td class="cn-odoo">'+_cnVentaTxt(t,t.odoo)+'</td>'
-      +'<td class="cn-count"><input class="cn-in" inputmode="decimal" value="'+(dr.cajas!=null?esc(dr.cajas):'')+'" oninput="cnTermCajas('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">cajas</span> + '
-      +'<input class="cn-in" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnTermSue('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(t.venta)+'</span>'
+    tm+='<tr><td class="cn-nm"><span class="cn-pnom">'+esc(t.label)+_cnDot('t',t.id,vacio,s)+'</span><span class="cn-pcaja">caja = '+cajaV+' '+cajaU+'</span></td><td class="cn-odoo">'+_cnVentaTxt(t,t.odoo)+'</td>'
+      +'<td class="cn-sub">'+_cnVentaTxt(t,t.odoo)+' · caja '+cajaV+' '+cajaU+'</td>'
+      +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr.cajas!=null?esc(dr.cajas):'')+'" oninput="cnTermCajas('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">cajas</span><span class="cn-lblm">caj</span> + '
+      +'<input class="cn-in" inputmode="numeric" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnTermSue('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(t.venta)+'</span><span class="cn-lblm">'+esc(t.venta)+'</span>'
       +'<span class="cn-ttot" id="cn-ttot'+t.id+'">'+(vacio?'':'= '+_cnVentaTxt(t,fis))+'</span></td>'
       +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-tdif'+t.id+'">'+(vacio?'—':_cnDiffTxt(t,diff))+'</td></tr>';
   }
@@ -7373,9 +7633,10 @@ function renderVentas(d,label){
   if(!d.filas.length){ el.innerHTML='<div class="muted">Sin ventas en '+esc(label)+'.</div>'; return; }
   let h='<div style="overflow-x:auto"><table class="cob-tbl"><tr><th>Canal</th><th style="text-align:right">Clientes</th><th style="text-align:right">Facturado neto</th></tr>';
   d.filas.forEach((c,ci)=>{
-    h+='<tr class="prod-row" onclick="ventToggle(\'c'+ci+'\')"><td><span class="pcaret">▸</span> '+esc(c.nombre)+(c.id==null?' <span class="muted" style="font-size:11px">⚠ sin canal</span>':'')+'</td>'
-      +'<td style="text-align:right">'+c.clientesArr.length+'</td><td style="text-align:right"><strong>'+cM(c.neto)+'</strong></td></tr>';
-    let sub='<tr class="hidden" id="vent-c'+ci+'"><td colspan="3"><div class="vent-sub">';
+    h+='<tr class="prod-row vent-gr" onclick="ventToggle(\'c'+ci+'\')"><td class="vent-g-nm"><span class="pcaret">▸</span> '+esc(c.nombre)+(c.id==null?' <span class="muted" style="font-size:11px">⚠ sin canal</span>':'')+'</td>'
+      +'<td class="vent-g-cli" style="text-align:right">'+c.clientesArr.length+'<span class="cob-movsuf"> clientes</span></td>'
+      +'<td class="vent-g-tot" style="text-align:right"><strong>'+cM(c.neto)+'</strong></td></tr>';
+    let sub='<tr class="hidden vent-det" id="vent-c'+ci+'"><td colspan="3"><div class="vent-sub">';
     c.clientesArr.forEach((cl,clj)=>{
       const key='c'+ci+'-'+clj;
       const nombre = cl.com ? esc(cl.com)+' <span class="muted" style="font-size:11px">· '+esc(cl.razon)+'</span>' : esc(cl.razon);
@@ -7604,7 +7865,47 @@ function rentaRender(R, label){
       }).join(' · ')+'.</span>';
   }
   h+='<div style="padding:10px 12px;font-size:11px;color:var(--text-3);border-top:1px solid var(--border)">'+foot+'</div>';
-  el.innerHTML=h;
+  _rentaR=R;                                  // el teléfono repinta su lista sin recalcular
+  el.innerHTML=_rentaMovHtml(R)+h;
+}
+// ── RENTABILIDAD EN TELÉFONO: un canal a la vez ──────────────────────────────
+// La matriz producto × canal no cabe en un teléfono sin volverse una tabla ancha. Acá se
+// elige el canal con píldoras deslizables y los productos salen en lista de una línea:
+// nombre a la izquierda, ganancia ₡ + margen % a la derecha. Las etiquetas ("empaque
+// incompleto", "sin días de producción propios…") van como línea tenue ámbar DEBAJO del
+// nombre — nunca como globo montado sobre el número, que es donde estorban.
+// Las etiquetas las siguen disparando los datos (empTag/diasTag), no una lista de IDs.
+let _rentaR=null, _rentaCanalMov=null;   // null = todavía sin elegir → arranca en Automercado
+function _rentaMovHtml(R){
+  if(_rentaCanalMov==null){
+    const i=R.canalesActivos.findIndex(c=>c.key==='auto');   // por clave del canal, no por rótulo
+    _rentaCanalMov = i>=0 ? i : 0;
+  }
+  const ci=Math.min(_rentaCanalMov, R.canalesActivos.length-1);
+  const pills=R.canalesActivos.map((c,i)=>'<button class="rm-pill'+(i===ci?' on':'')+'" onclick="rentaCanalMov('+i+')">'+esc(c.label)+'</button>').join('');
+  return '<div class="renta-mov"><div class="rm-pills">'+pills+'</div><div class="rm-list" id="rmList">'+_rentaMovLista(R,ci)+'</div></div>';
+}
+function _rentaMovLista(R, ci){
+  let out='';
+  R.filas.forEach(f=>{
+    const x=f.celdas[ci], d=_rentaData&&_rentaData.byKey&&_rentaData.byKey[f.P.key];
+    const tags=empTag(d)+diasTag(d);
+    out+='<div class="rm-row" onclick="rentaDetalle(\''+f.P.key+'\')">'
+      +'<div class="rm-l"><div class="rm-nm"><span class="pdot" style="background:'+f.P.color+'"></span>'+esc(f.P.label)+'</div>'
+      +(tags?('<div class="rm-tags">'+tags+'</div>'):'')+'</div>'
+      +(x ? ('<div class="rm-r"><div class="rg'+(x.gan<0?' rneg':'')+'">'+cMs(x.gan)+'</div><div class="rp">'+_pct(x.pct*100)+'</div></div>')
+          : '<div class="rm-r rm-na">—</div>')
+      +'</div>';
+  });
+  const t=R.colTot[ci];
+  out+='<div class="rm-row rm-tot"><div class="rm-l"><div class="rm-nm">Total del canal</div></div>'
+    +'<div class="rm-r"><div class="rg'+(t<0?' rneg':'')+'">'+cMs(t)+'</div></div></div>';
+  return out;
+}
+function rentaCanalMov(i){
+  _rentaCanalMov=i; if(!_rentaR) return;
+  const l=document.getElementById('rmList'); if(l) l.innerHTML=_rentaMovLista(_rentaR,i);
+  document.querySelectorAll('#rentaMatriz .rm-pill').forEach((b,k)=>b.classList.toggle('on',k===i));
 }
 function rentaDetalle(key){
   const P=RENTA_PROD.find(p=>p.key===key), el=document.getElementById('rentaDetalle');
@@ -8013,7 +8314,9 @@ async function cobTab(which){
 }
 // Fecha es-CR: 'YYYY-MM-DD' → 'DD/MM/YYYY'.
 function _fD(s){ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+'/'+m[2]+'/'+m[1]):(s?esc(s):'—'); }
-let _cobModo='factura', _cobVenc='todas';
+// En teléfono la vista por CLIENTE es la útil (nombre + total + vencido en una línea);
+// en escritorio sigue arrancando por factura. Es solo el valor inicial: el control manda.
+let _cobModo=(window.matchMedia&&matchMedia('(max-width:700px)').matches)?'cliente':'factura', _cobVenc='todas';
 function cobSetModo(m){ _cobModo=m; document.querySelectorAll('#cobModo button').forEach(b=>b.classList.toggle('on',b.dataset.m===m)); renderCob(); }
 function cobSetVenc(v){ _cobVenc=v; document.querySelectorAll('#cobVenc button').forEach(b=>b.classList.toggle('on',b.dataset.v===v)); renderCob(); }
 function renderCob(){
@@ -8033,6 +8336,7 @@ function renderCob(){
     +'</div>'
     +'<div class="m3sub" style="margin-top:8px;font-size:11px;color:var(--text-3)">Solo facturas de 2026 en adelante'+(which==='pagar'?' · excluye Gastos Adicionales (compensación de IVA, cuenta 640103)':'')+(soloVenc?' · solo vencidas':'')+'. El total es sobre lo visible.</div>';
   if(!d.length){ el.innerHTML='<div class="muted">Sin facturas vencidas.</div>'; return; }
+  document.querySelectorAll('#cobModo button').forEach(b=>b.classList.toggle('on',b.dataset.m===_cobModo));
   if(_cobModo==='cliente') renderCobCliente(which,d,el); else renderCobFactura(which,d,el);
 }
 // Cliente/proveedor: nombre comercial + razón social (parejo con Ventas).
@@ -8041,11 +8345,16 @@ function _cobPartner(r){ const razon=(r.partner_id&&r.partner_id[1])||'—'; ret
 // proveedor"), con el consecutivo interno de Odoo como referencia chica; si el
 // proveedor no trae número (~28%), cae al interno. En Por cobrar = nuestro nº de
 // factura (`name`) + ref/FE como secundario. (number_electronic no se usa en compras: 0% poblado.)
+// REGLA GENERAL (no por caso): en Por pagar manda el consecutivo del PROVEEDOR. El número
+// interno de Odoo nunca se muestra a secas — solo aparece como fallback cuando el proveedor
+// no trae consecutivo, y siempre rotulado "interno N".
+function _cobUlt4(s){ const t=String(s||'').replace(/\s+/g,''); return t?('…'+t.slice(-4)):''; }
 function _cobDoc(r){
   if(_cobTab==='pagar'){
     if(r.ref && String(r.ref).trim())
-      return esc(r.ref)+(r.name?' <span class="muted" style="font-size:11px">· interno '+esc(r.name)+'</span>':'');
-    return esc(r.name||'—')+' <span class="muted" style="font-size:11px">· sin nº de proveedor</span>';
+      return '<span class="cob-cons">'+esc(_cobUlt4(r.ref))+'</span> <span class="cob-consfull">'+esc(r.ref)+'</span>'
+        +(r.name?' <span class="muted" style="font-size:11px">· interno '+esc(r.name)+'</span>':'');
+    return '<span class="muted" style="font-size:11px">sin nº de proveedor · </span>interno '+esc(r.name||'—');
   }
   const refDist = r.ref && r.ref!==r.name ? ' <span class="muted" style="font-size:11px">· '+esc(r.ref)+'</span>' : '';
   const fe = r.number_electronic ? ' <span class="cob-fe" title="Comprobante electrónico: '+esc(r.number_electronic)+'">FE</span>' : '';
@@ -8055,11 +8364,11 @@ function _cobDoc(r){
 function _cobFilaFactura(r,conPartner){
   const dv=_diasVencida(r.invoice_date_due);
   const diasCell = dv>0 ? '<span class="cob-venc">'+dv+' d</span>' : '<span class="muted">—</span>';
-  return '<tr><td>'+_fD(r.invoice_date)+'</td><td>'+_fD(r.invoice_date_due)+'</td>'
-    +'<td style="text-align:right">'+diasCell+'</td>'
-    +(conPartner?'<td>'+_cobPartner(r)+'</td>':'')
-    +'<td>'+_cobDoc(r)+'</td>'
-    +'<td style="text-align:right"><strong>'+cM(r.amount_residual||0)+'</strong></td></tr>';
+  return '<tr class="cob-fr"><td class="cob-f-fecha">'+_fD(r.invoice_date)+'</td><td class="cob-f-vence">'+_fD(r.invoice_date_due)+'</td>'
+    +'<td class="cob-f-dias" style="text-align:right">'+diasCell+'</td>'
+    +(conPartner?'<td class="cob-f-cli">'+_cobPartner(r)+'</td>':'')
+    +'<td class="cob-f-doc">'+_cobDoc(r)+'</td>'
+    +'<td class="cob-f-tot" style="text-align:right"><strong>'+cM(r.amount_residual||0)+'</strong></td></tr>';
 }
 function renderCobFactura(which,d,el){
   const cliLbl=which==='cobrar'?'Cliente':'Proveedor';
@@ -8087,15 +8396,18 @@ function renderCobCliente(which,d,el){
     g.rows.sort((a,b)=>{ const x=a.invoice_date_due||'9999-99-99', y=b.invoice_date_due||'9999-99-99'; return x<y?-1:x>y?1:0; });
     const venc = g.maxVenc!=null && g.maxVenc>0;
     const vencCell = venc ? '<span class="cob-venc">'+g.maxVenc+' d</span>' : '<span class="muted">—</span>';
-    const btnCopiar = (which==='cobrar' && venc) ? ' <button class="cob-copy" onclick="cobCopiar('+i+',event)">Copiar recordatorio</button>' : '';
+    // WhatsApp es la acción principal (abre el chat con el mensaje escrito); copiar queda de apoyo.
+    const btnCopiar = (which==='cobrar' && venc)
+      ? ' <button class="cob-wa" onclick="cobWhatsApp('+i+',event)">WhatsApp</button>'
+        +' <button class="cob-copy" onclick="cobCopiar('+i+',event)">Copiar recordatorio</button>' : '';
     const primary = g.com ? esc(g.com) : esc(g.razon);
     const sec = g.com ? ' <span class="muted" style="font-size:11px">· '+esc(g.razon)+'</span>' : '';
-    h+='<tr class="prod-row" onclick="cobToggleGrupo('+i+')"><td><span class="pcaret">▸</span> '
+    h+='<tr class="prod-row cob-gr" onclick="cobToggleGrupo('+i+')"><td class="cob-g-nm"><span class="pcaret">▸</span> '
       +(venc?'<span class="cob-venc">'+primary+'</span>':primary)+sec+btnCopiar+'</td>'
-      +'<td style="text-align:right">'+g.rows.length+'</td>'
-      +'<td style="text-align:right"><strong>'+cM(g.total)+'</strong></td>'
-      +'<td style="text-align:right">'+vencCell+'</td></tr>';
-    let dt='<tr class="hidden" id="cobg-'+i+'"><td colspan="4"><div class="prod-det-wrap"><table>'
+      +'<td class="cob-g-fac" style="text-align:right">'+g.rows.length+'<span class="cob-movsuf"> facturas</span></td>'
+      +'<td class="cob-g-tot" style="text-align:right"><strong>'+cM(g.total)+'</strong></td>'
+      +'<td class="cob-g-venc" style="text-align:right">'+vencCell+'</td></tr>';
+    let dt='<tr class="hidden cob-det" id="cobg-'+i+'"><td colspan="4"><div class="prod-det-wrap"><table>'
       +'<tr><th>Fecha</th><th>Vence</th><th style="text-align:right">Días</th><th>Documento</th><th style="text-align:right">Pendiente</th></tr>';
     g.rows.forEach(r=>{ dt+=_cobFilaFactura(r,false); });
     h+=dt+'</table></div></td></tr>';
@@ -8111,19 +8423,33 @@ function _copiarTexto(txt){
   if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt);
   return new Promise((res,rej)=>{ try{ const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); res(); }catch(e){ rej(e); } });
 }
-// Recordatorio de WhatsApp con SOLO las facturas vencidas del cliente (Por cobrar).
-function cobCopiar(i,ev){
-  ev.stopPropagation();
-  const btn=ev.currentTarget, g=(window._cobGrupos||[])[i]; if(!g) return;
+// Texto del recordatorio: UNA sola fuente para el botón de copiar y para el de WhatsApp,
+// así los dos mandan exactamente el mismo mensaje.
+function _cobMensaje(g){
   const venc=g.rows.filter(r=>(_diasVencida(r.invoice_date_due)||0)>0);
-  if(!venc.length) return;
+  if(!venc.length) return '';
   let txt='Hola! Espero que estés muy bien. Te paso un resumen de las facturas pendientes de pago:\n';
   venc.forEach(r=>{ txt+='• Factura ...'+String(r.name||'').slice(-4)+' — '+_fD(r.invoice_date)+' — '+cM(r.amount_residual||0)+'\n'; });
   txt+='Total pendiente: '+cM(venc.reduce((s,r)=>s+(r.amount_residual||0),0))+'\n';
   txt+='Les agradecemos mucho el pago. ¡Gracias!';
+  return txt;
+}
+// Recordatorio de WhatsApp con SOLO las facturas vencidas del cliente (Por cobrar).
+function cobCopiar(i,ev){
+  ev.stopPropagation();
+  const btn=ev.currentTarget, g=(window._cobGrupos||[])[i]; if(!g) return;
+  const txt=_cobMensaje(g); if(!txt) return;
   const restore=()=>{ btn.textContent='Copiar recordatorio'; btn.classList.remove('on','err'); };
   _copiarTexto(txt).then(()=>{ btn.textContent='Copiado ✓'; btn.classList.add('on'); setTimeout(restore,1600); })
     .catch(()=>{ btn.textContent='No se pudo copiar'; btn.classList.add('err'); setTimeout(restore,1800); });
+}
+// Abre WhatsApp con el mensaje ya escrito. SIN número: wa.me/?text= deja que el usuario elija
+// el contacto en WhatsApp — la app no guarda teléfonos de clientes y no los inventa.
+function cobWhatsApp(i,ev){
+  ev.stopPropagation();
+  const g=(window._cobGrupos||[])[i]; if(!g) return;
+  const txt=_cobMensaje(g); if(!txt) return;
+  window.open('https://wa.me/?text='+encodeURIComponent(txt), '_blank', 'noopener');
 }
 
 // RENT_CANALES murió: las tarifas y términos por canal viven en la FUENTE ÚNICA
