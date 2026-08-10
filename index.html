@@ -775,9 +775,38 @@ table td,table th{border-color:#F2F0EA}
 #panel,#invPanel{background:var(--surface)!important;border-left:1px solid var(--border)!important}
 /* ── Header de la herramienta: migas de pan ── */
 #appHeader{height:auto;padding:14px 28px;background:var(--surface);border-bottom:1px solid var(--border);gap:14px}
+/* ══════════ ENCABEZADO EN TELÉFONO: una sola línea discreta ══════════
+   Antes ocupaba tres renglones (migas + "Conectado" + "producción · solo lectura") y competía
+   con el contenido. Ahora: punto verde de 5px · "Módulo · Vista" · "solo lectura" a la derecha,
+   todo en gris terciario. Nada de acento: el encabezado no es lo excepcional de la pantalla.
+   La columna derecha pasa a display:contents para poder repartir sus dos piezas a los extremos
+   con `order`, sin tocar el HTML. */
+@media(max-width:700px){
+  /* Va por id: #appHeader ya trae su propio padding y le gana a cualquier regla de clase.
+     Los 78px de la derecha son el espacio de la pastilla "Salir", que va fija. */
+  #appHeader,.header{height:auto;min-height:40px;padding:8px 78px 8px 1rem;gap:8px}
+  .header .hdr-right{display:contents}
+  .header .conn-ind{order:-1;margin:0;gap:0;font-size:0}               /* queda solo el punto */
+  .header .conn-ind .gdot{width:5px;height:5px}
+  .header .crumbs{order:0;gap:5px;font-size:12px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .header .crumb-dot{display:none}                                     /* el punto verde ya abre la línea */
+  .header .crumb-area,.header .crumb-cur{color:var(--text-3);font-weight:500}
+  .header .crumb-sep{font-size:0}
+  .header .crumb-sep::after{content:'·';font-size:12px;color:var(--text-3)}
+  .header .hdr-prod{order:1;margin-left:auto;font-size:0;white-space:nowrap}
+  .header .hdr-prod::after{content:'solo lectura';font-size:11px;color:var(--text-3)}
+  .header .logo-link{height:22px!important;order:-2}
+  #btnSalir{top:9px;right:12px;padding:4px 10px;font-size:11px;color:var(--text-3);border-color:#26262C}
+}
 .crumbs{display:flex;align-items:center;gap:9px;font-size:14px}
 .crumb-dot{width:7px;height:7px;border-radius:50%;background:#C964CF;flex-shrink:0}
 .crumb-area{color:var(--text-2)}.crumb-sep{color:#C5C2BA}.crumb-cur{color:#1A1A1A;font-weight:600}
+/* Columna derecha del encabezado. Estaba con estilo EN LÍNEA; vive acá para que el @media de
+   teléfono pueda volverla display:contents y repartir sus dos piezas a los extremos. */
+.hdr-right{margin-left:auto;margin-right:66px;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+/* El aviso de producción también tenía su estilo en línea (le ganaba al @media). Solo queda
+   `display` en línea, que es lo que el JS enciende y apaga. */
+.hdr-prod{font-size:11px;color:#B08585;letter-spacing:.01em}
 .conn-ind{margin-left:auto;display:flex;align-items:center;gap:7px;color:#5A5750;font-size:13px}
 .conn-ind .gdot{width:7px;height:7px;border-radius:50%;background:#4CAF6E}
 .logo-link{cursor:pointer}
@@ -934,9 +963,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <div class="header hidden" id="appHeader">
   <img src="Logo_Sec_Color.png" alt="True Food" class="logo-link" style="height:28px;width:auto;display:block" onclick="volverLobby()" title="Volver al inicio">
   <div class="crumbs"><span class="crumb-dot"></span><span class="crumb-area">Finanzas</span><span class="crumb-sep">/</span><span class="crumb-cur">Facturado por canal</span></div>
-  <div style="margin-left:auto;margin-right:66px;display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+  <div class="hdr-right">
     <div class="conn-ind" style="margin-left:0"><span class="gdot"></span>Conectado</div>
-    <span id="bannerProd" style="display:none;font-size:11px;color:#B08585;letter-spacing:.01em">producción · solo lectura</span>
+    <span id="bannerProd" class="hdr-prod" style="display:none">producción · solo lectura</span>
   </div>
   <span id="connPill" style="display:none"></span>
   <span id="headerSub" style="display:none"></span>
