@@ -1585,10 +1585,21 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-day.rz-ed:hover{border-color:#3A3A42;background:#191920}
 #vResumen .rz-day.rz-nav{cursor:pointer}
 #vResumen .rz-day.rz-nav:hover{border-color:#3A3A42}
-#vResumen .rz-grip{position:absolute;top:6px;right:5px;width:15px;height:15px;color:#4A4A50;cursor:grab;opacity:0;transition:opacity .12s}
-#vResumen .rz-grip svg{width:15px;height:15px;display:block}
-#vResumen .rz-day.rz-ed:hover .rz-grip{opacity:1}
-#vResumen .rz-grip:active{cursor:grabbing}
+/* Lápiz de edición: el glifo se dibuja a 15px pero el blanco táctil es de 44×44 (dedo), sin
+   salirse de la celda — el resto del día queda libre para el toque de intercambio. Siempre
+   visible (en pantalla táctil no hay hover) y solo en días editables. */
+#vResumen .rz-pen{position:absolute;top:2px;right:2px;width:44px;height:44px;display:flex;
+  align-items:center;justify-content:center;color:#4A4A50;cursor:pointer;transition:color .12s}
+#vResumen .rz-pen svg{width:15px;height:15px;display:block;pointer-events:none}
+#vResumen .rz-day.rz-ed:hover .rz-pen{color:#6E6C68}
+#vResumen .rz-pen:hover{color:#C77DA0}
+/* Día seleccionado para intercambiar: acento del módulo, anillo de 2px (el de hoy es de 1px)
+   y el estado lo dice con palabras — el color nunca es la única señal. */
+#vResumen .rz-day.rz-sel{border-color:#C77DA0;box-shadow:0 0 0 2px rgba(199,125,160,.55)}
+#vResumen .rz-day.rz-sel .rz-ds{color:#C77DA0}
+/* Motivo de un intercambio bloqueado: discreto, arriba del calendario. */
+#vResumen .rz-aviso{margin:0 0 10px;font-size:12px;color:#C99A4E;background:rgba(201,154,78,.08);
+  border:.5px solid rgba(201,154,78,.3);border-radius:8px;padding:7px 11px;max-width:640px}
 #vResumen .rz-day.rz-edited{border-color:rgba(201,154,78,.5)}
 #vResumen .rz-day.rz-edited .rz-ds{color:#C99A4E}
 #vResumen .rz-day.rz-autofill{border-style:dashed;border-color:#3E3E46}   /* provisional: lo agrega el sistema para la meta */
@@ -1598,7 +1609,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* 1 · Pendiente de fabricar (calendario de 2 semanas; ver .rz-cal2 arriba) */
 #vResumen .rz-day.rz-today{border-color:#C77DA0;box-shadow:0 0 0 1px rgba(199,125,160,.4)}
 #vResumen .rz-day.rz-today .rz-dd{color:#C77DA0}
-#vResumen .rz-grip.rz-grabbing{opacity:1;color:#C77DA0}
 /* Calendario de 2 semanas: ESTA semana completa (lun–vie) + PRÓXIMA atenuada a la derecha. */
 #vResumen .rz-cal2{display:flex;gap:26px;align-items:flex-start;margin-top:4px}
 #vResumen .rz-cal2 .rz-wk{flex:1 1 0;min-width:0}
@@ -4510,7 +4520,6 @@ function _compraUnidad(pid, faltaBase, uom){
 // Íconos inline en gris del módulo (#9A988F) — sin dependencia de librería de íconos.
 const _SVG_FLASK='<svg class="rz-pico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6l-4.5 8a2 2 0 0 0 1.8 3h9.4a2 2 0 0 0 1.8-3L14 9V3M7.5 14h9"/></svg>';
 const _SVG_CART='<svg class="rz-pico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/><path d="M3 4h2l2.4 11.4a1.5 1.5 0 0 0 1.5 1.2h7.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6"/></svg>';
-const _SVG_GRIP='<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg>';
 const _SVG_PENCIL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17.2 4 20z"/><path d="M13.5 6.5l4 4"/></svg>';
 const _SVG_PPL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0M16 5.5a3 3 0 0 1 0 5.8M18 20a5.5 5.5 0 0 0-3-4.9"/></svg>';
 
@@ -4519,7 +4528,8 @@ let _rzCtx=null;                 // {cfg,ritmo,stock,w0,weeks,real,hoyStr,mon0}
 let _rzOverrides={};             // {ds:{producto_id,batches,tipo}} — la fila más reciente por fecha manda
 let _rzAlistar=[{premez:[],compras:[]},{premez:[],compras:[]}];
 let _rzEdit=null;                // ds de la celda en modo edición (o null)
-let _rzDrag=null;                // ds de la celda que se está arrastrando
+let _rzSel=null;                 // ds del día seleccionado para intercambiar (tocar-tocar)
+let _rzAviso='';                 // motivo visible cuando un intercambio no se puede hacer
 let _rzAuto={};                  // auto-relleno derivado {ds:[{pid,batches}]} (opción 2: cubre el faltante de la meta)
 let _rzAutoLeft=[];              // faltante que NO cupo ni en el horizonte proyectado (raro)
 let _rzDerrame=[];              // producción que se corrió a una semana POSTERIOR, con día concreto [{pid,batches,ds}]
@@ -4596,7 +4606,7 @@ async function _rzSetup(){
   const {w0, weeks}=nivLevel(ritmo, finPlan, cfg);
   const hoy=new Date();
   _rzCtx={cfg, ritmo, stock, w0, weeks, real, hoyStr:_ymd(hoy), mon0:_mondayProd(hoy)};
-  _rzEdit=null; _rzDrag=null;
+  _rzEdit=null; _rzSel=null; _rzAviso='';
   _rzOverrides=await nivOverrides();          // ediciones futuras guardadas en Supabase
   // ÚLTIMAS producciones: plan del motor (sin real, sin override) de la semana vs Odoo real.
   const planW0={}; rzCeldas(_rzCtx.mon0, weeks[0], {}, _rzCtx.hoyStr, {}).forEach(function(cc){ if(cc.prods&&Object.keys(cc.prods).length) planW0[cc.ds]=cc.prods; });
@@ -5565,8 +5575,13 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
       c.prod=Object.keys(realDay).map(function(pp){return _rzBP(Math.round(realDay[pp]/NIV_INFO[+pp].rend), +pp);}).join(' + '); return c; }
     if(i<4 && slot[i] && slot[i].feriado){ c.kind='feriado'; c.editable=false; c.prod='Feriado'; c.bt=slot[i].feriado; return c; }
     if(ov && fut){ c.editable=true; c.edited=true; c.swappable=true;
-      if(ov.producto_id==null || !(ov.batches>0)){ c.kind='edit-empty'; c.prod='—'; c.bt=''; return c; }
-      c.kind='edit'; c.pid=ov.producto_id; c.batches=ov.batches; c.prods[ov.producto_id]=ov.batches; c.prod=_rzBP(ov.batches, ov.producto_id); c.bt=''; return c; }
+      // El PICADO del viernes es del día (depende de que haya Semillas el jueves), no del producto
+      // que se produzca ese día: una edición o un intercambio sobre el viernes no debe borrarlo.
+      const vPic=(i===4 && !!v.picado);
+      if(ov.producto_id==null || !(ov.batches>0)){ c.kind='edit-empty';
+        c.prod=vPic?'Picado':(i===4?'Limpieza':'—'); c.bt=''; return c; }
+      c.kind='edit'; c.pid=ov.producto_id; c.batches=ov.batches; c.prods[ov.producto_id]=ov.batches;
+      c.prod=(vPic?'Picado · ':'')+_rzBP(ov.batches, ov.producto_id); c.bt=''; return c; }
     if(i<4){
       const e=slot[i];
       if(e&&e.p){ c.kind=fut?'prop':(past?'pend':'prop'); c.editable=fut; c.swappable=fut; c.pid=e.p; c.batches=e.batches; c.prods[e.p]=e.batches; c.prod=_rzBP(e.batches, e.p); c.bt=''; c.today=ds===hoyStr; return c; }
@@ -5587,7 +5602,10 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
     if(v.prod && !(panEnVie && v.prod.p!==519)){   // el v.prod-pan se cae si ya hay un pan corrido; Galletas [519] siempre entra
       parts.push(_rzBP(v.prod.batches, v.prod.p)); c.prods[v.prod.p]=(c.prods[v.prod.p]||0)+v.prod.batches; if(PAN_VIE.has(v.prod.p)) panEnVie=true; }
     if(!parts.length) parts.push('Limpieza');   // día no cargado → limpieza profunda
-    c.kind='viernes'; c.editable=fut; c.swappable=false; c.prod=parts.join(' · '); c.bt=''; return c;
+    // El viernes ES intercambiable como cualquier otro día (antes swappable=false lo dejaba
+    // clavado, justo el día que hace falta mover). Si además lleva producción corrida por
+    // feriado son DOS productos y el intercambio lo bloquea con motivo — ver _rzSwapVeto.
+    c.kind='viernes'; c.editable=fut; c.swappable=fut; c.prod=parts.join(' · '); c.bt=''; return c;
   });
 }
 // Suma prods de las celdas de producción de la semana (editables o auto-relleno).
@@ -5819,7 +5837,9 @@ function rzStripHtml(){
   const leftnote=_rzDerrameNota();
   const cal='<div class="rz-cal2'+(_rzShowNext?' rz-shownext':'')+'">'+_rzWeekBlock(0)+_rzWeekBlock(1)+'</div>';
   const verbtn='<button class="rz-vernext" onclick="rzToggleNext(this)">'+(_rzShowNext?'Ocultar próxima semana':'Ver próxima semana')+'</button>';
-  return '<div class="rz-sec">'+head+_rzAlertaHtml()+cal+verbtn+leftnote+'</div>';
+  // Motivo de un intercambio bloqueado (nunca falla en silencio) — se va al tocar otro día.
+  const aviso=_rzAviso?('<div class="rz-aviso">'+esc(_rzAviso)+'</div>'):'';
+  return '<div class="rz-sec">'+head+_rzAlertaHtml()+aviso+cal+verbtn+leftnote+'</div>';
 }
 // ── 2 · PREMEZCLAS POR MEDIR (tira de una línea) ──
 function rzMedirHtml(){
@@ -5910,18 +5930,21 @@ function rzCellHtml(cell){
   const dd='<div class="rz-dd">'+cell.dow+' '+cell.dnum+'</div>';
   const dp='<div class="rz-dp">'+esc(cell.prod)+'</div>';
   const db=cell.bt?('<div class="rz-db">'+esc(cell.bt)+'</div>'):'';
-  const st='<div class="rz-ds">'+(cell.auto&&cell.kind==='viernes'?'Para cumplir la meta':m[1])+(cell.edited?' · editado':'')+'</div>';
+  const sel=_rzSel===ds;
+  const estado=(cell.auto&&cell.kind==='viernes'?'Para cumplir la meta':m[1])+(cell.edited?' · editado':'')
+    +(sel?' · seleccionado':'');
+  const st='<div class="rz-ds">'+estado+'</div>';
   const cls=m[0]+(cell.editable?' rz-ed':'')+(cell.edited?' rz-edited':'')+(cell.auto?' rz-autofill':'')
-    +(cell.today?' rz-today':'');
-  if(cell.editable){
-    const grip=cell.swappable?('<span class="rz-grip" draggable="true" title="Arrastrar para mover" onclick="event.stopPropagation()"'
-      +' ondragstart="rzDragStart(event,\''+ds+'\')" ondragend="rzDragEnd()"'
-      +' ontouchstart="rzTouchStart(event,\''+ds+'\')" ontouchmove="rzTouchMove(event)" ontouchend="rzTouchEnd(event)">'+_SVG_GRIP+'</span>'):'';
-    const drop=cell.swappable?' ondragover="rzDragOver(event)" ondrop="rzDrop(event,\''+ds+'\')"':'';
-    return '<div class="rz-day '+cls+'" data-ds="'+ds+'" onclick="rzOpenEdit(\''+ds+'\')"'+drop+'>'+grip+dd+dp+db+st+'</div>';
-  }
-  if(cell.nav) return '<div class="rz-day '+cls+' rz-nav" onclick="rzNavDia(\''+ds+'\')" title="Ver esta producción en Odoo">'+dd+dp+db+st+'</div>';
-  return '<div class="rz-day '+cls+'">'+dd+dp+db+st+'</div>';
+    +(cell.today?' rz-today':'')+(sel?' rz-sel':'');
+  // El lápiz sigue EXACTAMENTE la misma regla que el día: solo se dibuja si cell.editable.
+  // stopPropagation para que tocarlo no seleccione el día para intercambio.
+  const pen=cell.editable?('<span class="rz-pen" title="Editar este día"'
+    +' onclick="event.stopPropagation();rzOpenEdit(\''+ds+'\')">'+_SVG_PENCIL+'</span>'):'';
+  // Toda celda responde al toque — las no editables para decir POR QUÉ no se pueden intercambiar.
+  const tip=cell.editable?(sel?'Tocá otro día para intercambiar, o este mismo para cancelar':'Tocá para seleccionar e intercambiar')
+                         :(cell.nav?'Ver esta producción en Odoo':'');
+  return '<div class="rz-day '+cls+(cell.nav?' rz-nav':'')+'" data-ds="'+ds+'"'
+    +(tip?(' title="'+tip+'"'):'')+' onclick="rzTapDia(\''+ds+'\')">'+pen+dd+dp+db+st+'</div>';
 }
 function rzFormHtml(cell){
   const opts=NIV_PROD.map(p=>'<option value="'+p+'"'+(cell.pid===p?' selected':'')+'>'+esc(NIV_INFO[p].nom)+'</option>').join('');
@@ -5934,7 +5957,9 @@ function rzFormHtml(cell){
 }
 
 // ── Interacción: edición inline, intercambio (swap) y volver al plan ──
-function rzOpenEdit(ds){ if(_rzEdit===ds)return; _rzEdit=ds; rzRender(); const s=document.getElementById('rzFsel'); if(s)s.focus(); }
+// Abrir el editor cancela la selección de intercambio: un día no puede estar en los dos modos.
+function rzOpenEdit(ds){ if(_rzEdit===ds)return; _rzEdit=ds; _rzSel=null; _rzAviso=''; rzRender();
+  const s=document.getElementById('rzFsel'); if(s)s.focus(); }
 function rzCancelEdit(){ _rzEdit=null; rzRender(); }
 async function rzSaveEdit(ds){
   const sel=document.getElementById('rzFsel'), bt=document.getElementById('rzFbt');
@@ -5946,30 +5971,79 @@ async function rzSaveEdit(ds){
   rzPersist([{fecha:ds, producto_id:val.producto_id, batches:val.batches, tipo:'edicion'}]);
   await rzRecalcAlistar(); rzRender();                        // recalcula MP/premezclas sobre la meta
 }
-function rzDragStart(e,ds){ _rzDrag=ds; try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',ds); }catch(_){}}
-function rzDragEnd(){ _rzDrag=null; }
-function rzDragOver(e){ if(_rzDrag){ e.preventDefault(); try{ e.dataTransfer.dropEffect='move'; }catch(_){}} }
-function rzDrop(e, toDs){ if(e&&e.preventDefault)e.preventDefault(); const fromDs=_rzDrag; _rzDrag=null; if(fromDs&&fromDs!==toDs) rzSwap(fromDs, toDs); }
-// TÁCTIL (móvil): el HTML5 drag no anda en touch → gesto propio con elementFromPoint.
-let _rzTouchDs=null;
-function rzTouchStart(e,ds){ _rzTouchDs=ds; _rzDrag=ds; const g=e.currentTarget; if(g&&g.classList)g.classList.add('rz-grabbing'); if(e.cancelable)e.preventDefault(); }
-function rzTouchMove(e){ if(_rzTouchDs && e.cancelable) e.preventDefault(); }   // evita el scroll mientras se arrastra el handle
-function rzTouchEnd(e){ if(!_rzTouchDs) return; const from=_rzTouchDs; _rzTouchDs=null; _rzDrag=null;
-  const t=e.changedTouches&&e.changedTouches[0]; let toDs=null;
-  if(t){ const el=document.elementFromPoint(t.clientX,t.clientY); const day=el&&el.closest?el.closest('.rz-day'):null; if(day) toDs=day.getAttribute('data-ds'); }
-  const g=e.currentTarget; if(g&&g.classList)g.classList.remove('rz-grabbing');
-  if(toDs && from && toDs!==from) rzSwap(from, toDs); }
-// El swap lee las celdas TAL COMO SE VEN (con crédito de lo real + auto-relleno), no la base cruda,
-// para que mover un día use el producto/batches realmente mostrado.
+// ── INTERCAMBIO POR TOQUE (tocar un día · tocar el otro) ─────────────────────
+// Reemplaza al arrastre HTML5 + al gesto táctil propio, que eran dos caminos distintos para lo
+// mismo (y en táctil el ontouchstart del asa competía con el onclick de la celda: el onclick
+// llamaba rzOpenEdit → rzRender y el re-render mataba el arrastre a media pista).
+// Ahora hay UN solo camino, el mismo en escritorio y en pantalla táctil: `onclick` sobre la
+// celda. La selección vive en `_rzSel` (estado del módulo, NO en el DOM), así que un rzRender
+// intermedio la conserva en vez de borrarla — misma lección que las tarjetas de compra.
+// El lápiz de edición hace stopPropagation, así que tocar el lápiz NUNCA selecciona el día y
+// tocar el día NUNCA abre el editor.
+// El swap lee las celdas TAL COMO SE VEN (con crédito de lo real + auto-relleno), no la base
+// cruda, para que mover un día use el producto/batches realmente mostrado.
 function _rzCellByDs(ds){ for(let o=0;o<2;o++){ const hit=_rzCellsFull(o).find(x=>x.ds===ds); if(hit) return hit; } return null; }
+// Carga intercambiable de una celda: {pid,batches} o null si NO es representable como un solo
+// producto (un override de plan_overrides es una fila con un producto y sus batches). Un viernes
+// con producción corrida por feriado lleva dos panes: eso no cabe en una fila y se avisa.
+function _rzCarga(c){
+  const pr=c.prods||{}, ks=Object.keys(pr);
+  if(!ks.length) return {pid:null, batches:0};
+  if(ks.length>1) return null;
+  return {pid:+ks[0], batches:pr[ks[0]]};
+}
+function _rzDow(ds){ return new Date(ds+'T00:00:00').getDay(); }   // 4 = jueves
+function _rzFechaLbl(ds){ const d=new Date(ds+'T00:00:00'); return _DOW[d.getDay()]+' '+d.getDate(); }
+// ¿Este día admite intercambio? (día futuro editable que no sea feriado ni pasado)
+function _rzSwapOk(c){ return !!(c && c.swappable); }
+// Motivo por el que un día NO admite intercambio. Nunca se falla en silencio.
+function _rzMotivoDia(c){
+  if(!c) return 'Ese día no está en el plan visible.';
+  if(c.kind==='real')    return 'El '+_rzFechaLbl(c.ds)+' ya está producido y registrado en Odoo — no se puede mover.';
+  if(c.kind==='pend')    return 'El '+_rzFechaLbl(c.ds)+' ya pasó — no se puede mover.';
+  if(c.kind==='feriado') return 'El '+_rzFechaLbl(c.ds)+' es feriado ('+(c.bt||'sin producción')+') — no se produce.';
+  if(!c.editable)        return 'El '+_rzFechaLbl(c.ds)+' está fuera del rango editable.';
+  return 'El '+_rzFechaLbl(c.ds)+' no se puede intercambiar.';
+}
+// Reglas de negocio del intercambio. Devuelve el motivo (string) si NO se puede, o '' si sí.
+// No duplica el motor: se apoya en lo que las celdas ya traen (feriados, pasado, cierre) y solo
+// agrega lo que el intercambio puede romper y el motor no ve (Semillas fuera del jueves).
+function _rzSwapVeto(a, b){
+  const ca=_rzCarga(a), cb=_rzCarga(b);
+  if(!ca) return 'El '+_rzFechaLbl(a.ds)+' lleva más de un producto ('+a.prod+'). El intercambio mueve un producto por día — editalo primero.';
+  if(!cb) return 'El '+_rzFechaLbl(b.ds)+' lleva más de un producto ('+b.prod+'). El intercambio mueve un producto por día — editalo primero.';
+  // SEMILLAS [452] queda clavado al jueves: se pica al día siguiente y el sábado no se trabaja.
+  if(ca.pid===452 && _rzDow(b.ds)!==4)
+    return 'Pan Semillas solo puede ir un jueves: se pica al día siguiente y el sábado no se trabaja. El '+_rzFechaLbl(b.ds)+' no sirve de destino.';
+  if(cb.pid===452 && _rzDow(a.ds)!==4)
+    return 'Pan Semillas solo puede ir un jueves: se pica al día siguiente y el sábado no se trabaja. El '+_rzFechaLbl(a.ds)+' no sirve de destino.';
+  return '';
+}
+// Un solo handler para TODO toque sobre un día — editable o no.
+function rzTapDia(ds){
+  const c=_rzCellByDs(ds);
+  if(_rzSel===ds){ _rzSel=null; _rzAviso=''; rzRender(); return; }        // mismo día → cancela
+  if(!_rzSwapOk(c)){
+    if(_rzSel){ _rzAviso=_rzMotivoDia(c); rzRender(); }                   // había selección → decir por qué no
+    else if(c && c.nav){ rzNavDia(ds); }                                  // sin selección → ver la producción en Odoo
+    return;
+  }
+  if(!_rzSel){ _rzSel=ds; _rzAviso=''; rzRender(); return; }              // primer toque → seleccionar
+  const a=_rzCellByDs(_rzSel);
+  const veto=_rzSwapVeto(a, c);
+  if(veto){ _rzAviso=veto; rzRender(); return; }                          // bloqueado, con motivo visible
+  const from=_rzSel; _rzSel=null; _rzAviso='';
+  rzSwap(from, ds);
+}
 async function rzSwap(fromDs, toDs){
   const a=_rzCellByDs(fromDs), b=_rzCellByDs(toDs);
   if(!a||!b||!a.swappable||!b.swappable) return;              // solo entre días futuros intercambiables
-  _rzOverrides[fromDs]={producto_id:b.pid||null, batches:b.batches||0, tipo:'swap'};
-  _rzOverrides[toDs]  ={producto_id:a.pid||null, batches:a.batches||0, tipo:'swap'};
+  const ca=_rzCarga(a), cb=_rzCarga(b); if(!ca||!cb) return;
+  _rzOverrides[fromDs]={producto_id:cb.pid, batches:cb.batches, tipo:'swap'};
+  _rzOverrides[toDs]  ={producto_id:ca.pid, batches:ca.batches, tipo:'swap'};
   _rzRecalcAuto(); rzRender();
-  rzPersist([{fecha:fromDs, producto_id:b.pid||null, batches:b.batches||0, tipo:'swap'},
-             {fecha:toDs,   producto_id:a.pid||null, batches:a.batches||0, tipo:'swap'}]);
+  rzPersist([{fecha:fromDs, producto_id:cb.pid, batches:cb.batches, tipo:'swap'},
+             {fecha:toDs,   producto_id:ca.pid, batches:ca.batches, tipo:'swap'}]);
   await rzRecalcAlistar(); rzRender();                        // swap conserva la meta → premezclas/MP no cambian
 }
 async function rzPersist(filas){
