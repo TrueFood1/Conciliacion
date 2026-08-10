@@ -4385,11 +4385,21 @@ const MP_PREM_OTRO=[523,524,463,459];
 function _mpGrupo(pid, name){ const t=_mpTipo(name);
   return (t==='saco'||t==='azucar'||MP_PREM_OTRO.indexOf(pid)>=0) ? 'medir' : 'producir'; }
 // Necesidad de MP hoja para un mapa de batches: separa premezcla-MP de directos de producción.
-async function _mpNeeds(batchMap){
+// `premOh` (opcional) = {prem_pid: unidades en stock}. Con él, la premezcla YA MEDIDA no se
+// vuelve a comprar: se fabrican ceil(batches − stock) batches enteros, misma semántica que
+// nivAlistar (que es la referencia). Los directos de la etapa final se consumen igual, exista
+// o no la premezcla. Sin `premOh` el comportamiento es el de antes (necesidad bruta).
+async function _mpNeeds(batchMap, premOh){
   const prem={}, direct={};
   for(const p of NIV_PROD){ const b=(batchMap&&batchMap[p])||0; if(b<=0)continue; const I=NIV_INFO[p];
-    const r=await expandirReceta(I.prem, b); if(r) for(const k in r.hojas) prem[+k]=(prem[+k]||0)+r.hojas[k].qty;
+    const mk=premOh ? Math.ceil(Math.max(0, b-(premOh[I.prem]||0))) : b;
+    if(mk>0){ const r=await expandirReceta(I.prem, mk); if(r) for(const k in r.hojas) prem[+k]=(prem[+k]||0)+r.hojas[k].qty; }
     const bom=await _bomDe(p); if(bom) for(const ln of bom.lines){ if(ln.pid===I.prem||ln.pid===AGUA_PID)continue;
+      // DEUDA TÉCNICA: un componente de etapa final con BOM propia (que no sea la premezcla) se
+      // salta ENTERO en vez de expandirse a sus hojas. Hoy no dispara en ningún producto —
+      // verificado contra producción el 10-ago-2026, la lista de saltados sale vacía — pero si
+      // mañana alguien arma un subensamble, su MP desaparece de la lista de compra sin aviso.
+      // El arreglo es cambiar el `continue` por expandirReceta(ln.pid, …), como hace nivStock.
       const sub=await _bomDe(ln.pid); if(sub&&sub.lines.length)continue; const info=await _prodInfo(ln.pid);
       direct[ln.pid]=(direct[ln.pid]||0)+await _conv(ln.qty*b, ln.uom, info.uom); } }
   return {prem, direct}; }
@@ -4412,7 +4422,10 @@ async function nivCompras(stock){
     for(const k in o.prem)   m[+k]=(m[+k]||0)+o.prem[k];
     for(const k in o.direct) m[+k]=(m[+k]||0)+o.direct[k];
     return m; };
-  const bolsas=await _mpNeeds(win), need=_mrg(bolsas);
+  // La premezcla ya medida en stock NO se vuelve a comprar (nivAlistar ya lo hacía; la tarjeta
+  // no, y mandaba a Lorena a comprar MP de premezclas que están hechas).
+  const premOh={}; NIV_PROD.forEach(p=>{ const pr=NIV_INFO[p].prem; premOh[pr]=(stock.premOh||{})[pr]||0; });
+  const bolsas=await _mpNeeds(win, premOh), need=_mrg(bolsas);
   // Dónde se compra cada cosa. El CUÁNDO ya lo dice la fecha de la tarjeta (ventana única),
   // así que la acción por ítem solo indica la fuente — nada de plazos por tipo.
   const _mpFuente=t=>(t==='saco'||t==='huevo') ? 'proveedor' : 'súper';
