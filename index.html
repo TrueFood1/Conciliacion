@@ -1728,6 +1728,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-gnote{font-size:10px;color:#C99A4E;margin-top:3px}
 #vResumen .rz-ds{margin-top:auto;font-size:11px;font-weight:600;padding-top:8px}
 #vResumen .rz-dsm{display:none}   /* estado en una palabra: solo teléfono (ver @media 700px) */
+#vResumen .rz-edwrap{display:none}   /* "N días editados": solo teléfono */
 #vResumen .rz-day.rz-done{border-color:var(--border)} #vResumen .rz-day.rz-done .rz-ds{color:#7A7A72}
 #vResumen .rz-day.rz-today{border-color:#C77DA0;box-shadow:0 0 0 1px rgba(199,125,160,.4)} #vResumen .rz-day.rz-today .rz-ds{color:#C77DA0}
 #vResumen .rz-day.rz-miss{border-color:rgba(201,154,78,.4)} #vResumen .rz-day.rz-miss .rz-ds{color:#C99A4E}
@@ -1938,20 +1939,31 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    abajo, 3 — así las dos filas cierran contra el mismo borde. */
 @media(max-width:700px){
   #vResumen .rz-wrap{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
-  #vResumen .rz-cal2 .rz-days{grid-auto-flow:row;grid-template-columns:repeat(6,1fr);
+  /* Cuadrícula FIJA de 3 columnas y cuadritos del MISMO tamaño: jueves cae debajo del lunes
+     y viernes debajo del martes. (Antes eran 3+2 con anchos distintos.) */
+  #vResumen .rz-cal2 .rz-days{grid-auto-flow:row;grid-template-columns:repeat(3,1fr);
     grid-auto-columns:auto;overflow-x:visible;gap:7px;padding-bottom:0}
-  #vResumen .rz-cal2 .rz-days>*{grid-column:span 2}
-  #vResumen .rz-cal2 .rz-days>*:nth-child(4),#vResumen .rz-cal2 .rz-days>*:nth-child(5){grid-column:span 3}
-  /* Tarjeta de día compacta: día chiquito arriba, producto 14px, estado en una palabra. */
-  #vResumen .rz-day{min-height:0;padding:8px 9px 9px}
+  /* Tarjeta de día: SOLO fecha y producto. El estado ("propuesto"/"editado") se fue al pie
+     del calendario — el día normal no tiene por qué anunciarse. */
+  #vResumen .rz-day{min-height:74px;padding:8px 9px 9px}
   #vResumen .rz-dd{font-size:9.5px}
   #vResumen .rz-dp{font-size:14px;margin-top:4px}
   #vResumen .rz-db{font-size:10.5px}
-  #vResumen .rz-ds{display:none}                 /* el estado largo es de escritorio */
-  #vResumen .rz-dsm{display:block;margin-top:auto;padding-top:6px;font-size:10.5px;font-weight:600;color:var(--text-3)}
-  #vResumen .rz-day.rz-today .rz-dsm,#vResumen .rz-day.rz-sel .rz-dsm{color:#C77DA0}
-  #vResumen .rz-day.rz-miss .rz-dsm,#vResumen .rz-day.rz-edited .rz-dsm,
-  #vResumen .rz-day.rz-fer .rz-dsm{color:#C99A4E}
+  #vResumen .rz-ds,#vResumen .rz-dsm{display:none}
+  /* "Editado" ya no es una señal de la tarjeta: sin borde ámbar. Lo excepcional de verdad
+     (hoy, feriado, sin registrar, seleccionado) conserva el suyo. */
+  #vResumen .rz-day.rz-edited{border-color:var(--border)}
+  /* Pie del calendario: "N días editados" en gris con chevron, y la lista al tocarla. */
+  #vResumen .rz-edtoggle{display:flex;width:100%;align-items:center;gap:6px;margin-top:11px;
+    padding:0;border:none;background:none;color:var(--text-3);font-family:inherit;font-size:11px;
+    text-align:left;cursor:pointer}
+  #vResumen .rz-edtoggle::after{content:'⌄';font-size:13px;line-height:1;color:var(--text-3)}
+  #vResumen .rz-edtoggle.rz-abierto::after{content:'⌃'}
+  #vResumen .rz-edlista{margin-top:7px}
+  #vResumen .rz-edlista.hidden{display:none}
+  #vResumen .rz-edrow{display:flex;gap:8px;padding:4px 0;font-size:11.5px;color:var(--text-3)}
+  #vResumen .rz-edd{flex:none;min-width:52px}
+  #vResumen .rz-edp{color:var(--text-2);min-width:0}
   /* El lápiz mantiene su blanco táctil de 44×44 aunque la tarjeta sea más baja. */
   #vResumen .rz-pen{top:0;right:0}
   /* Encabezado de semana en UNA línea de texto, sin píldora con caja.
@@ -1974,6 +1986,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vResumen .rz-cal2 .rz-wk-next .rz-day{background:var(--surface-2);border-style:solid}
   /* Fuera del teléfono: el aviso de meta (derrame) y el bloque de Inventario, que vive en
      su propia pestaña. */
+  /* La etiqueta ámbar "editado" del encabezado decía lo mismo que la línea de abajo, y en
+     ámbar. Queda solo "Volver al plan", que es una acción. */
+  #vResumen .rz-edtag{display:none}
+  #vResumen .rz-edwrap{display:block}
   #vResumen .rz-leftnote{display:none}
   #vResumen .rz-invsec{display:none}
   /* Tarjetas 2×2 — fila 1: Por medir · Comprar·medir | fila 2: Producciones · Comprar·producir */
@@ -6030,6 +6046,30 @@ function _rzChipPersonas(iso, personas){
   return '<span class="rz-chip'+(personas===2?' rz-chip-amber':'')+'" onclick="rzTogglePersonas(\''+iso+'\')" title="Cambiar cuántas personas hay esa semana">'
     +personas+' persona'+(personas===1?'':'s')+' <span class="rz-chip-x">cambiar</span></span>';
 }
+// ── "N días editados" (solo teléfono) ───────────────────────────────────────
+// Las tarjetas de día dejaron de decir "editado"/"propuesto": el estado normal no tiene por
+// qué gritar en cada cuadrito. Lo excepcional —lo que Andrea cambió a mano— se resume en una
+// línea gris al pie del calendario y se despliega en una lista chica: fecha y qué quedó.
+// Sin colores, sin badges, sin tabla. Si no hay días editados, la línea no existe.
+let _rzEdListaOpen=false;
+function _rzEditadosHtml(){
+  const eds=[];
+  for(let o=0;o<2;o++) _rzCellsFull(o).forEach(function(c){ if(c.edited) eds.push(c); });
+  if(!eds.length) return '';
+  const filas=eds.map(function(c){
+    return '<div class="rz-edrow"><span class="rz-edd">'+c.dow+' '+c.dnum+'</span>'
+      +'<span class="rz-edp">'+esc(c.prod)+'</span></div>'; }).join('');
+  const n=eds.length;
+  return '<div class="rz-edwrap">'
+    +'<button class="rz-edtoggle'+(_rzEdListaOpen?' rz-abierto':'')+'" onclick="rzToggleEditados(this)">'
+      +n+' día'+(n===1?'':'s')+' editado'+(n===1?'':'s')+'</button>'
+    +'<div class="rz-edlista'+(_rzEdListaOpen?'':' hidden')+'" id="rzEdLista">'+filas+'</div></div>';
+}
+function rzToggleEditados(btn){
+  _rzEdListaOpen=!_rzEdListaOpen;
+  const l=document.getElementById('rzEdLista'); if(l) l.classList.toggle('hidden', !_rzEdListaOpen);
+  if(btn) btn.classList.toggle('rz-abierto', _rzEdListaOpen);
+}
 function rzToggleNext(btn){ const c=document.querySelector('#vResumen .rz-cal2'); if(!c)return;
   _rzShowNext=!_rzShowNext; c.classList.toggle('rz-shownext', _rzShowNext);
   // El chevron lo pone el CSS (::after) porque textContent borraría cualquier hijo del botón.
@@ -6098,7 +6138,7 @@ function rzStripHtml(){
     +(_rzShowNext?'Ocultar próxima semana':'Ver próxima semana')+'</button>';
   // Motivo de un intercambio bloqueado (nunca falla en silencio) — se va al tocar otro día.
   const aviso=_rzAviso?('<div class="rz-aviso">'+esc(_rzAviso)+'</div>'):'';
-  return '<div class="rz-sec">'+head+_rzAlertaHtml()+aviso+cal+verbtn+leftnote+'</div>';
+  return '<div class="rz-sec">'+head+_rzAlertaHtml()+aviso+cal+_rzEditadosHtml()+verbtn+leftnote+'</div>';
 }
 // ── 2 · PREMEZCLAS POR MEDIR (tira de una línea) ──
 function rzMedirHtml(){
