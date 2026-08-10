@@ -4357,11 +4357,16 @@ async function nivAlistar(batchMaps, stock){
   return out;
 }
 
-// ── COMPRAS por tipo de MP (reglas reales de Andrea) ──
-// SACOS (avena/almidón/harina): premezclas de la PRÓXIMA semana; pedir jueves, llega viernes.
-// AZÚCAR (súper): premezclas de ESTA semana; lunes antes de medir.
-// HUEVOS (proveedor): producción de esta semana + próximo lunes; el lunes al llegar.
-// ACEITE y otros de súper (producción): ventana +2 días.
+// ── COMPRAS: la lista de compra REAL de Lorena los lunes ──
+// VENTANA ÚNICA: desde HOY hasta el LUNES SIGUIENTE inclusive, para TODOS los tipos —
+// sacos incluidos. La tarjeta contesta una sola pregunta: "¿qué compra Lorena hoy?".
+// Ningún proveedor tarda más de una semana (confirmado por Andrea, 10-ago-2026), así que
+// una ventana sola da colchón de sobra y no hace falta ningún caso especial.
+// Antes eran CUATRO ventanas (sacos = próxima semana · azúcar = semana en curso · huevos =
+// semana + lunes · aceite/otro = hoy + 2 días). Con ellas, un batch puesto el viernes solo
+// movía los huevos: los sacos miraban la semana siguiente y el aceite/otros no llegaban más
+// allá de pasado mañana. El rótulo "medir lun 17" salía de ahí y llegaba tarde.
+// El tipo de MP ya NO decide ventana: decide únicamente en qué bloque de la lista se muestra.
 function _mpTipo(name){ const n=(name||'').toLowerCase();
   if(/az[uú]car/.test(n)) return 'azucar';
   if(/avena|almid[oó]n|harina/.test(n)) return 'saco';
@@ -4382,10 +4387,9 @@ async function nivCompras(stock){
   const mpOh=stock.mpOh||{}, meta=stock.meta||{};
   const perDate=_rzPerDate();                                  // plan futuro por fecha (con ediciones + auto)
   const nextMon=new Date(_rzCtx.mon0); nextMon.setDate(nextMon.getDate()+7); const nextMonStr=_ymd(nextMon);
-  const lim2=new Date(_rzCtx.hoyStr+'T00:00:00'); lim2.setDate(lim2.getDate()+2); const lim2Str=_ymd(lim2);
-  const sumWin=pred=>{ const m={}; for(const ds in perDate){ if(ds<_rzCtx.hoyStr||!pred(ds)) continue; const t=perDate[ds]; for(const k in t) m[+k]=(m[+k]||0)+t[k]; } return m; };
-  const thisWeek=sumWin(ds=>ds<nextMonStr), nextWeek=sumWin(ds=>ds>=nextMonStr),
-        thisPlusMon=sumWin(ds=>ds<=nextMonStr), plus2=sumWin(ds=>ds<=lim2Str);
+  // Ventana única: hoy ≤ ds ≤ lunes siguiente. Un solo mapa de batches para toda la lista.
+  const win={}; for(const ds in perDate){ if(ds<_rzCtx.hoyStr || ds>nextMonStr) continue;
+    const t=perDate[ds]; for(const k in t) win[+k]=(win[+k]||0)+t[k]; }
   // UNA SOLA BOLSA por ventana: la necesidad de un ingrediente NO depende de la etapa en que se
   // consume. Leer solo `.prem` (o solo `.direct`) perdía ingredientes ENTEROS — el azúcar [462]
   // de las galletas vive en la BOM final de Cookie Dough [519], no en la premezcla [517], y su
@@ -4397,18 +4401,21 @@ async function nivCompras(stock){
     for(const k in o.prem)   m[+k]=(m[+k]||0)+o.prem[k];
     for(const k in o.direct) m[+k]=(m[+k]||0)+o.direct[k];
     return m; };
-  const nSaco=_mrg(await _mpNeeds(nextWeek)), nAzucar=_mrg(await _mpNeeds(thisWeek)),
-        nHuevo=_mrg(await _mpNeeds(thisPlusMon)), nAceite=_mrg(await _mpNeeds(plus2));
-  function items(need, tipos, accion){ const out=[];
-    for(const k in need){ const pid=+k, nm=(meta[pid]&&meta[pid].name)||('id '+pid);
-      if(tipos.indexOf(_mpTipo(nm))<0) continue;
+  const need=_mrg(await _mpNeeds(win));
+  // Dónde se compra cada cosa. La CUÁNDO ya la dice la fecha de la tarjeta (ventana única),
+  // así que la acción por ítem solo indica la fuente — nada de plazos por tipo.
+  const _mpFuente=t=>(t==='saco'||t==='huevo') ? 'proveedor' : 'súper';
+  function items(tipos){ const out=[];
+    for(const k in need){ const pid=+k, nm=(meta[pid]&&meta[pid].name)||('id '+pid), tipo=_mpTipo(nm);
+      if(tipos.indexOf(tipo)<0) continue;
       const nq=need[pid], have=mpOh[pid]||0, falta=nq-have; if(falta<=0.0001) continue;
-      out.push({pid, nombre:nm, uom:(meta[pid]&&meta[pid].uom)||'', need:nq, have:have, falta:falta, accion:accion}); }
+      out.push({pid, nombre:nm, uom:(meta[pid]&&meta[pid].uom)||'', need:nq, have:have, falta:falta,
+                accion:_mpFuente(tipo)}); }
     return out; }
-  const lunLbl='lun '+nextMon.getDate();
+  const fecha='comprar hoy · cubre hasta el lun '+nextMon.getDate();
   return {
-    premezclas:{fecha:'medir '+lunLbl, items:items(nSaco,['saco'],'pedir antes del jueves · llega viernes').concat(items(nAzucar,['azucar'],'súper · lunes antes de medir'))},
-    produccion:{fecha:'semana + '+lunLbl, items:items(nHuevo,['huevo'],'al proveedor, el lunes al llegar').concat(items(nAceite,['aceite','otro'],'súper · 2 días'))}
+    premezclas:{fecha:fecha, items:items(['saco','azucar'])},
+    produccion:{fecha:fecha, items:items(['huevo','aceite','otro'])}
   };
 }
 // ÚLTIMAS producciones pasadas (chequeo de Keylor): plan del motor vs real Odoo.
