@@ -1738,14 +1738,12 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-vsn{color:var(--text-2)}
 #vResumen .rz-vsv{color:var(--text-3);font-variant-numeric:tabular-nums;white-space:nowrap}
 #vResumen .rz-vsv.rz-ok{color:#7E8C5A;font-weight:600}
-/* tarjetas COMPRAR: ítem urgente + "› más" para desplegar el resto */
+/* tarjetas COMPRAR: lista completa, sin desplegable (la tarjeta crece) */
 #vResumen .rz-c4it{padding:5px 0;border-top:.5px solid #232329}
 #vResumen .rz-c4item{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12.5px}
 #vResumen .rz-c4nota{font-size:10.5px;color:var(--text-3);margin-top:1px}
 #vResumen .rz-c4in{color:var(--text);text-transform:capitalize}
 #vResumen .rz-c4falta{color:#C99A4E;white-space:nowrap;font-weight:600;font-size:11.5px}
-#vResumen .rz-c4more{margin-top:7px;background:none;border:none;color:var(--text-2);font-size:11px;cursor:pointer;padding:0}
-#vResumen .rz-c4more:hover{color:var(--text)}
 /* 2 secciones abajo, 2 columnas cada una, cerrando contra el mismo borde */
 #vResumen .rz-two{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:30px;align-items:start}
 #vResumen .rz-two .rz-sec{margin-top:0}
@@ -5732,22 +5730,26 @@ function rzMedirCard(){
   const txt=pm.length?pm.map(function(x){return x.n+' '+x.prod.replace(/^Pan /,'');}).join(' · '):'ya está todo ✓';
   return '<div class="rz-card4"><div class="rz-c4h">Por medir</div><div class="rz-c4line'+(pm.length?'':' rz-ok')+'">'+esc(txt)+'</div></div>';
 }
-// TARJETAS "Comprar": ítem MÁS urgente + "› N más" para desplegar el resto. Fecha objetivo en rosa apagado.
+// TARJETAS "Comprar": LISTA COMPLETA, siempre. Fecha objetivo en rosa apagado.
+// Sin "+N más": es la lista de compra real de Lorena y un ítem escondido es un ítem que no se
+// compra. Antes se mostraba solo el más urgente y el resto quedaba en un <div hidden> con un
+// botón desplegable — y el botón conservaba el texto "+N más" al abrirse (rzToggleId solo
+// cambia el chevron), así que parecía que no había expandido; además cualquier edición del
+// plan re-renderiza y lo volvía a colapsar. La tarjeta crece con la lista.
 function rzComprasCards(){
   function itemHtml(it){ return '<div class="rz-c4it">'
       +'<div class="rz-c4item"><span class="rz-c4in">'+esc(it.nombre.toLowerCase())+'</span>'
       +'<span class="rz-c4falta">falta '+esc(_faltaCompra(it))+'</span></div>'
       +(it.nota?('<div class="rz-c4nota">'+esc(it.nota)+'</div>'):'')+'</div>'; }
-  function card(titulo, data, id){
+  function card(titulo, data){
     const items=(data.items||[]).slice().sort(function(a,b){ return (b.falta/(b.need||1))-(a.falta/(a.need||1)); });   // más urgente primero
-    if(!items.length) return '<div class="rz-card4"><div class="rz-c4h">'+titulo+'</div><div class="rz-c4fecha">'+esc(data.fecha)+'</div><div class="rz-c4line rz-ok">alcanza — nada que comprar</div></div>';
-    const resto=items.slice(1);
-    const restoHtml=resto.length?('<div id="'+id+'" class="hidden">'+resto.map(itemHtml).join('')+'</div>'):'';
-    const more=resto.length?('<button class="rz-c4more" onclick="rzToggleId(\''+id+'\',this)">+'+resto.length+' más ›</button>'):'';
-    return '<div class="rz-card4"><div class="rz-c4h">'+titulo+'</div><div class="rz-c4fecha">'+esc(data.fecha)+'</div>'+itemHtml(items[0])+restoHtml+more+'</div>';
+    const cuerpo=items.length ? items.map(itemHtml).join('')
+                              : '<div class="rz-c4line rz-ok">alcanza — nada que comprar</div>';
+    return '<div class="rz-card4"><div class="rz-c4h">'+titulo+'</div>'
+      +'<div class="rz-c4fecha">'+esc(data.fecha)+'</div>'+cuerpo+'</div>';
   }
-  return card('Comprar · para medir premezclas', _rzCompras.premezclas, 'rzCompP')
-       + card('Comprar · para producir', _rzCompras.produccion, 'rzCompR');
+  return card('Comprar · para medir premezclas', _rzCompras.premezclas)
+       + card('Comprar · para producir', _rzCompras.produccion);
 }
 // ── 1 · PENDIENTE DE FABRICAR: tira horizontal HOY → próximo lunes, editable + touch ──
 function _rzChipPersonas(iso, personas){
