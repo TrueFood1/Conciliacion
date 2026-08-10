@@ -6720,11 +6720,40 @@ async function mesesCerradosRolling(n){
   return out.reverse();
 }
 
+// ── DÍAS ATÍPICOS (decisión de Andrea, 9-ago-2026, sobre datos medidos) ─────
+// Días con producción REAL que NO son un día normal de fábrica. Sus unidades cuentan
+// (se produjeron y se vendieron); sus DÍAS no reparten indirecto.
+// Sin esta exclusión, estos dos días eran el 100% del indirecto de Cookie Dough en la
+// ventana marzo-abril-mayo 2026 (₡669,44/pote), y ninguno describe una jornada normal.
+const COSTOS_DIAS_ATIPICOS = {
+  519: {   // Cookie Dough
+    // MO/01209, 90 potes. Primer día que se hicieron galletas junto al equipo de
+    // producción, enseñándoles el proceso. Por eso no hubo pan ese día: la fábrica
+    // estaba capacitando, no corriendo su ritmo normal. Día de arranque, no de operación.
+    '2026-03-23':'capacitación — primer día de galletas con el equipo de producción',
+    // MO/01226, 160 potes. Lunes de Semana Santa (Pascua 2026 = domingo 5 de abril):
+    // la semana ENTERA (30-mar a 3-abr) no tuvo producción de pan. Las galletas las
+    // hicieron las socias. No es un día de producción normal de la fábrica.
+    '2026-03-30':'lunes de Semana Santa — la semana entera sin producción de pan'
+  }
+};
+// ── CONTEXTO OPERATIVO: la limpieza profunda semanal es PRÁCTICA NUEVA ──────
+// No se hacía antes. Por eso marzo-abril-mayo 2026 tiene 5 semanas seguidas sin ningún
+// día de limpieza (todos los días laborales produjeron pan) mientras junio-julio cierra
+// 9 de 10 semanas con su día de limpieza. NO es error de datos: es cambio de operación.
+// La regla semanal (a lo sumo UN día de limpieza por semana, solo si hay un día laboral
+// sin pan; no siempre viernes; la semana puede tener 5 o 6 días laborales por sábado de
+// urgencia; las galletas encima de un día de limpieza NO lo vuelven día de producción)
+// se implementa aparte, y su primer efecto real es el viernes 24-jul-2026 — día de
+// limpieza con 160 potes de galletas — que entra cuando la ventana rodante llegue a julio.
+//
 // Días distintos de producción + unidades (en unidad de venta) por producto, un mes.
 // Días reales de Odoo (mrp.production, date_start); NO supuestos fijos.
+// `date_start` es la fecha BUENA: las órdenes se abren y se cierran el mismo día en la
+// operación real. Que `date_finished` aparezca días después es retraso de validación
+// administrativa (88% de las órdenes, 2,3 días promedio), NO duración del trabajo.
 // Regla "día compartido lo paga el producto principal" (compartidoPid = Cookie Dough 519):
 // un día se le cuenta a Cookie SOLO si ningún otro terminado se produjo ese día calendario.
-// Las galletas siempre se hacen dentro de un día de pan (sin horno, masa cruda) → no abren día extra.
 // Las UNIDADES de Cookie no cambian (sí se producen); solo cambian sus DÍAS.
 async function diasUnidadesMes(D1,D2,ids,compartidoPid){
   const mos=await odooCall('mrp.production','search_read',
@@ -6743,6 +6772,12 @@ async function diasUnidadesMes(D1,D2,ids,compartidoPid){
     const otros=new Set();
     for(const pid in acc){ if(+pid!==compartidoPid) acc[pid].dias.forEach(d=>otros.add(d)); }
     acc[compartidoPid].dias = new Set([...acc[compartidoPid].dias].filter(d=>!otros.has(d)));
+  }
+  // DÍAS ATÍPICOS: producción real, pero NO un día normal de fábrica → no reparten indirecto.
+  // Las UNIDADES no se tocan (los potes se produjeron y se vendieron); solo salen los DÍAS.
+  for(const pid in acc){
+    const at=COSTOS_DIAS_ATIPICOS[pid]; if(!at) continue;
+    acc[pid].dias = new Set([...acc[pid].dias].filter(d=>!at[d]));
   }
   return acc;
 }
