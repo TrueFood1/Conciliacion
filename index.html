@@ -4386,8 +4386,19 @@ async function nivCompras(stock){
   const sumWin=pred=>{ const m={}; for(const ds in perDate){ if(ds<_rzCtx.hoyStr||!pred(ds)) continue; const t=perDate[ds]; for(const k in t) m[+k]=(m[+k]||0)+t[k]; } return m; };
   const thisWeek=sumWin(ds=>ds<nextMonStr), nextWeek=sumWin(ds=>ds>=nextMonStr),
         thisPlusMon=sumWin(ds=>ds<=nextMonStr), plus2=sumWin(ds=>ds<=lim2Str);
-  const nSaco=(await _mpNeeds(nextWeek)).prem, nAzucar=(await _mpNeeds(thisWeek)).prem,
-        nHuevo=(await _mpNeeds(thisPlusMon)).direct, nAceite=(await _mpNeeds(plus2)).direct;
+  // UNA SOLA BOLSA por ventana: la necesidad de un ingrediente NO depende de la etapa en que se
+  // consume. Leer solo `.prem` (o solo `.direct`) perdía ingredientes ENTEROS — el azúcar [462]
+  // de las galletas vive en la BOM final de Cookie Dough [519], no en la premezcla [517], y su
+  // tipo solo leía premezcla; bicarbonato [523], sal marina [524], goma xantana [463] y sal [459]
+  // viven en la premezcla y su tipo solo leía directos. Y el almidón de maíz [456] se contaba
+  // CORTO: los 360 g/batch de la etapa final de Pan Francés [453] nunca se sumaban.
+  // (Diagnóstico 10-ago-2026; el filtro por tipo es de AGRUPACIÓN, no de etapa.)
+  const _mrg=o=>{ const m={};
+    for(const k in o.prem)   m[+k]=(m[+k]||0)+o.prem[k];
+    for(const k in o.direct) m[+k]=(m[+k]||0)+o.direct[k];
+    return m; };
+  const nSaco=_mrg(await _mpNeeds(nextWeek)), nAzucar=_mrg(await _mpNeeds(thisWeek)),
+        nHuevo=_mrg(await _mpNeeds(thisPlusMon)), nAceite=_mrg(await _mpNeeds(plus2));
   function items(need, tipos, accion){ const out=[];
     for(const k in need){ const pid=+k, nm=(meta[pid]&&meta[pid].name)||('id '+pid);
       if(tipos.indexOf(_mpTipo(nm))<0) continue;
