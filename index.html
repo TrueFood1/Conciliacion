@@ -62,6 +62,11 @@ body{font-family:var(--font);background:var(--bg2);color:var(--text);font-size:1
 .s-err{background:var(--red-l);color:var(--red)}
 .s-info{background:var(--blue-l);color:var(--blue)}
 .s-warn{background:var(--amber-l);color:var(--amber)}
+/* Tag visible de empaque incompleto (no un asterisco al pie): el que mira el número sabe que le falta empaque. */
+.emp-inc,.dias-cero{display:inline-block;font-size:10.5px;font-weight:600;letter-spacing:.02em;color:#E9A23B;
+  border:.5px solid rgba(233,162,59,.45);border-radius:5px;padding:1px 6px;margin-left:8px;white-space:nowrap;vertical-align:middle;line-height:1.5}
+/* La etiqueta de "sin días propios" puede ser larga: en pantallas chicas que corte, no que desborde. */
+.dias-cero{white-space:normal}
 .progress{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-bottom:.5rem}
 .progress-fill{height:3px;background:var(--green);border-radius:2px;transition:width .4s}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:.75rem}
@@ -1191,13 +1196,13 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
       </div>
       <div class="card">
         <div class="card-title">Costo por unidad</div>
-        <div style="overflow-x:auto"><table><thead><tr><th>Producto</th><th style="text-align:right">Materia prima</th><th style="text-align:right">Indirecto</th><th style="text-align:right">Costo total</th><th style="text-align:right">Unid/mes</th></tr></thead><tbody id="simTbCosto"></tbody></table></div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Producto</th><th style="text-align:right">Materia prima</th><th style="text-align:right">Indirecto</th><th style="text-align:right">Empaque</th><th style="text-align:right">Costo total</th><th style="text-align:right">Unid/mes</th></tr></thead><tbody id="simTbCosto"></tbody></table></div>
       </div>
       <div class="card">
         <div class="card-title">Margen en <span id="simMargTitle" style="color:var(--text-2);font-weight:400">—</span></div>
         <div style="overflow-x:auto"><table><thead><tr><th>Producto</th><th style="text-align:right">Precio</th><th style="text-align:right">Precio neto</th><th style="text-align:right">Costo total</th><th style="text-align:right">Margen ₡</th><th style="text-align:right">Margen %</th></tr></thead><tbody id="simTbMarg"></tbody></table></div>
       </div>
-      <div class="m3sub" style="font-size:12px;margin-top:4px">Indirecto: costo fijo del mes (según personas) ÷ días de producción = costo/día, repartido por día. Galletas comparte el día del pan (tajada por batches). MP y precios exactos de Odoo. Sin frío mensual (fase real). Solo lectura.</div>
+      <div class="m3sub" style="font-size:12px;margin-top:4px">Indirecto: costo fijo del mes (según personas) ÷ días de producción = costo/día, repartido por día. Galletas comparte el día del pan (tajada por batches). MP y precios exactos de Odoo. Costo total = MP + indirecto + empaque (empaque = constante del Excel de costos). Sin frío mensual (fase real). Solo lectura.</div>
     </div>
   </div>
 </div>
@@ -1580,10 +1585,21 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-day.rz-ed:hover{border-color:#3A3A42;background:#191920}
 #vResumen .rz-day.rz-nav{cursor:pointer}
 #vResumen .rz-day.rz-nav:hover{border-color:#3A3A42}
-#vResumen .rz-grip{position:absolute;top:6px;right:5px;width:15px;height:15px;color:#4A4A50;cursor:grab;opacity:0;transition:opacity .12s}
-#vResumen .rz-grip svg{width:15px;height:15px;display:block}
-#vResumen .rz-day.rz-ed:hover .rz-grip{opacity:1}
-#vResumen .rz-grip:active{cursor:grabbing}
+/* Lápiz de edición: el glifo se dibuja a 15px pero el blanco táctil es de 44×44 (dedo), sin
+   salirse de la celda — el resto del día queda libre para el toque de intercambio. Siempre
+   visible (en pantalla táctil no hay hover) y solo en días editables. */
+#vResumen .rz-pen{position:absolute;top:2px;right:2px;width:44px;height:44px;display:flex;
+  align-items:center;justify-content:center;color:#4A4A50;cursor:pointer;transition:color .12s}
+#vResumen .rz-pen svg{width:15px;height:15px;display:block;pointer-events:none}
+#vResumen .rz-day.rz-ed:hover .rz-pen{color:#6E6C68}
+#vResumen .rz-pen:hover{color:#C77DA0}
+/* Día seleccionado para intercambiar: acento del módulo, anillo de 2px (el de hoy es de 1px)
+   y el estado lo dice con palabras — el color nunca es la única señal. */
+#vResumen .rz-day.rz-sel{border-color:#C77DA0;box-shadow:0 0 0 2px rgba(199,125,160,.55)}
+#vResumen .rz-day.rz-sel .rz-ds{color:#C77DA0}
+/* Motivo de un intercambio bloqueado: discreto, arriba del calendario. */
+#vResumen .rz-aviso{margin:0 0 10px;font-size:12px;color:#C99A4E;background:rgba(201,154,78,.08);
+  border:.5px solid rgba(201,154,78,.3);border-radius:8px;padding:7px 11px;max-width:640px}
 #vResumen .rz-day.rz-edited{border-color:rgba(201,154,78,.5)}
 #vResumen .rz-day.rz-edited .rz-ds{color:#C99A4E}
 #vResumen .rz-day.rz-autofill{border-style:dashed;border-color:#3E3E46}   /* provisional: lo agrega el sistema para la meta */
@@ -1593,7 +1609,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* 1 · Pendiente de fabricar (calendario de 2 semanas; ver .rz-cal2 arriba) */
 #vResumen .rz-day.rz-today{border-color:#C77DA0;box-shadow:0 0 0 1px rgba(199,125,160,.4)}
 #vResumen .rz-day.rz-today .rz-dd{color:#C77DA0}
-#vResumen .rz-grip.rz-grabbing{opacity:1;color:#C77DA0}
 /* Calendario de 2 semanas: ESTA semana completa (lun–vie) + PRÓXIMA atenuada a la derecha. */
 #vResumen .rz-cal2{display:flex;gap:26px;align-items:flex-start;margin-top:4px}
 #vResumen .rz-cal2 .rz-wk{flex:1 1 0;min-width:0}
@@ -1638,6 +1653,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-cf b{color:#C99A4E;font-weight:600}
 #vResumen .rz-cst{color:var(--text-3);font-size:11px;font-weight:400}
 #vResumen .rz-ca{font-size:11px;color:var(--text-3);margin-top:2px}
+#vResumen .rz-cnota{font-size:11px;color:var(--text-3);margin-top:1px}
 #vResumen .rz-cnone{font-size:12.5px;color:var(--text-3);padding-top:2px}
 /* 4 · Últimas producciones — pegada a su título (no dejarla flotando lejos) */
 #vResumen .rz-ult{margin-top:16px}
@@ -1732,13 +1748,12 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-vsn{color:var(--text-2)}
 #vResumen .rz-vsv{color:var(--text-3);font-variant-numeric:tabular-nums;white-space:nowrap}
 #vResumen .rz-vsv.rz-ok{color:#7E8C5A;font-weight:600}
-/* tarjetas COMPRAR: ítem urgente + "› más" para desplegar el resto */
-#vResumen .rz-c4item{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:5px 0;border-top:.5px solid #232329;font-size:12.5px}
-#vResumen .rz-c4item:first-of-type{border-top:none}
+/* tarjetas COMPRAR: lista completa, sin desplegable (la tarjeta crece) */
+#vResumen .rz-c4it{padding:5px 0;border-top:.5px solid #232329}
+#vResumen .rz-c4item{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12.5px}
+#vResumen .rz-c4nota{font-size:10.5px;color:var(--text-3);margin-top:1px}
 #vResumen .rz-c4in{color:var(--text);text-transform:capitalize}
 #vResumen .rz-c4falta{color:#C99A4E;white-space:nowrap;font-weight:600;font-size:11.5px}
-#vResumen .rz-c4more{margin-top:7px;background:none;border:none;color:var(--text-2);font-size:11px;cursor:pointer;padding:0}
-#vResumen .rz-c4more:hover{color:var(--text)}
 /* 2 secciones abajo, 2 columnas cada una, cerrando contra el mismo borde */
 #vResumen .rz-two{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:30px;align-items:start}
 #vResumen .rz-two .rz-sec{margin-top:0}
@@ -1919,7 +1934,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 5 ago 2026';
+const BUILD = 'v 10 ago 2026';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -3885,16 +3900,51 @@ const cM = n => '₡'+Math.round(Number(n)||0).toLocaleString('es-CR');   // col
 // batch   = cost-unidades por batch (denominador de indirecto/u: avg ÷ batch).
 // unitsPer = unidades individuales por cost-unit (paq de 2 → 2, paq de 4 → 4).
 // pack     = multiplicador de presentación para mostrar (×N). unidad = etiqueta visible.
+// EMPAQUE (costo por unidad de venta). FUENTE ÚNICA en toda la herramienta: este campo `emp`.
+//   emp   = colones por unidad de venta, SIN IVA (misma unidad que la del MP; verificado, no se convierte);
+//           la caja master YA viene prorrateada dentro de cada total (no sumarla de nuevo). null = sin dato.
+//   empOK = true SOLO cuando el empaque está completo y validado contra el Excel de costos.
+//   empHold = razón por la que sigue INCOMPLETO aunque haya número (no se auto-completa al poner emp).
+// Fuente: Excel Analisis_Costos_TrueFood.xlsx, hoja "Costos de Empaque" (Colinas Alta Vista = cajas,
+//   Indelsa = bolsas PE, potes craft propios). Desglose por producto:
+//   Blanco 69,55 (bolsa 29,65 + caja 39,90) · Semillas 77,58 (37,68 + 39,90) · Francés 64,26 (24,37 + 39,90)
+//   · Buns 60,34 (20,44 + 39,90) · Galletas 412,66 (pote 394,84 + caja 17,82).
+// PIZZA: 215,28 = SOLO la caja individual; faltan bolsa plástica y caja master (sin factura) → empHold fijo.
+//   Tener el número NO significa que esté completo: la marca de "empaque incompleto" se queda hasta quitar el hold.
 const COSTOS_PROD = [
   // prodId FIJO por producto — búsqueda por ID, nunca por nombre (trampa 517/519 "Prueba Galletas"). kw/rx quedan solo informativos.
-  {key:'blanco',  label:'Pan Blanco',      prodId:451, kw:'Pan Blanco', rx:/pan\s*blanco/i,    batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#378ADD', chkMP:805, chkInd:1462, chkTot:2267},
-  {key:'semillas',label:'Pan de Semillas', prodId:452, kw:'Semillas',   rx:/semillas/i,        batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#84BD00', chkMP:980, chkInd:1462, chkTot:2442},
-  {key:'pizza',   label:'Pizza Crust',     prodId:472, kw:'Pizza',      rx:/pizza/i,           batch:10,  unitsPer:2, pack:1, batchOverride:10, unidad:'por paquete de 2',  color:'#FF751F', chkMP:422, chkInd:3070, chkTot:3492},
-  {key:'frances', label:'Pan Francés',     prodId:453, kw:'Franc',      rx:/franc[eé]s/i,      batch:15,  unitsPer:4, pack:1, unidad:'por paquete de 4',  color:'#D4537E'},
-  {key:'buns',    label:'Buns',            prodId:503, kw:'Bun',        rx:/buns?|hamburgues/i,batch:75,  unitsPer:1, pack:4, unidad:'por paquete de 4',  color:'#7F77DD'},
+  {key:'blanco',  label:'Pan Blanco',      prodId:451, kw:'Pan Blanco', rx:/pan\s*blanco/i,    batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#378ADD', chkMP:805, chkInd:1462, chkTot:2267, emp:69.55,  empOK:true},
+  {key:'semillas',label:'Pan de Semillas', prodId:452, kw:'Semillas',   rx:/semillas/i,        batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#84BD00', chkMP:980, chkInd:1462, chkTot:2442, emp:77.58,  empOK:true},
+  {key:'pizza',   label:'Pizza Crust',     prodId:472, kw:'Pizza',      rx:/pizza/i,           batch:10,  unitsPer:2, pack:1, batchOverride:10, unidad:'por paquete de 2',  color:'#FF751F', chkMP:422, chkInd:3070, chkTot:3492, emp:215.28, empOK:false, empHold:'sólo caja individual — faltan bolsa + caja master'},
+  {key:'frances', label:'Pan Francés',     prodId:453, kw:'Franc',      rx:/franc[eé]s/i,      batch:15,  unitsPer:4, pack:1, unidad:'por paquete de 4',  color:'#D4537E', emp:64.26,  empOK:true},
+  {key:'buns',    label:'Buns',            prodId:503, kw:'Bun',        rx:/buns?|hamburgues/i,batch:75,  unitsPer:1, pack:4, unidad:'por paquete de 4',  color:'#7F77DD', emp:60.34,  empOK:true},
   // Galletas = product.product 519 en PRODUCCIÓN (es_CR "Cookie Dough" / en_US "Prueba Galletas"; template 705, BOM18 con chocolate, rinde 160, 353 on-hand). El 529 era id del demo.
-  {key:'galletas',label:'Galletas',        prodId:519, kw:'cookie dough',rx:/cookie\s*dough|cookie/i, batch:160, unitsPer:1, pack:1, unidad:'por unidad',        color:'#ED93B1'},
+  {key:'galletas',label:'Galletas',        prodId:519, kw:'cookie dough',rx:/cookie\s*dough|cookie/i, batch:160, unitsPer:1, pack:1, unidad:'por unidad',        color:'#ED93B1', emp:412.66, empOK:true},
 ];
+// Estado del empaque de un producto de COSTOS_PROD. `emp`=colones/unidad de venta o null.
+// `completo` sólo si hay número, empOK y NO hay empHold (Pizza nunca completa hasta quitar el hold).
+function empInfo(P){
+  const emp = (typeof P.emp==='number') ? P.emp : null;
+  const completo = emp!=null && P.empOK===true && !P.empHold;
+  const razon = P.empHold ? P.empHold : (emp==null ? 'sin dato de empaque' : (!P.empOK ? 'empaque sin validar' : ''));
+  return {emp, completo, razon};
+}
+// Tag visible (no asterisco al pie) para una fila con empaque incompleto. '' si está completo.
+function empTag(p){
+  if(p && p.empCompleto) return '';
+  const r=(p&&p.empRazon)||'empaque incompleto';
+  return '<span class="emp-inc" title="'+esc(r)+'">empaque incompleto</span>';
+}
+// Tag para un producto SIN días de producción propios en la ventana: su costo no lleva
+// indirecto, así que el número (y cualquier margen que salga de él) vale sólo bajo esa
+// condición y no puede mostrarse suelto. Es genérico a propósito: cuando el producto
+// vuelva a tener días propios —Cookie Dough, al entrar julio con el 24-jul— la etiqueta
+// desaparece sola, sin que haya que acordarse de quitarla.
+const DIAS_CERO_TXT='sin días de producción propios en la ventana — se revisa al entrar julio';
+function diasTag(p){
+  if(!p || (p.dias||0)>0) return '';
+  return '<span class="dias-cero" title="Su costo no incluye indirecto: en la ventana de costeo vigente no tuvo ningún día de producción propio.">'+DIAS_CERO_TXT+'</span>';
+}
 const COSTOS_INCLUDE = ['6101001','6101003','6101005','6101007','6101010','6101011','6103003','6104002','6104005','6104006','6104007','6105001','6105002','6105003','6106004','6106005','6106006','6106008','6106011','6106012','6106021','6106024','6400003','640102','6200001'];
 // 6104002 "Contabilidad, Auditoría, Fiscal" agregada como seguro (hoy ₡0; blinda si el contador se postea ahí).
 // ── VENTANA ROLLING DE MESES CERRADOS ──────────────────────────────────
@@ -4317,23 +4367,47 @@ async function nivAlistar(batchMaps, stock){
   return out;
 }
 
-// ── COMPRAS por tipo de MP (reglas reales de Andrea) ──
-// SACOS (avena/almidón/harina): premezclas de la PRÓXIMA semana; pedir jueves, llega viernes.
-// AZÚCAR (súper): premezclas de ESTA semana; lunes antes de medir.
-// HUEVOS (proveedor): producción de esta semana + próximo lunes; el lunes al llegar.
-// ACEITE y otros de súper (producción): ventana +2 días.
+// ── COMPRAS: la lista de compra REAL de Lorena los lunes ──
+// VENTANA ÚNICA: desde HOY hasta el LUNES SIGUIENTE inclusive, para TODOS los tipos —
+// sacos incluidos. La tarjeta contesta una sola pregunta: "¿qué compra Lorena hoy?".
+// Ningún proveedor tarda más de una semana (confirmado por Andrea, 10-ago-2026), así que
+// una ventana sola da colchón de sobra y no hace falta ningún caso especial.
+// Antes eran CUATRO ventanas (sacos = próxima semana · azúcar = semana en curso · huevos =
+// semana + lunes · aceite/otro = hoy + 2 días). Con ellas, un batch puesto el viernes solo
+// movía los huevos: los sacos miraban la semana siguiente y el aceite/otros no llegaban más
+// allá de pasado mañana. El rótulo "medir lun 17" salía de ahí y llegaba tarde.
+// El tipo de MP ya NO decide ventana: decide únicamente en qué bloque de la lista se muestra.
 function _mpTipo(name){ const n=(name||'').toLowerCase();
   if(/az[uú]car/.test(n)) return 'azucar';
   if(/avena|almid[oó]n|harina/.test(n)) return 'saco';
   if(/huevo/.test(n)) return 'huevo';
   if(/aceite/.test(n)) return 'aceite';
   return 'otro'; }
+// Ingredientes que se consumen AL MEDIR la premezcla pero cuyo nombre no cae en saco/azúcar:
+// bicarbonato [523] y sal marina [524] (premezcla de Galletas [517]), goma xantana [463] y
+// sal [459] (las cinco premezclas de pan). Por ID, nunca por nombre.
+// AGRUPACIÓN VISUAL solamente — la ventana es única para todos (ver arriba).
+const MP_PREM_OTRO=[523,524,463,459];
+// 'medir'    = lo que consumen las socias el lunes al medir premezclas.
+// 'producir' = lo que pesa el equipo de producción en la etapa final.
+function _mpGrupo(pid, name){ const t=_mpTipo(name);
+  return (t==='saco'||t==='azucar'||MP_PREM_OTRO.indexOf(pid)>=0) ? 'medir' : 'producir'; }
 // Necesidad de MP hoja para un mapa de batches: separa premezcla-MP de directos de producción.
-async function _mpNeeds(batchMap){
+// `premOh` (opcional) = {prem_pid: unidades en stock}. Con él, la premezcla YA MEDIDA no se
+// vuelve a comprar: se fabrican ceil(batches − stock) batches enteros, misma semántica que
+// nivAlistar (que es la referencia). Los directos de la etapa final se consumen igual, exista
+// o no la premezcla. Sin `premOh` el comportamiento es el de antes (necesidad bruta).
+async function _mpNeeds(batchMap, premOh){
   const prem={}, direct={};
   for(const p of NIV_PROD){ const b=(batchMap&&batchMap[p])||0; if(b<=0)continue; const I=NIV_INFO[p];
-    const r=await expandirReceta(I.prem, b); if(r) for(const k in r.hojas) prem[+k]=(prem[+k]||0)+r.hojas[k].qty;
+    const mk=premOh ? Math.ceil(Math.max(0, b-(premOh[I.prem]||0))) : b;
+    if(mk>0){ const r=await expandirReceta(I.prem, mk); if(r) for(const k in r.hojas) prem[+k]=(prem[+k]||0)+r.hojas[k].qty; }
     const bom=await _bomDe(p); if(bom) for(const ln of bom.lines){ if(ln.pid===I.prem||ln.pid===AGUA_PID)continue;
+      // DEUDA TÉCNICA: un componente de etapa final con BOM propia (que no sea la premezcla) se
+      // salta ENTERO en vez de expandirse a sus hojas. Hoy no dispara en ningún producto —
+      // verificado contra producción el 10-ago-2026, la lista de saltados sale vacía — pero si
+      // mañana alguien arma un subensamble, su MP desaparece de la lista de compra sin aviso.
+      // El arreglo es cambiar el `continue` por expandirReceta(ln.pid, …), como hace nivStock.
       const sub=await _bomDe(ln.pid); if(sub&&sub.lines.length)continue; const info=await _prodInfo(ln.pid);
       direct[ln.pid]=(direct[ln.pid]||0)+await _conv(ln.qty*b, ln.uom, info.uom); } }
   return {prem, direct}; }
@@ -4342,22 +4416,48 @@ async function nivCompras(stock){
   const mpOh=stock.mpOh||{}, meta=stock.meta||{};
   const perDate=_rzPerDate();                                  // plan futuro por fecha (con ediciones + auto)
   const nextMon=new Date(_rzCtx.mon0); nextMon.setDate(nextMon.getDate()+7); const nextMonStr=_ymd(nextMon);
-  const lim2=new Date(_rzCtx.hoyStr+'T00:00:00'); lim2.setDate(lim2.getDate()+2); const lim2Str=_ymd(lim2);
-  const sumWin=pred=>{ const m={}; for(const ds in perDate){ if(ds<_rzCtx.hoyStr||!pred(ds)) continue; const t=perDate[ds]; for(const k in t) m[+k]=(m[+k]||0)+t[k]; } return m; };
-  const thisWeek=sumWin(ds=>ds<nextMonStr), nextWeek=sumWin(ds=>ds>=nextMonStr),
-        thisPlusMon=sumWin(ds=>ds<=nextMonStr), plus2=sumWin(ds=>ds<=lim2Str);
-  const nSaco=(await _mpNeeds(nextWeek)).prem, nAzucar=(await _mpNeeds(thisWeek)).prem,
-        nHuevo=(await _mpNeeds(thisPlusMon)).direct, nAceite=(await _mpNeeds(plus2)).direct;
-  function items(need, tipos, accion){ const out=[];
+  // Ventana única: hoy ≤ ds ≤ lunes siguiente. Un solo mapa de batches para toda la lista.
+  const win={}; for(const ds in perDate){ if(ds<_rzCtx.hoyStr || ds>nextMonStr) continue;
+    const t=perDate[ds]; for(const k in t) win[+k]=(win[+k]||0)+t[k]; }
+  // UNA SOLA BOLSA por ventana: la necesidad de un ingrediente NO depende de la etapa en que se
+  // consume. Leer solo `.prem` (o solo `.direct`) perdía ingredientes ENTEROS — el azúcar [462]
+  // de las galletas vive en la BOM final de Cookie Dough [519], no en la premezcla [517], y su
+  // tipo solo leía premezcla; bicarbonato [523], sal marina [524], goma xantana [463] y sal [459]
+  // viven en la premezcla y su tipo solo leía directos. Y el almidón de maíz [456] se contaba
+  // CORTO: los 360 g/batch de la etapa final de Pan Francés [453] nunca se sumaban.
+  // (Diagnóstico 10-ago-2026; el filtro por tipo es de AGRUPACIÓN, no de etapa.)
+  const _mrg=o=>{ const m={};
+    for(const k in o.prem)   m[+k]=(m[+k]||0)+o.prem[k];
+    for(const k in o.direct) m[+k]=(m[+k]||0)+o.direct[k];
+    return m; };
+  // La premezcla ya medida en stock NO se vuelve a comprar (nivAlistar ya lo hacía; la tarjeta
+  // no, y mandaba a Lorena a comprar MP de premezclas que están hechas).
+  const premOh={}; NIV_PROD.forEach(p=>{ const pr=NIV_INFO[p].prem; premOh[pr]=(stock.premOh||{})[pr]||0; });
+  const bolsas=await _mpNeeds(win, premOh), need=_mrg(bolsas);
+  // Dónde se compra cada cosa. El CUÁNDO ya lo dice la fecha de la tarjeta (ventana única),
+  // así que la acción por ítem solo indica la fuente — nada de plazos por tipo.
+  const _mpFuente=t=>(t==='saco'||t==='huevo') ? 'proveedor' : 'súper';
+  const _cant=(q,u)=>_rzN(q, (u==='kg'||u==='L'||/gal/.test(u))?1:0)+(u?(' '+u):'');
+  function items(grupo){ const out=[];
     for(const k in need){ const pid=+k, nm=(meta[pid]&&meta[pid].name)||('id '+pid);
-      if(tipos.indexOf(_mpTipo(nm))<0) continue;
+      if(_mpGrupo(pid, nm)!==grupo) continue;
       const nq=need[pid], have=mpOh[pid]||0, falta=nq-have; if(falta<=0.0001) continue;
-      out.push({pid, nombre:nm, uom:(meta[pid]&&meta[pid].uom)||'', need:nq, have:have, falta:falta, accion:accion}); }
+      const uom=(meta[pid]&&meta[pid].uom)||'';
+      // REGLA GENERAL (no atada a ningún producto): un ingrediente puede consumirse en las DOS
+      // etapas — hoy el caso vivo es el azúcar [462] (premezclas de pan + receta final de
+      // Cookie Dough [519]), pero el almidón de maíz [456] hace lo mismo. Se muestra UNA sola
+      // vez, en su bloque, con una nota de cuánto viene de la otra etapa. Partirlo en dos
+      // líneas obligaría a repartir el stock on-hand entre etapas con una regla arbitraria y
+      // las dos líneas sumarían mal: la lista es de COMPRA, y se compra una vez.
+      const otra=(grupo==='medir' ? (bolsas.direct[pid]||0) : (bolsas.prem[pid]||0));
+      const nota=otra>0.0001 ? ('incluye '+_cant(otra,uom)+' de '+(grupo==='medir'?'producción':'premezclas')) : '';
+      out.push({pid, nombre:nm, uom:uom, need:nq, have:have, falta:falta,
+                accion:_mpFuente(_mpTipo(nm)), nota:nota}); }
     return out; }
-  const lunLbl='lun '+nextMon.getDate();
+  const fecha='comprar hoy · cubre hasta el lun '+nextMon.getDate();
   return {
-    premezclas:{fecha:'medir '+lunLbl, items:items(nSaco,['saco'],'pedir antes del jueves · llega viernes').concat(items(nAzucar,['azucar'],'súper · lunes antes de medir'))},
-    produccion:{fecha:'semana + '+lunLbl, items:items(nHuevo,['huevo'],'al proveedor, el lunes al llegar').concat(items(nAceite,['aceite','otro'],'súper · 2 días'))}
+    premezclas:{fecha:fecha, items:items('medir')},
+    produccion:{fecha:fecha, items:items('producir')}
   };
 }
 // ÚLTIMAS producciones pasadas (chequeo de Keylor): plan del motor vs real Odoo.
@@ -4420,7 +4520,6 @@ function _compraUnidad(pid, faltaBase, uom){
 // Íconos inline en gris del módulo (#9A988F) — sin dependencia de librería de íconos.
 const _SVG_FLASK='<svg class="rz-pico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6l-4.5 8a2 2 0 0 0 1.8 3h9.4a2 2 0 0 0 1.8-3L14 9V3M7.5 14h9"/></svg>';
 const _SVG_CART='<svg class="rz-pico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/><path d="M3 4h2l2.4 11.4a1.5 1.5 0 0 0 1.5 1.2h7.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6"/></svg>';
-const _SVG_GRIP='<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg>';
 const _SVG_PENCIL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17.2 4 20z"/><path d="M13.5 6.5l4 4"/></svg>';
 const _SVG_PPL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0M16 5.5a3 3 0 0 1 0 5.8M18 20a5.5 5.5 0 0 0-3-4.9"/></svg>';
 
@@ -4429,7 +4528,8 @@ let _rzCtx=null;                 // {cfg,ritmo,stock,w0,weeks,real,hoyStr,mon0}
 let _rzOverrides={};             // {ds:{producto_id,batches,tipo}} — la fila más reciente por fecha manda
 let _rzAlistar=[{premez:[],compras:[]},{premez:[],compras:[]}];
 let _rzEdit=null;                // ds de la celda en modo edición (o null)
-let _rzDrag=null;                // ds de la celda que se está arrastrando
+let _rzSel=null;                 // ds del día seleccionado para intercambiar (tocar-tocar)
+let _rzAviso='';                 // motivo visible cuando un intercambio no se puede hacer
 let _rzAuto={};                  // auto-relleno derivado {ds:[{pid,batches}]} (opción 2: cubre el faltante de la meta)
 let _rzAutoLeft=[];              // faltante que NO cupo ni en el horizonte proyectado (raro)
 let _rzDerrame=[];              // producción que se corrió a una semana POSTERIOR, con día concreto [{pid,batches,ds}]
@@ -4506,7 +4606,7 @@ async function _rzSetup(){
   const {w0, weeks}=nivLevel(ritmo, finPlan, cfg);
   const hoy=new Date();
   _rzCtx={cfg, ritmo, stock, w0, weeks, real, hoyStr:_ymd(hoy), mon0:_mondayProd(hoy)};
-  _rzEdit=null; _rzDrag=null;
+  _rzEdit=null; _rzSel=null; _rzAviso='';
   _rzOverrides=await nivOverrides();          // ediciones futuras guardadas en Supabase
   // ÚLTIMAS producciones: plan del motor (sin real, sin override) de la semana vs Odoo real.
   const planW0={}; rzCeldas(_rzCtx.mon0, weeks[0], {}, _rzCtx.hoyStr, {}).forEach(function(cc){ if(cc.prods&&Object.keys(cc.prods).length) planW0[cc.ds]=cc.prods; });
@@ -5475,8 +5575,13 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
       c.prod=Object.keys(realDay).map(function(pp){return _rzBP(Math.round(realDay[pp]/NIV_INFO[+pp].rend), +pp);}).join(' + '); return c; }
     if(i<4 && slot[i] && slot[i].feriado){ c.kind='feriado'; c.editable=false; c.prod='Feriado'; c.bt=slot[i].feriado; return c; }
     if(ov && fut){ c.editable=true; c.edited=true; c.swappable=true;
-      if(ov.producto_id==null || !(ov.batches>0)){ c.kind='edit-empty'; c.prod='—'; c.bt=''; return c; }
-      c.kind='edit'; c.pid=ov.producto_id; c.batches=ov.batches; c.prods[ov.producto_id]=ov.batches; c.prod=_rzBP(ov.batches, ov.producto_id); c.bt=''; return c; }
+      // El PICADO del viernes es del día (depende de que haya Semillas el jueves), no del producto
+      // que se produzca ese día: una edición o un intercambio sobre el viernes no debe borrarlo.
+      const vPic=(i===4 && !!v.picado);
+      if(ov.producto_id==null || !(ov.batches>0)){ c.kind='edit-empty';
+        c.prod=vPic?'Picado':(i===4?'Limpieza':'—'); c.bt=''; return c; }
+      c.kind='edit'; c.pid=ov.producto_id; c.batches=ov.batches; c.prods[ov.producto_id]=ov.batches;
+      c.prod=(vPic?'Picado · ':'')+_rzBP(ov.batches, ov.producto_id); c.bt=''; return c; }
     if(i<4){
       const e=slot[i];
       if(e&&e.p){ c.kind=fut?'prop':(past?'pend':'prop'); c.editable=fut; c.swappable=fut; c.pid=e.p; c.batches=e.batches; c.prods[e.p]=e.batches; c.prod=_rzBP(e.batches, e.p); c.bt=''; c.today=ds===hoyStr; return c; }
@@ -5497,7 +5602,10 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
     if(v.prod && !(panEnVie && v.prod.p!==519)){   // el v.prod-pan se cae si ya hay un pan corrido; Galletas [519] siempre entra
       parts.push(_rzBP(v.prod.batches, v.prod.p)); c.prods[v.prod.p]=(c.prods[v.prod.p]||0)+v.prod.batches; if(PAN_VIE.has(v.prod.p)) panEnVie=true; }
     if(!parts.length) parts.push('Limpieza');   // día no cargado → limpieza profunda
-    c.kind='viernes'; c.editable=fut; c.swappable=false; c.prod=parts.join(' · '); c.bt=''; return c;
+    // El viernes ES intercambiable como cualquier otro día (antes swappable=false lo dejaba
+    // clavado, justo el día que hace falta mover). Si además lleva producción corrida por
+    // feriado son DOS productos y el intercambio lo bloquea con motivo — ver _rzSwapVeto.
+    c.kind='viernes'; c.editable=fut; c.swappable=fut; c.prod=parts.join(' · '); c.bt=''; return c;
   });
 }
 // Suma prods de las celdas de producción de la semana (editables o auto-relleno).
@@ -5640,19 +5748,26 @@ function rzMedirCard(){
   const txt=pm.length?pm.map(function(x){return x.n+' '+x.prod.replace(/^Pan /,'');}).join(' · '):'ya está todo ✓';
   return '<div class="rz-card4"><div class="rz-c4h">Por medir</div><div class="rz-c4line'+(pm.length?'':' rz-ok')+'">'+esc(txt)+'</div></div>';
 }
-// TARJETAS "Comprar": ítem MÁS urgente + "› N más" para desplegar el resto. Fecha objetivo en rosa apagado.
+// TARJETAS "Comprar": LISTA COMPLETA, siempre. Fecha objetivo en rosa apagado.
+// Sin "+N más": es la lista de compra real de Lorena y un ítem escondido es un ítem que no se
+// compra. Antes se mostraba solo el más urgente y el resto quedaba en un <div hidden> con un
+// botón desplegable — y el botón conservaba el texto "+N más" al abrirse (rzToggleId solo
+// cambia el chevron), así que parecía que no había expandido; además cualquier edición del
+// plan re-renderiza y lo volvía a colapsar. La tarjeta crece con la lista.
 function rzComprasCards(){
-  function itemHtml(it){ return '<div class="rz-c4item"><span class="rz-c4in">'+esc(it.nombre.toLowerCase())+'</span><span class="rz-c4falta">falta '+esc(_faltaCompra(it))+'</span></div>'; }
-  function card(titulo, data, id){
+  function itemHtml(it){ return '<div class="rz-c4it">'
+      +'<div class="rz-c4item"><span class="rz-c4in">'+esc(it.nombre.toLowerCase())+'</span>'
+      +'<span class="rz-c4falta">falta '+esc(_faltaCompra(it))+'</span></div>'
+      +(it.nota?('<div class="rz-c4nota">'+esc(it.nota)+'</div>'):'')+'</div>'; }
+  function card(titulo, data){
     const items=(data.items||[]).slice().sort(function(a,b){ return (b.falta/(b.need||1))-(a.falta/(a.need||1)); });   // más urgente primero
-    if(!items.length) return '<div class="rz-card4"><div class="rz-c4h">'+titulo+'</div><div class="rz-c4fecha">'+esc(data.fecha)+'</div><div class="rz-c4line rz-ok">alcanza — nada que comprar</div></div>';
-    const resto=items.slice(1);
-    const restoHtml=resto.length?('<div id="'+id+'" class="hidden">'+resto.map(itemHtml).join('')+'</div>'):'';
-    const more=resto.length?('<button class="rz-c4more" onclick="rzToggleId(\''+id+'\',this)">+'+resto.length+' más ›</button>'):'';
-    return '<div class="rz-card4"><div class="rz-c4h">'+titulo+'</div><div class="rz-c4fecha">'+esc(data.fecha)+'</div>'+itemHtml(items[0])+restoHtml+more+'</div>';
+    const cuerpo=items.length ? items.map(itemHtml).join('')
+                              : '<div class="rz-c4line rz-ok">alcanza — nada que comprar</div>';
+    return '<div class="rz-card4"><div class="rz-c4h">'+titulo+'</div>'
+      +'<div class="rz-c4fecha">'+esc(data.fecha)+'</div>'+cuerpo+'</div>';
   }
-  return card('Comprar · premezclas', _rzCompras.premezclas, 'rzCompP')
-       + card('Comprar · producción', _rzCompras.produccion, 'rzCompR');
+  return card('Comprar · para medir premezclas', _rzCompras.premezclas)
+       + card('Comprar · para producir', _rzCompras.produccion);
 }
 // ── 1 · PENDIENTE DE FABRICAR: tira horizontal HOY → próximo lunes, editable + touch ──
 function _rzChipPersonas(iso, personas){
@@ -5722,7 +5837,9 @@ function rzStripHtml(){
   const leftnote=_rzDerrameNota();
   const cal='<div class="rz-cal2'+(_rzShowNext?' rz-shownext':'')+'">'+_rzWeekBlock(0)+_rzWeekBlock(1)+'</div>';
   const verbtn='<button class="rz-vernext" onclick="rzToggleNext(this)">'+(_rzShowNext?'Ocultar próxima semana':'Ver próxima semana')+'</button>';
-  return '<div class="rz-sec">'+head+_rzAlertaHtml()+cal+verbtn+leftnote+'</div>';
+  // Motivo de un intercambio bloqueado (nunca falla en silencio) — se va al tocar otro día.
+  const aviso=_rzAviso?('<div class="rz-aviso">'+esc(_rzAviso)+'</div>'):'';
+  return '<div class="rz-sec">'+head+_rzAlertaHtml()+aviso+cal+verbtn+leftnote+'</div>';
 }
 // ── 2 · PREMEZCLAS POR MEDIR (tira de una línea) ──
 function rzMedirHtml(){
@@ -5737,21 +5854,24 @@ function _faltaCompra(it){
   if(pe && pe.lab==='sacos'){ const n=Math.max(1, Math.round(it.falta/pe.peso)); return n+' saco'+(n===1?'':'s'); }
   return _compraUnidad(it.pid, it.falta, it.uom);
 }
-// ── 3 · COMPRAR: 2 tarjetas de ancho fijo (premezclas · producción) ──
+// ── 3 · COMPRAR: 2 tarjetas de ancho fijo (para medir premezclas · para producir) ──
+// NO está montada: el Resumen usa rzComprasCards() en la grilla de 4 tarjetas. Se mantiene
+// alineada con el mismo dato por si vuelve el layout ancho.
 function rzComprasHtml(){
   function card(icon, titulo, data){
     const items=data.items.length ? data.items.map(function(it){
       return '<div class="rz-ci"><div class="rz-cin">'+esc(it.nombre.toLowerCase())+'</div>'
         +'<div class="rz-cf">falta <b>'+esc(_faltaCompra(it))+'</b> '
           +'<span class="rz-cst">('+_rzN(Math.round(it.have))+'/'+_rzN(Math.round(it.need))+(it.uom?(' '+esc(it.uom)):'')+')</span></div>'
+        +(it.nota?('<div class="rz-cnota">'+esc(it.nota)+'</div>'):'')
         +'<div class="rz-ca">'+esc(it.accion)+'</div></div>';
     }).join('') : '<div class="rz-cnone">Alcanza — nada que comprar.</div>';
     return '<div class="rz-card"><div class="rz-ch">'+icon+'<span>'+titulo+'</span></div>'
       +'<div class="rz-cfecha">'+esc(data.fecha)+'</div>'+items+'</div>';
   }
   return '<div class="rz-cards">'
-    +card(_SVG_FLASK,'Para premezclas', _rzCompras.premezclas)
-    +card(_SVG_CART,'Para producción', _rzCompras.produccion)+'</div>';
+    +card(_SVG_FLASK,'Para medir premezclas', _rzCompras.premezclas)
+    +card(_SVG_CART,'Para producir', _rzCompras.produccion)+'</div>';
 }
 // ── 4 · ÚLTIMAS PRODUCCIONES (chequeo de Keylor) ──
 function rzUltimasHtml(){
@@ -5810,18 +5930,21 @@ function rzCellHtml(cell){
   const dd='<div class="rz-dd">'+cell.dow+' '+cell.dnum+'</div>';
   const dp='<div class="rz-dp">'+esc(cell.prod)+'</div>';
   const db=cell.bt?('<div class="rz-db">'+esc(cell.bt)+'</div>'):'';
-  const st='<div class="rz-ds">'+(cell.auto&&cell.kind==='viernes'?'Para cumplir la meta':m[1])+(cell.edited?' · editado':'')+'</div>';
+  const sel=_rzSel===ds;
+  const estado=(cell.auto&&cell.kind==='viernes'?'Para cumplir la meta':m[1])+(cell.edited?' · editado':'')
+    +(sel?' · seleccionado':'');
+  const st='<div class="rz-ds">'+estado+'</div>';
   const cls=m[0]+(cell.editable?' rz-ed':'')+(cell.edited?' rz-edited':'')+(cell.auto?' rz-autofill':'')
-    +(cell.today?' rz-today':'');
-  if(cell.editable){
-    const grip=cell.swappable?('<span class="rz-grip" draggable="true" title="Arrastrar para mover" onclick="event.stopPropagation()"'
-      +' ondragstart="rzDragStart(event,\''+ds+'\')" ondragend="rzDragEnd()"'
-      +' ontouchstart="rzTouchStart(event,\''+ds+'\')" ontouchmove="rzTouchMove(event)" ontouchend="rzTouchEnd(event)">'+_SVG_GRIP+'</span>'):'';
-    const drop=cell.swappable?' ondragover="rzDragOver(event)" ondrop="rzDrop(event,\''+ds+'\')"':'';
-    return '<div class="rz-day '+cls+'" data-ds="'+ds+'" onclick="rzOpenEdit(\''+ds+'\')"'+drop+'>'+grip+dd+dp+db+st+'</div>';
-  }
-  if(cell.nav) return '<div class="rz-day '+cls+' rz-nav" onclick="rzNavDia(\''+ds+'\')" title="Ver esta producción en Odoo">'+dd+dp+db+st+'</div>';
-  return '<div class="rz-day '+cls+'">'+dd+dp+db+st+'</div>';
+    +(cell.today?' rz-today':'')+(sel?' rz-sel':'');
+  // El lápiz sigue EXACTAMENTE la misma regla que el día: solo se dibuja si cell.editable.
+  // stopPropagation para que tocarlo no seleccione el día para intercambio.
+  const pen=cell.editable?('<span class="rz-pen" title="Editar este día"'
+    +' onclick="event.stopPropagation();rzOpenEdit(\''+ds+'\')">'+_SVG_PENCIL+'</span>'):'';
+  // Toda celda responde al toque — las no editables para decir POR QUÉ no se pueden intercambiar.
+  const tip=cell.editable?(sel?'Tocá otro día para intercambiar, o este mismo para cancelar':'Tocá para seleccionar e intercambiar')
+                         :(cell.nav?'Ver esta producción en Odoo':'');
+  return '<div class="rz-day '+cls+(cell.nav?' rz-nav':'')+'" data-ds="'+ds+'"'
+    +(tip?(' title="'+tip+'"'):'')+' onclick="rzTapDia(\''+ds+'\')">'+pen+dd+dp+db+st+'</div>';
 }
 function rzFormHtml(cell){
   const opts=NIV_PROD.map(p=>'<option value="'+p+'"'+(cell.pid===p?' selected':'')+'>'+esc(NIV_INFO[p].nom)+'</option>').join('');
@@ -5834,7 +5957,9 @@ function rzFormHtml(cell){
 }
 
 // ── Interacción: edición inline, intercambio (swap) y volver al plan ──
-function rzOpenEdit(ds){ if(_rzEdit===ds)return; _rzEdit=ds; rzRender(); const s=document.getElementById('rzFsel'); if(s)s.focus(); }
+// Abrir el editor cancela la selección de intercambio: un día no puede estar en los dos modos.
+function rzOpenEdit(ds){ if(_rzEdit===ds)return; _rzEdit=ds; _rzSel=null; _rzAviso=''; rzRender();
+  const s=document.getElementById('rzFsel'); if(s)s.focus(); }
 function rzCancelEdit(){ _rzEdit=null; rzRender(); }
 async function rzSaveEdit(ds){
   const sel=document.getElementById('rzFsel'), bt=document.getElementById('rzFbt');
@@ -5846,30 +5971,79 @@ async function rzSaveEdit(ds){
   rzPersist([{fecha:ds, producto_id:val.producto_id, batches:val.batches, tipo:'edicion'}]);
   await rzRecalcAlistar(); rzRender();                        // recalcula MP/premezclas sobre la meta
 }
-function rzDragStart(e,ds){ _rzDrag=ds; try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',ds); }catch(_){}}
-function rzDragEnd(){ _rzDrag=null; }
-function rzDragOver(e){ if(_rzDrag){ e.preventDefault(); try{ e.dataTransfer.dropEffect='move'; }catch(_){}} }
-function rzDrop(e, toDs){ if(e&&e.preventDefault)e.preventDefault(); const fromDs=_rzDrag; _rzDrag=null; if(fromDs&&fromDs!==toDs) rzSwap(fromDs, toDs); }
-// TÁCTIL (móvil): el HTML5 drag no anda en touch → gesto propio con elementFromPoint.
-let _rzTouchDs=null;
-function rzTouchStart(e,ds){ _rzTouchDs=ds; _rzDrag=ds; const g=e.currentTarget; if(g&&g.classList)g.classList.add('rz-grabbing'); if(e.cancelable)e.preventDefault(); }
-function rzTouchMove(e){ if(_rzTouchDs && e.cancelable) e.preventDefault(); }   // evita el scroll mientras se arrastra el handle
-function rzTouchEnd(e){ if(!_rzTouchDs) return; const from=_rzTouchDs; _rzTouchDs=null; _rzDrag=null;
-  const t=e.changedTouches&&e.changedTouches[0]; let toDs=null;
-  if(t){ const el=document.elementFromPoint(t.clientX,t.clientY); const day=el&&el.closest?el.closest('.rz-day'):null; if(day) toDs=day.getAttribute('data-ds'); }
-  const g=e.currentTarget; if(g&&g.classList)g.classList.remove('rz-grabbing');
-  if(toDs && from && toDs!==from) rzSwap(from, toDs); }
-// El swap lee las celdas TAL COMO SE VEN (con crédito de lo real + auto-relleno), no la base cruda,
-// para que mover un día use el producto/batches realmente mostrado.
+// ── INTERCAMBIO POR TOQUE (tocar un día · tocar el otro) ─────────────────────
+// Reemplaza al arrastre HTML5 + al gesto táctil propio, que eran dos caminos distintos para lo
+// mismo (y en táctil el ontouchstart del asa competía con el onclick de la celda: el onclick
+// llamaba rzOpenEdit → rzRender y el re-render mataba el arrastre a media pista).
+// Ahora hay UN solo camino, el mismo en escritorio y en pantalla táctil: `onclick` sobre la
+// celda. La selección vive en `_rzSel` (estado del módulo, NO en el DOM), así que un rzRender
+// intermedio la conserva en vez de borrarla — misma lección que las tarjetas de compra.
+// El lápiz de edición hace stopPropagation, así que tocar el lápiz NUNCA selecciona el día y
+// tocar el día NUNCA abre el editor.
+// El swap lee las celdas TAL COMO SE VEN (con crédito de lo real + auto-relleno), no la base
+// cruda, para que mover un día use el producto/batches realmente mostrado.
 function _rzCellByDs(ds){ for(let o=0;o<2;o++){ const hit=_rzCellsFull(o).find(x=>x.ds===ds); if(hit) return hit; } return null; }
+// Carga intercambiable de una celda: {pid,batches} o null si NO es representable como un solo
+// producto (un override de plan_overrides es una fila con un producto y sus batches). Un viernes
+// con producción corrida por feriado lleva dos panes: eso no cabe en una fila y se avisa.
+function _rzCarga(c){
+  const pr=c.prods||{}, ks=Object.keys(pr);
+  if(!ks.length) return {pid:null, batches:0};
+  if(ks.length>1) return null;
+  return {pid:+ks[0], batches:pr[ks[0]]};
+}
+function _rzDow(ds){ return new Date(ds+'T00:00:00').getDay(); }   // 4 = jueves
+function _rzFechaLbl(ds){ const d=new Date(ds+'T00:00:00'); return _DOW[d.getDay()]+' '+d.getDate(); }
+// ¿Este día admite intercambio? (día futuro editable que no sea feriado ni pasado)
+function _rzSwapOk(c){ return !!(c && c.swappable); }
+// Motivo por el que un día NO admite intercambio. Nunca se falla en silencio.
+function _rzMotivoDia(c){
+  if(!c) return 'Ese día no está en el plan visible.';
+  if(c.kind==='real')    return 'El '+_rzFechaLbl(c.ds)+' ya está producido y registrado en Odoo — no se puede mover.';
+  if(c.kind==='pend')    return 'El '+_rzFechaLbl(c.ds)+' ya pasó — no se puede mover.';
+  if(c.kind==='feriado') return 'El '+_rzFechaLbl(c.ds)+' es feriado ('+(c.bt||'sin producción')+') — no se produce.';
+  if(!c.editable)        return 'El '+_rzFechaLbl(c.ds)+' está fuera del rango editable.';
+  return 'El '+_rzFechaLbl(c.ds)+' no se puede intercambiar.';
+}
+// Reglas de negocio del intercambio. Devuelve el motivo (string) si NO se puede, o '' si sí.
+// No duplica el motor: se apoya en lo que las celdas ya traen (feriados, pasado, cierre) y solo
+// agrega lo que el intercambio puede romper y el motor no ve (Semillas fuera del jueves).
+function _rzSwapVeto(a, b){
+  const ca=_rzCarga(a), cb=_rzCarga(b);
+  if(!ca) return 'El '+_rzFechaLbl(a.ds)+' lleva más de un producto ('+a.prod+'). El intercambio mueve un producto por día — editalo primero.';
+  if(!cb) return 'El '+_rzFechaLbl(b.ds)+' lleva más de un producto ('+b.prod+'). El intercambio mueve un producto por día — editalo primero.';
+  // SEMILLAS [452] queda clavado al jueves: se pica al día siguiente y el sábado no se trabaja.
+  if(ca.pid===452 && _rzDow(b.ds)!==4)
+    return 'Pan Semillas solo puede ir un jueves: se pica al día siguiente y el sábado no se trabaja. El '+_rzFechaLbl(b.ds)+' no sirve de destino.';
+  if(cb.pid===452 && _rzDow(a.ds)!==4)
+    return 'Pan Semillas solo puede ir un jueves: se pica al día siguiente y el sábado no se trabaja. El '+_rzFechaLbl(a.ds)+' no sirve de destino.';
+  return '';
+}
+// Un solo handler para TODO toque sobre un día — editable o no.
+function rzTapDia(ds){
+  const c=_rzCellByDs(ds);
+  if(_rzSel===ds){ _rzSel=null; _rzAviso=''; rzRender(); return; }        // mismo día → cancela
+  if(!_rzSwapOk(c)){
+    if(_rzSel){ _rzAviso=_rzMotivoDia(c); rzRender(); }                   // había selección → decir por qué no
+    else if(c && c.nav){ rzNavDia(ds); }                                  // sin selección → ver la producción en Odoo
+    return;
+  }
+  if(!_rzSel){ _rzSel=ds; _rzAviso=''; rzRender(); return; }              // primer toque → seleccionar
+  const a=_rzCellByDs(_rzSel);
+  const veto=_rzSwapVeto(a, c);
+  if(veto){ _rzAviso=veto; rzRender(); return; }                          // bloqueado, con motivo visible
+  const from=_rzSel; _rzSel=null; _rzAviso='';
+  rzSwap(from, ds);
+}
 async function rzSwap(fromDs, toDs){
   const a=_rzCellByDs(fromDs), b=_rzCellByDs(toDs);
   if(!a||!b||!a.swappable||!b.swappable) return;              // solo entre días futuros intercambiables
-  _rzOverrides[fromDs]={producto_id:b.pid||null, batches:b.batches||0, tipo:'swap'};
-  _rzOverrides[toDs]  ={producto_id:a.pid||null, batches:a.batches||0, tipo:'swap'};
+  const ca=_rzCarga(a), cb=_rzCarga(b); if(!ca||!cb) return;
+  _rzOverrides[fromDs]={producto_id:cb.pid, batches:cb.batches, tipo:'swap'};
+  _rzOverrides[toDs]  ={producto_id:ca.pid, batches:ca.batches, tipo:'swap'};
   _rzRecalcAuto(); rzRender();
-  rzPersist([{fecha:fromDs, producto_id:b.pid||null, batches:b.batches||0, tipo:'swap'},
-             {fecha:toDs,   producto_id:a.pid||null, batches:a.batches||0, tipo:'swap'}]);
+  rzPersist([{fecha:fromDs, producto_id:cb.pid, batches:cb.batches, tipo:'swap'},
+             {fecha:toDs,   producto_id:ca.pid, batches:ca.batches, tipo:'swap'}]);
   await rzRecalcAlistar(); rzRender();                        // swap conserva la meta → premezclas/MP no cambian
 }
 async function rzPersist(filas){
@@ -6692,11 +6866,40 @@ async function mesesCerradosRolling(n){
   return out.reverse();
 }
 
+// ── DÍAS ATÍPICOS (decisión de Andrea, 9-ago-2026, sobre datos medidos) ─────
+// Días con producción REAL que NO son un día normal de fábrica. Sus unidades cuentan
+// (se produjeron y se vendieron); sus DÍAS no reparten indirecto.
+// Sin esta exclusión, estos dos días eran el 100% del indirecto de Cookie Dough en la
+// ventana marzo-abril-mayo 2026 (₡669,44/pote), y ninguno describe una jornada normal.
+const COSTOS_DIAS_ATIPICOS = {
+  519: {   // Cookie Dough
+    // MO/01209, 90 potes. Primer día que se hicieron galletas junto al equipo de
+    // producción, enseñándoles el proceso. Por eso no hubo pan ese día: la fábrica
+    // estaba capacitando, no corriendo su ritmo normal. Día de arranque, no de operación.
+    '2026-03-23':'capacitación — primer día de galletas con el equipo de producción',
+    // MO/01226, 160 potes. Lunes de Semana Santa (Pascua 2026 = domingo 5 de abril):
+    // la semana ENTERA (30-mar a 3-abr) no tuvo producción de pan. Las galletas las
+    // hicieron las socias. No es un día de producción normal de la fábrica.
+    '2026-03-30':'lunes de Semana Santa — la semana entera sin producción de pan'
+  }
+};
+// ── CONTEXTO OPERATIVO: la limpieza profunda semanal es PRÁCTICA NUEVA ──────
+// No se hacía antes. Por eso marzo-abril-mayo 2026 tiene 5 semanas seguidas sin ningún
+// día de limpieza (todos los días laborales produjeron pan) mientras junio-julio cierra
+// 9 de 10 semanas con su día de limpieza. NO es error de datos: es cambio de operación.
+// La regla semanal (a lo sumo UN día de limpieza por semana, solo si hay un día laboral
+// sin pan; no siempre viernes; la semana puede tener 5 o 6 días laborales por sábado de
+// urgencia; las galletas encima de un día de limpieza NO lo vuelven día de producción)
+// se implementa aparte, y su primer efecto real es el viernes 24-jul-2026 — día de
+// limpieza con 160 potes de galletas — que entra cuando la ventana rodante llegue a julio.
+//
 // Días distintos de producción + unidades (en unidad de venta) por producto, un mes.
 // Días reales de Odoo (mrp.production, date_start); NO supuestos fijos.
+// `date_start` es la fecha BUENA: las órdenes se abren y se cierran el mismo día en la
+// operación real. Que `date_finished` aparezca días después es retraso de validación
+// administrativa (88% de las órdenes, 2,3 días promedio), NO duración del trabajo.
 // Regla "día compartido lo paga el producto principal" (compartidoPid = Cookie Dough 519):
 // un día se le cuenta a Cookie SOLO si ningún otro terminado se produjo ese día calendario.
-// Las galletas siempre se hacen dentro de un día de pan (sin horno, masa cruda) → no abren día extra.
 // Las UNIDADES de Cookie no cambian (sí se producen); solo cambian sus DÍAS.
 async function diasUnidadesMes(D1,D2,ids,compartidoPid){
   const mos=await odooCall('mrp.production','search_read',
@@ -6716,7 +6919,53 @@ async function diasUnidadesMes(D1,D2,ids,compartidoPid){
     for(const pid in acc){ if(+pid!==compartidoPid) acc[pid].dias.forEach(d=>otros.add(d)); }
     acc[compartidoPid].dias = new Set([...acc[compartidoPid].dias].filter(d=>!otros.has(d)));
   }
+  // DÍAS ATÍPICOS: producción real, pero NO un día normal de fábrica → no reparten indirecto.
+  // Las UNIDADES no se tocan (los potes se produjeron y se vendieron); solo salen los DÍAS.
+  for(const pid in acc){
+    const at=COSTOS_DIAS_ATIPICOS[pid]; if(!at) continue;
+    acc[pid].dias = new Set([...acc[pid].dias].filter(d=>!at[d]));
+  }
+  // DÍA DE LIMPIEZA de cada semana: no es día de producción para NADIE, ni para quien haya
+  // producido encima. Mismo tratamiento que los atípicos: salen los días, no las unidades.
+  const limp = await diasLimpiezaSemanal(D1,D2,ids,compartidoPid);
+  if(limp.size) for(const pid in acc){ acc[pid].dias = new Set([...acc[pid].dias].filter(d=>!limp.has(d))); }
   return acc;
+}
+// ── REGLA SEMANAL DEL DÍA DE LIMPIEZA (Andrea, validada contra Odoo el 9-ago-2026) ──────
+// En cada semana laboral hay A LO SUMO UN día de limpieza profunda, y sólo si existe un día
+// laboral SIN producción de pan. Si todos los días produjeron, esa semana no tuvo limpieza:
+// no se fuerza. NO es siempre viernes (durante las certificaciones se corrió a miércoles dos
+// semanas seguidas); en marzo-mayo 2026 cayó en martes, lunes y viernes.
+// La semana puede tener 5 o 6 días laborales: el sábado cuenta sólo si se trabajó (urgencia).
+// Las GALLETAS encima de un día de limpieza NO lo vuelven día de producción — se hacen sobre
+// un día que la fábrica paga igual. Por eso el "pan" del test excluye a `compartidoPid`.
+// Si hay MÁS DE UN candidato, la regla no elige: semana ambigua, no se marca nada. Preferimos
+// no restar a restar mal (así quedaron las semanas del 23-mar y del 30-mar de 2026, que se
+// resolvieron aparte como días atípicos).
+// Medido: en marzo-abril-mayo 2026 esto no mueve ningún costo, porque los días de limpieza
+// que encuentra no tienen ninguna orden y por lo tanto nunca estuvieron en el denominador.
+// Su primer efecto real es el VIERNES 24-JUL-2026 — día de limpieza con 160 potes de galletas
+// encima — que entra al costeo cuando la ventana rodante llegue a julio.
+async function diasLimpiezaSemanal(D1,D2,ids,compartidoPid){
+  const pan=ids.filter(i=>i!==compartidoPid);
+  const lun=new Date(D1+'T00:00:00'); lun.setDate(lun.getDate()-((lun.getDay()+6)%7));   // lunes de la semana de D1
+  const dom=new Date(D2+'T00:00:00'); dom.setDate(dom.getDate()+(6-((dom.getDay()+6)%7)));// domingo de la semana de D2
+  // Semanas completas aunque crucen el borde del mes: si no, una semana partida inventa días libres.
+  const mos=await odooCall('mrp.production','search_read',
+    [[['state','=','done'],['product_id','in',ids],['date_start','>=',_ymd(lun)],['date_start','<=',_ymd(dom)+' 23:59:59']]],
+    {fields:['product_id','date_start'],limit:4000});
+  const porDia={};
+  mos.forEach(o=>{ const d=(o.date_start||'').slice(0,10); if(!d)return; (porDia[d]=porDia[d]||new Set()).add(o.product_id&&o.product_id[0]); });
+  const limp=new Set();
+  for(let t=new Date(lun); t<=dom; t.setDate(t.getDate()+7)){
+    const lab=[];
+    for(let i=0;i<7;i++){ const x=new Date(t); x.setDate(x.getDate()+i); const ds=_ymd(x);
+      if(i<=4 || porDia[ds]) lab.push(ds);           // lun–vie siempre; sáb/dom sólo si se trabajó
+    }
+    const libres=lab.filter(ds=>{ const s=porDia[ds]; return !s || !pan.some(p=>s.has(p)); });
+    if(libres.length===1) limp.add(libres[0]);       // exactamente un candidato → ése es el día de limpieza
+  }
+  return limp;
 }
 // Motor de costos reutilizable (dashboard de Costos + Rentabilidad). Devuelve {ventana,meses,poolAvg,totalDias,prods}.
 // Cachea el último cálculo; `force` (botón Recalcular) lo recomputa.
@@ -6757,9 +7006,22 @@ async function computeCostos(force){
     const indAsignado=poolAvg*pct;
     const indPerSales=unidades?indAsignado/unidades:0;   // por unidad de VENTA
     const indUnit=indPerSales/pack;                       // por cost-unit (×pack en display = indPerSales)
-    prods.push(Object.assign({},P,{mp,dias,unidades,pct,indAsignado,indPerSales,indUnit,total:mp.mpUnit+indUnit}));
+    const ei=empInfo(P);   // empaque por unidad de venta (fuente única COSTOS_PROD.emp)
+    // total = MP + indirecto por cost-unit. totalVenta = (MP+indirecto)×pack + empaque = costo total por unidad de venta.
+    prods.push(Object.assign({},P,{mp,dias,unidades,pct,indAsignado,indPerSales,indUnit,total:mp.mpUnit+indUnit,
+      emp:ei.emp, empCompleto:ei.completo, empRazon:ei.razon, totalVenta:(mp.mpUnit+indUnit)*pack+(ei.emp||0)}));
   }
-  return _costosCache={ventana,meses,poolAvg,totalDias,prods};
+  // ¿Alguno de los días atípicos cayó DENTRO de la ventana vigente? Si sí, el aviso de la vista
+  // tiene que salir: el mismo pool se repartió entre menos días y los demás productos subieron.
+  const _v1=ventana.length?ventana[0].D1:'', _v2=ventana.length?ventana[ventana.length-1].D2:'';
+  const atipicos=[];
+  for(const pid in COSTOS_DIAS_ATIPICOS){
+    for(const d in COSTOS_DIAS_ATIPICOS[pid]){
+      if(_v1&&d>=_v1&&d<=_v2){ const P=COSTOS_PROD.find(x=>x.prodId===+pid);
+        atipicos.push({pid:+pid, label:(P&&P.label)||('id '+pid), fecha:d, razon:COSTOS_DIAS_ATIPICOS[pid][d]}); }
+    }
+  }
+  return _costosCache={ventana,meses,poolAvg,totalDias,prods,atipicos};
 }
 async function calcularCostos(){
   const st=document.getElementById('costosStatus'),vp=document.getElementById('costosValid'),cg=document.getElementById('costosCards');
@@ -6767,10 +7029,10 @@ async function calcularCostos(){
   st.innerHTML='<span class="spin"></span>Leyendo Odoo y calculando costos en vivo… (puede tardar unos segundos)';
   vp.innerHTML='';cg.innerHTML='';
   try{
-    const {meses,poolAvg,totalDias,prods}=await computeCostos(true);   // botón Recalcular → cálculo fresco
+    const {meses,poolAvg,totalDias,prods,atipicos}=await computeCostos(true);   // botón Recalcular → cálculo fresco
     st.classList.add('hidden');
     renderValidacion(vp,{meses,poolAvg,totalDias},prods);
-    renderTarjetas(cg,prods);
+    renderTarjetas(cg,prods,atipicos);
   }catch(e){ st.className='status s-err'; st.innerHTML='No pude calcular los costos: '+esc(e&&e.message||e); }
 }
 
@@ -6785,10 +7047,10 @@ function renderValidacion(el,info,prods){
   h+='<tr style="font-weight:700"><td>Promedio</td><td>'+cM(poolAvg)+'</td></tr></table>';
   h+='<div style="margin-top:6px;font-size:11px;color:var(--text-3)">Total días de producción (promedio): <strong>'+fmtN(totalDias)+'</strong></div>';
   h+='<table style="margin-top:10px"><tr><th>Producto</th><th>Días/mes</th><th>Unid/mes</th><th>% asig.</th><th>Indir/u</th><th>MP/u</th><th>chk MP</th><th>Total/u</th></tr>';
-  prods.forEach(p=>{ const pack=p.pack||1; const mpU=p.mp.mpUnit*pack; const tot=mpU+p.indPerSales;
+  prods.forEach(p=>{ const pack=p.pack||1; const mpU=p.mp.mpUnit*pack; const tot=mpU+p.indPerSales+(p.emp||0);   // Total/u = MP + indirecto + empaque
     const tieneChk=p.chkMP!=null; const okMP=tieneChk&&tol(p.mp.mpUnit,p.chkMP,0.05);
     const chkMPcol=tieneChk?(cM(p.chkMP)+' '+(okMP?'<span class="ok-tag">✓</span>':'<span class="bad-tag">≠</span>')):'<span style="color:var(--text-3);font-size:11px">sin dato</span>';
-    h+='<tr><td>'+esc(p.label)+'</td><td>'+fmtN(p.dias)+'</td><td>'+fmtN(p.unidades)+'</td><td>'+(p.pct*100).toFixed(1)+'%</td><td>'+cM(p.indPerSales)+'</td><td>'+cM(mpU)+'</td><td>'+chkMPcol+'</td><td><strong>'+cM(tot)+'</strong></td></tr>'
+    h+='<tr><td>'+esc(p.label)+empTag(p)+diasTag(p)+'</td><td>'+fmtN(p.dias)+'</td><td>'+fmtN(p.unidades)+'</td><td>'+(p.pct*100).toFixed(1)+'%</td><td>'+cM(p.indPerSales)+'</td><td>'+cM(mpU)+'</td><td>'+chkMPcol+'</td><td><strong>'+cM(tot)+'</strong></td></tr>'
       +(p.mp.error?'<tr><td colspan="8" class="bad-tag" style="text-align:left">'+esc(p.label)+': '+esc(p.mp.error)+'</td></tr>':''); });
   h+='</table>';
   h+='<div style="font-size:11px;color:var(--text-3);margin-top:6px">Valores por unidad de venta (Pizza/paquete de 2, Francés y Buns/paquete de 4, resto por unidad). chk MP valida la materia prima. Números REALES de Odoo — no calzan exacto con el Excel (supuestos fijos), pero sí en el mismo orden de magnitud.</div></div>';
@@ -6802,19 +7064,33 @@ function toggleValid(){
   if(btn)btn.textContent=oculto?'Ver validación del cálculo (chequeo) ▾':'Ocultar validación del cálculo ▴';
 }
 
-function renderTarjetas(el,prods){
+function renderTarjetas(el,prods,atipicos){
   let h='';
+  // AVISO DE MOVIMIENTO: al sacar días atípicos del reparto, el MISMO pool se divide entre
+  // menos días → el costo de los demás productos SUBE. Con esto se fijan precios: el
+  // movimiento tiene que verse, no descubrirse.
+  if(atipicos && atipicos.length){
+    const det=atipicos.map(a=>esc(a.label)+' '+a.fecha.split('-').reverse().join('-')+' ('+esc(a.razon)+')').join(' · ');
+    h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-bottom:14px">'
+      +'<div style="font-weight:700;color:#E9A23B;font-size:12.5px">Los cinco panes subieron de costo</div>'
+      +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.6">'
+      +'Salieron del reparto de indirecto días con producción real que no son jornada normal de fábrica: '+det+'. '
+      +'Sus unidades siguen contando; sus días no. Como el pozo de indirecto es el mismo y ahora se divide entre menos días, '
+      +'<strong>el costo de los otros productos sube</strong>: entre <strong>+₡35,92</strong> y <strong>+₡87,40</strong> por unidad '
+      +'(medido el 9-ago-2026). No es un error de cálculo — es la contraparte de la exclusión.</div></div>';
+  }
   prods.forEach((p,i)=>{
     const pack=p.pack||1;
-    const mp=p.mp.mpUnit*pack, ind=p.indUnit*pack, tot=(p.total*pack)||1;
+    const mp=p.mp.mpUnit*pack, ind=p.indUnit*pack, emp=(p.emp!=null?p.emp:null), tot=(p.totalVenta)||1;
     // Color del producto SOLO en el puntito y el borde izquierdo 2px. El número va en blanco.
     h+='<div class="ccard" id="ccard'+i+'" onclick="toggleCard('+i+')" style="border-left:2px solid '+p.color+'">';
-    h+='<div class="ccard-name"><span class="ccard-swatch" style="background:'+p.color+'"></span>'+esc(p.label)+'</div>';
+    h+='<div class="ccard-name"><span class="ccard-swatch" style="background:'+p.color+'"></span>'+esc(p.label)+empTag(p)+diasTag(p)+'</div>';
     h+='<div class="ccard-total">'+cM(tot)+'</div>';
     h+='<div class="ccard-unit">costo total '+esc(p.unidad||'por unidad')+'</div>';
     h+='<div class="cmini-wrap">';
     h+='<div class="cmini"><span>Materia prima</span><span class="v">'+cM(mp)+'</span></div>';
     h+='<div class="cmini"><span>Indirecto</span><span class="v">'+cM(ind)+'</span></div>';
+    h+='<div class="cmini"><span>Empaque</span><span class="v">'+(emp!=null?cM(emp):'—')+'</span></div>';
     h+='</div>';
     h+='<button class="cbreak-btn" id="cbtn'+i+'" onclick="event.stopPropagation();toggleCard('+i+')">ver detalle ▾</button>';
     h+='<div class="cbreak">';
@@ -6823,6 +7099,9 @@ function renderTarjetas(el,prods){
     h+='<div class="cbreak-row" style="font-weight:600;border-top:1px solid var(--border);margin-top:4px;padding-top:4px"><span>Total MP</span><span>'+cM(mp)+'</span></div>';
     h+='<div class="cbreak-h">Indirecto '+esc(p.unidad||'por unidad')+'</div>';
     h+='<div class="cbreak-row"><span>Por días de producción ('+fmtN(p.dias||0)+' días/mes · '+((p.pct||0)*100).toFixed(1)+'% del pool)</span><span>'+cM(ind)+'</span></div>';
+    h+='<div class="cbreak-h">Empaque '+esc(p.unidad||'por unidad')+'</div>';
+    h+='<div class="cbreak-row"><span>Empaque'+(emp!=null&&!p.empCompleto?' (parcial)':'')+'</span><span>'+(emp!=null?cM(emp):'sin dato')+'</span></div>';
+    h+=(p.empCompleto?'':'<div class="cbreak-row" style="color:#E9A23B"><span>empaque incompleto</span><span>'+esc(p.empRazon||'')+'</span></div>');
     h+='<div class="cbreak-row" style="font-weight:700;border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span>Costo total</span><span>'+cM(tot)+'</span></div>';
     h+='</div></div>';
   });
@@ -7142,19 +7421,66 @@ const RENTA_PROD = [
   {key:'pizza',   pid:472, label:'Pizza Crust',     color:'#FF751F'},
   {key:'galletas',pid:519, label:'Cookie Dough',    color:'#ED93B1'},
 ];
-// Canales (columnas, en orden). pct = descuento sobre neto; frio = ₡ fijo/mes del
-// canal. AJUSTAR ACÁ cuando Andrea cambie un término (fuente entre paréntesis).
-const RENTA_CANALES = [
-  {key:'auto',   label:'Automercado',           pct:0,      frio:612912},  // frío ₡612.912/mes (Andrea, jul-2026)
-  {key:'walmart',label:'Walmart / Más x Menos', pct:0.0643, frio:0},       // descuento 6,43% (incluye todo)
-  {key:'mega',   label:'MegaSuper',             pct:0.065,  frio:0},       // descuento 6,5%
-  {key:'compre', label:'Compre Bien',           pct:0,      frio:34386},   // frío ₡34.386/mes
-  {key:'bm',     label:'BM',                    pct:0,      frio:0},       // sin descuento
-  {key:'negro',  label:'Super Negro',           pct:0,      frio:0},       // sin descuento
-  {key:'horeca', label:'HORECA',                pct:0,      frio:0},       // sin descuento
-  {key:'retail', label:'Retail',                pct:0,      frio:0},       // sin descuento (incluye Abner)
-  {key:'otros',  label:'Otros',                 pct:0,      frio:0},       // supermercados sin columna propia + resto
+// ════════════════════════════════════════════════════════════════════════
+// CANALES — FUENTE ÚNICA DE SUPUESTOS DE CANAL (rediseño Finanzas, fase 1).
+// Reemplaza a las dos tablas que se contradecían: RENTA_CANALES (Rentabilidad)
+// y RENT_CANALES (Simulador/Calculadora). UNA sola definición; si un supuesto
+// cambia, se cambia acá y lo ven TODAS las vistas.
+//
+//  key    → columna de la matriz de Rentabilidad (null = canal solo de precios)
+//  plId   → tarifa de Odoo (product.pricelist) para proyectar precios
+//  comision.enFactura → TRUE si la comisión ya viene aplicada como `discount` de
+//     la línea de la factura. Entonces `price_subtotal` YA está neto y Rentabilidad
+//     NO debe restarla otra vez (sería doble descuento). Las vistas de proyección
+//     sí la aplican sobre el precio de lista. Verificado en Odoo el 9-ago-2026.
+//  comision.intro → REGLA DE NEGOCIO: tarifa de introducción de producto nuevo.
+//     Automercado cobra 16,97% los primeros 3 meses de un producto y 12,6% desde
+//     el cuarto. Aplica a cada lanzamiento, no es promo. 1 − (0,874 × 0,95) =
+//     0,16970 exacto: por eso Cookie Dough facturó ₡2.820,45/u de abr a jul 2026
+//     (lista ₡3.396,90) y ₡2.968,89/u desde agosto, al cumplir los 3 meses.
+//  frio.monto → ₡ fijos/mes del canal. Se reparten por las unidades del canal
+//     (monto ÷ unidades = frío/u; poco volumen → pesa más, es correcto).
+// Cada supuesto lleva su fuente y fecha, y se muestran en la vista.
+// ════════════════════════════════════════════════════════════════════════
+const CANALES = [
+  {key:'auto',   label:'Automercado',           plId:4,
+   comision:{pct:0.126, enFactura:true, fuente:'acuerdo comercial · confirmado por Andrea, 9-ago-2026',
+             intro:{pct:0.1697, meses:3, motivo:'tarifa de introducción de producto nuevo'}},
+   frio:{monto:612912, fuente:'acuerdo comercial, jul-2026'}},
+  {key:'walmart',label:'Walmart / Más x Menos', plId:10,
+   comision:{pct:0.0654, enFactura:false, antes:0.0643, fuente:'acuerdo comercial (incluye todo), ago-2026'}, frio:null},
+  {key:'mega',   label:'MegaSuper',             plId:12,
+   comision:{pct:0.065,  enFactura:false, fuente:'acuerdo comercial, jul-2026'}, frio:null},
+  {key:'compre', label:'Compre Bien',           plId:5,
+   comision:null,
+   frio:{monto:51166.40, provisional:true, editable:true, antes:34386,
+         fuente:'dato real de facturas del portal (may–jun 2026) · pendiente confirmar tratamiento contable con la contadora',
+         nota:'Si el frío se capitaliza en la cuenta 111601 (activo prepagado) y se amortiza con otra periodicidad, el costo mensual real puede ser distinto. Editable hasta que responda Valery.'}},
+  {key:'bm',     label:'BM',                    plId:5,  comision:null, frio:null},
+  {key:'negro',  label:'Super Negro',           plId:5,  comision:null, frio:null},
+  {key:'horeca', label:'HORECA',                plId:2,  comision:null, frio:null},
+  {key:'retail', label:'Retail',                plId:3,  comision:null, frio:null},   // incluye Abner
+  {key:'otros',  label:'Otros',                 plId:null, comision:null, frio:null}, // supermercados sin columna + resto
+  // Canales SOLO de precios (no son columna de la matriz de Rentabilidad: caen en "Otros")
+  {key:null,     label:'Abner',                 plId:11, comision:null, frio:null},
+  {key:null,     label:'Quiznos',               plId:7,  comision:null, frio:null},
 ];
+const CANALES_MATRIZ = CANALES.filter(c=>c.key);      // columnas de Rentabilidad, en orden
+const CANALES_PRECIO = CANALES.filter(c=>c.plId);     // canales con tarifa en Odoo
+// Comisión que Rentabilidad debe RESTAR del neto facturado. Si va dentro de la
+// factura, el neto ya la trae → 0 (restarla sería doble descuento).
+const canalComRenta = c => (c.comision && !c.comision.enFactura) ? c.comision.pct : 0;
+// Comisión para PROYECTAR sobre precio de lista. intro=true → tarifa de producto nuevo.
+const canalComProy = (c,intro) => !c.comision ? 0 : ((intro && c.comision.intro) ? c.comision.intro.pct : c.comision.pct);
+const canalFrio = c => (c.frio && c.frio.monto) || 0;
+// Texto de fuente/fecha de un canal (tooltip). '' si el canal no tiene supuestos.
+function canalFuente(c){
+  const p=[];
+  if(c.comision) p.push('Comisión '+_pct(c.comision.pct*100)+(c.comision.enFactura?' (ya aplicada en la factura)':'')+' — '+c.comision.fuente
+    +(c.comision.intro?' · introducción '+_pct(c.comision.intro.pct*100)+' los primeros '+c.comision.intro.meses+' meses de un producto nuevo':''));
+  if(c.frio) p.push('Frío '+cM(c.frio.monto)+'/mes — '+c.frio.fuente);
+  return p.join('\n');
+}
 // Partner → canal. Por banner (commercial_name); razón social de respaldo. NUNCA por
 // tarifa: otros clientes pueden compartir la lista de precios de una cadena sin serlo
 // (comparten precio, NO el frío ni el descuento) → esos caen en "Otros".
@@ -7175,7 +7501,7 @@ let _rentaData=null, _rentaInit=false;   // _rentaData.byKey = costos del últim
 async function reporteRenta(D1,D2){
   const {prods}=await computeCostos();            // HEREDA el motor real de costos
   const byKey={}; prods.forEach(p=>byKey[p.key]=p);
-  const costoDe={}; RENTA_PROD.forEach(P=>{ const d=byKey[P.key]; costoDe[P.key]=d?(d.total||0)*(d.pack||1):0; });
+  const costoDe={}; RENTA_PROD.forEach(P=>{ const d=byKey[P.key]; costoDe[P.key]=d?(d.totalVenta||0):0; });   // costo por unidad de venta CON empaque (fuente única)
   _rentaData={byKey};
   // UoM de referencia (unidad de venta) por producto — para convertir el volumen
   const pids=RENTA_PROD.map(P=>P.pid), keyDe={}; RENTA_PROD.forEach(P=>keyDe[P.pid]=P.key);
@@ -7205,16 +7531,20 @@ async function reporteRenta(D1,D2){
     chVol[ch]=(chVol[ch]||0)+vol;
   }
   // Frío por unidad del canal (₡ fijo ÷ unidades del canal ese mes)
-  const frioUnit={}; RENTA_CANALES.forEach(c=>{ frioUnit[c.key]=(c.frio&&chVol[c.key])?c.frio/chVol[c.key]:0; });
+  const frioUnit={}; CANALES_MATRIZ.forEach(c=>{ const f=canalFrio(c); frioUnit[c.key]=(f&&chVol[c.key])?f/chVol[c.key]:0; });
   // Solo columnas con ventas ese mes
-  const canalesActivos=RENTA_CANALES.filter(c=>RENTA_PROD.some(P=>{ const x=cell[c.key+'|'+P.key]; return x&&Math.abs(x.vol)>1e-6; }));
+  const canalesActivos=CANALES_MATRIZ.filter(c=>RENTA_PROD.some(P=>{ const x=cell[c.key+'|'+P.key]; return x&&Math.abs(x.vol)>1e-6; }));
   const filas=RENTA_PROD.map(P=>{
     const costo=costoDe[P.key];
     const celdas=canalesActivos.map(c=>{
       const x=cell[c.key+'|'+P.key]; if(!x||Math.abs(x.vol)<1e-6) return null;
-      const desc=x.neto*(c.pct||0), frio=(frioUnit[c.key]||0)*x.vol, cprod=costo*x.vol;
+      // canalComRenta: 0 si la comisión ya viene aplicada en la factura (Automercado) → el
+      // neto ya está descontado y restarla acá sería doble descuento.
+      const desc=x.neto*canalComRenta(c), frio=(frioUnit[c.key]||0)*x.vol, cprod=costo*x.vol;
       const gan=x.neto-cprod-desc-frio;
-      return {neto:x.neto, vol:x.vol, cprod, desc, frio, gan, pct: x.neto?gan/x.neto:0};
+      // % SIEMPRE sobre |neto|: un mes con más notas de crédito que facturas deja el neto NEGATIVO,
+      // y gan/neto (negativo ÷ negativo) devolvía un % POSITIVO junto a una ganancia negativa.
+      return {neto:x.neto, vol:x.vol, cprod, desc, frio, gan, pct: x.neto?gan/Math.abs(x.neto):0};
     });
     return {P, celdas, rowTot:celdas.reduce((s,x)=>s+(x?x.gan:0),0)};
   });
@@ -7246,7 +7576,7 @@ function rentaRender(R, label){
       if(!x){ cells+='<td class="renta-na">—</td>'; return; }
       cells+='<td class="renta-cell"><div class="rg'+(x.gan<0?' rneg':'')+'">'+cMs(x.gan)+'</div><div class="rp">'+_pct(x.pct*100)+'</div></td>';
     });
-    h+='<tr class="renta-prow" onclick="rentaDetalle(\''+f.P.key+'\')"><td><span class="renta-prod"><span class="pdot" style="background:'+f.P.color+'"></span>'+esc(f.P.label)+'</span></td>'
+    h+='<tr class="renta-prow" onclick="rentaDetalle(\''+f.P.key+'\')"><td><span class="renta-prod"><span class="pdot" style="background:'+f.P.color+'"></span>'+esc(f.P.label)+'</span>'+empTag(_rentaData&&_rentaData.byKey&&_rentaData.byKey[f.P.key])+diasTag(_rentaData&&_rentaData.byKey&&_rentaData.byKey[f.P.key])+'</td>'
       +cells+'<td class="renta-cell renta-rowtot"><div class="rg'+(f.rowTot<0?' rneg':'')+'">'+cMs(f.rowTot)+'</div></td></tr>';
   });
   h+='</tbody><tfoot><tr><td>Total canal</td>'
@@ -7256,11 +7586,23 @@ function rentaRender(R, label){
   // la celda esquina (Total canal × Total producto). Acá solo el contexto de neto.
   let foot='Ganancia = neto sin IVA − costo de producir (motor) − costo de canal '
     +'(el total del mes está en la esquina de la tabla). Neto del mes: '+cM(R.netoTot)+'. Tocá un producto para ver su costo real.';
-  const notas=R.canalesActivos.filter(c=>c.pct||c.frio).map(c=>{
-    if(c.pct) return esc(c.label)+' −'+_pct(c.pct*100)+' sobre neto';
-    return esc(c.label)+' frío '+cM(c.frio)+'/mes ÷ '+fmtN(Math.round(R.chVol[c.key]||0))+' u = '+cM(R.frioUnit[c.key])+'/u';
+  const notas=R.canalesActivos.filter(c=>canalComRenta(c)||canalFrio(c)).map(c=>{
+    const t=' title="'+esc(canalFuente(c))+'"';
+    if(canalComRenta(c)) return '<span'+t+'>'+esc(c.label)+' −'+_pct(canalComRenta(c)*100)+' sobre neto</span>';
+    return '<span'+t+'>'+esc(c.label)+' frío '+cM(canalFrio(c))+'/mes ÷ '+fmtN(Math.round(R.chVol[c.key]||0))+' u = '
+      +cM(R.frioUnit[c.key])+'/u'+((c.frio&&c.frio.provisional)?' <em style="font-style:normal;color:#E9A23B">provisional</em>':'')+'</span>';
   });
   if(notas.length) foot+='<br>Costos de canal: '+notas.join(' · ')+'.';
+  // Cambio de supuestos VISIBLE (no silencioso): quien note que el margen de esos canales
+  // se movió tiene que poder entender por qué sin preguntar.
+  const cambiados=R.canalesActivos.filter(c=>(c.comision&&c.comision.antes!=null)||(c.frio&&c.frio.antes!=null));
+  if(cambiados.length){
+    foot+='<br><span style="color:var(--text-2)">Supuestos actualizados el 9-ago-2026: '
+      +cambiados.map(c=>{
+        if(c.frio&&c.frio.antes!=null) return esc(c.label)+' frío '+cM(c.frio.monto)+'/mes (antes '+cM(c.frio.antes)+', '+esc(c.frio.fuente)+')';
+        return esc(c.label)+' '+_pct(c.comision.pct*100)+' (antes '+_pct(c.comision.antes*100)+')';
+      }).join(' · ')+'.</span>';
+  }
   h+='<div style="padding:10px 12px;font-size:11px;color:var(--text-3);border-top:1px solid var(--border)">'+foot+'</div>';
   el.innerHTML=h;
 }
@@ -7268,14 +7610,15 @@ function rentaDetalle(key){
   const P=RENTA_PROD.find(p=>p.key===key), el=document.getElementById('rentaDetalle');
   const d=_rentaData&&_rentaData.byKey&&_rentaData.byKey[key];
   if(!P||!el||!d) return;
-  const pack=d.pack||1, mp=((d.mp&&d.mp.mpUnit)||0)*pack, ind=(d.indUnit||0)*pack, tot=(d.total||0)*pack;
+  const pack=d.pack||1, mp=((d.mp&&d.mp.mpUnit)||0)*pack, ind=(d.indUnit||0)*pack, emp=(d.emp!=null?d.emp:null), tot=(d.totalVenta||0);
   let h='<div class="card"><div class="card-title"><span class="pdot" style="background:'+P.color+'"></span> Costo real de '+esc(P.label)
     +' <span class="muted" style="font-weight:400;font-size:12px">· '+esc(d.unidad||'')+'</span></div>';
   h+='<div style="overflow-x:auto"><table class="cob-tbl" style="max-width:460px">';
   ((d.mp&&d.mp.desglose)||[]).slice(0,14).forEach(x=>{ h+='<tr><td>'+esc(x.name)+'</td><td style="text-align:right">'+cM(x.perUnit*pack)+'</td></tr>'; });
   h+='<tr style="font-weight:600;border-top:1px solid var(--border)"><td>Materia prima</td><td style="text-align:right">'+cM(mp)+'</td></tr>';
   h+='<tr><td>Indirecto ('+fmtN(Math.round(d.dias||0))+' días/mes · '+((d.pct||0)*100).toFixed(1)+'% del pool)</td><td style="text-align:right">'+cM(ind)+'</td></tr>';
-  h+='<tr style="border-top:1px solid var(--border-strong)"><td><strong>Costo total</strong></td><td style="text-align:right"><strong>'+cM(tot)+'</strong></td></tr>';
+  h+='<tr><td>Empaque'+(emp!=null&&!d.empCompleto?' (parcial)':'')+(d.empCompleto?'':' — <span style="color:#E9A23B">'+esc(d.empRazon||'incompleto')+'</span>')+'</td><td style="text-align:right">'+(emp!=null?cM(emp):'sin dato')+'</td></tr>';
+  h+='<tr style="border-top:1px solid var(--border-strong)"><td><strong>Costo total</strong>'+empTag(d)+diasTag(d)+'</td><td style="text-align:right"><strong>'+cM(tot)+'</strong></td></tr>';
   h+='</table></div><div class="m3sub" style="margin-top:8px;font-size:11px;color:var(--text-3)">Del motor real de Costos (promedio de los últimos meses cerrados). Reemplaza "Costos por producto".</div></div>';
   el.innerHTML=h; el.scrollIntoView({block:'nearest'});
 }
@@ -7783,25 +8126,11 @@ function cobCopiar(i,ev){
     .catch(()=>{ btn.textContent='No se pudo copiar'; btn.classList.add('err'); setTimeout(restore,1800); });
 }
 
-// ════════════════════════════════════════════════════════════════════════
-// TARIFAS POR CANAL (para Precios: Simulador + Calculadora). SOLO LECTURA.
-// El "teórico v1" de Rentabilidad murió: Rentabilidad ahora es el motor REAL de arriba
-// (ventas reales × costo real − costo de canal). Estas constantes SIGUEN VIVAS porque
-// la Calculadora/Simulador de Precios las usa (tarifa → precio de lista + término %).
-// ════════════════════════════════════════════════════════════════════════
-// canal → tarifa (plId) + término % directo. Algunos canales comparten tarifa (Super Negro [5]).
-const RENT_CANALES = [
-  {canal:'Automercado',           plId:4,  termino:0.13,   frio:'sin frío mensual (₡612.689,79/mes, descuento directo)'},
-  {canal:'Walmart / Más x Menos', plId:10, termino:0.0643},
-  {canal:'BM',                    plId:5,  termino:0},
-  {canal:'Compre Bien',           plId:5,  termino:0,      frio:'sin frío mensual (~₡34.386/mes, factura de proveedor)'},
-  {canal:'Super Negro',           plId:5,  termino:0},
-  {canal:'Abner',                 plId:11, termino:0},
-  {canal:'Quiznos',               plId:7,  termino:0},
-  {canal:'HORECA',                plId:2,  termino:0},
-  {canal:'Tiendas / Retail',      plId:3,  termino:0},
-  {canal:'MegaSuper',             plId:12, termino:0,      frio:'sin frío mensual (factura de proveedor)'},
-];
+// RENT_CANALES murió: las tarifas y términos por canal viven en la FUENTE ÚNICA
+// `CANALES` (arriba, junto a Rentabilidad). Tenía 13% para Automercado contra el 0%
+// de Rentabilidad y ₡34.386 de frío de Compre Bien — esa contradicción es justo la
+// que el rediseño de Finanzas viene a matar. Usar CANALES_PRECIO / canalComProy().
+
 // Los 6 terminados: key (casa con el costo del motor) + product.product id (para precios).
 const RENT_PROD = [
   {key:'blanco',  label:'Pan Blanco',      pid:451},
@@ -7829,7 +8158,7 @@ const SIM_PROD = [
   {key:'pizza',   label:'Pizza Crust',     color:'#FF751F'},
   {key:'galletas',label:'Cookie Dough',    color:'#ED93B1', comparte:true},
 ];
-let simMP={}, simDiasReal={}, simUnidReal={}, simPoolAvg=0, simTotalDiasReal=0, simPrecios=[], SIM=null, simPrev={};
+let simMP={}, simDiasReal={}, simUnidReal={}, simEmp={}, simEmpP={}, simPoolAvg=0, simTotalDiasReal=0, simPrecios=[], SIM=null, simPrev={};
 
 async function cargarSimulador(){
   const st=document.getElementById('simStatus'), grid=document.getElementById('simGrid');
@@ -7844,6 +8173,8 @@ async function cargarSimulador(){
       simMP[sp.key]       = p ? (p.mp.mpUnit*(p.pack||1)) : 0;   // MP por unidad de venta
       simDiasReal[sp.key] = p ? (p.dias||0) : 0;                 // días reales FRACCIONALES (exactos, no redondeados)
       simUnidReal[sp.key] = p ? (p.unidades||0) : 0;             // unidades/mes reales (unidad de venta)
+      simEmp[sp.key]      = p ? (p.emp!=null?p.emp:0) : 0;       // empaque por unidad de venta (constante, misma fuente única)
+      simEmpP[sp.key]     = p ? {emp:p.emp, empCompleto:p.empCompleto, empRazon:p.empRazon, dias:p.dias} : null;   // `dias` viaja para diasTag()
     });
     simPrecios = await simCargarPrecios();
     SIM = simEstadoBase(); simPrev={};
@@ -7851,19 +8182,20 @@ async function cargarSimulador(){
     st.classList.add('hidden'); grid.style.display='grid';
   }catch(e){ console.error('cargarSimulador:',e); st.className='status s-err'; st.innerHTML='No pude cargar el simulador: '+esc(e&&e.message||e); }
 }
-// Precios reales por canal (mismo origen que Rentabilidad: product.pricelist.item fixed_price + término RENT_CANALES).
+// Precios reales por canal: product.pricelist.item fixed_price + supuestos de la FUENTE ÚNICA `CANALES`.
+// Devuelve el canal entero (`c`) para que la vista pueda leer comisión de introducción, frío y fuentes.
 async function simCargarPrecios(){
   const pids=RENT_PROD.map(p=>p.pid);
   const info=await odooCall('product.product','read',[pids],{fields:['id','product_tmpl_id']});
   const tmplDe={}; info.forEach(p=>tmplDe[p.id]=p.product_tmpl_id&&p.product_tmpl_id[0]);
-  const plIds=[...new Set(RENT_CANALES.map(c=>c.plId))];
+  const plIds=[...new Set(CANALES_PRECIO.map(c=>c.plId))];
   const items=await odooCall('product.pricelist.item','search_read',
     [[['pricelist_id','in',plIds],['product_tmpl_id','in',Object.values(tmplDe).filter(Boolean)],['compute_price','=','fixed'],['applied_on','=','1_product']]],
     {fields:['pricelist_id','product_tmpl_id','fixed_price'],limit:1000});
   const pl={}; items.forEach(it=>pl[it.pricelist_id[0]+':'+it.product_tmpl_id[0]]=it.fixed_price);
-  return RENT_CANALES.map((c,i)=>{
+  return CANALES_PRECIO.map((c,i)=>{
     const precios={}; RENT_PROD.forEach(p=>{ const pr=pl[c.plId+':'+tmplDe[p.pid]]; if(pr) precios[p.key]=pr; });
-    return {key:'c'+i, label:c.canal, termino:c.termino, precios};
+    return {key:'c'+i, label:c.label, canal:c, termino:canalComProy(c,false), precios};
   });
 }
 function simEstadoBase(){
@@ -7884,7 +8216,7 @@ function simCalc(){
     const br = SIM_BATCHDIA[k] ? ((SIM.batchDia[k]||0)/SIM_BATCHDIA[k]) : 1;  // ratio de batches/día vs base
     const unid = (simUnidReal[k]||0) * dr * br;
     const indU = unid ? ((SIM.dias[k]||0)*costoDia)/unid : 0;                 // reparto por DÍAS
-    res[k]={dias:SIM.dias[k]||0, unid, mp:simMP[k]||0, indU, total:(simMP[k]||0)+indU};
+    res[k]={dias:SIM.dias[k]||0, unid, mp:simMP[k]||0, indU, emp:(simEmp[k]||0), total:(simMP[k]||0)+indU+(simEmp[k]||0)};   // total = MP + indirecto + empaque
   });
   res._diasTot=totalDias; res._costoDia=costoDia;
   res._unidTot=SIM_PROD.reduce((a,p)=>a+res[p.key].unid,0);
@@ -7901,9 +8233,10 @@ function simRender(){
   document.getElementById('simDiaNote').textContent=r._diasTot.toLocaleString('es-CR',{maximumFractionDigits:1})+' días de producción/mes';
   let h='';
   SIM_PROD.forEach(p=>{ const d=r[p.key];
-    h+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span></td>'
+    h+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+diasTag(simEmpP[p.key])+'</td>'
       +'<td style="text-align:right">'+cM(d.mp)+'</td>'
       +'<td style="text-align:right">'+cM(d.indU)+simDelta('ind_'+p.key,d.indU)+'</td>'
+      +'<td style="text-align:right">'+(d.emp?cM(d.emp):'—')+'</td>'
       +'<td style="text-align:right"><strong>'+cM(d.total)+'</strong></td>'
       +'<td style="text-align:right">'+Math.round(d.unid).toLocaleString('es-CR')+'</td></tr>';
     simPrev['ind_'+p.key]=d.indU;
@@ -7914,8 +8247,8 @@ function simRender(){
   let mh='', sum=0, n=0;
   SIM_PROD.forEach(p=>{ const precio=C.precios[p.key], d=r[p.key];
     if(precio==null){ mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span></td><td colspan="5" style="text-align:left;color:var(--text-3)">no se vende en este canal</td></tr>'; return; }
-    const neto=precio*(1-C.termino), margC=neto-d.total, margP=precio?margC/precio*100:0; sum+=margP; n++;   // margen % SOBRE PRECIO DE LISTA (igual que Rentabilidad)
-    mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span></td>'
+    const neto=precio*(1-C.termino), margC=neto-d.total, margP=precio?margC/precio*100:0; sum+=margP; n++;   // margen % sobre PRECIO DE LISTA bruto y SIN frío — NO es la base de Rentabilidad (que divide por el neto real y sí resta frío). Se unifica en el pendiente de canales.
+    mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+diasTag(simEmpP[p.key])+'</td>'
       +'<td style="text-align:right">'+cM(precio)+'</td>'
       +'<td style="text-align:right">'+cM(neto)+'</td>'
       +'<td style="text-align:right">'+cM(d.total)+'</td>'
@@ -8041,7 +8374,7 @@ function calcBuildUI(){
 }
 // Estado en cero: sin producto, campos en blanco, receta vacía, switches en default (dir A, modo existente)
 function calcReset(){
-  const canales = RENT_CANALES.map(c=>({label:c.canal, mc:CALC_MC_DEFAULT, t:+(c.termino*100).toFixed(2)}));
+  const canales = CANALES_PRECIO.map(c=>({label:c.label, mc:CALC_MC_DEFAULT, t:+(canalComProy(c,false)*100).toFixed(2), canal:c}));
   CALC={dir:'A', mode:'existente', mpMode:'total', receta:{rinde:0, lines:[], rindeUnid:'individual'}, ref:'', mp:0, indMes:0, unid:0, gondola:0, margen:0, canales};
   const sel=document.getElementById('calcRef'); if(sel) sel.value='';
   const rinde=document.getElementById('calcRecRinde'); if(rinde) rinde.value='';
@@ -8331,8 +8664,8 @@ async function resProdFooter(){
   el.innerHTML=RES_PROD.map(p=>'<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</div><div class="mg muted" style="font-size:13px">…</div></div>').join('');
   try{
     const {prods}=await computeCostos(); const byKey={}; prods.forEach(p=>byKey[p.key]=p);
-    el.innerHTML=RES_PROD.map(p=>{ const d=byKey[p.key], costo=d?Math.round((d.total||0)*(d.pack||1)):0, uni=(d&&d.unidad)||'';
-      return '<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</div>'
+    el.innerHTML=RES_PROD.map(p=>{ const d=byKey[p.key], costo=d?Math.round(d.totalVenta||0):0, uni=(d&&d.unidad)||'';
+      return '<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+empTag(d)+diasTag(d)+'</div>'
         +'<div class="mg">'+cM(costo)+'</div><div class="cu">costo real'+(uni?' · '+esc(uni):'')+'</div></div>'; }).join('');
   }catch(e){ el.innerHTML='<div class="muted" style="font-size:12px;padding:8px 4px">No pude leer los costos ('+esc(e&&e.message||e)+'). El detalle está en la pestaña Costos.</div>'; }
 }
