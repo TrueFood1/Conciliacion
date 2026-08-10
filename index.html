@@ -1589,6 +1589,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-db{font-size:11px;color:var(--text-2);margin-top:2px}
 #vResumen .rz-gnote{font-size:10px;color:#C99A4E;margin-top:3px}
 #vResumen .rz-ds{margin-top:auto;font-size:11px;font-weight:600;padding-top:8px}
+#vResumen .rz-dsm{display:none}   /* estado en una palabra: solo teléfono (ver @media 700px) */
 #vResumen .rz-day.rz-done{border-color:var(--border)} #vResumen .rz-day.rz-done .rz-ds{color:#7A7A72}
 #vResumen .rz-day.rz-today{border-color:#C77DA0;box-shadow:0 0 0 1px rgba(199,125,160,.4)} #vResumen .rz-day.rz-today .rz-ds{color:#C77DA0}
 #vResumen .rz-day.rz-miss{border-color:rgba(201,154,78,.4)} #vResumen .rz-day.rz-miss .rz-ds{color:#C99A4E}
@@ -1792,6 +1793,59 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vResumen .rz-two{grid-template-columns:1fr;gap:22px}
   #vResumen .rz-cal2 .rz-wk:first-child{padding-right:0;border-right:none}
   #vResumen .rz-cal2 .rz-wk:last-child{padding-left:0}
+}
+/* ══════════ RESUMEN EN TELÉFONO ══════════
+   Los cinco días entran en pantalla en cuadrícula 3+2 (lun-mar-mié / jue-vie), sin scroll
+   lateral. La grilla es de 6 columnas: los tres de arriba ocupan 2 cada uno y los dos de
+   abajo, 3 — así las dos filas cierran contra el mismo borde. */
+@media(max-width:700px){
+  #vResumen .rz-wrap{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+  #vResumen .rz-cal2 .rz-days{grid-auto-flow:row;grid-template-columns:repeat(6,1fr);
+    grid-auto-columns:auto;overflow-x:visible;gap:7px;padding-bottom:0}
+  #vResumen .rz-cal2 .rz-days>*{grid-column:span 2}
+  #vResumen .rz-cal2 .rz-days>*:nth-child(4),#vResumen .rz-cal2 .rz-days>*:nth-child(5){grid-column:span 3}
+  /* Tarjeta de día compacta: día chiquito arriba, producto 14px, estado en una palabra. */
+  #vResumen .rz-day{min-height:0;padding:8px 9px 9px}
+  #vResumen .rz-dd{font-size:9.5px}
+  #vResumen .rz-dp{font-size:14px;margin-top:4px}
+  #vResumen .rz-db{font-size:10.5px}
+  #vResumen .rz-ds{display:none}                 /* el estado largo es de escritorio */
+  #vResumen .rz-dsm{display:block;margin-top:auto;padding-top:6px;font-size:10.5px;font-weight:600;color:var(--text-3)}
+  #vResumen .rz-day.rz-today .rz-dsm,#vResumen .rz-day.rz-sel .rz-dsm{color:#C77DA0}
+  #vResumen .rz-day.rz-miss .rz-dsm,#vResumen .rz-day.rz-edited .rz-dsm,
+  #vResumen .rz-day.rz-fer .rz-dsm{color:#C99A4E}
+  /* El lápiz mantiene su blanco táctil de 44×44 aunque la tarjeta sea más baja. */
+  #vResumen .rz-pen{top:0;right:0}
+  /* Encabezado de semana en UNA línea de texto, sin píldora con caja.
+     Queda "Esta semana · 10 al 14 ago · [2 personas]" — el chip de personas conserva su
+     caja porque es lo único tocable de la línea. */
+  #vResumen .rz-whead{gap:5px;margin-bottom:8px;flex-wrap:nowrap;align-items:center}
+  #vResumen .rz-wtag{background:none;border:none;padding:0;border-radius:0;font-size:12px;
+    font-weight:600;letter-spacing:0;text-transform:none;color:var(--text)}
+  #vResumen .rz-wtag::after{content:' ·';color:var(--text-3)}
+  #vResumen .rz-wrange{font-size:12px;white-space:nowrap}
+  #vResumen .rz-whead .rz-chip{margin-left:auto;padding:2px 7px}
+  #vResumen .rz-whead .rz-chip-x{display:none}
+  /* "Ver próxima semana": línea divisoria de ancho completo con chevron, colapsada por defecto. */
+  #vResumen .rz-vernext{display:flex;width:100%;align-items:center;justify-content:space-between;
+    margin-top:14px;padding:11px 2px 0;border:none;border-top:.5px solid var(--border);
+    border-radius:0;background:none;color:var(--text-2);font-size:12.5px;text-align:left}
+  #vResumen .rz-vernext::after{content:'⌄';color:var(--text-3);font-size:14px;line-height:1}
+  #vResumen .rz-vernext.rz-abierto::after{content:'⌃'}
+  #vResumen .rz-cal2 .rz-wk-next{opacity:1}
+  #vResumen .rz-cal2 .rz-wk-next .rz-day{background:var(--surface-2);border-style:solid}
+  /* Fuera del teléfono: el aviso de meta (derrame) y el bloque de Inventario, que vive en
+     su propia pestaña. */
+  #vResumen .rz-leftnote{display:none}
+  #vResumen .rz-invsec{display:none}
+  /* Tarjetas 2×2 — fila 1: Por medir · Comprar·medir | fila 2: Producciones · Comprar·producir */
+  #vResumen .rz-cards4{gap:10px;margin-top:20px;align-items:start}   /* sin estirar: nada de cajas medio vacías */
+  #vResumen .rz-c4h{font-size:10px;letter-spacing:.03em;line-height:1.3}
+  #vResumen .rz-c4-medir{order:1} #vResumen .rz-c4-cmedir{order:2}
+  #vResumen .rz-c4-prod{order:3}  #vResumen .rz-c4-cprod{order:4}
+  /* En "Comprar · para producir" la cantidad va DEBAJO del nombre, no al lado. */
+  #vResumen .rz-c4-cprod .rz-c4item{flex-direction:column;align-items:flex-start;gap:1px}
+  #vResumen .rz-c4-cprod .rz-c4in{line-height:1.25}
 }
 </style>
 <div id="vResumen" class="hidden">
@@ -5760,13 +5814,13 @@ function rzVaSemanaCard(){
     const m=meta[p]||0, r=real[p]||0, done=r>=m;
     return '<div class="rz-vsrow"><span class="rz-vsn">'+esc(_nomCorto(p))+'</span>'
       +'<span class="rz-vsv'+(done?' rz-ok':'')+'">'+_rzN(r)+'/'+_rzN(m)+(done?' ✓':'')+'</span></div>'; }).join('');
-  return '<div class="rz-card4"><div class="rz-c4h">Producciones registradas</div>'+(rows||'<div class="rz-c4none">sin meta esta semana</div>')+'</div>';
+  return '<div class="rz-card4 rz-c4-prod"><div class="rz-c4h">Producciones registradas</div>'+(rows||'<div class="rz-c4none">sin meta esta semana</div>')+'</div>';
 }
 // TARJETA "Por medir": una línea (oliva si ya está todo).
 function rzMedirCard(){
   const pm=(_rzAlistar[0]&&_rzAlistar[0].premez)||[];
   const txt=pm.length?pm.map(function(x){return x.n+' '+x.prod.replace(/^Pan /,'');}).join(' · '):'ya está todo ✓';
-  return '<div class="rz-card4"><div class="rz-c4h">Por medir</div><div class="rz-c4line'+(pm.length?'':' rz-ok')+'">'+esc(txt)+'</div></div>';
+  return '<div class="rz-card4 rz-c4-medir"><div class="rz-c4h">Por medir</div><div class="rz-c4line'+(pm.length?'':' rz-ok')+'">'+esc(txt)+'</div></div>';
 }
 // TARJETAS "Comprar": LISTA COMPLETA, siempre. Fecha objetivo en rosa apagado.
 // Sin "+N más": es la lista de compra real de Lorena y un ítem escondido es un ítem que no se
@@ -5779,15 +5833,15 @@ function rzComprasCards(){
       +'<div class="rz-c4item"><span class="rz-c4in">'+esc(it.nombre.toLowerCase())+'</span>'
       +'<span class="rz-c4falta">falta '+esc(_faltaCompra(it))+'</span></div>'
       +(it.nota?('<div class="rz-c4nota">'+esc(it.nota)+'</div>'):'')+'</div>'; }
-  function card(titulo, data){
+  function card(titulo, data, extra){
     const items=(data.items||[]).slice().sort(function(a,b){ return (b.falta/(b.need||1))-(a.falta/(a.need||1)); });   // más urgente primero
     const cuerpo=items.length ? items.map(itemHtml).join('')
                               : '<div class="rz-c4line rz-ok">alcanza — nada que comprar</div>';
-    return '<div class="rz-card4"><div class="rz-c4h">'+titulo+'</div>'
+    return '<div class="rz-card4 '+extra+'"><div class="rz-c4h">'+titulo+'</div>'
       +'<div class="rz-c4fecha">'+esc(data.fecha)+'</div>'+cuerpo+'</div>';
   }
-  return card('Comprar · para medir premezclas', _rzCompras.premezclas)
-       + card('Comprar · para producir', _rzCompras.produccion);
+  return card('Comprar · para medir premezclas', _rzCompras.premezclas, 'rz-c4-cmedir')
+       + card('Comprar · para producir', _rzCompras.produccion, 'rz-c4-cprod');
 }
 // ── 1 · PENDIENTE DE FABRICAR: tira horizontal HOY → próximo lunes, editable + touch ──
 function _rzChipPersonas(iso, personas){
@@ -5796,7 +5850,9 @@ function _rzChipPersonas(iso, personas){
 }
 function rzToggleNext(btn){ const c=document.querySelector('#vResumen .rz-cal2'); if(!c)return;
   _rzShowNext=!_rzShowNext; c.classList.toggle('rz-shownext', _rzShowNext);
-  if(btn) btn.textContent = _rzShowNext ? 'Ocultar próxima semana' : 'Ver próxima semana'; }
+  // El chevron lo pone el CSS (::after) porque textContent borraría cualquier hijo del botón.
+  if(btn){ btn.textContent = _rzShowNext ? 'Ocultar próxima semana' : 'Ver próxima semana';
+           btn.classList.toggle('rz-abierto', _rzShowNext); } }
 // Un bloque de semana (lun–vie completo): cabecera con etiqueta + rango + chip de personas, y las 5 celdas.
 function _rzWeekBlock(offset){
   const mon=_rzMonday(offset), iso=_isoWk(mon), w=_rzCtx.weeks[offset]||{}, pers=w.personas||_personasDe(iso);
@@ -5856,7 +5912,8 @@ function rzStripHtml(){
     +right+'</div>';
   const leftnote=_rzDerrameNota();
   const cal='<div class="rz-cal2'+(_rzShowNext?' rz-shownext':'')+'">'+_rzWeekBlock(0)+_rzWeekBlock(1)+'</div>';
-  const verbtn='<button class="rz-vernext" onclick="rzToggleNext(this)">'+(_rzShowNext?'Ocultar próxima semana':'Ver próxima semana')+'</button>';
+  const verbtn='<button class="rz-vernext'+(_rzShowNext?' rz-abierto':'')+'" onclick="rzToggleNext(this)">'
+    +(_rzShowNext?'Ocultar próxima semana':'Ver próxima semana')+'</button>';
   // Motivo de un intercambio bloqueado (nunca falla en silencio) — se va al tocar otro día.
   const aviso=_rzAviso?('<div class="rz-aviso">'+esc(_rzAviso)+'</div>'):'';
   return '<div class="rz-sec">'+head+_rzAlertaHtml()+aviso+cal+verbtn+leftnote+'</div>';
@@ -5928,7 +5985,7 @@ function rzInvHtml(){
   const cPR=card('rzInvPr', 'Premezclas', nPrem+' con stock', NIV_PROD.map(function(p){ const b=Math.round((stock.premOh||{})[NIV_INFO[p].prem]||0); return row(_nomCorto(p), b>0?_rzN(b):'—'); }).join(''));
   const totalCj=NIV_PROD.reduce(function(a,p){ return a+Math.floor((stock.fin[p]||0)/NIV_INFO[p].cajaU); },0);
   const cTE=card('rzInvTe', 'Producto terminado', _rzN(totalCj)+' cajas', NIV_PROD.map(function(p){ const cajas=Math.floor((stock.fin[p]||0)/NIV_INFO[p].cajaU); return row(_nomCorto(p), _rzN(cajas)+' cj'); }).join(''));
-  return '<div class="rz-sec"><div class="rz-sh"><span class="rz-st">Inventario</span></div><div class="rz-inv3">'+cMP+cPR+cTE+'</div></div>';
+  return '<div class="rz-sec rz-invsec"><div class="rz-sh"><span class="rz-st">Inventario</span></div><div class="rz-inv3">'+cMP+cPR+cTE+'</div></div>';
 }
 function rzToggleMp(btn){ const e=document.getElementById('rzMpMas'); if(!e)return; const h=e.classList.toggle('hidden'); if(btn) btn.textContent = h ? btn.textContent.replace('▴','▾') : btn.textContent.replace('▾','▴'); }
 // "Volver al plan" de la ventana visible: descarta TODOS los overrides futuros (fila de anulación).
@@ -5939,6 +5996,17 @@ async function rzVolverPlanStrip(){
   _rzRecalcAuto(); rzRender();
   rzPersist(dss.map(function(ds){ return {fecha:ds, producto_id:null, batches:0, tipo:'anulacion'}; }));
   await rzRecalcAlistar(); rzRender();
+}
+// Estado del día en UNA palabra minúscula (tarjeta compacta de teléfono). "editado" gana sobre
+// el estado base: en escritorio se lee "Editado · editado", acá tiene que decirlo una sola vez.
+const _RZ_CORTO={real:'hecho', pend:'sin registrar', prop:'propuesto', libre:'libre',
+                 feriado:'feriado', viernes:'libre', edit:'editado', 'edit-empty':'editado',
+                 auto:'para la meta'};
+function _rzEstadoCorto(cell, sel){
+  if(sel) return 'seleccionado';
+  if(cell.edited) return 'editado';
+  if(cell.auto) return 'para la meta';
+  return _RZ_CORTO[cell.kind]||'';
 }
 function rzCellHtml(cell){
   // 'pend' = día pasado con plan y sin registro en Odoo → se ASUME hecho según el plan
@@ -5953,7 +6021,10 @@ function rzCellHtml(cell){
   const sel=_rzSel===ds;
   const estado=(cell.auto&&cell.kind==='viernes'?'Para cumplir la meta':m[1])+(cell.edited?' · editado':'')
     +(sel?' · seleccionado':'');
-  const st='<div class="rz-ds">'+estado+'</div>';
+  // En teléfono el estado va en UNA palabra minúscula. Se emiten los dos textos y el CSS
+  // muestra el que corresponde al ancho: así no hay rama por viewport en JS (que se rompería
+  // al rotar el teléfono) y el HTML es el mismo para las dos pantallas.
+  const st='<div class="rz-ds">'+estado+'</div><div class="rz-dsm">'+_rzEstadoCorto(cell, sel)+'</div>';
   const cls=m[0]+(cell.editable?' rz-ed':'')+(cell.edited?' rz-edited':'')+(cell.auto?' rz-autofill':'')
     +(cell.today?' rz-today':'')+(sel?' rz-sel':'');
   // El lápiz sigue EXACTAMENTE la misma regla que el día: solo se dibuja si cell.editable.
