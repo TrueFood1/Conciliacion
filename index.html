@@ -435,7 +435,19 @@ tr.r-ing td{background:#eff6ff}
 /* Pestañas que no se muestran en teléfono (Operaciones: Producción · Mermas · Plan ·
    Finanzas: Precios). Es SOLO visual — no hay roles todavía, la vista sigue accesible
    por URL o desde escritorio. */
-@media(max-width:700px){ .face-desk{display:none} }
+@media(max-width:700px){
+  .face-desk{display:none}
+  /* Barra de pestañas: si no caben, se desliza. Nunca se corta una etiqueta a la mitad
+     ni se parte en dos renglones (flex-wrap era lo que dejaba "Cobros y / Pagos"). */
+  .faces{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;
+    scrollbar-width:none;gap:2px}
+  .faces::-webkit-scrollbar{display:none}
+  .face{flex:none;white-space:nowrap;padding:8px 10px}
+  /* El pie (BUILD) no puede quedar debajo de la barra del navegador. */
+  .main{padding:.75rem 1rem calc(28px + env(safe-area-inset-bottom))}
+  /* Ninguna tabla ancha empuja la página: si algo se pasa, se desliza adentro de su caja. */
+  body{overflow-x:hidden}
+}
 .face{appearance:none;background:none;border:none;border-bottom:2px solid transparent;padding:8px 12px;font:600 13px/1 'DM Sans',sans-serif;color:var(--text-2);cursor:pointer}
 .face.on{color:#1A1A1A;border-bottom-color:#C964CF}
 .face.dis{color:#C5C2BA;cursor:not-allowed}
@@ -546,6 +558,9 @@ tr.r-ing td{background:#eff6ff}
 .home-sep{border-top:.5px solid #26262C;width:100%;margin:0}
 .home-modlabel{font-size:12px;font-weight:500;color:#6E6C68;letter-spacing:.5px;width:100%;margin:1.5rem 0 .9rem;text-align:left}
 .home-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;width:100%;max-width:760px}
+/* El sello de versión iba con estilo en línea; vive acá para que el @media pueda darle
+   el respiro del safe-area en teléfono (el estilo en línea le ganaba a la hoja). */
+.home-build{text-align:center;color:#6E6C68;font-size:11px;letter-spacing:.03em;padding:16px 0 6px}
 /* ── LOBBY en teléfono: módulos apilados en 2 columnas (la fila de 5 se cortaba) y
    menos aire muerto entre el saludo y los módulos. ── */
 @media(max-width:700px){
@@ -558,6 +573,7 @@ tr.r-ing td{background:#eff6ff}
   .home-modlabel{margin:1.1rem 0 .7rem}
   .home-grid{grid-template-columns:1fr 1fr}
   .home-mod{padding:14px}
+  .home-build{padding-bottom:calc(10px + env(safe-area-inset-bottom))}   /* el pie no queda bajo la barra del navegador */
 }
 /* Preguntas sugeridas: lista fina apilada, no botones */
 .home-qlist{width:100%;max-width:440px;margin-top:22px}
@@ -991,7 +1007,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
       </div>
     </div>
     </div><!-- /home-bottom -->
-    <div class="home-build" id="homeBuild" style="text-align:center;color:#6E6C68;font-size:11px;letter-spacing:.03em;padding:16px 0 6px"></div>
+    <div class="home-build" id="homeBuild"></div>
   </div>
 </div>
 
