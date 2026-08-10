@@ -6460,6 +6460,8 @@ function cnRecMP(pid){
   const diff=fis-m.qty, s=sem3(diff,_tolMP(m),vacio);
   const de=document.getElementById('cn-mdif'+pid), se=document.getElementById('cn-msem'+pid);
   const dot=document.getElementById('cn-mdot'+pid); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
+  const sub=document.getElementById('cn-msub'+pid);
+  if(sub) sub.textContent=_cnSub(fmtN(fis)+' '+m.uom, fmtN(m.qty)+' '+m.uom, vacio);
   if(de){ de.textContent=vacio?'—':fmtDiff(diff)+' '+m.uom; de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
   cnResumen();
@@ -6470,6 +6472,8 @@ function cnRecPremez(id){
   const fis=parseFloat(dr)||0, diff=fis-p.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
   const de=document.getElementById('cn-pdif'+id), se=document.getElementById('cn-psem'+id);
   const dot=document.getElementById('cn-pdot'+id); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
+  const sub=document.getElementById('cn-psub'+id);
+  if(sub) sub.textContent=_cnSub(fmtN(fis)+' batches', fmtN(p.odoo)+' batches', vacio);
   if(de){ de.textContent=vacio?'—':fmtDiff(diff)+' batch'; de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
   cnResumen();
@@ -6495,6 +6499,8 @@ function cnRecTerm(id){
   const diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
   const de=document.getElementById('cn-tdif'+id), se=document.getElementById('cn-tsem'+id), to=document.getElementById('cn-ttot'+id);
   const dot=document.getElementById('cn-tdot'+id); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
+  const sub=document.getElementById('cn-tsub'+id);
+  if(sub) sub.textContent=_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio);
   if(to){ to.textContent=vacio?'':'= '+_cnVentaTxt(t,fis); }
   if(de){ de.textContent=vacio?'—':_cnDiffTxt(t,diff); de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
@@ -6597,6 +6603,10 @@ const _CN_SING={sacos:'saco', cajas:'caja', bolsas:'bolsa', cartones:'cartón', 
 // color del semáforo, sin texto. Lo que calza y lo que todavía no se contó quedan limpios —
 // por eso la clase sale vacía salvo en cn-warn/cn-bad. Se pinta al escribir, sin guardar:
 // las funciones cnRec* lo mantienen al día igual que a la celda de diferencia.
+// Segunda línea de la fila (solo teléfono): el total físico calculado EN VIVO contra la
+// existencia de Odoo. Si el ítem todavía no se contó, solo la de Odoo. Todo en gris, sin
+// color y sin negrita — es contexto, no alarma; la alarma es el punto de descuadre.
+function _cnSub(contado, odoo, vacio){ return vacio ? ('Odoo '+odoo) : ('contado '+contado+' · Odoo '+odoo); }
 function _cnDotCls(vacio, s){ return (!vacio && s && (s.cls==='cn-warn'||s.cls==='cn-bad')) ? s.cls : ''; }
 function _cnDot(pre, id, vacio, s){ return '<span class="cn-dot '+_cnDotCls(vacio,s)+'" id="cn-'+pre+'dot'+id+'"></span>'; }
 function _cnPresLbl(pe){ return pe ? (_CN_SING[pe.lab]||pe.lab) : ''; }
@@ -6613,9 +6623,9 @@ function cnRender(){
     const sueLab=(pe&&pe.sueltoUnit)?pe.sueltoUnit:m.uom;
     const sueIn = (pe&&pe.noSuelto) ? '<span class="cn-lbl">sin suelto</span>'
       : '<input class="cn-in" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnMpSue('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(sueLab)+'</span><span class="cn-lblm">'+esc(sueLab)+'</span>';
-    const subMP=fmtN(m.qty)+' '+esc(m.uom)+(pe?(' · '+esc(_cnPresLbl(pe))+' '+fmtN(pe.peso)):'');
+    const subMP=_cnSub(fmtN(fis)+' '+esc(m.uom), fmtN(m.qty)+' '+esc(m.uom), vacio);
     mp+='<tr><td class="cn-nm">'+esc(nombreCortoMP(m.name))+_cnDot('m',m.pid,vacio,s)+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
-      +'<td class="cn-sub">'+subMP+'</td>'
+      +'<td class="cn-sub" id="cn-msub'+m.pid+'">'+subMP+'</td>'
       +'<td class="cn-count">'+empIn+(empIn&&!(pe&&pe.noSuelto)?' + ':'')+sueIn+'</td>'
       +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-mdif'+m.pid+'">'+(vacio?'—':fmtDiff(diff)+' '+m.uom)+'</td></tr>';
   }
@@ -6625,7 +6635,7 @@ function cnRender(){
   for(const p of _cnPremez){
     const dr=(d.premez||{})[p.id], vacio=(dr==null||dr===''); const fis=parseFloat(dr)||0, diff=fis-p.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
     pm+='<tr><td class="cn-nm">'+esc(p.label)+_cnDot('p',p.id,vacio,s)+'</td><td class="cn-odoo">'+fmtN(p.odoo)+' batches</td>'
-      +'<td class="cn-sub">'+fmtN(p.odoo)+' batches</td>'
+      +'<td class="cn-sub" id="cn-psub'+p.id+'">'+_cnSub(fmtN(fis)+' batches', fmtN(p.odoo)+' batches', vacio)+'</td>'
       +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr!=null?esc(dr):'')+'" oninput="cnPremez('+p.id+',this.value)" placeholder="0"><span class="cn-lbl">batches</span><span class="cn-lblm">bat</span></td>'
       +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-pdif'+p.id+'">'+(vacio?'—':fmtDiff(diff)+' batch')+'</td></tr>';
   }
@@ -6638,7 +6648,7 @@ function cnRender(){
     const fis=(parseFloat(dr.cajas)||0)*t.factor+(parseFloat(dr.sue)||0)*t.presDiv, diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
     const cajaV=t.factor/t.presDiv, cajaU=(t.presDiv===1?'u':'paq');   // caja en unidad de venta
     tm+='<tr><td class="cn-nm"><span class="cn-pnom">'+esc(t.label)+_cnDot('t',t.id,vacio,s)+'</span><span class="cn-pcaja">caja = '+cajaV+' '+cajaU+'</span></td><td class="cn-odoo">'+_cnVentaTxt(t,t.odoo)+'</td>'
-      +'<td class="cn-sub">'+_cnVentaTxt(t,t.odoo)+' · caja '+cajaV+' '+cajaU+'</td>'
+      +'<td class="cn-sub" id="cn-tsub'+t.id+'">'+_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio)+'</td>'
       +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr.cajas!=null?esc(dr.cajas):'')+'" oninput="cnTermCajas('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">cajas</span><span class="cn-lblm">caj</span> + '
       +'<input class="cn-in" inputmode="numeric" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnTermSue('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(t.venta)+'</span><span class="cn-lblm">'+esc(t.venta)+'</span>'
       +'<span class="cn-ttot" id="cn-ttot'+t.id+'">'+(vacio?'':'= '+_cnVentaTxt(t,fis))+'</span></td>'
