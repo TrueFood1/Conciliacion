@@ -63,8 +63,10 @@ body{font-family:var(--font);background:var(--bg2);color:var(--text);font-size:1
 .s-info{background:var(--blue-l);color:var(--blue)}
 .s-warn{background:var(--amber-l);color:var(--amber)}
 /* Tag visible de empaque incompleto (no un asterisco al pie): el que mira el número sabe que le falta empaque. */
-.emp-inc{display:inline-block;font-size:10.5px;font-weight:600;letter-spacing:.02em;color:#E9A23B;
+.emp-inc,.dias-cero{display:inline-block;font-size:10.5px;font-weight:600;letter-spacing:.02em;color:#E9A23B;
   border:.5px solid rgba(233,162,59,.45);border-radius:5px;padding:1px 6px;margin-left:8px;white-space:nowrap;vertical-align:middle;line-height:1.5}
+/* La etiqueta de "sin días propios" puede ser larga: en pantallas chicas que corte, no que desborde. */
+.dias-cero{white-space:normal}
 .progress{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-bottom:.5rem}
 .progress-fill{height:3px;background:var(--green);border-radius:2px;transition:width .4s}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:.75rem}
@@ -3923,6 +3925,16 @@ function empTag(p){
   const r=(p&&p.empRazon)||'empaque incompleto';
   return '<span class="emp-inc" title="'+esc(r)+'">empaque incompleto</span>';
 }
+// Tag para un producto SIN días de producción propios en la ventana: su costo no lleva
+// indirecto, así que el número (y cualquier margen que salga de él) vale sólo bajo esa
+// condición y no puede mostrarse suelto. Es genérico a propósito: cuando el producto
+// vuelva a tener días propios —Cookie Dough, al entrar julio con el 24-jul— la etiqueta
+// desaparece sola, sin que haya que acordarse de quitarla.
+const DIAS_CERO_TXT='sin días de producción propios en la ventana — se revisa al entrar julio';
+function diasTag(p){
+  if(!p || (p.dias||0)>0) return '';
+  return '<span class="dias-cero" title="Su costo no incluye indirecto: en la ventana de costeo vigente no tuvo ningún día de producción propio.">'+DIAS_CERO_TXT+'</span>';
+}
 const COSTOS_INCLUDE = ['6101001','6101003','6101005','6101007','6101010','6101011','6103003','6104002','6104005','6104006','6104007','6105001','6105002','6105003','6106004','6106005','6106006','6106008','6106011','6106012','6106021','6106024','6400003','640102','6200001'];
 // 6104002 "Contabilidad, Auditoría, Fiscal" agregada como seguro (hoy ₡0; blinda si el contador se postea ahí).
 // ── VENTANA ROLLING DE MESES CERRADOS ──────────────────────────────────
@@ -6779,7 +6791,47 @@ async function diasUnidadesMes(D1,D2,ids,compartidoPid){
     const at=COSTOS_DIAS_ATIPICOS[pid]; if(!at) continue;
     acc[pid].dias = new Set([...acc[pid].dias].filter(d=>!at[d]));
   }
+  // DÍA DE LIMPIEZA de cada semana: no es día de producción para NADIE, ni para quien haya
+  // producido encima. Mismo tratamiento que los atípicos: salen los días, no las unidades.
+  const limp = await diasLimpiezaSemanal(D1,D2,ids,compartidoPid);
+  if(limp.size) for(const pid in acc){ acc[pid].dias = new Set([...acc[pid].dias].filter(d=>!limp.has(d))); }
   return acc;
+}
+// ── REGLA SEMANAL DEL DÍA DE LIMPIEZA (Andrea, validada contra Odoo el 9-ago-2026) ──────
+// En cada semana laboral hay A LO SUMO UN día de limpieza profunda, y sólo si existe un día
+// laboral SIN producción de pan. Si todos los días produjeron, esa semana no tuvo limpieza:
+// no se fuerza. NO es siempre viernes (durante las certificaciones se corrió a miércoles dos
+// semanas seguidas); en marzo-mayo 2026 cayó en martes, lunes y viernes.
+// La semana puede tener 5 o 6 días laborales: el sábado cuenta sólo si se trabajó (urgencia).
+// Las GALLETAS encima de un día de limpieza NO lo vuelven día de producción — se hacen sobre
+// un día que la fábrica paga igual. Por eso el "pan" del test excluye a `compartidoPid`.
+// Si hay MÁS DE UN candidato, la regla no elige: semana ambigua, no se marca nada. Preferimos
+// no restar a restar mal (así quedaron las semanas del 23-mar y del 30-mar de 2026, que se
+// resolvieron aparte como días atípicos).
+// Medido: en marzo-abril-mayo 2026 esto no mueve ningún costo, porque los días de limpieza
+// que encuentra no tienen ninguna orden y por lo tanto nunca estuvieron en el denominador.
+// Su primer efecto real es el VIERNES 24-JUL-2026 — día de limpieza con 160 potes de galletas
+// encima — que entra al costeo cuando la ventana rodante llegue a julio.
+async function diasLimpiezaSemanal(D1,D2,ids,compartidoPid){
+  const pan=ids.filter(i=>i!==compartidoPid);
+  const lun=new Date(D1+'T00:00:00'); lun.setDate(lun.getDate()-((lun.getDay()+6)%7));   // lunes de la semana de D1
+  const dom=new Date(D2+'T00:00:00'); dom.setDate(dom.getDate()+(6-((dom.getDay()+6)%7)));// domingo de la semana de D2
+  // Semanas completas aunque crucen el borde del mes: si no, una semana partida inventa días libres.
+  const mos=await odooCall('mrp.production','search_read',
+    [[['state','=','done'],['product_id','in',ids],['date_start','>=',_ymd(lun)],['date_start','<=',_ymd(dom)+' 23:59:59']]],
+    {fields:['product_id','date_start'],limit:4000});
+  const porDia={};
+  mos.forEach(o=>{ const d=(o.date_start||'').slice(0,10); if(!d)return; (porDia[d]=porDia[d]||new Set()).add(o.product_id&&o.product_id[0]); });
+  const limp=new Set();
+  for(let t=new Date(lun); t<=dom; t.setDate(t.getDate()+7)){
+    const lab=[];
+    for(let i=0;i<7;i++){ const x=new Date(t); x.setDate(x.getDate()+i); const ds=_ymd(x);
+      if(i<=4 || porDia[ds]) lab.push(ds);           // lun–vie siempre; sáb/dom sólo si se trabajó
+    }
+    const libres=lab.filter(ds=>{ const s=porDia[ds]; return !s || !pan.some(p=>s.has(p)); });
+    if(libres.length===1) limp.add(libres[0]);       // exactamente un candidato → ése es el día de limpieza
+  }
+  return limp;
 }
 // Motor de costos reutilizable (dashboard de Costos + Rentabilidad). Devuelve {ventana,meses,poolAvg,totalDias,prods}.
 // Cachea el último cálculo; `force` (botón Recalcular) lo recomputa.
@@ -6825,7 +6877,17 @@ async function computeCostos(force){
     prods.push(Object.assign({},P,{mp,dias,unidades,pct,indAsignado,indPerSales,indUnit,total:mp.mpUnit+indUnit,
       emp:ei.emp, empCompleto:ei.completo, empRazon:ei.razon, totalVenta:(mp.mpUnit+indUnit)*pack+(ei.emp||0)}));
   }
-  return _costosCache={ventana,meses,poolAvg,totalDias,prods};
+  // ¿Alguno de los días atípicos cayó DENTRO de la ventana vigente? Si sí, el aviso de la vista
+  // tiene que salir: el mismo pool se repartió entre menos días y los demás productos subieron.
+  const _v1=ventana.length?ventana[0].D1:'', _v2=ventana.length?ventana[ventana.length-1].D2:'';
+  const atipicos=[];
+  for(const pid in COSTOS_DIAS_ATIPICOS){
+    for(const d in COSTOS_DIAS_ATIPICOS[pid]){
+      if(_v1&&d>=_v1&&d<=_v2){ const P=COSTOS_PROD.find(x=>x.prodId===+pid);
+        atipicos.push({pid:+pid, label:(P&&P.label)||('id '+pid), fecha:d, razon:COSTOS_DIAS_ATIPICOS[pid][d]}); }
+    }
+  }
+  return _costosCache={ventana,meses,poolAvg,totalDias,prods,atipicos};
 }
 async function calcularCostos(){
   const st=document.getElementById('costosStatus'),vp=document.getElementById('costosValid'),cg=document.getElementById('costosCards');
@@ -6833,10 +6895,10 @@ async function calcularCostos(){
   st.innerHTML='<span class="spin"></span>Leyendo Odoo y calculando costos en vivo… (puede tardar unos segundos)';
   vp.innerHTML='';cg.innerHTML='';
   try{
-    const {meses,poolAvg,totalDias,prods}=await computeCostos(true);   // botón Recalcular → cálculo fresco
+    const {meses,poolAvg,totalDias,prods,atipicos}=await computeCostos(true);   // botón Recalcular → cálculo fresco
     st.classList.add('hidden');
     renderValidacion(vp,{meses,poolAvg,totalDias},prods);
-    renderTarjetas(cg,prods);
+    renderTarjetas(cg,prods,atipicos);
   }catch(e){ st.className='status s-err'; st.innerHTML='No pude calcular los costos: '+esc(e&&e.message||e); }
 }
 
@@ -6854,7 +6916,7 @@ function renderValidacion(el,info,prods){
   prods.forEach(p=>{ const pack=p.pack||1; const mpU=p.mp.mpUnit*pack; const tot=mpU+p.indPerSales+(p.emp||0);   // Total/u = MP + indirecto + empaque
     const tieneChk=p.chkMP!=null; const okMP=tieneChk&&tol(p.mp.mpUnit,p.chkMP,0.05);
     const chkMPcol=tieneChk?(cM(p.chkMP)+' '+(okMP?'<span class="ok-tag">✓</span>':'<span class="bad-tag">≠</span>')):'<span style="color:var(--text-3);font-size:11px">sin dato</span>';
-    h+='<tr><td>'+esc(p.label)+empTag(p)+'</td><td>'+fmtN(p.dias)+'</td><td>'+fmtN(p.unidades)+'</td><td>'+(p.pct*100).toFixed(1)+'%</td><td>'+cM(p.indPerSales)+'</td><td>'+cM(mpU)+'</td><td>'+chkMPcol+'</td><td><strong>'+cM(tot)+'</strong></td></tr>'
+    h+='<tr><td>'+esc(p.label)+empTag(p)+diasTag(p)+'</td><td>'+fmtN(p.dias)+'</td><td>'+fmtN(p.unidades)+'</td><td>'+(p.pct*100).toFixed(1)+'%</td><td>'+cM(p.indPerSales)+'</td><td>'+cM(mpU)+'</td><td>'+chkMPcol+'</td><td><strong>'+cM(tot)+'</strong></td></tr>'
       +(p.mp.error?'<tr><td colspan="8" class="bad-tag" style="text-align:left">'+esc(p.label)+': '+esc(p.mp.error)+'</td></tr>':''); });
   h+='</table>';
   h+='<div style="font-size:11px;color:var(--text-3);margin-top:6px">Valores por unidad de venta (Pizza/paquete de 2, Francés y Buns/paquete de 4, resto por unidad). chk MP valida la materia prima. Números REALES de Odoo — no calzan exacto con el Excel (supuestos fijos), pero sí en el mismo orden de magnitud.</div></div>';
@@ -6868,14 +6930,27 @@ function toggleValid(){
   if(btn)btn.textContent=oculto?'Ver validación del cálculo (chequeo) ▾':'Ocultar validación del cálculo ▴';
 }
 
-function renderTarjetas(el,prods){
+function renderTarjetas(el,prods,atipicos){
   let h='';
+  // AVISO DE MOVIMIENTO: al sacar días atípicos del reparto, el MISMO pool se divide entre
+  // menos días → el costo de los demás productos SUBE. Con esto se fijan precios: el
+  // movimiento tiene que verse, no descubrirse.
+  if(atipicos && atipicos.length){
+    const det=atipicos.map(a=>esc(a.label)+' '+a.fecha.split('-').reverse().join('-')+' ('+esc(a.razon)+')').join(' · ');
+    h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-bottom:14px">'
+      +'<div style="font-weight:700;color:#E9A23B;font-size:12.5px">Los cinco panes subieron de costo</div>'
+      +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.6">'
+      +'Salieron del reparto de indirecto días con producción real que no son jornada normal de fábrica: '+det+'. '
+      +'Sus unidades siguen contando; sus días no. Como el pozo de indirecto es el mismo y ahora se divide entre menos días, '
+      +'<strong>el costo de los otros productos sube</strong>: entre <strong>+₡35,92</strong> y <strong>+₡87,40</strong> por unidad '
+      +'(medido el 9-ago-2026). No es un error de cálculo — es la contraparte de la exclusión.</div></div>';
+  }
   prods.forEach((p,i)=>{
     const pack=p.pack||1;
     const mp=p.mp.mpUnit*pack, ind=p.indUnit*pack, emp=(p.emp!=null?p.emp:null), tot=(p.totalVenta)||1;
     // Color del producto SOLO en el puntito y el borde izquierdo 2px. El número va en blanco.
     h+='<div class="ccard" id="ccard'+i+'" onclick="toggleCard('+i+')" style="border-left:2px solid '+p.color+'">';
-    h+='<div class="ccard-name"><span class="ccard-swatch" style="background:'+p.color+'"></span>'+esc(p.label)+empTag(p)+'</div>';
+    h+='<div class="ccard-name"><span class="ccard-swatch" style="background:'+p.color+'"></span>'+esc(p.label)+empTag(p)+diasTag(p)+'</div>';
     h+='<div class="ccard-total">'+cM(tot)+'</div>';
     h+='<div class="ccard-unit">costo total '+esc(p.unidad||'por unidad')+'</div>';
     h+='<div class="cmini-wrap">';
@@ -7367,7 +7442,7 @@ function rentaRender(R, label){
       if(!x){ cells+='<td class="renta-na">—</td>'; return; }
       cells+='<td class="renta-cell"><div class="rg'+(x.gan<0?' rneg':'')+'">'+cMs(x.gan)+'</div><div class="rp">'+_pct(x.pct*100)+'</div></td>';
     });
-    h+='<tr class="renta-prow" onclick="rentaDetalle(\''+f.P.key+'\')"><td><span class="renta-prod"><span class="pdot" style="background:'+f.P.color+'"></span>'+esc(f.P.label)+'</span>'+empTag(_rentaData&&_rentaData.byKey&&_rentaData.byKey[f.P.key])+'</td>'
+    h+='<tr class="renta-prow" onclick="rentaDetalle(\''+f.P.key+'\')"><td><span class="renta-prod"><span class="pdot" style="background:'+f.P.color+'"></span>'+esc(f.P.label)+'</span>'+empTag(_rentaData&&_rentaData.byKey&&_rentaData.byKey[f.P.key])+diasTag(_rentaData&&_rentaData.byKey&&_rentaData.byKey[f.P.key])+'</td>'
       +cells+'<td class="renta-cell renta-rowtot"><div class="rg'+(f.rowTot<0?' rneg':'')+'">'+cMs(f.rowTot)+'</div></td></tr>';
   });
   h+='</tbody><tfoot><tr><td>Total canal</td>'
@@ -7409,7 +7484,7 @@ function rentaDetalle(key){
   h+='<tr style="font-weight:600;border-top:1px solid var(--border)"><td>Materia prima</td><td style="text-align:right">'+cM(mp)+'</td></tr>';
   h+='<tr><td>Indirecto ('+fmtN(Math.round(d.dias||0))+' días/mes · '+((d.pct||0)*100).toFixed(1)+'% del pool)</td><td style="text-align:right">'+cM(ind)+'</td></tr>';
   h+='<tr><td>Empaque'+(emp!=null&&!d.empCompleto?' (parcial)':'')+(d.empCompleto?'':' — <span style="color:#E9A23B">'+esc(d.empRazon||'incompleto')+'</span>')+'</td><td style="text-align:right">'+(emp!=null?cM(emp):'sin dato')+'</td></tr>';
-  h+='<tr style="border-top:1px solid var(--border-strong)"><td><strong>Costo total</strong>'+empTag(d)+'</td><td style="text-align:right"><strong>'+cM(tot)+'</strong></td></tr>';
+  h+='<tr style="border-top:1px solid var(--border-strong)"><td><strong>Costo total</strong>'+empTag(d)+diasTag(d)+'</td><td style="text-align:right"><strong>'+cM(tot)+'</strong></td></tr>';
   h+='</table></div><div class="m3sub" style="margin-top:8px;font-size:11px;color:var(--text-3)">Del motor real de Costos (promedio de los últimos meses cerrados). Reemplaza "Costos por producto".</div></div>';
   el.innerHTML=h; el.scrollIntoView({block:'nearest'});
 }
@@ -7965,7 +8040,7 @@ async function cargarSimulador(){
       simDiasReal[sp.key] = p ? (p.dias||0) : 0;                 // días reales FRACCIONALES (exactos, no redondeados)
       simUnidReal[sp.key] = p ? (p.unidades||0) : 0;             // unidades/mes reales (unidad de venta)
       simEmp[sp.key]      = p ? (p.emp!=null?p.emp:0) : 0;       // empaque por unidad de venta (constante, misma fuente única)
-      simEmpP[sp.key]     = p ? {emp:p.emp, empCompleto:p.empCompleto, empRazon:p.empRazon} : null;
+      simEmpP[sp.key]     = p ? {emp:p.emp, empCompleto:p.empCompleto, empRazon:p.empRazon, dias:p.dias} : null;   // `dias` viaja para diasTag()
     });
     simPrecios = await simCargarPrecios();
     SIM = simEstadoBase(); simPrev={};
@@ -8024,7 +8099,7 @@ function simRender(){
   document.getElementById('simDiaNote').textContent=r._diasTot.toLocaleString('es-CR',{maximumFractionDigits:1})+' días de producción/mes';
   let h='';
   SIM_PROD.forEach(p=>{ const d=r[p.key];
-    h+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+'</td>'
+    h+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+diasTag(simEmpP[p.key])+'</td>'
       +'<td style="text-align:right">'+cM(d.mp)+'</td>'
       +'<td style="text-align:right">'+cM(d.indU)+simDelta('ind_'+p.key,d.indU)+'</td>'
       +'<td style="text-align:right">'+(d.emp?cM(d.emp):'—')+'</td>'
@@ -8039,7 +8114,7 @@ function simRender(){
   SIM_PROD.forEach(p=>{ const precio=C.precios[p.key], d=r[p.key];
     if(precio==null){ mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span></td><td colspan="5" style="text-align:left;color:var(--text-3)">no se vende en este canal</td></tr>'; return; }
     const neto=precio*(1-C.termino), margC=neto-d.total, margP=precio?margC/precio*100:0; sum+=margP; n++;   // margen % sobre PRECIO DE LISTA bruto y SIN frío — NO es la base de Rentabilidad (que divide por el neto real y sí resta frío). Se unifica en el pendiente de canales.
-    mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+'</td>'
+    mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+diasTag(simEmpP[p.key])+'</td>'
       +'<td style="text-align:right">'+cM(precio)+'</td>'
       +'<td style="text-align:right">'+cM(neto)+'</td>'
       +'<td style="text-align:right">'+cM(d.total)+'</td>'
@@ -8456,7 +8531,7 @@ async function resProdFooter(){
   try{
     const {prods}=await computeCostos(); const byKey={}; prods.forEach(p=>byKey[p.key]=p);
     el.innerHTML=RES_PROD.map(p=>{ const d=byKey[p.key], costo=d?Math.round(d.totalVenta||0):0, uni=(d&&d.unidad)||'';
-      return '<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+empTag(d)+'</div>'
+      return '<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+empTag(d)+diasTag(d)+'</div>'
         +'<div class="mg">'+cM(costo)+'</div><div class="cu">costo real'+(uni?' · '+esc(uni):'')+'</div></div>'; }).join('');
   }catch(e){ el.innerHTML='<div class="muted" style="font-size:12px;padding:8px 4px">No pude leer los costos ('+esc(e&&e.message||e)+'). El detalle está en la pestaña Costos.</div>'; }
 }
