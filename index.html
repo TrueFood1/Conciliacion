@@ -1729,6 +1729,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-ds{margin-top:auto;font-size:11px;font-weight:600;padding-top:8px}
 #vResumen .rz-dsm{display:none}   /* estado en una palabra: solo teléfono (ver @media 700px) */
 #vResumen .rz-edwrap{display:none}   /* "N días editados": solo teléfono */
+#vResumen .rz-c4-mov{display:none}   /* texto de tarjeta vacía: solo teléfono */
 #vResumen .rz-day.rz-done{border-color:var(--border)} #vResumen .rz-day.rz-done .rz-ds{color:#7A7A72}
 #vResumen .rz-day.rz-today{border-color:#C77DA0;box-shadow:0 0 0 1px rgba(199,125,160,.4)} #vResumen .rz-day.rz-today .rz-ds{color:#C77DA0}
 #vResumen .rz-day.rz-miss{border-color:rgba(201,154,78,.4)} #vResumen .rz-day.rz-miss .rz-ds{color:#C99A4E}
@@ -1995,6 +1996,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   /* Tarjetas 2×2 — fila 1: Por medir · Comprar·medir | fila 2: Producciones · Comprar·producir */
   #vResumen .rz-cards4{gap:10px;margin-top:20px;align-items:start}   /* sin estirar: nada de cajas medio vacías */
   #vResumen .rz-c4h{font-size:10px;letter-spacing:.03em;line-height:1.3}
+  /* El plazo ya lo dice la pantalla una vez: no hace falta repetirlo en cada tarjeta. */
+  #vResumen .rz-c4fecha{display:none}
+  #vResumen .rz-c4-desk{display:none} #vResumen .rz-c4-mov{display:inline}
   #vResumen .rz-c4-medir{order:1} #vResumen .rz-c4-cmedir{order:2}
   #vResumen .rz-c4-prod{order:3}  #vResumen .rz-c4-cprod{order:4}
   /* En "Comprar · para producir" la cantidad va DEBAJO del nombre, no al lado. */
@@ -6033,8 +6037,11 @@ function rzComprasCards(){
       +(it.nota?('<div class="rz-c4nota">'+esc(it.nota)+'</div>'):'')+'</div>'; }
   function card(titulo, data, extra){
     const items=(data.items||[]).slice().sort(function(a,b){ return (b.falta/(b.need||1))-(a.falta/(a.need||1)); });   // más urgente primero
+    // Vacío: en teléfono dice lo mismo que "Por medir" ("ya está todo ✓") y en el mismo tono.
+    // Se emiten los dos textos y el CSS elige, para no tocar lo que ya se lee en escritorio.
     const cuerpo=items.length ? items.map(itemHtml).join('')
-                              : '<div class="rz-c4line rz-ok">alcanza — nada que comprar</div>';
+      : '<div class="rz-c4line rz-ok"><span class="rz-c4-desk">alcanza — nada que comprar</span>'
+        +'<span class="rz-c4-mov">ya está todo ✓</span></div>';
     return '<div class="rz-card4 '+extra+'"><div class="rz-c4h">'+titulo+'</div>'
       +'<div class="rz-c4fecha">'+esc(data.fecha)+'</div>'+cuerpo+'</div>';
   }
