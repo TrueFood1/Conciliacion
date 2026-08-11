@@ -304,6 +304,7 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
    deslizables y los productos salen en lista de una línea. Las etiquetas van DEBAJO del
    nombre, nunca montadas sobre el número. */
 .renta-mov{display:none}
+.rf-toggle{display:none}   /* el pie de Rentabilidad se pliega solo en teléfono */
 @media(max-width:700px){
   #vRentabilidad .renta-tbl{display:none}
   #vRentabilidad .renta-mov{display:block}
@@ -328,6 +329,14 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
   .rm-r.rm-na{color:var(--text-3)}
   .rm-tot{border-top:.5px solid var(--border-strong);margin-top:2px}
   .rm-tot .rm-nm,.rm-tot .rg{font-weight:600}
+  /* Pie de Rentabilidad: una línea tocable; el texto largo, adentro. */
+  #vRentabilidad .rf-toggle{display:flex;width:100%;align-items:center;justify-content:space-between;
+    padding:0;border:none;background:none;color:var(--text-3);font-family:inherit;font-size:11px;
+    text-align:left;cursor:pointer}
+  #vRentabilidad .rf-toggle::after{content:'⌄';font-size:13px;line-height:1}
+  #vRentabilidad .rf-toggle.rf-abierto::after{content:'⌃'}
+  #vRentabilidad .rf-body{display:none;margin-top:8px;line-height:1.5}
+  #vRentabilidad .rf-body.rf-abierto{display:block}
 }
 .renta-tbl tfoot td{border-top:1px solid var(--border-strong);border-bottom:none;color:var(--text)}
 .renta-tbl tfoot td:first-child{text-align:left;color:var(--text-2)}
@@ -379,6 +388,7 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .res-pcell .nm i{width:8px;height:8px;border-radius:2px;flex-shrink:0}
 .res-pcell .mg{font-size:20px;color:var(--text);margin-top:7px;font-variant-numeric:tabular-nums}
 .res-pcell .cu{font-size:11.5px;color:var(--text-3);margin-top:3px;font-variant-numeric:tabular-nums}
+.rp-mov,.rp-des,.rp-nota{display:none}   /* desglose y nota: solo teléfono */
 @media(max-width:920px){.res-prod{grid-template-columns:repeat(2,1fr)}.res-pcell{border-bottom:1px solid var(--border)}}
 /* ══════════ FINANZAS EN TELÉFONO: mismo lenguaje que el resto ══════════
    Métricas apiladas de a dos, listas de una línea, sin textos explicativos largos.
@@ -388,7 +398,28 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
   #vResultados .m3sub,#vFacturado .m3sub,#vRentabilidad .m3sub,#vCobros .m3sub:not(.res-nota){display:none}
   #vResultados .m3title,#vFacturado .m3title,#vRentabilidad .m3title,#vCobros .m3title{font-size:20px}
   #vResultados .res-strip{grid-template-columns:1fr 1fr;gap:10px}
-  #vResultados .res-prod{grid-template-columns:1fr}
+  /* COSTO POR PRODUCTO: 6 tarjetas chicas en 3 columnas (3 arriba, 3 abajo), mismo patrón
+     que la cuadrícula de días. Cada una abre su desglose al tocarla. */
+  #vResultados .res-prod{grid-template-columns:repeat(3,1fr);gap:0}
+  #vResultados .res-pcell{padding:10px 9px;border-bottom:1px solid var(--border);cursor:pointer}
+  #vResultados .res-pcell:nth-child(3n){border-right:none}
+  #vResultados .res-pcell .nm{font-size:11px;gap:5px;line-height:1.25}
+  #vResultados .res-pcell .nm i{width:7px;height:7px}
+  #vResultados .res-pcell .mg{font-size:15px;margin-top:5px}
+  #vResultados .res-pcell .cu{font-size:10.5px;margin-top:2px}
+  #vResultados .rp-desk{display:none} #vResultados .rp-mov{display:inline}
+  #vResultados .rp-des{display:block;margin-top:7px;padding-top:6px;border-top:.5px solid #232329}
+  #vResultados .rp-des.hidden{display:none}
+  #vResultados .rp-dr{display:flex;justify-content:space-between;gap:6px;font-size:10px;
+    color:var(--text-3);padding:1px 0;font-variant-numeric:tabular-nums}
+  #vResultados .res-pcell.rp-abierta{background:#141417}
+  #vResultados .rp-nota{display:block;grid-column:1/-1;padding:9px 10px;font-size:10px;
+    color:var(--text-3);line-height:1.45}
+  /* la etiqueta de empaque incompleto baja a su propio renglón: al lado del nombre
+     ensanchaba la tarjeta y descuadraba la fila */
+  #vResultados .res-pcell .nm{flex-wrap:wrap}
+  #vResultados .res-pcell .emp-inc{display:block;width:100%;margin:2px 0 0;font-size:9.5px;
+    white-space:normal;border:none;background:none;padding:0;line-height:1.3}
   #vResultados .sim-seg{max-width:none}
   /* Ventas: canal + facturado arriba, "N clientes" abajo. */
   #vFacturado .cob-tbl{display:block}
@@ -397,11 +428,27 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
   #vFacturado .cob-tbl>tbody>tr>td,#vFacturado .cob-tbl>tr>td{display:block;border:none;padding:0;white-space:normal}
   #vFacturado .cob-tbl>tbody>tr>th,#vFacturado .cob-tbl>tr>th{display:none}
   #vFacturado .cob-movsuf{display:inline}
-  #vFacturado td.vent-g-nm{grid-column:1;grid-row:1;font-size:13.5px}
-  #vFacturado td.vent-g-tot{grid-column:2;grid-row:1;text-align:right;font-size:13.5px}
-  #vFacturado td.vent-g-cli{grid-column:1;grid-row:2;text-align:left;font-size:11px;color:var(--text-3)}
+  /* La tarjeta usaba media pantalla con los números apiñados a la izquierda: ahora la tabla
+     ocupa el ancho completo y cada canal es nombre a la izquierda, monto a la derecha y
+     "N clientes" en sub-línea tenue. */
+  #vFacturado .card{padding:0}
+  /* el tbody sigue siendo table-row-group y dimensiona las filas por contenido: con
+     display:block cada fila ocupa el ancho completo y el monto cierra contra el borde */
+  #vFacturado .cob-tbl,#vFacturado .cob-tbl>tbody{display:block;width:100%}
+  #vFacturado .cob-tbl>tbody>tr,#vFacturado .cob-tbl>tr{grid-template-columns:1fr auto;padding:11px 12px}
+  #vFacturado td.vent-g-nm{grid-column:1;grid-row:1;font-size:13.5px;min-width:0}
+  #vFacturado td.vent-g-tot{grid-column:2;grid-row:1;text-align:right;font-size:13.5px;
+    font-variant-numeric:tabular-nums;white-space:nowrap}
+  #vFacturado td.vent-g-cli{grid-column:1/-1;grid-row:2;text-align:left;font-size:11px;color:var(--text-3)}
   #vFacturado tr.vent-det>td{grid-column:1/-1}
+  #vFacturado tr.vent-total{grid-template-columns:1fr auto}
+  #vFacturado .vent-sub{padding:2px 0 8px 12px}
+  #vFacturado .vent-cli{padding:8px 12px 8px 0}
+  #vFacturado .vent-fac{padding:4px 0 10px 12px}
   #vFacturado .vent-fac table{width:100%}
+  #vFacturado .vent-fac th,#vFacturado .vent-fac td{padding-right:8px}
+  /* el contenedor con overflow-x ya no hace falta: nada se sale */
+  #vFacturado #repCanal>div[style*="overflow-x"]{overflow-x:visible}
 }
 /* ── CALCULADORA DE PRECIOS (Finanzas) ── */
 .calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -614,16 +661,21 @@ tr.r-ing td{background:#eff6ff}
 /* ── LOBBY en teléfono: módulos apilados en 2 columnas (la fila de 5 se cortaba) y
    menos aire muerto entre el saludo y los módulos. ── */
 @media(max-width:700px){
-  .home-wrap{padding:2vh 1.1rem calc(3vh + env(safe-area-inset-bottom))}
-  .home-live{margin-right:0}
+  .home-wrap{padding:calc(2vh + env(safe-area-inset-top)) 1.1rem calc(3vh + env(safe-area-inset-bottom))}
+  /* 78px a la derecha = el ancho de la pastilla "Salir", que va fija: sin esto se montaba
+     encima de "conectado a Odoo · datos en vivo". */
+  .home-hdr{padding-right:78px}
+  .home-live{margin-right:0;min-width:0}
+  .home-live .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .home-live .t{font-size:11px}
   /* El grupo saludo + buscador + módulos queda CENTRADO en la pantalla: el aire sobrante se
      reparte arriba y abajo (los dos `auto`) en vez de acumularse entre el saludo y las
      tarjetas, que era el hueco grande. El encabezado se queda arriba. */
-  /* Saludo + buscador centrados en el espacio entre el encabezado y los módulos: la zona se
-     estira y centra su contenido, sin márgenes fijos que haya que adivinar. */
-  .home-center{flex:1 1 auto;justify-content:center;margin:0}
-  .home-bottom{margin-bottom:0}
+  /* El aire sobrante se reparte ARRIBA del saludo y DEBAJO de los módulos, en vez de
+     acumularse entre el buscador y "TUS MÓDULOS": así los módulos suben y el hueco del medio
+     se achica. (Con flex:1 en .home-center el sobrante caía todo en el medio.) */
+  .home-center{flex:0 0 auto;justify-content:center;margin:auto 0 0}
+  .home-bottom{margin-bottom:auto}
   .home-hi{font-size:22px}
   .home-soon{margin-top:1.3rem}
   .home-modlabel{margin:1.5rem 0 .8rem}
@@ -850,7 +902,10 @@ table td,table th{border-color:#F2F0EA}
 @media(max-width:700px){
   /* Va por id: #appHeader ya trae su propio padding y le gana a cualquier regla de clase.
      Los 78px de la derecha son el espacio de la pastilla "Salir", que va fija. */
-  #appHeader,.header{height:auto;min-height:40px;padding:8px 78px 8px 1rem;gap:8px}
+  /* padding-top con safe-area: sin él, en iPhone el encabezado entra DEBAJO de la barra de
+     estado y se ve cortado hasta que uno hace scroll. */
+  #appHeader,.header{height:auto;min-height:40px;gap:8px;
+    padding:calc(8px + env(safe-area-inset-top)) 78px 8px 1rem}
   .header .hdr-right{display:contents}
   .header .conn-ind{order:-1;margin:0;gap:0;font-size:0}               /* queda solo el punto */
   .header .conn-ind .gdot{width:5px;height:5px}
@@ -862,7 +917,8 @@ table td,table th{border-color:#F2F0EA}
   .header .hdr-prod{order:1;margin-left:auto;font-size:0;white-space:nowrap}
   .header .hdr-prod::after{content:'solo lectura';font-size:11px;color:var(--text-3)}
   .header .logo-link{height:22px!important;order:-2}
-  #btnSalir{top:9px;right:12px;padding:4px 10px;font-size:11px;color:var(--text-3);border-color:#26262C}
+  #btnSalir{top:calc(9px + env(safe-area-inset-top));right:12px;padding:4px 10px;font-size:11px;
+    color:var(--text-3);border-color:#26262C}
 }
 .crumbs{display:flex;align-items:center;gap:9px;font-size:14px}
 .crumb-dot{width:7px;height:7px;border-radius:50%;background:#C964CF;flex-shrink:0}
@@ -1541,7 +1597,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <div class="res-strip" id="resStrip"></div>
     <div class="card-title" style="margin-top:28px">Gastos por familia</div>
     <div class="card" style="margin-top:10px;max-width:720px" id="resFamTabla"></div>
-    <div class="card-title" style="margin-top:28px">Margen por producto</div>
+    <div class="card-title" style="margin-top:28px">Costo por producto</div>
     <div class="m3sub" style="margin-top:2px">Las mismas cifras de Costos y Rentabilidad — un producto, un costo, un margen en toda pantalla.</div>
     <div class="card" style="margin-top:10px;padding:0;overflow:hidden"><div class="res-prod" id="resProdLinea"></div></div>
   </div>
@@ -2130,7 +2186,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vConteo .cn-btns{display:flex;gap:10px}
 #vConteo .cn-btn{background:var(--surface-2);border:.5px solid var(--border);color:var(--text-2);font-size:12.5px;padding:9px 16px;border-radius:8px;cursor:pointer}
 #vConteo .cn-guardar{background:#E9FE60;color:#1A1A1A;border:none;font-weight:600}
-#vConteo .cn-sub,#vConteo .cn-lblm,#vConteo .cn-tmov,#vConteo .cn-dot{display:none}   /* piezas de teléfono */
+#vConteo .cn-sub,#vConteo .cn-lblm,#vConteo .cn-tmov,#vConteo .cn-dot,#vConteo .cn-pres{display:none}   /* piezas de teléfono */
 /* ══════════ CONTEO EN TELÉFONO ══════════
    La tabla de 4 columnas se vuelve una lista: cada fila es un renglón de dos líneas
    (nombre arriba, existencia Odoo + presentación abajo) con los campos a la derecha,
@@ -2150,7 +2206,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vConteo .cn-tbl tbody tr:last-child{border-bottom:none}
   #vConteo .cn-tbl td{display:block;border:none;padding:0}
   /* `td.` en el selector para ganarle a la regla genérica `#vConteo .cn-tbl td` de arriba. */
-  #vConteo .cn-tbl td.cn-nm{grid-column:1;grid-row:1;font-size:13px;min-width:0;font-weight:500}
+  #vConteo .cn-tbl td.cn-nm{grid-column:1;grid-row:1;font-size:13px;min-width:0;font-weight:500;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* La presentación acompaña al NOMBRE, no a los campos ni a la sub-línea. */
+  #vConteo .cn-pres{display:inline;margin-left:7px;color:var(--text-3);font-size:10.5px;font-weight:400}
   /* Punto de descuadre: solo cuando el físico no calza. Inline al lado del nombre, 7px, sin
      texto; la fila que calza (o que todavía no se contó) queda limpia. No toca la altura:
      va en la misma línea del nombre con vertical-align. */
@@ -4287,7 +4346,7 @@ function empTag(p){
 // condición y no puede mostrarse suelto. Es genérico a propósito: cuando el producto
 // vuelva a tener días propios —Cookie Dough, al entrar julio con el 24-jul— la etiqueta
 // desaparece sola, sin que haya que acordarse de quitarla.
-const DIAS_CERO_TXT='sin días de producción propios en la ventana — se revisa al entrar julio';
+const DIAS_CERO_TXT='sin días propios';
 function diasTag(p){
   if(!p || (p.dias||0)>0) return '';
   return '<span class="dias-cero" title="Su costo no incluye indirecto: en la ventana de costeo vigente no tuvo ningún día de producción propio.">'+DIAS_CERO_TXT+'</span>';
@@ -6132,7 +6191,10 @@ function _rzChipPersonas(iso, personas){
 let _rzEdListaOpen=false;
 function _rzEditadosHtml(){
   const eds=[];
-  for(let o=0;o<2;o++) _rzCellsFull(o).forEach(function(c){ if(c.edited) eds.push(c); });
+  // Cuenta SOLO los días VISIBLES: si la próxima semana está colapsada, sus ediciones no
+  // entran (decían "6 días editados" con 5 días en pantalla). Al desplegarla, entran las dos.
+  const semanas = _rzShowNext ? 2 : 1;
+  for(let o=0;o<semanas;o++) _rzCellsFull(o).forEach(function(c){ if(c.edited) eds.push(c); });
   if(!eds.length) return '';
   const filas=eds.map(function(c){
     return '<div class="rz-edrow"><span class="rz-edd">'+c.dow+' '+c.dnum+'</span>'
@@ -6148,11 +6210,12 @@ function rzToggleEditados(btn){
   const l=document.getElementById('rzEdLista'); if(l) l.classList.toggle('hidden', !_rzEdListaOpen);
   if(btn) btn.classList.toggle('rz-abierto', _rzEdListaOpen);
 }
-function rzToggleNext(btn){ const c=document.querySelector('#vResumen .rz-cal2'); if(!c)return;
-  _rzShowNext=!_rzShowNext; c.classList.toggle('rz-shownext', _rzShowNext);
-  // El chevron lo pone el CSS (::after) porque textContent borraría cualquier hijo del botón.
-  if(btn){ btn.textContent = _rzShowNext ? 'Ocultar próxima semana' : 'Ver próxima semana';
-           btn.classList.toggle('rz-abierto', _rzShowNext); } }
+function rzToggleNext(btn){
+  _rzShowNext=!_rzShowNext;
+  // Se repinta entero (y no solo la clase) para que "N días editados" vuelva a contar sobre
+  // lo que quedó visible. El estado vive en _rzShowNext, así que el render lo reproduce.
+  rzRender();
+}
 // Un bloque de semana (lun–vie completo): cabecera con etiqueta + rango + chip de personas, y las 5 celdas.
 function _rzWeekBlock(offset){
   const mon=_rzMonday(offset), iso=_isoWk(mon), w=_rzCtx.weeks[offset]||{}, pers=w.personas||_personasDe(iso);
@@ -6533,7 +6596,7 @@ function cnRecMP(pid){
   const de=document.getElementById('cn-mdif'+pid), se=document.getElementById('cn-msem'+pid);
   const dot=document.getElementById('cn-mdot'+pid); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
   const sub=document.getElementById('cn-msub'+pid);
-  if(sub) sub.textContent=_cnSub(fmtN(fis)+' '+m.uom, fmtN(m.qty)+' '+m.uom, vacio, _cnPresMP(pe));
+  if(sub) sub.textContent=_cnSub(fmtN(fis)+' '+m.uom, fmtN(m.qty)+' '+m.uom, vacio);
   if(de){ de.textContent=vacio?'—':fmtDiff(diff)+' '+m.uom; de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
   cnResumen();
@@ -6572,7 +6635,7 @@ function cnRecTerm(id){
   const de=document.getElementById('cn-tdif'+id), se=document.getElementById('cn-tsem'+id), to=document.getElementById('cn-ttot'+id);
   const dot=document.getElementById('cn-tdot'+id); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
   const sub=document.getElementById('cn-tsub'+id);
-  if(sub) sub.textContent=_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio, _cnPresTerm(t));
+  if(sub) sub.textContent=_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio);
   if(to){ to.textContent=vacio?'':'= '+_cnVentaTxt(t,fis); }
   if(de){ de.textContent=vacio?'—':_cnDiffTxt(t,diff); de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
@@ -6678,10 +6741,12 @@ const _CN_SING={sacos:'saco', cajas:'caja', bolsas:'bolsa', cartones:'cartón', 
 // Segunda línea de la fila (solo teléfono): el total físico calculado EN VIVO contra la
 // existencia de Odoo. Si el ítem todavía no se contó, solo la de Odoo. Todo en gris, sin
 // color y sin negrita — es contexto, no alarma; la alarma es el punto de descuadre.
-function _cnSub(contado, odoo, vacio, pres){
-  return (vacio ? ('Odoo '+odoo) : ('contado '+contado+' · Odoo '+odoo)) + (pres?(' · '+pres):'');
+function _cnSub(contado, odoo, vacio){
+  return vacio ? ('Odoo '+odoo) : ('contado '+contado+' · Odoo '+odoo);
 }
-// Presentación de compra del ítem, para el final de la sub-línea: "saco 22,68", "caja 6 u".
+// Presentación de compra del ítem. Va AL LADO DEL NOMBRE (no junto a los campos ni en la
+// sub-línea): es una propiedad del producto, no del conteo. Solo se dibuja en teléfono.
+function _cnPresTag(txt){ return txt ? ('<span class="cn-pres">'+esc(txt)+'</span>') : ''; }
 function _cnPresMP(pe){ return pe ? (_cnPresLbl(pe)+' '+fmtN(pe.peso)) : ''; }
 function _cnPresTerm(t){ return 'caja '+(t.factor/t.presDiv)+' '+(t.presDiv===1?'u':'paq'); }
 function _cnDotCls(vacio, s){ return (!vacio && s && (s.cls==='cn-warn'||s.cls==='cn-bad')) ? s.cls : ''; }
@@ -6700,8 +6765,8 @@ function cnRender(){
     const sueLab=(pe&&pe.sueltoUnit)?pe.sueltoUnit:m.uom;
     const sueIn = (pe&&pe.noSuelto) ? '<span class="cn-lbl">sin suelto</span>'
       : '<input class="cn-in" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnMpSue('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(sueLab)+'</span><span class="cn-lblm">'+esc(sueLab)+'</span>';
-    const subMP=_cnSub(fmtN(fis)+' '+esc(m.uom), fmtN(m.qty)+' '+esc(m.uom), vacio, esc(_cnPresMP(pe)));
-    mp+='<tr><td class="cn-nm">'+esc(nombreCortoMP(m.name))+_cnDot('m',m.pid,vacio,s)+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
+    const subMP=_cnSub(fmtN(fis)+' '+esc(m.uom), fmtN(m.qty)+' '+esc(m.uom), vacio);
+    mp+='<tr><td class="cn-nm">'+esc(nombreCortoMP(m.name))+_cnPresTag(_cnPresMP(pe))+_cnDot('m',m.pid,vacio,s)+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
       +'<td class="cn-sub" id="cn-msub'+m.pid+'">'+subMP+'</td>'
       +'<td class="cn-count">'+empIn+(empIn&&!(pe&&pe.noSuelto)?' + ':'')+sueIn+'</td>'
       +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-mdif'+m.pid+'">'+(vacio?'—':fmtDiff(diff)+' '+m.uom)+'</td></tr>';
@@ -6724,8 +6789,8 @@ function cnRender(){
     const dr=(d.term||{})[t.id]||{}, vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
     const fis=_crDec(dr.cajas)*t.factor+_crDec(dr.sue)*t.presDiv, diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
     const cajaV=t.factor/t.presDiv, cajaU=(t.presDiv===1?'u':'paq');   // caja en unidad de venta
-    tm+='<tr><td class="cn-nm"><span class="cn-pnom">'+esc(t.label)+_cnDot('t',t.id,vacio,s)+'</span><span class="cn-pcaja">caja = '+cajaV+' '+cajaU+'</span></td><td class="cn-odoo">'+_cnVentaTxt(t,t.odoo)+'</td>'
-      +'<td class="cn-sub" id="cn-tsub'+t.id+'">'+_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio, _cnPresTerm(t))+'</td>'
+    tm+='<tr><td class="cn-nm"><span class="cn-pnom">'+esc(t.label)+_cnPresTag(_cnPresTerm(t))+_cnDot('t',t.id,vacio,s)+'</span><span class="cn-pcaja">caja = '+cajaV+' '+cajaU+'</span></td><td class="cn-odoo">'+_cnVentaTxt(t,t.odoo)+'</td>'
+      +'<td class="cn-sub" id="cn-tsub'+t.id+'">'+_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio)+'</td>'
       +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr.cajas!=null?esc(dr.cajas):'')+'" oninput="cnTermCajas('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">cajas</span><span class="cn-lblm">caj</span> + '
       +'<input class="cn-in" inputmode="numeric" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnTermSue('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(t.venta)+'</span><span class="cn-lblm">'+esc(t.venta)+'</span>'
       +'<span class="cn-ttot" id="cn-ttot'+t.id+'">'+(vacio?'':'= '+_cnVentaTxt(t,fis))+'</span></td>'
@@ -7477,7 +7542,7 @@ function renderValidacion(el,info,prods){
   prods.forEach(p=>{ const pack=p.pack||1; const mpU=p.mp.mpUnit*pack; const tot=mpU+p.indPerSales+(p.emp||0);   // Total/u = MP + indirecto + empaque
     const tieneChk=p.chkMP!=null; const okMP=tieneChk&&tol(p.mp.mpUnit,p.chkMP,0.05);
     const chkMPcol=tieneChk?(cM(p.chkMP)+' '+(okMP?'<span class="ok-tag">✓</span>':'<span class="bad-tag">≠</span>')):'<span style="color:var(--text-3);font-size:11px">sin dato</span>';
-    h+='<tr><td>'+esc(p.label)+empTag(p)+diasTag(p)+'</td><td>'+fmtN(p.dias)+'</td><td>'+fmtN(p.unidades)+'</td><td>'+(p.pct*100).toFixed(1)+'%</td><td>'+cM(p.indPerSales)+'</td><td>'+cM(mpU)+'</td><td>'+chkMPcol+'</td><td><strong>'+cM(tot)+'</strong></td></tr>'
+    h+='<tr><td>'+esc(p.label)+empTag(p)+'</td><td>'+fmtN(p.dias)+'</td><td>'+fmtN(p.unidades)+'</td><td>'+(p.pct*100).toFixed(1)+'%</td><td>'+cM(p.indPerSales)+'</td><td>'+cM(mpU)+'</td><td>'+chkMPcol+'</td><td><strong>'+cM(tot)+'</strong></td></tr>'
       +(p.mp.error?'<tr><td colspan="8" class="bad-tag" style="text-align:left">'+esc(p.label)+': '+esc(p.mp.error)+'</td></tr>':''); });
   h+='</table>';
   h+='<div style="font-size:11px;color:var(--text-3);margin-top:6px">Valores por unidad de venta (Pizza/paquete de 2, Francés y Buns/paquete de 4, resto por unidad). chk MP valida la materia prima. Números REALES de Odoo — no calzan exacto con el Excel (supuestos fijos), pero sí en el mismo orden de magnitud.</div></div>';
@@ -7511,7 +7576,7 @@ function renderTarjetas(el,prods,atipicos){
     const mp=p.mp.mpUnit*pack, ind=p.indUnit*pack, emp=(p.emp!=null?p.emp:null), tot=(p.totalVenta)||1;
     // Color del producto SOLO en el puntito y el borde izquierdo 2px. El número va en blanco.
     h+='<div class="ccard" id="ccard'+i+'" onclick="toggleCard('+i+')" style="border-left:2px solid '+p.color+'">';
-    h+='<div class="ccard-name"><span class="ccard-swatch" style="background:'+p.color+'"></span>'+esc(p.label)+empTag(p)+diasTag(p)+'</div>';
+    h+='<div class="ccard-name"><span class="ccard-swatch" style="background:'+p.color+'"></span>'+esc(p.label)+empTag(p)+'</div>';
     h+='<div class="ccard-total">'+cM(tot)+'</div>';
     h+='<div class="ccard-unit">costo total '+esc(p.unidad||'por unidad')+'</div>';
     h+='<div class="cmini-wrap">';
@@ -7801,7 +7866,7 @@ function renderVentas(d,label){
   let h='<div style="overflow-x:auto"><table class="cob-tbl"><tr><th>Canal</th><th style="text-align:right">Clientes</th><th style="text-align:right">Facturado neto</th></tr>';
   d.filas.forEach((c,ci)=>{
     h+='<tr class="prod-row vent-gr" onclick="ventToggle(\'c'+ci+'\')"><td class="vent-g-nm"><span class="pcaret">▸</span> '+esc(c.nombre)+(c.id==null?' <span class="muted" style="font-size:11px">⚠ sin canal</span>':'')+'</td>'
-      +'<td class="vent-g-cli" style="text-align:right">'+c.clientesArr.length+'<span class="cob-movsuf"> clientes</span></td>'
+      +'<td class="vent-g-cli" style="text-align:right">'+c.clientesArr.length+'<span class="cob-movsuf"> cliente'+(c.clientesArr.length===1?'':'s')+'</span></td>'
       +'<td class="vent-g-tot" style="text-align:right"><strong>'+cM(c.neto)+'</strong></td></tr>';
     let sub='<tr class="hidden vent-det" id="vent-c'+ci+'"><td colspan="3"><div class="vent-sub">';
     c.clientesArr.forEach((cl,clj)=>{
@@ -8031,7 +8096,11 @@ function rentaRender(R, label){
         return esc(c.label)+' '+_pct(c.comision.pct*100)+' (antes '+_pct(c.comision.antes*100)+')';
       }).join(' · ')+'.</span>';
   }
-  h+='<div style="padding:10px 12px;font-size:11px;color:var(--text-3);border-top:1px solid var(--border)">'+foot+'</div>';
+  // El pie (fórmula + costos de canal + supuestos) es tres párrafos: en teléfono queda
+  // detrás de un toque y en escritorio se ve entero como siempre.
+  h+='<div class="renta-foot" style="padding:10px 12px;font-size:11px;color:var(--text-3);border-top:1px solid var(--border)">'
+    +'<button class="rf-toggle" onclick="rentaFootToggle(this)">Cómo se calcula</button>'
+    +'<div class="rf-body">'+foot+'</div></div>';
   _rentaR=R;                                  // el teléfono repinta su lista sin recalcular
   el.innerHTML=_rentaMovHtml(R)+h;
 }
@@ -8069,6 +8138,12 @@ function _rentaMovLista(R, ci){
     +'<div class="rm-r"><div class="rg'+(t<0?' rneg':'')+'">'+cMs(t)+'</div></div></div>';
   return out;
 }
+// Abre/cierra las notas al pie de Rentabilidad (teléfono).
+function rentaFootToggle(btn){
+  const b=btn.parentElement.querySelector('.rf-body'); if(!b) return;
+  const abierto=b.classList.toggle('rf-abierto');
+  btn.classList.toggle('rf-abierto', abierto);
+}
 function rentaCanalMov(i){
   _rentaCanalMov=i; if(!_rentaR) return;
   const l=document.getElementById('rmList'); if(l) l.innerHTML=_rentaMovLista(_rentaR,i);
@@ -8086,7 +8161,7 @@ function rentaDetalle(key){
   h+='<tr style="font-weight:600;border-top:1px solid var(--border)"><td>Materia prima</td><td style="text-align:right">'+cM(mp)+'</td></tr>';
   h+='<tr><td>Indirecto ('+fmtN(Math.round(d.dias||0))+' días/mes · '+((d.pct||0)*100).toFixed(1)+'% del pool)</td><td style="text-align:right">'+cM(ind)+'</td></tr>';
   h+='<tr><td>Empaque'+(emp!=null&&!d.empCompleto?' (parcial)':'')+(d.empCompleto?'':' — <span style="color:#E9A23B">'+esc(d.empRazon||'incompleto')+'</span>')+'</td><td style="text-align:right">'+(emp!=null?cM(emp):'sin dato')+'</td></tr>';
-  h+='<tr style="border-top:1px solid var(--border-strong)"><td><strong>Costo total</strong>'+empTag(d)+diasTag(d)+'</td><td style="text-align:right"><strong>'+cM(tot)+'</strong></td></tr>';
+  h+='<tr style="border-top:1px solid var(--border-strong)"><td><strong>Costo total</strong>'+empTag(d)+'</td><td style="text-align:right"><strong>'+cM(tot)+'</strong></td></tr>';
   h+='</table></div><div class="m3sub" style="margin-top:8px;font-size:11px;color:var(--text-3)">Del motor real de Costos (promedio de los últimos meses cerrados). Reemplaza "Costos por producto".</div></div>';
   el.innerHTML=h; el.scrollIntoView({block:'nearest'});
 }
@@ -8582,7 +8657,7 @@ function renderCobCliente(which,d,el){
     const sec = g.com ? ' <span class="muted cob-razon" style="font-size:11px"><span class="cob-sep">· </span>'+esc(g.razon)+'</span>' : '';
     h+='<tr class="prod-row cob-gr" onclick="cobToggleGrupo('+i+')"><td class="cob-g-nm"><span class="pcaret">▸</span> '
       +(venc?'<span class="cob-venc">'+primary+'</span>':primary)+sec+btnCopiar+'</td>'
-      +'<td class="cob-g-fac">'+g.rows.length+'<span class="cob-movsuf"> facturas</span>'
+      +'<td class="cob-g-fac">'+g.rows.length+'<span class="cob-movsuf"> factura'+(g.rows.length===1?'':'s')+'</span>'
         +'<span class="cob-diasmov cob-venc'+(venc&&g.maxVenc>COB_DIAS_ROJO?' cob-d30':'')+'"> · '
         +(venc?(g.maxVenc+' d'):'al día')+'</span></td>'
       +'<td class="cob-g-tot" style="text-align:right"><strong>'+cM(g.total)+'</strong></td>'
@@ -8611,7 +8686,7 @@ function _cobMensaje(g){
   const venc=g.rows.filter(r=>(_diasVencida(r.invoice_date_due)||0)>0);
   if(!venc.length) return '';
   let txt='Hola! Espero que estés muy bien. Te paso un resumen de las facturas pendientes de pago:\n';
-  venc.forEach(r=>{ txt+='• Factura ...'+String(r.name||'').slice(-4)+' — '+_fD(r.invoice_date)+' — '+cM(r.amount_residual||0)+'\n'; });
+  venc.forEach(r=>{ txt+='• …'+String(r.name||'').slice(-4)+' — '+_fD(r.invoice_date)+' — '+cM(r.amount_residual||0)+'\n'; });
   txt+='Total pendiente: '+cM(venc.reduce((s,r)=>s+(r.amount_residual||0),0))+'\n';
   txt+='Les agradecemos mucho el pago. ¡Gracias!';
   return txt;
@@ -8682,7 +8757,7 @@ async function cargarSimulador(){
       simDiasReal[sp.key] = p ? (p.dias||0) : 0;                 // días reales FRACCIONALES (exactos, no redondeados)
       simUnidReal[sp.key] = p ? (p.unidades||0) : 0;             // unidades/mes reales (unidad de venta)
       simEmp[sp.key]      = p ? (p.emp!=null?p.emp:0) : 0;       // empaque por unidad de venta (constante, misma fuente única)
-      simEmpP[sp.key]     = p ? {emp:p.emp, empCompleto:p.empCompleto, empRazon:p.empRazon, dias:p.dias} : null;   // `dias` viaja para diasTag()
+      simEmpP[sp.key]     = p ? {emp:p.emp, empCompleto:p.empCompleto, empRazon:p.empRazon, dias:p.dias} : null;
     });
     simPrecios = await simCargarPrecios();
     SIM = simEstadoBase(); simPrev={};
@@ -8741,7 +8816,7 @@ function simRender(){
   document.getElementById('simDiaNote').textContent=r._diasTot.toLocaleString('es-CR',{maximumFractionDigits:1})+' días de producción/mes';
   let h='';
   SIM_PROD.forEach(p=>{ const d=r[p.key];
-    h+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+diasTag(simEmpP[p.key])+'</td>'
+    h+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+'</td>'
       +'<td style="text-align:right">'+cM(d.mp)+'</td>'
       +'<td style="text-align:right">'+cM(d.indU)+simDelta('ind_'+p.key,d.indU)+'</td>'
       +'<td style="text-align:right">'+(d.emp?cM(d.emp):'—')+'</td>'
@@ -8756,7 +8831,7 @@ function simRender(){
   SIM_PROD.forEach(p=>{ const precio=C.precios[p.key], d=r[p.key];
     if(precio==null){ mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span></td><td colspan="5" style="text-align:left;color:var(--text-3)">no se vende en este canal</td></tr>'; return; }
     const neto=precio*(1-C.termino), margC=neto-d.total, margP=precio?margC/precio*100:0; sum+=margP; n++;   // margen % sobre PRECIO DE LISTA bruto y SIN frío — NO es la base de Rentabilidad (que divide por el neto real y sí resta frío). Se unifica en el pendiente de canales.
-    mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+diasTag(simEmpP[p.key])+'</td>'
+    mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+'</td>'
       +'<td style="text-align:right">'+cM(precio)+'</td>'
       +'<td style="text-align:right">'+cM(neto)+'</td>'
       +'<td style="text-align:right">'+cM(d.total)+'</td>'
@@ -9172,10 +9247,32 @@ async function resProdFooter(){
   el.innerHTML=RES_PROD.map(p=>'<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</div><div class="mg muted" style="font-size:13px">…</div></div>').join('');
   try{
     const {prods}=await computeCostos(); const byKey={}; prods.forEach(p=>byKey[p.key]=p);
-    el.innerHTML=RES_PROD.map(p=>{ const d=byKey[p.key], costo=d?Math.round(d.totalVenta||0):0, uni=(d&&d.unidad)||'';
-      return '<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+empTag(d)+diasTag(d)+'</div>'
-        +'<div class="mg">'+cM(costo)+'</div><div class="cu">costo real'+(uni?' · '+esc(uni):'')+'</div></div>'; }).join('');
+    // Cada tarjeta abre su desglose: los TRES términos con los que está definido el costo
+    // (materia prima + indirecto + empaque). El desglose es de teléfono; en escritorio la
+    // tarjeta se ve exactamente igual que antes.
+    el.innerHTML=RES_PROD.map(function(p,i){
+      const d=byKey[p.key], costo=d?Math.round(d.totalVenta||0):0, uni=(d&&d.unidad)||'';
+      const pack=(d&&d.pack)||1;
+      const mp=d?((d.mp&&d.mp.mpUnit)||0)*pack:0, ind=d?((d.indUnit||0)*pack):0,
+            emp=(d&&d.emp!=null)?d.emp:null;
+      const fila=(k,v)=>'<div class="rp-dr"><span>'+k+'</span><span>'+v+'</span></div>';
+      const des='<div class="rp-des hidden" id="rpDes'+i+'">'
+        +fila('materia prima', cM(mp))+fila('indirecto', cM(ind))
+        +fila('empaque', emp!=null?cM(emp):'sin dato')+'</div>';
+      return '<div class="res-pcell" onclick="resProdToggle('+i+',this)">'
+        +'<div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+empTag(d)+'</div>'
+        +'<div class="mg">'+cM(costo)+'</div>'
+        +'<div class="cu"><span class="rp-desk">costo real'+(uni?' · '+esc(uni):'')+'</span>'
+          +'<span class="rp-mov">'+esc(uni||'')+'</span></div>'+des+'</div>'; }).join('')
+      +'<div class="rp-nota">El indirecto sale del promedio de los últimos 3 meses cerrados '
+      +'(ventana que avanza sola).</div>';
   }catch(e){ el.innerHTML='<div class="muted" style="font-size:12px;padding:8px 4px">No pude leer los costos ('+esc(e&&e.message||e)+'). El detalle está en la pestaña Costos.</div>'; }
+}
+// Abre/cierra el desglose de una tarjeta de costo (teléfono).
+function resProdToggle(i, cell){
+  const d=document.getElementById('rpDes'+i); if(!d) return;
+  const abierto=!d.classList.toggle('hidden');
+  if(cell) cell.classList.toggle('rp-abierta', abierto);
 }
 let resMeses=[], _resBuilt=false;
 const RES_STATE={mes:0, comp:[]};
