@@ -2130,7 +2130,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vConteo .cn-btns{display:flex;gap:10px}
 #vConteo .cn-btn{background:var(--surface-2);border:.5px solid var(--border);color:var(--text-2);font-size:12.5px;padding:9px 16px;border-radius:8px;cursor:pointer}
 #vConteo .cn-guardar{background:#E9FE60;color:#1A1A1A;border:none;font-weight:600}
-#vConteo .cn-sub,#vConteo .cn-lblm,#vConteo .cn-tmov,#vConteo .cn-dot{display:none}   /* piezas de teléfono */
+#vConteo .cn-sub,#vConteo .cn-lblm,#vConteo .cn-tmov,#vConteo .cn-dot,#vConteo .cn-pres{display:none}   /* piezas de teléfono */
 /* ══════════ CONTEO EN TELÉFONO ══════════
    La tabla de 4 columnas se vuelve una lista: cada fila es un renglón de dos líneas
    (nombre arriba, existencia Odoo + presentación abajo) con los campos a la derecha,
@@ -2150,7 +2150,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vConteo .cn-tbl tbody tr:last-child{border-bottom:none}
   #vConteo .cn-tbl td{display:block;border:none;padding:0}
   /* `td.` en el selector para ganarle a la regla genérica `#vConteo .cn-tbl td` de arriba. */
-  #vConteo .cn-tbl td.cn-nm{grid-column:1;grid-row:1;font-size:13px;min-width:0;font-weight:500}
+  #vConteo .cn-tbl td.cn-nm{grid-column:1;grid-row:1;font-size:13px;min-width:0;font-weight:500;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* La presentación acompaña al NOMBRE, no a los campos ni a la sub-línea. */
+  #vConteo .cn-pres{display:inline;margin-left:7px;color:var(--text-3);font-size:10.5px;font-weight:400}
   /* Punto de descuadre: solo cuando el físico no calza. Inline al lado del nombre, 7px, sin
      texto; la fila que calza (o que todavía no se contó) queda limpia. No toca la altura:
      va en la misma línea del nombre con vertical-align. */
@@ -6537,7 +6540,7 @@ function cnRecMP(pid){
   const de=document.getElementById('cn-mdif'+pid), se=document.getElementById('cn-msem'+pid);
   const dot=document.getElementById('cn-mdot'+pid); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
   const sub=document.getElementById('cn-msub'+pid);
-  if(sub) sub.textContent=_cnSub(fmtN(fis)+' '+m.uom, fmtN(m.qty)+' '+m.uom, vacio, _cnPresMP(pe));
+  if(sub) sub.textContent=_cnSub(fmtN(fis)+' '+m.uom, fmtN(m.qty)+' '+m.uom, vacio);
   if(de){ de.textContent=vacio?'—':fmtDiff(diff)+' '+m.uom; de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
   cnResumen();
@@ -6576,7 +6579,7 @@ function cnRecTerm(id){
   const de=document.getElementById('cn-tdif'+id), se=document.getElementById('cn-tsem'+id), to=document.getElementById('cn-ttot'+id);
   const dot=document.getElementById('cn-tdot'+id); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
   const sub=document.getElementById('cn-tsub'+id);
-  if(sub) sub.textContent=_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio, _cnPresTerm(t));
+  if(sub) sub.textContent=_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio);
   if(to){ to.textContent=vacio?'':'= '+_cnVentaTxt(t,fis); }
   if(de){ de.textContent=vacio?'—':_cnDiffTxt(t,diff); de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
@@ -6682,10 +6685,12 @@ const _CN_SING={sacos:'saco', cajas:'caja', bolsas:'bolsa', cartones:'cartón', 
 // Segunda línea de la fila (solo teléfono): el total físico calculado EN VIVO contra la
 // existencia de Odoo. Si el ítem todavía no se contó, solo la de Odoo. Todo en gris, sin
 // color y sin negrita — es contexto, no alarma; la alarma es el punto de descuadre.
-function _cnSub(contado, odoo, vacio, pres){
-  return (vacio ? ('Odoo '+odoo) : ('contado '+contado+' · Odoo '+odoo)) + (pres?(' · '+pres):'');
+function _cnSub(contado, odoo, vacio){
+  return vacio ? ('Odoo '+odoo) : ('contado '+contado+' · Odoo '+odoo);
 }
-// Presentación de compra del ítem, para el final de la sub-línea: "saco 22,68", "caja 6 u".
+// Presentación de compra del ítem. Va AL LADO DEL NOMBRE (no junto a los campos ni en la
+// sub-línea): es una propiedad del producto, no del conteo. Solo se dibuja en teléfono.
+function _cnPresTag(txt){ return txt ? ('<span class="cn-pres">'+esc(txt)+'</span>') : ''; }
 function _cnPresMP(pe){ return pe ? (_cnPresLbl(pe)+' '+fmtN(pe.peso)) : ''; }
 function _cnPresTerm(t){ return 'caja '+(t.factor/t.presDiv)+' '+(t.presDiv===1?'u':'paq'); }
 function _cnDotCls(vacio, s){ return (!vacio && s && (s.cls==='cn-warn'||s.cls==='cn-bad')) ? s.cls : ''; }
@@ -6704,8 +6709,8 @@ function cnRender(){
     const sueLab=(pe&&pe.sueltoUnit)?pe.sueltoUnit:m.uom;
     const sueIn = (pe&&pe.noSuelto) ? '<span class="cn-lbl">sin suelto</span>'
       : '<input class="cn-in" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnMpSue('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(sueLab)+'</span><span class="cn-lblm">'+esc(sueLab)+'</span>';
-    const subMP=_cnSub(fmtN(fis)+' '+esc(m.uom), fmtN(m.qty)+' '+esc(m.uom), vacio, esc(_cnPresMP(pe)));
-    mp+='<tr><td class="cn-nm">'+esc(nombreCortoMP(m.name))+_cnDot('m',m.pid,vacio,s)+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
+    const subMP=_cnSub(fmtN(fis)+' '+esc(m.uom), fmtN(m.qty)+' '+esc(m.uom), vacio);
+    mp+='<tr><td class="cn-nm">'+esc(nombreCortoMP(m.name))+_cnPresTag(_cnPresMP(pe))+_cnDot('m',m.pid,vacio,s)+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
       +'<td class="cn-sub" id="cn-msub'+m.pid+'">'+subMP+'</td>'
       +'<td class="cn-count">'+empIn+(empIn&&!(pe&&pe.noSuelto)?' + ':'')+sueIn+'</td>'
       +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-mdif'+m.pid+'">'+(vacio?'—':fmtDiff(diff)+' '+m.uom)+'</td></tr>';
@@ -6728,8 +6733,8 @@ function cnRender(){
     const dr=(d.term||{})[t.id]||{}, vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
     const fis=_crDec(dr.cajas)*t.factor+_crDec(dr.sue)*t.presDiv, diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
     const cajaV=t.factor/t.presDiv, cajaU=(t.presDiv===1?'u':'paq');   // caja en unidad de venta
-    tm+='<tr><td class="cn-nm"><span class="cn-pnom">'+esc(t.label)+_cnDot('t',t.id,vacio,s)+'</span><span class="cn-pcaja">caja = '+cajaV+' '+cajaU+'</span></td><td class="cn-odoo">'+_cnVentaTxt(t,t.odoo)+'</td>'
-      +'<td class="cn-sub" id="cn-tsub'+t.id+'">'+_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio, _cnPresTerm(t))+'</td>'
+    tm+='<tr><td class="cn-nm"><span class="cn-pnom">'+esc(t.label)+_cnPresTag(_cnPresTerm(t))+_cnDot('t',t.id,vacio,s)+'</span><span class="cn-pcaja">caja = '+cajaV+' '+cajaU+'</span></td><td class="cn-odoo">'+_cnVentaTxt(t,t.odoo)+'</td>'
+      +'<td class="cn-sub" id="cn-tsub'+t.id+'">'+_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio)+'</td>'
       +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr.cajas!=null?esc(dr.cajas):'')+'" oninput="cnTermCajas('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">cajas</span><span class="cn-lblm">caj</span> + '
       +'<input class="cn-in" inputmode="numeric" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnTermSue('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(t.venta)+'</span><span class="cn-lblm">'+esc(t.venta)+'</span>'
       +'<span class="cn-ttot" id="cn-ttot'+t.id+'">'+(vacio?'':'= '+_cnVentaTxt(t,fis))+'</span></td>'
