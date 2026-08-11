@@ -1541,7 +1541,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <div class="res-strip" id="resStrip"></div>
     <div class="card-title" style="margin-top:28px">Gastos por familia</div>
     <div class="card" style="margin-top:10px;max-width:720px" id="resFamTabla"></div>
-    <div class="card-title" style="margin-top:28px">Margen por producto</div>
+    <div class="card-title" style="margin-top:28px">Costo por producto</div>
     <div class="m3sub" style="margin-top:2px">Las mismas cifras de Costos y Rentabilidad — un producto, un costo, un margen en toda pantalla.</div>
     <div class="card" style="margin-top:10px;padding:0;overflow:hidden"><div class="res-prod" id="resProdLinea"></div></div>
   </div>
@@ -4287,7 +4287,7 @@ function empTag(p){
 // condición y no puede mostrarse suelto. Es genérico a propósito: cuando el producto
 // vuelva a tener días propios —Cookie Dough, al entrar julio con el 24-jul— la etiqueta
 // desaparece sola, sin que haya que acordarse de quitarla.
-const DIAS_CERO_TXT='sin días de producción propios en la ventana — se revisa al entrar julio';
+const DIAS_CERO_TXT='sin días propios';
 function diasTag(p){
   if(!p || (p.dias||0)>0) return '';
   return '<span class="dias-cero" title="Su costo no incluye indirecto: en la ventana de costeo vigente no tuvo ningún día de producción propio.">'+DIAS_CERO_TXT+'</span>';
@@ -6132,7 +6132,10 @@ function _rzChipPersonas(iso, personas){
 let _rzEdListaOpen=false;
 function _rzEditadosHtml(){
   const eds=[];
-  for(let o=0;o<2;o++) _rzCellsFull(o).forEach(function(c){ if(c.edited) eds.push(c); });
+  // Cuenta SOLO los días VISIBLES: si la próxima semana está colapsada, sus ediciones no
+  // entran (decían "6 días editados" con 5 días en pantalla). Al desplegarla, entran las dos.
+  const semanas = _rzShowNext ? 2 : 1;
+  for(let o=0;o<semanas;o++) _rzCellsFull(o).forEach(function(c){ if(c.edited) eds.push(c); });
   if(!eds.length) return '';
   const filas=eds.map(function(c){
     return '<div class="rz-edrow"><span class="rz-edd">'+c.dow+' '+c.dnum+'</span>'
@@ -6148,11 +6151,12 @@ function rzToggleEditados(btn){
   const l=document.getElementById('rzEdLista'); if(l) l.classList.toggle('hidden', !_rzEdListaOpen);
   if(btn) btn.classList.toggle('rz-abierto', _rzEdListaOpen);
 }
-function rzToggleNext(btn){ const c=document.querySelector('#vResumen .rz-cal2'); if(!c)return;
-  _rzShowNext=!_rzShowNext; c.classList.toggle('rz-shownext', _rzShowNext);
-  // El chevron lo pone el CSS (::after) porque textContent borraría cualquier hijo del botón.
-  if(btn){ btn.textContent = _rzShowNext ? 'Ocultar próxima semana' : 'Ver próxima semana';
-           btn.classList.toggle('rz-abierto', _rzShowNext); } }
+function rzToggleNext(btn){
+  _rzShowNext=!_rzShowNext;
+  // Se repinta entero (y no solo la clase) para que "N días editados" vuelva a contar sobre
+  // lo que quedó visible. El estado vive en _rzShowNext, así que el render lo reproduce.
+  rzRender();
+}
 // Un bloque de semana (lun–vie completo): cabecera con etiqueta + rango + chip de personas, y las 5 celdas.
 function _rzWeekBlock(offset){
   const mon=_rzMonday(offset), iso=_isoWk(mon), w=_rzCtx.weeks[offset]||{}, pers=w.personas||_personasDe(iso);
@@ -7477,7 +7481,7 @@ function renderValidacion(el,info,prods){
   prods.forEach(p=>{ const pack=p.pack||1; const mpU=p.mp.mpUnit*pack; const tot=mpU+p.indPerSales+(p.emp||0);   // Total/u = MP + indirecto + empaque
     const tieneChk=p.chkMP!=null; const okMP=tieneChk&&tol(p.mp.mpUnit,p.chkMP,0.05);
     const chkMPcol=tieneChk?(cM(p.chkMP)+' '+(okMP?'<span class="ok-tag">✓</span>':'<span class="bad-tag">≠</span>')):'<span style="color:var(--text-3);font-size:11px">sin dato</span>';
-    h+='<tr><td>'+esc(p.label)+empTag(p)+diasTag(p)+'</td><td>'+fmtN(p.dias)+'</td><td>'+fmtN(p.unidades)+'</td><td>'+(p.pct*100).toFixed(1)+'%</td><td>'+cM(p.indPerSales)+'</td><td>'+cM(mpU)+'</td><td>'+chkMPcol+'</td><td><strong>'+cM(tot)+'</strong></td></tr>'
+    h+='<tr><td>'+esc(p.label)+empTag(p)+'</td><td>'+fmtN(p.dias)+'</td><td>'+fmtN(p.unidades)+'</td><td>'+(p.pct*100).toFixed(1)+'%</td><td>'+cM(p.indPerSales)+'</td><td>'+cM(mpU)+'</td><td>'+chkMPcol+'</td><td><strong>'+cM(tot)+'</strong></td></tr>'
       +(p.mp.error?'<tr><td colspan="8" class="bad-tag" style="text-align:left">'+esc(p.label)+': '+esc(p.mp.error)+'</td></tr>':''); });
   h+='</table>';
   h+='<div style="font-size:11px;color:var(--text-3);margin-top:6px">Valores por unidad de venta (Pizza/paquete de 2, Francés y Buns/paquete de 4, resto por unidad). chk MP valida la materia prima. Números REALES de Odoo — no calzan exacto con el Excel (supuestos fijos), pero sí en el mismo orden de magnitud.</div></div>';
@@ -7511,7 +7515,7 @@ function renderTarjetas(el,prods,atipicos){
     const mp=p.mp.mpUnit*pack, ind=p.indUnit*pack, emp=(p.emp!=null?p.emp:null), tot=(p.totalVenta)||1;
     // Color del producto SOLO en el puntito y el borde izquierdo 2px. El número va en blanco.
     h+='<div class="ccard" id="ccard'+i+'" onclick="toggleCard('+i+')" style="border-left:2px solid '+p.color+'">';
-    h+='<div class="ccard-name"><span class="ccard-swatch" style="background:'+p.color+'"></span>'+esc(p.label)+empTag(p)+diasTag(p)+'</div>';
+    h+='<div class="ccard-name"><span class="ccard-swatch" style="background:'+p.color+'"></span>'+esc(p.label)+empTag(p)+'</div>';
     h+='<div class="ccard-total">'+cM(tot)+'</div>';
     h+='<div class="ccard-unit">costo total '+esc(p.unidad||'por unidad')+'</div>';
     h+='<div class="cmini-wrap">';
@@ -8086,7 +8090,7 @@ function rentaDetalle(key){
   h+='<tr style="font-weight:600;border-top:1px solid var(--border)"><td>Materia prima</td><td style="text-align:right">'+cM(mp)+'</td></tr>';
   h+='<tr><td>Indirecto ('+fmtN(Math.round(d.dias||0))+' días/mes · '+((d.pct||0)*100).toFixed(1)+'% del pool)</td><td style="text-align:right">'+cM(ind)+'</td></tr>';
   h+='<tr><td>Empaque'+(emp!=null&&!d.empCompleto?' (parcial)':'')+(d.empCompleto?'':' — <span style="color:#E9A23B">'+esc(d.empRazon||'incompleto')+'</span>')+'</td><td style="text-align:right">'+(emp!=null?cM(emp):'sin dato')+'</td></tr>';
-  h+='<tr style="border-top:1px solid var(--border-strong)"><td><strong>Costo total</strong>'+empTag(d)+diasTag(d)+'</td><td style="text-align:right"><strong>'+cM(tot)+'</strong></td></tr>';
+  h+='<tr style="border-top:1px solid var(--border-strong)"><td><strong>Costo total</strong>'+empTag(d)+'</td><td style="text-align:right"><strong>'+cM(tot)+'</strong></td></tr>';
   h+='</table></div><div class="m3sub" style="margin-top:8px;font-size:11px;color:var(--text-3)">Del motor real de Costos (promedio de los últimos meses cerrados). Reemplaza "Costos por producto".</div></div>';
   el.innerHTML=h; el.scrollIntoView({block:'nearest'});
 }
@@ -8611,7 +8615,7 @@ function _cobMensaje(g){
   const venc=g.rows.filter(r=>(_diasVencida(r.invoice_date_due)||0)>0);
   if(!venc.length) return '';
   let txt='Hola! Espero que estés muy bien. Te paso un resumen de las facturas pendientes de pago:\n';
-  venc.forEach(r=>{ txt+='• Factura ...'+String(r.name||'').slice(-4)+' — '+_fD(r.invoice_date)+' — '+cM(r.amount_residual||0)+'\n'; });
+  venc.forEach(r=>{ txt+='• …'+String(r.name||'').slice(-4)+' — '+_fD(r.invoice_date)+' — '+cM(r.amount_residual||0)+'\n'; });
   txt+='Total pendiente: '+cM(venc.reduce((s,r)=>s+(r.amount_residual||0),0))+'\n';
   txt+='Les agradecemos mucho el pago. ¡Gracias!';
   return txt;
@@ -8682,7 +8686,7 @@ async function cargarSimulador(){
       simDiasReal[sp.key] = p ? (p.dias||0) : 0;                 // días reales FRACCIONALES (exactos, no redondeados)
       simUnidReal[sp.key] = p ? (p.unidades||0) : 0;             // unidades/mes reales (unidad de venta)
       simEmp[sp.key]      = p ? (p.emp!=null?p.emp:0) : 0;       // empaque por unidad de venta (constante, misma fuente única)
-      simEmpP[sp.key]     = p ? {emp:p.emp, empCompleto:p.empCompleto, empRazon:p.empRazon, dias:p.dias} : null;   // `dias` viaja para diasTag()
+      simEmpP[sp.key]     = p ? {emp:p.emp, empCompleto:p.empCompleto, empRazon:p.empRazon, dias:p.dias} : null;
     });
     simPrecios = await simCargarPrecios();
     SIM = simEstadoBase(); simPrev={};
@@ -8741,7 +8745,7 @@ function simRender(){
   document.getElementById('simDiaNote').textContent=r._diasTot.toLocaleString('es-CR',{maximumFractionDigits:1})+' días de producción/mes';
   let h='';
   SIM_PROD.forEach(p=>{ const d=r[p.key];
-    h+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+diasTag(simEmpP[p.key])+'</td>'
+    h+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+'</td>'
       +'<td style="text-align:right">'+cM(d.mp)+'</td>'
       +'<td style="text-align:right">'+cM(d.indU)+simDelta('ind_'+p.key,d.indU)+'</td>'
       +'<td style="text-align:right">'+(d.emp?cM(d.emp):'—')+'</td>'
@@ -8756,7 +8760,7 @@ function simRender(){
   SIM_PROD.forEach(p=>{ const precio=C.precios[p.key], d=r[p.key];
     if(precio==null){ mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span></td><td colspan="5" style="text-align:left;color:var(--text-3)">no se vende en este canal</td></tr>'; return; }
     const neto=precio*(1-C.termino), margC=neto-d.total, margP=precio?margC/precio*100:0; sum+=margP; n++;   // margen % sobre PRECIO DE LISTA bruto y SIN frío — NO es la base de Rentabilidad (que divide por el neto real y sí resta frío). Se unifica en el pendiente de canales.
-    mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+diasTag(simEmpP[p.key])+'</td>'
+    mh+='<tr><td><span class="pname"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</span>'+empTag(simEmpP[p.key])+'</td>'
       +'<td style="text-align:right">'+cM(precio)+'</td>'
       +'<td style="text-align:right">'+cM(neto)+'</td>'
       +'<td style="text-align:right">'+cM(d.total)+'</td>'
@@ -9173,7 +9177,7 @@ async function resProdFooter(){
   try{
     const {prods}=await computeCostos(); const byKey={}; prods.forEach(p=>byKey[p.key]=p);
     el.innerHTML=RES_PROD.map(p=>{ const d=byKey[p.key], costo=d?Math.round(d.totalVenta||0):0, uni=(d&&d.unidad)||'';
-      return '<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+empTag(d)+diasTag(d)+'</div>'
+      return '<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+empTag(d)+'</div>'
         +'<div class="mg">'+cM(costo)+'</div><div class="cu">costo real'+(uni?' · '+esc(uni):'')+'</div></div>'; }).join('');
   }catch(e){ el.innerHTML='<div class="muted" style="font-size:12px;padding:8px 4px">No pude leer los costos ('+esc(e&&e.message||e)+'). El detalle está en la pestaña Costos.</div>'; }
 }
