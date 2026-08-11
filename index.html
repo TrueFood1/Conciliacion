@@ -304,6 +304,7 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
    deslizables y los productos salen en lista de una línea. Las etiquetas van DEBAJO del
    nombre, nunca montadas sobre el número. */
 .renta-mov{display:none}
+.rf-toggle{display:none}   /* el pie de Rentabilidad se pliega solo en teléfono */
 @media(max-width:700px){
   #vRentabilidad .renta-tbl{display:none}
   #vRentabilidad .renta-mov{display:block}
@@ -328,6 +329,14 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
   .rm-r.rm-na{color:var(--text-3)}
   .rm-tot{border-top:.5px solid var(--border-strong);margin-top:2px}
   .rm-tot .rm-nm,.rm-tot .rg{font-weight:600}
+  /* Pie de Rentabilidad: una línea tocable; el texto largo, adentro. */
+  #vRentabilidad .rf-toggle{display:flex;width:100%;align-items:center;justify-content:space-between;
+    padding:0;border:none;background:none;color:var(--text-3);font-family:inherit;font-size:11px;
+    text-align:left;cursor:pointer}
+  #vRentabilidad .rf-toggle::after{content:'⌄';font-size:13px;line-height:1}
+  #vRentabilidad .rf-toggle.rf-abierto::after{content:'⌃'}
+  #vRentabilidad .rf-body{display:none;margin-top:8px;line-height:1.5}
+  #vRentabilidad .rf-body.rf-abierto{display:block}
 }
 .renta-tbl tfoot td{border-top:1px solid var(--border-strong);border-bottom:none;color:var(--text)}
 .renta-tbl tfoot td:first-child{text-align:left;color:var(--text-2)}
@@ -419,11 +428,27 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
   #vFacturado .cob-tbl>tbody>tr>td,#vFacturado .cob-tbl>tr>td{display:block;border:none;padding:0;white-space:normal}
   #vFacturado .cob-tbl>tbody>tr>th,#vFacturado .cob-tbl>tr>th{display:none}
   #vFacturado .cob-movsuf{display:inline}
-  #vFacturado td.vent-g-nm{grid-column:1;grid-row:1;font-size:13.5px}
-  #vFacturado td.vent-g-tot{grid-column:2;grid-row:1;text-align:right;font-size:13.5px}
-  #vFacturado td.vent-g-cli{grid-column:1;grid-row:2;text-align:left;font-size:11px;color:var(--text-3)}
+  /* La tarjeta usaba media pantalla con los números apiñados a la izquierda: ahora la tabla
+     ocupa el ancho completo y cada canal es nombre a la izquierda, monto a la derecha y
+     "N clientes" en sub-línea tenue. */
+  #vFacturado .card{padding:0}
+  /* el tbody sigue siendo table-row-group y dimensiona las filas por contenido: con
+     display:block cada fila ocupa el ancho completo y el monto cierra contra el borde */
+  #vFacturado .cob-tbl,#vFacturado .cob-tbl>tbody{display:block;width:100%}
+  #vFacturado .cob-tbl>tbody>tr,#vFacturado .cob-tbl>tr{grid-template-columns:1fr auto;padding:11px 12px}
+  #vFacturado td.vent-g-nm{grid-column:1;grid-row:1;font-size:13.5px;min-width:0}
+  #vFacturado td.vent-g-tot{grid-column:2;grid-row:1;text-align:right;font-size:13.5px;
+    font-variant-numeric:tabular-nums;white-space:nowrap}
+  #vFacturado td.vent-g-cli{grid-column:1/-1;grid-row:2;text-align:left;font-size:11px;color:var(--text-3)}
   #vFacturado tr.vent-det>td{grid-column:1/-1}
+  #vFacturado tr.vent-total{grid-template-columns:1fr auto}
+  #vFacturado .vent-sub{padding:2px 0 8px 12px}
+  #vFacturado .vent-cli{padding:8px 12px 8px 0}
+  #vFacturado .vent-fac{padding:4px 0 10px 12px}
   #vFacturado .vent-fac table{width:100%}
+  #vFacturado .vent-fac th,#vFacturado .vent-fac td{padding-right:8px}
+  /* el contenedor con overflow-x ya no hace falta: nada se sale */
+  #vFacturado #repCanal>div[style*="overflow-x"]{overflow-x:visible}
 }
 /* ── CALCULADORA DE PRECIOS (Finanzas) ── */
 .calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -7832,7 +7857,7 @@ function renderVentas(d,label){
   let h='<div style="overflow-x:auto"><table class="cob-tbl"><tr><th>Canal</th><th style="text-align:right">Clientes</th><th style="text-align:right">Facturado neto</th></tr>';
   d.filas.forEach((c,ci)=>{
     h+='<tr class="prod-row vent-gr" onclick="ventToggle(\'c'+ci+'\')"><td class="vent-g-nm"><span class="pcaret">▸</span> '+esc(c.nombre)+(c.id==null?' <span class="muted" style="font-size:11px">⚠ sin canal</span>':'')+'</td>'
-      +'<td class="vent-g-cli" style="text-align:right">'+c.clientesArr.length+'<span class="cob-movsuf"> clientes</span></td>'
+      +'<td class="vent-g-cli" style="text-align:right">'+c.clientesArr.length+'<span class="cob-movsuf"> cliente'+(c.clientesArr.length===1?'':'s')+'</span></td>'
       +'<td class="vent-g-tot" style="text-align:right"><strong>'+cM(c.neto)+'</strong></td></tr>';
     let sub='<tr class="hidden vent-det" id="vent-c'+ci+'"><td colspan="3"><div class="vent-sub">';
     c.clientesArr.forEach((cl,clj)=>{
@@ -8062,7 +8087,11 @@ function rentaRender(R, label){
         return esc(c.label)+' '+_pct(c.comision.pct*100)+' (antes '+_pct(c.comision.antes*100)+')';
       }).join(' · ')+'.</span>';
   }
-  h+='<div style="padding:10px 12px;font-size:11px;color:var(--text-3);border-top:1px solid var(--border)">'+foot+'</div>';
+  // El pie (fórmula + costos de canal + supuestos) es tres párrafos: en teléfono queda
+  // detrás de un toque y en escritorio se ve entero como siempre.
+  h+='<div class="renta-foot" style="padding:10px 12px;font-size:11px;color:var(--text-3);border-top:1px solid var(--border)">'
+    +'<button class="rf-toggle" onclick="rentaFootToggle(this)">Cómo se calcula</button>'
+    +'<div class="rf-body">'+foot+'</div></div>';
   _rentaR=R;                                  // el teléfono repinta su lista sin recalcular
   el.innerHTML=_rentaMovHtml(R)+h;
 }
@@ -8099,6 +8128,12 @@ function _rentaMovLista(R, ci){
   out+='<div class="rm-row rm-tot"><div class="rm-l"><div class="rm-nm">Total del canal</div></div>'
     +'<div class="rm-r"><div class="rg'+(t<0?' rneg':'')+'">'+cMs(t)+'</div></div></div>';
   return out;
+}
+// Abre/cierra las notas al pie de Rentabilidad (teléfono).
+function rentaFootToggle(btn){
+  const b=btn.parentElement.querySelector('.rf-body'); if(!b) return;
+  const abierto=b.classList.toggle('rf-abierto');
+  btn.classList.toggle('rf-abierto', abierto);
 }
 function rentaCanalMov(i){
   _rentaCanalMov=i; if(!_rentaR) return;
@@ -8613,7 +8648,7 @@ function renderCobCliente(which,d,el){
     const sec = g.com ? ' <span class="muted cob-razon" style="font-size:11px"><span class="cob-sep">· </span>'+esc(g.razon)+'</span>' : '';
     h+='<tr class="prod-row cob-gr" onclick="cobToggleGrupo('+i+')"><td class="cob-g-nm"><span class="pcaret">▸</span> '
       +(venc?'<span class="cob-venc">'+primary+'</span>':primary)+sec+btnCopiar+'</td>'
-      +'<td class="cob-g-fac">'+g.rows.length+'<span class="cob-movsuf"> facturas</span>'
+      +'<td class="cob-g-fac">'+g.rows.length+'<span class="cob-movsuf"> factura'+(g.rows.length===1?'':'s')+'</span>'
         +'<span class="cob-diasmov cob-venc'+(venc&&g.maxVenc>COB_DIAS_ROJO?' cob-d30':'')+'"> · '
         +(venc?(g.maxVenc+' d'):'al día')+'</span></td>'
       +'<td class="cob-g-tot" style="text-align:right"><strong>'+cM(g.total)+'</strong></td>'
