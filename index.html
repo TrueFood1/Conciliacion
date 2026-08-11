@@ -349,18 +349,6 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .plan-tbl tr:last-child td{border-bottom:none}
 .plan-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;vertical-align:middle}
 
-/* ── Alertas del lobby (Bloque 4) ── */
-.alertas-fab{position:fixed;right:20px;bottom:20px;z-index:150;display:flex;flex-direction:column;align-items:flex-end;gap:10px}
-.alertas-btn{background:var(--surface);border:1px solid var(--border-strong);color:var(--text);font-family:inherit;font-size:13px;font-weight:500;padding:10px 16px;border-radius:999px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.35)}
-.alertas-btn:hover{border-color:var(--text-3)}
-.alertas-btn.vacio{color:var(--text-3);font-weight:400;box-shadow:none;opacity:.75}
-.alertas-panel{width:340px;max-width:calc(100vw - 40px);max-height:60vh;overflow-y:auto;background:var(--surface);border:1px solid var(--border-strong);border-radius:14px;padding:4px 14px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
-.alerta-linea{display:flex;align-items:center;gap:10px;padding:9px 4px;font-size:13px;color:var(--text-2);cursor:pointer;border-bottom:1px solid var(--border)}
-.alerta-linea:hover{color:var(--text)}
-.alerta-linea:last-child{border-bottom:none}
-.alerta-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.alerta-arr{margin-left:auto;color:var(--text-3);font-size:12px}
-.alerta-vacio,.alerta-vacio:hover{color:var(--text-3);cursor:default}
 .res-frow{display:grid;grid-template-columns:16px 1fr 130px 64px;gap:10px;align-items:baseline;padding:12px 6px;border-bottom:1px solid var(--border);cursor:pointer}
 .res-frow:last-of-type{border-bottom:none}
 .res-frow .car{color:var(--text-3);font-size:11px;transition:transform .15s;display:inline-block}
@@ -668,14 +656,13 @@ tr.r-ing td{background:#eff6ff}
   .home-live{margin-right:0;min-width:0}
   .home-live .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .home-live .t{font-size:11px}
-  /* El grupo saludo + buscador + módulos queda CENTRADO en la pantalla: el aire sobrante se
-     reparte arriba y abajo (los dos `auto`) en vez de acumularse entre el saludo y las
-     tarjetas, que era el hueco grande. El encabezado se queda arriba. */
-  /* El aire sobrante se reparte ARRIBA del saludo y DEBAJO de los módulos, en vez de
-     acumularse entre el buscador y "TUS MÓDULOS": así los módulos suben y el hueco del medio
-     se achica. (Con flex:1 en .home-center el sobrante caía todo en el medio.) */
-  .home-center{flex:0 0 auto;justify-content:center;margin:auto 0 0}
-  .home-bottom{margin-bottom:auto}
+  /* Saludo + buscador quedan ARRIBA, pegados al encabezado; los módulos se anclan ABAJO
+     (`margin-top:auto` se come todo el sobrante) y el hueco del medio queda grande y limpio.
+     --lobby-piso es el colchón contra el filo inferior: es LA perilla de esta pantalla,
+     se ajusta con la captura del teléfono sin tocar nada más. */
+  .home-wrap{--lobby-piso:22px}
+  .home-center{flex:0 0 auto;justify-content:flex-start;margin:0}
+  .home-bottom{margin-top:auto;margin-bottom:0}
   .home-hi{font-size:22px}
   .home-soon{margin-top:1.3rem}
   .home-modlabel{margin:1.5rem 0 .8rem}
@@ -690,7 +677,7 @@ tr.r-ing td{background:#eff6ff}
   #vLobby .home-mod.inert{opacity:.38}
   .home-mod .home-mod-state{margin-top:auto}
   .home-mod.inert .home-mod-state{text-transform:lowercase;font-weight:400}
-  .home-build{padding-top:18px}
+  .home-build{padding-top:var(--lobby-piso)}
   .home-build{padding-bottom:calc(10px + env(safe-area-inset-bottom))}   /* el pie no queda bajo la barra del navegador */
 }
 /* Preguntas sugeridas: lista fina apilada, no botones */
@@ -1160,12 +1147,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     </div><!-- /home-bottom -->
     <div class="home-build" id="homeBuild"></div>
   </div>
-</div>
-
-<!-- ALERTAS · botón flotante del lobby (Bloque 4, rediseño) -->
-<div id="alertasFab" class="alertas-fab hidden">
-  <div id="alertasPanel" class="alertas-panel hidden"></div>
-  <button id="alertasBtn" class="alertas-btn" onclick="toggleAlertasPanel()">Alertas (0)</button>
 </div>
 
 <!-- UPLOAD -->
@@ -2340,7 +2321,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 10 ago 2026';
+const BUILD = 'v 11 ago 2026';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -2657,7 +2638,6 @@ async function doLogin(isRetry){
     document.getElementById('alertConn').classList.remove('hidden');
     document.getElementById('vLogin').classList.add('hidden');
     document.getElementById('vLobby').classList.remove('hidden');   // tras conectar → lobby
-    mostrarAlertasFab(); cargarAlertas();   // Bloque 4: botón flotante de avisos (async, no bloquea)
   }catch(e){
     st.innerHTML='<div class="status s-err">Error: '+esc(e.message)+'</div>';
   }
@@ -2759,7 +2739,6 @@ function _modShow(id){
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.toggle('hidden', v!==id); });
   document.getElementById('vLobby').classList.add('hidden');
   document.getElementById('appHeader').classList.remove('hidden');
-  ocultarAlertasFab();   // el botón flotante de alertas es solo del lobby
   aplicarModoProduccion();
 }
 function crumbSet(area,cur){
@@ -2782,7 +2761,6 @@ function volverLobby(){
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.add('hidden'); });
   document.getElementById('appHeader').classList.add('hidden');
   document.getElementById('vLobby').classList.remove('hidden');
-  mostrarAlertasFab(); cargarAlertas();   // Bloque 4: botón flotante; refresca una vez por sesión
 }
 
 function setProgress(pct,msg){
@@ -6025,7 +6003,23 @@ function _rzRealBatches(){ const b={}, bd=(_rzCtx&&_rzCtx.real&&_rzCtx.real.byDa
 function _rzMonday(offset){ const mon=new Date(_rzCtx.mon0); mon.setDate(mon.getDate()+offset*7); return mon; }
 function _rzCells(offset){ return rzCeldas(_rzMonday(offset), _rzCtx.weeks[offset]||{otros:[],semillas:0,viernes:{}}, _rzCtx.real.byDate, _rzCtx.hoyStr, _rzOverrides); }
 // META de la semana = propuesta del motor (layout sin editar). Es lo que NO se debe romper.
+// OJO: es la meta BASE — no ve ediciones ni auto-relleno. Sirve como referencia interna del
+// nivelador (_rzAutoFill la usa para saber qué falta). Para MOSTRARLE un denominador a Andrea
+// hay que usar _rzMetaEfectiva: si no, la pantalla contradice al calendario.
 function _rzMeta(offset){ return _semanaBatches(_rzCtx.weeks[offset]||{otros:[],semillas:0,viernes:{}}); }
+// META EFECTIVA = LO QUE MUESTRA EL CALENDARIO, no la propuesta base. Se suma sobre las MISMAS
+// celdas que pinta el calendario (_rzCellsFull = base + overrides + auto-relleno):
+//   · días pasados CON registro en Odoo → lo real (esas celdas son kind 'real' y van sin prods)
+//   · días pasados con plan y SIN registro ('pend') → lo asumido
+//   · de hoy en adelante → lo planeado (propuesta, edición, auto-relleno o viernes)
+// Difiere de la base cuando la edición SUPERA la meta (2 días de Blanco donde había 1) o cuando
+// el auto-relleno no consiguió dónde reponer el faltante (_rzAutoLeft).
+function _rzMetaEfectiva(offset){
+  const b = offset===0 ? Object.assign({}, _rzHechoOAsumido()) : {};
+  const fut=_rzFutBatches(_rzCellsFull(offset));
+  for(const k in fut) b[+k]=(b[+k]||0)+fut[+k];
+  return b;
+}
 // ── RAZONAR POR SEMANA (no por día): acredita lo REAL producido contra la meta semanal y
 //    LIBERA los días futuros cuyo producto ya está cumplido. Sin esto el motor duplicaba
 //    (ej: 2 Blanco hechos lun+mar y el nivelador seguía proponiendo Blanco el miércoles).
@@ -6140,8 +6134,11 @@ function rzToggleId(id, btn){ const e=document.getElementById(id); if(!e)return;
   if(btn){ btn.textContent = h ? btn.textContent.replace('⌄','›') : btn.textContent.replace('›','⌄'); } }
 // TARJETA "Producciones registradas": lo REGISTRADO en Odoo vs la meta, por producto (oliva si
 // cumplido). Solo cuenta lo confirmado por Odoo — lo asumido no suma acá, por eso "registradas".
+// El DENOMINADOR sale de _rzMetaEfectiva, el mismo plan que pinta el calendario: con la meta
+// BASE la tarjeta mostraba los números previos a la edición (Blanco 0/6 con dos días de Blanco
+// puestos a mano) y se contradecía con la cuadrícula de arriba.
 function rzVaSemanaCard(){
-  const meta=_rzMeta(0), real=_rzRealBatches();
+  const meta=_rzMetaEfectiva(0), real=_rzRealBatches();
   const rows=NIV_PROD.filter(function(p){return (meta[p]||0)>0;}).map(function(p){
     const m=meta[p]||0, r=real[p]||0, done=r>=m;
     return '<div class="rz-vsrow"><span class="rz-vsn">'+esc(_nomCorto(p))+'</span>'
@@ -7946,9 +7943,9 @@ const CANALES = [
    comision:{pct:0.065,  enFactura:false, fuente:'acuerdo comercial, jul-2026'}, frio:null},
   {key:'compre', label:'Compre Bien',           plId:5,
    comision:null,
-   frio:{monto:51166.40, provisional:true, editable:true, antes:34386,
-         fuente:'dato real de facturas del portal (may–jun 2026) · pendiente confirmar tratamiento contable con la contadora',
-         nota:'Si el frío se capitaliza en la cuenta 111601 (activo prepagado) y se amortiza con otra periodicidad, el costo mensual real puede ser distinto. Editable hasta que responda Valery.'}},
+   frio:{monto:51166.40, verificado:true, editable:true, antes:34386,
+         fuente:'facturas del proveedor en 6106013, verificado factura por factura (11-ago-2026)',
+         nota:'Cuatro bills recurrentes de Compre Bien, sin IVA: pf31/CM lineal 9.420 · Pan True Food 13.640 · Pan congelado 16.500 · Pizza 5.720 = 45.280 → ×1,13 = ₡51.166,40. Estables desde mayo 2026 (antes el pan congelado facturaba 1.650 y el total daba ₡32.521,40). El ₡34.386 viejo salía de 6106028, que NO es gasto: es la cuenta transitoria donde caen los write-off del descuento sobre el depósito.'}},
   {key:'bm',     label:'BM',                    plId:5,  comision:null, frio:null},
   {key:'negro',  label:'Super Negro',           plId:5,  comision:null, frio:null},
   {key:'horeca', label:'HORECA',                plId:2,  comision:null, frio:null},
@@ -8419,84 +8416,6 @@ function renderPlan(rows){
   h+='</table></div>';
   h+='<div class="m3sub" style="margin-top:10px;font-size:11px;color:var(--text-3)">Curva de hoy ('+esc(hoy)+'). Stock en unidades individuales (potes para galletas). Checkpoints = valor objetivo de la curva en esa fecha.</div>';
   document.getElementById('planTabla').innerHTML=h;
-}
-
-// ════════════════════════════════════════════════════════════════════════
-// ALERTAS DEL LOBBY (Bloque 4) — v1, SOLO de lo que ya funciona. SOLO LECTURA.
-// (a) MP bajo umbral · (b) merma nueva 7 días · (c) terminado en rojo vs plan ·
-// (d) sin producción 3+ días hábiles · (e) checkpoint del plan ≤7 días.
-// Cada alerta: {ord, mod, txt, go}. mod → color del módulo de origen.
-// ════════════════════════════════════════════════════════════════════════
-function _haceDiasISO(n){ const d=new Date(); d.setDate(d.getDate()-n); const p=x=>String(x).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
-function _fechaCRiso(s){ const m=String(s||'').match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/); if(!m) return String(s||'').slice(0,10);
-  const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5])-6*3600*1000),p=x=>String(x).padStart(2,'0'); return d.getUTCFullYear()+'-'+p(d.getUTCMonth()+1)+'-'+p(d.getUTCDate()); }
-// Días hábiles = lun–jue (producción TrueFood; viernes es limpieza, no cuenta).
-function _diasHabilesEntre(d1,d2){ let a=_diaNum(d1),b=_diaNum(d2),c=0; for(let x=a+1;x<=b;x++){ const wd=new Date(x*86400000).getUTCDay(); if(wd>=1&&wd<=4)c++; } return c; }
-async function _alertaMP(){
-  const mp = window._invMP && window._invMP.length ? window._invMP : (window._invMP=await listaMP());
-  const bajos = mp.filter(m=>mpAlerta(m).nivel==='bajo');
-  if(!bajos.length) return null;
-  const nombres=bajos.slice(0,3).map(m=>m.name).join(', ')+(bajos.length>3?'…':'');
-  return {ord:1, mod:'op', txt:bajos.length+' materia'+(bajos.length>1?'s primas':' prima')+' bajo umbral de reorden: '+nombres, go:'irAInventario'};
-}
-async function _alertaMerma(){
-  const n=await odooCall('stock.scrap','search_count',[[['state','=','done'],['date_done','>=',_haceDiasISO(7)+' 00:00:00']]]);
-  if(!n) return null;
-  return {ord:2, mod:'op', txt:n+' merma'+(n>1?'s':'')+' nueva'+(n>1?'s':'')+' registrada'+(n>1?'s':'')+' en los últimos 7 días', go:'irAMermas'};
-}
-async function _alertaPlanRojo(){
-  const ids=PLAN_PROD.map(p=>p.id);
-  const q=await odooCall('stock.quant','read_group',[[['product_id','in',ids],['location_id.usage','=','internal']],['quantity'],['product_id']],{lazy:false});
-  const oh={}; q.forEach(r=>{ const pid=r.product_id&&r.product_id[0]; if(pid) oh[pid]=(oh[pid]||0)+(r.quantity||0); });
-  const rojos=[];
-  for(const p of PLAN_PROD){ const stock=(oh[p.id]||0)/(await prodUomFactor(p.id)); if(planSem(p,stock).k==='rojo') rojos.push(p.label); }
-  if(!rojos.length) return null;
-  return {ord:3, mod:'op', txt:'Plan: '+rojos.join(', ')+' en rojo contra la curva de diciembre', go:'irAPlan'};
-}
-async function _alertaSinProd(){
-  const last=await odooCall('mrp.production','search_read',[[['state','=','done']]],{fields:['date_start'],limit:1,order:'date_start desc'});
-  if(!last.length||!last[0].date_start) return null;
-  const dias=_diasHabilesEntre(_fechaCRiso(last[0].date_start), _hoyISO());
-  if(dias<3) return null;
-  return {ord:4, mod:'op', txt:'Sin órdenes de producción registradas hace '+dias+' días hábiles', go:'irAProduccion'};
-}
-function _alertaCheckpoint(){
-  const hoy=_diaNum(_hoyISO());
-  for(const [fecha,label] of PLAN_CHK){ const dd=_diaNum(fecha)-hoy;
-    if(dd>=0&&dd<=7) return {ord:5, mod:'op', txt:'Checkpoint del plan ('+label+') en '+dd+' día'+(dd===1?'':'s'), go:'irAPlan'}; }
-  return null;
-}
-const _ALERTA_COL={op:'#D4537E', fin:'#378ADD', con:'#84BD00'};
-let _alertas=[];
-// Render en el botón flotante + panel (abajo a la derecha del lobby).
-function renderAlertas(alertas){
-  _alertas=alertas.slice().sort((a,b)=>a.ord-b.ord);
-  const btn=document.getElementById('alertasBtn'), panel=document.getElementById('alertasPanel');
-  if(!btn||!panel) return;
-  const n=_alertas.length;
-  btn.textContent='Alertas ('+n+')';
-  btn.classList.toggle('vacio', n===0);
-  panel.innerHTML = n
-    ? _alertas.map(a=>'<div class="alerta-linea" onclick="alertaIr(\''+a.go+'\')"><span class="alerta-dot" style="background:'+(_ALERTA_COL[a.mod]||'#D4537E')+'"></span><span>'+esc(a.txt)+'</span><span class="alerta-arr">→</span></div>').join('')
-    : '<div class="alerta-linea alerta-vacio">Sin avisos</div>';
-}
-function alertaIr(fn){ cerrarAlertasPanel(); if(typeof window[fn]==='function') window[fn](); }
-function toggleAlertasPanel(){ const p=document.getElementById('alertasPanel'); if(p) p.classList.toggle('hidden'); }
-function cerrarAlertasPanel(){ const p=document.getElementById('alertasPanel'); if(p) p.classList.add('hidden'); }
-function mostrarAlertasFab(){ const f=document.getElementById('alertasFab'); if(f) f.classList.remove('hidden'); }
-function ocultarAlertasFab(){ const f=document.getElementById('alertasFab'); if(f) f.classList.add('hidden'); cerrarAlertasPanel(); }
-let _alertasCargadas=false;
-async function cargarAlertas(force){
-  const btn=document.getElementById('alertasBtn'); if(!btn) return;
-  if(_alertasCargadas && !force) return;
-  _alertasCargadas=true;
-  const found=[];
-  btn.textContent='Alertas …';
-  const tasks=[ Promise.resolve(_alertaCheckpoint()), _alertaMerma(), _alertaPlanRojo(), _alertaSinProd(), _alertaMP() ];
-  await Promise.all(tasks.map(t=>t.catch(e=>{console.warn('alerta:',e);return null;}).then(a=>{
-    if(a){ found.push(a); renderAlertas(found); }
-  })));
-  renderAlertas(found);   // estado final (incluye "Alertas (0)" / "Sin avisos")
 }
 
 // ════════════════════════════════════════════════════════════════════════
