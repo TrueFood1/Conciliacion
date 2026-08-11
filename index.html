@@ -188,6 +188,7 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 /* Consecutivo del proveedor: los últimos 4 en mono, siempre visibles; el completo al lado. */
 .cob-cons{display:none;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--text)}
 .cob-consfull{color:var(--text-2)}
+#vCobros .cob-tbl td.cob-g-fac{text-align:right}   /* escritorio: la columna Facturas va a la derecha */
 .cob-movsuf,.cob-diasmov,.cob-detacc{display:none}
 #vCobros .cob-tbl td.cob-g-acc{display:none}   /* la columna del ícono es solo de teléfono */
 .cob-wa-ico{display:none;background:none;border:.5px solid var(--border);border-radius:999px;
@@ -220,13 +221,28 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
   #vCobros .cob-detacc .cob-copy{margin:0;padding:5px 12px;font-size:12px;border-radius:999px}
   #vCobros .cob-detacc .cob-copy::before{content:none}
   #vCobros .cob-tbl tr.cob-det>td{grid-column:1/-1}
-  /* Por factura: consecutivo + monto arriba; cliente · vence · días abajo. */
+  /* Por factura (lista suelta): consecutivo + monto arriba; cliente · vence · días abajo. */
   #vCobros .cob-tbl td.cob-f-doc{grid-column:1;grid-row:1;font-size:13px}
   #vCobros .cob-tbl td.cob-f-tot{grid-column:2;grid-row:1;text-align:right}
   #vCobros .cob-tbl td.cob-f-cli{grid-column:1;grid-row:2;font-size:11px;color:var(--text-3)}
   #vCobros .cob-tbl td.cob-f-fecha{grid-column:1;grid-row:3;font-size:11px;color:var(--text-3)}
   #vCobros .cob-tbl td.cob-f-vence{grid-column:2;grid-row:2;text-align:right;font-size:11px;color:var(--text-3)}
   #vCobros .cob-tbl td.cob-f-dias{grid-column:2;grid-row:3;text-align:right;font-size:11px}
+  /* DENTRO del detalle de un proveedor/cliente: UNA línea por factura, indentada —
+     consecutivo en mono · días · monto a la derecha. Las fechas de emisión y vencimiento
+     son de escritorio: en el teléfono la factura se reconoce por su consecutivo. */
+  #vCobros .cob-det .cob-fr{grid-template-columns:1fr auto auto;padding:7px 0 7px 14px;
+    border-bottom:.5px solid #1A1A1E}
+  #vCobros .cob-det .cob-fr td.cob-f-doc{grid-column:1;grid-row:1;font-size:12.5px;min-width:0}
+  #vCobros .cob-det .cob-fr td.cob-f-dias{grid-column:2;grid-row:1;text-align:right;font-size:11px;
+    padding-left:10px;align-self:center}
+  #vCobros .cob-det .cob-fr td.cob-f-tot{grid-column:3;grid-row:1;text-align:right;font-size:12.5px;
+    padding-left:12px}
+  #vCobros .cob-det .cob-fr td.cob-f-fecha,#vCobros .cob-det .cob-fr td.cob-f-vence,
+  #vCobros .cob-det .cob-fr td.cob-f-cli{display:none}
+  #vCobros .cob-det table{width:100%}
+  #vCobros .cob-det table>tbody>tr:first-child,#vCobros .cob-det table>tr:first-child{display:none}   /* el encabezado de la subtabla */
+  #vCobros .prod-det-wrap{padding:0}
   #vCobros .cob-cons{display:inline}            /* en el teléfono manda el "…4471" */
   #vCobros .cob-consfull{display:none}          /* el consecutivo completo es de escritorio */
   /* ── Bajar el volumen ──
@@ -8566,7 +8582,7 @@ function renderCobCliente(which,d,el){
     const sec = g.com ? ' <span class="muted cob-razon" style="font-size:11px"><span class="cob-sep">· </span>'+esc(g.razon)+'</span>' : '';
     h+='<tr class="prod-row cob-gr" onclick="cobToggleGrupo('+i+')"><td class="cob-g-nm"><span class="pcaret">▸</span> '
       +(venc?'<span class="cob-venc">'+primary+'</span>':primary)+sec+btnCopiar+'</td>'
-      +'<td class="cob-g-fac" style="text-align:right">'+g.rows.length+'<span class="cob-movsuf"> facturas</span>'
+      +'<td class="cob-g-fac">'+g.rows.length+'<span class="cob-movsuf"> facturas</span>'
         +'<span class="cob-diasmov cob-venc'+(venc&&g.maxVenc>COB_DIAS_ROJO?' cob-d30':'')+'"> · '
         +(venc?(g.maxVenc+' d'):'al día')+'</span></td>'
       +'<td class="cob-g-tot" style="text-align:right"><strong>'+cM(g.total)+'</strong></td>'
