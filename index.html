@@ -188,7 +188,11 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 /* Consecutivo del proveedor: los últimos 4 en mono, siempre visibles; el completo al lado. */
 .cob-cons{display:none;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--text)}
 .cob-consfull{color:var(--text-2)}
-.cob-movsuf{display:none}
+.cob-movsuf,.cob-diasmov,.cob-detacc{display:none}
+#vCobros .cob-tbl td.cob-g-acc{display:none}   /* la columna del ícono es solo de teléfono */
+.cob-wa-ico{display:none;background:none;border:.5px solid var(--border);border-radius:999px;
+  color:var(--text-3);padding:5px;cursor:pointer;line-height:0}
+.cob-wa-ico svg{width:17px;height:17px;display:block}
 /* ══════════ COBROS Y PAGOS EN TELÉFONO ══════════
    Las dos tablas (por cliente y por factura) se vuelven filas de dos líneas. Nunca tabla ancha. */
 @media(max-width:700px){
@@ -200,14 +204,21 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
   #vCobros .cob-tbl td{display:block;border:none;padding:0;white-space:normal}
   #vCobros .cob-tbl th{display:none}
   #vCobros .cob-movsuf{display:inline}
-  /* Por cliente: nombre + total arriba; "N facturas" y lo vencido abajo. */
-  /* min-width:0 para que la columna del nombre pueda encogerse: sin esto los botones la
-     estiraban y el monto se salía de la fila. */
+  /* Por cliente, DOS líneas: nombre + monto + ícono arriba; "N facturas · X d" abajo,
+     pegado a la izquierda. La razón social y el par de botones grandes son de escritorio. */
+  #vCobros .cob-tbl tr.cob-gr{grid-template-columns:1fr auto auto}
   #vCobros .cob-tbl td.cob-g-nm{grid-column:1;grid-row:1;font-size:13.5px;min-width:0}
-  #vCobros .cob-acc{display:block}   /* las acciones, en su propio renglón */
+  #vCobros .cob-razon,#vCobros .cob-acc{display:none}
   #vCobros .cob-tbl td.cob-g-tot{grid-column:2;grid-row:1;text-align:right;font-size:13.5px}
-  #vCobros .cob-tbl td.cob-g-fac{grid-column:1;grid-row:2;text-align:left;font-size:11px;color:var(--text-3)}
-  #vCobros .cob-tbl td.cob-g-venc{grid-column:2;grid-row:2;text-align:right;font-size:11px}
+  #vCobros .cob-tbl td.cob-g-acc{display:block;grid-column:3;grid-row:1;padding-left:10px}
+  #vCobros .cob-wa-ico{display:inline-block}
+  #vCobros .cob-tbl td.cob-g-fac{grid-column:1/-1;grid-row:2;text-align:left;font-size:11px;color:var(--text-3)}
+  #vCobros .cob-diasmov{display:inline}
+  #vCobros .cob-tbl td.cob-g-venc{display:none}   /* los días ya van en la línea tenue */
+  /* "Copiar recordatorio" vive en el detalle del cliente, no en la fila. */
+  #vCobros .cob-detacc{display:block;padding:2px 0 8px}
+  #vCobros .cob-detacc .cob-copy{margin:0;padding:5px 12px;font-size:12px;border-radius:999px}
+  #vCobros .cob-detacc .cob-copy::before{content:none}
   #vCobros .cob-tbl tr.cob-det>td{grid-column:1/-1}
   /* Por factura: consecutivo + monto arriba; cliente · vence · días abajo. */
   #vCobros .cob-tbl td.cob-f-doc{grid-column:1;grid-row:1;font-size:13px}
@@ -224,14 +235,9 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
   /* Los días de atraso en gris; el rojo se reserva para lo que de verdad lo amerita. */
   #vCobros .cob-venc{color:var(--text-3)}
   #vCobros .cob-venc.cob-d30{color:var(--red)}
-  /* La razón social larga envolvía y desalineaba la fila: baja a segunda línea tenue. */
-  #vCobros .cob-razon{display:block;margin-top:2px;color:var(--text-3);font-size:10.5px;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  #vCobros .cob-sep{display:none}   /* el "·" separaba en línea; en su propio renglón sobra */
-  /* WhatsApp: pastilla chica con borde hairline. Copiar: solo el ícono (el texto que le pone
-     el JS al copiar queda a font-size 0; la confirmación se ve en el color del ícono). */
-  #vCobros .cob-wa{margin:7px 8px 0 0;padding:4px 11px;font-size:11.5px;border-width:.5px;
-    border-color:var(--border);color:var(--text-3);border-radius:999px}
+  /* La razón social no se muestra en teléfono (sí en escritorio): la fila es de dos líneas
+     y el alias comercial alcanza para reconocer al cliente. */
+  /* Copiar, cuando aparece fuera del detalle, queda solo como ícono. */
   #vCobros .cob-copy{margin:7px 0 0;padding:4px 8px;font-size:0;border-width:.5px;
     border-color:var(--border);border-radius:999px;vertical-align:middle}
   #vCobros .cob-copy::before{content:'⧉';font-size:13px;line-height:1;color:var(--text-3)}
@@ -6158,6 +6164,7 @@ function _rzDerrameNota(){
   }
   return parts.length?('<div class="rz-leftnote">Para cumplir la meta: '+parts.join(' · ')+'.</div>'):'';
 }
+const _SVG_WA='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-12.6 7.3L3 20.5l1.8-5.2A8.4 8.4 0 1 1 21 11.5z"/></svg>';
 const _SVG_ALERT='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>';
 // Días con plan que siguen SIN REGISTRAR. La alerta se prende 1 DÍA CALENDARIO después de la
 // fecha planeada y queda prendida hasta que se registre (día corrido, sin días hábiles:
@@ -8544,17 +8551,27 @@ function renderCobCliente(which,d,el){
     const venc = g.maxVenc!=null && g.maxVenc>0;
     const vencCell = venc ? '<span class="cob-venc'+(g.maxVenc>COB_DIAS_ROJO?' cob-d30':'')+'">'+g.maxVenc+' d</span>' : '<span class="muted">—</span>';
     // WhatsApp es la acción principal (abre el chat con el mensaje escrito); copiar queda de apoyo.
-    const btnCopiar = (which==='cobrar' && venc)
+    // Escritorio: los dos botones junto al nombre, como siempre.
+    // Teléfono: solo el ícono de WhatsApp, en celda propia a la derecha del monto; "Copiar"
+    // se muda al detalle del cliente (ver más abajo) para que la fila quede de dos líneas.
+    const conAcc = (which==='cobrar' && venc);
+    const btnCopiar = conAcc
       ? ' <span class="cob-acc"><button class="cob-wa" onclick="cobWhatsApp('+i+',event)">WhatsApp</button>'
         +' <button class="cob-copy" onclick="cobCopiar('+i+',event)">Copiar recordatorio</button></span>' : '';
+    const celdaAcc = '<td class="cob-g-acc">'+(conAcc
+      ? '<button class="cob-wa-ico" title="Mandar recordatorio por WhatsApp" onclick="cobWhatsApp('+i+',event)">'+_SVG_WA+'</button>' : '')+'</td>';
     const primary = g.com ? esc(g.com) : esc(g.razon);
     const sec = g.com ? ' <span class="muted cob-razon" style="font-size:11px"><span class="cob-sep">· </span>'+esc(g.razon)+'</span>' : '';
     h+='<tr class="prod-row cob-gr" onclick="cobToggleGrupo('+i+')"><td class="cob-g-nm"><span class="pcaret">▸</span> '
       +(venc?'<span class="cob-venc">'+primary+'</span>':primary)+sec+btnCopiar+'</td>'
-      +'<td class="cob-g-fac" style="text-align:right">'+g.rows.length+'<span class="cob-movsuf"> facturas</span></td>'
+      +'<td class="cob-g-fac" style="text-align:right">'+g.rows.length+'<span class="cob-movsuf"> facturas</span>'
+        +'<span class="cob-diasmov cob-venc'+(venc&&g.maxVenc>COB_DIAS_ROJO?' cob-d30':'')+'"> · '
+        +(venc?(g.maxVenc+' d'):'al día')+'</span></td>'
       +'<td class="cob-g-tot" style="text-align:right"><strong>'+cM(g.total)+'</strong></td>'
-      +'<td class="cob-g-venc" style="text-align:right">'+vencCell+'</td></tr>';
-    let dt='<tr class="hidden cob-det" id="cobg-'+i+'"><td colspan="4"><div class="prod-det-wrap"><table>'
+      +'<td class="cob-g-venc" style="text-align:right">'+vencCell+'</td>'+celdaAcc+'</tr>';
+    const copiaDet = conAcc
+      ? '<div class="cob-detacc"><button class="cob-copy" onclick="cobCopiar('+i+',event)">Copiar recordatorio</button></div>' : '';
+    let dt='<tr class="hidden cob-det" id="cobg-'+i+'"><td colspan="5"><div class="prod-det-wrap">'+copiaDet+'<table>'
       +'<tr><th>Fecha</th><th>Vence</th><th style="text-align:right">Días</th><th>Documento</th><th style="text-align:right">Pendiente</th></tr>';
     g.rows.forEach(r=>{ dt+=_cobFilaFactura(r,false); });
     h+=dt+'</table></div></td></tr>';
