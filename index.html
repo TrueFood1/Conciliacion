@@ -349,18 +349,6 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .plan-tbl tr:last-child td{border-bottom:none}
 .plan-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;vertical-align:middle}
 
-/* ── Alertas del lobby (Bloque 4) ── */
-.alertas-fab{position:fixed;right:20px;bottom:20px;z-index:150;display:flex;flex-direction:column;align-items:flex-end;gap:10px}
-.alertas-btn{background:var(--surface);border:1px solid var(--border-strong);color:var(--text);font-family:inherit;font-size:13px;font-weight:500;padding:10px 16px;border-radius:999px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.35)}
-.alertas-btn:hover{border-color:var(--text-3)}
-.alertas-btn.vacio{color:var(--text-3);font-weight:400;box-shadow:none;opacity:.75}
-.alertas-panel{width:340px;max-width:calc(100vw - 40px);max-height:60vh;overflow-y:auto;background:var(--surface);border:1px solid var(--border-strong);border-radius:14px;padding:4px 14px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
-.alerta-linea{display:flex;align-items:center;gap:10px;padding:9px 4px;font-size:13px;color:var(--text-2);cursor:pointer;border-bottom:1px solid var(--border)}
-.alerta-linea:hover{color:var(--text)}
-.alerta-linea:last-child{border-bottom:none}
-.alerta-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.alerta-arr{margin-left:auto;color:var(--text-3);font-size:12px}
-.alerta-vacio,.alerta-vacio:hover{color:var(--text-3);cursor:default}
 .res-frow{display:grid;grid-template-columns:16px 1fr 130px 64px;gap:10px;align-items:baseline;padding:12px 6px;border-bottom:1px solid var(--border);cursor:pointer}
 .res-frow:last-of-type{border-bottom:none}
 .res-frow .car{color:var(--text-3);font-size:11px;transition:transform .15s;display:inline-block}
@@ -1160,12 +1148,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     </div><!-- /home-bottom -->
     <div class="home-build" id="homeBuild"></div>
   </div>
-</div>
-
-<!-- ALERTAS · botón flotante del lobby (Bloque 4, rediseño) -->
-<div id="alertasFab" class="alertas-fab hidden">
-  <div id="alertasPanel" class="alertas-panel hidden"></div>
-  <button id="alertasBtn" class="alertas-btn" onclick="toggleAlertasPanel()">Alertas (0)</button>
 </div>
 
 <!-- UPLOAD -->
@@ -2657,7 +2639,6 @@ async function doLogin(isRetry){
     document.getElementById('alertConn').classList.remove('hidden');
     document.getElementById('vLogin').classList.add('hidden');
     document.getElementById('vLobby').classList.remove('hidden');   // tras conectar → lobby
-    mostrarAlertasFab(); cargarAlertas();   // Bloque 4: botón flotante de avisos (async, no bloquea)
   }catch(e){
     st.innerHTML='<div class="status s-err">Error: '+esc(e.message)+'</div>';
   }
@@ -2759,7 +2740,6 @@ function _modShow(id){
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.toggle('hidden', v!==id); });
   document.getElementById('vLobby').classList.add('hidden');
   document.getElementById('appHeader').classList.remove('hidden');
-  ocultarAlertasFab();   // el botón flotante de alertas es solo del lobby
   aplicarModoProduccion();
 }
 function crumbSet(area,cur){
@@ -2782,7 +2762,6 @@ function volverLobby(){
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.add('hidden'); });
   document.getElementById('appHeader').classList.add('hidden');
   document.getElementById('vLobby').classList.remove('hidden');
-  mostrarAlertasFab(); cargarAlertas();   // Bloque 4: botón flotante; refresca una vez por sesión
 }
 
 function setProgress(pct,msg){
@@ -8419,84 +8398,6 @@ function renderPlan(rows){
   h+='</table></div>';
   h+='<div class="m3sub" style="margin-top:10px;font-size:11px;color:var(--text-3)">Curva de hoy ('+esc(hoy)+'). Stock en unidades individuales (potes para galletas). Checkpoints = valor objetivo de la curva en esa fecha.</div>';
   document.getElementById('planTabla').innerHTML=h;
-}
-
-// ════════════════════════════════════════════════════════════════════════
-// ALERTAS DEL LOBBY (Bloque 4) — v1, SOLO de lo que ya funciona. SOLO LECTURA.
-// (a) MP bajo umbral · (b) merma nueva 7 días · (c) terminado en rojo vs plan ·
-// (d) sin producción 3+ días hábiles · (e) checkpoint del plan ≤7 días.
-// Cada alerta: {ord, mod, txt, go}. mod → color del módulo de origen.
-// ════════════════════════════════════════════════════════════════════════
-function _haceDiasISO(n){ const d=new Date(); d.setDate(d.getDate()-n); const p=x=>String(x).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
-function _fechaCRiso(s){ const m=String(s||'').match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/); if(!m) return String(s||'').slice(0,10);
-  const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5])-6*3600*1000),p=x=>String(x).padStart(2,'0'); return d.getUTCFullYear()+'-'+p(d.getUTCMonth()+1)+'-'+p(d.getUTCDate()); }
-// Días hábiles = lun–jue (producción TrueFood; viernes es limpieza, no cuenta).
-function _diasHabilesEntre(d1,d2){ let a=_diaNum(d1),b=_diaNum(d2),c=0; for(let x=a+1;x<=b;x++){ const wd=new Date(x*86400000).getUTCDay(); if(wd>=1&&wd<=4)c++; } return c; }
-async function _alertaMP(){
-  const mp = window._invMP && window._invMP.length ? window._invMP : (window._invMP=await listaMP());
-  const bajos = mp.filter(m=>mpAlerta(m).nivel==='bajo');
-  if(!bajos.length) return null;
-  const nombres=bajos.slice(0,3).map(m=>m.name).join(', ')+(bajos.length>3?'…':'');
-  return {ord:1, mod:'op', txt:bajos.length+' materia'+(bajos.length>1?'s primas':' prima')+' bajo umbral de reorden: '+nombres, go:'irAInventario'};
-}
-async function _alertaMerma(){
-  const n=await odooCall('stock.scrap','search_count',[[['state','=','done'],['date_done','>=',_haceDiasISO(7)+' 00:00:00']]]);
-  if(!n) return null;
-  return {ord:2, mod:'op', txt:n+' merma'+(n>1?'s':'')+' nueva'+(n>1?'s':'')+' registrada'+(n>1?'s':'')+' en los últimos 7 días', go:'irAMermas'};
-}
-async function _alertaPlanRojo(){
-  const ids=PLAN_PROD.map(p=>p.id);
-  const q=await odooCall('stock.quant','read_group',[[['product_id','in',ids],['location_id.usage','=','internal']],['quantity'],['product_id']],{lazy:false});
-  const oh={}; q.forEach(r=>{ const pid=r.product_id&&r.product_id[0]; if(pid) oh[pid]=(oh[pid]||0)+(r.quantity||0); });
-  const rojos=[];
-  for(const p of PLAN_PROD){ const stock=(oh[p.id]||0)/(await prodUomFactor(p.id)); if(planSem(p,stock).k==='rojo') rojos.push(p.label); }
-  if(!rojos.length) return null;
-  return {ord:3, mod:'op', txt:'Plan: '+rojos.join(', ')+' en rojo contra la curva de diciembre', go:'irAPlan'};
-}
-async function _alertaSinProd(){
-  const last=await odooCall('mrp.production','search_read',[[['state','=','done']]],{fields:['date_start'],limit:1,order:'date_start desc'});
-  if(!last.length||!last[0].date_start) return null;
-  const dias=_diasHabilesEntre(_fechaCRiso(last[0].date_start), _hoyISO());
-  if(dias<3) return null;
-  return {ord:4, mod:'op', txt:'Sin órdenes de producción registradas hace '+dias+' días hábiles', go:'irAProduccion'};
-}
-function _alertaCheckpoint(){
-  const hoy=_diaNum(_hoyISO());
-  for(const [fecha,label] of PLAN_CHK){ const dd=_diaNum(fecha)-hoy;
-    if(dd>=0&&dd<=7) return {ord:5, mod:'op', txt:'Checkpoint del plan ('+label+') en '+dd+' día'+(dd===1?'':'s'), go:'irAPlan'}; }
-  return null;
-}
-const _ALERTA_COL={op:'#D4537E', fin:'#378ADD', con:'#84BD00'};
-let _alertas=[];
-// Render en el botón flotante + panel (abajo a la derecha del lobby).
-function renderAlertas(alertas){
-  _alertas=alertas.slice().sort((a,b)=>a.ord-b.ord);
-  const btn=document.getElementById('alertasBtn'), panel=document.getElementById('alertasPanel');
-  if(!btn||!panel) return;
-  const n=_alertas.length;
-  btn.textContent='Alertas ('+n+')';
-  btn.classList.toggle('vacio', n===0);
-  panel.innerHTML = n
-    ? _alertas.map(a=>'<div class="alerta-linea" onclick="alertaIr(\''+a.go+'\')"><span class="alerta-dot" style="background:'+(_ALERTA_COL[a.mod]||'#D4537E')+'"></span><span>'+esc(a.txt)+'</span><span class="alerta-arr">→</span></div>').join('')
-    : '<div class="alerta-linea alerta-vacio">Sin avisos</div>';
-}
-function alertaIr(fn){ cerrarAlertasPanel(); if(typeof window[fn]==='function') window[fn](); }
-function toggleAlertasPanel(){ const p=document.getElementById('alertasPanel'); if(p) p.classList.toggle('hidden'); }
-function cerrarAlertasPanel(){ const p=document.getElementById('alertasPanel'); if(p) p.classList.add('hidden'); }
-function mostrarAlertasFab(){ const f=document.getElementById('alertasFab'); if(f) f.classList.remove('hidden'); }
-function ocultarAlertasFab(){ const f=document.getElementById('alertasFab'); if(f) f.classList.add('hidden'); cerrarAlertasPanel(); }
-let _alertasCargadas=false;
-async function cargarAlertas(force){
-  const btn=document.getElementById('alertasBtn'); if(!btn) return;
-  if(_alertasCargadas && !force) return;
-  _alertasCargadas=true;
-  const found=[];
-  btn.textContent='Alertas …';
-  const tasks=[ Promise.resolve(_alertaCheckpoint()), _alertaMerma(), _alertaPlanRojo(), _alertaSinProd(), _alertaMP() ];
-  await Promise.all(tasks.map(t=>t.catch(e=>{console.warn('alerta:',e);return null;}).then(a=>{
-    if(a){ found.push(a); renderAlertas(found); }
-  })));
-  renderAlertas(found);   // estado final (incluye "Alertas (0)" / "Sin avisos")
 }
 
 // ════════════════════════════════════════════════════════════════════════
