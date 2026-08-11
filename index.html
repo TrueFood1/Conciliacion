@@ -201,7 +201,10 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
   #vCobros .cob-tbl th{display:none}
   #vCobros .cob-movsuf{display:inline}
   /* Por cliente: nombre + total arriba; "N facturas" y lo vencido abajo. */
-  #vCobros .cob-tbl td.cob-g-nm{grid-column:1;grid-row:1;font-size:13.5px}
+  /* min-width:0 para que la columna del nombre pueda encogerse: sin esto los botones la
+     estiraban y el monto se salía de la fila. */
+  #vCobros .cob-tbl td.cob-g-nm{grid-column:1;grid-row:1;font-size:13.5px;min-width:0}
+  #vCobros .cob-acc{display:block}   /* las acciones, en su propio renglón */
   #vCobros .cob-tbl td.cob-g-tot{grid-column:2;grid-row:1;text-align:right;font-size:13.5px}
   #vCobros .cob-tbl td.cob-g-fac{grid-column:1;grid-row:2;text-align:left;font-size:11px;color:var(--text-3)}
   #vCobros .cob-tbl td.cob-g-venc{grid-column:2;grid-row:2;text-align:right;font-size:11px}
@@ -215,7 +218,30 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
   #vCobros .cob-tbl td.cob-f-dias{grid-column:2;grid-row:3;text-align:right;font-size:11px}
   #vCobros .cob-cons{display:inline}            /* en el teléfono manda el "…4471" */
   #vCobros .cob-consfull{display:none}          /* el consecutivo completo es de escritorio */
-  #vCobros .cob-wa,#vCobros .cob-copy{margin:6px 8px 0 0;padding:5px 12px;font-size:12px}
+  /* ── Bajar el volumen ──
+     El nombre del cliente en texto normal: que TODOS salieran rojos vaciaba la señal. */
+  #vCobros .cob-g-nm .cob-venc{color:var(--text)}
+  /* Los días de atraso en gris; el rojo se reserva para lo que de verdad lo amerita. */
+  #vCobros .cob-venc{color:var(--text-3)}
+  #vCobros .cob-venc.cob-d30{color:var(--red)}
+  /* La razón social larga envolvía y desalineaba la fila: baja a segunda línea tenue. */
+  #vCobros .cob-razon{display:block;margin-top:2px;color:var(--text-3);font-size:10.5px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #vCobros .cob-sep{display:none}   /* el "·" separaba en línea; en su propio renglón sobra */
+  /* WhatsApp: pastilla chica con borde hairline. Copiar: solo el ícono (el texto que le pone
+     el JS al copiar queda a font-size 0; la confirmación se ve en el color del ícono). */
+  #vCobros .cob-wa{margin:7px 8px 0 0;padding:4px 11px;font-size:11.5px;border-width:.5px;
+    border-color:var(--border);color:var(--text-3);border-radius:999px}
+  #vCobros .cob-copy{margin:7px 0 0;padding:4px 8px;font-size:0;border-width:.5px;
+    border-color:var(--border);border-radius:999px;vertical-align:middle}
+  #vCobros .cob-copy::before{content:'⧉';font-size:13px;line-height:1;color:var(--text-3)}
+  #vCobros .cob-copy.on::before{color:var(--green)}
+  #vCobros .cob-copy.err::before{color:var(--red)}
+  /* Filtros: de cajas grandes a texto; el activo se marca con subrayado, no con relleno. */
+  #vCobros .sim-seg{background:none;border:none;border-radius:0;padding:0;gap:18px}
+  #vCobros .sim-seg button{flex:none;padding:4px 0;border-radius:0;font-size:12.5px;
+    color:var(--text-3);border-bottom:1.5px solid transparent}
+  #vCobros .sim-seg button.on{background:none;color:var(--text);border-bottom-color:var(--text-2)}
   #vCobros .cob-tbl tr.cob-total{grid-template-columns:1fr auto}
   #vCobros .cob-tbl tr.cob-total td:nth-child(2),#vCobros .cob-tbl tr.cob-total td:nth-child(4){display:none}
 }
@@ -8354,6 +8380,9 @@ async function cargarAlertas(force){
 // electrónico CR, l10n_cr — clave de 50 dígitos) en tooltip + ref del proveedor.
 // ════════════════════════════════════════════════════════════════════════
 const _COB_MT={cobrar:'out_invoice', pagar:'in_invoice'};
+// Días vencidos a partir de los cuales el número se pinta de rojo EN TELÉFONO. Debajo de este
+// umbral el atraso es normal y va en gris: si todo es rojo, el rojo no dice nada.
+const COB_DIAS_ROJO=30;
 let _cobData={cobrar:null, pagar:null}, _cobTab='cobrar';
 // Días vencida: hoy (CR, fecha local) − vencimiento. >0 = vencida. null si no hay vencimiento.
 function _diasVencida(due){
@@ -8453,7 +8482,9 @@ function _cobDoc(r){
 // Fila de una factura (reusada en modo factura y en el detalle del modo cliente). conPartner=incluir columna cliente.
 function _cobFilaFactura(r,conPartner){
   const dv=_diasVencida(r.invoice_date_due);
-  const diasCell = dv>0 ? '<span class="cob-venc">'+dv+' d</span>' : '<span class="muted">—</span>';
+  // El rojo se gana: solo lo MUY vencido. La clase se emite siempre y el CSS decide por ancho,
+  // así escritorio sigue viendo lo de siempre.
+  const diasCell = dv>0 ? '<span class="cob-venc'+(dv>COB_DIAS_ROJO?' cob-d30':'')+'">'+dv+' d</span>' : '<span class="muted">—</span>';
   return '<tr class="cob-fr"><td class="cob-f-fecha">'+_fD(r.invoice_date)+'</td><td class="cob-f-vence">'+_fD(r.invoice_date_due)+'</td>'
     +'<td class="cob-f-dias" style="text-align:right">'+diasCell+'</td>'
     +(conPartner?'<td class="cob-f-cli">'+_cobPartner(r)+'</td>':'')
@@ -8485,13 +8516,13 @@ function renderCobCliente(which,d,el){
     // rows ordenadas por vencimiento asc dentro del grupo
     g.rows.sort((a,b)=>{ const x=a.invoice_date_due||'9999-99-99', y=b.invoice_date_due||'9999-99-99'; return x<y?-1:x>y?1:0; });
     const venc = g.maxVenc!=null && g.maxVenc>0;
-    const vencCell = venc ? '<span class="cob-venc">'+g.maxVenc+' d</span>' : '<span class="muted">—</span>';
+    const vencCell = venc ? '<span class="cob-venc'+(g.maxVenc>COB_DIAS_ROJO?' cob-d30':'')+'">'+g.maxVenc+' d</span>' : '<span class="muted">—</span>';
     // WhatsApp es la acción principal (abre el chat con el mensaje escrito); copiar queda de apoyo.
     const btnCopiar = (which==='cobrar' && venc)
-      ? ' <button class="cob-wa" onclick="cobWhatsApp('+i+',event)">WhatsApp</button>'
-        +' <button class="cob-copy" onclick="cobCopiar('+i+',event)">Copiar recordatorio</button>' : '';
+      ? ' <span class="cob-acc"><button class="cob-wa" onclick="cobWhatsApp('+i+',event)">WhatsApp</button>'
+        +' <button class="cob-copy" onclick="cobCopiar('+i+',event)">Copiar recordatorio</button></span>' : '';
     const primary = g.com ? esc(g.com) : esc(g.razon);
-    const sec = g.com ? ' <span class="muted" style="font-size:11px">· '+esc(g.razon)+'</span>' : '';
+    const sec = g.com ? ' <span class="muted cob-razon" style="font-size:11px"><span class="cob-sep">· </span>'+esc(g.razon)+'</span>' : '';
     h+='<tr class="prod-row cob-gr" onclick="cobToggleGrupo('+i+')"><td class="cob-g-nm"><span class="pcaret">▸</span> '
       +(venc?'<span class="cob-venc">'+primary+'</span>':primary)+sec+btnCopiar+'</td>'
       +'<td class="cob-g-fac" style="text-align:right">'+g.rows.length+'<span class="cob-movsuf"> facturas</span></td>'
