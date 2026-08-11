@@ -6003,7 +6003,23 @@ function _rzRealBatches(){ const b={}, bd=(_rzCtx&&_rzCtx.real&&_rzCtx.real.byDa
 function _rzMonday(offset){ const mon=new Date(_rzCtx.mon0); mon.setDate(mon.getDate()+offset*7); return mon; }
 function _rzCells(offset){ return rzCeldas(_rzMonday(offset), _rzCtx.weeks[offset]||{otros:[],semillas:0,viernes:{}}, _rzCtx.real.byDate, _rzCtx.hoyStr, _rzOverrides); }
 // META de la semana = propuesta del motor (layout sin editar). Es lo que NO se debe romper.
+// OJO: es la meta BASE — no ve ediciones ni auto-relleno. Sirve como referencia interna del
+// nivelador (_rzAutoFill la usa para saber qué falta). Para MOSTRARLE un denominador a Andrea
+// hay que usar _rzMetaEfectiva: si no, la pantalla contradice al calendario.
 function _rzMeta(offset){ return _semanaBatches(_rzCtx.weeks[offset]||{otros:[],semillas:0,viernes:{}}); }
+// META EFECTIVA = LO QUE MUESTRA EL CALENDARIO, no la propuesta base. Se suma sobre las MISMAS
+// celdas que pinta el calendario (_rzCellsFull = base + overrides + auto-relleno):
+//   · días pasados CON registro en Odoo → lo real (esas celdas son kind 'real' y van sin prods)
+//   · días pasados con plan y SIN registro ('pend') → lo asumido
+//   · de hoy en adelante → lo planeado (propuesta, edición, auto-relleno o viernes)
+// Difiere de la base cuando la edición SUPERA la meta (2 días de Blanco donde había 1) o cuando
+// el auto-relleno no consiguió dónde reponer el faltante (_rzAutoLeft).
+function _rzMetaEfectiva(offset){
+  const b = offset===0 ? Object.assign({}, _rzHechoOAsumido()) : {};
+  const fut=_rzFutBatches(_rzCellsFull(offset));
+  for(const k in fut) b[+k]=(b[+k]||0)+fut[+k];
+  return b;
+}
 // ── RAZONAR POR SEMANA (no por día): acredita lo REAL producido contra la meta semanal y
 //    LIBERA los días futuros cuyo producto ya está cumplido. Sin esto el motor duplicaba
 //    (ej: 2 Blanco hechos lun+mar y el nivelador seguía proponiendo Blanco el miércoles).
@@ -6118,8 +6134,11 @@ function rzToggleId(id, btn){ const e=document.getElementById(id); if(!e)return;
   if(btn){ btn.textContent = h ? btn.textContent.replace('⌄','›') : btn.textContent.replace('›','⌄'); } }
 // TARJETA "Producciones registradas": lo REGISTRADO en Odoo vs la meta, por producto (oliva si
 // cumplido). Solo cuenta lo confirmado por Odoo — lo asumido no suma acá, por eso "registradas".
+// El DENOMINADOR sale de _rzMetaEfectiva, el mismo plan que pinta el calendario: con la meta
+// BASE la tarjeta mostraba los números previos a la edición (Blanco 0/6 con dos días de Blanco
+// puestos a mano) y se contradecía con la cuadrícula de arriba.
 function rzVaSemanaCard(){
-  const meta=_rzMeta(0), real=_rzRealBatches();
+  const meta=_rzMetaEfectiva(0), real=_rzRealBatches();
   const rows=NIV_PROD.filter(function(p){return (meta[p]||0)>0;}).map(function(p){
     const m=meta[p]||0, r=real[p]||0, done=r>=m;
     return '<div class="rz-vsrow"><span class="rz-vsn">'+esc(_nomCorto(p))+'</span>'
