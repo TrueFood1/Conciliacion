@@ -661,16 +661,21 @@ tr.r-ing td{background:#eff6ff}
 /* ── LOBBY en teléfono: módulos apilados en 2 columnas (la fila de 5 se cortaba) y
    menos aire muerto entre el saludo y los módulos. ── */
 @media(max-width:700px){
-  .home-wrap{padding:2vh 1.1rem calc(3vh + env(safe-area-inset-bottom))}
-  .home-live{margin-right:0}
+  .home-wrap{padding:calc(2vh + env(safe-area-inset-top)) 1.1rem calc(3vh + env(safe-area-inset-bottom))}
+  /* 78px a la derecha = el ancho de la pastilla "Salir", que va fija: sin esto se montaba
+     encima de "conectado a Odoo · datos en vivo". */
+  .home-hdr{padding-right:78px}
+  .home-live{margin-right:0;min-width:0}
+  .home-live .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .home-live .t{font-size:11px}
   /* El grupo saludo + buscador + módulos queda CENTRADO en la pantalla: el aire sobrante se
      reparte arriba y abajo (los dos `auto`) en vez de acumularse entre el saludo y las
      tarjetas, que era el hueco grande. El encabezado se queda arriba. */
-  /* Saludo + buscador centrados en el espacio entre el encabezado y los módulos: la zona se
-     estira y centra su contenido, sin márgenes fijos que haya que adivinar. */
-  .home-center{flex:1 1 auto;justify-content:center;margin:0}
-  .home-bottom{margin-bottom:0}
+  /* El aire sobrante se reparte ARRIBA del saludo y DEBAJO de los módulos, en vez de
+     acumularse entre el buscador y "TUS MÓDULOS": así los módulos suben y el hueco del medio
+     se achica. (Con flex:1 en .home-center el sobrante caía todo en el medio.) */
+  .home-center{flex:0 0 auto;justify-content:center;margin:auto 0 0}
+  .home-bottom{margin-bottom:auto}
   .home-hi{font-size:22px}
   .home-soon{margin-top:1.3rem}
   .home-modlabel{margin:1.5rem 0 .8rem}
@@ -897,7 +902,10 @@ table td,table th{border-color:#F2F0EA}
 @media(max-width:700px){
   /* Va por id: #appHeader ya trae su propio padding y le gana a cualquier regla de clase.
      Los 78px de la derecha son el espacio de la pastilla "Salir", que va fija. */
-  #appHeader,.header{height:auto;min-height:40px;padding:8px 78px 8px 1rem;gap:8px}
+  /* padding-top con safe-area: sin él, en iPhone el encabezado entra DEBAJO de la barra de
+     estado y se ve cortado hasta que uno hace scroll. */
+  #appHeader,.header{height:auto;min-height:40px;gap:8px;
+    padding:calc(8px + env(safe-area-inset-top)) 78px 8px 1rem}
   .header .hdr-right{display:contents}
   .header .conn-ind{order:-1;margin:0;gap:0;font-size:0}               /* queda solo el punto */
   .header .conn-ind .gdot{width:5px;height:5px}
@@ -909,7 +917,8 @@ table td,table th{border-color:#F2F0EA}
   .header .hdr-prod{order:1;margin-left:auto;font-size:0;white-space:nowrap}
   .header .hdr-prod::after{content:'solo lectura';font-size:11px;color:var(--text-3)}
   .header .logo-link{height:22px!important;order:-2}
-  #btnSalir{top:9px;right:12px;padding:4px 10px;font-size:11px;color:var(--text-3);border-color:#26262C}
+  #btnSalir{top:calc(9px + env(safe-area-inset-top));right:12px;padding:4px 10px;font-size:11px;
+    color:var(--text-3);border-color:#26262C}
 }
 .crumbs{display:flex;align-items:center;gap:9px;font-size:14px}
 .crumb-dot{width:7px;height:7px;border-radius:50%;background:#C964CF;flex-shrink:0}
