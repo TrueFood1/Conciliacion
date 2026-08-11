@@ -596,13 +596,25 @@ tr.r-ing td{background:#eff6ff}
   /* El grupo saludo + buscador + módulos queda CENTRADO en la pantalla: el aire sobrante se
      reparte arriba y abajo (los dos `auto`) en vez de acumularse entre el saludo y las
      tarjetas, que era el hueco grande. El encabezado se queda arriba. */
-  .home-center{flex:0 0 auto;margin:auto 0 0}
-  .home-bottom{margin-bottom:auto}
+  /* Saludo + buscador centrados en el espacio entre el encabezado y los módulos: la zona se
+     estira y centra su contenido, sin márgenes fijos que haya que adivinar. */
+  .home-center{flex:1 1 auto;justify-content:center;margin:0}
+  .home-bottom{margin-bottom:0}
   .home-hi{font-size:22px}
   .home-soon{margin-top:1.3rem}
-  .home-modlabel{margin:1.9rem 0 .8rem}
-  .home-grid{grid-template-columns:1fr 1fr}
-  .home-mod{padding:14px}
+  .home-modlabel{margin:1.5rem 0 .8rem}
+  /* CUATRO módulos en teléfono, todos del mismo tamaño (misma técnica que la cuadrícula de
+     días: columnas fijas + min-height igual). Conciliación se suma a lo que es solo de
+     escritorio, junto con Precios, Producción, Mermas y Plan. */
+  .home-grid{grid-template-columns:1fr 1fr;gap:9px}
+  .home-mod{padding:14px;min-height:86px;display:flex;flex-direction:column;box-sizing:border-box}
+  .home-mod-conc{display:none}
+  .home-mod-ops{order:1} .home-mod-fin{order:2} .home-mod-ven{order:3} .home-mod-auto{order:4}
+  /* Por id: la regla base de .home-mod.inert va más abajo en la hoja y le ganaba por orden. */
+  #vLobby .home-mod.inert{opacity:.38}
+  .home-mod .home-mod-state{margin-top:auto}
+  .home-mod.inert .home-mod-state{text-transform:lowercase;font-weight:400}
+  .home-build{padding-top:18px}
   .home-build{padding-bottom:calc(10px + env(safe-area-inset-bottom))}   /* el pie no queda bajo la barra del navegador */
 }
 /* Preguntas sugeridas: lista fina apilada, no botones */
@@ -1039,27 +1051,27 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <div class="home-sep"></div>
     <div class="home-modlabel">TUS MÓDULOS</div>
     <div class="home-grid">
-      <div class="home-mod" style="border-color:#21456B" onclick="abrirFinanzas()">
+      <div class="home-mod home-mod-fin" style="border-color:#21456B" onclick="abrirFinanzas()">
         <span class="home-mod-dot" style="background:#378ADD"></span>
         <div class="home-mod-name" style="color:#F5F4F0">Finanzas</div>
         <div class="home-mod-state" style="color:#7FB0E0">Abrir →</div>
       </div>
-      <div class="home-mod" style="border-color:#2E5C3A" onclick="abrirConciliacion()">
+      <div class="home-mod home-mod-conc" style="border-color:#2E5C3A" onclick="abrirConciliacion()">
         <span class="home-mod-dot" style="background:#84BD00"></span>
         <div class="home-mod-name" style="color:#F5F4F0">Conciliación</div>
         <div class="home-mod-state" style="color:#9BD46A">Abrir →</div>
       </div>
-      <div class="home-mod" style="border-color:#4E2536" onclick="abrirOperaciones()">
+      <div class="home-mod home-mod-ops" style="border-color:#4E2536" onclick="abrirOperaciones()">
         <span class="home-mod-dot" style="background:#D4537E"></span>
         <div class="home-mod-name" style="color:#F5F4F0">Operaciones</div>
         <div class="home-mod-state" style="color:#E491AC">Abrir →</div>
       </div>
-      <div class="home-mod inert">
+      <div class="home-mod inert home-mod-ven">
         <span class="home-mod-dot" style="background:#7F77DD"></span>
         <div class="home-mod-name" style="color:#C9C7C1">Ventas</div>
         <div class="home-mod-state" style="color:#6E6C68">Pronto</div>
       </div>
-      <div class="home-mod inert">
+      <div class="home-mod inert home-mod-auto">
         <span class="home-mod-dot" style="background:#FF751F"></span>
         <div class="home-mod-name" style="color:#C9C7C1">Automatización</div>
         <div class="home-mod-state" style="color:#6E6C68">Pronto</div>
