@@ -379,6 +379,7 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .res-pcell .nm i{width:8px;height:8px;border-radius:2px;flex-shrink:0}
 .res-pcell .mg{font-size:20px;color:var(--text);margin-top:7px;font-variant-numeric:tabular-nums}
 .res-pcell .cu{font-size:11.5px;color:var(--text-3);margin-top:3px;font-variant-numeric:tabular-nums}
+.rp-mov,.rp-des,.rp-nota{display:none}   /* desglose y nota: solo teléfono */
 @media(max-width:920px){.res-prod{grid-template-columns:repeat(2,1fr)}.res-pcell{border-bottom:1px solid var(--border)}}
 /* ══════════ FINANZAS EN TELÉFONO: mismo lenguaje que el resto ══════════
    Métricas apiladas de a dos, listas de una línea, sin textos explicativos largos.
@@ -388,7 +389,28 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
   #vResultados .m3sub,#vFacturado .m3sub,#vRentabilidad .m3sub,#vCobros .m3sub:not(.res-nota){display:none}
   #vResultados .m3title,#vFacturado .m3title,#vRentabilidad .m3title,#vCobros .m3title{font-size:20px}
   #vResultados .res-strip{grid-template-columns:1fr 1fr;gap:10px}
-  #vResultados .res-prod{grid-template-columns:1fr}
+  /* COSTO POR PRODUCTO: 6 tarjetas chicas en 3 columnas (3 arriba, 3 abajo), mismo patrón
+     que la cuadrícula de días. Cada una abre su desglose al tocarla. */
+  #vResultados .res-prod{grid-template-columns:repeat(3,1fr);gap:0}
+  #vResultados .res-pcell{padding:10px 9px;border-bottom:1px solid var(--border);cursor:pointer}
+  #vResultados .res-pcell:nth-child(3n){border-right:none}
+  #vResultados .res-pcell .nm{font-size:11px;gap:5px;line-height:1.25}
+  #vResultados .res-pcell .nm i{width:7px;height:7px}
+  #vResultados .res-pcell .mg{font-size:15px;margin-top:5px}
+  #vResultados .res-pcell .cu{font-size:10.5px;margin-top:2px}
+  #vResultados .rp-desk{display:none} #vResultados .rp-mov{display:inline}
+  #vResultados .rp-des{display:block;margin-top:7px;padding-top:6px;border-top:.5px solid #232329}
+  #vResultados .rp-des.hidden{display:none}
+  #vResultados .rp-dr{display:flex;justify-content:space-between;gap:6px;font-size:10px;
+    color:var(--text-3);padding:1px 0;font-variant-numeric:tabular-nums}
+  #vResultados .res-pcell.rp-abierta{background:#141417}
+  #vResultados .rp-nota{display:block;grid-column:1/-1;padding:9px 10px;font-size:10px;
+    color:var(--text-3);line-height:1.45}
+  /* la etiqueta de empaque incompleto baja a su propio renglón: al lado del nombre
+     ensanchaba la tarjeta y descuadraba la fila */
+  #vResultados .res-pcell .nm{flex-wrap:wrap}
+  #vResultados .res-pcell .emp-inc{display:block;width:100%;margin:2px 0 0;font-size:9.5px;
+    white-space:normal;border:none;background:none;padding:0;line-height:1.3}
   #vResultados .sim-seg{max-width:none}
   /* Ventas: canal + facturado arriba, "N clientes" abajo. */
   #vFacturado .cob-tbl{display:block}
@@ -9181,10 +9203,32 @@ async function resProdFooter(){
   el.innerHTML=RES_PROD.map(p=>'<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+'</div><div class="mg muted" style="font-size:13px">…</div></div>').join('');
   try{
     const {prods}=await computeCostos(); const byKey={}; prods.forEach(p=>byKey[p.key]=p);
-    el.innerHTML=RES_PROD.map(p=>{ const d=byKey[p.key], costo=d?Math.round(d.totalVenta||0):0, uni=(d&&d.unidad)||'';
-      return '<div class="res-pcell"><div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+empTag(d)+'</div>'
-        +'<div class="mg">'+cM(costo)+'</div><div class="cu">costo real'+(uni?' · '+esc(uni):'')+'</div></div>'; }).join('');
+    // Cada tarjeta abre su desglose: los TRES términos con los que está definido el costo
+    // (materia prima + indirecto + empaque). El desglose es de teléfono; en escritorio la
+    // tarjeta se ve exactamente igual que antes.
+    el.innerHTML=RES_PROD.map(function(p,i){
+      const d=byKey[p.key], costo=d?Math.round(d.totalVenta||0):0, uni=(d&&d.unidad)||'';
+      const pack=(d&&d.pack)||1;
+      const mp=d?((d.mp&&d.mp.mpUnit)||0)*pack:0, ind=d?((d.indUnit||0)*pack):0,
+            emp=(d&&d.emp!=null)?d.emp:null;
+      const fila=(k,v)=>'<div class="rp-dr"><span>'+k+'</span><span>'+v+'</span></div>';
+      const des='<div class="rp-des hidden" id="rpDes'+i+'">'
+        +fila('materia prima', cM(mp))+fila('indirecto', cM(ind))
+        +fila('empaque', emp!=null?cM(emp):'sin dato')+'</div>';
+      return '<div class="res-pcell" onclick="resProdToggle('+i+',this)">'
+        +'<div class="nm"><i style="background:'+p.color+'"></i>'+esc(p.label)+empTag(d)+'</div>'
+        +'<div class="mg">'+cM(costo)+'</div>'
+        +'<div class="cu"><span class="rp-desk">costo real'+(uni?' · '+esc(uni):'')+'</span>'
+          +'<span class="rp-mov">'+esc(uni||'')+'</span></div>'+des+'</div>'; }).join('')
+      +'<div class="rp-nota">El indirecto sale del promedio de los últimos 3 meses cerrados '
+      +'(ventana que avanza sola).</div>';
   }catch(e){ el.innerHTML='<div class="muted" style="font-size:12px;padding:8px 4px">No pude leer los costos ('+esc(e&&e.message||e)+'). El detalle está en la pestaña Costos.</div>'; }
+}
+// Abre/cierra el desglose de una tarjeta de costo (teléfono).
+function resProdToggle(i, cell){
+  const d=document.getElementById('rpDes'+i); if(!d) return;
+  const abierto=!d.classList.toggle('hidden');
+  if(cell) cell.classList.toggle('rp-abierta', abierto);
 }
 let resMeses=[], _resBuilt=false;
 const RES_STATE={mes:0, comp:[]};
