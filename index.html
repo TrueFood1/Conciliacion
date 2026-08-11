@@ -578,6 +578,22 @@ tr.r-ing td{background:#eff6ff}
 .auth-hint{font-size:12px;color:#6E6C68;text-align:center}
 #authMsg{font-size:13px;color:#FF8A8A;text-align:center;min-height:17px}
 #btnSalir{position:fixed;top:12px;right:14px;z-index:120;background:none;border:.5px solid #2C2C33;color:#A8A6A0;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif}
+/* ── LOGIN en teléfono: logo en el tercio de arriba, formulario centrado en la pantalla ──
+   En escritorio el logo y el formulario son UN bloque centrado, y con los 76px de separación
+   el logo cae casi al medio y empuja el formulario al tercio de abajo. Acá el logo sale del
+   flujo (absoluto, anclado arriba con su safe-area) y el formulario queda como único hijo en
+   flujo → el `justify-content:center` lo centra de verdad en la pantalla.
+   Dos perillas, para ajustar con la captura sin tocar el layout:
+     --auth-techo = a qué altura cuelga el logo · --auth-piso = colchón contra el filo de abajo.
+   "Conectando a producción…" (#authMsg) vive dentro de .auth-card, debajo del botón: se mueve
+   con el formulario y no hay que tocarlo. */
+@media(max-width:700px){
+  #vAuth{--auth-techo:15vh; --auth-piso:22px;
+    padding:calc(2vh + env(safe-area-inset-top)) 24px calc(var(--auth-piso) + env(safe-area-inset-bottom))}
+  .auth-logo{position:absolute;top:calc(var(--auth-techo) + env(safe-area-inset-top));
+    left:50%;transform:translateX(-50%);margin:0}
+  .auth-card{margin:0}
+}
 /* ── Historial de conteos (modal oscuro) ── */
 #vHistorial{position:fixed;inset:0;z-index:160;background:rgba(8,8,10,.72);display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;overflow-y:auto;font-family:'DM Sans',sans-serif}
 .hist-box{background:#161619;border:.5px solid #2C2C33;border-radius:14px;width:100%;max-width:640px;padding:18px 20px;color:#F5F4F0;box-sizing:border-box}
