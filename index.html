@@ -2119,8 +2119,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vConteo .cn-dot.cn-warn{background:#E9A23B}
   #vConteo .cn-dot.cn-bad{background:#E24B4A}
   #vConteo .cn-pcaja{display:none}                       /* va en la segunda línea, junto al Odoo */
+  /* Una sola línea siempre: si no cabe se recorta por el final (lo primero que se pierde es la
+     presentación, que es lo menos crítico) y todas las filas conservan la misma altura. */
   #vConteo .cn-tbl td.cn-sub{display:block;grid-column:1;grid-row:2;font-size:10px;color:var(--text-3);
-    font-variant-numeric:tabular-nums}
+    font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   #vConteo .cn-tbl td.cn-count{grid-column:2;grid-row:1/span 2;white-space:nowrap;text-align:right}
   #vConteo .cn-tbl td.cn-odoo,#vConteo .cn-tbl td.cn-diff{display:none}
   #vConteo .cn-ttot{display:none}
@@ -6482,12 +6484,12 @@ function cnTermSue(id,v){ const d=cnDraft(); d.term=d.term||{}; d.term[id]=d.ter
 
 function cnRecMP(pid){
   const m=_cnMP.find(x=>x.pid===pid); if(!m)return;
-  const dr=(cnDraft().mp||{})[pid]||{}; const {fis,vacio}=fisicoMP(m,dr);
+  const dr=(cnDraft().mp||{})[pid]||{}; const {pe,fis,vacio}=fisicoMP(m,dr);
   const diff=fis-m.qty, s=sem3(diff,_tolMP(m),vacio);
   const de=document.getElementById('cn-mdif'+pid), se=document.getElementById('cn-msem'+pid);
   const dot=document.getElementById('cn-mdot'+pid); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
   const sub=document.getElementById('cn-msub'+pid);
-  if(sub) sub.textContent=_cnSub(fmtN(fis)+' '+m.uom, fmtN(m.qty)+' '+m.uom, vacio);
+  if(sub) sub.textContent=_cnSub(fmtN(fis)+' '+m.uom, fmtN(m.qty)+' '+m.uom, vacio, _cnPresMP(pe));
   if(de){ de.textContent=vacio?'—':fmtDiff(diff)+' '+m.uom; de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
   cnResumen();
@@ -6495,7 +6497,7 @@ function cnRecMP(pid){
 function cnRecPremez(id){
   const p=_cnPremez.find(x=>x.id===id); if(!p)return;
   const dr=(cnDraft().premez||{})[id]; const vacio=(dr==null||dr==='');
-  const fis=parseFloat(dr)||0, diff=fis-p.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
+  const fis=_crDec(dr), diff=fis-p.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
   const de=document.getElementById('cn-pdif'+id), se=document.getElementById('cn-psem'+id);
   const dot=document.getElementById('cn-pdot'+id); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
   const sub=document.getElementById('cn-psub'+id);
@@ -6520,13 +6522,13 @@ function cnRecTerm(id){
   const t=_cnTerm.find(x=>x.id===id); if(!t)return;
   const dr=(cnDraft().term||{})[id]||{};
   const vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
-  const cajas=parseFloat(dr.cajas)||0, sue=parseFloat(dr.sue)||0;
+  const cajas=_crDec(dr.cajas), sue=_crDec(dr.sue);
   const fis=cajas*t.factor+sue*t.presDiv;          // cajas (uds indiv) + sueltos en unidad de venta → uds individuales
   const diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
   const de=document.getElementById('cn-tdif'+id), se=document.getElementById('cn-tsem'+id), to=document.getElementById('cn-ttot'+id);
   const dot=document.getElementById('cn-tdot'+id); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
   const sub=document.getElementById('cn-tsub'+id);
-  if(sub) sub.textContent=_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio);
+  if(sub) sub.textContent=_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio, _cnPresTerm(t));
   if(to){ to.textContent=vacio?'':'= '+_cnVentaTxt(t,fis); }
   if(de){ de.textContent=vacio?'—':_cnDiffTxt(t,diff); de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
@@ -6538,10 +6540,10 @@ function cnResumen(){
   for(const m of _cnMP){ const dr=(cnDraft().mp||{})[m.pid]||{}; const {fis,vacio}=fisicoMP(m,dr);
     if(vacio){ sin++; continue; } if(Math.abs(fis-m.qty)>_tolMP(m).verde) desc++; }
   for(const p of _cnPremez){ const dr=(cnDraft().premez||{})[p.id]; const vacio=(dr==null||dr==='');
-    if(vacio){ sin++; continue; } if(Math.abs((parseFloat(dr)||0)-p.odoo)>CONTEO_TOL.term.verde) desc++; }
+    if(vacio){ sin++; continue; } if(Math.abs(_crDec(dr)-p.odoo)>CONTEO_TOL.term.verde) desc++; }
   for(const t of _cnTerm){ const dr=(cnDraft().term||{})[t.id]||{};
     const vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
-    if(vacio){ sin++; continue; } const fis=(parseFloat(dr.cajas)||0)*t.factor+(parseFloat(dr.sue)||0)*t.presDiv;
+    if(vacio){ sin++; continue; } const fis=_crDec(dr.cajas)*t.factor+_crDec(dr.sue)*t.presDiv;
     if(Math.abs(fis-t.odoo)>CONTEO_TOL.term.verde) desc++; }
   const el=document.getElementById('cn-resumen'); if(el) el.innerHTML=
     '<b>'+desc+'</b> descuadre'+(desc===1?'':'s')+' · <b>'+sin+'</b> sin contar';
@@ -6632,7 +6634,12 @@ const _CN_SING={sacos:'saco', cajas:'caja', bolsas:'bolsa', cartones:'cartón', 
 // Segunda línea de la fila (solo teléfono): el total físico calculado EN VIVO contra la
 // existencia de Odoo. Si el ítem todavía no se contó, solo la de Odoo. Todo en gris, sin
 // color y sin negrita — es contexto, no alarma; la alarma es el punto de descuadre.
-function _cnSub(contado, odoo, vacio){ return vacio ? ('Odoo '+odoo) : ('contado '+contado+' · Odoo '+odoo); }
+function _cnSub(contado, odoo, vacio, pres){
+  return (vacio ? ('Odoo '+odoo) : ('contado '+contado+' · Odoo '+odoo)) + (pres?(' · '+pres):'');
+}
+// Presentación de compra del ítem, para el final de la sub-línea: "saco 22,68", "caja 6 u".
+function _cnPresMP(pe){ return pe ? (_cnPresLbl(pe)+' '+fmtN(pe.peso)) : ''; }
+function _cnPresTerm(t){ return 'caja '+(t.factor/t.presDiv)+' '+(t.presDiv===1?'u':'paq'); }
 function _cnDotCls(vacio, s){ return (!vacio && s && (s.cls==='cn-warn'||s.cls==='cn-bad')) ? s.cls : ''; }
 function _cnDot(pre, id, vacio, s){ return '<span class="cn-dot '+_cnDotCls(vacio,s)+'" id="cn-'+pre+'dot'+id+'"></span>'; }
 function _cnPresLbl(pe){ return pe ? (_CN_SING[pe.lab]||pe.lab) : ''; }
@@ -6649,7 +6656,7 @@ function cnRender(){
     const sueLab=(pe&&pe.sueltoUnit)?pe.sueltoUnit:m.uom;
     const sueIn = (pe&&pe.noSuelto) ? '<span class="cn-lbl">sin suelto</span>'
       : '<input class="cn-in" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnMpSue('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(sueLab)+'</span><span class="cn-lblm">'+esc(sueLab)+'</span>';
-    const subMP=_cnSub(fmtN(fis)+' '+esc(m.uom), fmtN(m.qty)+' '+esc(m.uom), vacio);
+    const subMP=_cnSub(fmtN(fis)+' '+esc(m.uom), fmtN(m.qty)+' '+esc(m.uom), vacio, esc(_cnPresMP(pe)));
     mp+='<tr><td class="cn-nm">'+esc(nombreCortoMP(m.name))+_cnDot('m',m.pid,vacio,s)+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
       +'<td class="cn-sub" id="cn-msub'+m.pid+'">'+subMP+'</td>'
       +'<td class="cn-count">'+empIn+(empIn&&!(pe&&pe.noSuelto)?' + ':'')+sueIn+'</td>'
@@ -6659,7 +6666,7 @@ function cnRender(){
   // PREMEZCLAS (# batches directo, sin suelto)
   let pm='<table class="cn-tbl"><thead><tr><th>Premezcla</th><th>Odoo dice</th><th>Conteo físico</th><th class="r">Diferencia</th></tr></thead><tbody>';
   for(const p of _cnPremez){
-    const dr=(d.premez||{})[p.id], vacio=(dr==null||dr===''); const fis=parseFloat(dr)||0, diff=fis-p.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
+    const dr=(d.premez||{})[p.id], vacio=(dr==null||dr===''); const fis=_crDec(dr), diff=fis-p.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
     pm+='<tr><td class="cn-nm">'+esc(p.label)+_cnDot('p',p.id,vacio,s)+'</td><td class="cn-odoo">'+fmtN(p.odoo)+' batches</td>'
       +'<td class="cn-sub" id="cn-psub'+p.id+'">'+_cnSub(fmtN(fis)+' batches', fmtN(p.odoo)+' batches', vacio)+'</td>'
       +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr!=null?esc(dr):'')+'" oninput="cnPremez('+p.id+',this.value)" placeholder="0"><span class="cn-lbl">batches</span><span class="cn-lblm">bat</span></td>'
@@ -6671,10 +6678,10 @@ function cnRender(){
   let tm='<table class="cn-tbl"><thead><tr><th>Producto</th><th>Odoo dice</th><th>Conteo físico (unidad de venta)</th><th class="r">Diferencia</th></tr></thead><tbody>';
   for(const t of _cnTerm){
     const dr=(d.term||{})[t.id]||{}, vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
-    const fis=(parseFloat(dr.cajas)||0)*t.factor+(parseFloat(dr.sue)||0)*t.presDiv, diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
+    const fis=_crDec(dr.cajas)*t.factor+_crDec(dr.sue)*t.presDiv, diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
     const cajaV=t.factor/t.presDiv, cajaU=(t.presDiv===1?'u':'paq');   // caja en unidad de venta
     tm+='<tr><td class="cn-nm"><span class="cn-pnom">'+esc(t.label)+_cnDot('t',t.id,vacio,s)+'</span><span class="cn-pcaja">caja = '+cajaV+' '+cajaU+'</span></td><td class="cn-odoo">'+_cnVentaTxt(t,t.odoo)+'</td>'
-      +'<td class="cn-sub" id="cn-tsub'+t.id+'">'+_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio)+'</td>'
+      +'<td class="cn-sub" id="cn-tsub'+t.id+'">'+_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio, _cnPresTerm(t))+'</td>'
       +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr.cajas!=null?esc(dr.cajas):'')+'" oninput="cnTermCajas('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">cajas</span><span class="cn-lblm">caj</span> + '
       +'<input class="cn-in" inputmode="numeric" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnTermSue('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(t.venta)+'</span><span class="cn-lblm">'+esc(t.venta)+'</span>'
       +'<span class="cn-ttot" id="cn-ttot'+t.id+'">'+(vacio?'':'= '+_cnVentaTxt(t,fis))+'</span></td>'
@@ -6687,9 +6694,9 @@ function cnRender(){
 async function cnGuardar(){
   const d=cnDraft(), snap={fecha:new Date().toISOString().slice(0,16), rezago:d.rezago||{}, mp:{}, premez:{}, term:{}};
   _cnMP.forEach(m=>{ const dr=(d.mp||{})[m.pid]||{}; const {pe,fis,vacio}=fisicoMP(m,dr);
-    snap.mp[m.pid]={name:m.name, uom:m.uom, empaques:dr.emp!=null&&dr.emp!==''?parseFloat(dr.emp)||0:null, suelto:dr.sue!=null&&dr.sue!==''?parseFloat(dr.sue)||0:null, fisicoBase:vacio?null:fis, odoo:m.qty, diff:vacio?null:fis-m.qty}; });
-  _cnPremez.forEach(p=>{ const dr=(d.premez||{})[p.id]; const vac=(dr==null||dr===''); const fis=parseFloat(dr)||0; snap.premez[p.id]={label:p.label, batches:vac?null:fis, odoo:p.odoo, diff:vac?null:fis-p.odoo}; });
-  _cnTerm.forEach(t=>{ const dr=(d.term||{})[t.id]||{}; const cajas=parseFloat(dr.cajas)||0, sue=parseFloat(dr.sue)||0, fis=cajas*t.factor+sue*t.presDiv;
+    snap.mp[m.pid]={name:m.name, uom:m.uom, empaques:dr.emp!=null&&dr.emp!==''?_crDec(dr.emp):null, suelto:dr.sue!=null&&dr.sue!==''?_crDec(dr.sue):null, fisicoBase:vacio?null:fis, odoo:m.qty, diff:vacio?null:fis-m.qty}; });
+  _cnPremez.forEach(p=>{ const dr=(d.premez||{})[p.id]; const vac=(dr==null||dr===''); const fis=_crDec(dr); snap.premez[p.id]={label:p.label, batches:vac?null:fis, odoo:p.odoo, diff:vac?null:fis-p.odoo}; });
+  _cnTerm.forEach(t=>{ const dr=(d.term||{})[t.id]||{}; const cajas=_crDec(dr.cajas), sue=_crDec(dr.sue), fis=cajas*t.factor+sue*t.presDiv;
     const vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue===''); snap.term[t.id]={label:t.label, cajas, sueltas:sue, sueltasUnidad:t.venta, fisicoBase:vacio?null:fis, odoo:t.odoo, diff:vacio?null:fis-t.odoo}; });
   const c=sbClient(); if(!c){ alert('Sin conexión con la base. Reintentá.'); return; }
   let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
@@ -9306,7 +9313,7 @@ function invMpSue(pid,val){ const d=invDraft(); d.mp=d.mp||{}; d.mp[pid]=d.mp[pi
 // Físico MP = (# empaques × peso) + suelto, comparado contra stock.quant (mismo semáforo que terminado).
 function fisicoMP(m, dr){
   const pe=PESO_EMPAQUE.find(x=>x.rx.test(m.name));
-  const emp=parseFloat(dr.emp)||0, sue=parseFloat(dr.sue)||0;
+  const emp=_crDec(dr.emp), sue=_crDec(dr.sue);   // es-CR: la coma es el decimal (ver _crDec)
   const sf=(pe&&pe.sueltoFactor)?pe.sueltoFactor:1;
   const fis = pe ? (emp*pe.peso + (pe.noSuelto?0:sue*sf)) : sue;   // suelto convertido a unidad de stock si aplica
   const empVacio=(dr.emp==null||dr.emp===''), sueVacio=(dr.sue==null||dr.sue==='');
@@ -9412,7 +9419,7 @@ function recomputeTerm(id){
   const t=(window._invTerm||[]).find(x=>x.id===id); if(!t)return;
   const dr=(invDraft().term||{})[id]||{};
   const vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sueltos==null||dr.sueltos==='');
-  const cajas=parseFloat(dr.cajas)||0, sueltos=parseFloat(dr.sueltos)||0;
+  const cajas=_crDec(dr.cajas), sueltos=_crDec(dr.sueltos);
   const fis=cajas*t.factor+sueltos*t.presDiv, diff=fis-t.odoo, s=semTerm(diff,vacio);   // sueltos en unidad de venta → uds indiv
   const fe=document.getElementById('tfis'+id), de=document.getElementById('tdif'+id), se=document.getElementById('tsem'+id);
   if(fe)fe.textContent=fmtN(fis); if(de)de.textContent=vacio?'—':fmtDiff(diff);
@@ -9424,7 +9431,7 @@ function renderTerm(){
   for(const t of (window._invTerm||[])){
     const dr=d[t.id]||{};
     const vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sueltos==null||dr.sueltos==='');
-    const cajas=parseFloat(dr.cajas)||0, sueltos=parseFloat(dr.sueltos)||0;
+    const cajas=_crDec(dr.cajas), sueltos=_crDec(dr.sueltos);
     const fis=cajas*t.factor+sueltos*t.presDiv, diff=fis-t.odoo, s=semTerm(diff,vacio);   // sueltos en unidad de venta → uds indiv
     const cajaV=t.factor/t.presDiv, cajaU=(t.presDiv===1?'u':'paq');
     h+='<tr><td>'+esc(t.label)+' <span class="muted" style="font-size:11px">caja = '+cajaV+' '+cajaU+'</span></td>'
@@ -9444,7 +9451,7 @@ function recomputePremez(id){
   const p=(window._invPremez||[]).find(x=>x.id===id); if(!p)return;
   const dr=(invDraft().premez||{})[id];
   const vacio=(dr==null||dr==='');
-  const fis=parseFloat(dr)||0, diff=fis-p.odoo, s=semMP(diff,vacio);
+  const fis=_crDec(dr), diff=fis-p.odoo, s=semMP(diff,vacio);
   const fe=document.getElementById('pfis'+id), de=document.getElementById('pdif'+id), se=document.getElementById('psem'+id);
   if(fe)fe.textContent=vacio?'—':fmtN(fis); if(de){ de.textContent=vacio?'—':fmtDiff(diff); de.className=(s.cls==='inv-bad'?'inv-bad':''); }
   if(se){ se.textContent=s.txt; se.className=s.cls; }
@@ -9454,7 +9461,7 @@ function renderPremez(){
   let h='<table class="inv-tbl"><tr><th>Premezcla</th><th># batches</th><th style="text-align:right">Físico</th><th style="text-align:right">Odoo</th><th style="text-align:right">Δ</th></tr>';
   for(const p of (window._invPremez||[])){
     const dr=d[p.id]; const vacio=(dr==null||dr==='');
-    const fis=parseFloat(dr)||0, diff=fis-p.odoo, s=semMP(diff,vacio);
+    const fis=_crDec(dr), diff=fis-p.odoo, s=semMP(diff,vacio);
     h+='<tr><td>'+esc(p.label)+'</td>'
       +'<td><input class="inv-in inv-in-sm" inputmode="numeric" value="'+(dr!=null?esc(dr):'')+'" oninput="invPremezBatches('+p.id+',this.value)" placeholder="0"> <span class="muted" style="font-size:11px">batches</span></td>'
       +'<td style="text-align:right" id="pfis'+p.id+'">'+(vacio?'—':fmtN(fis))+'</td>'
@@ -9497,9 +9504,9 @@ async function cargarInventario(){
 
 async function guardarConteo(){
   const d=invDraft(); const snap={fecha:new Date().toISOString().slice(0,16), mp:{}, premez:{}, term:{}};
-  (window._invMP||[]).forEach(m=>{ const dr=(d.mp&&d.mp[m.pid])||{}; const {pe,fis,vacio}=fisicoMP(m,dr); snap.mp[m.pid]={name:m.name, uom:m.uom, empaque:pe?pe.lab:null, empaques:dr.emp!=null&&dr.emp!==''?parseFloat(dr.emp)||0:null, suelto:dr.sue!=null&&dr.sue!==''?parseFloat(dr.sue)||0:null, fisicoBase:vacio?null:fis, odoo:m.qty, diff:vacio?null:fis-m.qty}; });
-  (window._invPremez||[]).forEach(p=>{ const dr=(d.premez&&d.premez[p.id]); const vac=(dr==null||dr===''); const fis=parseFloat(dr)||0; snap.premez[p.id]={label:p.label, batches:vac?null:fis, odoo:p.odoo, diff:vac?null:fis-p.odoo}; });
-  (window._invTerm||[]).forEach(t=>{ const dr=(d.term&&d.term[t.id])||{}; const cajas=parseFloat(dr.cajas)||0, sueltos=parseFloat(dr.sueltos)||0; const fis=cajas*t.factor+sueltos*t.presDiv; snap.term[t.id]={label:t.label, cajas, sueltos, sueltosUnidad:t.venta, fisicoBase:fis, odoo:t.odoo, diff:fis-t.odoo}; });
+  (window._invMP||[]).forEach(m=>{ const dr=(d.mp&&d.mp[m.pid])||{}; const {pe,fis,vacio}=fisicoMP(m,dr); snap.mp[m.pid]={name:m.name, uom:m.uom, empaque:pe?pe.lab:null, empaques:dr.emp!=null&&dr.emp!==''?_crDec(dr.emp):null, suelto:dr.sue!=null&&dr.sue!==''?_crDec(dr.sue):null, fisicoBase:vacio?null:fis, odoo:m.qty, diff:vacio?null:fis-m.qty}; });
+  (window._invPremez||[]).forEach(p=>{ const dr=(d.premez&&d.premez[p.id]); const vac=(dr==null||dr===''); const fis=_crDec(dr); snap.premez[p.id]={label:p.label, batches:vac?null:fis, odoo:p.odoo, diff:vac?null:fis-p.odoo}; });
+  (window._invTerm||[]).forEach(t=>{ const dr=(d.term&&d.term[t.id])||{}; const cajas=_crDec(dr.cajas), sueltos=_crDec(dr.sueltos); const fis=cajas*t.factor+sueltos*t.presDiv; snap.term[t.id]={label:t.label, cajas, sueltos, sueltosUnidad:t.venta, fisicoBase:fis, odoo:t.odoo, diff:fis-t.odoo}; });
   const c=sbClient(); if(!c){ alert('No hay conexión con la base. Reintentá.'); return; }
   let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
   const { error } = await c.from('conteos').insert({ usuario: email||null, data: snap });
