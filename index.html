@@ -245,6 +245,25 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
   #vCobros .prod-det-wrap{padding:0}
   #vCobros .cob-cons{display:inline}            /* en el teléfono manda el "…4471" */
   #vCobros .cob-consfull{display:none}          /* el consecutivo completo es de escritorio */
+  /* ── El resaltado del toque no se queda pegado ──
+     Al abrir un cliente quedaba una mancha detrás del punto donde se tocó: iOS pinta
+     -webkit-tap-highlight-color y, como la fila es un <tr> con onclick, ni :active ni el foco
+     se limpian solos al volver de la navegación. Se apaga el resaltado nativo y se anula el
+     rastro de :active/:focus — la fila ya se entiende porque se despliega. */
+  #vCobros .cob-tbl tr{-webkit-tap-highlight-color:transparent}
+  #vCobros .cob-tbl tr:focus,#vCobros .cob-tbl tr:focus-visible,
+  #vCobros .cob-tbl tr:active,#vCobros .cob-tbl td:active{outline:none;background:transparent}
+  /* ── Jerarquía de la lista de clientes ──
+     Estaba toda al mismo peso y color, así que había que leerla entera para encontrar algo.
+     Sin agregar color (la regla es peso y grises): el NOMBRE y su MONTO en blanco hueso y
+     semibold —son las dos cosas que se buscan—, la línea de "N facturas · X d" en gris
+     terciario y más chica, y cada bloque de cliente abierto por una línea, no pegado al
+     anterior. */
+  #vCobros .cob-tbl tr.cob-gr{padding:14px 0;border-top:1px solid var(--border);border-bottom:none}
+  #vCobros .cob-tbl tr.cob-gr:first-child{border-top:none}
+  #vCobros .cob-tbl td.cob-g-nm{font-weight:600;color:var(--text)}
+  #vCobros .cob-tbl td.cob-g-tot{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+  #vCobros .cob-tbl td.cob-g-fac{color:var(--text-3);font-size:11px;padding-top:3px}
   /* ── Bajar el volumen ──
      El nombre del cliente en texto normal: que TODOS salieran rojos vaciaba la señal. */
   #vCobros .cob-g-nm .cob-venc{color:var(--text)}
@@ -429,7 +448,21 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
     font-variant-numeric:tabular-nums;white-space:nowrap}
   #vFacturado td.vent-g-cli{grid-column:1/-1;grid-row:2;text-align:left;font-size:11px;color:var(--text-3)}
   #vFacturado tr.vent-det>td{grid-column:1/-1}
-  #vFacturado tr.vent-total{grid-template-columns:1fr auto}
+  /* ── Jerarquía por tonos, la misma de Rentabilidad e Inventario ──
+     El MONTO es el dato: blanco hueso. El nombre del canal lo acompaña en gris secundario, y
+     "N clientes" es contexto en terciario. Antes los tres iban al mismo peso y color. */
+  #vFacturado td.vent-g-nm{color:var(--text-2);font-weight:500}
+  #vFacturado td.vent-g-tot{color:var(--text);font-weight:600}
+  /* ── El TOTAL, en UNA línea ──
+     Ocupaba dos porque hereda la cuadrícula de las filas de canal, donde "N clientes" vive en
+     el renglón 2. Acá las tres celdas van al renglón 1, el conteo de clientes se calla (ya
+     está en cada fila) y el desglose "facturado · NC" queda de sub-línea bajo el monto. */
+  #vFacturado tr.vent-total{grid-template-columns:1fr auto;row-gap:0;padding:14px 12px;
+    border-top:1px solid var(--border-strong);border-bottom:none}
+  #vFacturado tr.vent-total>td{grid-row:1}
+  #vFacturado tr.vent-total td.vent-g-cli{display:none}
+  #vFacturado tr.vent-total td.vent-g-nm{color:var(--text);font-weight:600}
+  #vFacturado .vent-total-sub{margin-top:2px}
   #vFacturado .vent-sub{padding:2px 0 8px 12px}
   #vFacturado .vent-cli{padding:8px 12px 8px 0}
   #vFacturado .vent-fac{padding:4px 0 10px 12px}
@@ -910,8 +943,15 @@ table td,table th{border-color:#F2F0EA}
      Los 78px de la derecha son el espacio de la pastilla "Salir", que va fija. */
   /* padding-top con safe-area: sin él, en iPhone el encabezado entra DEBAJO de la barra de
      estado y se ve cortado hasta que uno hace scroll. */
+  /* STICKY: el encabezado no se va con el scroll. Antes era una fila en flujo normal, así que
+     al bajar se metía DEBAJO de la barra de estado del iPhone y la hora quedaba encima del
+     logo; y como "Salir" es position:fixed, se quedaba arriba mientras el encabezado se iba,
+     terminando encima de las pestañas. Fijándolo, el safe-area sigue reservando el alto de la
+     barra de estado también SCROLLEADO, y "Salir" queda otra vez a la altura del encabezado.
+     El fondo tiene que ser opaco: si no, el contenido se transparenta al pasar por debajo. */
   #appHeader,.header{height:auto;min-height:40px;gap:8px;
-    padding:calc(8px + env(safe-area-inset-top)) 78px 8px 1rem}
+    padding:calc(8px + env(safe-area-inset-top)) 78px 8px 1rem;
+    position:sticky;top:0;z-index:110;background:var(--surface)}
   .header .hdr-right{display:contents}
   .header .conn-ind{order:-1;margin:0;gap:0;font-size:0}               /* queda solo el punto */
   .header .conn-ind .gdot{width:5px;height:5px}
@@ -7905,9 +7945,12 @@ function renderVentas(d,label){
   // Fila Total del mes: neto (facturado bruto − NC restadas), como la vieja "Facturado por canal".
   const nCli=d.filas.reduce((s,c)=>s+c.clientesArr.length,0);
   const sub=(d.nc?('facturado '+cM(d.bruto)+' · NC −'+cM(d.nc)):'sin NC en el mes');
-  h+='<tr class="vent-total"><td><strong>Total</strong></td><td style="text-align:right">'+nCli+'</td>'
-    +'<td style="text-align:right"><strong>'+cM(d.total)+'</strong>'
-    +'<div class="muted" style="font-size:11px;font-weight:400">'+esc(sub)+'</div></td></tr>';
+  // Las tres celdas llevan las MISMAS clases que las filas de canal (vent-g-nm/cli/tot): sin
+  // ellas, en teléfono la cuadrícula las acomodaba sola y "Total" se partía en dos renglones.
+  h+='<tr class="vent-total"><td class="vent-g-nm"><strong>Total</strong></td>'
+    +'<td class="vent-g-cli" style="text-align:right">'+nCli+'<span class="cob-movsuf"> cliente'+(nCli===1?'':'s')+'</span></td>'
+    +'<td class="vent-g-tot" style="text-align:right"><strong>'+cM(d.total)+'</strong>'
+    +'<div class="muted vent-total-sub" style="font-size:11px;font-weight:400">'+esc(sub)+'</div></td></tr>';
   el.innerHTML=h+'</table></div>';
 }
 
