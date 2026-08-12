@@ -17,9 +17,16 @@
 -- ── 1 · ANCLA DE INVENTARIO (el conteo del viernes) ─────────────────────
 -- Un conteo = una foto del congelador. El del viernes 14-ago reemplaza al del
 -- 17-jul. Se guardan varios a lo largo del tiempo; manda el más reciente.
+-- El ancla SE REPITE: habrá otro conteo en unos meses, y ese pasa a ser el nuevo
+-- punto de partida. No hay restricción de unicidad por fecha a propósito.
+-- `corte` es el instante en que la foto fue verdad, y es LA línea divisoria:
+-- todo lo fabricado y todo lo entregado se cuenta DESPUÉS de ese instante.
+-- Se usa un timestamp y no la fecha porque el viernes 14 hay conteo Y puede
+-- haber entregas el mismo día: con fecha suelta no se sabe cuál va primero.
 create table ent_conteo (
   id           bigint generated always as identity primary key,
-  fecha        date        not null,              -- el día que se contó (no el de captura)
+  fecha        date        not null,              -- el día que se contó, para leerlo
+  corte        timestamptz not null default now(),-- el instante exacto: la línea divisoria
   responsable  text        not null,              -- quién contó (Daniel)
   nota         text,
   creado_en    timestamptz not null default now(),
@@ -107,22 +114,42 @@ create index on ent_alisto_lote (lote);
 -- ── 4 · SALDO POR LOTE ──────────────────────────────────────────────────
 -- No es una tabla: es una resta que se hace al vuelo, y se deja escrita acá
 -- para que haya UNA sola definición.
---   saldo(producto,lote) = conteo del ancla más reciente
---                        + fabricado en Odoo DESPUÉS de la fecha del ancla
---                        − entregado registrado en este módulo (alistos vigentes)
+--   saldo(producto,lote) = conteo del ANCLA VIGENTE
+--                        + fabricado en Odoo   DESPUÉS del corte del ancla
+--                        − entregado en este módulo DESPUÉS del corte del ancla
 -- Lo fabricado sale del extractor de lote (chatter de mrp.production), no de
 -- una tabla: Odoo no lleva lote en producto terminado (tracking = none en los
 -- seis, y 1.604 movimientos de 2026 con cero lot_id — verificado 11-ago).
-create view ent_entregado_por_lote as
+-- OJO al convertir date_finished a día CR (UTC−6) antes de comparar.
+
+-- El ancla vigente: el conteo más reciente. Si se corrige el mismo día, gana
+-- el capturado después. Cuando entre el conteo de dentro de unos meses, esta
+-- vista empieza a devolverlo sola y el saldo arranca de cero desde ahí.
+create view ent_ancla as
+  select id, fecha, corte
+    from ent_conteo
+   order by fecha desc, creado_en desc
+   limit 1;
+
+-- Lo entregado DESDE EL ANCLA. El filtro por corte es lo que hace que el ancla
+-- nuevo sea un punto de partida y no una suma más: sin él, las entregas
+-- anteriores al conteo se restarían dos veces (ya están descontadas en la foto).
+create view ent_entregado_desde_ancla as
   select al.lote, ali.producto_id, sum(al.cant_uds) as uds
     from ent_alisto_lote al
     join ent_alisto_linea ali on ali.id = al.linea_id
     join ent_alisto a         on a.id  = ali.alisto_id
    where a.anulado = false
+     and a.creado_en > (select corte from ent_ancla)
      -- solo el alisto vigente de cada pedido (el más reciente no anulado)
      and a.creado_en = (select max(a2.creado_en) from ent_alisto a2
                          where a2.pedido_id = a.pedido_id and a2.anulado = false)
    group by al.lote, ali.producto_id;
+
+-- Un lote que existía en el ancla anterior y NO aparece en el nuevo conteo
+-- queda en cero, que es lo correcto: si no se contó, no está. Si igual sale
+-- en una entrega, la pantalla lo acepta (regla e: propone, nunca bloquea) y
+-- el saldo negativo es la señal de que hay que ajustar.
 
 
 -- ── 5 · RLS ─────────────────────────────────────────────────────────────
