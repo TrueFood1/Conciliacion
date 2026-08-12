@@ -4466,8 +4466,19 @@ function diasTag(p){
   if(!p || (p.dias||0)>0) return '';
   return '<span class="dias-cero" title="Su costo no incluye indirecto: en la ventana de costeo vigente no tuvo ningún día de producción propio.">'+DIAS_CERO_TXT+'</span>';
 }
-const COSTOS_INCLUDE = ['6101001','6101003','6101005','6101007','6101010','6101011','6103003','6104002','6104005','6104006','6104007','6105001','6105002','6105003','6106004','6106005','6106006','6106008','6106011','6106012','6106021','6106024','6400003','640102','6200001'];
-// 6104002 "Contabilidad, Auditoría, Fiscal" agregada como seguro (hoy ₡0; blinda si el contador se postea ahí).
+// pool = solo producción: planilla de planta (incl. RT en 6500002 mientras se corrige el posteo
+// a 6101004) + planta física + laboratorio + PSF. Administración, distribución, financiero y
+// empaque (cobrado por unidad) van fuera. Decisión Andrea 12-ago-2026.
+const COSTOS_INCLUDE = ['6101001','6101002','6101003','6101004','6101005','6101006','6101010','6102002','6106001','6106021','6106005','6106006','6106012','6105001','6105002','6105003','6106024','6400005','6500002'];
+// El PAR de Riesgos del Trabajo va a propósito: hoy el gasto cae en la transitoria 6500002 y la
+// cuenta propia 6101004 está en ₡0; con las dos adentro el pool no lo pierde ni antes ni después
+// de que la contadora corrija el posteo. Si algún día se postea en las dos a la vez, se duplica —
+// revisar al cerrar la corrección.
+// Fuera a propósito (no son olvidos): 6106009 "Suministros de Oficina" es la cuenta de COMPRAS DE
+// EMPAQUE (cajas de pizza, fundas, etiquetas) y el empaque ya se cobra por unidad en
+// COSTOS_PROD.emp — meterla sería doble conteo. 6104006 mezcla certificación de planta (Qualität)
+// con comisión de crédito (Diatom): entra cuando se separen las cuentas. 6106016 "Pérdida producto
+// defectuoso" es merma cuyo MP ya se cargó por receta.
 // ── VENTANA ROLLING DE MESES CERRADOS ──────────────────────────────────
 // Ya NO una lista fija de meses. Se toman los 3 meses CERRADOS más recientes.
 // "Cerrado" = tiene los rubros fijos grandes posteados: planilla (cargas sociales) + electricidad + alquiler.
