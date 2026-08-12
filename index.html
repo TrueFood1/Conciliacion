@@ -672,13 +672,16 @@ tr.r-ing td{background:#eff6ff}
   .home-live{margin-right:0;min-width:0}
   .home-live .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .home-live .t{font-size:11px}
-  /* Saludo + buscador quedan ARRIBA, pegados al encabezado; los módulos se anclan ABAJO
-     (`margin-top:auto` se come todo el sobrante) y el hueco del medio queda grande y limpio.
-     --lobby-piso es el colchón contra el filo inferior: es LA perilla de esta pantalla,
-     se ajusta con la captura del teléfono sin tocar nada más. */
-  .home-wrap{--lobby-piso:22px}
-  .home-center{flex:0 0 auto;justify-content:flex-start;margin:0}
-  .home-bottom{margin-top:auto;margin-bottom:0}
+  /* REPARTO DEL ESPACIO. El intento anterior anclaba el saludo al encabezado y los módulos al
+     filo: TODO el sobrante caía al medio y dejaba 411px de vacío — se veía partido en dos, no
+     espacioso. Ahora la separación del medio es FIJA (--lobby-hueco) y el sobrante se parte en
+     dos con los dos `auto`: mitad arriba del saludo, mitad debajo de los módulos. Así el saludo
+     baja, los módulos suben y forman conjunto con el buscador.
+     --lobby-hueco es LA perilla: 32 compacto · 56 intermedio (esta) · 120 aireado.
+     --lobby-piso es el colchón del sello contra el filo de abajo. */
+  .home-wrap{--lobby-hueco:56px; --lobby-piso:22px}
+  .home-center{flex:0 0 auto;justify-content:flex-start;margin:auto 0 0}
+  .home-bottom{margin-top:var(--lobby-hueco);margin-bottom:auto}
   .home-hi{font-size:22px}
   .home-soon{margin-top:1.3rem}
   .home-modlabel{margin:1.5rem 0 .8rem}
@@ -7963,7 +7966,16 @@ const CANALES = [
   {key:'walmart',label:'Walmart / Más x Menos', plId:10,
    comision:{pct:0.0654, enFactura:false, antes:0.0643, fuente:'acuerdo comercial (incluye todo), ago-2026'}, frio:null},
   {key:'mega',   label:'MegaSuper',             plId:12,
-   comision:{pct:0.065,  enFactura:false, fuente:'acuerdo comercial, jul-2026'}, frio:null},
+   comision:{pct:0.065,  enFactura:false, fuente:'acuerdo comercial, jul-2026'},
+   // MegaSuper factura el frío POR TIENDA, no un monto fijo al mes: mayo 1 tienda · junio 2 ·
+   // julio 10 (M126 M414 M316 M214 M215 M216 M217 M315 M412 M510), todas a ₡2.709,19. Por eso
+   // el dato editable es el NÚMERO DE TIENDAS y el monto sale de multiplicar: una constante
+   // mensual quedaría vieja el día que entre la tienda 11. Es aparte del 6,5% de comisión —
+   // verificado que las facturas de venta van con discount 0 y que las bills del proveedor son
+   // solo frío, así que no hay doble conteo.
+   frio:{porTienda:2709.19, tiendas:10, verificado:true, editable:true,
+         fuente:'bills del proveedor en 6106013, una por tienda — julio 2026 (11-ago-2026)',
+         nota:'Arranca en mayo 2026. El write-off de ₡12.018,39 en 6106028 NO es gasto: es el pago de las bills de mayo+junio (₡10.635,75 × 1,13 = ₡12.018,40) descontado del depósito.'}},
   {key:'compre', label:'Compre Bien',           plId:5,
    comision:null,
    frio:{monto:51166.40, verificado:true, editable:true, antes:34386,
@@ -7985,13 +7997,20 @@ const CANALES_PRECIO = CANALES.filter(c=>c.plId);     // canales con tarifa en O
 const canalComRenta = c => (c.comision && !c.comision.enFactura) ? c.comision.pct : 0;
 // Comisión para PROYECTAR sobre precio de lista. intro=true → tarifa de producto nuevo.
 const canalComProy = (c,intro) => !c.comision ? 0 : ((intro && c.comision.intro) ? c.comision.intro.pct : c.comision.pct);
-const canalFrio = c => (c.frio && c.frio.monto) || 0;
+// Frío ₡/mes del canal. Dos formas de decirlo, una sola respuesta:
+//   · monto     → cifra fija al mes (Automercado, Compre Bien)
+//   · porTienda × tiendas → el canal cobra por punto de venta (MegaSuper)
+const canalFrio = c => !c.frio ? 0 : (c.frio.porTienda ? c.frio.porTienda*(c.frio.tiendas||0) : (c.frio.monto||0));
+// Cómo se explica ese número en el tooltip: si es por tienda, se muestra la multiplicación.
+const canalFrioCalc = c => (c.frio && c.frio.porTienda)
+  ? cM(c.frio.porTienda)+' × '+fmtN(c.frio.tiendas||0)+' tienda'+((c.frio.tiendas||0)===1?'':'s')+' = '+cM(canalFrio(c))
+  : cM(canalFrio(c));
 // Texto de fuente/fecha de un canal (tooltip). '' si el canal no tiene supuestos.
 function canalFuente(c){
   const p=[];
   if(c.comision) p.push('Comisión '+_pct(c.comision.pct*100)+(c.comision.enFactura?' (ya aplicada en la factura)':'')+' — '+c.comision.fuente
     +(c.comision.intro?' · introducción '+_pct(c.comision.intro.pct*100)+' los primeros '+c.comision.intro.meses+' meses de un producto nuevo':''));
-  if(c.frio) p.push('Frío '+cM(c.frio.monto)+'/mes — '+c.frio.fuente);
+  if(c.frio) p.push('Frío '+canalFrioCalc(c)+'/mes — '+c.frio.fuente+(c.frio.nota?'\n'+c.frio.nota:''));
   return p.join('\n');
 }
 // Partner → canal. Por banner (commercial_name); razón social de respaldo. NUNCA por
@@ -8112,7 +8131,7 @@ function rentaRender(R, label){
   if(cambiados.length){
     foot+='<br><span style="color:var(--text-2)">Supuestos actualizados el 9-ago-2026: '
       +cambiados.map(c=>{
-        if(c.frio&&c.frio.antes!=null) return esc(c.label)+' frío '+cM(c.frio.monto)+'/mes (antes '+cM(c.frio.antes)+', '+esc(c.frio.fuente)+')';
+        if(c.frio&&c.frio.antes!=null) return esc(c.label)+' frío '+cM(canalFrio(c))+'/mes (antes '+cM(c.frio.antes)+', '+esc(c.frio.fuente)+')';
         return esc(c.label)+' '+_pct(c.comision.pct*100)+' (antes '+_pct(c.comision.antes*100)+')';
       }).join(' · ')+'.</span>';
   }
