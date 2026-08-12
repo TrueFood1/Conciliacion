@@ -553,8 +553,40 @@ tr.r-ing td{background:#eff6ff}
 /* Pestañas que no se muestran en teléfono (Operaciones: Producción · Mermas · Plan ·
    Finanzas: Precios). Es SOLO visual — no hay roles todavía, la vista sigue accesible
    por URL o desde escritorio. */
+/* El panel del "+" y su botón: en ESCRITORIO no existen (todas las pestañas se ven). */
+.face-mas{display:none}
+#finMas{display:none}
 @media(max-width:700px){
   .face-desk{display:none}
+  /* ── FINANZAS EN TELÉFONO: operativas a la vista, análisis detrás del "+" ──
+     Visibles: Cobros y Pagos · Resultados · Ventas — en ese orden, que es el de
+     frecuencia de uso. Detrás del "+": Rentabilidad, Precios y las dos caras de
+     análisis de Resultados (12 meses y Comparador). No se esconde nada: Precios
+     de hecho pasa de INVISIBLE en el teléfono a accesible por primera vez. */
+  .face-plus{display:none}
+  .face-mas{display:flex;align-items:center;justify-content:center;flex:none;
+    min-width:34px;padding:8px 10px;font-size:16px;line-height:1;color:var(--text-3)}
+  /* OJO: solo la barra de FINANZAS. `.faces-ops` (Operaciones) queda intacta —
+     ahí el orden Resumen · Inventario es el correcto y reordenar lo rompería. */
+  .faces:not(.faces-ops) .face:nth-child(4){order:1}   /* Cobros y Pagos, primera */
+  .faces:not(.faces-ops) .face:nth-child(1){order:2}   /* Resultados */
+  .faces:not(.faces-ops) .face:nth-child(2){order:3}   /* Ventas */
+  .faces:not(.faces-ops) .face-mas{order:9}
+  /* Panel del "+": lista simple anclada al pie, del ancho de la pantalla. */
+  #finMas{display:block;position:fixed;left:0;right:0;bottom:0;z-index:130;
+    background:var(--surface);border-top:.5px solid var(--border-strong);
+    padding:6px 0 calc(10px + env(safe-area-inset-bottom));
+    box-shadow:0 -10px 30px rgba(0,0,0,.35)}
+  #finMas.hidden{display:none}
+  #finMas .fm-h{font-size:11px;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--text-3);padding:10px 20px 6px}
+  #finMas button{display:block;width:100%;text-align:left;background:none;border:none;
+    font-family:inherit;font-size:15px;color:var(--text);padding:13px 20px;cursor:pointer;
+    -webkit-tap-highlight-color:transparent}
+  #finMas button .sub{display:block;font-size:11.5px;color:var(--text-3);margin-top:2px}
+  /* Las dos caras de análisis de Resultados salen del conmutador en teléfono:
+     viven en el "+". "El mes" queda sola y por eso el conmutador entero sobra. */
+  #vResultados #resSeg{display:none}
   /* Barra de pestañas: si no caben, se desliza. Nunca se corta una etiqueta a la mitad
      ni se parte en dos renglones (flex-wrap era lo que dejaba "Cobros y / Pagos"). */
   .faces{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;
@@ -1224,6 +1256,15 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   </div>
 </div>
 
+<!-- "+" de Finanzas en teléfono: las vistas de análisis. Solo móvil (CSS). -->
+<div id="finMas" class="hidden">
+  <div class="fm-h">Análisis</div>
+  <button onclick="finMasIr('rent')">Rentabilidad<span class="sub">Ganancia por producto y canal, del mes</span></button>
+  <button onclick="finMasIr('doce')">Últimos 12 meses<span class="sub">Ingresos, gastos y resultado, mes a mes</span></button>
+  <button onclick="finMasIr('comp')">Comparador<span class="sub">Dos o más meses lado a lado</span></button>
+  <button onclick="finMasIr('precios')">Precios<span class="sub">Simulador y calculadora</span></button>
+</div>
+
 <!-- UPLOAD -->
 <div id="vUpload" class="hidden">
   <div id="alertConn" class="hidden" style="font-size:11px;color:var(--text-3);letter-spacing:.02em;margin-bottom:14px"></div>
@@ -1337,9 +1378,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   <div class="faces">
     <button class="face" onclick="irAResultados()">Resultados</button>
     <button class="face" onclick="irAVentas()">Ventas</button>
-    <button class="face on">Rentabilidad</button>
+    <button class="face on face-plus">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
-    <button class="face face-desk" onclick="irAPrecios()">Precios</button>
+    <button class="face face-plus" onclick="irAPrecios()">Precios</button><button class="face face-mas" onclick="finMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1359,9 +1400,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   <div class="faces">
     <button class="face" onclick="irAResultados()">Resultados</button>
     <button class="face on">Ventas</button>
-    <button class="face" onclick="irARentabilidad()">Rentabilidad</button>
+    <button class="face face-plus" onclick="irARentabilidad()">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
-    <button class="face face-desk" onclick="irAPrecios()">Precios</button>
+    <button class="face face-plus" onclick="irAPrecios()">Precios</button><button class="face face-mas" onclick="finMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1460,9 +1501,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   <div class="faces">
     <button class="face" onclick="irAResultados()">Resultados</button>
     <button class="face" onclick="irAVentas()">Ventas</button>
-    <button class="face on">Rentabilidad</button>
+    <button class="face on face-plus">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
-    <button class="face face-desk" onclick="irAPrecios()">Precios</button>
+    <button class="face face-plus" onclick="irAPrecios()">Precios</button><button class="face face-mas" onclick="finMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1483,9 +1524,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   <div class="faces">
     <button class="face" onclick="irAResultados()">Resultados</button>
     <button class="face" onclick="irAVentas()">Ventas</button>
-    <button class="face" onclick="irARentabilidad()">Rentabilidad</button>
+    <button class="face face-plus" onclick="irARentabilidad()">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
-    <button class="face on face-desk">Precios</button>
+    <button class="face on face-plus">Precios</button><button class="face face-mas" onclick="finMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div class="m3nav" style="margin-top:12px">
     <button class="m3tab on" onclick="irASimulador()">Simulador</button>
@@ -1544,9 +1585,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   <div class="faces">
     <button class="face" onclick="irAResultados()">Resultados</button>
     <button class="face" onclick="irAVentas()">Ventas</button>
-    <button class="face" onclick="irARentabilidad()">Rentabilidad</button>
+    <button class="face face-plus" onclick="irARentabilidad()">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
-    <button class="face on face-desk">Precios</button>
+    <button class="face on face-plus">Precios</button><button class="face face-mas" onclick="finMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div class="m3nav" style="margin-top:12px">
     <button class="m3tab" onclick="irASimulador()">Simulador</button>
@@ -1629,9 +1670,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   <div class="faces">
     <button class="face on">Resultados</button>
     <button class="face" onclick="irAVentas()">Ventas</button>
-    <button class="face" onclick="irARentabilidad()">Rentabilidad</button>
+    <button class="face face-plus" onclick="irARentabilidad()">Rentabilidad</button>
     <button class="face" onclick="irACobros()">Cobros y Pagos</button>
-    <button class="face face-desk" onclick="irAPrecios()">Precios</button>
+    <button class="face face-plus" onclick="irAPrecios()">Precios</button><button class="face face-mas" onclick="finMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1679,9 +1720,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   <div class="faces">
     <button class="face" onclick="irAResultados()">Resultados</button>
     <button class="face" onclick="irAVentas()">Ventas</button>
-    <button class="face" onclick="irARentabilidad()">Rentabilidad</button>
+    <button class="face face-plus" onclick="irARentabilidad()">Rentabilidad</button>
     <button class="face on">Cobros y Pagos</button>
-    <button class="face face-desk" onclick="irAPrecios()">Precios</button>
+    <button class="face face-plus" onclick="irAPrecios()">Precios</button><button class="face face-mas" onclick="finMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -2831,6 +2872,7 @@ function _modShow(id){
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.toggle('hidden', v!==id); });
   document.getElementById('vLobby').classList.add('hidden');
   document.getElementById('appHeader').classList.remove('hidden');
+  finMasCerrar();   // el "+" es de Finanzas: no sobrevive a un cambio de vista
   aplicarModoProduccion();
 }
 function crumbSet(area,cur){
@@ -2841,7 +2883,10 @@ function crumbSet(area,cur){
   const d=document.querySelector('.crumb-dot'); if(d)d.style.background=COL[area]||'#378ADD';
 }
 // Entradas desde el HOME (una por módulo).
-function abrirFinanzas(){ irAResultados(); }                 // Finanzas → 1ª pestaña (Resultados)
+// Finanzas entra por Resultados en escritorio y por COBROS Y PAGOS en teléfono: es la
+// razón principal para abrir Finanzas desde el teléfono (a quién cobrar y pagar esta
+// semana). Si Andrea echa de menos Resultados a la mano, se revierte cambiando esta línea.
+function abrirFinanzas(){ return esMovil() ? irACobros() : irAResultados(); }
 function abrirOperaciones(){ irAResumen(); }              // Operaciones → 1ª sub-pestaña
 function abrirContabilidad(){ abrirFinanzas(); }             // alias histórico
 function entrarHerramienta(){ abrirFinanzas(); }             // alias histórico
@@ -9337,19 +9382,43 @@ function resProdToggle(i, cell){
   if(cell) cell.classList.toggle('rp-abierta', abierto);
 }
 let resMeses=[], _resBuilt=false;
+// ── Conmutador de vistas de Resultados. Vive aparte del wiring porque el "+" de
+// teléfono también lo usa: en móvil #resSeg está oculto y la vista se elige desde ahí.
+function resVer(v){
+  document.querySelectorAll('#resSeg button').forEach(x=>x.classList.toggle('on', x.dataset.v===v));
+  document.getElementById('resVistaMes').classList.toggle('hidden',v!=='mes');
+  document.getElementById('resVistaDoce').classList.toggle('hidden',v!=='doce');
+  document.getElementById('resVistaComp').classList.toggle('hidden',v!=='comp');
+}
+// ── "+" de Finanzas en teléfono ─────────────────────────────────────────
+// Las pestañas de análisis (Rentabilidad · Precios) y las dos caras de análisis de
+// Resultados viven acá. Nada se elimina: se ordena por frecuencia de uso.
+const esMovil = () => window.matchMedia && matchMedia('(max-width:700px)').matches;
+function finMasToggle(ev){ if(ev) ev.stopPropagation();
+  const p=document.getElementById('finMas'); if(p) p.classList.toggle('hidden'); }
+function finMasCerrar(){ const p=document.getElementById('finMas'); if(p) p.classList.add('hidden'); }
+function finMasIr(k){
+  finMasCerrar();
+  if(k==='rent')    return irARentabilidad();
+  if(k==='precios') return irAPrecios();
+  // 12 meses y Comparador: abrir Resultados y dejar puesta esa cara.
+  irAResultados();
+  // resInit() es async la 1ª vez; se espera a que el conmutador exista antes de elegir.
+  const poner=()=>{ if(document.getElementById('resVistaDoce')) resVer(k); };
+  poner(); setTimeout(poner, 350);
+}
+// Un toque fuera del panel lo cierra (no hay botón de cerrar: sobra).
+document.addEventListener('click', function(e){
+  const p=document.getElementById('finMas');
+  if(p && !p.classList.contains('hidden') && !p.contains(e.target)) finMasCerrar();
+});
 const RES_STATE={mes:0, comp:[]};
 const cMs = n => (n<0?'−':'')+cM(Math.abs(n));   // colones con signo tipográfico (−, no guion)
 async function resInit(){
   if(_resBuilt) return;
   _resBuilt=true;
   // wiring del selector de vista (una vez)
-  document.querySelectorAll('#resSeg button').forEach(b=>b.onclick=()=>{
-    document.querySelectorAll('#resSeg button').forEach(x=>x.classList.toggle('on',x===b));
-    const v=b.dataset.v;
-    document.getElementById('resVistaMes').classList.toggle('hidden',v!=='mes');
-    document.getElementById('resVistaDoce').classList.toggle('hidden',v!=='doce');
-    document.getElementById('resVistaComp').classList.toggle('hidden',v!=='comp');
-  });
+  document.querySelectorAll('#resSeg button').forEach(b=>b.onclick=()=>resVer(b.dataset.v));
   const strip=document.getElementById('resStrip');
   if(strip) strip.innerHTML='<div class="sim-stat" style="grid-column:1/-1"><div class="k"><span class="spin"></span> Leyendo Odoo…</div><div class="note">estado de resultados en vivo (devengado)</div></div>';
   try{ resMeses=await reporteResultados(); }

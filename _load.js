@@ -431,6 +431,7 @@ function _modShow(id){
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.toggle('hidden', v!==id); });
   document.getElementById('vLobby').classList.add('hidden');
   document.getElementById('appHeader').classList.remove('hidden');
+  finMasCerrar();   // el "+" es de Finanzas: no sobrevive a un cambio de vista
   aplicarModoProduccion();
 }
 function crumbSet(area,cur){
@@ -441,7 +442,10 @@ function crumbSet(area,cur){
   const d=document.querySelector('.crumb-dot'); if(d)d.style.background=COL[area]||'#378ADD';
 }
 // Entradas desde el HOME (una por módulo).
-function abrirFinanzas(){ irAResultados(); }                 // Finanzas → 1ª pestaña (Resultados)
+// Finanzas entra por Resultados en escritorio y por COBROS Y PAGOS en teléfono: es la
+// razón principal para abrir Finanzas desde el teléfono (a quién cobrar y pagar esta
+// semana). Si Andrea echa de menos Resultados a la mano, se revierte cambiando esta línea.
+function abrirFinanzas(){ return esMovil() ? irACobros() : irAResultados(); }
 function abrirOperaciones(){ irAResumen(); }              // Operaciones → 1ª sub-pestaña
 function abrirContabilidad(){ abrirFinanzas(); }             // alias histórico
 function entrarHerramienta(){ abrirFinanzas(); }             // alias histórico
@@ -6937,19 +6941,43 @@ function resProdToggle(i, cell){
   if(cell) cell.classList.toggle('rp-abierta', abierto);
 }
 let resMeses=[], _resBuilt=false;
+// ── Conmutador de vistas de Resultados. Vive aparte del wiring porque el "+" de
+// teléfono también lo usa: en móvil #resSeg está oculto y la vista se elige desde ahí.
+function resVer(v){
+  document.querySelectorAll('#resSeg button').forEach(x=>x.classList.toggle('on', x.dataset.v===v));
+  document.getElementById('resVistaMes').classList.toggle('hidden',v!=='mes');
+  document.getElementById('resVistaDoce').classList.toggle('hidden',v!=='doce');
+  document.getElementById('resVistaComp').classList.toggle('hidden',v!=='comp');
+}
+// ── "+" de Finanzas en teléfono ─────────────────────────────────────────
+// Las pestañas de análisis (Rentabilidad · Precios) y las dos caras de análisis de
+// Resultados viven acá. Nada se elimina: se ordena por frecuencia de uso.
+const esMovil = () => window.matchMedia && matchMedia('(max-width:700px)').matches;
+function finMasToggle(ev){ if(ev) ev.stopPropagation();
+  const p=document.getElementById('finMas'); if(p) p.classList.toggle('hidden'); }
+function finMasCerrar(){ const p=document.getElementById('finMas'); if(p) p.classList.add('hidden'); }
+function finMasIr(k){
+  finMasCerrar();
+  if(k==='rent')    return irARentabilidad();
+  if(k==='precios') return irAPrecios();
+  // 12 meses y Comparador: abrir Resultados y dejar puesta esa cara.
+  irAResultados();
+  // resInit() es async la 1ª vez; se espera a que el conmutador exista antes de elegir.
+  const poner=()=>{ if(document.getElementById('resVistaDoce')) resVer(k); };
+  poner(); setTimeout(poner, 350);
+}
+// Un toque fuera del panel lo cierra (no hay botón de cerrar: sobra).
+document.addEventListener('click', function(e){
+  const p=document.getElementById('finMas');
+  if(p && !p.classList.contains('hidden') && !p.contains(e.target)) finMasCerrar();
+});
 const RES_STATE={mes:0, comp:[]};
 const cMs = n => (n<0?'−':'')+cM(Math.abs(n));   // colones con signo tipográfico (−, no guion)
 async function resInit(){
   if(_resBuilt) return;
   _resBuilt=true;
   // wiring del selector de vista (una vez)
-  document.querySelectorAll('#resSeg button').forEach(b=>b.onclick=()=>{
-    document.querySelectorAll('#resSeg button').forEach(x=>x.classList.toggle('on',x===b));
-    const v=b.dataset.v;
-    document.getElementById('resVistaMes').classList.toggle('hidden',v!=='mes');
-    document.getElementById('resVistaDoce').classList.toggle('hidden',v!=='doce');
-    document.getElementById('resVistaComp').classList.toggle('hidden',v!=='comp');
-  });
+  document.querySelectorAll('#resSeg button').forEach(b=>b.onclick=()=>resVer(b.dataset.v));
   const strip=document.getElementById('resStrip');
   if(strip) strip.innerHTML='<div class="sim-stat" style="grid-column:1/-1"><div class="k"><span class="spin"></span> Leyendo Odoo…</div><div class="note">estado de resultados en vivo (devengado)</div></div>';
   try{ resMeses=await reporteResultados(); }
