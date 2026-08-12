@@ -3,7 +3,10 @@
 # como usar un const antes de declararlo (TDZ) — el bug del 11-ago.
 import re, subprocess, os, sys
 JSC='/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc'
-SP=os.path.dirname(os.path.abspath(__file__))
+# El archivo temporal NO se escribe en el repo: la primera versión lo dejaba al lado de
+# loadcheck.py y `git add -A` se lo llevó a un repo PÚBLICO (11-ago). Va a un temporal.
+import tempfile
+SP=tempfile.mkdtemp(prefix='tf_loadcheck_')
 s=open('index.html',encoding='utf-8').read()
 body=re.findall(r'<script(?![^>]*src=)[^>]*>(.*?)</script>', s, re.S)[0]
 stub = r'''
