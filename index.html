@@ -7548,6 +7548,62 @@ const COSTOS_DIAS_ATIPICOS = {
     '2026-03-30':'lunes de Semana Santa — la semana entera sin producción de pan'
   }
 };
+// ── EXCLUSIONES PUNTUALES DEL POOL (decisión de Andrea, 12-ago-2026) ────────
+// Líneas posteadas en una cuenta del pool que NO son costo de producción del mes.
+// Se EXCLUYEN con razón documentada, nunca se borran de Odoo — mismo criterio que
+// COSTOS_DIAS_ATIPICOS: el dato real se respeta, lo que se ajusta es qué entra al reparto.
+//
+// La llave es el id de account.move.line (inmutable; la descripción no lo es).
+// `monto` NO es decorativo: es la HUELLA que se verifica contra Odoo antes de excluir
+// (junto con fecha y cuenta). Si algo no calza, la exclusión NO se aplica y sale en rojo.
+// `montoExcluido` es lo que sale del pool: puede ser TODO (monto) o una PARTE.
+const COSTOS_LINEAS_EXCLUIDAS = {
+  // Factura 2014 de Global Supply, 9-mar-2026. PROCOMER reembolsó ₡750.000 por la
+  // actividad 1.3 "Pago de Equipo Gluten Tox y Luminómetro" — un solo monto para las
+  // DOS líneas de abajo (bundle de ₡1.115.000).
+  //
+  // Luminómetro: exclusión TOTAL, y NO por el reembolso. Es equipo, no consumible:
+  // corresponde capitalizarlo y depreciarlo. El propio PROCOMER exige "registro de
+  // activo" como entregable de la actividad — el programa lo trata como activo. Mientras
+  // el posteo no se corrija, no puede cargar entero a un mes de la ventana.
+  107850: {fecha:'2026-03-09', cuenta:'6400005', monto:875000, montoExcluido:875000,
+           etiqueta:'Luminómetro Hygiena SystemSure Plus · Global Supply',
+           razon:'Es equipo, no consumible: corresponde capitalizar y depreciar. PROCOMER '
+                +'exige registro de activo como entregable de la actividad 1.3.'},
+  // Kit de gluten: exclusión PARCIAL. Sí es consumible legítimo (25 pruebas), pero parte
+  // la pagó PROCOMER. Reparto PROPORCIONAL al monto de cada línea dentro del bundle
+  // (240.000/1.115.000 = 21,5247% × 750.000 = 161.434,98). No se le imputa el reembolso al
+  // luminómetro porque ése ya sale entero por ser activo: sería usarlo dos veces.
+  107852: {fecha:'2026-03-09', cuenta:'6400005', monto:240000, montoExcluido:161434.98,
+           etiqueta:'Kit Gluten Tox Pro (25 pruebas) · Global Supply',
+           razon:'Reembolso PROCOMER (actividad 1.3), parte proporcional. Los ₡78.565,02 '
+                +'restantes SÍ son costo de producción y se quedan en el pool.'},
+};
+// Verifica cada exclusión contra Odoo. Si algo no calza, NO se aplica y se marca rota:
+// preferimos no restar a restar mal (mismo criterio que la regla del día de limpieza).
+async function verificarExclusiones(){
+  const ids=Object.keys(COSTOS_LINEAS_EXCLUIDAS).map(Number);
+  if(!ids.length) return [];
+  const ls=await odooCall('account.move.line','search_read',[[['id','in',ids]]],
+    {fields:['id','date','debit','credit','account_id','parent_state']});
+  const byId={}; ls.forEach(l=>byId[l.id]=l);
+  return ids.map(id=>{
+    const d=COSTOS_LINEAS_EXCLUIDAS[id], l=byId[id], fallas=[];
+    if(!l) fallas.push('la línea ya no existe en Odoo');
+    else{
+      const cod=l.account_id?String(l.account_id[1]).trim().split(' ')[0]:'';
+      const monto=(l.debit||0)-(l.credit||0);
+      if(l.date!==d.fecha)   fallas.push('fecha: Odoo dice '+l.date+', la lista dice '+d.fecha);
+      if(cod!==d.cuenta)     fallas.push('cuenta: Odoo dice '+cod+', la lista dice '+d.cuenta);
+      if(Math.abs(monto-d.monto)>0.5) fallas.push('monto: Odoo dice '+monto.toFixed(2)+', la lista dice '+d.monto.toFixed(2));
+      if(l.parent_state!=='posted')   fallas.push('el asiento ya no está posteado ('+l.parent_state+')');
+    }
+    if(!(d.montoExcluido>=0) || d.montoExcluido>d.monto+0.5)
+      fallas.push('montoExcluido ('+d.montoExcluido+') no puede superar el monto de la línea ('+d.monto+')');
+    return Object.assign({id}, d, {ok:!fallas.length, fallas,
+                                   parcial:d.montoExcluido < d.monto-0.5});
+  });
+}
 // ── CONTEXTO OPERATIVO: la limpieza profunda semanal es PRÁCTICA NUEVA ──────
 // No se hacía antes. Por eso marzo-abril-mayo 2026 tiene 5 semanas seguidas sin ningún
 // día de limpieza (todos los días laborales produjeron pan) mientras junio-julio cierra
@@ -7643,15 +7699,23 @@ async function computeCostos(force){
   const keyPid={}; RENT_PROD.forEach(p=>keyPid[p.key]=p.pid);   // key del motor → product.product id
   const ids=Object.values(keyPid);
   const ventana=await mesesCerradosRolling(COSTOS_NVENTANA);
+  const exclusiones=await verificarExclusiones();
+  const exVigentes=exclusiones.filter(e=>e.ok);   // las rotas NO restan: el pool las cuenta entero
   const meses=[];
   for(const {nom,D1,D2} of ventana){
     // Pool de indirecto del mes (mismas cuentas de siempre). Sueldos 6101001 = planilla 3 personas.
     const g=await odooCall('account.move.line','read_group',
       [[['date','>=',D1],['date','<=',D2],['parent_state','=','posted'],['account_id.code','in',COSTOS_INCLUDE]],['debit','credit'],[]],{lazy:false});
-    const pool=((g[0]&&g[0].debit)||0)-((g[0]&&g[0].credit)||0);   // débito − crédito (NC reducen gasto)
+    const poolBruto=((g[0]&&g[0].debit)||0)-((g[0]&&g[0].credit)||0);   // débito − crédito (NC reducen gasto)
+    // Exclusiones puntuales del mes. Se RESTAN del bruto en vez de sacarse del dominio:
+    // una sola regla sirve para las totales y para las parciales, la atribución al mes
+    // queda explícita, y permite mostrar bruto → exclusiones → neto en la validación.
+    const exMes=exVigentes.filter(e=>e.fecha>=D1 && e.fecha<=D2);
+    const excluido=exMes.reduce((s,e)=>s+e.montoExcluido,0);
+    const pool=poolBruto-excluido;
     const acc=await diasUnidadesMes(D1,D2,ids,keyPid['galletas']);   // Cookie Dough = día compartido
     const porKey={}; COSTOS_PROD.forEach(P=>{ const a=acc[keyPid[P.key]]; porKey[P.key]={dias:a?a.dias.size:0, unidades:a?a.unidades:0}; });
-    meses.push({nom,D1,D2,pool,porKey});
+    meses.push({nom,D1,D2,pool,poolBruto,excluido,exMes,porKey});
   }
   const poolAvg=meses.reduce((s,m)=>s+m.pool,0)/(meses.length||1);
   // Promediar días y unidades por producto sobre los mismos meses
@@ -7686,7 +7750,7 @@ async function computeCostos(force){
         atipicos.push({pid:+pid, label:(P&&P.label)||('id '+pid), fecha:d, razon:COSTOS_DIAS_ATIPICOS[pid][d]}); }
     }
   }
-  return _costosCache={ventana,meses,poolAvg,totalDias,prods,atipicos};
+  return _costosCache={ventana,meses,poolAvg,totalDias,prods,atipicos,exclusiones};
 }
 async function calcularCostos(){
   const st=document.getElementById('costosStatus'),vp=document.getElementById('costosValid'),cg=document.getElementById('costosCards');
@@ -7694,22 +7758,67 @@ async function calcularCostos(){
   st.innerHTML='<span class="spin"></span>Leyendo Odoo y calculando costos en vivo… (puede tardar unos segundos)';
   vp.innerHTML='';cg.innerHTML='';
   try{
-    const {meses,poolAvg,totalDias,prods,atipicos}=await computeCostos(true);   // botón Recalcular → cálculo fresco
+    const {meses,poolAvg,totalDias,prods,atipicos,exclusiones}=await computeCostos(true);   // botón Recalcular → cálculo fresco
     st.classList.add('hidden');
-    renderValidacion(vp,{meses,poolAvg,totalDias},prods);
+    renderValidacion(vp,{meses,poolAvg,totalDias,exclusiones},prods);
     renderTarjetas(cg,prods,atipicos);
   }catch(e){ st.className='status s-err'; st.innerHTML='No pude calcular los costos: '+esc(e&&e.message||e); }
 }
 
+// Tres formas de visibilidad de las exclusiones, para que ninguna sea silenciosa:
+//   1) las que SÍ están restando en la ventana vigente,
+//   2) las registradas fuera de la ventana (documentadas, hoy sin efecto),
+//   3) las ROTAS — en rojo aunque estén fuera de la ventana, porque una exclusión que
+//      apunta a una línea que cambió es un error de configuración, no un dato.
+function renderExclusiones(exclusiones,meses){
+  const ex=exclusiones||[]; if(!ex.length) return '';
+  const dentro=e=>meses.some(m=>e.fecha>=m.D1 && e.fecha<=m.D2);
+  const aplic=ex.filter(e=>e.ok && dentro(e));
+  const fuera=ex.filter(e=>e.ok && !dentro(e));
+  const rotas=ex.filter(e=>!e.ok);
+  const dmy=f=>String(f||'').split('-').reverse().join('-');
+  const fila=e=>'<tr><td>'+dmy(e.fecha)+'</td><td>'+esc(e.cuenta)+'</td><td>'+esc(e.etiqueta)+'</td>'
+    +'<td style="text-align:right">'+(e.parcial
+        ? '<strong>'+cM(e.montoExcluido)+'</strong> <span style="color:var(--text-3)">de '+cM(e.monto)+'</span>'
+        : cM(e.montoExcluido))+'</td>'
+    +'<td style="font-size:11px;color:var(--text-2)">'+esc(e.razon)+'</td></tr>';
+  const cab='<tr><th>Fecha</th><th>Cuenta</th><th>Concepto</th><th>Excluido</th><th>Razón</th></tr>';
+  let h='';
+  if(aplic.length){
+    h+='<div style="margin-top:12px;font-weight:700;color:var(--text);font-size:12.5px">Exclusiones aplicadas</div>'
+      +'<div style="font-size:11px;color:var(--text-3);margin:2px 0 6px">Líneas posteadas en una cuenta del pool que NO son costo de producción del mes. Se restan del pool bruto; el dato en Odoo no se toca. Las <strong>parciales</strong> muestran las dos cifras: lo excluido y el total de la línea.</div>'
+      +'<table>'+cab+aplic.map(fila).join('')+'</table>';
+  }
+  if(fuera.length){
+    h+='<div style="margin-top:12px;font-size:11px;color:var(--text-3)"><strong>Exclusiones registradas fuera de la ventana vigente</strong> — documentadas, hoy sin efecto en el costo. Se listan para que la decisión no se pierda cuando la ventana rueda.</div>'
+      +'<table style="opacity:.55">'+cab+fuera.map(fila).join('')+'</table>';
+  }
+  if(rotas.length){
+    h+='<div class="valid-box" style="border-color:rgba(224,90,90,.45);background:rgba(224,90,90,.08);margin-top:12px">'
+      +'<div style="font-weight:700;color:#E05A5A;font-size:12.5px">Exclusiones rotas — NO se aplicaron</div>'
+      +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.6">Ya no calzan con lo que hay en Odoo, así que el pool está contando esas líneas <strong>enteras</strong>. Preferimos no restar a restar mal: hay que revisarlas a mano.</div>'
+      +'<table style="margin-top:6px"><tr><th>Línea</th><th>Concepto</th><th>Qué no calza</th></tr>'
+      +rotas.map(e=>'<tr><td>'+e.id+'</td><td>'+esc(e.etiqueta)+'</td>'
+        +'<td class="bad-tag" style="text-align:left">'+esc(e.fallas.join(' · '))+'</td></tr>').join('')
+      +'</table></div>';
+  }
+  return h;
+}
+
 function renderValidacion(el,info,prods){
   const tol=(a,b,p)=>b?Math.abs(a-b)/b<p:false;
-  const {meses,poolAvg,totalDias}=info;
+  const {meses,poolAvg,totalDias,exclusiones}=info;
   const ventTxt = meses.map(m=>m.nom).join(' · ') || '—';
   let h='<div class="valid-box"><div style="font-weight:700;color:var(--text)">Validación del cálculo en vivo</div>';
   h+='<div style="font-size:11px;color:var(--text-3);margin:2px 0 8px">Indirecto repartido por <strong>días de producción</strong> reales (Odoo), ventana <strong>rolling</strong> de '+meses.length+' meses cerrados → <strong>'+esc(ventTxt)+'</strong>. % producto = días ÷ días totales; indirecto/u = (pool × %) ÷ unidades. Pool y días/unidades promediados sobre los mismos meses. Escenario 3 personas (Sueldos posteados = planilla de 3).</div>';
-  h+='<table><tr><th>Mes</th><th>Pool indirecto</th></tr>';
-  meses.forEach(m=>{ h+='<tr><td>'+esc(m.nom)+'</td><td>'+cM(m.pool)+'</td></tr>'; });
-  h+='<tr style="font-weight:700"><td>Promedio</td><td>'+cM(poolAvg)+'</td></tr></table>';
+  // Bruto → exclusiones → neto. Un mes sin exclusiones deja la celda VACÍA, no en ₡0:
+  // lo que está OK no muestra texto, solo lo anómalo llama la atención.
+  h+='<table><tr><th>Mes</th><th>Pool bruto</th><th>Exclusiones</th><th>Pool neto</th></tr>';
+  meses.forEach(m=>{ h+='<tr><td>'+esc(m.nom)+'</td><td>'+cM(m.poolBruto!=null?m.poolBruto:m.pool)+'</td>'
+    +'<td>'+(m.excluido?('<span class="bad-tag">−'+cM(m.excluido)+'</span>'):'')+'</td>'
+    +'<td>'+cM(m.pool)+'</td></tr>'; });
+  h+='<tr style="font-weight:700"><td>Promedio</td><td></td><td></td><td>'+cM(poolAvg)+'</td></tr></table>';
+  h+=renderExclusiones(exclusiones,meses);
   h+='<div style="margin-top:6px;font-size:11px;color:var(--text-3)">Total días de producción (promedio): <strong>'+fmtN(totalDias)+'</strong></div>';
   h+='<table style="margin-top:10px"><tr><th>Producto</th><th>Días/mes</th><th>Unid/mes</th><th>% asig.</th><th>Indir/u</th><th>MP/u</th><th>chk MP</th><th>Total/u</th></tr>';
   prods.forEach(p=>{ const pack=p.pack||1; const mpU=p.mp.mpUnit*pack; const tot=mpU+p.indPerSales+(p.emp||0);   // Total/u = MP + indirecto + empaque
