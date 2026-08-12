@@ -13,7 +13,7 @@ var setTimeout=function(){}, setInterval=function(){}, matchMedia=function(){ret
 var fetch=function(){return {then:function(){return this;},catch:function(){return this;}};};
 
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 11 ago 2026 · b3';
+const BUILD = 'v 11 ago 2026 · b4';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
