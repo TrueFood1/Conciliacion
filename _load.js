@@ -13,7 +13,7 @@ var setTimeout=function(){}, setInterval=function(){}, matchMedia=function(){ret
 var fetch=function(){return {then:function(){return this;},catch:function(){return this;}};};
 
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 11 ago 2026 · b3';
+const BUILD = 'v 11 ago 2026 · b4';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -431,6 +431,7 @@ function _modShow(id){
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.toggle('hidden', v!==id); });
   document.getElementById('vLobby').classList.add('hidden');
   document.getElementById('appHeader').classList.remove('hidden');
+  finMasCerrar();   // el "+" es de Finanzas: no sobrevive a un cambio de vista
   aplicarModoProduccion();
 }
 function crumbSet(area,cur){
@@ -441,7 +442,10 @@ function crumbSet(area,cur){
   const d=document.querySelector('.crumb-dot'); if(d)d.style.background=COL[area]||'#378ADD';
 }
 // Entradas desde el HOME (una por módulo).
-function abrirFinanzas(){ irAResultados(); }                 // Finanzas → 1ª pestaña (Resultados)
+// Finanzas entra por Resultados en escritorio y por COBROS Y PAGOS en teléfono: es la
+// razón principal para abrir Finanzas desde el teléfono (a quién cobrar y pagar esta
+// semana). Si Andrea echa de menos Resultados a la mano, se revierte cambiando esta línea.
+function abrirFinanzas(){ return esMovil() ? irACobros() : irAResultados(); }
 function abrirOperaciones(){ irAResumen(); }              // Operaciones → 1ª sub-pestaña
 function abrirContabilidad(){ abrirFinanzas(); }             // alias histórico
 function entrarHerramienta(){ abrirFinanzas(); }             // alias histórico
@@ -5664,13 +5668,16 @@ const CANALES = [
    comision:{pct:0.0654, enFactura:false, antes:0.0643, fuente:'acuerdo comercial (incluye todo), ago-2026'}, frio:null},
   {key:'mega',   label:'MegaSuper',             plId:12,
    comision:{pct:0.065,  enFactura:false, fuente:'acuerdo comercial, jul-2026'},
-   // MegaSuper factura el frío POR TIENDA, no un monto fijo al mes: mayo 1 tienda · junio 2 ·
+   // MegaSuper factura el frío por RENGLÓN, no como monto fijo al mes: mayo 1 · junio 2 ·
    // julio 10 (M126 M414 M316 M214 M215 M216 M217 M315 M412 M510), todas a ₡2.709,19. Por eso
-   // el dato editable es el NÚMERO DE TIENDAS y el monto sale de multiplicar: una constante
-   // mensual quedaría vieja el día que entre la tienda 11. Es aparte del 6,5% de comisión —
+   // el dato editable es la CANTIDAD DE RENGLONES y el monto sale de multiplicar: una constante
+   // mensual quedaría vieja al mes siguiente. Qué mide cada código TODAVÍA NO SE SABE —
+   // Andrea dice que MegaSuper no tiene 10 tiendas sino 2 o 3, y los códigos vienen en rachas
+   // consecutivas (M214-217, M315-316, M412-414), así que el campo se llama `unidades_cobro`
+   // a propósito: el nombre no debe afirmar lo que no está confirmado. Es aparte del 6,5% —
    // verificado que las facturas de venta van con discount 0 y que las bills del proveedor son
    // solo frío, así que no hay doble conteo.
-   frio:{porTienda:2709.19, tiendas:10, verificado:true, editable:true,
+   frio:{porTienda:2709.19, unidades_cobro:10, verificado:true, editable:true,
          fuente:'bills del proveedor en 6106013, una por tienda — julio 2026 (11-ago-2026)',
          nota:'Arranca en mayo 2026. El write-off de ₡12.018,39 en 6106028 NO es gasto: es el pago de las bills de mayo+junio (₡10.635,75 × 1,13 = ₡12.018,40) descontado del depósito.'}},
   {key:'compre', label:'Compre Bien',           plId:5,
@@ -5696,11 +5703,12 @@ const canalComRenta = c => (c.comision && !c.comision.enFactura) ? c.comision.pc
 const canalComProy = (c,intro) => !c.comision ? 0 : ((intro && c.comision.intro) ? c.comision.intro.pct : c.comision.pct);
 // Frío ₡/mes del canal. Dos formas de decirlo, una sola respuesta:
 //   · monto     → cifra fija al mes (Automercado, Compre Bien)
-//   · porTienda × tiendas → el canal cobra por punto de venta (MegaSuper)
-const canalFrio = c => !c.frio ? 0 : (c.frio.porTienda ? c.frio.porTienda*(c.frio.tiendas||0) : (c.frio.monto||0));
+//   · porTienda × unidades_cobro → el canal cobra por renglón (MegaSuper). Qué mide cada
+//     renglón está sin confirmar: por eso el campo NO se llama `tiendas`.
+const canalFrio = c => !c.frio ? 0 : (c.frio.porTienda ? c.frio.porTienda*(c.frio.unidades_cobro||0) : (c.frio.monto||0));
 // Cómo se explica ese número en el tooltip: si es por tienda, se muestra la multiplicación.
 const canalFrioCalc = c => (c.frio && c.frio.porTienda)
-  ? cM(c.frio.porTienda)+' × '+fmtN(c.frio.tiendas||0)+' tienda'+((c.frio.tiendas||0)===1?'':'s')+' = '+cM(canalFrio(c))
+  ? cM(c.frio.porTienda)+' × '+fmtN(c.frio.unidades_cobro||0)+' = '+cM(canalFrio(c))
   : cM(canalFrio(c));
 // Texto de fuente/fecha de un canal (tooltip). '' si el canal no tiene supuestos.
 function canalFuente(c){
@@ -6933,19 +6941,43 @@ function resProdToggle(i, cell){
   if(cell) cell.classList.toggle('rp-abierta', abierto);
 }
 let resMeses=[], _resBuilt=false;
+// ── Conmutador de vistas de Resultados. Vive aparte del wiring porque el "+" de
+// teléfono también lo usa: en móvil #resSeg está oculto y la vista se elige desde ahí.
+function resVer(v){
+  document.querySelectorAll('#resSeg button').forEach(x=>x.classList.toggle('on', x.dataset.v===v));
+  document.getElementById('resVistaMes').classList.toggle('hidden',v!=='mes');
+  document.getElementById('resVistaDoce').classList.toggle('hidden',v!=='doce');
+  document.getElementById('resVistaComp').classList.toggle('hidden',v!=='comp');
+}
+// ── "+" de Finanzas en teléfono ─────────────────────────────────────────
+// Las pestañas de análisis (Rentabilidad · Precios) y las dos caras de análisis de
+// Resultados viven acá. Nada se elimina: se ordena por frecuencia de uso.
+const esMovil = () => window.matchMedia && matchMedia('(max-width:700px)').matches;
+function finMasToggle(ev){ if(ev) ev.stopPropagation();
+  const p=document.getElementById('finMas'); if(p) p.classList.toggle('hidden'); }
+function finMasCerrar(){ const p=document.getElementById('finMas'); if(p) p.classList.add('hidden'); }
+function finMasIr(k){
+  finMasCerrar();
+  if(k==='rent')    return irARentabilidad();
+  if(k==='precios') return irAPrecios();
+  // 12 meses y Comparador: abrir Resultados y dejar puesta esa cara.
+  irAResultados();
+  // resInit() es async la 1ª vez; se espera a que el conmutador exista antes de elegir.
+  const poner=()=>{ if(document.getElementById('resVistaDoce')) resVer(k); };
+  poner(); setTimeout(poner, 350);
+}
+// Un toque fuera del panel lo cierra (no hay botón de cerrar: sobra).
+document.addEventListener('click', function(e){
+  const p=document.getElementById('finMas');
+  if(p && !p.classList.contains('hidden') && !p.contains(e.target)) finMasCerrar();
+});
 const RES_STATE={mes:0, comp:[]};
 const cMs = n => (n<0?'−':'')+cM(Math.abs(n));   // colones con signo tipográfico (−, no guion)
 async function resInit(){
   if(_resBuilt) return;
   _resBuilt=true;
   // wiring del selector de vista (una vez)
-  document.querySelectorAll('#resSeg button').forEach(b=>b.onclick=()=>{
-    document.querySelectorAll('#resSeg button').forEach(x=>x.classList.toggle('on',x===b));
-    const v=b.dataset.v;
-    document.getElementById('resVistaMes').classList.toggle('hidden',v!=='mes');
-    document.getElementById('resVistaDoce').classList.toggle('hidden',v!=='doce');
-    document.getElementById('resVistaComp').classList.toggle('hidden',v!=='comp');
-  });
+  document.querySelectorAll('#resSeg button').forEach(b=>b.onclick=()=>resVer(b.dataset.v));
   const strip=document.getElementById('resStrip');
   if(strip) strip.innerHTML='<div class="sim-stat" style="grid-column:1/-1"><div class="k"><span class="spin"></span> Leyendo Odoo…</div><div class="note">estado de resultados en vivo (devengado)</div></div>';
   try{ resMeses=await reporteResultados(); }
