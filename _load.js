@@ -5664,13 +5664,16 @@ const CANALES = [
    comision:{pct:0.0654, enFactura:false, antes:0.0643, fuente:'acuerdo comercial (incluye todo), ago-2026'}, frio:null},
   {key:'mega',   label:'MegaSuper',             plId:12,
    comision:{pct:0.065,  enFactura:false, fuente:'acuerdo comercial, jul-2026'},
-   // MegaSuper factura el frío POR TIENDA, no un monto fijo al mes: mayo 1 tienda · junio 2 ·
+   // MegaSuper factura el frío por RENGLÓN, no como monto fijo al mes: mayo 1 · junio 2 ·
    // julio 10 (M126 M414 M316 M214 M215 M216 M217 M315 M412 M510), todas a ₡2.709,19. Por eso
-   // el dato editable es el NÚMERO DE TIENDAS y el monto sale de multiplicar: una constante
-   // mensual quedaría vieja el día que entre la tienda 11. Es aparte del 6,5% de comisión —
+   // el dato editable es la CANTIDAD DE RENGLONES y el monto sale de multiplicar: una constante
+   // mensual quedaría vieja al mes siguiente. Qué mide cada código TODAVÍA NO SE SABE —
+   // Andrea dice que MegaSuper no tiene 10 tiendas sino 2 o 3, y los códigos vienen en rachas
+   // consecutivas (M214-217, M315-316, M412-414), así que el campo se llama `unidades_cobro`
+   // a propósito: el nombre no debe afirmar lo que no está confirmado. Es aparte del 6,5% —
    // verificado que las facturas de venta van con discount 0 y que las bills del proveedor son
    // solo frío, así que no hay doble conteo.
-   frio:{porTienda:2709.19, tiendas:10, verificado:true, editable:true,
+   frio:{porTienda:2709.19, unidades_cobro:10, verificado:true, editable:true,
          fuente:'bills del proveedor en 6106013, una por tienda — julio 2026 (11-ago-2026)',
          nota:'Arranca en mayo 2026. El write-off de ₡12.018,39 en 6106028 NO es gasto: es el pago de las bills de mayo+junio (₡10.635,75 × 1,13 = ₡12.018,40) descontado del depósito.'}},
   {key:'compre', label:'Compre Bien',           plId:5,
@@ -5696,11 +5699,12 @@ const canalComRenta = c => (c.comision && !c.comision.enFactura) ? c.comision.pc
 const canalComProy = (c,intro) => !c.comision ? 0 : ((intro && c.comision.intro) ? c.comision.intro.pct : c.comision.pct);
 // Frío ₡/mes del canal. Dos formas de decirlo, una sola respuesta:
 //   · monto     → cifra fija al mes (Automercado, Compre Bien)
-//   · porTienda × tiendas → el canal cobra por punto de venta (MegaSuper)
-const canalFrio = c => !c.frio ? 0 : (c.frio.porTienda ? c.frio.porTienda*(c.frio.tiendas||0) : (c.frio.monto||0));
+//   · porTienda × unidades_cobro → el canal cobra por renglón (MegaSuper). Qué mide cada
+//     renglón está sin confirmar: por eso el campo NO se llama `tiendas`.
+const canalFrio = c => !c.frio ? 0 : (c.frio.porTienda ? c.frio.porTienda*(c.frio.unidades_cobro||0) : (c.frio.monto||0));
 // Cómo se explica ese número en el tooltip: si es por tienda, se muestra la multiplicación.
 const canalFrioCalc = c => (c.frio && c.frio.porTienda)
-  ? cM(c.frio.porTienda)+' × '+fmtN(c.frio.tiendas||0)+' tienda'+((c.frio.tiendas||0)===1?'':'s')+' = '+cM(canalFrio(c))
+  ? cM(c.frio.porTienda)+' × '+fmtN(c.frio.unidades_cobro||0)+' = '+cM(canalFrio(c))
   : cM(canalFrio(c));
 // Texto de fuente/fecha de un canal (tooltip). '' si el canal no tiene supuestos.
 function canalFuente(c){
