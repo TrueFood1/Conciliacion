@@ -1993,6 +1993,11 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-ir{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:4px 0;font-size:13px}
 #vResumen .rz-irn{color:var(--text-2);text-transform:capitalize}
 #vResumen .rz-irv{color:var(--text);font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* Sub-línea del ítem: el conteo físico guardado contra la existencia de Odoo. Ocupa el ancho
+   completo debajo del nombre y el número — por eso .rz-ir envuelve. En gris terciario: es
+   contexto, no alarma. Si el ítem no se contó, no se dibuja. */
+#vResumen .rz-ir{flex-wrap:wrap}
+#vResumen .rz-irs{flex:0 0 100%;color:var(--text-3);font-size:11px;font-variant-numeric:tabular-nums;margin-top:1px}
 #vResumen .rz-vermas{margin-top:8px;background:none;border:none;color:#C77DA0;font-size:12px;cursor:pointer;padding:0}
 #vResumen .rz-edtag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;color:#C99A4E}
 #vResumen .rz-edtag svg{width:12px;height:12px}
@@ -2152,7 +2157,15 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vResumen .rz-edtag{display:none}
   #vResumen .rz-edwrap{display:block}
   #vResumen .rz-leftnote{display:none}
-  #vResumen .rz-invsec{display:none}
+  /* El bloque de Inventario VUELVE al teléfono (se había escondido el 10-ago para calmar la
+     pantalla). Sigue colapsado —tres tarjetas que se abren al tocar—, así que no pesa hasta
+     que se pide. Al desplegar, las cantidades van más grandes: es un dato que se lee de
+     lejos, en la cámara, no un renglón de tabla. */
+  #vResumen .rz-inv3{gap:9px}
+  #vResumen .rz-ir{padding:7px 0}
+  #vResumen .rz-irn{font-size:13.5px}
+  #vResumen .rz-irv{font-size:16px;font-weight:600}
+  #vResumen .rz-irs{font-size:11.5px}
   /* Tarjetas 2×2 — fila 1: Por medir · Comprar·medir | fila 2: Producciones · Comprar·producir */
   #vResumen .rz-cards4{gap:10px;margin-top:20px;align-items:start}   /* sin estirar: nada de cajas medio vacías */
   #vResumen .rz-c4h{font-size:10px;letter-spacing:.03em;line-height:1.3}
@@ -2229,6 +2242,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* La presentación entre paréntesis se ve en las DOS anchuras (antes era solo de teléfono y en
    escritorio se mostraba .cn-pcaja "caja = 6 paq", que decía otra cosa). Fuente única. */
 #vConteo .cn-pres{margin-left:6px;color:var(--text-3);font-size:11px;font-weight:400}
+/* Rótulo de conversión (Vainilla): dice de dónde sale el número, para que nadie crea que
+   cambió algo en Odoo. Segunda línea, gris terciario. */
+#vConteo .cn-conv{display:block;color:var(--text-3);font-size:10.5px;font-weight:400;margin-top:1px}
 /* ══════════ CONTEO EN TELÉFONO ══════════
    La tabla de 4 columnas se vuelve una lista: cada fila es un renglón de dos líneas
    (nombre arriba, existencia Odoo + presentación abajo) con los campos a la derecha,
@@ -6391,10 +6407,20 @@ function rzUltimasHtml(){
 // ── 5 · INVENTARIO: 3 tarjetas-RESUMEN (MP · premezclas · terminado); "›" abre la tabla completa. ──
 function rzInvHtml(){
   const stock=_rzCtx.stock, meta=stock.meta||{};
-  const mp=Object.keys(stock.mpOh||{}).map(function(k){ const pid=+k, m=meta[pid]||{}; return {pid:pid, name:(m.name||('id '+pid)), uom:m.uom||'', qty:stock.mpOh[pid]||0}; })
+  // _mpDisplay: la Vainilla se muestra en litros como en Conteo e Inventario (Odoo la lleva en
+  // galones). Acá no hay qtyRef, así que se calcula con la constante.
+  const mp=Object.keys(stock.mpOh||{}).map(function(k){ const pid=+k, m=meta[pid]||{}, q=stock.mpOh[pid]||0;
+    return _mpDisplay({pid:pid, name:(m.name||('id '+pid)), uom:m.uom||'', qty:q, qtyRef:(/gal/i.test(m.uom||'')?q*GAL_US_A_L:q)}); })
     .sort(function(a,b){ return _mpRank(a.name)-_mpRank(b.name); });
-  function row(n,v){ return '<div class="rz-ir"><span class="rz-irn">'+esc(n)+'</span><span class="rz-irv">'+v+'</span></div>'; }
-  function mpRow(x){ const dec=(x.uom==='kg'||x.uom==='L'||/gal/.test(x.uom))?1:0; return row(x.name.toLowerCase(), _rzN(x.qty,dec)+(x.uom?(' '+esc(x.uom)):'')); }
+  // El CONTEO guardado (localStorage, el mismo borrador de la pantalla de Conteo) para poder
+  // poner "contado X · Odoo Y" debajo de cada ítem. Si no se contó, solo va Odoo.
+  const _cd=cnDraft();
+  function row(n,v,sub){ return '<div class="rz-ir"><span class="rz-irn">'+esc(n)+'</span><span class="rz-irv">'+v+'</span>'
+    +(sub?('<span class="rz-irs">'+esc(sub)+'</span>'):'')+'</div>'; }
+  function mpRow(x){ const dec=(x.uom==='kg'||x.uom==='L'||/gal/.test(x.uom))?1:0;
+    const dr=(_cd.mp||{})[x.pid]||{}, f=fisicoMP({name:x.name}, dr);
+    const sub=f.vacio?'' : ('contado '+_rzN(f.fis,dec)+' '+x.uom+' · Odoo '+_rzN(x.qty,dec)+' '+x.uom);
+    return row(x.name.toLowerCase(), _rzN(x.qty,dec)+(x.uom?(' '+esc(x.uom)):''), sub); }
   // tarjeta-resumen: título + resumen tocable "N ›" + cuerpo oculto con la tabla completa
   function card(id, titulo, resumen, bodyHtml){
     return '<div class="rz-i3"><div class="rz-i3h"><span class="rz-i3t">'+titulo+'</span>'
@@ -6403,9 +6429,19 @@ function rzInvHtml(){
   }
   const cMP=card('rzInvMp', 'Materia prima', mp.length+' ítems', mp.length?mp.map(mpRow).join(''):row('sin datos',''));
   const nPrem=NIV_PROD.filter(function(p){return ((stock.premOh||{})[NIV_INFO[p].prem]||0)>0;}).length;
-  const cPR=card('rzInvPr', 'Premezclas', nPrem+' con stock', NIV_PROD.map(function(p){ const b=Math.round((stock.premOh||{})[NIV_INFO[p].prem]||0); return row(_nomCorto(p), b>0?_rzN(b):'—'); }).join(''));
+  const cPR=card('rzInvPr', 'Premezclas', nPrem+' con stock', NIV_PROD.map(function(p){
+    const b=Math.round((stock.premOh||{})[NIV_INFO[p].prem]||0), c=(_cd.premez||{})[NIV_INFO[p].prem];
+    const sub=(c==null||c==='')?'':('contado '+_rzN(_crDec(c))+' batches · Odoo '+_rzN(b)+' batches');
+    return row(_nomCorto(p), b>0?(_rzN(b)+' batches'):'—', sub); }).join(''));
   const totalCj=NIV_PROD.reduce(function(a,p){ return a+Math.floor((stock.fin[p]||0)/NIV_INFO[p].cajaU); },0);
-  const cTE=card('rzInvTe', 'Producto terminado', _rzN(totalCj)+' cajas', NIV_PROD.map(function(p){ const cajas=Math.floor((stock.fin[p]||0)/NIV_INFO[p].cajaU); return row(_nomCorto(p), _rzN(cajas)+' cj'); }).join(''));
+  const cTE=card('rzInvTe', 'Producto terminado', _rzN(totalCj)+' cajas', NIV_PROD.map(function(p){
+    const cajas=Math.floor((stock.fin[p]||0)/NIV_INFO[p].cajaU);
+    const t=INV_TERM.find(function(x){ return x.id===p; }), dr=(_cd.term||{})[p]||{};
+    const vac=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
+    // el conteo se captura en cajas + sueltas de VENTA → a unidades individuales, como Odoo
+    const fis=t?(_crDec(dr.cajas)*t.factor+_crDec(dr.sue)*t.presDiv):0;
+    const sub=(vac||!t)?'':('contado '+_rzN(Math.floor(fis/NIV_INFO[p].cajaU))+' cj · Odoo '+_rzN(cajas)+' cj');
+    return row(_nomCorto(p), _rzN(cajas)+' cj', sub); }).join(''));
   return '<div class="rz-sec rz-invsec"><div class="rz-sh"><span class="rz-st">Inventario</span></div><div class="rz-inv3">'+cMP+cPR+cTE+'</div></div>';
 }
 function rzToggleMp(btn){ const e=document.getElementById('rzMpMas'); if(!e)return; const h=e.classList.toggle('hidden'); if(btn) btn.textContent = h ? btn.textContent.replace('▴','▾') : btn.textContent.replace('▾','▴'); }
@@ -6830,7 +6866,9 @@ function cnRender(){
     const sueIn = (pe&&pe.noSuelto) ? '<span class="cn-lbl">sin suelto</span>'
       : '<input class="cn-in" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnMpSue('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(sueLab)+'</span><span class="cn-lblm">'+esc(sueLab)+'</span>';
     const subMP=_cnSub(fmtN(fis)+' '+esc(m.uom), fmtN(m.qty)+' '+esc(m.uom), vacio);
-    mp+='<tr><td class="cn-nm">'+esc(nombreCortoMP(m.name))+_cnPresTag(_cnPresMP(pe))+_cnDot('m',m.pid,vacio,s)+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
+    const conv=mpConvTxt(m);
+    mp+='<tr><td class="cn-nm">'+esc(nombreCortoMP(m.name))+_cnPresTag(_cnPresMP(pe))
+      +(conv?('<span class="cn-conv">'+esc(conv)+'</span>'):'')+_cnDot('m',m.pid,vacio,s)+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
       +'<td class="cn-sub" id="cn-msub'+m.pid+'">'+subMP+'</td>'
       +'<td class="cn-count">'+empIn+(empIn&&!(pe&&pe.noSuelto)?' + ':'')+sueIn+'</td>'
       +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-mdif'+m.pid+'">'+(vacio?'—':fmtDiff(diff)+' '+m.uom)+'</td></tr>';
@@ -9454,6 +9492,20 @@ const PESO_EMPAQUE = [
   {rx:/aceite/i,                peso:3,     lab:'potes',    unidad:'L', sueltoUnit:'kg', sueltoFactor:1/ACEITE_DENSIDAD},  // suelto en kg de balanza → L = kg ÷ 0,92
   {rx:/huevo\s*l[ií]quido/i,    peso:9,     lab:'bolsas',   unidad:'kg', noSuelto:true},   // nunca queda bolsa abierta → sin suelto
 ];
+// ── VAINILLA · conteo estilo aceite, PREPARADO PERO APAGADO ──────────────────
+// Mismo diseño que el aceite, que NO es un error: el pote se cuenta entero y lo que queda
+// suelto se PESA en balanza y se convierte con densidad (aceite 0,92 kg/L). La vainilla va
+// igual: potes de 3 L + gramos sueltos ÷ densidad.
+// Falta UN número: VAINILLA_DENSIDAD (arriba), que sale de pesar un galón lleno sin abrir.
+// Mientras sea null esta entrada NO entra en PESO_EMPAQUE y la vainilla se sigue contando en
+// unidad base — encenderlo es poner la densidad, nada más.
+const VAINILLA_EMPAQUE = {rx:/vainilla/i, peso:3, lab:'potes', unidad:'L',
+                          sueltoUnit:'g', sueltoFactor:null};   // sueltoFactor = 1/(densidad×1000): g → L
+if(vainillaConteoListo()){
+  // g de balanza → L: dividir entre los gramos que pesa un litro (densidad kg/L × 1000).
+  VAINILLA_EMPAQUE.sueltoFactor = 1/(VAINILLA_DENSIDAD*1000);
+  PESO_EMPAQUE.push(VAINILLA_EMPAQUE);
+}
 // Sin presentación (solo unidad base, como hoy): Vainilla, Bicarbonato.
 const fmtN  = n => (Number(n)||0).toLocaleString('es-CR',{minimumFractionDigits:0,maximumFractionDigits:2});
 const fmtDiff = n => (n>0?'+':'')+fmtN(n);
@@ -9493,6 +9545,40 @@ function invTermCajas(id,val){ invSetTerm(id,'cajas',val); }
 function invTermSueltos(id,val){ invSetTerm(id,'sueltos',val); }
 
 // Lista de MP = hojas únicas de la expansión recursiva de los 6 BOM (reusa _bomDe).
+// ══════════ VAINILLA — se muestra en LITROS, Odoo sigue en galones ══════════
+// Odoo lleva la Vainilla [525] en galones US porque así la compra el proveedor, pero nadie en
+// planta piensa en galones: la receta pide 0,84 L por batch y el pote es de 3 L. La conversión
+// es SOLO DE PANTALLA — no se toca nada en Odoo, y por eso el rótulo dice de dónde sale.
+const GAL_US_A_L = 3.785;                 // 1 galón US = 3,785 L (definición, no medición)
+const VAINILLA_PID = 525;
+// Densidad de la vainilla en kg/L. TODAVÍA NO MEDIDA: Andrea pesa un galón lleno sin abrir y
+// el número entra acá. Mientras sea null, el conteo de vainilla NO cambia (sigue en unidad
+// base); en cuanto tenga valor se enciende el conteo estilo aceite —potes de 3 L + suelto en
+// gramos ÷ densidad— sin tocar nada más. Ver VAINILLA_EMPAQUE, abajo de PESO_EMPAQUE.
+const VAINILLA_DENSIDAD = null;
+// ¿Está listo el conteo estilo aceite? Una sola pregunta, un solo lugar donde encenderlo.
+const vainillaConteoListo = () => VAINILLA_DENSIDAD != null && VAINILLA_DENSIDAD > 0;
+// Convierte lo que viene de Odoo a la unidad en que la planta piensa el ingrediente.
+// Hoy solo la Vainilla; devuelve el ítem intacto para todo lo demás.
+function _mpDisplay(m){
+  if(m.pid !== VAINILLA_PID || !/gal/i.test(m.uom||'')) return m;
+  // Los litros salen de qtyRef, que ya viene convertido por el factor de uom.uom de Odoo — no
+  // de multiplicar por la constante. Así el número es el mismo que muestra Odoo y la constante
+  // queda solo para el rótulo; si Odoo afinara el factor, la pantalla lo sigue sola.
+  const litros = m.qtyRef || 0;
+  const chico = litros > 0 && litros < 1;   // menos de un litro se lee mejor en mililitros
+  return Object.assign({}, m, {
+    qty: chico ? litros*1000 : litros,
+    uom: chico ? 'mL' : 'L',
+    qtyRef: litros, refU: 'L',
+    convertido: {desde:'gal (EE. UU.)', factor:GAL_US_A_L, qtyOrig:m.qty}   // el rótulo lo usa
+  });
+}
+// Texto del rótulo de conversión: "convertido de 2,4 gal · 1 gal = 3,785 L". Vacío si no aplica.
+function mpConvTxt(m){
+  const c=m&&m.convertido; if(!c) return '';
+  return 'convertido de '+fmtN(c.qtyOrig)+' '+c.desde+' · 1 gal = '+fmtN(GAL_US_A_L)+' L';
+}
 async function listaMP(){
   const leaves=new Set();
   async function rec(pid,depth){
@@ -9512,7 +9598,8 @@ async function listaMP(){
   const oh={}; q.forEach(r=>{ const pid=r.product_id&&r.product_id[0]; if(pid) oh[pid]=(oh[pid]||0)+(r.quantity||0); });
   return prods.map(p=>{
     const uomName=(p.uom_id&&p.uom_id[1])||'', factor=uf[(p.uom_id&&p.uom_id[0])]||1, qty=oh[p.id]||0;
-    return {pid:p.id, name:p.name, uom:uomName, qty, qtyRef:qty/factor, refU:refUnitDe(uomName)};  // qtyRef en kg/L (unidad de referencia)
+    const m={pid:p.id, name:p.name, uom:uomName, qty, qtyRef:qty/factor, refU:refUnitDe(uomName)};  // qtyRef en kg/L (unidad de referencia)
+    return _mpDisplay(m);
   }).sort((a,b)=>a.name.localeCompare(b.name,'es'));
 }
 
@@ -9554,7 +9641,9 @@ function renderMP(){
     const sueCell = (pe&&pe.noSuelto)
       ? '<span class="muted" style="font-size:11px">— (sin suelto)</span>'
       : '<input class="inv-in inv-in-sm" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="invMpSue('+m.pid+',this.value)" placeholder="0"> <span class="muted" style="font-size:11px">'+esc(sueLab)+'</span>';
-    h+='<tr><td>'+esc(m.name)+_invPresTag(_cnPresMP(pe))+'</td>'
+    const conv=mpConvTxt(m);
+    h+='<tr><td>'+esc(m.name)+_invPresTag(_cnPresMP(pe))
+      +(conv?(' <span class="muted" style="font-size:10.5px">'+esc(conv)+'</span>'):'')+'</td>'
       +'<td style="text-align:right">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
       +'<td>'+empCell+'</td>'
       +'<td>'+sueCell+'</td>'
