@@ -2119,7 +2119,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* fila de 4 tarjetas IGUALES (una por columna de la grilla) */
 #vResumen .rz-cards4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:26px}
 #vResumen .rz-card4{background:#141417;border:.5px solid #26262C;border-radius:12px;padding:13px 15px;min-width:0}
-#vResumen .rz-c4h{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);font-weight:600;margin-bottom:9px}
+/* Rótulo = etiqueta, no titular: sin mayúsculas, tracking corto, peso 500. La jerarquía la
+   hace el TONO (terciario rótulo → secundario apoyo → blanco hueso el dato), no el tamaño. */
+#vResumen .rz-c4h{font-size:11px;letter-spacing:.02em;color:var(--text-3);font-weight:500;margin-bottom:9px}
 #vResumen .rz-c4fecha{font-size:11px;font-weight:600;color:var(--accent);margin:-4px 0 9px}
 #vResumen .rz-c4line{font-size:13px;color:var(--text);line-height:1.5}
 #vResumen .rz-c4line.rz-ok{color:#7E8C5A}
@@ -2133,8 +2135,12 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-c4it{padding:5px 0;border-top:.5px solid #232329}
 #vResumen .rz-c4item{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12.5px}
 #vResumen .rz-c4nota{font-size:10.5px;color:var(--text-3);margin-top:1px}
-#vResumen .rz-c4in{color:var(--text);text-transform:capitalize}
-#vResumen .rz-c4falta{color:#C99A4E;white-space:nowrap;font-weight:600;font-size:11.5px}
+#vResumen .rz-c4in{color:var(--text-2);text-transform:capitalize}
+/* El ámbar marcaba "esta tarjeta tiene contenido" y con cuatro tarjetas encendidas no decía
+   nada. Ahora el dato va en blanco hueso, y el ámbar queda para .rz-c4urg — el único caso que
+   exige acción HOY (la compra vence hoy o mañana). */
+#vResumen .rz-c4falta{color:var(--text);white-space:nowrap;font-weight:600;font-size:11.5px}
+#vResumen .rz-c4it.rz-c4urg .rz-c4falta{color:#C99A4E}
 /* 2 secciones abajo, 2 columnas cada una, cerrando contra el mismo borde */
 #vResumen .rz-two{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:30px;align-items:start}
 #vResumen .rz-two .rz-sec{margin-top:0}
@@ -2225,7 +2231,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vResumen .rz-irs{font-size:11.5px}
   /* Tarjetas 2×2 — fila 1: Por medir · Comprar·medir | fila 2: Producciones · Comprar·producir */
   #vResumen .rz-cards4{gap:10px;margin-top:20px;align-items:start}   /* sin estirar: nada de cajas medio vacías */
-  #vResumen .rz-c4h{font-size:10px;letter-spacing:.03em;line-height:1.3}
+  #vResumen .rz-c4h{font-size:10.5px;letter-spacing:.02em;line-height:1.3}
   /* El plazo ya lo dice la pantalla una vez: no hace falta repetirlo en cada tarjeta. */
   #vResumen .rz-c4fecha{display:none}
   #vResumen .rz-c4-desk{display:none} #vResumen .rz-c4-mov{display:inline}
@@ -4430,13 +4436,19 @@ const cM = n => '₡'+Math.round(Number(n)||0).toLocaleString('es-CR');   // col
 //   Indelsa = bolsas PE, potes craft propios). Desglose por producto:
 //   Blanco 69,55 (bolsa 29,65 + caja 39,90) · Semillas 77,58 (37,68 + 39,90) · Francés 64,26 (24,37 + 39,90)
 //   · Buns 60,34 (20,44 + 39,90) · Galletas 412,66 (pote 394,84 + caja 17,82).
-// PIZZA: 215,28 = SOLO la caja individual; faltan bolsa plástica y caja master (sin factura) → empHold fijo.
-//   Tener el número NO significa que esté completo: la marca de "empaque incompleto" se queda hasta quitar el hold.
+// CRITERIO (verificado 12-ago-2026): ÚLTIMA COMPRA registrada de cada componente, con la caja
+//   master prorrateada entre las unidades que caben. Valida al céntimo contra Galletas:
+//   pote 65,36 + tapa 66,50 (Diamantes de Papel 8-may) + funda 262,98 (Ind. Cartón 9-jun) = 394,84.
+// PIZZA 417,43 = caja individual 377,76 (Industrias de Cartón, 2-jul-2026) + caja master 39,67
+//   (Colinas 26-sep-2025, ₡238,00 ÷ 6 paquetes). La caja master SÍ existe: se compró en 2025 y
+//   todavía hay inventario, por eso 2026 no la muestra. FALTA la bolsa de polipropileno: se
+//   compra por KILO a Aida María (₡2.876,11/kg) y ni la factura ni el producto de Odoo dicen
+//   cuántas bolsas trae — Andrea las cuenta a mano. El empHold se queda hasta tener ese dato.
 const COSTOS_PROD = [
   // prodId FIJO por producto — búsqueda por ID, nunca por nombre (trampa 517/519 "Prueba Galletas"). kw/rx quedan solo informativos.
   {key:'blanco',  label:'Pan Blanco',      prodId:451, kw:'Pan Blanco', rx:/pan\s*blanco/i,    batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#378ADD', chkMP:805, chkInd:1462, chkTot:2267, emp:69.55,  empOK:true},
   {key:'semillas',label:'Pan de Semillas', prodId:452, kw:'Semillas',   rx:/semillas/i,        batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#84BD00', chkMP:980, chkInd:1462, chkTot:2442, emp:77.58,  empOK:true},
-  {key:'pizza',   label:'Pizza Crust',     prodId:472, kw:'Pizza',      rx:/pizza/i,           batch:10,  unitsPer:2, pack:1, batchOverride:10, unidad:'por paquete de 2',  color:'#FF751F', chkMP:422, chkInd:3070, chkTot:3492, emp:215.28, empOK:false, empHold:'sólo caja individual — faltan bolsa + caja master'},
+  {key:'pizza',   label:'Pizza Crust',     prodId:472, kw:'Pizza',      rx:/pizza/i,           batch:10,  unitsPer:2, pack:1, batchOverride:10, unidad:'por paquete de 2',  color:'#FF751F', chkMP:422, chkInd:3070, chkTot:3492, emp:417.43, empOK:false, empHold:'falta solo la bolsa de polipropileno (conteo manual pendiente)'},
   {key:'frances', label:'Pan Francés',     prodId:453, kw:'Franc',      rx:/franc[eé]s/i,      batch:15,  unitsPer:4, pack:1, unidad:'por paquete de 4',  color:'#D4537E', emp:64.26,  empOK:true},
   {key:'buns',    label:'Buns',            prodId:503, kw:'Bun',        rx:/buns?|hamburgues/i,batch:75,  unitsPer:1, pack:4, unidad:'por paquete de 4',  color:'#7F77DD', emp:60.34,  empOK:true},
   // Galletas = product.product 519 en PRODUCCIÓN (es_CR "Cookie Dough" / en_US "Prueba Galletas"; template 705, BOM18 con chocolate, rinde 160, 353 on-hand). El 529 era id del demo.
