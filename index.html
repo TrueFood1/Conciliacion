@@ -245,6 +245,25 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
   #vCobros .prod-det-wrap{padding:0}
   #vCobros .cob-cons{display:inline}            /* en el teléfono manda el "…4471" */
   #vCobros .cob-consfull{display:none}          /* el consecutivo completo es de escritorio */
+  /* ── El resaltado del toque no se queda pegado ──
+     Al abrir un cliente quedaba una mancha detrás del punto donde se tocó: iOS pinta
+     -webkit-tap-highlight-color y, como la fila es un <tr> con onclick, ni :active ni el foco
+     se limpian solos al volver de la navegación. Se apaga el resaltado nativo y se anula el
+     rastro de :active/:focus — la fila ya se entiende porque se despliega. */
+  #vCobros .cob-tbl tr{-webkit-tap-highlight-color:transparent}
+  #vCobros .cob-tbl tr:focus,#vCobros .cob-tbl tr:focus-visible,
+  #vCobros .cob-tbl tr:active,#vCobros .cob-tbl td:active{outline:none;background:transparent}
+  /* ── Jerarquía de la lista de clientes ──
+     Estaba toda al mismo peso y color, así que había que leerla entera para encontrar algo.
+     Sin agregar color (la regla es peso y grises): el NOMBRE y su MONTO en blanco hueso y
+     semibold —son las dos cosas que se buscan—, la línea de "N facturas · X d" en gris
+     terciario y más chica, y cada bloque de cliente abierto por una línea, no pegado al
+     anterior. */
+  #vCobros .cob-tbl tr.cob-gr{padding:14px 0;border-top:1px solid var(--border);border-bottom:none}
+  #vCobros .cob-tbl tr.cob-gr:first-child{border-top:none}
+  #vCobros .cob-tbl td.cob-g-nm{font-weight:600;color:var(--text)}
+  #vCobros .cob-tbl td.cob-g-tot{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+  #vCobros .cob-tbl td.cob-g-fac{color:var(--text-3);font-size:11px;padding-top:3px}
   /* ── Bajar el volumen ──
      El nombre del cliente en texto normal: que TODOS salieran rojos vaciaba la señal. */
   #vCobros .cob-g-nm .cob-venc{color:var(--text)}
@@ -429,7 +448,21 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
     font-variant-numeric:tabular-nums;white-space:nowrap}
   #vFacturado td.vent-g-cli{grid-column:1/-1;grid-row:2;text-align:left;font-size:11px;color:var(--text-3)}
   #vFacturado tr.vent-det>td{grid-column:1/-1}
-  #vFacturado tr.vent-total{grid-template-columns:1fr auto}
+  /* ── Jerarquía por tonos, la misma de Rentabilidad e Inventario ──
+     El MONTO es el dato: blanco hueso. El nombre del canal lo acompaña en gris secundario, y
+     "N clientes" es contexto en terciario. Antes los tres iban al mismo peso y color. */
+  #vFacturado td.vent-g-nm{color:var(--text-2);font-weight:500}
+  #vFacturado td.vent-g-tot{color:var(--text);font-weight:600}
+  /* ── El TOTAL, en UNA línea ──
+     Ocupaba dos porque hereda la cuadrícula de las filas de canal, donde "N clientes" vive en
+     el renglón 2. Acá las tres celdas van al renglón 1, el conteo de clientes se calla (ya
+     está en cada fila) y el desglose "facturado · NC" queda de sub-línea bajo el monto. */
+  #vFacturado tr.vent-total{grid-template-columns:1fr auto;row-gap:0;padding:14px 12px;
+    border-top:1px solid var(--border-strong);border-bottom:none}
+  #vFacturado tr.vent-total>td{grid-row:1}
+  #vFacturado tr.vent-total td.vent-g-cli{display:none}
+  #vFacturado tr.vent-total td.vent-g-nm{color:var(--text);font-weight:600}
+  #vFacturado .vent-total-sub{margin-top:2px}
   #vFacturado .vent-sub{padding:2px 0 8px 12px}
   #vFacturado .vent-cli{padding:8px 12px 8px 0}
   #vFacturado .vent-fac{padding:4px 0 10px 12px}
@@ -578,6 +611,22 @@ tr.r-ing td{background:#eff6ff}
 .auth-hint{font-size:12px;color:#6E6C68;text-align:center}
 #authMsg{font-size:13px;color:#FF8A8A;text-align:center;min-height:17px}
 #btnSalir{position:fixed;top:12px;right:14px;z-index:120;background:none;border:.5px solid #2C2C33;color:#A8A6A0;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif}
+/* ── LOGIN en teléfono: logo en el tercio de arriba, formulario centrado en la pantalla ──
+   En escritorio el logo y el formulario son UN bloque centrado, y con los 76px de separación
+   el logo cae casi al medio y empuja el formulario al tercio de abajo. Acá el logo sale del
+   flujo (absoluto, anclado arriba con su safe-area) y el formulario queda como único hijo en
+   flujo → el `justify-content:center` lo centra de verdad en la pantalla.
+   Dos perillas, para ajustar con la captura sin tocar el layout:
+     --auth-techo = a qué altura cuelga el logo · --auth-piso = colchón contra el filo de abajo.
+   "Conectando a producción…" (#authMsg) vive dentro de .auth-card, debajo del botón: se mueve
+   con el formulario y no hay que tocarlo. */
+@media(max-width:700px){
+  #vAuth{--auth-techo:15vh; --auth-piso:22px;
+    padding:calc(2vh + env(safe-area-inset-top)) 24px calc(var(--auth-piso) + env(safe-area-inset-bottom))}
+  .auth-logo{position:absolute;top:calc(var(--auth-techo) + env(safe-area-inset-top));
+    left:50%;transform:translateX(-50%);margin:0}
+  .auth-card{margin:0}
+}
 /* ── Historial de conteos (modal oscuro) ── */
 #vHistorial{position:fixed;inset:0;z-index:160;background:rgba(8,8,10,.72);display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;overflow-y:auto;font-family:'DM Sans',sans-serif}
 .hist-box{background:#161619;border:.5px solid #2C2C33;border-radius:14px;width:100%;max-width:640px;padding:18px 20px;color:#F5F4F0;box-sizing:border-box}
@@ -656,13 +705,16 @@ tr.r-ing td{background:#eff6ff}
   .home-live{margin-right:0;min-width:0}
   .home-live .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .home-live .t{font-size:11px}
-  /* Saludo + buscador quedan ARRIBA, pegados al encabezado; los módulos se anclan ABAJO
-     (`margin-top:auto` se come todo el sobrante) y el hueco del medio queda grande y limpio.
-     --lobby-piso es el colchón contra el filo inferior: es LA perilla de esta pantalla,
-     se ajusta con la captura del teléfono sin tocar nada más. */
-  .home-wrap{--lobby-piso:22px}
-  .home-center{flex:0 0 auto;justify-content:flex-start;margin:0}
-  .home-bottom{margin-top:auto;margin-bottom:0}
+  /* REPARTO DEL ESPACIO. El intento anterior anclaba el saludo al encabezado y los módulos al
+     filo: TODO el sobrante caía al medio y dejaba 411px de vacío — se veía partido en dos, no
+     espacioso. Ahora la separación del medio es FIJA (--lobby-hueco) y el sobrante se parte en
+     dos con los dos `auto`: mitad arriba del saludo, mitad debajo de los módulos. Así el saludo
+     baja, los módulos suben y forman conjunto con el buscador.
+     --lobby-hueco es LA perilla: 32 compacto · 56 intermedio (esta) · 120 aireado.
+     --lobby-piso es el colchón del sello contra el filo de abajo. */
+  .home-wrap{--lobby-hueco:56px; --lobby-piso:22px}
+  .home-center{flex:0 0 auto;justify-content:flex-start;margin:auto 0 0}
+  .home-bottom{margin-top:var(--lobby-hueco);margin-bottom:auto}
   .home-hi{font-size:22px}
   .home-soon{margin-top:1.3rem}
   .home-modlabel{margin:1.5rem 0 .8rem}
@@ -891,8 +943,15 @@ table td,table th{border-color:#F2F0EA}
      Los 78px de la derecha son el espacio de la pastilla "Salir", que va fija. */
   /* padding-top con safe-area: sin él, en iPhone el encabezado entra DEBAJO de la barra de
      estado y se ve cortado hasta que uno hace scroll. */
+  /* STICKY: el encabezado no se va con el scroll. Antes era una fila en flujo normal, así que
+     al bajar se metía DEBAJO de la barra de estado del iPhone y la hora quedaba encima del
+     logo; y como "Salir" es position:fixed, se quedaba arriba mientras el encabezado se iba,
+     terminando encima de las pestañas. Fijándolo, el safe-area sigue reservando el alto de la
+     barra de estado también SCROLLEADO, y "Salir" queda otra vez a la altura del encabezado.
+     El fondo tiene que ser opaco: si no, el contenido se transparenta al pasar por debajo. */
   #appHeader,.header{height:auto;min-height:40px;gap:8px;
-    padding:calc(8px + env(safe-area-inset-top)) 78px 8px 1rem}
+    padding:calc(8px + env(safe-area-inset-top)) 78px 8px 1rem;
+    position:sticky;top:0;z-index:110;background:var(--surface)}
   .header .hdr-right{display:contents}
   .header .conn-ind{order:-1;margin:0;gap:0;font-size:0}               /* queda solo el punto */
   .header .conn-ind .gdot{width:5px;height:5px}
@@ -1934,6 +1993,11 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-ir{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:4px 0;font-size:13px}
 #vResumen .rz-irn{color:var(--text-2);text-transform:capitalize}
 #vResumen .rz-irv{color:var(--text);font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* Sub-línea del ítem: el conteo físico guardado contra la existencia de Odoo. Ocupa el ancho
+   completo debajo del nombre y el número — por eso .rz-ir envuelve. En gris terciario: es
+   contexto, no alarma. Si el ítem no se contó, no se dibuja. */
+#vResumen .rz-ir{flex-wrap:wrap}
+#vResumen .rz-irs{flex:0 0 100%;color:var(--text-3);font-size:11px;font-variant-numeric:tabular-nums;margin-top:1px}
 #vResumen .rz-vermas{margin-top:8px;background:none;border:none;color:#C77DA0;font-size:12px;cursor:pointer;padding:0}
 #vResumen .rz-edtag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;color:#C99A4E}
 #vResumen .rz-edtag svg{width:12px;height:12px}
@@ -2093,7 +2157,15 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vResumen .rz-edtag{display:none}
   #vResumen .rz-edwrap{display:block}
   #vResumen .rz-leftnote{display:none}
-  #vResumen .rz-invsec{display:none}
+  /* El bloque de Inventario VUELVE al teléfono (se había escondido el 10-ago para calmar la
+     pantalla). Sigue colapsado —tres tarjetas que se abren al tocar—, así que no pesa hasta
+     que se pide. Al desplegar, las cantidades van más grandes: es un dato que se lee de
+     lejos, en la cámara, no un renglón de tabla. */
+  #vResumen .rz-inv3{gap:9px}
+  #vResumen .rz-ir{padding:7px 0}
+  #vResumen .rz-irn{font-size:13.5px}
+  #vResumen .rz-irv{font-size:16px;font-weight:600}
+  #vResumen .rz-irs{font-size:11.5px}
   /* Tarjetas 2×2 — fila 1: Por medir · Comprar·medir | fila 2: Producciones · Comprar·producir */
   #vResumen .rz-cards4{gap:10px;margin-top:20px;align-items:start}   /* sin estirar: nada de cajas medio vacías */
   #vResumen .rz-c4h{font-size:10px;letter-spacing:.03em;line-height:1.3}
@@ -2148,7 +2220,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vConteo .cn-chip-btn:hover{background:rgba(212,83,126,.10)}
 #vConteo .cn-nm{font-weight:500;min-width:132px}
 #vConteo .cn-pnom{display:block;white-space:nowrap}
-#vConteo .cn-pcaja{display:block;white-space:nowrap;color:var(--text-3);font-size:11px;font-weight:400;margin-top:2px}
 #vConteo .cn-odoo{color:var(--text-2);white-space:nowrap}
 #vConteo .cn-aj{color:#E9A23B;font-size:11px}
 #vConteo .cn-count{white-space:nowrap}
@@ -2167,7 +2238,13 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vConteo .cn-btns{display:flex;gap:10px}
 #vConteo .cn-btn{background:var(--surface-2);border:.5px solid var(--border);color:var(--text-2);font-size:12.5px;padding:9px 16px;border-radius:8px;cursor:pointer}
 #vConteo .cn-guardar{background:#E9FE60;color:#1A1A1A;border:none;font-weight:600}
-#vConteo .cn-sub,#vConteo .cn-lblm,#vConteo .cn-tmov,#vConteo .cn-dot,#vConteo .cn-pres{display:none}   /* piezas de teléfono */
+#vConteo .cn-sub,#vConteo .cn-lblm,#vConteo .cn-tmov,#vConteo .cn-dot{display:none}   /* piezas de teléfono */
+/* La presentación entre paréntesis se ve en las DOS anchuras (antes era solo de teléfono y en
+   escritorio se mostraba .cn-pcaja "caja = 6 paq", que decía otra cosa). Fuente única. */
+#vConteo .cn-pres{margin-left:6px;color:var(--text-3);font-size:11px;font-weight:400}
+/* Rótulo de conversión (Vainilla): dice de dónde sale el número, para que nadie crea que
+   cambió algo en Odoo. Segunda línea, gris terciario. */
+#vConteo .cn-conv{display:block;color:var(--text-3);font-size:10.5px;font-weight:400;margin-top:1px}
 /* ══════════ CONTEO EN TELÉFONO ══════════
    La tabla de 4 columnas se vuelve una lista: cada fila es un renglón de dos líneas
    (nombre arriba, existencia Odoo + presentación abajo) con los campos a la derecha,
@@ -2190,7 +2267,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vConteo .cn-tbl td.cn-nm{grid-column:1;grid-row:1;font-size:13px;min-width:0;font-weight:500;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* La presentación acompaña al NOMBRE, no a los campos ni a la sub-línea. */
-  #vConteo .cn-pres{display:inline;margin-left:7px;color:var(--text-3);font-size:10.5px;font-weight:400}
+  #vConteo .cn-pres{font-size:10.5px;margin-left:7px}
   /* Punto de descuadre: solo cuando el físico no calza. Inline al lado del nombre, 7px, sin
      texto; la fila que calza (o que todavía no se contó) queda limpia. No toca la altura:
      va en la misma línea del nombre con vertical-align. */
@@ -2198,7 +2275,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     border-radius:50%;margin-left:7px;vertical-align:middle;flex:none}
   #vConteo .cn-dot.cn-warn{background:#E9A23B}
   #vConteo .cn-dot.cn-bad{background:#E24B4A}
-  #vConteo .cn-pcaja{display:none}                       /* va en la segunda línea, junto al Odoo */
   /* Una sola línea siempre: si no cabe se recorta por el final (lo primero que se pierde es la
      presentación, que es lo menos crítico) y todas las filas conservan la misma altura. */
   #vConteo .cn-tbl td.cn-sub{display:block;grid-column:1;grid-row:2;font-size:10px;color:var(--text-3);
@@ -2321,7 +2397,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 11 ago 2026';
+const BUILD = 'v 11 ago 2026 · b2';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -6331,10 +6407,20 @@ function rzUltimasHtml(){
 // ── 5 · INVENTARIO: 3 tarjetas-RESUMEN (MP · premezclas · terminado); "›" abre la tabla completa. ──
 function rzInvHtml(){
   const stock=_rzCtx.stock, meta=stock.meta||{};
-  const mp=Object.keys(stock.mpOh||{}).map(function(k){ const pid=+k, m=meta[pid]||{}; return {pid:pid, name:(m.name||('id '+pid)), uom:m.uom||'', qty:stock.mpOh[pid]||0}; })
+  // _mpDisplay: la Vainilla se muestra en litros como en Conteo e Inventario (Odoo la lleva en
+  // galones). Acá no hay qtyRef, así que se calcula con la constante.
+  const mp=Object.keys(stock.mpOh||{}).map(function(k){ const pid=+k, m=meta[pid]||{}, q=stock.mpOh[pid]||0;
+    return _mpDisplay({pid:pid, name:(m.name||('id '+pid)), uom:m.uom||'', qty:q, qtyRef:(/gal/i.test(m.uom||'')?q*GAL_US_A_L:q)}); })
     .sort(function(a,b){ return _mpRank(a.name)-_mpRank(b.name); });
-  function row(n,v){ return '<div class="rz-ir"><span class="rz-irn">'+esc(n)+'</span><span class="rz-irv">'+v+'</span></div>'; }
-  function mpRow(x){ const dec=(x.uom==='kg'||x.uom==='L'||/gal/.test(x.uom))?1:0; return row(x.name.toLowerCase(), _rzN(x.qty,dec)+(x.uom?(' '+esc(x.uom)):'')); }
+  // El CONTEO guardado (localStorage, el mismo borrador de la pantalla de Conteo) para poder
+  // poner "contado X · Odoo Y" debajo de cada ítem. Si no se contó, solo va Odoo.
+  const _cd=cnDraft();
+  function row(n,v,sub){ return '<div class="rz-ir"><span class="rz-irn">'+esc(n)+'</span><span class="rz-irv">'+v+'</span>'
+    +(sub?('<span class="rz-irs">'+esc(sub)+'</span>'):'')+'</div>'; }
+  function mpRow(x){ const dec=(x.uom==='kg'||x.uom==='L'||/gal/.test(x.uom))?1:0;
+    const dr=(_cd.mp||{})[x.pid]||{}, f=fisicoMP({name:x.name}, dr);
+    const sub=f.vacio?'' : ('contado '+_rzN(f.fis,dec)+' '+x.uom+' · Odoo '+_rzN(x.qty,dec)+' '+x.uom);
+    return row(x.name.toLowerCase(), _rzN(x.qty,dec)+(x.uom?(' '+esc(x.uom)):''), sub); }
   // tarjeta-resumen: título + resumen tocable "N ›" + cuerpo oculto con la tabla completa
   function card(id, titulo, resumen, bodyHtml){
     return '<div class="rz-i3"><div class="rz-i3h"><span class="rz-i3t">'+titulo+'</span>'
@@ -6343,9 +6429,19 @@ function rzInvHtml(){
   }
   const cMP=card('rzInvMp', 'Materia prima', mp.length+' ítems', mp.length?mp.map(mpRow).join(''):row('sin datos',''));
   const nPrem=NIV_PROD.filter(function(p){return ((stock.premOh||{})[NIV_INFO[p].prem]||0)>0;}).length;
-  const cPR=card('rzInvPr', 'Premezclas', nPrem+' con stock', NIV_PROD.map(function(p){ const b=Math.round((stock.premOh||{})[NIV_INFO[p].prem]||0); return row(_nomCorto(p), b>0?_rzN(b):'—'); }).join(''));
+  const cPR=card('rzInvPr', 'Premezclas', nPrem+' con stock', NIV_PROD.map(function(p){
+    const b=Math.round((stock.premOh||{})[NIV_INFO[p].prem]||0), c=(_cd.premez||{})[NIV_INFO[p].prem];
+    const sub=(c==null||c==='')?'':('contado '+_rzN(_crDec(c))+' batches · Odoo '+_rzN(b)+' batches');
+    return row(_nomCorto(p), b>0?(_rzN(b)+' batches'):'—', sub); }).join(''));
   const totalCj=NIV_PROD.reduce(function(a,p){ return a+Math.floor((stock.fin[p]||0)/NIV_INFO[p].cajaU); },0);
-  const cTE=card('rzInvTe', 'Producto terminado', _rzN(totalCj)+' cajas', NIV_PROD.map(function(p){ const cajas=Math.floor((stock.fin[p]||0)/NIV_INFO[p].cajaU); return row(_nomCorto(p), _rzN(cajas)+' cj'); }).join(''));
+  const cTE=card('rzInvTe', 'Producto terminado', _rzN(totalCj)+' cajas', NIV_PROD.map(function(p){
+    const cajas=Math.floor((stock.fin[p]||0)/NIV_INFO[p].cajaU);
+    const t=INV_TERM.find(function(x){ return x.id===p; }), dr=(_cd.term||{})[p]||{};
+    const vac=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
+    // el conteo se captura en cajas + sueltas de VENTA → a unidades individuales, como Odoo
+    const fis=t?(_crDec(dr.cajas)*t.factor+_crDec(dr.sue)*t.presDiv):0;
+    const sub=(vac||!t)?'':('contado '+_rzN(Math.floor(fis/NIV_INFO[p].cajaU))+' cj · Odoo '+_rzN(cajas)+' cj');
+    return row(_nomCorto(p), _rzN(cajas)+' cj', sub); }).join(''));
   return '<div class="rz-sec rz-invsec"><div class="rz-sh"><span class="rz-st">Inventario</span></div><div class="rz-inv3">'+cMP+cPR+cTE+'</div></div>';
 }
 function rzToggleMp(btn){ const e=document.getElementById('rzMpMas'); if(!e)return; const h=e.classList.toggle('hidden'); if(btn) btn.textContent = h ? btn.textContent.replace('▴','▾') : btn.textContent.replace('▾','▴'); }
@@ -6743,9 +6839,16 @@ function _cnSub(contado, odoo, vacio){
 }
 // Presentación de compra del ítem. Va AL LADO DEL NOMBRE (no junto a los campos ni en la
 // sub-línea): es una propiedad del producto, no del conteo. Solo se dibuja en teléfono.
-function _cnPresTag(txt){ return txt ? ('<span class="cn-pres">'+esc(txt)+'</span>') : ''; }
-function _cnPresMP(pe){ return pe ? (_cnPresLbl(pe)+' '+fmtN(pe.peso)) : ''; }
-function _cnPresTerm(t){ return 'caja '+(t.factor/t.presDiv)+' '+(t.presDiv===1?'u':'paq'); }
+// La presentación va ENTRE PARÉNTESIS pegada al nombre — "Avena (saco 22,68 kg)" en vez de
+// "Avena · saco 22,68". El paréntesis la lee como lo que es: una aclaración del producto.
+function _cnPresTag(txt){ return txt ? ('<span class="cn-pres">('+esc(txt)+')</span>') : ''; }
+// La misma presentación en la tabla de Inventario (M7), que sí se ve en escritorio. Misma
+// fuente (_cnPresMP/_cnPresTerm) para que Conteo e Inventario nunca digan cosas distintas.
+function _invPresTag(txt){ return txt ? (' <span class="muted" style="font-size:11px">('+esc(txt)+')</span>') : ''; }
+function _cnPresMP(pe){ return pe ? (_cnPresLbl(pe)+' '+fmtN(pe.peso)+' '+pe.unidad) : ''; }
+// Producto terminado: la caja se nombra por sus UNIDADES INDIVIDUALES (factor), no por
+// paquetes — "Pan Francés (caja de 24)", no "caja 6 paq". Es como la nombra la operación.
+function _cnPresTerm(t){ return 'caja de '+t.factor; }
 function _cnDotCls(vacio, s){ return (!vacio && s && (s.cls==='cn-warn'||s.cls==='cn-bad')) ? s.cls : ''; }
 function _cnDot(pre, id, vacio, s){ return '<span class="cn-dot '+_cnDotCls(vacio,s)+'" id="cn-'+pre+'dot'+id+'"></span>'; }
 function _cnPresLbl(pe){ return pe ? (_CN_SING[pe.lab]||pe.lab) : ''; }
@@ -6763,7 +6866,9 @@ function cnRender(){
     const sueIn = (pe&&pe.noSuelto) ? '<span class="cn-lbl">sin suelto</span>'
       : '<input class="cn-in" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnMpSue('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(sueLab)+'</span><span class="cn-lblm">'+esc(sueLab)+'</span>';
     const subMP=_cnSub(fmtN(fis)+' '+esc(m.uom), fmtN(m.qty)+' '+esc(m.uom), vacio);
-    mp+='<tr><td class="cn-nm">'+esc(nombreCortoMP(m.name))+_cnPresTag(_cnPresMP(pe))+_cnDot('m',m.pid,vacio,s)+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
+    const conv=mpConvTxt(m);
+    mp+='<tr><td class="cn-nm">'+esc(nombreCortoMP(m.name))+_cnPresTag(_cnPresMP(pe))
+      +(conv?('<span class="cn-conv">'+esc(conv)+'</span>'):'')+_cnDot('m',m.pid,vacio,s)+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
       +'<td class="cn-sub" id="cn-msub'+m.pid+'">'+subMP+'</td>'
       +'<td class="cn-count">'+empIn+(empIn&&!(pe&&pe.noSuelto)?' + ':'')+sueIn+'</td>'
       +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-mdif'+m.pid+'">'+(vacio?'—':fmtDiff(diff)+' '+m.uom)+'</td></tr>';
@@ -6785,8 +6890,7 @@ function cnRender(){
   for(const t of _cnTerm){
     const dr=(d.term||{})[t.id]||{}, vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
     const fis=_crDec(dr.cajas)*t.factor+_crDec(dr.sue)*t.presDiv, diff=fis-t.odoo, s=sem3(diff,CONTEO_TOL.term,vacio);
-    const cajaV=t.factor/t.presDiv, cajaU=(t.presDiv===1?'u':'paq');   // caja en unidad de venta
-    tm+='<tr><td class="cn-nm"><span class="cn-pnom">'+esc(t.label)+_cnPresTag(_cnPresTerm(t))+_cnDot('t',t.id,vacio,s)+'</span><span class="cn-pcaja">caja = '+cajaV+' '+cajaU+'</span></td><td class="cn-odoo">'+_cnVentaTxt(t,t.odoo)+'</td>'
+    tm+='<tr><td class="cn-nm"><span class="cn-pnom">'+esc(t.label)+_cnPresTag(_cnPresTerm(t))+_cnDot('t',t.id,vacio,s)+'</span></td><td class="cn-odoo">'+_cnVentaTxt(t,t.odoo)+'</td>'
       +'<td class="cn-sub" id="cn-tsub'+t.id+'">'+_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio)+'</td>'
       +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr.cajas!=null?esc(dr.cajas):'')+'" oninput="cnTermCajas('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">cajas</span><span class="cn-lblm">caj</span> + '
       +'<input class="cn-in" inputmode="numeric" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnTermSue('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(t.venta)+'</span><span class="cn-lblm">'+esc(t.venta)+'</span>'
@@ -7879,9 +7983,12 @@ function renderVentas(d,label){
   // Fila Total del mes: neto (facturado bruto − NC restadas), como la vieja "Facturado por canal".
   const nCli=d.filas.reduce((s,c)=>s+c.clientesArr.length,0);
   const sub=(d.nc?('facturado '+cM(d.bruto)+' · NC −'+cM(d.nc)):'sin NC en el mes');
-  h+='<tr class="vent-total"><td><strong>Total</strong></td><td style="text-align:right">'+nCli+'</td>'
-    +'<td style="text-align:right"><strong>'+cM(d.total)+'</strong>'
-    +'<div class="muted" style="font-size:11px;font-weight:400">'+esc(sub)+'</div></td></tr>';
+  // Las tres celdas llevan las MISMAS clases que las filas de canal (vent-g-nm/cli/tot): sin
+  // ellas, en teléfono la cuadrícula las acomodaba sola y "Total" se partía en dos renglones.
+  h+='<tr class="vent-total"><td class="vent-g-nm"><strong>Total</strong></td>'
+    +'<td class="vent-g-cli" style="text-align:right">'+nCli+'<span class="cob-movsuf"> cliente'+(nCli===1?'':'s')+'</span></td>'
+    +'<td class="vent-g-tot" style="text-align:right"><strong>'+cM(d.total)+'</strong>'
+    +'<div class="muted vent-total-sub" style="font-size:11px;font-weight:400">'+esc(sub)+'</div></td></tr>';
   el.innerHTML=h+'</table></div>';
 }
 
@@ -7940,7 +8047,16 @@ const CANALES = [
   {key:'walmart',label:'Walmart / Más x Menos', plId:10,
    comision:{pct:0.0654, enFactura:false, antes:0.0643, fuente:'acuerdo comercial (incluye todo), ago-2026'}, frio:null},
   {key:'mega',   label:'MegaSuper',             plId:12,
-   comision:{pct:0.065,  enFactura:false, fuente:'acuerdo comercial, jul-2026'}, frio:null},
+   comision:{pct:0.065,  enFactura:false, fuente:'acuerdo comercial, jul-2026'},
+   // MegaSuper factura el frío POR TIENDA, no un monto fijo al mes: mayo 1 tienda · junio 2 ·
+   // julio 10 (M126 M414 M316 M214 M215 M216 M217 M315 M412 M510), todas a ₡2.709,19. Por eso
+   // el dato editable es el NÚMERO DE TIENDAS y el monto sale de multiplicar: una constante
+   // mensual quedaría vieja el día que entre la tienda 11. Es aparte del 6,5% de comisión —
+   // verificado que las facturas de venta van con discount 0 y que las bills del proveedor son
+   // solo frío, así que no hay doble conteo.
+   frio:{porTienda:2709.19, tiendas:10, verificado:true, editable:true,
+         fuente:'bills del proveedor en 6106013, una por tienda — julio 2026 (11-ago-2026)',
+         nota:'Arranca en mayo 2026. El write-off de ₡12.018,39 en 6106028 NO es gasto: es el pago de las bills de mayo+junio (₡10.635,75 × 1,13 = ₡12.018,40) descontado del depósito.'}},
   {key:'compre', label:'Compre Bien',           plId:5,
    comision:null,
    frio:{monto:51166.40, verificado:true, editable:true, antes:34386,
@@ -7962,13 +8078,20 @@ const CANALES_PRECIO = CANALES.filter(c=>c.plId);     // canales con tarifa en O
 const canalComRenta = c => (c.comision && !c.comision.enFactura) ? c.comision.pct : 0;
 // Comisión para PROYECTAR sobre precio de lista. intro=true → tarifa de producto nuevo.
 const canalComProy = (c,intro) => !c.comision ? 0 : ((intro && c.comision.intro) ? c.comision.intro.pct : c.comision.pct);
-const canalFrio = c => (c.frio && c.frio.monto) || 0;
+// Frío ₡/mes del canal. Dos formas de decirlo, una sola respuesta:
+//   · monto     → cifra fija al mes (Automercado, Compre Bien)
+//   · porTienda × tiendas → el canal cobra por punto de venta (MegaSuper)
+const canalFrio = c => !c.frio ? 0 : (c.frio.porTienda ? c.frio.porTienda*(c.frio.tiendas||0) : (c.frio.monto||0));
+// Cómo se explica ese número en el tooltip: si es por tienda, se muestra la multiplicación.
+const canalFrioCalc = c => (c.frio && c.frio.porTienda)
+  ? cM(c.frio.porTienda)+' × '+fmtN(c.frio.tiendas||0)+' tienda'+((c.frio.tiendas||0)===1?'':'s')+' = '+cM(canalFrio(c))
+  : cM(canalFrio(c));
 // Texto de fuente/fecha de un canal (tooltip). '' si el canal no tiene supuestos.
 function canalFuente(c){
   const p=[];
   if(c.comision) p.push('Comisión '+_pct(c.comision.pct*100)+(c.comision.enFactura?' (ya aplicada en la factura)':'')+' — '+c.comision.fuente
     +(c.comision.intro?' · introducción '+_pct(c.comision.intro.pct*100)+' los primeros '+c.comision.intro.meses+' meses de un producto nuevo':''));
-  if(c.frio) p.push('Frío '+cM(c.frio.monto)+'/mes — '+c.frio.fuente);
+  if(c.frio) p.push('Frío '+canalFrioCalc(c)+'/mes — '+c.frio.fuente+(c.frio.nota?'\n'+c.frio.nota:''));
   return p.join('\n');
 }
 // Partner → canal. Por banner (commercial_name); razón social de respaldo. NUNCA por
@@ -8089,7 +8212,7 @@ function rentaRender(R, label){
   if(cambiados.length){
     foot+='<br><span style="color:var(--text-2)">Supuestos actualizados el 9-ago-2026: '
       +cambiados.map(c=>{
-        if(c.frio&&c.frio.antes!=null) return esc(c.label)+' frío '+cM(c.frio.monto)+'/mes (antes '+cM(c.frio.antes)+', '+esc(c.frio.fuente)+')';
+        if(c.frio&&c.frio.antes!=null) return esc(c.label)+' frío '+cM(canalFrio(c))+'/mes (antes '+cM(c.frio.antes)+', '+esc(c.frio.fuente)+')';
         return esc(c.label)+' '+_pct(c.comision.pct*100)+' (antes '+_pct(c.comision.antes*100)+')';
       }).join(' · ')+'.</span>';
   }
@@ -9369,6 +9492,20 @@ const PESO_EMPAQUE = [
   {rx:/aceite/i,                peso:3,     lab:'potes',    unidad:'L', sueltoUnit:'kg', sueltoFactor:1/ACEITE_DENSIDAD},  // suelto en kg de balanza → L = kg ÷ 0,92
   {rx:/huevo\s*l[ií]quido/i,    peso:9,     lab:'bolsas',   unidad:'kg', noSuelto:true},   // nunca queda bolsa abierta → sin suelto
 ];
+// ── VAINILLA · conteo estilo aceite, PREPARADO PERO APAGADO ──────────────────
+// Mismo diseño que el aceite, que NO es un error: el pote se cuenta entero y lo que queda
+// suelto se PESA en balanza y se convierte con densidad (aceite 0,92 kg/L). La vainilla va
+// igual: potes de 3 L + gramos sueltos ÷ densidad.
+// Falta UN número: VAINILLA_DENSIDAD (arriba), que sale de pesar un galón lleno sin abrir.
+// Mientras sea null esta entrada NO entra en PESO_EMPAQUE y la vainilla se sigue contando en
+// unidad base — encenderlo es poner la densidad, nada más.
+const VAINILLA_EMPAQUE = {rx:/vainilla/i, peso:3, lab:'potes', unidad:'L',
+                          sueltoUnit:'g', sueltoFactor:null};   // sueltoFactor = 1/(densidad×1000): g → L
+if(vainillaConteoListo()){
+  // g de balanza → L: dividir entre los gramos que pesa un litro (densidad kg/L × 1000).
+  VAINILLA_EMPAQUE.sueltoFactor = 1/(VAINILLA_DENSIDAD*1000);
+  PESO_EMPAQUE.push(VAINILLA_EMPAQUE);
+}
 // Sin presentación (solo unidad base, como hoy): Vainilla, Bicarbonato.
 const fmtN  = n => (Number(n)||0).toLocaleString('es-CR',{minimumFractionDigits:0,maximumFractionDigits:2});
 const fmtDiff = n => (n>0?'+':'')+fmtN(n);
@@ -9408,6 +9545,40 @@ function invTermCajas(id,val){ invSetTerm(id,'cajas',val); }
 function invTermSueltos(id,val){ invSetTerm(id,'sueltos',val); }
 
 // Lista de MP = hojas únicas de la expansión recursiva de los 6 BOM (reusa _bomDe).
+// ══════════ VAINILLA — se muestra en LITROS, Odoo sigue en galones ══════════
+// Odoo lleva la Vainilla [525] en galones US porque así la compra el proveedor, pero nadie en
+// planta piensa en galones: la receta pide 0,84 L por batch y el pote es de 3 L. La conversión
+// es SOLO DE PANTALLA — no se toca nada en Odoo, y por eso el rótulo dice de dónde sale.
+const GAL_US_A_L = 3.785;                 // 1 galón US = 3,785 L (definición, no medición)
+const VAINILLA_PID = 525;
+// Densidad de la vainilla en kg/L. TODAVÍA NO MEDIDA: Andrea pesa un galón lleno sin abrir y
+// el número entra acá. Mientras sea null, el conteo de vainilla NO cambia (sigue en unidad
+// base); en cuanto tenga valor se enciende el conteo estilo aceite —potes de 3 L + suelto en
+// gramos ÷ densidad— sin tocar nada más. Ver VAINILLA_EMPAQUE, abajo de PESO_EMPAQUE.
+const VAINILLA_DENSIDAD = null;
+// ¿Está listo el conteo estilo aceite? Una sola pregunta, un solo lugar donde encenderlo.
+const vainillaConteoListo = () => VAINILLA_DENSIDAD != null && VAINILLA_DENSIDAD > 0;
+// Convierte lo que viene de Odoo a la unidad en que la planta piensa el ingrediente.
+// Hoy solo la Vainilla; devuelve el ítem intacto para todo lo demás.
+function _mpDisplay(m){
+  if(m.pid !== VAINILLA_PID || !/gal/i.test(m.uom||'')) return m;
+  // Los litros salen de qtyRef, que ya viene convertido por el factor de uom.uom de Odoo — no
+  // de multiplicar por la constante. Así el número es el mismo que muestra Odoo y la constante
+  // queda solo para el rótulo; si Odoo afinara el factor, la pantalla lo sigue sola.
+  const litros = m.qtyRef || 0;
+  const chico = litros > 0 && litros < 1;   // menos de un litro se lee mejor en mililitros
+  return Object.assign({}, m, {
+    qty: chico ? litros*1000 : litros,
+    uom: chico ? 'mL' : 'L',
+    qtyRef: litros, refU: 'L',
+    convertido: {desde:'gal (EE. UU.)', factor:GAL_US_A_L, qtyOrig:m.qty}   // el rótulo lo usa
+  });
+}
+// Texto del rótulo de conversión: "convertido de 2,4 gal · 1 gal = 3,785 L". Vacío si no aplica.
+function mpConvTxt(m){
+  const c=m&&m.convertido; if(!c) return '';
+  return 'convertido de '+fmtN(c.qtyOrig)+' '+c.desde+' · 1 gal = '+fmtN(GAL_US_A_L)+' L';
+}
 async function listaMP(){
   const leaves=new Set();
   async function rec(pid,depth){
@@ -9427,7 +9598,8 @@ async function listaMP(){
   const oh={}; q.forEach(r=>{ const pid=r.product_id&&r.product_id[0]; if(pid) oh[pid]=(oh[pid]||0)+(r.quantity||0); });
   return prods.map(p=>{
     const uomName=(p.uom_id&&p.uom_id[1])||'', factor=uf[(p.uom_id&&p.uom_id[0])]||1, qty=oh[p.id]||0;
-    return {pid:p.id, name:p.name, uom:uomName, qty, qtyRef:qty/factor, refU:refUnitDe(uomName)};  // qtyRef en kg/L (unidad de referencia)
+    const m={pid:p.id, name:p.name, uom:uomName, qty, qtyRef:qty/factor, refU:refUnitDe(uomName)};  // qtyRef en kg/L (unidad de referencia)
+    return _mpDisplay(m);
   }).sort((a,b)=>a.name.localeCompare(b.name,'es'));
 }
 
@@ -9469,7 +9641,9 @@ function renderMP(){
     const sueCell = (pe&&pe.noSuelto)
       ? '<span class="muted" style="font-size:11px">— (sin suelto)</span>'
       : '<input class="inv-in inv-in-sm" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="invMpSue('+m.pid+',this.value)" placeholder="0"> <span class="muted" style="font-size:11px">'+esc(sueLab)+'</span>';
-    h+='<tr><td>'+esc(m.name)+'</td>'
+    const conv=mpConvTxt(m);
+    h+='<tr><td>'+esc(m.name)+_invPresTag(_cnPresMP(pe))
+      +(conv?(' <span class="muted" style="font-size:10.5px">'+esc(conv)+'</span>'):'')+'</td>'
       +'<td style="text-align:right">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
       +'<td>'+empCell+'</td>'
       +'<td>'+sueCell+'</td>'
@@ -9503,8 +9677,7 @@ function renderTerm(){
     const vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sueltos==null||dr.sueltos==='');
     const cajas=_crDec(dr.cajas), sueltos=_crDec(dr.sueltos);
     const fis=cajas*t.factor+sueltos*t.presDiv, diff=fis-t.odoo, s=semTerm(diff,vacio);   // sueltos en unidad de venta → uds indiv
-    const cajaV=t.factor/t.presDiv, cajaU=(t.presDiv===1?'u':'paq');
-    h+='<tr><td>'+esc(t.label)+' <span class="muted" style="font-size:11px">caja = '+cajaV+' '+cajaU+'</span></td>'
+    h+='<tr><td>'+esc(t.label)+_invPresTag(_cnPresTerm(t))+'</td>'
       +'<td><input class="inv-in inv-in-sm" inputmode="numeric" value="'+(dr.cajas!=null?esc(dr.cajas):'')+'" oninput="invTermCajas('+t.id+',this.value)" placeholder="0"></td>'
       +'<td><input class="inv-in inv-in-sm" inputmode="numeric" value="'+(dr.sueltos!=null?esc(dr.sueltos):'')+'" oninput="invTermSueltos('+t.id+',this.value)" placeholder="0"> <span class="muted" style="font-size:11px">'+esc(t.venta)+'</span></td>'
       +'<td style="text-align:right" id="tfis'+t.id+'">'+fmtN(fis)+'</td>'
