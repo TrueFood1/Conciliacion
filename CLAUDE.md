@@ -19,6 +19,11 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
 - **Cambios visuales no tocan lógica probada**: conservar ids/handlers,
   revalidar sintaxis al final. Al cambiar ids de contenedores, buscar TODOS los
   `getElementById` que los referencian.
+- **Antes de publicar, correr `python3 loadcheck.py`**: ejecuta el bloque JS de
+  arriba a abajo con un DOM de mentira y falla si algo revienta AL CARGAR.
+  Validar sintaxis no alcanza — un `const` usado antes de declararse parsea
+  perfecto y mata el bloque entero en el navegador (pasó el 11-ago con el bloque
+  de vainilla, y salió publicado). Sintaxis OK ≠ la página carga.
 - **Credenciales nunca por el chat** ni impresas en output: van directo a
   `conexion_prod.env`; confirmar presencia con sí/no, sin mostrar la key.
 - Explicar en español simple; reportar con evidencia (números, no adjetivos).
