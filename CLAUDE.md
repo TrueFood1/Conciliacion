@@ -137,7 +137,9 @@ Productos terminados (IDs de producción):
 - Formato **es-CR** en todo número (₡, coma decimal), incluidos campos editables.
 - **El color identifica y señala, nunca decora** — un solo acento por vista,
   el del módulo: Finanzas `#378ADD` · Conciliación `#84BD00` · Operaciones
-  `#D4537E` · Ventas `#7F77DD` · Automatización `#FF751F`.
+  `#D4537E` · **Entregas `#7F77DD`** · Ventas `#3FB6A8` · Automatización `#FF751F`.
+  (Entregas se quedó con el morado que el MAPA le asignaba; Ventas, que todavía no
+  existe, cedió y se movió al teal — 12-ago-2026.)
 - Tablas: encabezado 11px gris terciario con línea 1px debajo, sin bordes entre
   filas, padding vertical ~11px, número principal de la fila en blanco hueso.
 - Jerarquía tipográfica moderada: títulos de página contenidos, no gigantes.

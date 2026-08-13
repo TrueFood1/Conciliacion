@@ -739,7 +739,7 @@ tr.r-ing td{background:#eff6ff}
 .home-soon .home-search{margin-top:0}
 .home-sep{border-top:.5px solid #26262C;width:100%;margin:0}
 .home-modlabel{font-size:12px;font-weight:500;color:#6E6C68;letter-spacing:.5px;width:100%;margin:1.5rem 0 .9rem;text-align:left}
-.home-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;width:100%;max-width:760px}
+.home-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;width:100%;max-width:760px}
 /* El sello de versión iba con estilo en línea; vive acá para que el @media pueda darle
    el respiro del safe-area en teléfono (el estilo en línea le ganaba a la hoja). */
 .home-build{text-align:center;color:#6E6C68;font-size:11px;letter-spacing:.03em;padding:16px 0 6px}
@@ -770,6 +770,11 @@ tr.r-ing td{background:#eff6ff}
      días: columnas fijas + min-height igual). Conciliación se suma a lo que es solo de
      escritorio, junto con Precios, Producción, Mermas y Plan. */
   .home-grid{grid-template-columns:1fr 1fr;gap:9px}
+  /* 6 módulos en 2 columnas = 3 filas exactas. Entregas va en la fila 2 (no al fondo
+     con los grises) porque es el único que abre otra persona: Daniel entra solo ahí. */
+  .home-mod-fin{order:1}  .home-mod-ops{order:2}
+  .home-mod-ent{order:3}  .home-mod-conc{order:4}
+  .home-mod-ven{order:5}  .home-mod-auto{order:6}
   .home-mod{padding:14px;min-height:86px;display:flex;flex-direction:column;box-sizing:border-box}
   .home-mod-conc{display:none}
   .home-mod-ops{order:1} .home-mod-fin{order:2} .home-mod-ven{order:3} .home-mod-auto{order:4}
@@ -1240,8 +1245,13 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
         <div class="home-mod-name" style="color:#F5F4F0">Operaciones</div>
         <div class="home-mod-state" style="color:#E491AC">Abrir →</div>
       </div>
-      <div class="home-mod inert home-mod-ven">
+      <div class="home-mod home-mod-ent" style="border-color:#3A3670" onclick="abrirEntregas()">
         <span class="home-mod-dot" style="background:#7F77DD"></span>
+        <div class="home-mod-name" style="color:#F5F4F0">Entregas</div>
+        <div class="home-mod-state" style="color:#A9A3EA">Abrir →</div>
+      </div>
+      <div class="home-mod inert home-mod-ven">
+        <span class="home-mod-dot" style="background:#3FB6A8"></span>
         <div class="home-mod-name" style="color:#C9C7C1">Ventas</div>
         <div class="home-mod-state" style="color:#6E6C68">Pronto</div>
       </div>
@@ -1426,7 +1436,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face on face-desk">Producción</button>
     <button class="face face-desk" onclick="irAMermas()">Mermas</button>
     <button class="face" onclick="irAConteo()">Inventario</button>
-    <button class="face" onclick="irAConteoLote()">Conteo por lote</button>
     <button class="face face-desk" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
@@ -1452,13 +1461,11 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <!-- MERMAS (módulo Operaciones) -->
 <div id="vConteoLote" class="hidden">
-  <div class="faces faces-ops">
-    <button class="face" onclick="irAResumen()">Resumen</button>
-    <button class="face face-desk" onclick="irAProduccion()">Producción</button>
-    <button class="face face-desk" onclick="irAMermas()">Mermas</button>
-    <button class="face" onclick="irAConteo()">Inventario</button>
+  <div class="faces faces-ent">
     <button class="face on">Conteo por lote</button>
-    <button class="face face-desk" onclick="irAPlan()">Plan</button>
+    <button class="face face-soon" disabled title="Fase 1 — en construcción">Reporte</button>
+    <button class="face face-soon" disabled title="Fase 2">Preparar</button>
+    <button class="face face-soon" disabled title="Después del viernes">Trazabilidad</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
@@ -1476,7 +1483,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face face-desk" onclick="irAProduccion()">Producción</button>
     <button class="face on face-desk">Mermas</button>
     <button class="face" onclick="irAConteo()">Inventario</button>
-    <button class="face" onclick="irAConteoLote()">Conteo por lote</button>
     <button class="face face-desk" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
@@ -1777,7 +1783,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face face-desk" onclick="irAProduccion()">Producción</button>
     <button class="face face-desk" onclick="irAMermas()">Mermas</button>
     <button class="face on">Inventario</button>
-    <button class="face" onclick="irAConteoLote()">Conteo por lote</button>
     <button class="face face-desk" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
@@ -1920,7 +1925,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face face-desk" onclick="irAProduccion()">Producción</button>
     <button class="face face-desk" onclick="irAMermas()">Mermas</button>
     <button class="face" onclick="irAConteo()">Inventario</button>
-    <button class="face" onclick="irAConteoLote()">Conteo por lote</button>
     <button class="face on face-desk">Plan</button>
   </div>
   <div>
@@ -2023,6 +2027,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vResumen .rz-vernext:hover{border-color:#3A3A42;color:var(--text)}
 }
 
+/* Barra del módulo Entregas. Las pestañas que todavía no existen se ven, en gris y
+   sin respuesta al toque: dicen que el módulo tiene más, sin fingir que ya está. */
+.faces-ent .face.face-soon{opacity:.34;cursor:default;pointer-events:none}
 /* ── Conteo por lote ── */
 .cl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
 .cl-card{padding:14px 16px}
@@ -2290,7 +2297,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face face-desk" onclick="irAProduccion()">Producción</button>
     <button class="face face-desk" onclick="irAMermas()">Mermas</button>
     <button class="face" onclick="irAConteo()">Inventario</button>
-    <button class="face" onclick="irAConteoLote()">Conteo por lote</button>
     <button class="face face-desk" onclick="irAPlan()">Plan</button>
   </div>
   <div id="rzBody" style="margin-top:6px"></div>
@@ -2410,7 +2416,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face face-desk" onclick="irAProduccion()">Producción</button>
     <button class="face face-desk" onclick="irAMermas()">Mermas</button>
     <button class="face on">Inventario</button>
-    <button class="face" onclick="irAConteoLote()">Conteo por lote</button>
     <button class="face face-desk" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
@@ -2504,7 +2509,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 11 ago 2026 · b4';
+const BUILD = 'v 12 ago 2026 · b5';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -2929,7 +2934,7 @@ function crumbSet(area,cur){
   const a=document.querySelector('.crumb-area'); if(a)a.textContent=area;
   const c=document.querySelector('.crumb-cur'); if(c)c.textContent=cur;
   // el punto del breadcrumb sigue el color del módulo (Finanzas azul · Operaciones rosa · Conciliación verde)
-  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Conciliación':'#84BD00'};
+  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Conciliación':'#84BD00','Entregas':'#7F77DD','Ventas':'#3FB6A8'};
   const d=document.querySelector('.crumb-dot'); if(d)d.style.background=COL[area]||'#378ADD';
 }
 // Entradas desde el HOME (una por módulo).
@@ -5728,8 +5733,37 @@ async function rzDiagEscenarios(body){
 // ════════════════════════════════════════════════════════════════════════
 const ENT_PROD=[451,452,453,503,472,519];                     // los 6 productos
 const ENT_COD={451:2,452:4,453:1,503:3,472:5,519:null};       // código en el lote (Cookie Dough: sin confirmar)
-const ENT_ANIO_OK=new Set([24,25,26,27]);                     // AA de VENCIMIENTO válido (regla NUEVA, aprobada)
-const ENT_ANIO_ESPEC=new Set([24,25,26]);                     // regla VIEJA de la ESPEC (solo para comparar cobertura)
+// ── VENTANA DE VENCIMIENTO (regla derivada, Andrea 12-ago-2026) ──────────
+// El AA del lote es el VENCIMIENTO, no la producción. Una lista fija de años
+// (24-27) se vencía cada enero Y dejaba pasar errores: con 6 meses de vida útil,
+// nada vivo HOY puede vencer en 24 o 25 — un "24" leído hoy es mis-parseo, no un
+// lote viejo. Así que el rango se deriva del calendario y se corre solo.
+const ENT_VIDA_MESES   = 6;   // vida útil del producto congelado
+const ENT_MARGEN_MESES = 2;   // hacia atrás: producto por vencer o recién vencido que sigue en el congelador
+// Ventana válida en MESES ABSOLUTOS (año×12+mes), para comparar sin bordes de año.
+function _entVentanaVenc(hoy){
+  const d=hoy||new Date(), m0=d.getFullYear()*12+d.getMonth();
+  return {desde:m0-ENT_MARGEN_MESES, hasta:m0+ENT_VIDA_MESES+ENT_MARGEN_MESES};
+}
+function _entVencOK(mesV, anioV, hoy){
+  const v=_entVentanaVenc(hoy), abs=(2000+anioV)*12+(mesV-1);
+  return abs>=v.desde && abs<=v.hasta;
+}
+// Etiqueta legible de la ventana vigente, para poder decirla en pantalla.
+function _entVentanaLbl(hoy){
+  const v=_entVentanaVenc(hoy), f=function(m){ return String(m%12+1).padStart(2,'0')+'-'+String(Math.floor(m/12)).slice(2); };
+  return f(v.desde)+' a '+f(v.hasta);
+}
+// Las listas viejas quedan SOLO para la vista de diagnóstico (?diag=lotes), que
+// compara cobertura entre reglas. El motor ya no las usa.
+const ENT_ANIO_OK=new Set([24,25,26,27]);                     // regla fija anterior
+const ENT_ANIO_ESPEC=new Set([24,25,26]);                     // regla original de la ESPEC
+// Acepta la regla como función (nueva), como Set de años (las viejas) o nada (default).
+function _entReglaOk(regla){
+  if(typeof regla==='function') return regla;
+  if(regla instanceof Set) return function(mesV,anioV){ return regla.has(anioV); };
+  return _entVencOK;
+}
 
 // Chatter (HTML) → texto limpio para parsear.
 function _entLimpiarChatter(html){
@@ -5743,9 +5777,9 @@ function _entLimpiarChatter(html){
 function _julian(d){ const dt=(d instanceof Date)?d:new Date(String(d).slice(0,10)+'T00:00:00');
   const ini=new Date(dt.getFullYear(),0,0); return Math.floor((dt-ini)/86400000); }
 // Parsea el chatter → candidatos válidos + estado. prodYear/prodJulian anclan la PRODUCCIÓN.
-// anioSet elige la regla (nueva 24-27 vs vieja ESPEC 24-26) → sirve para comparar cobertura.
+// anioSet: sin pasar nada usa la ventana de vencimiento (motor). Un Set fuerza una regla fija (diag).
 function _entParseLote(chatterTxt, prodYear, prodJulian, anioSet){
-  anioSet=anioSet||ENT_ANIO_OK;
+  const _ok=_entReglaOk(anioSet);
   const t=_entLimpiarChatter(chatterTxt);
   // DDD [C] sep M sep AA — código opcional (1 díg), separadores flexibles, ancla opcional "Lote:".
   // (?!\d) al final rechaza el año de 4 díg (una fecha DD/MM/AAAA no se cuela como lote).
@@ -5757,7 +5791,7 @@ function _entParseLote(chatterTxt, prodYear, prodJulian, anioSet){
     if(mesV<1||mesV>12) continue;                  // mes inválido → no es lote
     const canon=ddd+' / '+mesV+'-'+String(anioV).padStart(2,'0');   // la clave NO depende del código
     if(vistos[canon]) continue; vistos[canon]=1;
-    cands.push({ddd,cod,mesV,anioV,canon,anioOK:anioSet.has(anioV)});
+    cands.push({ddd,cod,mesV,anioV,canon,anioOK:_ok(mesV,anioV)});
   }
   const validos=cands.filter(c=>c.anioOK);
   const coincideJul = prodJulian!=null ? validos.some(c=>Math.abs(c.ddd-prodJulian)<=3) : null;
@@ -5790,7 +5824,7 @@ async function entLeerCrudo(desdeYmd){
 // Devuelve {lotes:{key:{...ordenes}}, buckets:{sin_lote,ambiguo,anio_invalido}}. Alimenta el
 // selector de Daniel Y el conteo inicial. Casos raros SIEMPRE explícitos (nunca se asumen).
 async function entLotesActivos(meses, anioSet){
-  meses=meses||3; anioSet=anioSet||ENT_ANIO_OK;
+  meses=meses||3;   // anioSet undefined → regla de ventana de vencimiento (la del motor)
   const d=new Date(); d.setMonth(d.getMonth()-meses);
   const crudo=await entLeerCrudo(_ymd(d));
   return _entAgrupar(crudo, anioSet);
@@ -5824,8 +5858,11 @@ function _clAviso(tipo, html){
   st.className='status '+tipo; st.classList.remove('hidden'); st.innerHTML=html;
 }
 
+// Entrada del módulo desde el lobby. Hoy Entregas tiene UNA pantalla viva, así que
+// abrir el módulo es abrir el conteo; cuando entre Reporte, acá va la elección.
+function abrirEntregas(){ irAConteoLote(); }
 function irAConteoLote(){
-  _modShow('vConteoLote'); crumbSet('Operaciones','Conteo por lote');
+  _modShow('vConteoLote'); crumbSet('Entregas','Conteo por lote');
   cargarConteoLote(false);
 }
 
@@ -5927,7 +5964,7 @@ function _clRender(){
       +'si hay producto de alguna en el congelador, agregá el lote a mano en el producto que corresponda.</div>'
       +'<table class="cl-tbl" style="margin-top:8px"><tr><th>Orden</th><th>Producto</th><th>Fecha</th><th>Caso</th></tr>';
     ['sin_lote','ambiguo','anio_invalido'].forEach(function(k){
-      const lbl={sin_lote:'sin lote en el chatter',ambiguo:'ambiguo (más de un candidato)',anio_invalido:'año fuera de rango'}[k];
+      const lbl={sin_lote:'sin lote en el chatter',ambiguo:'ambiguo (más de un candidato)',anio_invalido:'año fuera del rango de vida útil'}[k];
       (b[k]||[]).slice(0,40).forEach(function(r){
         h+='<tr><td>'+esc(r.orden||'')+'</td><td>'+esc(_clNom(r.producto))+'</td>'
           +'<td>'+esc(r.fecha||'')+'</td><td class="muted">'+lbl+'</td></tr>';
@@ -6042,13 +6079,13 @@ async function rzDiagLotes(body){
     if(!crudo.length){ body.innerHTML='<div class="rz-err">Odoo no devolvió órdenes done desde 2025-01-01.</div>'; return; }
     const capado = crudo[0].capMos || crudo[0].capMsgs;
     // cobertura por año de producción, con cada regla
-    const reglas=[{k:'nueva', set:ENT_ANIO_OK, lbl:'Nueva (venc. 24–27)'},{k:'espec', set:ENT_ANIO_ESPEC, lbl:'ESPEC vieja (24–26)'}];
+    const reglas=[{k:'venc', set:null, lbl:'Ventana de vida útil ('+_entVentanaLbl()+')'},{k:'fija', set:ENT_ANIO_OK, lbl:'Fija anterior (24–27)'},{k:'espec', set:ENT_ANIO_ESPEC, lbl:'ESPEC original (24–26)'}];
     const porAnio={};   // {py:{total, nueva:{ok}, espec:{ok}}}
     const estNueva={ok:0, sin_lote:0, ambiguo:0, anio_invalido:0};
     crudo.forEach(function(o){
       porAnio[o.py]=porAnio[o.py]||{total:0, nueva:0, espec:0}; porAnio[o.py].total++;
       reglas.forEach(function(rg){ const r=_entParseLote(o.cmts,o.py,o.pj,rg.set); if(r.estado==='ok') porAnio[o.py][rg.k]++; });
-      estNueva[_entParseLote(o.cmts,o.py,o.pj,ENT_ANIO_OK).estado]++;
+      estNueva[_entParseLote(o.cmts,o.py,o.pj,null).estado]++;
     });
     const total=crudo.length;
     const okNueva=Object.values(porAnio).reduce((a,y)=>a+y.nueva,0);
@@ -6057,7 +6094,7 @@ async function rzDiagLotes(body){
     const anios=Object.keys(porAnio).map(Number).sort();
 
     // muestra de lotes OK (regla nueva) + un vistazo a cada bucket
-    const g=_entAgrupar(crudo, ENT_ANIO_OK);
+    const g=_entAgrupar(crudo, null);
     const nomP=(pid)=>NIV_INFO[pid]?NIV_INFO[pid].nom:('id '+pid);
     const lotesArr=Object.values(g.lotes).sort((a,b)=>a.key<b.key?1:-1);
     const muestraOk=lotesArr.slice(0,14).map(function(L){
