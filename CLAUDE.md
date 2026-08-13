@@ -137,9 +137,18 @@ Productos terminados (IDs de producción):
 - Formato **es-CR** en todo número (₡, coma decimal), incluidos campos editables.
 - **El color identifica y señala, nunca decora** — un solo acento por vista,
   el del módulo: Finanzas `#378ADD` · Conciliación `#84BD00` · Operaciones
-  `#D4537E` · **Entregas `#7F77DD`** · Ventas `#3FB6A8` · Automatización `#FF751F`.
-  (Entregas se quedó con el morado que el MAPA le asignaba; Ventas, que todavía no
-  existe, cedió y se movió al teal — 12-ago-2026.)
+  `#D4537E` · **Entregas `#E9FE60` (lima True Food)** · Ventas `#3FB6A8` ·
+  Automatización `#FF751F`.
+  **El morado `#7F77DD` ya NO es color de módulo** (13-ago-2026): Entregas es lo que
+  vive en producción frente al congelador y va onbrand. Sigue existiendo como color
+  de PRODUCTO (Buns) en las tablas — son dos paletas distintas, no tocar.
+  Del lima hay UN tono, `#E9FE60`, más un borde oscuro derivado `#3F4A16`; no se
+  inventan tonos intermedios.
+- **Lima y ámbar conviven: cuidado.** El lima ya era el color de ACCIÓN del sistema
+  (botones primarios), así que dentro de Entregas acento-de-módulo y color-de-acción
+  coinciden — está bien, es la misma familia. Pero el ámbar (`#E9A23B` / `#C99A4E`)
+  es el que AVISA. Se distinguen porque el lima nunca se usa como fondo lavado: los
+  bloques de alerta conservan su lavado naranja y su borde. No poner fondos lima.
 - Tablas: encabezado 11px gris terciario con línea 1px debajo, sin bordes entre
   filas, padding vertical ~11px, número principal de la fila en blanco hueso.
 - Jerarquía tipográfica moderada: títulos de página contenidos, no gigantes.
