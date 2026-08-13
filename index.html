@@ -2031,6 +2031,20 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    sin respuesta al toque: dicen que el módulo tiene más, sin fingir que ya está. */
 .faces-ent .face.face-soon{opacity:.34;cursor:default;pointer-events:none}
 /* ── Conteo por lote ── */
+.cl-hrow{cursor:pointer}
+.cl-hrow:hover td{color:var(--text)}
+.cl-badge-a{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:#0E0E11;background:#7F77DD;border-radius:999px;padding:1px 7px;margin-left:5px;font-weight:600}
+.cl-badge-b{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);border:1px solid var(--border-strong);border-radius:999px;padding:1px 7px;margin-left:5px}
+.cl-det{background:#0E0E11;border:1px solid var(--border);border-radius:9px;padding:10px 12px}
+.cl-detnota{font-size:11.5px;color:var(--text-3);margin-bottom:6px}
+.cl-detpie{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px}
+.cl-okmsg{font-size:11.5px;color:#8FBF6A}
+.cl-confirmar{border-color:#7F77DD;color:#A9A3EA}
+@media(max-width:700px){
+  .cl-hrow td:nth-child(4){display:none}   /* los totales viven en el detalle, no en la fila */
+  .cl-detpie{flex-direction:column;align-items:stretch}
+}
+
 .cl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
 .cl-card{padding:14px 16px}
 .cl-none{font-size:12.5px;color:var(--text-3);padding:6px 0}
@@ -5975,20 +5989,145 @@ function _clRender(){
 
   h+='<div class="card" style="margin-top:16px"><div class="card-title">Guardar el conteo</div>'
     +'<div style="font-size:11.5px;color:var(--text-3);margin:-4px 0 10px;line-height:1.6">'
-    +'Al guardar se fija el <strong>corte</strong>: el instante exacto en que esta foto fue verdad. '
-    +'Lo entregado antes del corte ya está descontado en los números que anotes; lo de después se resta encima. '
-    +'No se edita nada: si hay que corregir, se guarda un conteo nuevo y manda el más reciente.</div>'
+    +'Guardar deja un <strong>borrador</strong>: se puede repetir las veces que haga falta y no cambia ningún saldo. '
+    +'El conteo recién pasa a ser el <strong>ancla</strong> —la línea divisoria de todos los saldos por lote— cuando se confirma abajo, '
+    +'en un segundo paso aparte. Nada se edita: corregir es guardar otro borrador.</div>'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">'
     +'<div class="field" style="min-width:190px"><label>Quién contó</label>'
-    +'<input id="clResp" class="cl-in" style="width:100%" placeholder="Daniel"></div>'
+    +'<input id="clResp" class="cl-in" style="width:100%" placeholder="tu nombre" autocomplete="off"></div>'
     +'<div class="field" style="flex:1;min-width:220px"><label>Nota (opcional)</label>'
     +'<input id="clNota" class="cl-in" style="width:100%" placeholder="lo que valga la pena recordar"></div>'
     +'<button class="btn" id="clSave" onclick="guardarConteoLote()">Guardar conteo</button></div>'
     +'<div id="clSaveMsg" style="margin-top:10px;font-size:12.5px"></div>'
     +'<div id="clResumen" style="margin-top:10px;font-size:12.5px;color:var(--text-2)"></div></div>';
 
+  h+='<div id="clHist" style="margin-top:16px"></div>';
   body.innerHTML=h; body.style.display='block';
   _clTotales();
+  _clHistPintar();
+  if(!_clHist) _clCargarHist();
+}
+
+// ── HISTORIAL DE CONTEOS ────────────────────────────────────────────────
+// Guardar sin poder ver lo guardado es guardar a ciegas. Mismo patrón que el
+// historial del inventario (M7): lista compacta, detalle al tocar.
+let _clHist=null, _clHistErr='', _clAbierto=null, _clSinAncla=false;
+
+async function _clCargarHist(){
+  const c=sbClient(); if(!c){ _clHistErr='no hay sesión de Supabase'; _clHistPintar(); return; }
+  try{
+    const {data:cab,error:e1}=await c.from('ent_conteo')
+      .select('id,fecha,corte,responsable,nota,creado_en,creado_por')
+      .order('creado_en',{ascending:false}).limit(50);
+    if(e1) throw e1;
+    const ids=(cab||[]).map(function(x){return x.id;});
+    let lin=[];
+    if(ids.length){
+      const {data:dl,error:e2}=await c.from('ent_conteo_linea')
+        .select('conteo_id,producto_id,lote,cajas,sueltas,uds').in('conteo_id',ids);
+      if(e2) throw e2; lin=dl||[];
+    }
+    // El estado (ancla sí/no) vive en una tabla que puede no estar creada todavía.
+    // Si falta, NO se rompe el historial: se muestra todo como borrador y se avisa.
+    let est={}; _clSinAncla=false;
+    try{
+      const {data:de,error:e3}=await c.from('ent_conteo_estado')
+        .select('conteo_id,anulada,confirmado_en,confirmado_por');
+      if(e3) throw e3;
+      (de||[]).forEach(function(r){ est[r.conteo_id]=r; });
+    }catch(e){ _clSinAncla=true; }
+    const porC={};
+    lin.forEach(function(r){ (porC[r.conteo_id]=porC[r.conteo_id]||[]).push(r); });
+    _clHist=(cab||[]).map(function(x){
+      const ls=porC[x.id]||[], tot={};
+      ls.forEach(function(r){ tot[r.producto_id]=(tot[r.producto_id]||0)+(+r.uds||0); });
+      const e=est[x.id];
+      return Object.assign({}, x, {lineas:ls, tot:tot, ancla:!!(e && !e.anulada), est:e});
+    });
+    _clHistErr='';
+  }catch(e){ _clHistErr=(e&&e.message)||String(e); _clHist=[]; }
+  _clHistPintar();
+}
+
+function _clHistPintar(){
+  const el=document.getElementById('clHist'); if(!el) return;
+  if(_clHist===null){ el.innerHTML='<div class="cl-none">Cargando conteos guardados…</div>'; return; }
+  if(_clHistErr){
+    el.innerHTML='<div class="valid-box" style="border-color:rgba(224,90,90,.45);background:rgba(224,90,90,.08)">'
+      +'<div style="font-weight:700;color:#E05A5A;font-size:12.5px">No pude leer los conteos guardados</div>'
+      +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px">'+esc(_clHistErr)+'</div></div>';
+    return;
+  }
+  let h='<div class="card"><div class="card-title">Conteos guardados</div>';
+  if(_clSinAncla){
+    h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-bottom:10px">'
+      +'<div style="font-size:11.5px;color:var(--text-2);line-height:1.6">'
+      +'Falta correr <strong>ENTREGAS_ANCLA.sql</strong> en Supabase. Hasta entonces se puede contar y guardar, '
+      +'pero no confirmar el ancla: todos los conteos figuran como borrador.</div></div>';
+  }
+  if(!_clHist.length){ h+='<div class="cl-none">Todavía no hay ningún conteo guardado.</div></div>'; el.innerHTML=h; return; }
+  h+='<table class="cl-tbl"><tr><th>Guardado</th><th>Quién</th><th>Lotes</th><th>Totales</th><th></th></tr>';
+  _clHist.forEach(function(x){
+    const cuando=String(x.creado_en||'').replace('T',' ').slice(0,16);
+    const tot=ENT_PROD.filter(function(p){return x.tot[p];})
+      .map(function(p){ return _clNom(p).replace(/^Pan /,'')+' '+_rzN(x.tot[p]); }).join(' · ');
+    h+='<tr class="cl-hrow" onclick="_clVerDetalle('+x.id+')">'
+      +'<td>'+esc(cuando)+(x.ancla?' <span class="cl-badge-a">ancla</span>':' <span class="cl-badge-b">borrador</span>')+'</td>'
+      +'<td>'+esc(x.responsable||'')+'</td>'
+      +'<td style="text-align:right">'+x.lineas.length+'</td>'
+      +'<td style="font-size:11.5px;color:var(--text-3)">'+esc(tot||'—')+'</td>'
+      +'<td style="text-align:right">'+(_clAbierto===x.id?'▴':'▾')+'</td></tr>';
+    if(_clAbierto===x.id){
+      h+='<tr><td colspan="5" style="padding:2px 0 12px"><div class="cl-det">';
+      if(x.nota) h+='<div class="cl-detnota">'+esc(x.nota)+'</div>';
+      h+='<table class="cl-tbl"><tr><th>Producto</th><th>Lote</th><th>Cajas</th><th>Sueltas</th><th>Unidades</th></tr>';
+      x.lineas.slice().sort(function(a,z){ return a.producto_id-z.producto_id || String(a.lote).localeCompare(String(z.lote),'es'); })
+        .forEach(function(r){
+          h+='<tr><td>'+esc(_clNom(r.producto_id))+'</td><td>'+esc(r.lote)+'</td>'
+            +'<td style="text-align:right">'+_rzN(r.cajas)+'</td><td style="text-align:right">'+_rzN(r.sueltas)+'</td>'
+            +'<td class="cl-uds">'+_rzN(r.uds)+'</td></tr>';
+        });
+      h+='</table>';
+      if(!_clSinAncla){
+        h+= x.ancla
+          ? '<div class="cl-detpie"><span class="cl-okmsg">Es el ancla vigente'
+            +(x.est&&x.est.confirmado_en?(' · confirmada '+esc(String(x.est.confirmado_en).replace('T',' ').slice(0,16))):'')
+            +(x.est&&x.est.confirmado_por?(' por '+esc(x.est.confirmado_por)):'')+'</span>'
+            +'<button class="btn btn-sm" onclick="event.stopPropagation();_clDesanclar('+x.id+')">Desanclar</button></div>'
+          : '<div class="cl-detpie"><span style="font-size:11.5px;color:var(--text-3)">Revisá los totales. Al confirmar, este conteo pasa a ser la línea divisoria de todos los saldos por lote.</span>'
+            +'<button class="btn btn-sm cl-confirmar" onclick="event.stopPropagation();_clConfirmarAncla('+x.id+')">Confirmar como ancla</button></div>';
+      }
+      h+='</div></td></tr>';
+    }
+  });
+  h+='</table></div>';
+  el.innerHTML=h;
+}
+
+function _clVerDetalle(id){ _clAbierto=(_clAbierto===id?null:id); _clHistPintar(); }
+
+// Confirmar y desanclar son los dos INSERTS: nunca se edita la fila anterior.
+async function _clAnclaInsert(id, anulada, texto){
+  const c=sbClient(); if(!c) return;
+  try{
+    const {data:{user}}=await c.auth.getUser();
+    const {error}=await c.from('ent_conteo_ancla')
+      .insert({conteo_id:id, anulada:anulada, creado_por:(user&&user.email)||'desconocido'});
+    if(error) throw error;
+    await _clCargarHist();
+  }catch(e){ alert('No se pudo '+texto+': '+((e&&e.message)||e)); }
+}
+function _clConfirmarAncla(id){
+  const x=(_clHist||[]).find(function(y){return y.id===id;}); if(!x) return;
+  const tot=ENT_PROD.filter(function(p){return x.tot[p];})
+    .map(function(p){ return '  '+_clNom(p)+': '+_rzN(x.tot[p])+' u'; }).join('\n');
+  if(!confirm('Confirmar el conteo #'+id+' como ANCLA?\n\n'+tot
+    +'\n\nDesde este momento todos los saldos por lote se calculan contra esta foto.')) return;
+  _clAnclaInsert(id, false, 'confirmar');
+}
+function _clDesanclar(id){
+  if(!confirm('Desanclar el conteo #'+id+'?\n\nLos saldos vuelven a calcularse contra el conteo confirmado anterior, si lo hay.')) return;
+  _clAnclaInsert(id, true, 'desanclar');
 }
 
 function _clRecalc(inp){
@@ -6044,7 +6183,7 @@ async function guardarConteoLote(){
   if(!resp){ msg.style.color='#E9A23B'; msg.textContent='Falta quién contó.'; return; }
   const c=sbClient();
   if(!c){ msg.style.color='#FF8A8A'; msg.textContent='No hay sesión de Supabase.'; return; }
-  if(!confirm('Guardar el conteo con '+lineas.length+' lote'+(lineas.length===1?'':'s')+'?\n\nEsto fija el corte: los saldos se calculan desde este instante.')) return;
+  if(!confirm('Guardar el conteo con '+lineas.length+' lote'+(lineas.length===1?'':'s')+'?\n\nQueda como BORRADOR: no cambia ningún saldo hasta que lo confirmes como ancla.')) return;
   _clGuardando=true; btn.disabled=true;
   msg.style.color='#A8A6A0'; msg.textContent='Guardando…';
   try{
@@ -6059,10 +6198,11 @@ async function guardarConteoLote(){
       .insert(lineas.map(function(r){ return Object.assign({conteo_id:cab.id}, r); }));
     if(e2) throw e2;
     msg.style.color='#8FBF6A';
-    msg.innerHTML='Conteo guardado (#'+cab.id+', '+lineas.length+' lotes). '
-      +'Corte: '+esc(String(cab.corte||'').replace('T',' ').slice(0,16))+'. '
-      +'A partir de acá los saldos se calculan solos.';
-    btn.textContent='Guardado';
+    msg.innerHTML='Borrador guardado (#'+cab.id+', '+lineas.length+' lotes · corte '
+      +esc(String(cab.corte||'').replace('T',' ').slice(0,16))+'). '
+      +'<strong>Todavía no es el ancla</strong>: revisá los totales abajo y confirmalo.';
+    btn.textContent='Guardar conteo';
+    await _clCargarHist();          // el borrador nuevo aparece en el historial, listo para confirmar
   }catch(e){
     msg.style.color='#FF8A8A';
     msg.textContent='No se pudo guardar: '+((e&&e.message)||e);
