@@ -739,7 +739,7 @@ tr.r-ing td{background:#eff6ff}
 .home-soon .home-search{margin-top:0}
 .home-sep{border-top:.5px solid #26262C;width:100%;margin:0}
 .home-modlabel{font-size:12px;font-weight:500;color:#6E6C68;letter-spacing:.5px;width:100%;margin:1.5rem 0 .9rem;text-align:left}
-.home-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;width:100%;max-width:760px}
+.home-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;width:100%;max-width:760px}
 /* El sello de versión iba con estilo en línea; vive acá para que el @media pueda darle
    el respiro del safe-area en teléfono (el estilo en línea le ganaba a la hoja). */
 .home-build{text-align:center;color:#6E6C68;font-size:11px;letter-spacing:.03em;padding:16px 0 6px}
@@ -770,6 +770,11 @@ tr.r-ing td{background:#eff6ff}
      días: columnas fijas + min-height igual). Conciliación se suma a lo que es solo de
      escritorio, junto con Precios, Producción, Mermas y Plan. */
   .home-grid{grid-template-columns:1fr 1fr;gap:9px}
+  /* 6 módulos en 2 columnas = 3 filas exactas. Entregas va en la fila 2 (no al fondo
+     con los grises) porque es el único que abre otra persona: Daniel entra solo ahí. */
+  .home-mod-fin{order:1}  .home-mod-ops{order:2}
+  .home-mod-ent{order:3}  .home-mod-conc{order:4}
+  .home-mod-ven{order:5}  .home-mod-auto{order:6}
   .home-mod{padding:14px;min-height:86px;display:flex;flex-direction:column;box-sizing:border-box}
   .home-mod-conc{display:none}
   .home-mod-ops{order:1} .home-mod-fin{order:2} .home-mod-ven{order:3} .home-mod-auto{order:4}
@@ -1240,8 +1245,13 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
         <div class="home-mod-name" style="color:#F5F4F0">Operaciones</div>
         <div class="home-mod-state" style="color:#E491AC">Abrir →</div>
       </div>
-      <div class="home-mod inert home-mod-ven">
+      <div class="home-mod home-mod-ent" style="border-color:#3A3670" onclick="abrirEntregas()">
         <span class="home-mod-dot" style="background:#7F77DD"></span>
+        <div class="home-mod-name" style="color:#F5F4F0">Entregas</div>
+        <div class="home-mod-state" style="color:#A9A3EA">Abrir →</div>
+      </div>
+      <div class="home-mod inert home-mod-ven">
+        <span class="home-mod-dot" style="background:#3FB6A8"></span>
         <div class="home-mod-name" style="color:#C9C7C1">Ventas</div>
         <div class="home-mod-state" style="color:#6E6C68">Pronto</div>
       </div>
@@ -1450,6 +1460,23 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 </div>
 
 <!-- MERMAS (módulo Operaciones) -->
+<div id="vConteoLote" class="hidden">
+  <div class="faces faces-ent">
+    <button class="face on">Conteo por lote</button>
+    <button class="face face-soon" disabled title="Fase 1 — en construcción">Reporte</button>
+    <button class="face face-soon" disabled title="Fase 2">Preparar</button>
+    <button class="face face-soon" disabled title="Después del viernes">Trazabilidad</button>
+  </div>
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <div class="m3title" style="font-size:24px">Conteo por lote</div>
+      <div class="m3sub" style="margin-top:2px">La foto del congelador que ancla los saldos. Todo lo que se fabrique y se entregue después de este instante se cuenta contra esta foto.</div>
+    </div>
+    <button class="btn btn-sm" id="clRecargar" onclick="cargarConteoLote(true)">Recargar lotes</button>
+  </div>
+  <div id="clStatus" class="status hidden" style="margin-top:14px"></div>
+  <div id="clBody" style="margin-top:14px;display:none"></div>
+</div>
 <div id="vMermas" class="hidden">
   <div class="faces faces-ops">
     <button class="face" onclick="irAResumen()">Resumen</button>
@@ -1999,6 +2026,42 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vResumen .rz-vernext{display:inline-block;margin-top:12px;background:none;border:.5px solid var(--border);color:var(--text-2);font-size:12px;border-radius:6px;padding:5px 12px;cursor:pointer}
   #vResumen .rz-vernext:hover{border-color:#3A3A42;color:var(--text)}
 }
+
+/* Barra del módulo Entregas. Las pestañas que todavía no existen se ven, en gris y
+   sin respuesta al toque: dicen que el módulo tiene más, sin fingir que ya está. */
+.faces-ent .face.face-soon{opacity:.34;cursor:default;pointer-events:none}
+/* ── Conteo por lote ── */
+.cl-hrow{cursor:pointer}
+.cl-hrow:hover td{color:var(--text)}
+.cl-badge-a{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:#0E0E11;background:#7F77DD;border-radius:999px;padding:1px 7px;margin-left:5px;font-weight:600}
+.cl-badge-b{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);border:1px solid var(--border-strong);border-radius:999px;padding:1px 7px;margin-left:5px}
+.cl-det{background:#0E0E11;border:1px solid var(--border);border-radius:9px;padding:10px 12px}
+.cl-detnota{font-size:11.5px;color:var(--text-3);margin-bottom:6px}
+.cl-detpie{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px}
+.cl-okmsg{font-size:11.5px;color:#8FBF6A}
+.cl-confirmar{border-color:#7F77DD;color:#A9A3EA}
+@media(max-width:700px){
+  .cl-hrow td:nth-child(4){display:none}   /* los totales viven en el detalle, no en la fila */
+  .cl-detpie{flex-direction:column;align-items:stretch}
+}
+
+.cl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.cl-card{padding:14px 16px}
+.cl-none{font-size:12.5px;color:var(--text-3);padding:6px 0}
+.cl-tbl{width:100%;border-collapse:collapse;margin-top:4px}
+.cl-tbl th{text-align:left;font-size:10.5px;font-weight:400;letter-spacing:.03em;color:var(--text-3);padding:4px 6px 6px 0;border-bottom:1px solid var(--border)}
+.cl-tbl td{padding:5px 6px 5px 0;font-size:12.5px;color:var(--text-2);vertical-align:middle}
+.cl-tbl td.cl-uds{color:var(--text);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.cl-in{width:62px;background:#0E0E11;border:1px solid var(--border-strong);border-radius:7px;color:var(--text);
+  font:inherit;font-size:13px;padding:6px 8px;text-align:right}
+.cl-in:focus{outline:none;border-color:#7F77DD}
+.cl-tag{font-size:10px;color:var(--text-3);border:1px solid var(--border);border-radius:999px;padding:1px 6px;margin-left:4px}
+.cl-add{margin-top:10px}
+@media(max-width:700px){
+  .cl-grid{grid-template-columns:1fr;gap:10px}
+  .cl-in{width:100%;min-width:0;font-size:16px;padding:9px 8px}   /* 16px: iOS no hace zoom al enfocar */
+  .cl-tbl th:nth-child(4),.cl-tbl td:nth-child(4){display:none}   /* el total vive en el pie, no por fila */
+}
 /* chip de capacidad por personas (marca manual de la semana) */
 #vResumen .rz-chip,#vPlan .rz-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text-2);background:var(--surface-2);border:.5px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;white-space:nowrap}
 #vResumen .rz-chip:hover,#vPlan .rz-chip:hover{border-color:#3A3A42}
@@ -2119,7 +2182,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* fila de 4 tarjetas IGUALES (una por columna de la grilla) */
 #vResumen .rz-cards4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:26px}
 #vResumen .rz-card4{background:#141417;border:.5px solid #26262C;border-radius:12px;padding:13px 15px;min-width:0}
-#vResumen .rz-c4h{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);font-weight:600;margin-bottom:9px}
+/* Rótulo = etiqueta, no titular: sin mayúsculas, tracking corto, peso 500. La jerarquía la
+   hace el TONO (terciario rótulo → secundario apoyo → blanco hueso el dato), no el tamaño. */
+#vResumen .rz-c4h{font-size:11px;letter-spacing:.02em;color:var(--text-3);font-weight:500;margin-bottom:9px}
 #vResumen .rz-c4fecha{font-size:11px;font-weight:600;color:var(--accent);margin:-4px 0 9px}
 #vResumen .rz-c4line{font-size:13px;color:var(--text);line-height:1.5}
 #vResumen .rz-c4line.rz-ok{color:#7E8C5A}
@@ -2133,8 +2198,12 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-c4it{padding:5px 0;border-top:.5px solid #232329}
 #vResumen .rz-c4item{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12.5px}
 #vResumen .rz-c4nota{font-size:10.5px;color:var(--text-3);margin-top:1px}
-#vResumen .rz-c4in{color:var(--text);text-transform:capitalize}
-#vResumen .rz-c4falta{color:#C99A4E;white-space:nowrap;font-weight:600;font-size:11.5px}
+#vResumen .rz-c4in{color:var(--text-2);text-transform:capitalize}
+/* El ámbar marcaba "esta tarjeta tiene contenido" y con cuatro tarjetas encendidas no decía
+   nada. Ahora el dato va en blanco hueso, y el ámbar queda para .rz-c4urg — el único caso que
+   exige acción HOY (la compra vence hoy o mañana). */
+#vResumen .rz-c4falta{color:var(--text);white-space:nowrap;font-weight:600;font-size:11.5px}
+#vResumen .rz-c4it.rz-c4urg .rz-c4falta{color:#C99A4E}
 /* 2 secciones abajo, 2 columnas cada una, cerrando contra el mismo borde */
 #vResumen .rz-two{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:30px;align-items:start}
 #vResumen .rz-two .rz-sec{margin-top:0}
@@ -2225,7 +2294,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vResumen .rz-irs{font-size:11.5px}
   /* Tarjetas 2×2 — fila 1: Por medir · Comprar·medir | fila 2: Producciones · Comprar·producir */
   #vResumen .rz-cards4{gap:10px;margin-top:20px;align-items:start}   /* sin estirar: nada de cajas medio vacías */
-  #vResumen .rz-c4h{font-size:10px;letter-spacing:.03em;line-height:1.3}
+  #vResumen .rz-c4h{font-size:10.5px;letter-spacing:.02em;line-height:1.3}
   /* El plazo ya lo dice la pantalla una vez: no hace falta repetirlo en cada tarjeta. */
   #vResumen .rz-c4fecha{display:none}
   #vResumen .rz-c4-desk{display:none} #vResumen .rz-c4-mov{display:inline}
@@ -2454,7 +2523,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 11 ago 2026 · b4';
+const BUILD = 'v 12 ago 2026 · b5';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -2867,7 +2936,7 @@ function aplicarModoProduccion(){
   });
 }
 // Vistas de módulo (Contabilidad + Conciliación + Operaciones). Muestra UNA, oculta el resto.
-const _MOD_VIEWS=['vUpload','vFacturado','vProduccion','vMermas','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vInventario','vPlan','vResumen','vConteo','vResults'];
+const _MOD_VIEWS=['vUpload','vFacturado','vProduccion','vMermas','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vInventario','vPlan','vResumen','vConteo','vConteoLote','vResults'];
 function _modShow(id){
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.toggle('hidden', v!==id); });
   document.getElementById('vLobby').classList.add('hidden');
@@ -2879,7 +2948,7 @@ function crumbSet(area,cur){
   const a=document.querySelector('.crumb-area'); if(a)a.textContent=area;
   const c=document.querySelector('.crumb-cur'); if(c)c.textContent=cur;
   // el punto del breadcrumb sigue el color del módulo (Finanzas azul · Operaciones rosa · Conciliación verde)
-  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Conciliación':'#84BD00'};
+  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Conciliación':'#84BD00','Entregas':'#7F77DD','Ventas':'#3FB6A8'};
   const d=document.querySelector('.crumb-dot'); if(d)d.style.background=COL[area]||'#378ADD';
 }
 // Entradas desde el HOME (una por módulo).
@@ -4430,13 +4499,19 @@ const cM = n => '₡'+Math.round(Number(n)||0).toLocaleString('es-CR');   // col
 //   Indelsa = bolsas PE, potes craft propios). Desglose por producto:
 //   Blanco 69,55 (bolsa 29,65 + caja 39,90) · Semillas 77,58 (37,68 + 39,90) · Francés 64,26 (24,37 + 39,90)
 //   · Buns 60,34 (20,44 + 39,90) · Galletas 412,66 (pote 394,84 + caja 17,82).
-// PIZZA: 215,28 = SOLO la caja individual; faltan bolsa plástica y caja master (sin factura) → empHold fijo.
-//   Tener el número NO significa que esté completo: la marca de "empaque incompleto" se queda hasta quitar el hold.
+// CRITERIO (verificado 12-ago-2026): ÚLTIMA COMPRA registrada de cada componente, con la caja
+//   master prorrateada entre las unidades que caben. Valida al céntimo contra Galletas:
+//   pote 65,36 + tapa 66,50 (Diamantes de Papel 8-may) + funda 262,98 (Ind. Cartón 9-jun) = 394,84.
+// PIZZA 417,43 = caja individual 377,76 (Industrias de Cartón, 2-jul-2026) + caja master 39,67
+//   (Colinas 26-sep-2025, ₡238,00 ÷ 6 paquetes). La caja master SÍ existe: se compró en 2025 y
+//   todavía hay inventario, por eso 2026 no la muestra. FALTA la bolsa de polipropileno: se
+//   compra por KILO a Aida María (₡2.876,11/kg) y ni la factura ni el producto de Odoo dicen
+//   cuántas bolsas trae — Andrea las cuenta a mano. El empHold se queda hasta tener ese dato.
 const COSTOS_PROD = [
   // prodId FIJO por producto — búsqueda por ID, nunca por nombre (trampa 517/519 "Prueba Galletas"). kw/rx quedan solo informativos.
   {key:'blanco',  label:'Pan Blanco',      prodId:451, kw:'Pan Blanco', rx:/pan\s*blanco/i,    batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#378ADD', chkMP:805, chkInd:1462, chkTot:2267, emp:69.55,  empOK:true},
   {key:'semillas',label:'Pan de Semillas', prodId:452, kw:'Semillas',   rx:/semillas/i,        batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#84BD00', chkMP:980, chkInd:1462, chkTot:2442, emp:77.58,  empOK:true},
-  {key:'pizza',   label:'Pizza Crust',     prodId:472, kw:'Pizza',      rx:/pizza/i,           batch:10,  unitsPer:2, pack:1, batchOverride:10, unidad:'por paquete de 2',  color:'#FF751F', chkMP:422, chkInd:3070, chkTot:3492, emp:215.28, empOK:false, empHold:'sólo caja individual — faltan bolsa + caja master'},
+  {key:'pizza',   label:'Pizza Crust',     prodId:472, kw:'Pizza',      rx:/pizza/i,           batch:10,  unitsPer:2, pack:1, batchOverride:10, unidad:'por paquete de 2',  color:'#FF751F', chkMP:422, chkInd:3070, chkTot:3492, emp:417.43, empOK:false, empHold:'falta solo la bolsa de polipropileno (conteo manual pendiente)'},
   {key:'frances', label:'Pan Francés',     prodId:453, kw:'Franc',      rx:/franc[eé]s/i,      batch:15,  unitsPer:4, pack:1, unidad:'por paquete de 4',  color:'#D4537E', emp:64.26,  empOK:true},
   {key:'buns',    label:'Buns',            prodId:503, kw:'Bun',        rx:/buns?|hamburgues/i,batch:75,  unitsPer:1, pack:4, unidad:'por paquete de 4',  color:'#7F77DD', emp:60.34,  empOK:true},
   // Galletas = product.product 519 en PRODUCCIÓN (es_CR "Cookie Dough" / en_US "Prueba Galletas"; template 705, BOM18 con chocolate, rinde 160, 353 on-hand). El 529 era id del demo.
@@ -4466,8 +4541,19 @@ function diasTag(p){
   if(!p || (p.dias||0)>0) return '';
   return '<span class="dias-cero" title="Su costo no incluye indirecto: en la ventana de costeo vigente no tuvo ningún día de producción propio.">'+DIAS_CERO_TXT+'</span>';
 }
-const COSTOS_INCLUDE = ['6101001','6101003','6101005','6101007','6101010','6101011','6103003','6104002','6104005','6104006','6104007','6105001','6105002','6105003','6106004','6106005','6106006','6106008','6106011','6106012','6106021','6106024','6400003','640102','6200001'];
-// 6104002 "Contabilidad, Auditoría, Fiscal" agregada como seguro (hoy ₡0; blinda si el contador se postea ahí).
+// pool = solo producción: planilla de planta (incl. RT en 6500002 mientras se corrige el posteo
+// a 6101004) + planta física + laboratorio + PSF. Administración, distribución, financiero y
+// empaque (cobrado por unidad) van fuera. Decisión Andrea 12-ago-2026.
+const COSTOS_INCLUDE = ['6101001','6101002','6101003','6101004','6101005','6101006','6101010','6102002','6106001','6106021','6106005','6106006','6106012','6105001','6105002','6105003','6106024','6400005','6500002'];
+// El PAR de Riesgos del Trabajo va a propósito: hoy el gasto cae en la transitoria 6500002 y la
+// cuenta propia 6101004 está en ₡0; con las dos adentro el pool no lo pierde ni antes ni después
+// de que la contadora corrija el posteo. Si algún día se postea en las dos a la vez, se duplica —
+// revisar al cerrar la corrección.
+// Fuera a propósito (no son olvidos): 6106009 "Suministros de Oficina" es la cuenta de COMPRAS DE
+// EMPAQUE (cajas de pizza, fundas, etiquetas) y el empaque ya se cobra por unidad en
+// COSTOS_PROD.emp — meterla sería doble conteo. 6104006 mezcla certificación de planta (Qualität)
+// con comisión de crédito (Diatom): entra cuando se separen las cuentas. 6106016 "Pérdida producto
+// defectuoso" es merma cuyo MP ya se cargó por receta.
 // ── VENTANA ROLLING DE MESES CERRADOS ──────────────────────────────────
 // Ya NO una lista fija de meses. Se toman los 3 meses CERRADOS más recientes.
 // "Cerrado" = tiene los rubros fijos grandes posteados: planilla (cargas sociales) + electricidad + alquiler.
@@ -5661,8 +5747,37 @@ async function rzDiagEscenarios(body){
 // ════════════════════════════════════════════════════════════════════════
 const ENT_PROD=[451,452,453,503,472,519];                     // los 6 productos
 const ENT_COD={451:2,452:4,453:1,503:3,472:5,519:null};       // código en el lote (Cookie Dough: sin confirmar)
-const ENT_ANIO_OK=new Set([24,25,26,27]);                     // AA de VENCIMIENTO válido (regla NUEVA, aprobada)
-const ENT_ANIO_ESPEC=new Set([24,25,26]);                     // regla VIEJA de la ESPEC (solo para comparar cobertura)
+// ── VENTANA DE VENCIMIENTO (regla derivada, Andrea 12-ago-2026) ──────────
+// El AA del lote es el VENCIMIENTO, no la producción. Una lista fija de años
+// (24-27) se vencía cada enero Y dejaba pasar errores: con 6 meses de vida útil,
+// nada vivo HOY puede vencer en 24 o 25 — un "24" leído hoy es mis-parseo, no un
+// lote viejo. Así que el rango se deriva del calendario y se corre solo.
+const ENT_VIDA_MESES   = 6;   // vida útil del producto congelado
+const ENT_MARGEN_MESES = 2;   // hacia atrás: producto por vencer o recién vencido que sigue en el congelador
+// Ventana válida en MESES ABSOLUTOS (año×12+mes), para comparar sin bordes de año.
+function _entVentanaVenc(hoy){
+  const d=hoy||new Date(), m0=d.getFullYear()*12+d.getMonth();
+  return {desde:m0-ENT_MARGEN_MESES, hasta:m0+ENT_VIDA_MESES+ENT_MARGEN_MESES};
+}
+function _entVencOK(mesV, anioV, hoy){
+  const v=_entVentanaVenc(hoy), abs=(2000+anioV)*12+(mesV-1);
+  return abs>=v.desde && abs<=v.hasta;
+}
+// Etiqueta legible de la ventana vigente, para poder decirla en pantalla.
+function _entVentanaLbl(hoy){
+  const v=_entVentanaVenc(hoy), f=function(m){ return String(m%12+1).padStart(2,'0')+'-'+String(Math.floor(m/12)).slice(2); };
+  return f(v.desde)+' a '+f(v.hasta);
+}
+// Las listas viejas quedan SOLO para la vista de diagnóstico (?diag=lotes), que
+// compara cobertura entre reglas. El motor ya no las usa.
+const ENT_ANIO_OK=new Set([24,25,26,27]);                     // regla fija anterior
+const ENT_ANIO_ESPEC=new Set([24,25,26]);                     // regla original de la ESPEC
+// Acepta la regla como función (nueva), como Set de años (las viejas) o nada (default).
+function _entReglaOk(regla){
+  if(typeof regla==='function') return regla;
+  if(regla instanceof Set) return function(mesV,anioV){ return regla.has(anioV); };
+  return _entVencOK;
+}
 
 // Chatter (HTML) → texto limpio para parsear.
 function _entLimpiarChatter(html){
@@ -5676,9 +5791,9 @@ function _entLimpiarChatter(html){
 function _julian(d){ const dt=(d instanceof Date)?d:new Date(String(d).slice(0,10)+'T00:00:00');
   const ini=new Date(dt.getFullYear(),0,0); return Math.floor((dt-ini)/86400000); }
 // Parsea el chatter → candidatos válidos + estado. prodYear/prodJulian anclan la PRODUCCIÓN.
-// anioSet elige la regla (nueva 24-27 vs vieja ESPEC 24-26) → sirve para comparar cobertura.
+// anioSet: sin pasar nada usa la ventana de vencimiento (motor). Un Set fuerza una regla fija (diag).
 function _entParseLote(chatterTxt, prodYear, prodJulian, anioSet){
-  anioSet=anioSet||ENT_ANIO_OK;
+  const _ok=_entReglaOk(anioSet);
   const t=_entLimpiarChatter(chatterTxt);
   // DDD [C] sep M sep AA — código opcional (1 díg), separadores flexibles, ancla opcional "Lote:".
   // (?!\d) al final rechaza el año de 4 díg (una fecha DD/MM/AAAA no se cuela como lote).
@@ -5690,7 +5805,7 @@ function _entParseLote(chatterTxt, prodYear, prodJulian, anioSet){
     if(mesV<1||mesV>12) continue;                  // mes inválido → no es lote
     const canon=ddd+' / '+mesV+'-'+String(anioV).padStart(2,'0');   // la clave NO depende del código
     if(vistos[canon]) continue; vistos[canon]=1;
-    cands.push({ddd,cod,mesV,anioV,canon,anioOK:anioSet.has(anioV)});
+    cands.push({ddd,cod,mesV,anioV,canon,anioOK:_ok(mesV,anioV)});
   }
   const validos=cands.filter(c=>c.anioOK);
   const coincideJul = prodJulian!=null ? validos.some(c=>Math.abs(c.ddd-prodJulian)<=3) : null;
@@ -5723,7 +5838,7 @@ async function entLeerCrudo(desdeYmd){
 // Devuelve {lotes:{key:{...ordenes}}, buckets:{sin_lote,ambiguo,anio_invalido}}. Alimenta el
 // selector de Daniel Y el conteo inicial. Casos raros SIEMPRE explícitos (nunca se asumen).
 async function entLotesActivos(meses, anioSet){
-  meses=meses||3; anioSet=anioSet||ENT_ANIO_OK;
+  meses=meses||3;   // anioSet undefined → regla de ventana de vencimiento (la del motor)
   const d=new Date(); d.setMonth(d.getMonth()-meses);
   const crudo=await entLeerCrudo(_ymd(d));
   return _entAgrupar(crudo, anioSet);
@@ -5741,6 +5856,361 @@ function _entAgrupar(crudo, anioSet){
   return {lotes, buckets};
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// CONTEO POR LOTE — el ANCLA de saldos del módulo de Entregas (Pieza 4).
+// Es una FOTO del congelador: qué lotes hay y cuánto de cada uno. Todo lo
+// fabricado (Odoo) y lo entregado (este módulo) se cuenta DESPUÉS del corte.
+// Append-only: cada guardado inserta un conteo nuevo; el más reciente manda.
+// Odoo sigue SOLO LECTURA — acá solo se escribe en Supabase.
+// ════════════════════════════════════════════════════════════════════════
+let _clLotes=null, _clExtra={}, _clGuardando=false, _clHuerfanos=[];
+// Nombre legible de un producto por id (los buckets traen el id pelado).
+function _clNom(pid){ const I=NIV_INFO[+pid]; return I?I.nom:('producto '+pid); }
+// Aviso de pantalla. NUNCA se deja el cuerpo mudo: si algo falla, se dice y se sigue.
+function _clAviso(tipo, html){
+  const st=document.getElementById('clStatus'); if(!st) return;
+  st.className='status '+tipo; st.classList.remove('hidden'); st.innerHTML=html;
+}
+
+// Entrada del módulo desde el lobby. Hoy Entregas tiene UNA pantalla viva, así que
+// abrir el módulo es abrir el conteo; cuando entre Reporte, acá va la elección.
+function abrirEntregas(){ irAConteoLote(); }
+function irAConteoLote(){
+  _modShow('vConteoLote'); crumbSet('Entregas','Conteo por lote');
+  cargarConteoLote(false);
+}
+
+// uds individuales = cajas × unidades por caja + sueltas × unidades por presentación.
+// (Francés/Buns: la "suelta" es un paquete de 4 · Pizza: paquete de 2 · resto: la unidad.)
+function _clUds(pid, cajas, sueltas){
+  const I=NIV_INFO[pid]||{cajaU:1,presDiv:1};
+  return (+cajas||0)*I.cajaU + (+sueltas||0)*I.presDiv;
+}
+
+async function cargarConteoLote(force){
+  const st=document.getElementById('clStatus'), body=document.getElementById('clBody');
+  if(_clLotes && !force){ _clRender(); return; }
+  st.className='status s-info'; st.classList.remove('hidden');
+  st.innerHTML='<span class="spin"></span>Leyendo los lotes de los últimos 3 meses del chatter de Odoo (solo lectura)…';
+  body.style.display='none';
+  try{
+    _clLotes=await entLotesActivos(3);
+  }catch(e){
+    _clLotes={lotes:{},buckets:{sin_lote:[],ambiguo:[],anio_invalido:[]}, _err:(e&&e.message)||String(e)};
+  }
+  // El render va SIEMPRE, haya fallado la lectura o no: la pantalla tiene que poder
+  // usarse a mano aunque Odoo no conteste. Y si el propio render revienta, se dice.
+  try{ _clRender(); }
+  catch(e){
+    _clAviso('s-err','No pude dibujar la pantalla: '+esc((e&&e.message)||e)
+      +'. Avisale a Claude Code con este texto.');
+    const b=document.getElementById('clBody'); if(b) b.style.display='none';
+  }
+}
+
+function _clRender(){
+  const body=document.getElementById('clBody'); if(!body) return;
+  _clHuerfanos=[];
+  const porProd={}; ENT_PROD.forEach(function(pid){ porProd[pid]=[]; });
+  // OJO: entLeerCrudo devuelve `producto` como el ID pelado (o.product_id[0]), no como
+  // el par [id,nombre] de Odoo. Leerlo como par dejaba todos los lotes sin producto.
+  Object.values(_clLotes.lotes||{}).forEach(function(L){
+    const pid=+L.producto;
+    if(pid && porProd[pid]) porProd[pid].push(L);
+    else _clHuerfanos.push(L);   // lote de un producto fuera de ENT_PROD: se dice, no se pierde
+  });
+  ENT_PROD.forEach(function(pid){
+    (_clExtra[pid]||[]).forEach(function(x){ porProd[pid].push({key:'x:'+pid+':'+x, canon:x, extra:true}); });
+    porProd[pid].sort(function(a,z){ return String(a.canon).localeCompare(String(z.canon),'es'); });
+  });
+
+  let h='';
+  // Tres motivos por los que la lista puede venir corta, los tres DICHOS en texto.
+  if(_clLotes._err){
+    _clAviso('s-err','No pude leer los lotes de Odoo: '+esc(_clLotes._err)
+      +' — podés contar igual agregando cada lote a mano con el botón de cada producto.');
+  } else if(!Object.keys(_clLotes.lotes||{}).length){
+    _clAviso('s-warn','Odoo contestó, pero <strong>no hay ningún lote</strong> en la ventana de 3 meses. '
+      +'Si el congelador tiene producto, agregá los lotes a mano — el conteo vale igual.');
+  } else {
+    const st=document.getElementById('clStatus'); if(st) st.classList.add('hidden');
+  }
+  if(_clHuerfanos.length){
+    h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-bottom:14px">'
+      +'<div style="font-weight:700;color:#E9A23B;font-size:12.5px">'+_clHuerfanos.length
+      +' lotes de un producto que no es de los seis</div>'
+      +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px">'
+      +esc(_clHuerfanos.map(function(L){return L.canon+' (id '+L.producto+')';}).join(' · '))
+      +'</div></div>';
+  }
+  h+='<div class="cl-grid">';
+  ENT_PROD.forEach(function(pid){
+    const I=NIV_INFO[pid]||{nom:'id '+pid,cajaU:1,presDiv:1,presLbl:'uds'};
+    const ls=porProd[pid]||[];
+    h+='<div class="card cl-card"><div class="card-title">'+esc(I.nom)
+      +' <span class="muted" style="font-weight:400;font-size:11.5px">· caja de '+I.cajaU+' u'
+      +(I.presDiv>1?(' · suelta = '+I.presLbl+' de '+I.presDiv):'')+'</span></div>';
+    if(!ls.length) h+='<div class="cl-none">Sin lotes en la ventana de 3 meses. Si hay producto físico, agregalo abajo.</div>';
+    else{
+      h+='<table class="cl-tbl"><tr><th>Lote</th><th>Cajas</th><th>Sueltas</th><th>Unidades</th></tr>';
+      ls.forEach(function(L){
+        const id='cl_'+L.key.replace(/[^A-Za-z0-9]/g,'_');
+        h+='<tr data-pid="'+pid+'" data-lote="'+esc(L.canon)+'">'
+          +'<td>'+esc(L.canon)+(L.extra?' <span class="cl-tag">agregado</span>':'')+'</td>'
+          +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_c" oninput="_clRecalc(this)"></td>'
+          +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_s" oninput="_clRecalc(this)"></td>'
+          +'<td class="cl-uds" id="'+id+'_u">—</td></tr>';
+      });
+      h+='</table>';
+    }
+    h+='<button class="btn btn-sm cl-add" onclick="_clAgregar('+pid+')">Agregar un lote que no está</button></div>';
+  });
+  h+='</div>';
+
+  // Los casos que el extractor NO pudo resolver van a la vista, nunca escondidos (regla de la ESPEC).
+  const b=_clLotes.buckets||{};
+  const nb=(b.sin_lote||[]).length+(b.ambiguo||[]).length+(b.anio_invalido||[]).length;
+  if(nb){
+    h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-top:16px">'
+      +'<div style="font-weight:700;color:#E9A23B;font-size:12.5px">'+nb+' órdenes sin lote legible</div>'
+      +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.6">'
+      +'El extractor no pudo sacar el lote del chatter de estas órdenes. No se asumen ni se esconden: '
+      +'si hay producto de alguna en el congelador, agregá el lote a mano en el producto que corresponda.</div>'
+      +'<table class="cl-tbl" style="margin-top:8px"><tr><th>Orden</th><th>Producto</th><th>Fecha</th><th>Caso</th></tr>';
+    ['sin_lote','ambiguo','anio_invalido'].forEach(function(k){
+      const lbl={sin_lote:'sin lote en el chatter',ambiguo:'ambiguo (más de un candidato)',anio_invalido:'año fuera del rango de vida útil'}[k];
+      (b[k]||[]).slice(0,40).forEach(function(r){
+        h+='<tr><td>'+esc(r.orden||'')+'</td><td>'+esc(_clNom(r.producto))+'</td>'
+          +'<td>'+esc(r.fecha||'')+'</td><td class="muted">'+lbl+'</td></tr>';
+      });
+    });
+    h+='</table></div>';
+  }
+
+  h+='<div class="card" style="margin-top:16px"><div class="card-title">Guardar el conteo</div>'
+    +'<div style="font-size:11.5px;color:var(--text-3);margin:-4px 0 10px;line-height:1.6">'
+    +'Guardar deja un <strong>borrador</strong>: se puede repetir las veces que haga falta y no cambia ningún saldo. '
+    +'El conteo recién pasa a ser el <strong>ancla</strong> —la línea divisoria de todos los saldos por lote— cuando se confirma abajo, '
+    +'en un segundo paso aparte. Nada se edita: corregir es guardar otro borrador.</div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">'
+    +'<div class="field" style="min-width:190px"><label>Quién contó</label>'
+    +'<input id="clResp" class="cl-in" style="width:100%" placeholder="tu nombre" autocomplete="off"></div>'
+    +'<div class="field" style="flex:1;min-width:220px"><label>Nota (opcional)</label>'
+    +'<input id="clNota" class="cl-in" style="width:100%" placeholder="lo que valga la pena recordar"></div>'
+    +'<button class="btn" id="clSave" onclick="guardarConteoLote()">Guardar conteo</button></div>'
+    +'<div id="clSaveMsg" style="margin-top:10px;font-size:12.5px"></div>'
+    +'<div id="clResumen" style="margin-top:10px;font-size:12.5px;color:var(--text-2)"></div></div>';
+
+  h+='<div id="clHist" style="margin-top:16px"></div>';
+  body.innerHTML=h; body.style.display='block';
+  _clTotales();
+  _clHistPintar();
+  if(!_clHist) _clCargarHist();
+}
+
+// ── HISTORIAL DE CONTEOS ────────────────────────────────────────────────
+// Guardar sin poder ver lo guardado es guardar a ciegas. Mismo patrón que el
+// historial del inventario (M7): lista compacta, detalle al tocar.
+let _clHist=null, _clHistErr='', _clAbierto=null, _clSinAncla=false;
+
+async function _clCargarHist(){
+  const c=sbClient(); if(!c){ _clHistErr='no hay sesión de Supabase'; _clHistPintar(); return; }
+  try{
+    const {data:cab,error:e1}=await c.from('ent_conteo')
+      .select('id,fecha,corte,responsable,nota,creado_en,creado_por')
+      .order('creado_en',{ascending:false}).limit(50);
+    if(e1) throw e1;
+    const ids=(cab||[]).map(function(x){return x.id;});
+    let lin=[];
+    if(ids.length){
+      const {data:dl,error:e2}=await c.from('ent_conteo_linea')
+        .select('conteo_id,producto_id,lote,cajas,sueltas,uds').in('conteo_id',ids);
+      if(e2) throw e2; lin=dl||[];
+    }
+    // El estado (ancla sí/no) vive en una tabla que puede no estar creada todavía.
+    // Si falta, NO se rompe el historial: se muestra todo como borrador y se avisa.
+    let est={}; _clSinAncla=false;
+    try{
+      const {data:de,error:e3}=await c.from('ent_conteo_estado')
+        .select('conteo_id,anulada,confirmado_en,confirmado_por');
+      if(e3) throw e3;
+      (de||[]).forEach(function(r){ est[r.conteo_id]=r; });
+    }catch(e){ _clSinAncla=true; }
+    const porC={};
+    lin.forEach(function(r){ (porC[r.conteo_id]=porC[r.conteo_id]||[]).push(r); });
+    _clHist=(cab||[]).map(function(x){
+      const ls=porC[x.id]||[], tot={};
+      ls.forEach(function(r){ tot[r.producto_id]=(tot[r.producto_id]||0)+(+r.uds||0); });
+      const e=est[x.id];
+      return Object.assign({}, x, {lineas:ls, tot:tot, ancla:!!(e && !e.anulada), est:e});
+    });
+    _clHistErr='';
+  }catch(e){ _clHistErr=(e&&e.message)||String(e); _clHist=[]; }
+  _clHistPintar();
+}
+
+function _clHistPintar(){
+  const el=document.getElementById('clHist'); if(!el) return;
+  if(_clHist===null){ el.innerHTML='<div class="cl-none">Cargando conteos guardados…</div>'; return; }
+  if(_clHistErr){
+    el.innerHTML='<div class="valid-box" style="border-color:rgba(224,90,90,.45);background:rgba(224,90,90,.08)">'
+      +'<div style="font-weight:700;color:#E05A5A;font-size:12.5px">No pude leer los conteos guardados</div>'
+      +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px">'+esc(_clHistErr)+'</div></div>';
+    return;
+  }
+  let h='<div class="card"><div class="card-title">Conteos guardados</div>';
+  if(_clSinAncla){
+    h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-bottom:10px">'
+      +'<div style="font-size:11.5px;color:var(--text-2);line-height:1.6">'
+      +'Falta correr <strong>ENTREGAS_ANCLA.sql</strong> en Supabase. Hasta entonces se puede contar y guardar, '
+      +'pero no confirmar el ancla: todos los conteos figuran como borrador.</div></div>';
+  }
+  if(!_clHist.length){ h+='<div class="cl-none">Todavía no hay ningún conteo guardado.</div></div>'; el.innerHTML=h; return; }
+  h+='<table class="cl-tbl"><tr><th>Guardado</th><th>Quién</th><th>Lotes</th><th>Totales</th><th></th></tr>';
+  _clHist.forEach(function(x){
+    const cuando=String(x.creado_en||'').replace('T',' ').slice(0,16);
+    const tot=ENT_PROD.filter(function(p){return x.tot[p];})
+      .map(function(p){ return _clNom(p).replace(/^Pan /,'')+' '+_rzN(x.tot[p]); }).join(' · ');
+    h+='<tr class="cl-hrow" onclick="_clVerDetalle('+x.id+')">'
+      +'<td>'+esc(cuando)+(x.ancla?' <span class="cl-badge-a">ancla</span>':' <span class="cl-badge-b">borrador</span>')+'</td>'
+      +'<td>'+esc(x.responsable||'')+'</td>'
+      +'<td style="text-align:right">'+x.lineas.length+'</td>'
+      +'<td style="font-size:11.5px;color:var(--text-3)">'+esc(tot||'—')+'</td>'
+      +'<td style="text-align:right">'+(_clAbierto===x.id?'▴':'▾')+'</td></tr>';
+    if(_clAbierto===x.id){
+      h+='<tr><td colspan="5" style="padding:2px 0 12px"><div class="cl-det">';
+      if(x.nota) h+='<div class="cl-detnota">'+esc(x.nota)+'</div>';
+      h+='<table class="cl-tbl"><tr><th>Producto</th><th>Lote</th><th>Cajas</th><th>Sueltas</th><th>Unidades</th></tr>';
+      x.lineas.slice().sort(function(a,z){ return a.producto_id-z.producto_id || String(a.lote).localeCompare(String(z.lote),'es'); })
+        .forEach(function(r){
+          h+='<tr><td>'+esc(_clNom(r.producto_id))+'</td><td>'+esc(r.lote)+'</td>'
+            +'<td style="text-align:right">'+_rzN(r.cajas)+'</td><td style="text-align:right">'+_rzN(r.sueltas)+'</td>'
+            +'<td class="cl-uds">'+_rzN(r.uds)+'</td></tr>';
+        });
+      h+='</table>';
+      if(!_clSinAncla){
+        h+= x.ancla
+          ? '<div class="cl-detpie"><span class="cl-okmsg">Es el ancla vigente'
+            +(x.est&&x.est.confirmado_en?(' · confirmada '+esc(String(x.est.confirmado_en).replace('T',' ').slice(0,16))):'')
+            +(x.est&&x.est.confirmado_por?(' por '+esc(x.est.confirmado_por)):'')+'</span>'
+            +'<button class="btn btn-sm" onclick="event.stopPropagation();_clDesanclar('+x.id+')">Desanclar</button></div>'
+          : '<div class="cl-detpie"><span style="font-size:11.5px;color:var(--text-3)">Revisá los totales. Al confirmar, este conteo pasa a ser la línea divisoria de todos los saldos por lote.</span>'
+            +'<button class="btn btn-sm cl-confirmar" onclick="event.stopPropagation();_clConfirmarAncla('+x.id+')">Confirmar como ancla</button></div>';
+      }
+      h+='</div></td></tr>';
+    }
+  });
+  h+='</table></div>';
+  el.innerHTML=h;
+}
+
+function _clVerDetalle(id){ _clAbierto=(_clAbierto===id?null:id); _clHistPintar(); }
+
+// Confirmar y desanclar son los dos INSERTS: nunca se edita la fila anterior.
+async function _clAnclaInsert(id, anulada, texto){
+  const c=sbClient(); if(!c) return;
+  try{
+    const {data:{user}}=await c.auth.getUser();
+    const {error}=await c.from('ent_conteo_ancla')
+      .insert({conteo_id:id, anulada:anulada, creado_por:(user&&user.email)||'desconocido'});
+    if(error) throw error;
+    await _clCargarHist();
+  }catch(e){ alert('No se pudo '+texto+': '+((e&&e.message)||e)); }
+}
+function _clConfirmarAncla(id){
+  const x=(_clHist||[]).find(function(y){return y.id===id;}); if(!x) return;
+  const tot=ENT_PROD.filter(function(p){return x.tot[p];})
+    .map(function(p){ return '  '+_clNom(p)+': '+_rzN(x.tot[p])+' u'; }).join('\n');
+  if(!confirm('Confirmar el conteo #'+id+' como ANCLA?\n\n'+tot
+    +'\n\nDesde este momento todos los saldos por lote se calculan contra esta foto.')) return;
+  _clAnclaInsert(id, false, 'confirmar');
+}
+function _clDesanclar(id){
+  if(!confirm('Desanclar el conteo #'+id+'?\n\nLos saldos vuelven a calcularse contra el conteo confirmado anterior, si lo hay.')) return;
+  _clAnclaInsert(id, true, 'desanclar');
+}
+
+function _clRecalc(inp){
+  const tr=inp.closest('tr'); if(!tr) return;
+  const pid=+tr.getAttribute('data-pid');
+  const base=inp.id.replace(/_(c|s)$/,'');
+  const c=document.getElementById(base+'_c'), s=document.getElementById(base+'_s'), u=document.getElementById(base+'_u');
+  const uds=_clUds(pid, c&&c.value, s&&s.value);
+  if(u) u.textContent = uds ? _rzN(uds) : '—';
+  _clTotales();
+}
+
+// Total vivo por producto: sirve de chequeo grueso contra lo que Daniel ve en el congelador.
+function _clTotales(){
+  const el=document.getElementById('clResumen'); if(!el) return;
+  const t=_clLeer(), por={};
+  t.forEach(function(r){ por[r.producto_id]=(por[r.producto_id]||0)+r.uds; });
+  const parts=ENT_PROD.filter(function(p){return por[p];}).map(function(p){
+    return (NIV_INFO[p]?NIV_INFO[p].nom:p)+' '+_rzN(por[p])+' u'; });
+  el.innerHTML = parts.length ? ('Contado hasta ahora: '+esc(parts.join(' · '))) : '';
+}
+
+// Lee la pantalla. Solo las filas con algo anotado — un lote en cero no se guarda:
+// "no se contó" y "se contó y había cero" son lo mismo para el saldo, y guardar
+// ceros ensucia la foto con lotes que ya no existen.
+function _clLeer(){
+  const out=[];
+  document.querySelectorAll('#clBody tr[data-pid]').forEach(function(tr){
+    const pid=+tr.getAttribute('data-pid'), lote=tr.getAttribute('data-lote');
+    const ins=tr.querySelectorAll('input.cl-in');
+    const cajas=+(ins[0]&&ins[0].value||0), sueltas=+(ins[1]&&ins[1].value||0);
+    if(!cajas && !sueltas) return;
+    out.push({producto_id:pid, lote:lote, cajas:cajas, sueltas:sueltas, uds:_clUds(pid,cajas,sueltas)});
+  });
+  return out;
+}
+
+function _clAgregar(pid){
+  const v=prompt('Lote de '+((NIV_INFO[pid]&&NIV_INFO[pid].nom)||pid)+' que no está en la lista\n(forma "154 / 12-26"):');
+  if(!v) return;
+  const canon=String(v).trim(); if(!canon) return;
+  _clExtra[pid]=_clExtra[pid]||[];
+  if(_clExtra[pid].indexOf(canon)<0) _clExtra[pid].push(canon);
+  _clRender();
+}
+
+async function guardarConteoLote(){
+  if(_clGuardando) return;
+  const msg=document.getElementById('clSaveMsg'), btn=document.getElementById('clSave');
+  const lineas=_clLeer();
+  if(!lineas.length){ msg.style.color='#E9A23B'; msg.textContent='No hay nada anotado todavía.'; return; }
+  const resp=(document.getElementById('clResp').value||'').trim();
+  if(!resp){ msg.style.color='#E9A23B'; msg.textContent='Falta quién contó.'; return; }
+  const c=sbClient();
+  if(!c){ msg.style.color='#FF8A8A'; msg.textContent='No hay sesión de Supabase.'; return; }
+  if(!confirm('Guardar el conteo con '+lineas.length+' lote'+(lineas.length===1?'':'s')+'?\n\nQueda como BORRADOR: no cambia ningún saldo hasta que lo confirmes como ancla.')) return;
+  _clGuardando=true; btn.disabled=true;
+  msg.style.color='#A8A6A0'; msg.textContent='Guardando…';
+  try{
+    const {data:{user}}=await c.auth.getUser();
+    const email=(user&&user.email)||'desconocido';
+    const {data:cab,error:e1}=await c.from('ent_conteo').insert({
+      fecha:_ymd(new Date()), responsable:resp,
+      nota:(document.getElementById('clNota').value||'').trim()||null, creado_por:email
+    }).select('id,corte').single();
+    if(e1) throw e1;
+    const {error:e2}=await c.from('ent_conteo_linea')
+      .insert(lineas.map(function(r){ return Object.assign({conteo_id:cab.id}, r); }));
+    if(e2) throw e2;
+    msg.style.color='#8FBF6A';
+    msg.innerHTML='Borrador guardado (#'+cab.id+', '+lineas.length+' lotes · corte '
+      +esc(String(cab.corte||'').replace('T',' ').slice(0,16))+'). '
+      +'<strong>Todavía no es el ancla</strong>: revisá los totales abajo y confirmalo.';
+    btn.textContent='Guardar conteo';
+    await _clCargarHist();          // el borrador nuevo aparece en el historial, listo para confirmar
+  }catch(e){
+    msg.style.color='#FF8A8A';
+    msg.textContent='No se pudo guardar: '+((e&&e.message)||e);
+    btn.disabled=false; btn.textContent='Guardar conteo';
+  }
+  _clGuardando=false;
+}
+
 // ── VALIDACIÓN (index.html?diag=lotes): cobertura del extractor con las DOS reglas. Solo lectura.
 async function rzDiagLotes(body){
   body.innerHTML='<div class="rz-load">Leyendo órdenes y chatter de Odoo (solo lectura)…</div>';
@@ -5749,13 +6219,13 @@ async function rzDiagLotes(body){
     if(!crudo.length){ body.innerHTML='<div class="rz-err">Odoo no devolvió órdenes done desde 2025-01-01.</div>'; return; }
     const capado = crudo[0].capMos || crudo[0].capMsgs;
     // cobertura por año de producción, con cada regla
-    const reglas=[{k:'nueva', set:ENT_ANIO_OK, lbl:'Nueva (venc. 24–27)'},{k:'espec', set:ENT_ANIO_ESPEC, lbl:'ESPEC vieja (24–26)'}];
+    const reglas=[{k:'venc', set:null, lbl:'Ventana de vida útil ('+_entVentanaLbl()+')'},{k:'fija', set:ENT_ANIO_OK, lbl:'Fija anterior (24–27)'},{k:'espec', set:ENT_ANIO_ESPEC, lbl:'ESPEC original (24–26)'}];
     const porAnio={};   // {py:{total, nueva:{ok}, espec:{ok}}}
     const estNueva={ok:0, sin_lote:0, ambiguo:0, anio_invalido:0};
     crudo.forEach(function(o){
       porAnio[o.py]=porAnio[o.py]||{total:0, nueva:0, espec:0}; porAnio[o.py].total++;
       reglas.forEach(function(rg){ const r=_entParseLote(o.cmts,o.py,o.pj,rg.set); if(r.estado==='ok') porAnio[o.py][rg.k]++; });
-      estNueva[_entParseLote(o.cmts,o.py,o.pj,ENT_ANIO_OK).estado]++;
+      estNueva[_entParseLote(o.cmts,o.py,o.pj,null).estado]++;
     });
     const total=crudo.length;
     const okNueva=Object.values(porAnio).reduce((a,y)=>a+y.nueva,0);
@@ -5764,7 +6234,7 @@ async function rzDiagLotes(body){
     const anios=Object.keys(porAnio).map(Number).sort();
 
     // muestra de lotes OK (regla nueva) + un vistazo a cada bucket
-    const g=_entAgrupar(crudo, ENT_ANIO_OK);
+    const g=_entAgrupar(crudo, null);
     const nomP=(pid)=>NIV_INFO[pid]?NIV_INFO[pid].nom:('id '+pid);
     const lotesArr=Object.values(g.lotes).sort((a,b)=>a.key<b.key?1:-1);
     const muestraOk=lotesArr.slice(0,14).map(function(L){
@@ -7537,6 +8007,62 @@ const COSTOS_DIAS_ATIPICOS = {
     '2026-03-30':'lunes de Semana Santa — la semana entera sin producción de pan'
   }
 };
+// ── EXCLUSIONES PUNTUALES DEL POOL (decisión de Andrea, 12-ago-2026) ────────
+// Líneas posteadas en una cuenta del pool que NO son costo de producción del mes.
+// Se EXCLUYEN con razón documentada, nunca se borran de Odoo — mismo criterio que
+// COSTOS_DIAS_ATIPICOS: el dato real se respeta, lo que se ajusta es qué entra al reparto.
+//
+// La llave es el id de account.move.line (inmutable; la descripción no lo es).
+// `monto` NO es decorativo: es la HUELLA que se verifica contra Odoo antes de excluir
+// (junto con fecha y cuenta). Si algo no calza, la exclusión NO se aplica y sale en rojo.
+// `montoExcluido` es lo que sale del pool: puede ser TODO (monto) o una PARTE.
+const COSTOS_LINEAS_EXCLUIDAS = {
+  // Factura 2014 de Global Supply, 9-mar-2026. PROCOMER reembolsó ₡750.000 por la
+  // actividad 1.3 "Pago de Equipo Gluten Tox y Luminómetro" — un solo monto para las
+  // DOS líneas de abajo (bundle de ₡1.115.000).
+  //
+  // Luminómetro: exclusión TOTAL, y NO por el reembolso. Es equipo, no consumible:
+  // corresponde capitalizarlo y depreciarlo. El propio PROCOMER exige "registro de
+  // activo" como entregable de la actividad — el programa lo trata como activo. Mientras
+  // el posteo no se corrija, no puede cargar entero a un mes de la ventana.
+  107850: {fecha:'2026-03-09', cuenta:'6400005', monto:875000, montoExcluido:875000,
+           etiqueta:'Luminómetro Hygiena SystemSure Plus · Global Supply',
+           razon:'Es equipo, no consumible: corresponde capitalizar y depreciar. PROCOMER '
+                +'exige registro de activo como entregable de la actividad 1.3.'},
+  // Kit de gluten: exclusión PARCIAL. Sí es consumible legítimo (25 pruebas), pero parte
+  // la pagó PROCOMER. Reparto PROPORCIONAL al monto de cada línea dentro del bundle
+  // (240.000/1.115.000 = 21,5247% × 750.000 = 161.434,98). No se le imputa el reembolso al
+  // luminómetro porque ése ya sale entero por ser activo: sería usarlo dos veces.
+  107852: {fecha:'2026-03-09', cuenta:'6400005', monto:240000, montoExcluido:161434.98,
+           etiqueta:'Kit Gluten Tox Pro (25 pruebas) · Global Supply',
+           razon:'Reembolso PROCOMER (actividad 1.3), parte proporcional. Los ₡78.565,02 '
+                +'restantes SÍ son costo de producción y se quedan en el pool.'},
+};
+// Verifica cada exclusión contra Odoo. Si algo no calza, NO se aplica y se marca rota:
+// preferimos no restar a restar mal (mismo criterio que la regla del día de limpieza).
+async function verificarExclusiones(){
+  const ids=Object.keys(COSTOS_LINEAS_EXCLUIDAS).map(Number);
+  if(!ids.length) return [];
+  const ls=await odooCall('account.move.line','search_read',[[['id','in',ids]]],
+    {fields:['id','date','debit','credit','account_id','parent_state']});
+  const byId={}; ls.forEach(l=>byId[l.id]=l);
+  return ids.map(id=>{
+    const d=COSTOS_LINEAS_EXCLUIDAS[id], l=byId[id], fallas=[];
+    if(!l) fallas.push('la línea ya no existe en Odoo');
+    else{
+      const cod=l.account_id?String(l.account_id[1]).trim().split(' ')[0]:'';
+      const monto=(l.debit||0)-(l.credit||0);
+      if(l.date!==d.fecha)   fallas.push('fecha: Odoo dice '+l.date+', la lista dice '+d.fecha);
+      if(cod!==d.cuenta)     fallas.push('cuenta: Odoo dice '+cod+', la lista dice '+d.cuenta);
+      if(Math.abs(monto-d.monto)>0.5) fallas.push('monto: Odoo dice '+monto.toFixed(2)+', la lista dice '+d.monto.toFixed(2));
+      if(l.parent_state!=='posted')   fallas.push('el asiento ya no está posteado ('+l.parent_state+')');
+    }
+    if(!(d.montoExcluido>=0) || d.montoExcluido>d.monto+0.5)
+      fallas.push('montoExcluido ('+d.montoExcluido+') no puede superar el monto de la línea ('+d.monto+')');
+    return Object.assign({id}, d, {ok:!fallas.length, fallas,
+                                   parcial:d.montoExcluido < d.monto-0.5});
+  });
+}
 // ── CONTEXTO OPERATIVO: la limpieza profunda semanal es PRÁCTICA NUEVA ──────
 // No se hacía antes. Por eso marzo-abril-mayo 2026 tiene 5 semanas seguidas sin ningún
 // día de limpieza (todos los días laborales produjeron pan) mientras junio-julio cierra
@@ -7632,15 +8158,23 @@ async function computeCostos(force){
   const keyPid={}; RENT_PROD.forEach(p=>keyPid[p.key]=p.pid);   // key del motor → product.product id
   const ids=Object.values(keyPid);
   const ventana=await mesesCerradosRolling(COSTOS_NVENTANA);
+  const exclusiones=await verificarExclusiones();
+  const exVigentes=exclusiones.filter(e=>e.ok);   // las rotas NO restan: el pool las cuenta entero
   const meses=[];
   for(const {nom,D1,D2} of ventana){
     // Pool de indirecto del mes (mismas cuentas de siempre). Sueldos 6101001 = planilla 3 personas.
     const g=await odooCall('account.move.line','read_group',
       [[['date','>=',D1],['date','<=',D2],['parent_state','=','posted'],['account_id.code','in',COSTOS_INCLUDE]],['debit','credit'],[]],{lazy:false});
-    const pool=((g[0]&&g[0].debit)||0)-((g[0]&&g[0].credit)||0);   // débito − crédito (NC reducen gasto)
+    const poolBruto=((g[0]&&g[0].debit)||0)-((g[0]&&g[0].credit)||0);   // débito − crédito (NC reducen gasto)
+    // Exclusiones puntuales del mes. Se RESTAN del bruto en vez de sacarse del dominio:
+    // una sola regla sirve para las totales y para las parciales, la atribución al mes
+    // queda explícita, y permite mostrar bruto → exclusiones → neto en la validación.
+    const exMes=exVigentes.filter(e=>e.fecha>=D1 && e.fecha<=D2);
+    const excluido=exMes.reduce((s,e)=>s+e.montoExcluido,0);
+    const pool=poolBruto-excluido;
     const acc=await diasUnidadesMes(D1,D2,ids,keyPid['galletas']);   // Cookie Dough = día compartido
     const porKey={}; COSTOS_PROD.forEach(P=>{ const a=acc[keyPid[P.key]]; porKey[P.key]={dias:a?a.dias.size:0, unidades:a?a.unidades:0}; });
-    meses.push({nom,D1,D2,pool,porKey});
+    meses.push({nom,D1,D2,pool,poolBruto,excluido,exMes,porKey});
   }
   const poolAvg=meses.reduce((s,m)=>s+m.pool,0)/(meses.length||1);
   // Promediar días y unidades por producto sobre los mismos meses
@@ -7675,7 +8209,7 @@ async function computeCostos(force){
         atipicos.push({pid:+pid, label:(P&&P.label)||('id '+pid), fecha:d, razon:COSTOS_DIAS_ATIPICOS[pid][d]}); }
     }
   }
-  return _costosCache={ventana,meses,poolAvg,totalDias,prods,atipicos};
+  return _costosCache={ventana,meses,poolAvg,totalDias,prods,atipicos,exclusiones};
 }
 async function calcularCostos(){
   const st=document.getElementById('costosStatus'),vp=document.getElementById('costosValid'),cg=document.getElementById('costosCards');
@@ -7683,22 +8217,67 @@ async function calcularCostos(){
   st.innerHTML='<span class="spin"></span>Leyendo Odoo y calculando costos en vivo… (puede tardar unos segundos)';
   vp.innerHTML='';cg.innerHTML='';
   try{
-    const {meses,poolAvg,totalDias,prods,atipicos}=await computeCostos(true);   // botón Recalcular → cálculo fresco
+    const {meses,poolAvg,totalDias,prods,atipicos,exclusiones}=await computeCostos(true);   // botón Recalcular → cálculo fresco
     st.classList.add('hidden');
-    renderValidacion(vp,{meses,poolAvg,totalDias},prods);
+    renderValidacion(vp,{meses,poolAvg,totalDias,exclusiones},prods);
     renderTarjetas(cg,prods,atipicos);
   }catch(e){ st.className='status s-err'; st.innerHTML='No pude calcular los costos: '+esc(e&&e.message||e); }
 }
 
+// Tres formas de visibilidad de las exclusiones, para que ninguna sea silenciosa:
+//   1) las que SÍ están restando en la ventana vigente,
+//   2) las registradas fuera de la ventana (documentadas, hoy sin efecto),
+//   3) las ROTAS — en rojo aunque estén fuera de la ventana, porque una exclusión que
+//      apunta a una línea que cambió es un error de configuración, no un dato.
+function renderExclusiones(exclusiones,meses){
+  const ex=exclusiones||[]; if(!ex.length) return '';
+  const dentro=e=>meses.some(m=>e.fecha>=m.D1 && e.fecha<=m.D2);
+  const aplic=ex.filter(e=>e.ok && dentro(e));
+  const fuera=ex.filter(e=>e.ok && !dentro(e));
+  const rotas=ex.filter(e=>!e.ok);
+  const dmy=f=>String(f||'').split('-').reverse().join('-');
+  const fila=e=>'<tr><td>'+dmy(e.fecha)+'</td><td>'+esc(e.cuenta)+'</td><td>'+esc(e.etiqueta)+'</td>'
+    +'<td style="text-align:right">'+(e.parcial
+        ? '<strong>'+cM(e.montoExcluido)+'</strong> <span style="color:var(--text-3)">de '+cM(e.monto)+'</span>'
+        : cM(e.montoExcluido))+'</td>'
+    +'<td style="font-size:11px;color:var(--text-2)">'+esc(e.razon)+'</td></tr>';
+  const cab='<tr><th>Fecha</th><th>Cuenta</th><th>Concepto</th><th>Excluido</th><th>Razón</th></tr>';
+  let h='';
+  if(aplic.length){
+    h+='<div style="margin-top:12px;font-weight:700;color:var(--text);font-size:12.5px">Exclusiones aplicadas</div>'
+      +'<div style="font-size:11px;color:var(--text-3);margin:2px 0 6px">Líneas posteadas en una cuenta del pool que NO son costo de producción del mes. Se restan del pool bruto; el dato en Odoo no se toca. Las <strong>parciales</strong> muestran las dos cifras: lo excluido y el total de la línea.</div>'
+      +'<table>'+cab+aplic.map(fila).join('')+'</table>';
+  }
+  if(fuera.length){
+    h+='<div style="margin-top:12px;font-size:11px;color:var(--text-3)"><strong>Exclusiones registradas fuera de la ventana vigente</strong> — documentadas, hoy sin efecto en el costo. Se listan para que la decisión no se pierda cuando la ventana rueda.</div>'
+      +'<table style="opacity:.55">'+cab+fuera.map(fila).join('')+'</table>';
+  }
+  if(rotas.length){
+    h+='<div class="valid-box" style="border-color:rgba(224,90,90,.45);background:rgba(224,90,90,.08);margin-top:12px">'
+      +'<div style="font-weight:700;color:#E05A5A;font-size:12.5px">Exclusiones rotas — NO se aplicaron</div>'
+      +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.6">Ya no calzan con lo que hay en Odoo, así que el pool está contando esas líneas <strong>enteras</strong>. Preferimos no restar a restar mal: hay que revisarlas a mano.</div>'
+      +'<table style="margin-top:6px"><tr><th>Línea</th><th>Concepto</th><th>Qué no calza</th></tr>'
+      +rotas.map(e=>'<tr><td>'+e.id+'</td><td>'+esc(e.etiqueta)+'</td>'
+        +'<td class="bad-tag" style="text-align:left">'+esc(e.fallas.join(' · '))+'</td></tr>').join('')
+      +'</table></div>';
+  }
+  return h;
+}
+
 function renderValidacion(el,info,prods){
   const tol=(a,b,p)=>b?Math.abs(a-b)/b<p:false;
-  const {meses,poolAvg,totalDias}=info;
+  const {meses,poolAvg,totalDias,exclusiones}=info;
   const ventTxt = meses.map(m=>m.nom).join(' · ') || '—';
   let h='<div class="valid-box"><div style="font-weight:700;color:var(--text)">Validación del cálculo en vivo</div>';
   h+='<div style="font-size:11px;color:var(--text-3);margin:2px 0 8px">Indirecto repartido por <strong>días de producción</strong> reales (Odoo), ventana <strong>rolling</strong> de '+meses.length+' meses cerrados → <strong>'+esc(ventTxt)+'</strong>. % producto = días ÷ días totales; indirecto/u = (pool × %) ÷ unidades. Pool y días/unidades promediados sobre los mismos meses. Escenario 3 personas (Sueldos posteados = planilla de 3).</div>';
-  h+='<table><tr><th>Mes</th><th>Pool indirecto</th></tr>';
-  meses.forEach(m=>{ h+='<tr><td>'+esc(m.nom)+'</td><td>'+cM(m.pool)+'</td></tr>'; });
-  h+='<tr style="font-weight:700"><td>Promedio</td><td>'+cM(poolAvg)+'</td></tr></table>';
+  // Bruto → exclusiones → neto. Un mes sin exclusiones deja la celda VACÍA, no en ₡0:
+  // lo que está OK no muestra texto, solo lo anómalo llama la atención.
+  h+='<table><tr><th>Mes</th><th>Pool bruto</th><th>Exclusiones</th><th>Pool neto</th></tr>';
+  meses.forEach(m=>{ h+='<tr><td>'+esc(m.nom)+'</td><td>'+cM(m.poolBruto!=null?m.poolBruto:m.pool)+'</td>'
+    +'<td>'+(m.excluido?('<span class="bad-tag">−'+cM(m.excluido)+'</span>'):'')+'</td>'
+    +'<td>'+cM(m.pool)+'</td></tr>'; });
+  h+='<tr style="font-weight:700"><td>Promedio</td><td></td><td></td><td>'+cM(poolAvg)+'</td></tr></table>';
+  h+=renderExclusiones(exclusiones,meses);
   h+='<div style="margin-top:6px;font-size:11px;color:var(--text-3)">Total días de producción (promedio): <strong>'+fmtN(totalDias)+'</strong></div>';
   h+='<table style="margin-top:10px"><tr><th>Producto</th><th>Días/mes</th><th>Unid/mes</th><th>% asig.</th><th>Indir/u</th><th>MP/u</th><th>chk MP</th><th>Total/u</th></tr>';
   prods.forEach(p=>{ const pack=p.pack||1; const mpU=p.mp.mpUnit*pack; const tot=mpU+p.indPerSales+(p.emp||0);   // Total/u = MP + indirecto + empaque
