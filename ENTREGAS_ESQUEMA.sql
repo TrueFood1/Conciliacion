@@ -1,6 +1,10 @@
 -- ════════════════════════════════════════════════════════════════════════
--- MÓDULO DE ENTREGAS · ESQUEMA SUPABASE — PROPUESTA, NO CREADO TODAVÍA
--- Fecha: 11-ago-2026 · Requiere OK de Andrea antes de correrse.
+-- MÓDULO DE ENTREGAS · ESQUEMA SUPABASE
+-- Aprobado 12-ago-2026. LISTO PARA PEGAR UNA SOLA VEZ en el SQL Editor.
+--
+-- Se puede correr más de una vez sin romper nada (todo es "if not exists" /
+-- "or replace" / "drop policy if exists"). Si algo sale mal a mitad, se
+-- corrige y se vuelve a pegar completo.
 --
 -- Principios (los mismos del resto de Truefie):
 --  · APPEND-ONLY. Nada se actualiza ni se borra: corregir = insertar una fila
@@ -23,7 +27,7 @@
 -- todo lo fabricado y todo lo entregado se cuenta DESPUÉS de ese instante.
 -- Se usa un timestamp y no la fecha porque el viernes 14 hay conteo Y puede
 -- haber entregas el mismo día: con fecha suelta no se sabe cuál va primero.
-create table ent_conteo (
+create table if not exists ent_conteo (
   id           bigint generated always as identity primary key,
   fecha        date        not null,              -- el día que se contó, para leerlo
   corte        timestamptz not null default now(),-- el instante exacto: la línea divisoria
@@ -33,7 +37,7 @@ create table ent_conteo (
   creado_por   text        not null               -- email del usuario de Supabase
 );
 
-create table ent_conteo_linea (
+create table if not exists ent_conteo_linea (
   id           bigint generated always as identity primary key,
   conteo_id    bigint  not null references ent_conteo(id),
   producto_id  integer not null,                  -- product.product de Odoo (451/452/453/472/503/519)
@@ -43,13 +47,14 @@ create table ent_conteo_linea (
   uds          numeric not null,                  -- total en unidades individuales (derivado, se guarda)
   creado_en    timestamptz not null default now()
 );
-create index on ent_conteo_linea (producto_id, lote);
+create index if not exists ent_conteo_linea_prod_lote_idx
+  on ent_conteo_linea (producto_id, lote);
 
 
 -- ── 2 · PEDIDOS MANDADOS A ENTREGAS ─────────────────────────────────────
 -- Nace de una factura de Odoo (camino normal) o a mano (red de seguridad, para
 -- cuando el pedido llega por texto y se factura después).
-create table ent_pedido (
+create table if not exists ent_pedido (
   id              bigint generated always as identity primary key,
   fecha_despacho  date        not null,
   origen          text        not null check (origen in ('factura','manual')),
@@ -65,10 +70,12 @@ create table ent_pedido (
 );
 -- Una factura no se manda dos veces. Los pedidos manuales quedan fuera del
 -- índice (factura_id null) porque justamente todavía no tienen factura.
-create unique index on ent_pedido (factura_id) where factura_id is not null;
-create index on ent_pedido (fecha_despacho);
+create unique index if not exists ent_pedido_factura_uidx
+  on ent_pedido (factura_id) where factura_id is not null;
+create index if not exists ent_pedido_despacho_idx
+  on ent_pedido (fecha_despacho);
 
-create table ent_pedido_linea (
+create table if not exists ent_pedido_linea (
   id            bigint generated always as identity primary key,
   pedido_id     bigint  not null references ent_pedido(id),
   producto_id   integer not null,
@@ -81,7 +88,7 @@ create table ent_pedido_linea (
 -- ── 3 · EL ALISTO (lo que Daniel confirma) ──────────────────────────────
 -- Evento append-only: si Daniel corrige, se inserta otro alisto del mismo
 -- pedido y manda el de creado_en más reciente. No se edita el anterior.
-create table ent_alisto (
+create table if not exists ent_alisto (
   id          bigint generated always as identity primary key,
   pedido_id   bigint  not null references ent_pedido(id),
   responsable text    not null,                   -- quién alistó
@@ -90,9 +97,10 @@ create table ent_alisto (
   creado_en   timestamptz not null default now(),
   creado_por  text    not null
 );
-create index on ent_alisto (pedido_id, creado_en desc);
+create index if not exists ent_alisto_pedido_idx
+  on ent_alisto (pedido_id, creado_en desc);
 
-create table ent_alisto_linea (
+create table if not exists ent_alisto_linea (
   id          bigint generated always as identity primary key,
   alisto_id   bigint  not null references ent_alisto(id),
   producto_id integer not null,
@@ -101,14 +109,15 @@ create table ent_alisto_linea (
 
 -- ── EL CORAZÓN: una línea puede repartirse entre VARIOS lotes ───────────
 -- 16 uds = 12 del lote 318 + 4 del 326 → dos filas acá.
-create table ent_alisto_lote (
+create table if not exists ent_alisto_lote (
   id        bigint generated always as identity primary key,
   linea_id  bigint  not null references ent_alisto_linea(id),
   lote      text    not null,                     -- "154 / 12-26"; el producto sale de la línea
   cant_uds  numeric not null,
   orden     smallint not null default 0           -- en qué orden los tocó (del más viejo al más nuevo)
 );
-create index on ent_alisto_lote (lote);
+create index if not exists ent_alisto_lote_lote_idx
+  on ent_alisto_lote (lote);
 
 
 -- ── 4 · SALDO POR LOTE ──────────────────────────────────────────────────
@@ -122,10 +131,13 @@ create index on ent_alisto_lote (lote);
 -- seis, y 1.604 movimientos de 2026 con cero lot_id — verificado 11-ago).
 -- OJO al convertir date_finished a día CR (UTC−6) antes de comparar.
 
+-- security_invoker = true es OBLIGATORIO en Supabase: sin eso la vista corre con
+-- los permisos de quien la creó y se saltaría el RLS de las tablas de abajo.
+--
 -- El ancla vigente: el conteo más reciente. Si se corrige el mismo día, gana
 -- el capturado después. Cuando entre el conteo de dentro de unos meses, esta
 -- vista empieza a devolverlo sola y el saldo arranca de cero desde ahí.
-create view ent_ancla as
+create or replace view ent_ancla with (security_invoker = true) as
   select id, fecha, corte
     from ent_conteo
    order by fecha desc, creado_en desc
@@ -134,7 +146,9 @@ create view ent_ancla as
 -- Lo entregado DESDE EL ANCLA. El filtro por corte es lo que hace que el ancla
 -- nuevo sea un punto de partida y no una suma más: sin él, las entregas
 -- anteriores al conteo se restarían dos veces (ya están descontadas en la foto).
-create view ent_entregado_desde_ancla as
+-- Antes del primer conteo esta vista devuelve CERO filas (no hay corte contra
+-- el cual comparar). Es lo correcto: sin ancla no hay saldo que calcular.
+create or replace view ent_entregado_desde_ancla with (security_invoker = true) as
   select al.lote, ali.producto_id, sum(al.cant_uds) as uds
     from ent_alisto_lote al
     join ent_alisto_linea ali on ali.id = al.linea_id
@@ -165,10 +179,76 @@ alter table ent_alisto_linea  enable row level security;
 alter table ent_alisto_lote   enable row level security;
 
 -- Lectura y alta para cualquier usuario autenticado. NO hay update ni delete:
--- append-only se hace cumplir acá, no solo por convención.
-create policy ent_sel on ent_conteo       for select to authenticated using (true);
-create policy ent_ins on ent_conteo       for insert to authenticated with check (true);
--- (mismo par de políticas para las otras seis tablas)
+-- append-only se hace cumplir ACÁ, no solo por convención. Sin política de
+-- update/delete, Postgres las niega — que es exactamente lo que queremos.
+
+drop policy if exists ent_conteo_sel on ent_conteo;
+drop policy if exists ent_conteo_ins on ent_conteo;
+create policy ent_conteo_sel on ent_conteo
+  for select to authenticated using (true);
+create policy ent_conteo_ins on ent_conteo
+  for insert to authenticated with check (true);
+
+drop policy if exists ent_conteo_linea_sel on ent_conteo_linea;
+drop policy if exists ent_conteo_linea_ins on ent_conteo_linea;
+create policy ent_conteo_linea_sel on ent_conteo_linea
+  for select to authenticated using (true);
+create policy ent_conteo_linea_ins on ent_conteo_linea
+  for insert to authenticated with check (true);
+
+drop policy if exists ent_pedido_sel on ent_pedido;
+drop policy if exists ent_pedido_ins on ent_pedido;
+create policy ent_pedido_sel on ent_pedido
+  for select to authenticated using (true);
+create policy ent_pedido_ins on ent_pedido
+  for insert to authenticated with check (true);
+
+drop policy if exists ent_pedido_linea_sel on ent_pedido_linea;
+drop policy if exists ent_pedido_linea_ins on ent_pedido_linea;
+create policy ent_pedido_linea_sel on ent_pedido_linea
+  for select to authenticated using (true);
+create policy ent_pedido_linea_ins on ent_pedido_linea
+  for insert to authenticated with check (true);
+
+drop policy if exists ent_alisto_sel on ent_alisto;
+drop policy if exists ent_alisto_ins on ent_alisto;
+create policy ent_alisto_sel on ent_alisto
+  for select to authenticated using (true);
+create policy ent_alisto_ins on ent_alisto
+  for insert to authenticated with check (true);
+
+drop policy if exists ent_alisto_linea_sel on ent_alisto_linea;
+drop policy if exists ent_alisto_linea_ins on ent_alisto_linea;
+create policy ent_alisto_linea_sel on ent_alisto_linea
+  for select to authenticated using (true);
+create policy ent_alisto_linea_ins on ent_alisto_linea
+  for insert to authenticated with check (true);
+
+drop policy if exists ent_alisto_lote_sel on ent_alisto_lote;
+drop policy if exists ent_alisto_lote_ins on ent_alisto_lote;
+create policy ent_alisto_lote_sel on ent_alisto_lote
+  for select to authenticated using (true);
+create policy ent_alisto_lote_ins on ent_alisto_lote
+  for insert to authenticated with check (true);
+
+
+-- ── 5b · PERMISOS DE ROL ────────────────────────────────────────────────
+-- Supabase normalmente ya concede esto por privilegios por defecto, pero se
+-- deja explícito para que el pegado funcione sí o sí. Ojo: select+insert y
+-- nada más. Sin update ni delete a nivel de permiso TAMBIÉN — doble candado
+-- sobre el append-only (el RLS de arriba y el grant de acá).
+grant usage on schema public to authenticated;
+grant select, insert on ent_conteo        to authenticated;
+grant select, insert on ent_conteo_linea  to authenticated;
+grant select, insert on ent_pedido        to authenticated;
+grant select, insert on ent_pedido_linea  to authenticated;
+grant select, insert on ent_alisto        to authenticated;
+grant select, insert on ent_alisto_linea  to authenticated;
+grant select, insert on ent_alisto_lote   to authenticated;
+grant select on ent_ancla                 to authenticated;
+grant select on ent_entregado_desde_ancla to authenticated;
+-- Las tablas usan "generated always as identity", que no crea secuencias con
+-- permiso aparte, así que no hace falta grant usage on sequences.
 
 
 -- ── 6 · EL REGISTRO AB-RE-04 SALE DE ACÁ ────────────────────────────────
@@ -181,3 +261,14 @@ create policy ent_ins on ent_conteo       for insert to authenticated with check
 --   Cantidad x Lote    → ent_alisto_lote.cant_uds
 --   Lotes              → ent_alisto_lote.lote
 --   Responsable        → ent_alisto.responsable
+
+
+-- ── 7 · VERIFICACIÓN (opcional: devuelve una tabla con el resultado) ────
+-- Si querés confirmar sin ir al Table Editor, corré esto después:
+--   select table_name, 'tabla' as tipo from information_schema.tables
+--    where table_schema='public' and table_name like 'ent\_%'
+--   union all
+--   select table_name, 'vista' from information_schema.views
+--    where table_schema='public' and table_name like 'ent\_%'
+--   order by tipo, table_name;
+-- Tienen que salir 7 tablas y 2 vistas.
