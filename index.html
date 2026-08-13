@@ -2917,7 +2917,7 @@ function aplicarModoProduccion(){
   });
 }
 // Vistas de módulo (Contabilidad + Conciliación + Operaciones). Muestra UNA, oculta el resto.
-const _MOD_VIEWS=['vUpload','vFacturado','vProduccion','vMermas','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vInventario','vPlan','vResumen','vConteo','vResults'];
+const _MOD_VIEWS=['vUpload','vFacturado','vProduccion','vMermas','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vInventario','vPlan','vResumen','vConteo','vConteoLote','vResults'];
 function _modShow(id){
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.toggle('hidden', v!==id); });
   document.getElementById('vLobby').classList.add('hidden');
@@ -5815,7 +5815,14 @@ function _entAgrupar(crudo, anioSet){
 // Append-only: cada guardado inserta un conteo nuevo; el más reciente manda.
 // Odoo sigue SOLO LECTURA — acá solo se escribe en Supabase.
 // ════════════════════════════════════════════════════════════════════════
-let _clLotes=null, _clExtra={}, _clGuardando=false;
+let _clLotes=null, _clExtra={}, _clGuardando=false, _clHuerfanos=[];
+// Nombre legible de un producto por id (los buckets traen el id pelado).
+function _clNom(pid){ const I=NIV_INFO[+pid]; return I?I.nom:('producto '+pid); }
+// Aviso de pantalla. NUNCA se deja el cuerpo mudo: si algo falla, se dice y se sigue.
+function _clAviso(tipo, html){
+  const st=document.getElementById('clStatus'); if(!st) return;
+  st.className='status '+tipo; st.classList.remove('hidden'); st.innerHTML=html;
+}
 
 function irAConteoLote(){
   _modShow('vConteoLote'); crumbSet('Operaciones','Conteo por lote');
@@ -5837,27 +5844,55 @@ async function cargarConteoLote(force){
   body.style.display='none';
   try{
     _clLotes=await entLotesActivos(3);
-    st.classList.add('hidden'); _clRender();
   }catch(e){
-    st.className='status s-err';
-    st.innerHTML='No pude leer los lotes: '+esc((e&&e.message)||e)+'. Podés contar igual agregando los lotes a mano.';
-    _clLotes={lotes:{},buckets:{sin_lote:[],ambiguo:[],anio_invalido:[]}}; _clRender();
+    _clLotes={lotes:{},buckets:{sin_lote:[],ambiguo:[],anio_invalido:[]}, _err:(e&&e.message)||String(e)};
+  }
+  // El render va SIEMPRE, haya fallado la lectura o no: la pantalla tiene que poder
+  // usarse a mano aunque Odoo no conteste. Y si el propio render revienta, se dice.
+  try{ _clRender(); }
+  catch(e){
+    _clAviso('s-err','No pude dibujar la pantalla: '+esc((e&&e.message)||e)
+      +'. Avisale a Claude Code con este texto.');
+    const b=document.getElementById('clBody'); if(b) b.style.display='none';
   }
 }
 
 function _clRender(){
   const body=document.getElementById('clBody'); if(!body) return;
+  _clHuerfanos=[];
   const porProd={}; ENT_PROD.forEach(function(pid){ porProd[pid]=[]; });
+  // OJO: entLeerCrudo devuelve `producto` como el ID pelado (o.product_id[0]), no como
+  // el par [id,nombre] de Odoo. Leerlo como par dejaba todos los lotes sin producto.
   Object.values(_clLotes.lotes||{}).forEach(function(L){
-    const pid=L.ordenes&&L.ordenes[0]&&L.ordenes[0].producto&&L.ordenes[0].producto[0];
+    const pid=+L.producto;
     if(pid && porProd[pid]) porProd[pid].push(L);
+    else _clHuerfanos.push(L);   // lote de un producto fuera de ENT_PROD: se dice, no se pierde
   });
   ENT_PROD.forEach(function(pid){
     (_clExtra[pid]||[]).forEach(function(x){ porProd[pid].push({key:'x:'+pid+':'+x, canon:x, extra:true}); });
     porProd[pid].sort(function(a,z){ return String(a.canon).localeCompare(String(z.canon),'es'); });
   });
 
-  let h='<div class="cl-grid">';
+  let h='';
+  // Tres motivos por los que la lista puede venir corta, los tres DICHOS en texto.
+  if(_clLotes._err){
+    _clAviso('s-err','No pude leer los lotes de Odoo: '+esc(_clLotes._err)
+      +' — podés contar igual agregando cada lote a mano con el botón de cada producto.');
+  } else if(!Object.keys(_clLotes.lotes||{}).length){
+    _clAviso('s-warn','Odoo contestó, pero <strong>no hay ningún lote</strong> en la ventana de 3 meses. '
+      +'Si el congelador tiene producto, agregá los lotes a mano — el conteo vale igual.');
+  } else {
+    const st=document.getElementById('clStatus'); if(st) st.classList.add('hidden');
+  }
+  if(_clHuerfanos.length){
+    h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-bottom:14px">'
+      +'<div style="font-weight:700;color:#E9A23B;font-size:12.5px">'+_clHuerfanos.length
+      +' lotes de un producto que no es de los seis</div>'
+      +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px">'
+      +esc(_clHuerfanos.map(function(L){return L.canon+' (id '+L.producto+')';}).join(' · '))
+      +'</div></div>';
+  }
+  h+='<div class="cl-grid">';
   ENT_PROD.forEach(function(pid){
     const I=NIV_INFO[pid]||{nom:'id '+pid,cajaU:1,presDiv:1,presLbl:'uds'};
     const ls=porProd[pid]||[];
@@ -5894,7 +5929,7 @@ function _clRender(){
     ['sin_lote','ambiguo','anio_invalido'].forEach(function(k){
       const lbl={sin_lote:'sin lote en el chatter',ambiguo:'ambiguo (más de un candidato)',anio_invalido:'año fuera de rango'}[k];
       (b[k]||[]).slice(0,40).forEach(function(r){
-        h+='<tr><td>'+esc(r.orden||'')+'</td><td>'+esc((r.producto&&r.producto[1])||'')+'</td>'
+        h+='<tr><td>'+esc(r.orden||'')+'</td><td>'+esc(_clNom(r.producto))+'</td>'
           +'<td>'+esc(r.fecha||'')+'</td><td class="muted">'+lbl+'</td></tr>';
       });
     });
