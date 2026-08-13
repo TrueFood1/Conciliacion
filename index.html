@@ -567,11 +567,17 @@ tr.r-ing td{background:#eff6ff}
   .face-mas{display:flex;align-items:center;justify-content:center;flex:none;
     min-width:34px;padding:8px 10px;font-size:16px;line-height:1;color:var(--text-3)}
   /* OJO: solo la barra de FINANZAS. `.faces-ops` (Operaciones) queda intacta —
-     ahí el orden Resumen · Inventario es el correcto y reordenar lo rompería. */
-  .faces:not(.faces-ops) .face:nth-child(4){order:1}   /* Cobros y Pagos, primera */
-  .faces:not(.faces-ops) .face:nth-child(1){order:2}   /* Resultados */
-  .faces:not(.faces-ops) .face:nth-child(2){order:3}   /* Ventas */
-  .faces:not(.faces-ops) .face-mas{order:9}
+     ahí el orden Resumen · Inventario es el correcto y reordenar lo rompería.
+     `.faces-ent` (Entregas) también queda fuera, y esto ERA UN BUG: el reordenado
+     está escrito por POSICIÓN para la barra de Finanzas, y en Entregas mandaba
+     adelante a las dos pestañas apagadas (Preparar, Trazabilidad) y empujaba la
+     pestaña ACTIVA fuera de la pantalla — en el conteo había que deslizar la barra
+     para ver dónde estabas parado. Medido a 375px: "Conteo por lote" arrancaba en
+     x=295 de 343 útiles. */
+  .faces:not(.faces-ops):not(.faces-ent) .face:nth-child(4){order:1}   /* Cobros y Pagos, primera */
+  .faces:not(.faces-ops):not(.faces-ent) .face:nth-child(1){order:2}   /* Resultados */
+  .faces:not(.faces-ops):not(.faces-ent) .face:nth-child(2){order:3}   /* Ventas */
+  .faces:not(.faces-ops):not(.faces-ent) .face-mas{order:9}
   /* Panel del "+": lista simple anclada al pie, del ancho de la pantalla. */
   #finMas{display:block;position:fixed;left:0;right:0;bottom:0;z-index:130;
     background:var(--surface);border-top:.5px solid var(--border-strong);
@@ -808,11 +814,37 @@ tr.r-ing td{background:#eff6ff}
 #vFacturado,#vCostos,#vRentabilidad,#vSimulador,#vCalcPrecios,#vResultados{--mod:#378ADD;--accent:#378ADD;--blue:#378ADD;--blue-l:rgba(55,138,221,.15)}   /* Finanzas = azul */
 #vProduccion,#vMermas,#vInventario,#vResumen,#vConteo,#vPlan{--mod:#C77DA0;--accent:#C77DA0;--blue:#C77DA0;--blue-l:rgba(199,125,160,.15)}                          /* Operaciones = rosa apagado (sistema de color disciplinado) */
 #vUpload{--mod:#84BD00;--accent:#84BD00;--blue:#84BD00;--blue-l:rgba(132,189,0,.15)}                                                     /* Conciliación = verde */
+/* ENTREGAS = LIMA TRUE FOOD (13-ago-2026). Antes era morado #7F77DD; Andrea lo cambió
+   porque "ese morado no es de ninguno de nuestros productos" y Entregas es lo que vive
+   en producción, frente al congelador: que sea onbrand. Estas vistas NO tenían --mod
+   —la pestaña activa quedaba sin subrayado de color—, así que esta línea además arregla
+   eso. UN SOLO tono de lima en todo el sistema (#E9FE60) + un borde oscuro derivado
+   (#3F4A16); no se inventan tonos intermedios.
+   OJO con el ámbar: #E9A23B / #C99A4E avisan, el lima identifica. Conviven cerca ahora,
+   así que el lima NUNCA se usa de fondo lavado — los bloques de alerta conservan su
+   lavado naranja, que es lo que los separa de un vistazo. */
+#vConteoLote,#vReporte,#vPendientes{--mod:#E9FE60;--accent:#E9FE60;--blue:#E9FE60;--blue-l:rgba(233,254,96,.14)}
 .faces .face.on{color:var(--text);border-bottom-color:var(--mod)}
 .m3nav .m3tab.on{background:transparent;color:var(--mod);border-bottom-color:var(--mod)}
 .home-mod-dot{width:9px;height:9px;border-radius:3px;display:inline-block}
 .home-mod-name{font-size:14px;font-weight:500;margin-top:10px}
 .home-mod-state{font-size:12px;font-weight:500;margin-top:6px}
+/* ── LOBBY DE UN SOLO MÓDULO (hoy: Daniel) ──
+   Una cuadrícula de cinco con una sola tarjeta se lee como una cuadrícula ROTA: la
+   tarjeta queda arrinconada arriba a la izquierda y el resto es vacío. Con un módulo
+   el lobby deja de ser índice y pasa a ser PORTADA: saludo y tarjeta forman un bloque
+   centrado, la tarjeta crece a un tamaño proporcionado al espacio, y desaparecen el
+   separador y el rótulo "TUS MÓDULOS" (rotular una lista de uno no informa nada).
+   El centrado usa la misma técnica que ya usa el lobby en teléfono: los dos `auto`
+   reparten el sobrante arriba y abajo del bloque, en vez de dejarlo todo abajo. */
+.home-wrap.solo .home-center{flex:0 0 auto;margin:auto 0 0}
+.home-wrap.solo .home-bottom{margin:26px auto auto;max-width:380px}
+.home-wrap.solo .home-sep,.home-wrap.solo .home-modlabel{display:none}
+.home-wrap.solo .home-grid{grid-template-columns:1fr;max-width:380px}
+.home-wrap.solo .home-mod{padding:26px 24px;min-height:0;border-radius:16px}
+.home-wrap.solo .home-mod-dot{width:11px;height:11px}
+.home-wrap.solo .home-mod-name{font-size:19px;margin-top:15px}
+.home-wrap.solo .home-mod-state{font-size:13px;margin-top:9px}
 /* ── M3 — Asistente de conciliación (presentación; lógica intacta) ── */
 .m3card{background:var(--bg);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:1rem;overflow:hidden}
 .m3head{padding:1rem 1.25rem .75rem}
@@ -945,7 +977,11 @@ body{background:var(--bg);color:var(--text);letter-spacing:-0.005em}
 /* inputs */
 .field input,select{background:var(--surface);border:1px solid #E4E1DA;color:var(--text);border-radius:10px;padding:11px 13px;font-size:14px}
 .field input:focus,select:focus{border-color:#C964CF;outline:none}
-.field input::placeholder{color:#C5C2BA}
+/* El placeholder iba en #C5C2BA, un gris del tema CLARO que quedó colgado: sobre fondo
+   oscuro se lee casi como un valor escrito, no como una pista. Va al gris terciario del
+   sistema, que es el escalón que le corresponde. Afecta a todos los campos de Truefie
+   —a propósito: el defecto era del sistema, no de una pantalla. */
+.field input::placeholder{color:var(--text-3)}
 .field label{font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-3);margin-bottom:6px}
 input[type=date]{color-scheme:light}
 /* pestañas estilo navegador */
@@ -1254,10 +1290,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
         <div class="home-mod-name" style="color:#F5F4F0">Operaciones</div>
         <div class="home-mod-state" style="color:#E491AC">Abrir →</div>
       </div>
-      <div class="home-mod home-mod-ent" style="border-color:#3A3670" onclick="abrirEntregas()">
-        <span class="home-mod-dot" style="background:#7F77DD"></span>
+      <div class="home-mod home-mod-ent" style="border-color:#3F4A16" onclick="abrirEntregas()">
+        <span class="home-mod-dot" style="background:#E9FE60"></span>
         <div class="home-mod-name" style="color:#F5F4F0">Entregas</div>
-        <div class="home-mod-state" style="color:#A9A3EA">Abrir →</div>
+        <div class="home-mod-state" style="color:#E9FE60">Abrir →</div>
       </div>
       <div class="home-mod inert home-mod-ven">
         <span class="home-mod-dot" style="background:#3FB6A8"></span>
@@ -2085,7 +2121,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .rp-clivacio{width:100%;text-align:left;background:#0E0E11;border:1px dashed var(--border-strong);border-radius:8px;padding:10px 11px;font:inherit;font-size:14px;color:var(--text-3);cursor:pointer}
 .rp-tipo{display:flex;gap:8px}
 .rp-tipo button{flex:1;background:#0E0E11;border:1px solid var(--border-strong);border-radius:8px;color:var(--text-3);font:inherit;font-size:13.5px;padding:10px 8px;cursor:pointer}
-.rp-tipo button.on{border-color:#7F77DD;color:var(--text);background:rgba(127,119,221,.08)}
+.rp-tipo button.on{border-color:#E9FE60;color:var(--text);background:rgba(233,254,96,.08)}
 .rp-nota{font-size:11.5px;color:var(--text-3);margin-top:6px;line-height:1.5}
 .rp-nota.rp-falta{color:#C99A4E}
 .rp-prods{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -2094,7 +2130,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .rp-conv{font-size:13px;color:var(--text);padding:9px 0;font-variant-numeric:tabular-nums}
 .rp-lote{display:flex;align-items:center;gap:8px;margin-top:6px}
 .rp-lotebtn{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:#0E0E11;border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:13px;padding:10px 11px;cursor:pointer}
-.rp-lote.on .rp-lotebtn{border-color:#7F77DD;color:var(--text)}
+.rp-lote.on .rp-lotebtn{border-color:#E9FE60;color:var(--text)}
 .rp-lote.ago .rp-lotebtn{opacity:.45}
 .rp-saldo{font-size:11px;color:var(--text-3);white-space:nowrap}
 .rp-lotein{width:76px}
@@ -2111,8 +2147,8 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .pd-exp td{padding:0}
 .pd-clasif{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#0E0E11;border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin:4px 0 10px;font-size:12px;color:var(--text-3)}
 .pd-clasif button{background:#161619;border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:12.5px;padding:8px 11px;cursor:pointer}
-.pd-clasif button:hover{color:var(--text);border-color:#7F77DD}
-#entCard{margin-top:12px;background:#141417;border:.5px solid #3A3670;border-radius:12px;padding:13px 15px;cursor:pointer}
+.pd-clasif button:hover{color:var(--text);border-color:#E9FE60}
+#entCard{margin-top:12px;background:#141417;border:.5px solid #3F4A16;border-radius:12px;padding:13px 15px;cursor:pointer}
 #entCard .ec-t{font-size:12px;color:var(--text-2);font-weight:600}
 #entCard .ec-row{font-size:12px;color:var(--text-3);margin-top:5px}
 #entCard .ec-c{display:inline-block;min-width:18px;text-align:center;font-size:11px;font-weight:600;color:var(--text-3);border:1px solid var(--border-strong);border-radius:999px;padding:0 6px}
@@ -2134,39 +2170,46 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    La letra de los inputs NO baja de 16px: menos que eso reintroduce el zoom de iOS. */
 .cl-lista{display:flex;flex-direction:column;gap:6px}
 .cl-prod{border:.5px solid var(--border);border-radius:10px;background:#141417;overflow:hidden}
-.cl-prod.on{border-color:#7F77DD}
+.cl-prod.on{border-color:#E9FE60}
 /* JERARQUÍA: el nombre del producto es una ETIQUETA — Andrea ya sabe qué está
    contando —, y lo que manda visualmente es el NÚMERO. Por eso el nombre va en
    secundario 500 y el total en el acento del módulo, no al mismo peso.
-   El acento es el de ENTREGAS (#7F77DD), aclarado a #A9A3EA para que se lea sobre
-   fondo oscuro — es el mismo tono que ya usan la tarjeta del lobby y el botón de
-   confirmar ancla. El ámbar queda reservado para lo que de verdad avisa (el bloque
-   de lotes ilegibles): un total contado no es una alerta. */
+   El acento es el de ENTREGAS: lima True Food #E9FE60, el mismo que usan la tarjeta
+   del lobby, la pestaña activa y el botón de guardar. Se usa TAL CUAL sobre fondo
+   oscuro (no hace falta aclararlo: ya es claro). El ámbar queda reservado para lo que
+   de verdad avisa (el bloque de lotes ilegibles): un total contado no es una alerta,
+   y por eso el lima nunca aparece como fondo lavado. */
 .cl-cab{display:flex;align-items:baseline;gap:9px;width:100%;text-align:left;background:none;border:none;
-  color:var(--text);font:inherit;font-size:13px;padding:13px 14px;cursor:pointer}
+  color:var(--text);font:inherit;font-size:13px;padding:13px 16px;cursor:pointer}
 .cl-fl{color:var(--text-3);font-size:11px;width:10px;flex:0 0 10px}
 .cl-nom{font-weight:500;color:var(--text-2);white-space:nowrap}
 .cl-pres{color:var(--text-3);font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cl-tot{color:var(--text-3);font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
-.cl-tot.hay{color:#A9A3EA;font-weight:600}
-.cl-cuerpo{padding:0 14px 12px}
-/* El LOTE no se parte nunca: es el identificador que se busca con la vista. */
-.cl-tbl td.cl-lote{white-space:nowrap;color:var(--text)}
-.cl-pie{position:sticky;bottom:0;margin:10px -14px -12px;padding:10px 14px;
+.cl-tot.hay{color:#E9FE60;font-weight:600}
+.cl-cuerpo{padding:0 16px 12px}
+/* El LOTE no se parte nunca: es el identificador que se busca con la vista.
+   Va en MONO y en secundario: es un código, no una cifra — el ojo lo usa para
+   ubicarse, y quien manda en la fila es el número. Mismo tratamiento que los
+   códigos del resto de Truefie. */
+.cl-tbl td.cl-lote{white-space:nowrap;color:var(--text-2);font-family:var(--mono);font-size:12px;letter-spacing:-.01em}
+.cl-pie{position:sticky;bottom:0;margin:10px -16px -12px;padding:10px 16px;
   background:#0E0E11;border-top:1px solid var(--border);font-size:11.5px;color:var(--text-3)}
-.cl-pie strong{color:#A9A3EA;font-size:13.5px;font-variant-numeric:tabular-nums;margin-left:3px}
+.cl-pie strong{color:#E9FE60;font-size:13.5px;font-variant-numeric:tabular-nums;margin-left:3px}
 /* ── Conteo por lote ── */
 .cl-hrow{cursor:pointer}
 .cl-hrow:hover td{color:var(--text)}
-.cl-badge-a{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:#0E0E11;background:#7F77DD;border-radius:999px;padding:1px 7px;margin-left:5px;font-weight:600}
+.cl-badge-a{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:#2C3A00;background:#E9FE60;border-radius:999px;padding:1px 7px;margin-left:5px;font-weight:600}
 .cl-badge-b{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);border:1px solid var(--border-strong);border-radius:999px;padding:1px 7px;margin-left:5px}
 .cl-det{background:#0E0E11;border:1px solid var(--border);border-radius:9px;padding:10px 12px}
 .cl-detnota{font-size:11.5px;color:var(--text-3);margin-bottom:6px}
 .cl-detpie{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px}
 .cl-okmsg{font-size:11.5px;color:#8FBF6A}
-.cl-confirmar{border-color:#7F77DD;color:#A9A3EA}
+.cl-confirmar{border-color:#E9FE60;color:#E9FE60}
 @media(max-width:700px){
-  .cl-hrow td:nth-child(4){display:none}   /* los totales viven en el detalle, no en la fila */
+  /* Los totales viven en el detalle, no en la fila. OJO: hay que esconder la CELDA y
+     el ENCABEZADO. Escondiendo solo la celda quedaba un "TOTALES" rotulando una columna
+     que no existe, y la chevron corrida un lugar: eso era el "se ve sin alinear". */
+  .cl-hrow td:nth-child(4),.cl-hhead th:nth-child(4){display:none}
   .cl-detpie{flex-direction:column;align-items:stretch}
 }
 
@@ -2176,26 +2219,65 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .cl-tbl{width:100%;border-collapse:collapse;margin-top:4px}
 .cl-tbl th{text-align:left;font-size:11px;font-weight:400;letter-spacing:.03em;color:var(--text-3);padding:4px 6px 6px 0;border-bottom:1px solid var(--border)}
 .cl-tbl td{padding:5px 6px 5px 0;font-size:12.5px;color:var(--text-2);vertical-align:middle}
+/* .valid-box (la caja ámbar) alinea TODAS sus celdas a la derecha menos la primera —
+   viene de cuando solo llevaba números. Adentro va una .cl-tbl de puro texto (orden,
+   producto, fecha, caso) y quedaba con los encabezados a la izquierda y el contenido
+   a la derecha. Adentro de una .cl-tbl manda la .cl-tbl. */
+.valid-box .cl-tbl th,.valid-box .cl-tbl td{text-align:left}
+/* Números a la derecha, y el ENCABEZADO con ellos. Antes los th iban todos a la
+   izquierda y las celdas de número a la derecha: eso era el "se ve sin alinear".
+   Van DESPUÉS de la regla de arriba a propósito: misma especificidad, gana la última. */
+.cl-tbl th.num,.cl-tbl td.num{text-align:right}
+.cl-tbl th.mid,.cl-tbl td.mid{text-align:center}
+.cl-tbl td.cl-nw{white-space:nowrap}   /* fechas: una fecha partida en dos renglones no es una fecha */
 .cl-tbl td.cl-uds{color:var(--text);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
-.cl-in{width:62px;background:#0E0E11;border:1px solid var(--border-strong);border-radius:7px;color:var(--text);
-  font:inherit;font-size:13px;padding:6px 8px;text-align:right}
-.cl-in:focus{outline:none;border-color:#7F77DD}
+/* PROPORCIONES DE TABLA CONTABLE, no de formulario: el lote manda a la izquierda y
+   los dos campos son columnas angostas y FIJAS, con el número centrado. Las columnas
+   de captura llevan ancho fijo para que las cifras queden en dos ejes verticales
+   limpios — con anchos elásticos la vista se leía como un formulario suelto. */
+.cl-tbl col.cl-cap{width:76px}
+.cl-tbl col.cl-fin{width:70px}
+.cl-in{width:68px;background:#0E0E11;border:1px solid var(--border-strong);border-radius:7px;color:var(--text);
+  font:inherit;font-size:16px;padding:6px 6px;text-align:center;font-variant-numeric:tabular-nums}
+.cl-in:focus{outline:none;border-color:#E9FE60}
 .cl-resumen{margin-top:10px;font-size:11.5px;color:var(--text-3);line-height:1.7}
-.cl-resumen b{color:#A9A3EA;font-weight:600;font-variant-numeric:tabular-nums}
+.cl-resumen b{color:#E9FE60;font-weight:600;font-variant-numeric:tabular-nums}
 .cl-tag{font-size:10px;color:var(--text-3);border:1px solid var(--border);border-radius:999px;padding:1px 6px;margin-left:4px}
 .cl-add{margin-top:10px}
+/* ── Bloque "Guardar el conteo" ──
+   El párrafo entero visible siempre competía con el título y con los campos, y no
+   tenía jerarquía: tres tamaños de letra distintos en cinco centímetros. Ahora la
+   primera línea dice lo único que hay que saber ANTES de guardar (no cambia saldos)
+   y el resto —qué es el ancla, que no se edita— vive detrás de "Ver más". */
+.cl-explica{font-size:11.5px;color:var(--text-3);line-height:1.6;margin:-2px 0 12px}
+.cl-explica strong{color:var(--text-2);font-weight:600}
+.cl-explica-mas{margin-top:-8px}
+.cl-vermas{background:none;border:none;padding:0;margin-left:4px;font:inherit;font-size:11.5px;
+  color:var(--text-2);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.cl-vermas:hover{color:var(--text)}
+/* Los dos campos en rejilla pareja y el botón EN SU PROPIA LÍNEA del flujo vertical.
+   Antes el botón iba dentro del mismo flex que los campos, alineado al pie de la nota:
+   quedaba flotando a la derecha, sin pertenecer ni a los campos ni a la tarjeta. */
+.cl-form{display:grid;grid-template-columns:220px minmax(0,1fr);gap:12px;max-width:620px;margin-bottom:14px}
+.cl-form .field{margin-bottom:0}
 @media(max-width:700px){
   .cl-grid{grid-template-columns:1fr;gap:10px}
   /* Densidad: la fila baja de ~130px a ~62px quitando AIRE, no letra. El input mantiene
      los 16px (menos = zoom de iOS) y lo que se recorta es el padding. Objetivo: 8-10
      lotes por pantalla sin scrollear. */
-  .cl-in{width:100%;min-width:0;font-size:16px;padding:5px 7px}
+  /* El input NO se estira al 100%: con ancho fijo las dos columnas de captura quedan
+     en ejes verticales limpios y sobra lugar para el total por fila. Medido a 375px:
+     lote ~60 + 68 + 68 + total ~44 ≈ 246px de 349 útiles. El total por fila vuelve a
+     verse en teléfono (antes se escondía por falta de lugar; ya no falta). */
+  .cl-in{width:68px;min-width:0;font-size:16px;padding:5px 6px}
+  .cl-tbl col.cl-cap{width:74px}
+  .cl-tbl col.cl-fin{width:56px}
   .cl-tbl td{padding:3px 5px 3px 0}
   .cl-tbl th{padding:3px 5px 4px 0}
-  .cl-tbl th:nth-child(4),.cl-tbl td:nth-child(4){display:none}   /* el total vive en el pie, no por fila */
-  .cl-cab{padding:11px 12px;font-size:13px}
-  .cl-cuerpo{padding:0 12px 10px}
-  .cl-pie{margin:8px -12px -10px;padding:9px 12px}
+  .cl-cab{padding:11px 13px;font-size:13px}
+  .cl-cuerpo{padding:0 13px 10px}
+  .cl-pie{margin:8px -13px -10px;padding:9px 13px}
+  .cl-form{grid-template-columns:1fr;gap:10px}
   .cl-pres{display:none}       /* la presentación se ve al abrir; en la fila colapsada estorba */
 }
 /* chip de capacidad por personas (marca manual de la semana) */
@@ -2659,7 +2741,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 13 ago 2026 · b11';
+const BUILD = 'v 13 ago 2026 · b12';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -3045,7 +3127,18 @@ async function authEntrar(){
 }
 // Saludo por usuario autenticado: lee el email de la sesión de Supabase y lo mapea a un nombre.
 // Sin mapeo → "Hola" sin nombre. Nada hardcodeado: cambia solo al entrar con otra cuenta.
+//
+// POR QUÉ HAY DOS MAPAS. Este repo es PÚBLICO y el index.html se publica tal cual en
+// GitHub Pages. Los correos @truefoodcr.com son direcciones de empresa y van en claro.
+// Un correo PERSONAL no: publicarlo lo deja servido a cualquier robot que rastree
+// GitHub en busca de direcciones. Para esos va la HUELLA del correo, no el correo.
+// Esto NO es seguridad —quien ya tenga la dirección puede recalcular la huella— es
+// simplemente no dejarla publicada en texto plano.
+// Para sumar a alguien con correo personal: correr _saludoHuella('su@correo') en la
+// consola del navegador y pegar acá el resultado con su nombre de pila.
 const SALUDO_NOMBRES={'andrea@truefoodcr.com':'Andrea', 'lorena@truefoodcr.com':'Lorena'};
+const SALUDO_HUELLAS={'gyfj9w':'Daniel'};
+function _saludoHuella(s){ let h=5381; for(let i=0;i<s.length;i++){ h=((h*33)^s.charCodeAt(i))>>>0; } return h.toString(36); }
 
 // ════════════════════════════════════════════════════════════════════════
 // ACCESO POR USUARIO — ⚠️ ESTO ES COSMÉTICO, NO ES SEGURIDAD ⚠️
@@ -3070,8 +3163,8 @@ const SALUDO_NOMBRES={'andrea@truefoodcr.com':'Andrea', 'lorena@truefoodcr.com':
 const ACCESO_USUARIOS = {
   'andrea@truefoodcr.com':'todo',
   'lorena@truefoodcr.com':'todo',
-  // 'daniel@…':['entregas'],   ← el correo de Daniel va acá cuando exista la cuenta.
-  //                              Mientras tanto el default ya lo deja en Entregas.
+  // Daniel: cubierto por el default (solo Entregas). No se nombra por ser
+  // gmail personal en repo público. Nombrar cuando tenga correo @truefoodcr.com.
 };
 const ACCESO_DEFAULT = ['entregas'];
 // Qué vistas son de cada módulo. Las que no estén acá se consideran de acceso libre.
@@ -3104,11 +3197,24 @@ function accesoPintarLobby(){
   }
   const ec=document.getElementById('entCard');
   if(ec && !accesoPuede('finanzas')) ec.classList.add('hidden');   // la tarjeta de pendientes es de las socias
+  // El buscador conversacional es la puerta del dashboard de las socias. A quien no
+  // tiene acceso a todo no le sirve, y es superficie de más en una pantalla que
+  // debería tener UNA sola cosa que hacer.
+  const hs=document.querySelector('#vLobby .home-soon');
+  if(hs) hs.style.display = (_accesoMods==='todo') ? '' : 'none';
+  // UN SOLO módulo visible → el lobby deja de ser cuadrícula y pasa a ser portada:
+  // saludo y tarjeta juntos y centrados, sin separador ni rótulo "TUS MÓDULOS"
+  // (rotular una lista de uno es ruido). Es el caso de Daniel.
+  const wrap=document.querySelector('#vLobby .home-wrap');
+  if(wrap){
+    const vis=Object.keys(map).filter(function(m){ return accesoPuede(m); }).length;
+    wrap.classList.toggle('solo', vis===1);
+  }
 }
 async function setSaludo(){
   const el=document.getElementById('homeHi'); if(!el) return;
   let email=''; try{ const {data}=await sbClient().auth.getUser(); email=((data&&data.user&&data.user.email)||'').trim().toLowerCase(); }catch(e){}
-  const nom=SALUDO_NOMBRES[email];
+  const nom=SALUDO_NOMBRES[email] || (email ? SALUDO_HUELLAS[_saludoHuella(email)] : null);
   el.textContent=nom ? ('Hola '+nom+'.') : 'Hola.';
 }
 async function authLogout(){ try{ await sbClient().auth.signOut(); }catch(e){} location.reload(); }
@@ -3149,7 +3255,7 @@ function crumbSet(area,cur){
   const a=document.querySelector('.crumb-area'); if(a)a.textContent=area;
   const c=document.querySelector('.crumb-cur'); if(c)c.textContent=cur;
   // el punto del breadcrumb sigue el color del módulo (Finanzas azul · Operaciones rosa · Conciliación verde)
-  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Conciliación':'#84BD00','Entregas':'#7F77DD','Ventas':'#3FB6A8'};
+  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Conciliación':'#84BD00','Entregas':'#E9FE60','Ventas':'#3FB6A8'};
   const d=document.querySelector('.crumb-dot'); if(d)d.style.background=COL[area]||'#378ADD';
 }
 // Entradas desde el HOME (una por módulo).
@@ -6173,7 +6279,11 @@ function _clRender(){
       h+='<div class="cl-cuerpo">';
       if(!ls.length) h+='<div class="cl-none">Sin lotes en la ventana de 3 meses. Si hay producto físico, agregalo abajo.</div>';
       else{
-        h+='<table class="cl-tbl"><tr><th>Lote</th><th>Cajas</th><th>Sueltas</th></tr>';
+        // colgroup = los dos ejes verticales de captura. El encabezado "Unidades" faltaba:
+        // la fila tenía 4 celdas y la cabecera 3, y esa columna quedaba sin nombre.
+        h+='<table class="cl-tbl">'
+          +'<colgroup><col><col class="cl-cap"><col class="cl-cap"><col class="cl-fin"></colgroup>'
+          +'<tr><th>Lote</th><th class="mid">Cajas</th><th class="mid">Sueltas</th><th class="num">Unidades</th></tr>';
         ls.forEach(function(L){
           const id='cl_'+L.key.replace(/[^A-Za-z0-9]/g,'_');
           h+='<tr data-pid="'+pid+'" data-lote="'+esc(L.canon)+'">'
@@ -6207,24 +6317,34 @@ function _clRender(){
     ['sin_lote','ambiguo','anio_invalido'].forEach(function(k){
       const lbl={sin_lote:'sin lote en el chatter',ambiguo:'ambiguo (más de un candidato)',anio_invalido:'año fuera del rango de vida útil'}[k];
       (b[k]||[]).slice(0,40).forEach(function(r){
-        h+='<tr><td>'+esc(r.orden||'')+'</td><td>'+esc(_clNom(r.producto))+'</td>'
-          +'<td>'+esc(r.fecha||'')+'</td><td class="muted">'+lbl+'</td></tr>';
+        h+='<tr><td class="cl-lote">'+esc(r.orden||'')+'</td><td>'+esc(_clNom(r.producto))+'</td>'
+          +'<td class="cl-nw">'+esc(r.fecha||'')+'</td><td class="muted">'+lbl+'</td></tr>';
       });
     });
     h+='</table></div>';
   }
 
+  // GUARDAR — todo sale de la escala del sistema, nada propio de esta vista:
+  //   título   → .card-title (13px/600, igual que toda tarjeta de Truefie)
+  //   etiquetas→ .field label (10px/600 versalitas, igual que todo campo de Truefie)
+  //   campos   → .field input (14px, alineado a la IZQUIERDA; antes llevaban .cl-in,
+  //              que es el input de TABLA — de ahí el "diferentes letras y tamaños")
+  //   botón    → .btn.btn-amarillo, el botón de acción del sistema, ya en lima
+  // El párrafo largo se resume en una línea; el resto vive detrás de "Ver más".
   h+='<div class="card" style="margin-top:16px"><div class="card-title">Guardar el conteo</div>'
-    +'<div style="font-size:11.5px;color:var(--text-3);margin:-4px 0 10px;line-height:1.6">'
-    +'Guardar deja un <strong>borrador</strong>: se puede repetir las veces que haga falta y no cambia ningún saldo. '
-    +'El conteo recién pasa a ser el <strong>ancla</strong> —la línea divisoria de todos los saldos por lote— cuando se confirma abajo, '
-    +'en un segundo paso aparte. Nada se edita: corregir es guardar otro borrador.</div>'
-    +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">'
-    +'<div class="field" style="min-width:190px"><label>Quién contó</label>'
-    +'<input id="clResp" class="cl-in" style="width:100%" placeholder="tu nombre" autocomplete="off"></div>'
-    +'<div class="field" style="flex:1;min-width:220px"><label>Nota (opcional)</label>'
-    +'<input id="clNota" class="cl-in" style="width:100%" placeholder="lo que valga la pena recordar"></div>'
-    +'<button class="btn" id="clSave" onclick="guardarConteoLote()">Guardar conteo</button></div>'
+    +'<div class="cl-explica">Queda como <strong>borrador</strong>: no cambia ningún saldo. '
+    +'<button type="button" class="cl-vermas" onclick="_clVerMas(this)">Ver más</button></div>'
+    +'<div class="cl-explica cl-explica-mas hidden" id="clExplicaMas">'
+    +'Se puede repetir las veces que haga falta. El conteo recién pasa a ser el <strong>ancla</strong> '
+    +'—la línea divisoria de todos los saldos por lote— cuando se confirma abajo, en un segundo paso aparte. '
+    +'Nada se edita: corregir es guardar otro borrador.</div>'
+    +'<div class="cl-form">'
+    +'<div class="field"><label>Quién contó</label>'
+    +'<input id="clResp" placeholder="tu nombre" autocomplete="off"></div>'
+    +'<div class="field"><label>Nota (opcional)</label>'
+    +'<input id="clNota" placeholder="lo que valga la pena recordar"></div>'
+    +'</div>'
+    +'<button class="btn btn-amarillo" id="clSave" onclick="guardarConteoLote()">Guardar conteo</button>'
     +'<div id="clSaveMsg" style="margin-top:10px;font-size:12.5px"></div>'
     +'<div id="clResumen" class="cl-resumen"></div></div>';
 
@@ -6241,6 +6361,13 @@ function _clRender(){
 let _clHist=null, _clHistErr='', _clAbierto=null, _clSinAncla=false;
 let _clProdAbierto=null;   // un producto abierto a la vez: con guantes, un toque de más es caro
 function _clAbrirProd(pid){ _clProdAbierto=(_clProdAbierto===pid?null:pid); _clRender(); }
+// "Ver más" del bloque de guardar. Sin re-render: el re-render borraría lo ya escrito
+// en los inputs de la pantalla.
+function _clVerMas(btn){
+  const el=document.getElementById('clExplicaMas'); if(!el) return;
+  const abierto=el.classList.toggle('hidden')===false;
+  btn.textContent = abierto ? 'Ver menos' : 'Ver más';
+}
 // Total contado por producto, leyendo lo que hay escrito en pantalla AHORA.
 function _clTotalPorProd(){
   const t={};
@@ -6301,7 +6428,7 @@ function _clHistPintar(){
       +'pero no confirmar el ancla: todos los conteos figuran como borrador.</div></div>';
   }
   if(!_clHist.length){ h+='<div class="cl-none">Todavía no hay ningún conteo guardado.</div></div>'; el.innerHTML=h; return; }
-  h+='<table class="cl-tbl"><tr><th>Guardado</th><th>Quién</th><th>Lotes</th><th>Totales</th><th></th></tr>';
+  h+='<table class="cl-tbl"><tr class="cl-hhead"><th>Guardado</th><th>Quién</th><th class="num">Lotes</th><th>Totales</th><th class="num"></th></tr>';
   _clHist.forEach(function(x){
     const cuando=String(x.creado_en||'').replace('T',' ').slice(0,16);
     const tot=ENT_PROD.filter(function(p){return x.tot[p];})
@@ -6309,17 +6436,17 @@ function _clHistPintar(){
     h+='<tr class="cl-hrow" onclick="_clVerDetalle('+x.id+')">'
       +'<td>'+esc(cuando)+(x.ancla?' <span class="cl-badge-a">ancla</span>':' <span class="cl-badge-b">borrador</span>')+'</td>'
       +'<td>'+esc(x.responsable||'')+'</td>'
-      +'<td style="text-align:right">'+x.lineas.length+'</td>'
+      +'<td class="num">'+x.lineas.length+'</td>'
       +'<td style="font-size:11.5px;color:var(--text-3)">'+esc(tot||'—')+'</td>'
-      +'<td style="text-align:right">'+(_clAbierto===x.id?'▴':'▾')+'</td></tr>';
+      +'<td class="num">'+(_clAbierto===x.id?'▴':'▾')+'</td></tr>';
     if(_clAbierto===x.id){
       h+='<tr><td colspan="5" style="padding:2px 0 12px"><div class="cl-det">';
       if(x.nota) h+='<div class="cl-detnota">'+esc(x.nota)+'</div>';
-      h+='<table class="cl-tbl"><tr><th>Producto</th><th>Lote</th><th>Cajas</th><th>Sueltas</th><th>Unidades</th></tr>';
+      h+='<table class="cl-tbl"><tr><th>Producto</th><th>Lote</th><th class="num">Cajas</th><th class="num">Sueltas</th><th class="num">Unidades</th></tr>';
       x.lineas.slice().sort(function(a,z){ return a.producto_id-z.producto_id || String(a.lote).localeCompare(String(z.lote),'es'); })
         .forEach(function(r){
-          h+='<tr><td>'+esc(_clNom(r.producto_id))+'</td><td>'+esc(r.lote)+'</td>'
-            +'<td style="text-align:right">'+_rzN(r.cajas)+'</td><td style="text-align:right">'+_rzN(r.sueltas)+'</td>'
+          h+='<tr><td>'+esc(_clNom(r.producto_id))+'</td><td class="cl-lote">'+esc(r.lote)+'</td>'
+            +'<td class="num">'+_rzN(r.cajas)+'</td><td class="num">'+_rzN(r.sueltas)+'</td>'
             +'<td class="cl-uds">'+_rzN(r.uds)+'</td></tr>';
         });
       h+='</table>';
@@ -6884,6 +7011,12 @@ async function pdInsert(tabla,fila,texto){
 // contadores que exigen acción, y las 3 más recientes con cliente y fecha.
 async function entCardCargar(){
   const el=document.getElementById('entCard'); if(!el) return;
+  // La tarjeta es la bandeja de las socias. El filtro vivía SOLO en accesoPintarLobby(),
+  // que corre ANTES que esta función: la escondía, y un segundo después el
+  // classList.remove('hidden') de abajo la volvía a mostrar. Por eso seguía saliendo en
+  // la sesión de Daniel. El filtro tiene que estar acá, que es donde se decide mostrarla,
+  // y antes del pdLeer(): a quien no le toca, ni siquiera se le hace la consulta.
+  if(!accesoPuede('finanzas')){ el.classList.add('hidden'); return; }
   try{
     const d=await pdLeer();
     const tot=d.l1.length+d.l2.length+d.l3.length;
@@ -6940,7 +7073,7 @@ async function rzDiagLotes(body){
     const barra=function(n){ const p=total?n/total*100:0; return '<div style="height:7px;background:#26262C;border-radius:4px;overflow:hidden;margin-top:4px"><div style="height:100%;width:'+p.toFixed(1)+'%;background:var(--ent)"></div></div>'; };
 
     body.innerHTML='<div class="rz-wrap" style="font-size:13px;color:var(--text-2);line-height:1.6">'
-      +'<style>.rz-wrap{--ent:#7F77DD}</style>'
+      +'<style>.rz-wrap{--ent:#E9FE60}</style>'
       +'<h3 style="color:var(--text);font-size:15px;margin:0 0 4px">Extractor de lote v2 — cobertura (validación Etapa 1)</h3>'
       +'<div style="color:var(--text-3);margin-bottom:16px;max-width:900px">Órdenes <b style="color:var(--text-2)">done</b> de los 6 productos desde <b style="color:var(--text-2)">2025-01-01</b>. El lote se lee del chatter (comentario de Keylor) con la regla v2. El año de PRODUCCIÓN se ancla en <code>date_finished</code>; <b style="color:var(--text-2)">M/AA es la fecha de vencimiento</b> (producción + ~6 meses). Solo lectura de Odoo.'+(capado?' <b style="color:#C99A4E">⚠ lectura tope: hay más datos de los leídos, la cobertura es aproximada.</b>':'')+'</div>'
 
