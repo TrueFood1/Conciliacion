@@ -2626,7 +2626,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 12 ago 2026 · b8';
+const BUILD = 'v 13 ago 2026 · b9';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -3003,6 +3003,7 @@ async function authEntrar(){
   if(SESSION && SESSION.uid){
     document.getElementById('vAuth').classList.add('hidden');   // conectado → recién ahora dejamos ver el lobby
     setSaludo();                                                // saluda a quien está autenticado (no un nombre fijo)
+    await accesoCargar();                                       // qué módulos dibuja el lobby (cosmético)
     entCardCargar();                                            // pendientes de Entregas, sin bloquear el lobby
   }else if(msg){
     msg.style.color='#FF8A8A'; msg.textContent='No pude conectar a producción. Reintentá.';
@@ -3012,6 +3013,65 @@ async function authEntrar(){
 // Saludo por usuario autenticado: lee el email de la sesión de Supabase y lo mapea a un nombre.
 // Sin mapeo → "Hola" sin nombre. Nada hardcodeado: cambia solo al entrar con otra cuenta.
 const SALUDO_NOMBRES={'andrea@truefoodcr.com':'Andrea', 'lorena@truefoodcr.com':'Lorena'};
+
+// ════════════════════════════════════════════════════════════════════════
+// ACCESO POR USUARIO — ⚠️ ESTO ES COSMÉTICO, NO ES SEGURIDAD ⚠️
+// ════════════════════════════════════════════════════════════════════════
+// Solución MÍNIMA para el 13-ago-2026: Daniel hace el conteo por lote y Andrea no
+// está. Hace falta que no vea Finanzas, y hoy no existen roles.
+//
+// LO QUE ESTO HACE:  no dibuja en el lobby los módulos que no le tocan, y si alguien
+//                    navega directo a una vista ajena lo devuelve al lobby.
+// LO QUE NO HACE:    NO protege NADA. La RLS de Supabase y el proxy de lectura le
+//                    responden igual a CUALQUIER sesión autenticada. Quien abra la
+//                    consola del navegador ve y consulta todo. Es una cortina, no
+//                    una puerta con llave.
+//
+// La versión REAL —tabla de permisos en Supabase + RLS por rol + el proxy validando
+// el rol del JWT— sigue pendiente como "Roles y accesos" y se diseña aparte.
+// NO agregar aquí nada que dependa de que esto sea seguro.
+//
+// Regla del default: quien NO esté en la lista ve SOLO Entregas. Es a propósito —
+// si mañana se crea una cuenta nueva y nadie actualizó esta lista, el que entra ve
+// de menos, no de más. Para sumar a alguien a todo, va acá con 'todo'.
+const ACCESO_USUARIOS = {
+  'andrea@truefoodcr.com':'todo',
+  'lorena@truefoodcr.com':'todo',
+  // 'daniel@…':['entregas'],   ← el correo de Daniel va acá cuando exista la cuenta.
+  //                              Mientras tanto el default ya lo deja en Entregas.
+};
+const ACCESO_DEFAULT = ['entregas'];
+// Qué vistas son de cada módulo. Las que no estén acá se consideran de acceso libre.
+const ACCESO_VISTAS = {
+  finanzas:     ['vFacturado','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vResults'],
+  conciliacion: ['vUpload'],
+  operaciones:  ['vProduccion','vMermas','vInventario','vPlan','vResumen','vConteo'],
+  entregas:     ['vConteoLote','vReporte','vPendientes'],
+};
+let _accesoMods=null;   // se llena al entrar; null = todavía no se sabe → no se restringe
+function accesoPuede(mod){ return !_accesoMods || _accesoMods==='todo' || _accesoMods.indexOf(mod)>=0; }
+function accesoModDeVista(v){
+  for(const m in ACCESO_VISTAS){ if(ACCESO_VISTAS[m].indexOf(v)>=0) return m; }
+  return null;   // vista sin módulo declarado → libre
+}
+async function accesoCargar(){
+  let email='';
+  try{ const {data}=await sbClient().auth.getUser(); email=((data&&data.user&&data.user.email)||'').trim().toLowerCase(); }catch(e){}
+  const v=ACCESO_USUARIOS[email];
+  _accesoMods = (v==='todo') ? 'todo' : (v || ACCESO_DEFAULT);
+  accesoPintarLobby();
+}
+// El lobby no dibuja lo que no le toca (los inertes "Pronto" tampoco).
+function accesoPintarLobby(){
+  const map={finanzas:'home-mod-fin', conciliacion:'home-mod-conc', operaciones:'home-mod-ops',
+             entregas:'home-mod-ent', ventas:'home-mod-ven', automatizacion:'home-mod-auto'};
+  for(const mod in map){
+    const el=document.querySelector('#vLobby .'+map[mod]);
+    if(el) el.style.display = accesoPuede(mod) ? '' : 'none';
+  }
+  const ec=document.getElementById('entCard');
+  if(ec && !accesoPuede('finanzas')) ec.classList.add('hidden');   // la tarjeta de pendientes es de las socias
+}
 async function setSaludo(){
   const el=document.getElementById('homeHi'); if(!el) return;
   let email=''; try{ const {data}=await sbClient().auth.getUser(); email=((data&&data.user&&data.user.email)||'').trim().toLowerCase(); }catch(e){}
@@ -3042,6 +3102,10 @@ function aplicarModoProduccion(){
 // Vistas de módulo (Contabilidad + Conciliación + Operaciones). Muestra UNA, oculta el resto.
 const _MOD_VIEWS=['vUpload','vFacturado','vProduccion','vMermas','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vInventario','vPlan','vResumen','vConteo','vConteoLote','vReporte','vPendientes','vResults'];
 function _modShow(id){
+  // Guardia COSMÉTICO (ver ACCESO_USUARIOS): navegar directo a una vista ajena
+  // devuelve al lobby. No protege los datos — eso lo hará "Roles y accesos".
+  const mod=accesoModDeVista(id);
+  if(mod && !accesoPuede(mod)){ volverLobby(); return; }
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.toggle('hidden', v!==id); });
   document.getElementById('vLobby').classList.add('hidden');
   document.getElementById('appHeader').classList.remove('hidden');
@@ -3071,6 +3135,7 @@ function volverLobby(){
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.add('hidden'); });
   document.getElementById('appHeader').classList.add('hidden');
   document.getElementById('vLobby').classList.remove('hidden');
+  accesoPintarLobby();
   entCardCargar();   // los contadores pueden haber cambiado mientras se trabajaba
 }
 
