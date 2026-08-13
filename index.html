@@ -2127,6 +2127,26 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* Barra del módulo Entregas. Las pestañas que todavía no existen se ven, en gris y
    sin respuesta al toque: dicen que el módulo tiene más, sin fingir que ya está. */
 .faces-ent .face.face-soon{opacity:.34;cursor:default;pointer-events:none}
+/* ── Conteo por lote ──
+   Se cuenta DENTRO del congelador: frío, guantes, prisa. Todo el diseño responde a eso:
+   productos colapsados (los seis en pantalla), uno abierto a la vez, filas a la mitad de
+   alto, el lote sin partir nunca, y el total del producto pegado al pie mientras se cuenta.
+   La letra de los inputs NO baja de 16px: menos que eso reintroduce el zoom de iOS. */
+.cl-lista{display:flex;flex-direction:column;gap:6px}
+.cl-prod{border:.5px solid var(--border);border-radius:10px;background:#141417;overflow:hidden}
+.cl-prod.on{border-color:#7F77DD}
+.cl-cab{display:flex;align-items:baseline;gap:9px;width:100%;text-align:left;background:none;border:none;
+  color:var(--text);font:inherit;font-size:14px;padding:13px 14px;cursor:pointer}
+.cl-fl{color:var(--text-3);font-size:11px;width:10px;flex:0 0 10px}
+.cl-nom{font-weight:600;white-space:nowrap}
+.cl-pres{color:var(--text-3);font-size:11.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl-tot{color:var(--text-3);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cl-tot.hay{color:#7E8C5A;font-weight:600}
+.cl-cuerpo{padding:0 14px 12px}
+/* El LOTE no se parte nunca: es el identificador que se busca con la vista. */
+.cl-tbl td.cl-lote{white-space:nowrap;color:var(--text)}
+.cl-pie{position:sticky;bottom:0;margin:10px -14px -12px;padding:10px 14px;
+  background:#0E0E11;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-2)}
 /* ── Conteo por lote ── */
 .cl-hrow{cursor:pointer}
 .cl-hrow:hover td{color:var(--text)}
@@ -2156,8 +2176,17 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .cl-add{margin-top:10px}
 @media(max-width:700px){
   .cl-grid{grid-template-columns:1fr;gap:10px}
-  .cl-in{width:100%;min-width:0;font-size:16px;padding:9px 8px}   /* 16px: iOS no hace zoom al enfocar */
+  /* Densidad: la fila baja de ~130px a ~62px quitando AIRE, no letra. El input mantiene
+     los 16px (menos = zoom de iOS) y lo que se recorta es el padding. Objetivo: 8-10
+     lotes por pantalla sin scrollear. */
+  .cl-in{width:100%;min-width:0;font-size:16px;padding:5px 7px}
+  .cl-tbl td{padding:3px 5px 3px 0}
+  .cl-tbl th{padding:3px 5px 4px 0}
   .cl-tbl th:nth-child(4),.cl-tbl td:nth-child(4){display:none}   /* el total vive en el pie, no por fila */
+  .cl-cab{padding:11px 12px;font-size:14.5px}
+  .cl-cuerpo{padding:0 12px 10px}
+  .cl-pie{margin:8px -12px -10px;padding:9px 12px}
+  .cl-pres{display:none}       /* la presentación se ve al abrir; en la fila colapsada estorba */
 }
 /* chip de capacidad por personas (marca manual de la semana) */
 #vResumen .rz-chip,#vPlan .rz-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text-2);background:var(--surface-2);border:.5px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;white-space:nowrap}
@@ -6113,27 +6142,45 @@ function _clRender(){
       +esc(_clHuerfanos.map(function(L){return L.canon+' (id '+L.producto+')';}).join(' · '))
       +'</div></div>';
   }
-  h+='<div class="cl-grid">';
+  // ── LISTA COLAPSADA: Andrea cuenta DENTRO del congelador, con frío y guantes.
+  // Los seis productos caben en pantalla; se abre UNO a la vez. La fila colapsada
+  // contesta de un vistazo la pregunta real: ¿cuáles ya conté?
+  const totales=_clTotalPorProd();
+  h+='<div class="cl-lista">';
   ENT_PROD.forEach(function(pid){
     const I=NIV_INFO[pid]||{nom:'id '+pid,cajaU:1,presDiv:1,presLbl:'uds'};
     const ls=porProd[pid]||[];
-    h+='<div class="card cl-card"><div class="card-title">'+esc(I.nom)
-      +' <span class="muted" style="font-weight:400;font-size:11.5px">· caja de '+I.cajaU+' u'
-      +(I.presDiv>1?(' · suelta = '+I.presLbl+' de '+I.presDiv):'')+'</span></div>';
-    if(!ls.length) h+='<div class="cl-none">Sin lotes en la ventana de 3 meses. Si hay producto físico, agregalo abajo.</div>';
-    else{
-      h+='<table class="cl-tbl"><tr><th>Lote</th><th>Cajas</th><th>Sueltas</th><th>Unidades</th></tr>';
-      ls.forEach(function(L){
-        const id='cl_'+L.key.replace(/[^A-Za-z0-9]/g,'_');
-        h+='<tr data-pid="'+pid+'" data-lote="'+esc(L.canon)+'">'
-          +'<td>'+esc(L.canon)+(L.extra?' <span class="cl-tag">agregado</span>':'')+'</td>'
-          +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_c" oninput="_clRecalc(this)"></td>'
-          +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_s" oninput="_clRecalc(this)"></td>'
-          +'<td class="cl-uds" id="'+id+'_u">—</td></tr>';
-      });
-      h+='</table>';
+    const abierto=(_clProdAbierto===pid), t=totales[pid]||0;
+    const pres='caja de '+I.cajaU+' u'+(I.presDiv>1?(' · '+I.presLbl+' de '+I.presDiv):'');
+    h+='<div class="cl-prod'+(abierto?' on':'')+'">'
+      +'<button class="cl-cab" onclick="_clAbrirProd('+pid+')">'
+      +'<span class="cl-fl">'+(abierto?'▾':'▸')+'</span>'
+      +'<span class="cl-nom">'+esc(I.nom)+'</span>'
+      +'<span class="cl-pres">'+esc(pres)+'</span>'
+      +'<span class="cl-tot'+(t?' hay':'')+'">'+(t?(_rzN(t)+' u'):'—')+'</span>'
+      +'</button>';
+    if(abierto){
+      h+='<div class="cl-cuerpo">';
+      if(!ls.length) h+='<div class="cl-none">Sin lotes en la ventana de 3 meses. Si hay producto físico, agregalo abajo.</div>';
+      else{
+        h+='<table class="cl-tbl"><tr><th>Lote</th><th>Cajas</th><th>Sueltas</th></tr>';
+        ls.forEach(function(L){
+          const id='cl_'+L.key.replace(/[^A-Za-z0-9]/g,'_');
+          h+='<tr data-pid="'+pid+'" data-lote="'+esc(L.canon)+'">'
+            +'<td class="cl-lote">'+esc(L.canon)+(L.extra?' <span class="cl-tag">agregado</span>':'')+'</td>'
+            +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_c" oninput="_clRecalc(this)"></td>'
+            +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_s" oninput="_clRecalc(this)"></td>'
+            +'<td class="cl-uds" id="'+id+'_u">—</td></tr>';
+        });
+        h+='</table>';
+      }
+      h+='<button class="btn btn-sm cl-add" onclick="_clAgregar('+pid+')">Agregar un lote que no está</button>'
+        // El total del producto abierto viaja pegado al pie mientras se cuenta:
+        // no hay que ir al final de la lista para saber cómo va.
+        +'<div class="cl-pie" id="clPie'+pid+'">'+esc(I.nom)+' · contado hasta ahora <strong>'+_rzN(t)+' u</strong></div>'
+        +'</div>';
     }
-    h+='<button class="btn btn-sm cl-add" onclick="_clAgregar('+pid+')">Agregar un lote que no está</button></div>';
+    h+='</div>';
   });
   h+='</div>';
 
@@ -6182,6 +6229,14 @@ function _clRender(){
 // Guardar sin poder ver lo guardado es guardar a ciegas. Mismo patrón que el
 // historial del inventario (M7): lista compacta, detalle al tocar.
 let _clHist=null, _clHistErr='', _clAbierto=null, _clSinAncla=false;
+let _clProdAbierto=null;   // un producto abierto a la vez: con guantes, un toque de más es caro
+function _clAbrirProd(pid){ _clProdAbierto=(_clProdAbierto===pid?null:pid); _clRender(); }
+// Total contado por producto, leyendo lo que hay escrito en pantalla AHORA.
+function _clTotalPorProd(){
+  const t={};
+  _clLeer().forEach(function(r){ t[r.producto_id]=(t[r.producto_id]||0)+r.uds; });
+  return t;
+}
 
 async function _clCargarHist(){
   const c=sbClient(); if(!c){ _clHistErr='no hay sesión de Supabase'; _clHistPintar(); return; }
@@ -6307,6 +6362,13 @@ function _clRecalc(inp){
   const c=document.getElementById(base+'_c'), s=document.getElementById(base+'_s'), u=document.getElementById(base+'_u');
   const uds=_clUds(pid, c&&c.value, s&&s.value);
   if(u) u.textContent = uds ? _rzN(uds) : '—';
+  // Se actualizan el pie y la cabecera del producto SIN re-renderizar: un re-render
+  // mataría el foco del input y el teclado del teléfono se cerraría en cada dígito.
+  const t=_clTotalPorProd(), tp=t[pid]||0;
+  const pie=document.getElementById('clPie'+pid);
+  if(pie) pie.innerHTML=esc((NIV_INFO[pid]&&NIV_INFO[pid].nom)||pid)+' · contado hasta ahora <strong>'+_rzN(tp)+' u</strong>';
+  const cab=tr.closest('.cl-prod'); const tot=cab&&cab.querySelector('.cl-tot');
+  if(tot){ tot.textContent = tp ? (_rzN(tp)+' u') : '—'; tot.classList.toggle('hay', !!tp); }
   _clTotales();
 }
 
@@ -6341,6 +6403,7 @@ function _clAgregar(pid){
   const canon=String(v).trim(); if(!canon) return;
   _clExtra[pid]=_clExtra[pid]||[];
   if(_clExtra[pid].indexOf(canon)<0) _clExtra[pid].push(canon);
+  _clProdAbierto=pid;
   _clRender();
 }
 
