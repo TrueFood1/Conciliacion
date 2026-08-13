@@ -1775,7 +1775,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   <!-- Vista 2 · Últimos 12 meses -->
   <div id="resVistaDoce" class="hidden" style="margin-top:20px">
     <div class="card-title">Ingresos, gastos y resultado — mes a mes</div>
-    <div class="m3sub" style="margin-top:2px">Los meses en curso o sin cerrar aparecen marcados como parciales. Deslizá hacia el lado si no cabe.</div>
+    <div class="m3sub" style="margin-top:2px">Los meses en curso o sin cerrar aparecen marcados como parciales. Deslizá hacia el lado si no cabe. El producto "Envío" está excluido de ingresos y facturado: es un cargo de entrega, no venta de producto.</div>
     <div class="card" style="margin-top:10px"><div style="overflow-x:auto"><table class="res-tbl" id="resTbl12"></table></div></div>
   </div>
 
@@ -10421,6 +10421,8 @@ function _resFamDe(code){
 }
 // Motor real: arma los 12 meses (terminando en el mes en curso, marcado parcial)
 // leyendo asientos posteados de Odoo. Bucketea por mes calendario (campos Date).
+// Productos que NO son venta de producto y se excluyen de Resultados (con nombre y razón).
+const RES_PROD_EXCLUIDOS={478:'Envío — cargo de entrega trasladado al cliente; su gasto espejo vive en 6400003'};
 async function reporteResultados(){
   const pad=x=>String(x).padStart(2,'0'), now=new Date(), meses=[];
   for(let i=11;i>=0;i--){ const d=new Date(now.getFullYear(),now.getMonth()-i,1);
@@ -10444,18 +10446,30 @@ async function reporteResultados(){
     {fields:['balance','date'],limit:50000});
   c.forEach(l=>{ const ym=(l.date||'').slice(0,7); if(mesSet.has(ym)) by[ym].cogs+=l.balance||0; });
   // 3) Ingresos SIN IVA (líneas product, out_invoice − out_refund)
+  // EXCLUSIÓN EXPLÍCITA (decisión Andrea, 12-ago-2026): el producto "Envío" [478] NO es venta
+  // de producto — es el cargo de entrega que se le traslada al cliente (₡4.000) y que tiene su
+  // gasto espejo en 6400003 (Don Jorge). Dejarlo dentro inflaba los ingresos ~₡95.458/mes.
+  // Misma filosofía que COSTOS_LINEAS_EXCLUIDAS: constante con nombre y razón, no un filtro mudo.
+  // En Rentabilidad NO hace falta: esa vista filtra por los 6 productos y el Envío nunca entra.
   for(const [mt,sg] of [['out_invoice',1],['out_refund',-1]]){
     const inc=await odooCall('account.move.line','search_read',
-      [[['parent_state','=','posted'],['move_id.move_type','=',mt],['display_type','=','product'],['date','>=',D1]]],
+      [[['parent_state','=','posted'],['move_id.move_type','=',mt],['display_type','=','product'],['date','>=',D1],
+        ['product_id','not in',Object.keys(RES_PROD_EXCLUIDOS).map(Number)]]],
       {fields:['price_subtotal','date'],limit:50000});
     inc.forEach(l=>{ const ym=(l.date||'').slice(0,7); if(mesSet.has(ym)) by[ym].ingresos+=sg*(l.price_subtotal||0); });
   }
-  // 4) Facturado con IVA (amount_total de facturas)
+  // 4) Facturado con IVA (amount_total de facturas) — el Envío se resta línea a línea porque
+  // amount_total viene por factura entera y no se puede filtrar por producto en la cabecera.
   for(const [mt,sg] of [['out_invoice',1],['out_refund',-1]]){
     const mv=await odooCall('account.move','search_read',
       [[['state','=','posted'],['move_type','=',mt],['invoice_date','>=',D1]]],
       {fields:['amount_total','invoice_date'],limit:50000});
     mv.forEach(m=>{ const ym=(m.invoice_date||'').slice(0,7); if(mesSet.has(ym)) by[ym].facturado+=sg*(m.amount_total||0); });
+    const exl=await odooCall('account.move.line','search_read',
+      [[['parent_state','=','posted'],['move_id.move_type','=',mt],['display_type','=','product'],['date','>=',D1],
+        ['product_id','in',Object.keys(RES_PROD_EXCLUIDOS).map(Number)]]],
+      {fields:['price_total','date'],limit:50000});
+    exl.forEach(l=>{ const ym=(l.date||'').slice(0,7); if(mesSet.has(ym)) by[ym].facturado-=sg*(l.price_total||0); });
   }
   return meses.map(mm=>{ const b=by[mm.ym];
     const famDet={}; Object.keys(b.famDet).forEach(k=>famDet[k]=Object.values(b.famDet[k]).sort((a,z)=>z.monto-a.monto));
