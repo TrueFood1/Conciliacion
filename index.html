@@ -739,7 +739,7 @@ tr.r-ing td{background:#eff6ff}
 .home-soon .home-search{margin-top:0}
 .home-sep{border-top:.5px solid #26262C;width:100%;margin:0}
 .home-modlabel{font-size:12px;font-weight:500;color:#6E6C68;letter-spacing:.5px;width:100%;margin:1.5rem 0 .9rem;text-align:left}
-.home-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;width:100%;max-width:760px}
+.home-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;width:100%;max-width:760px}
 /* El sello de versión iba con estilo en línea; vive acá para que el @media pueda darle
    el respiro del safe-area en teléfono (el estilo en línea le ganaba a la hoja). */
 .home-build{text-align:center;color:#6E6C68;font-size:11px;letter-spacing:.03em;padding:16px 0 6px}
@@ -780,14 +780,13 @@ tr.r-ing td{background:#eff6ff}
      preferencia de diseño sino una restricción de la plataforma. */
   input,select,textarea{font-size:16px !important}
   .home-grid{grid-template-columns:1fr 1fr;gap:9px}
-  /* 6 módulos en 2 columnas = 3 filas exactas. Entregas va en la fila 2 (no al fondo
-     con los grises) porque es el único que abre otra persona: Daniel entra solo ahí. */
-  .home-mod-fin{order:1}  .home-mod-ops{order:2}
-  .home-mod-ent{order:3}  .home-mod-conc{order:4}
-  .home-mod-ven{order:5}  .home-mod-auto{order:6}
+  /* En teléfono Conciliación no se muestra, así que quedan CUATRO módulos: 2×2 exacto,
+     sin huecos ni tarjeta estirada. Arriba lo que se usa a diario (Operaciones y
+     Entregas), abajo lo que se consulta (Finanzas) y lo que todavía no existe (Ventas). */
+  .home-mod-ops{order:1}  .home-mod-ent{order:2}
+  .home-mod-fin{order:3}  .home-mod-ven{order:4}
   .home-mod{padding:14px;min-height:86px;display:flex;flex-direction:column;box-sizing:border-box}
   .home-mod-conc{display:none}
-  .home-mod-ops{order:1} .home-mod-fin{order:2} .home-mod-ven{order:3} .home-mod-auto{order:4}
   /* Por id: la regla base de .home-mod.inert va más abajo en la hoja y le ganaba por orden. */
   #vLobby .home-mod.inert{opacity:.38}
   .home-mod .home-mod-state{margin-top:auto}
@@ -1263,11 +1262,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
       <div class="home-mod inert home-mod-ven">
         <span class="home-mod-dot" style="background:#3FB6A8"></span>
         <div class="home-mod-name" style="color:#C9C7C1">Ventas</div>
-        <div class="home-mod-state" style="color:#6E6C68">Pronto</div>
-      </div>
-      <div class="home-mod inert home-mod-auto">
-        <span class="home-mod-dot" style="background:#FF751F"></span>
-        <div class="home-mod-name" style="color:#C9C7C1">Automatización</div>
         <div class="home-mod-state" style="color:#6E6C68">Pronto</div>
       </div>
     </div>
@@ -2133,6 +2127,26 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* Barra del módulo Entregas. Las pestañas que todavía no existen se ven, en gris y
    sin respuesta al toque: dicen que el módulo tiene más, sin fingir que ya está. */
 .faces-ent .face.face-soon{opacity:.34;cursor:default;pointer-events:none}
+/* ── Conteo por lote ──
+   Se cuenta DENTRO del congelador: frío, guantes, prisa. Todo el diseño responde a eso:
+   productos colapsados (los seis en pantalla), uno abierto a la vez, filas a la mitad de
+   alto, el lote sin partir nunca, y el total del producto pegado al pie mientras se cuenta.
+   La letra de los inputs NO baja de 16px: menos que eso reintroduce el zoom de iOS. */
+.cl-lista{display:flex;flex-direction:column;gap:6px}
+.cl-prod{border:.5px solid var(--border);border-radius:10px;background:#141417;overflow:hidden}
+.cl-prod.on{border-color:#7F77DD}
+.cl-cab{display:flex;align-items:baseline;gap:9px;width:100%;text-align:left;background:none;border:none;
+  color:var(--text);font:inherit;font-size:14px;padding:13px 14px;cursor:pointer}
+.cl-fl{color:var(--text-3);font-size:11px;width:10px;flex:0 0 10px}
+.cl-nom{font-weight:600;white-space:nowrap}
+.cl-pres{color:var(--text-3);font-size:11.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl-tot{color:var(--text-3);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cl-tot.hay{color:#7E8C5A;font-weight:600}
+.cl-cuerpo{padding:0 14px 12px}
+/* El LOTE no se parte nunca: es el identificador que se busca con la vista. */
+.cl-tbl td.cl-lote{white-space:nowrap;color:var(--text)}
+.cl-pie{position:sticky;bottom:0;margin:10px -14px -12px;padding:10px 14px;
+  background:#0E0E11;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-2)}
 /* ── Conteo por lote ── */
 .cl-hrow{cursor:pointer}
 .cl-hrow:hover td{color:var(--text)}
@@ -2162,8 +2176,17 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .cl-add{margin-top:10px}
 @media(max-width:700px){
   .cl-grid{grid-template-columns:1fr;gap:10px}
-  .cl-in{width:100%;min-width:0;font-size:16px;padding:9px 8px}   /* 16px: iOS no hace zoom al enfocar */
+  /* Densidad: la fila baja de ~130px a ~62px quitando AIRE, no letra. El input mantiene
+     los 16px (menos = zoom de iOS) y lo que se recorta es el padding. Objetivo: 8-10
+     lotes por pantalla sin scrollear. */
+  .cl-in{width:100%;min-width:0;font-size:16px;padding:5px 7px}
+  .cl-tbl td{padding:3px 5px 3px 0}
+  .cl-tbl th{padding:3px 5px 4px 0}
   .cl-tbl th:nth-child(4),.cl-tbl td:nth-child(4){display:none}   /* el total vive en el pie, no por fila */
+  .cl-cab{padding:11px 12px;font-size:14.5px}
+  .cl-cuerpo{padding:0 12px 10px}
+  .cl-pie{margin:8px -12px -10px;padding:9px 12px}
+  .cl-pres{display:none}       /* la presentación se ve al abrir; en la fila colapsada estorba */
 }
 /* chip de capacidad por personas (marca manual de la semana) */
 #vResumen .rz-chip,#vPlan .rz-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text-2);background:var(--surface-2);border:.5px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;white-space:nowrap}
@@ -2626,7 +2649,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 12 ago 2026 · b8';
+const BUILD = 'v 13 ago 2026 · b10';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -3003,6 +3026,7 @@ async function authEntrar(){
   if(SESSION && SESSION.uid){
     document.getElementById('vAuth').classList.add('hidden');   // conectado → recién ahora dejamos ver el lobby
     setSaludo();                                                // saluda a quien está autenticado (no un nombre fijo)
+    await accesoCargar();                                       // qué módulos dibuja el lobby (cosmético)
     entCardCargar();                                            // pendientes de Entregas, sin bloquear el lobby
   }else if(msg){
     msg.style.color='#FF8A8A'; msg.textContent='No pude conectar a producción. Reintentá.';
@@ -3012,6 +3036,65 @@ async function authEntrar(){
 // Saludo por usuario autenticado: lee el email de la sesión de Supabase y lo mapea a un nombre.
 // Sin mapeo → "Hola" sin nombre. Nada hardcodeado: cambia solo al entrar con otra cuenta.
 const SALUDO_NOMBRES={'andrea@truefoodcr.com':'Andrea', 'lorena@truefoodcr.com':'Lorena'};
+
+// ════════════════════════════════════════════════════════════════════════
+// ACCESO POR USUARIO — ⚠️ ESTO ES COSMÉTICO, NO ES SEGURIDAD ⚠️
+// ════════════════════════════════════════════════════════════════════════
+// Solución MÍNIMA para el 13-ago-2026: Daniel hace el conteo por lote y Andrea no
+// está. Hace falta que no vea Finanzas, y hoy no existen roles.
+//
+// LO QUE ESTO HACE:  no dibuja en el lobby los módulos que no le tocan, y si alguien
+//                    navega directo a una vista ajena lo devuelve al lobby.
+// LO QUE NO HACE:    NO protege NADA. La RLS de Supabase y el proxy de lectura le
+//                    responden igual a CUALQUIER sesión autenticada. Quien abra la
+//                    consola del navegador ve y consulta todo. Es una cortina, no
+//                    una puerta con llave.
+//
+// La versión REAL —tabla de permisos en Supabase + RLS por rol + el proxy validando
+// el rol del JWT— sigue pendiente como "Roles y accesos" y se diseña aparte.
+// NO agregar aquí nada que dependa de que esto sea seguro.
+//
+// Regla del default: quien NO esté en la lista ve SOLO Entregas. Es a propósito —
+// si mañana se crea una cuenta nueva y nadie actualizó esta lista, el que entra ve
+// de menos, no de más. Para sumar a alguien a todo, va acá con 'todo'.
+const ACCESO_USUARIOS = {
+  'andrea@truefoodcr.com':'todo',
+  'lorena@truefoodcr.com':'todo',
+  // 'daniel@…':['entregas'],   ← el correo de Daniel va acá cuando exista la cuenta.
+  //                              Mientras tanto el default ya lo deja en Entregas.
+};
+const ACCESO_DEFAULT = ['entregas'];
+// Qué vistas son de cada módulo. Las que no estén acá se consideran de acceso libre.
+const ACCESO_VISTAS = {
+  finanzas:     ['vFacturado','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vResults'],
+  conciliacion: ['vUpload'],
+  operaciones:  ['vProduccion','vMermas','vInventario','vPlan','vResumen','vConteo'],
+  entregas:     ['vConteoLote','vReporte','vPendientes'],
+};
+let _accesoMods=null;   // se llena al entrar; null = todavía no se sabe → no se restringe
+function accesoPuede(mod){ return !_accesoMods || _accesoMods==='todo' || _accesoMods.indexOf(mod)>=0; }
+function accesoModDeVista(v){
+  for(const m in ACCESO_VISTAS){ if(ACCESO_VISTAS[m].indexOf(v)>=0) return m; }
+  return null;   // vista sin módulo declarado → libre
+}
+async function accesoCargar(){
+  let email='';
+  try{ const {data}=await sbClient().auth.getUser(); email=((data&&data.user&&data.user.email)||'').trim().toLowerCase(); }catch(e){}
+  const v=ACCESO_USUARIOS[email];
+  _accesoMods = (v==='todo') ? 'todo' : (v || ACCESO_DEFAULT);
+  accesoPintarLobby();
+}
+// El lobby no dibuja lo que no le toca (los inertes "Pronto" tampoco).
+function accesoPintarLobby(){
+  const map={finanzas:'home-mod-fin', conciliacion:'home-mod-conc', operaciones:'home-mod-ops',
+             entregas:'home-mod-ent', ventas:'home-mod-ven'};
+  for(const mod in map){
+    const el=document.querySelector('#vLobby .'+map[mod]);
+    if(el) el.style.display = accesoPuede(mod) ? '' : 'none';
+  }
+  const ec=document.getElementById('entCard');
+  if(ec && !accesoPuede('finanzas')) ec.classList.add('hidden');   // la tarjeta de pendientes es de las socias
+}
 async function setSaludo(){
   const el=document.getElementById('homeHi'); if(!el) return;
   let email=''; try{ const {data}=await sbClient().auth.getUser(); email=((data&&data.user&&data.user.email)||'').trim().toLowerCase(); }catch(e){}
@@ -3042,6 +3125,10 @@ function aplicarModoProduccion(){
 // Vistas de módulo (Contabilidad + Conciliación + Operaciones). Muestra UNA, oculta el resto.
 const _MOD_VIEWS=['vUpload','vFacturado','vProduccion','vMermas','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vInventario','vPlan','vResumen','vConteo','vConteoLote','vReporte','vPendientes','vResults'];
 function _modShow(id){
+  // Guardia COSMÉTICO (ver ACCESO_USUARIOS): navegar directo a una vista ajena
+  // devuelve al lobby. No protege los datos — eso lo hará "Roles y accesos".
+  const mod=accesoModDeVista(id);
+  if(mod && !accesoPuede(mod)){ volverLobby(); return; }
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.toggle('hidden', v!==id); });
   document.getElementById('vLobby').classList.add('hidden');
   document.getElementById('appHeader').classList.remove('hidden');
@@ -3071,6 +3158,7 @@ function volverLobby(){
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.add('hidden'); });
   document.getElementById('appHeader').classList.add('hidden');
   document.getElementById('vLobby').classList.remove('hidden');
+  accesoPintarLobby();
   entCardCargar();   // los contadores pueden haber cambiado mientras se trabajaba
 }
 
@@ -6054,27 +6142,45 @@ function _clRender(){
       +esc(_clHuerfanos.map(function(L){return L.canon+' (id '+L.producto+')';}).join(' · '))
       +'</div></div>';
   }
-  h+='<div class="cl-grid">';
+  // ── LISTA COLAPSADA: Andrea cuenta DENTRO del congelador, con frío y guantes.
+  // Los seis productos caben en pantalla; se abre UNO a la vez. La fila colapsada
+  // contesta de un vistazo la pregunta real: ¿cuáles ya conté?
+  const totales=_clTotalPorProd();
+  h+='<div class="cl-lista">';
   ENT_PROD.forEach(function(pid){
     const I=NIV_INFO[pid]||{nom:'id '+pid,cajaU:1,presDiv:1,presLbl:'uds'};
     const ls=porProd[pid]||[];
-    h+='<div class="card cl-card"><div class="card-title">'+esc(I.nom)
-      +' <span class="muted" style="font-weight:400;font-size:11.5px">· caja de '+I.cajaU+' u'
-      +(I.presDiv>1?(' · suelta = '+I.presLbl+' de '+I.presDiv):'')+'</span></div>';
-    if(!ls.length) h+='<div class="cl-none">Sin lotes en la ventana de 3 meses. Si hay producto físico, agregalo abajo.</div>';
-    else{
-      h+='<table class="cl-tbl"><tr><th>Lote</th><th>Cajas</th><th>Sueltas</th><th>Unidades</th></tr>';
-      ls.forEach(function(L){
-        const id='cl_'+L.key.replace(/[^A-Za-z0-9]/g,'_');
-        h+='<tr data-pid="'+pid+'" data-lote="'+esc(L.canon)+'">'
-          +'<td>'+esc(L.canon)+(L.extra?' <span class="cl-tag">agregado</span>':'')+'</td>'
-          +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_c" oninput="_clRecalc(this)"></td>'
-          +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_s" oninput="_clRecalc(this)"></td>'
-          +'<td class="cl-uds" id="'+id+'_u">—</td></tr>';
-      });
-      h+='</table>';
+    const abierto=(_clProdAbierto===pid), t=totales[pid]||0;
+    const pres='caja de '+I.cajaU+' u'+(I.presDiv>1?(' · '+I.presLbl+' de '+I.presDiv):'');
+    h+='<div class="cl-prod'+(abierto?' on':'')+'">'
+      +'<button class="cl-cab" onclick="_clAbrirProd('+pid+')">'
+      +'<span class="cl-fl">'+(abierto?'▾':'▸')+'</span>'
+      +'<span class="cl-nom">'+esc(I.nom)+'</span>'
+      +'<span class="cl-pres">'+esc(pres)+'</span>'
+      +'<span class="cl-tot'+(t?' hay':'')+'">'+(t?(_rzN(t)+' u'):'—')+'</span>'
+      +'</button>';
+    if(abierto){
+      h+='<div class="cl-cuerpo">';
+      if(!ls.length) h+='<div class="cl-none">Sin lotes en la ventana de 3 meses. Si hay producto físico, agregalo abajo.</div>';
+      else{
+        h+='<table class="cl-tbl"><tr><th>Lote</th><th>Cajas</th><th>Sueltas</th></tr>';
+        ls.forEach(function(L){
+          const id='cl_'+L.key.replace(/[^A-Za-z0-9]/g,'_');
+          h+='<tr data-pid="'+pid+'" data-lote="'+esc(L.canon)+'">'
+            +'<td class="cl-lote">'+esc(L.canon)+(L.extra?' <span class="cl-tag">agregado</span>':'')+'</td>'
+            +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_c" oninput="_clRecalc(this)"></td>'
+            +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_s" oninput="_clRecalc(this)"></td>'
+            +'<td class="cl-uds" id="'+id+'_u">—</td></tr>';
+        });
+        h+='</table>';
+      }
+      h+='<button class="btn btn-sm cl-add" onclick="_clAgregar('+pid+')">Agregar un lote que no está</button>'
+        // El total del producto abierto viaja pegado al pie mientras se cuenta:
+        // no hay que ir al final de la lista para saber cómo va.
+        +'<div class="cl-pie" id="clPie'+pid+'">'+esc(I.nom)+' · contado hasta ahora <strong>'+_rzN(t)+' u</strong></div>'
+        +'</div>';
     }
-    h+='<button class="btn btn-sm cl-add" onclick="_clAgregar('+pid+')">Agregar un lote que no está</button></div>';
+    h+='</div>';
   });
   h+='</div>';
 
@@ -6123,6 +6229,14 @@ function _clRender(){
 // Guardar sin poder ver lo guardado es guardar a ciegas. Mismo patrón que el
 // historial del inventario (M7): lista compacta, detalle al tocar.
 let _clHist=null, _clHistErr='', _clAbierto=null, _clSinAncla=false;
+let _clProdAbierto=null;   // un producto abierto a la vez: con guantes, un toque de más es caro
+function _clAbrirProd(pid){ _clProdAbierto=(_clProdAbierto===pid?null:pid); _clRender(); }
+// Total contado por producto, leyendo lo que hay escrito en pantalla AHORA.
+function _clTotalPorProd(){
+  const t={};
+  _clLeer().forEach(function(r){ t[r.producto_id]=(t[r.producto_id]||0)+r.uds; });
+  return t;
+}
 
 async function _clCargarHist(){
   const c=sbClient(); if(!c){ _clHistErr='no hay sesión de Supabase'; _clHistPintar(); return; }
@@ -6248,6 +6362,13 @@ function _clRecalc(inp){
   const c=document.getElementById(base+'_c'), s=document.getElementById(base+'_s'), u=document.getElementById(base+'_u');
   const uds=_clUds(pid, c&&c.value, s&&s.value);
   if(u) u.textContent = uds ? _rzN(uds) : '—';
+  // Se actualizan el pie y la cabecera del producto SIN re-renderizar: un re-render
+  // mataría el foco del input y el teclado del teléfono se cerraría en cada dígito.
+  const t=_clTotalPorProd(), tp=t[pid]||0;
+  const pie=document.getElementById('clPie'+pid);
+  if(pie) pie.innerHTML=esc((NIV_INFO[pid]&&NIV_INFO[pid].nom)||pid)+' · contado hasta ahora <strong>'+_rzN(tp)+' u</strong>';
+  const cab=tr.closest('.cl-prod'); const tot=cab&&cab.querySelector('.cl-tot');
+  if(tot){ tot.textContent = tp ? (_rzN(tp)+' u') : '—'; tot.classList.toggle('hay', !!tp); }
   _clTotales();
 }
 
@@ -6282,6 +6403,7 @@ function _clAgregar(pid){
   const canon=String(v).trim(); if(!canon) return;
   _clExtra[pid]=_clExtra[pid]||[];
   if(_clExtra[pid].indexOf(canon)<0) _clExtra[pid].push(canon);
+  _clProdAbierto=pid;
   _clRender();
 }
 
