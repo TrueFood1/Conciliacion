@@ -151,6 +151,29 @@ Productos terminados (IDs de producción):
   bloques de alerta conservan su lavado naranja y su borde. No poner fondos lima.
 - Tablas: encabezado 11px gris terciario con línea 1px debajo, sin bordes entre
   filas, padding vertical ~11px, número principal de la fila en blanco hueso.
+
+### Alertas del lobby — 5 reglas (estándar del sistema, 13-ago-2026)
+
+Aplican a **todas** las alertas, no al módulo que las inventó. Una alerta que no
+cumple las cinco no es una alerta: es información, y la información vive adentro
+del módulo.
+
+1. **Una alerta solo existe si hay algo que hacer.** Informar no es alertar.
+   Corolario: si no hay nada pendiente, la alerta **no aparece** — no se muestra
+   diciendo "todo al día".
+2. **Tiene fecha o no es alerta.** Lo que no vence no urge; eso vive adentro
+   del módulo.
+3. **Se apaga sola al resolverse.** Nunca "marcar como visto": el estado sale
+   del dato, no de un gesto.
+4. **Máximo 3 visibles.** De la cuarta en adelante, "y N más →".
+5. **Ámbar solo lo que vence hoy o mañana.** El resto en gris. El ámbar no
+   significa "existe", significa "se te viene encima".
+
+Auditoría de lo que ya existía (13-ago): la tarjeta de **Entregas pendientes**
+incumple 1 (muestra "Todo al día." cuando no hay nada), 2 (no tiene fecha de
+vencimiento en ninguna parte), 4 (no tiene el colapso "y N más") y 5 (pinta el
+contador de ámbar por existir, no por urgir). Sin corregir todavía — el detalle
+y las opciones están en `BITACORA.md`.
 - Jerarquía tipográfica moderada: títulos de página contenidos, no gigantes.
 - Alertas/estados: lo que está OK no muestra texto (celda vacía o punto verde);
   solo lo anómalo llama la atención.
