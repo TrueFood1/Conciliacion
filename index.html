@@ -2616,7 +2616,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 12 ago 2026 · b6';
+const BUILD = 'v 12 ago 2026 · b7';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -9391,6 +9391,118 @@ function clasificarCanal(p){
   return 'otros';
 }
 let _rentaData=null, _rentaInit=false;   // _rentaData.byKey = costos del último cálculo (para el detalle)
+
+// Ids de notas de crédito que son ANULACIÓN, no devolución. Ver la regla en reporteRenta.
+async function _rentaReversiones(D1,D2){
+  const mv=await odooCall('account.move','search_read',
+    [[['move_type','=','out_refund'],['state','=','posted'],['invoice_date','>=',D1],['invoice_date','<=',D2]]],
+    {fields:['id','ref','reversed_entry_id'],limit:5000});
+  const s=new Set();
+  mv.forEach(m=>{ if(m.reversed_entry_id || /^reversal of/i.test(m.ref||'')) s.add(m.id); });
+  return s;
+}
+
+// ── LOGÍSTICA POR CANAL — cuatro modelos distintos, uno por transportista ──
+// (1) MARLON, fijo por viaje: entrega a los CEDI de Automercado y Walmart SOLO los lunes,
+//     con cita. Misma frecuencia a los dos → 50/50. Regla de operación, no supuesto.
+// (2) LUSOF, por SEMANA DE SERVICIO: cada factura cubre una semana lun-vie y el rango va en
+//     el <OtroTexto> del comprobante electrónico. El costo de la semana se reparte entre lo
+//     facturado a sus clientes ESA MISMA semana. Se lee del XML: no hay que transcribir nada.
+// (3) EYC → MegaSuper. (4) DON JORGE: par ingreso/gasto (cobrado por el producto Envío menos
+//     lo pagado); el NETO se carga a los canales que lo generan.
+// MENTHA Y LIMÓN queda FUERA del reparto de Lusof a propósito — ver la nota de abajo.
+const LOG_MARLON=1161, LOG_LUSOF=1106, LOG_EYC=1098;
+const LOG_LUSOF_CLI={1004:'bm',1006:'bm',1008:'bm',1011:'bm',1012:'bm',1054:'bm',1104:'bm',1191:'bm',
+                     1032:'compre'};
+// A Mentha (887) NO se le asigna Lusof. El método supone que si a un cliente se le facturó esa
+// semana, Lusof lo llevó — y para Mentha es falso: también lo entrega EyC (consta en su factura
+// de enero) y Don Jorge. En 3 de las 22 semanas Mentha aparecía SOLO y absorbía la factura
+// entera; la del 2-6 de marzo cargaba ₡125.676 contra ₡55.360 de venta, un 227%. Es limitación
+// del método, no un dato. Se resuelve cuando Lusof mande el detalle por factura.
+const LOG_SIN_ASIGNAR_NOTA='Mentha y limón: logística no asignable — el método no aplica a este cliente';
+
+async function reporteLogistica(D1,D2,cell,keyDe){
+  const out={porCanal:{}, detalle:[], sinAsignar:[], notas:[]};
+  const gastoDe=async(pid,cta)=>{
+    const g=await odooCall('account.move.line','read_group',
+      [[['partner_id','=',pid],['account_id.code','=',cta],['parent_state','=','posted'],
+        ['date','>=',D1],['date','<=',D2],['debit','>',0]],['debit'],[]],{lazy:false});
+    return (g[0]&&g[0].debit)||0;
+  };
+  // (1) Marlon 50/50
+  const marlon=await gastoDe(LOG_MARLON,'6103003');
+  if(marlon){ out.porCanal.auto=(out.porCanal.auto||0)+marlon/2;
+              out.porCanal.walmart=(out.porCanal.walmart||0)+marlon/2;
+              out.detalle.push({q:'Marlon (CEDI Auto+WM)', monto:marlon, modo:'fijo por viaje · 50/50'}); }
+  // (3) EyC → MegaSuper
+  const eyc=await gastoDe(LOG_EYC,'6103003');
+  if(eyc){ out.porCanal.mega=(out.porCanal.mega||0)+eyc;
+           out.detalle.push({q:'EyC (MegaSuper)', monto:eyc, modo:'directo al canal'}); }
+  // (2) Lusof por semana de servicio
+  const lu=await logLusofSemanal(D1,D2);
+  for(const k in lu.porCanal) out.porCanal[k]=(out.porCanal[k]||0)+lu.porCanal[k];
+  if(lu.total) out.detalle.push({q:'Lusof (BM + Compre Bien)', monto:lu.total, modo:'por semana de servicio'});
+  out.sinAsignar=lu.sinAsignar;
+  if(lu.mentha) out.notas.push(LOG_SIN_ASIGNAR_NOTA);
+  // (4) Don Jorge: par ingreso/gasto, el NETO a sus canales por su peso de venta
+  const pag=await odooCall('account.move.line','read_group',
+    [[['account_id.code','=','6400003'],['parent_state','=','posted'],['date','>=',D1],['date','<=',D2],
+      ['debit','>',0],['name','not ilike','uber']],['debit'],[]],{lazy:false});
+  const cob=await odooCall('account.move.line','read_group',
+    [[['product_id','=',478],['parent_state','=','posted'],['move_id.move_type','=','out_invoice'],
+      ['date','>=',D1],['date','<=',D2]],['price_subtotal'],[]],{lazy:false});
+  const neto=(((pag[0]&&pag[0].debit)||0))-(((cob[0]&&cob[0].price_subtotal)||0));
+  const DJ=['horeca','retail','otros'];
+  const netoDJ=DJ.reduce((s,c)=>s+RENTA_PROD.reduce((a,P)=>{ const y=cell[c+'|'+P.key]; return a+(y?y.neto:0); },0),0);
+  if(netoDJ) DJ.forEach(c=>{ const n=RENTA_PROD.reduce((a,P)=>{ const y=cell[c+'|'+P.key]; return a+(y?y.neto:0); },0);
+    out.porCanal[c]=(out.porCanal[c]||0)+neto*n/netoDJ; });
+  out.detalle.push({q:'Don Jorge (neto: cobrado − pagado)', monto:neto,
+                    modo:'par ingreso/gasto · el hueco es la exención, NO la tarifa'});
+  return out;
+}
+
+// Reparto semanal de Lusof. El rango de fechas sale del <OtroTexto> del comprobante
+// electrónico (formato "SERVICIO DE TRANSPORTE DEL d AL d-m-aa"): 24 de 27 lo traen.
+async function logLusofSemanal(D1,D2){
+  const res={porCanal:{}, total:0, sinAsignar:[], mentha:false};
+  let vs=[];
+  try{
+    vs=await odooCall('electronic.voucher.supplier','search_read',
+      [[['partner_id','=',LOG_LUSOF],['xml_supplier_approval','!=',false]]],
+      {fields:['consecutive_number_xml','xml_supplier_approval'],limit:80});
+  }catch(e){ return res; }   // sin acceso al comprobante → Lusof no se reparte (y no se inventa)
+  const fs=await odooCall('account.move','search_read',
+    [[['partner_id','=',LOG_LUSOF],['move_type','=','in_invoice'],['state','=','posted']]],
+    {fields:['ref','amount_untaxed'],limit:200});
+  const byRef={}; fs.forEach(f=>byRef[(f.ref||'').trim()]=f);
+  for(const v of vs){
+    let txt=''; try{ txt=decodeURIComponent(escape(atob(v.xml_supplier_approval))); }catch(e){ try{ txt=atob(v.xml_supplier_approval); }catch(e2){ continue; } }
+    const ot=/<OtroTexto[^>]*>([\s\S]*?)<\/OtroTexto>/i.exec(txt);
+    const r=ot && /DEL\s+(\d{1,2})\s+AL\s+(\d{1,2})-(\d{1,2})-(\d{2})/i.exec(ot[1]);
+    if(!r) continue;
+    const y=2000+ +r[4], mo=+r[3];
+    const a=y+'-'+String(mo).padStart(2,'0')+'-'+String(+r[1]).padStart(2,'0');
+    const b=y+'-'+String(mo).padStart(2,'0')+'-'+String(+r[2]).padStart(2,'0');
+    if(b<D1 || a>D2) continue;                       // la semana no cae en el período
+    const f=byRef[v.consecutive_number_xml]; if(!f) continue;
+    const ls=await odooCall('account.move.line','search_read',
+      [[['partner_id','in',Object.keys(LOG_LUSOF_CLI).map(Number).concat([887])],
+        ['parent_state','=','posted'],['move_id.move_type','=','out_invoice'],
+        ['display_type','=','product'],['date','>=',a],['date','<=',b],
+        ['product_id','in',RENTA_PROD.map(P=>P.pid)]]],
+      {fields:['partner_id','price_subtotal'],limit:2000});
+    const w={}; let tot=0;
+    ls.forEach(l=>{ const pid=l.partner_id[0];
+      if(pid===887){ res.mentha=true; return; }      // Mentha NO entra al denominador
+      const ch=LOG_LUSOF_CLI[pid]; if(!ch) return;
+      w[ch]=(w[ch]||0)+(l.price_subtotal||0); tot+=(l.price_subtotal||0); });
+    res.total+=f.amount_untaxed;
+    if(!tot){ res.sinAsignar.push({sem:a+' al '+b, monto:f.amount_untaxed}); continue; }
+    for(const ch in w) res.porCanal[ch]=(res.porCanal[ch]||0)+f.amount_untaxed*w[ch]/tot;
+  }
+  return res;
+}
+
 async function reporteRenta(D1,D2){
   const {prods}=await computeCostos();            // HEREDA el motor real de costos
   const byKey={}; prods.forEach(p=>byKey[p.key]=p);
@@ -9401,13 +9513,24 @@ async function reporteRenta(D1,D2){
   const pinfo=await odooCall('product.product','read',[pids],{fields:['id','uom_id']});
   const refUom={}; pinfo.forEach(p=>{ refUom[keyDe[p.id]]=p.uom_id&&p.uom_id[0]; });
   // Líneas de venta (product, NUNCA COGS): out_invoice − out_refund
+  // ── REGLA PERMANENTE: una REVERSIÓN NO es una devolución ────────────────
+  // Una nota de crédito con `reversed_entry_id` poblado (o `ref` que empieza con
+  // "Reversal of") es la ANULACIÓN de una factura mal emitida: se anula y se vuelve a
+  // facturar. No salió ni volvió producto, así que NO puede tocar el margen del canal.
+  // MEDIDO el 12-ago-2026 sobre 2026: de 43 notas de crédito, 37 son reversiones
+  // (₡17.865.806) y solo 6 son devoluciones comerciales reales (₡445.813). Las más
+  // grandes son de los canales más grandes — Walmart ₡7,71M y Automercado ₡4,14M —,
+  // no de un cliente raro. Contarlas como devolución hundía el margen de los dos
+  // canales sobre los que se negocia. NO REVERTIR ESTE FILTRO.
+  const revIds=await _rentaReversiones(D1,D2);
   const lines=[];
   for(const [mt,sg] of [['out_invoice',1],['out_refund',-1]]){
     const rows=await odooCall('account.move.line','search_read',
       [[['parent_state','=','posted'],['move_id.move_type','=',mt],['display_type','=','product'],
         ['date','>=',D1],['date','<=',D2],['product_id','in',pids]]],
-      {fields:['product_id','quantity','price_subtotal','product_uom_id','partner_id'],limit:20000});
-    rows.forEach(r=>{ r._sg=sg; lines.push(r); });
+      {fields:['product_id','quantity','price_subtotal','product_uom_id','partner_id','move_id'],limit:20000});
+    rows.forEach(r=>{ if(sg<0 && revIds.has(r.move_id&&r.move_id[0])) return;   // anulación: fuera
+                      r._sg=sg; lines.push(r); });
   }
   // Partner → canal (el canal vive en el cliente, no en la factura)
   const partIds=[...new Set(lines.map(l=>l.partner_id&&l.partner_id[0]).filter(Boolean))];
@@ -9425,6 +9548,7 @@ async function reporteRenta(D1,D2){
   }
   // Frío por unidad del canal (₡ fijo ÷ unidades del canal ese mes)
   const frioUnit={}; CANALES_MATRIZ.forEach(c=>{ const f=canalFrio(c); frioUnit[c.key]=(f&&chVol[c.key])?f/chVol[c.key]:0; });
+  const logi=await reporteLogistica(D1,D2,cell,keyDe);   // costo de entrega por canal
   // Solo columnas con ventas ese mes
   const canalesActivos=CANALES_MATRIZ.filter(c=>RENTA_PROD.some(P=>{ const x=cell[c.key+'|'+P.key]; return x&&Math.abs(x.vol)>1e-6; }));
   const filas=RENTA_PROD.map(P=>{
@@ -9434,17 +9558,20 @@ async function reporteRenta(D1,D2){
       // canalComRenta: 0 si la comisión ya viene aplicada en la factura (Automercado) → el
       // neto ya está descontado y restarla acá sería doble descuento.
       const desc=x.neto*canalComRenta(c), frio=(frioUnit[c.key]||0)*x.vol, cprod=costo*x.vol;
-      const gan=x.neto-cprod-desc-frio;
+      // Logística: se reparte dentro del canal en proporción al neto de cada producto.
+      const netoCanal=RENTA_PROD.reduce((s,PP)=>{ const y=cell[c.key+'|'+PP.key]; return s+(y?y.neto:0); },0);
+      const log=(logi.porCanal[c.key]||0)*(netoCanal?x.neto/netoCanal:0);
+      const gan=x.neto-cprod-desc-frio-log;
       // % SIEMPRE sobre |neto|: un mes con más notas de crédito que facturas deja el neto NEGATIVO,
       // y gan/neto (negativo ÷ negativo) devolvía un % POSITIVO junto a una ganancia negativa.
-      return {neto:x.neto, vol:x.vol, cprod, desc, frio, gan, pct: x.neto?gan/Math.abs(x.neto):0};
+      return {neto:x.neto, vol:x.vol, cprod, desc, frio, log, gan, pct: x.neto?gan/Math.abs(x.neto):0};
     });
     return {P, celdas, rowTot:celdas.reduce((s,x)=>s+(x?x.gan:0),0)};
   });
   const colTot=canalesActivos.map((c,ci)=>filas.reduce((s,f)=>s+(f.celdas[ci]?f.celdas[ci].gan:0),0));
   const gran=colTot.reduce((s,x)=>s+x,0);
   const netoTot=filas.reduce((s,f)=>s+f.celdas.reduce((a,x)=>a+(x?x.neto:0),0),0);
-  return {canalesActivos, filas, colTot, gran, netoTot, frioUnit, chVol};
+  return {canalesActivos, filas, colTot, gran, netoTot, frioUnit, chVol, logi, revIds};
 }
 async function cargarRenta(){
   const sel=document.getElementById('mesRenta'), ym=sel&&sel.value; if(!ym) return;
