@@ -9230,7 +9230,13 @@ const CANALES = [
   {key:'auto',   label:'Automercado',           plId:4,
    comision:{pct:0.126, enFactura:true, fuente:'acuerdo comercial · confirmado por Andrea, 9-ago-2026',
              intro:{pct:0.1697, meses:3, motivo:'tarifa de introducción de producto nuevo'}},
-   frio:{monto:612912, fuente:'acuerdo comercial, jul-2026'}},
+   frioPartner:713,
+   frio:{monto:612726.83, modo:'constante', desvioMax:0.05,
+         fuente:'aviso de pago de Automercado del 3-ago-2026: factura 0010000101 0000003373 por '
+               +'₡1.800.739,66 − ND FACCLI-0061942 (22-jul) por ₡612.912 = depósito ₡1.187.827,66. '
+               +'En Odoo solo queda el write-off: NO hay factura ni nota de débito formal.',
+         nota:'Automercado no declara el mes de servicio en el texto, así que va por CONSTANTE. '
+             +'Si el write-off del mes difiere más de 5%, la validación lo avisa en ámbar.'}},
   {key:'walmart',label:'Walmart / Más x Menos', plId:10,
    // enFactura:true CORREGIDO el 12-ago-2026. Estaba en false y Rentabilidad le restaba el
    // 6,54% a un neto que YA lo traía descontado: doble conteo de ~6,5 puntos de margen.
@@ -9258,14 +9264,21 @@ const CANALES = [
    // a propósito: el nombre no debe afirmar lo que no está confirmado. Es aparte del 6,5% —
    // verificado que las facturas de venta van con discount 0 y que las bills del proveedor son
    // solo frío, así que no hay doble conteo.
-   frio:{porTienda:2709.19, unidades_cobro:10, verificado:true, editable:true,
+   frioPartner:1224,
+   frio:{porTienda:2709.19, unidades_cobro:10, verificado:true, editable:true, modo:'parseMes',
          fuente:'bills del proveedor en 6106013, una por tienda — julio 2026 (11-ago-2026)',
          nota:'Arranca en mayo 2026. El write-off de ₡12.018,39 en 6106028 NO es gasto: es el pago de las bills de mayo+junio (₡10.635,75 × 1,13 = ₡12.018,40) descontado del depósito.'}},
   {key:'compre', label:'Compre Bien',           plId:5,
    comision:null,
-   frio:{monto:51166.40, verificado:true, editable:true, antes:34386,
+   frioPartner:1032,
+   frio:{monto:76500, verificado:true, editable:true, antes:45280, modo:'parseMes',
          fuente:'facturas del proveedor en 6106013, verificado factura por factura (11-ago-2026)',
-         nota:'Cuatro bills recurrentes de Compre Bien, sin IVA: pf31/CM lineal 9.420 · Pan True Food 13.640 · Pan congelado 16.500 · Pizza 5.720 = 45.280 → ×1,13 = ₡51.166,40. Estables desde mayo 2026 (antes el pan congelado facturaba 1.650 y el total daba ₡32.521,40). El ₡34.386 viejo salía de 6106028, que NO es gasto: es la cuenta transitoria donde caen los write-off del descuento sobre el depósito.'}},
+         nota:'MENSUAL, una línea por TIENDA y por línea de producto, con el mes escrito en el texto '
+             +'(// JULIO // NICOYA). Julio-2026 sin IVA = 76.500: Nicoya pf31 9.420 + Pizza SC 5.720 + '
+             +'Pan congelado SC 16.500 + Pan TF Palmares 13.640 + Pan TF Grecia 6.600 + TrueFood 60cm '
+             +'Esparza 13.620 + Puertas de frío Cañas 11.000. El 45.280 anterior era la foto de feb-may, '
+             +'antes de que entraran Grecia, Esparza y Cañas: una constante nace vencida, por eso este '
+             +'canal se lee del mayor parseando el mes.'}},
   {key:'bm',     label:'BM',                    plId:5,  comision:null, frio:null},
   {key:'negro',  label:'Super Negro',           plId:5,  comision:null, frio:null},
   {key:'horeca', label:'HORECA',                plId:2,  comision:null, frio:null},
@@ -9295,6 +9308,60 @@ const canalComProy = (c,intro) => !c.comision ? 0 : ((intro && c.comision.intro)
 //   · porTienda × unidades_cobro → el canal cobra por renglón (MegaSuper). Qué mide cada
 //     renglón está sin confirmar: por eso el campo NO se llama `tiendas`.
 const canalFrio = c => !c.frio ? 0 : (c.frio.porTienda ? c.frio.porTienda*(c.frio.unidades_cobro||0) : (c.frio.monto||0));
+// ── FRÍO DEL MES DE SERVICIO (no del mes de posteo) ─────────────────────
+// TRAMPA MEDIDA el 12-ago-2026: el mes en que se postea NO es el mes que cubre el cargo.
+// Julio-2026 en el mayor daba Automercado ₡1.225.454 (dos write-offs de dos meses), Compre Bien
+// ₡156.202 (mezcla de meses + la transitoria) y MegaSuper ₡39.110 (incluye el write-off de
+// mayo+junio). Leer el mayor a lo bruto da PEOR que la constante.
+// Compre Bien y MegaSuper escriben el mes en el texto de cada línea → se parsea de ahí.
+// Automercado no lo escribe → va por constante, con aviso si el mes se desvía más de 5%.
+const _MESTXT={enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,
+               setiembre:9,septiembre:9,octubre:10,noviembre:11,diciembre:12};
+function _frioMesDe(txt){
+  const t=(txt||'').toLowerCase();
+  for(const k in _MESTXT){ if(t.indexOf(k)>=0) return _MESTXT[k]; }
+  return null;
+}
+// Devuelve {monto, fuente:'parseo'|'constante', aviso:''} para el canal en el mes [D1,D2].
+async function canalFrioMes(c, D1, D2){
+  const base=canalFrio(c);
+  if(!c.frio || !c.frioPartner) return {monto:base, fuente:'constante', aviso:''};
+  let ls=[];
+  try{
+    ls=await odooCall('account.move.line','search_read',
+      [[['partner_id','=',c.frioPartner],['account_id.code','in',['6106013','6106028']],
+        ['parent_state','=','posted'],['date','>=',_frioDesde(D1)],['date','<=',_frioHasta(D2)]]],
+      {fields:['name','debit','credit','date'],limit:400});
+  }catch(e){
+    return {monto:base, fuente:'constante', aviso:'no pude leer el mayor ('+((e&&e.message)||e)+'): va la constante'};
+  }
+  const mes=+D1.slice(5,7);
+  if(c.frio.modo==='parseMes'){
+    let suma=0, n=0, sinMes=0;
+    ls.forEach(function(l){
+      const m=_frioMesDe(l.name);
+      if(m===null){ sinMes++; return; }
+      if(m===mes){ suma+=(l.debit||0)-(l.credit||0); n++; }
+    });
+    // Blindaje: si no se pudo parsear nada, o el mes no tiene ni una línea, cae a la constante Y LO DICE.
+    if(!n) return {monto:base, fuente:'constante',
+      aviso:'no encontré ninguna línea de frío con el mes escrito en el texto: va la constante ('+cM(base)+')'};
+    const iva = FRIO_CON_IVA ? FRIO_IVA : 1;
+    return {monto:suma*iva, fuente:'parseo', n:n,
+      aviso: sinMes ? (sinMes+' línea'+(sinMes===1?'':'s')+' de frío sin mes legible, no se contaron') : ''};
+  }
+  // modo constante (Automercado): se compara contra lo posteado y se avisa si difiere
+  const post=ls.reduce(function(s,l){ return s+(l.debit||0)-(l.credit||0); },0);
+  const lim=c.frio.desvioMax||0.05;
+  const av = (post>0 && Math.abs(post-base)/base>lim)
+    ? ('el mayor de este mes trae '+cM(post)+' contra la constante '+cM(base)
+       +' ('+((post/base-1)*100).toFixed(0)+'%) — puede ser un mes con dos cargos o uno sin cargo')
+    : '';
+  return {monto:base, fuente:'constante', aviso:av};
+}
+// El cargo puede postearse con desfase: se mira una ventana amplia y el mes lo decide el TEXTO.
+function _frioDesde(D1){ const d=new Date(D1+'T00:00:00'); d.setMonth(d.getMonth()-1); return _ymd(d); }
+function _frioHasta(D2){ const d=new Date(D2+'T00:00:00'); d.setMonth(d.getMonth()+3); return _ymd(d); }
 // Cómo se explica ese número en el tooltip: si es por tienda, se muestra la multiplicación.
 const canalFrioCalc = c => (c.frio && c.frio.porTienda)
   ? cM(c.frio.porTienda)+' × '+fmtN(c.frio.unidades_cobro||0)+' = '+cM(canalFrio(c))
