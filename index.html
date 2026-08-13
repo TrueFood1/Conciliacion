@@ -1426,6 +1426,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face on face-desk">Producción</button>
     <button class="face face-desk" onclick="irAMermas()">Mermas</button>
     <button class="face" onclick="irAConteo()">Inventario</button>
+    <button class="face" onclick="irAConteoLote()">Conteo por lote</button>
     <button class="face face-desk" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
@@ -1450,12 +1451,32 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 </div>
 
 <!-- MERMAS (módulo Operaciones) -->
+<div id="vConteoLote" class="hidden">
+  <div class="faces faces-ops">
+    <button class="face" onclick="irAResumen()">Resumen</button>
+    <button class="face face-desk" onclick="irAProduccion()">Producción</button>
+    <button class="face face-desk" onclick="irAMermas()">Mermas</button>
+    <button class="face" onclick="irAConteo()">Inventario</button>
+    <button class="face on">Conteo por lote</button>
+    <button class="face face-desk" onclick="irAPlan()">Plan</button>
+  </div>
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <div class="m3title" style="font-size:24px">Conteo por lote</div>
+      <div class="m3sub" style="margin-top:2px">La foto del congelador que ancla los saldos. Todo lo que se fabrique y se entregue después de este instante se cuenta contra esta foto.</div>
+    </div>
+    <button class="btn btn-sm" id="clRecargar" onclick="cargarConteoLote(true)">Recargar lotes</button>
+  </div>
+  <div id="clStatus" class="status hidden" style="margin-top:14px"></div>
+  <div id="clBody" style="margin-top:14px;display:none"></div>
+</div>
 <div id="vMermas" class="hidden">
   <div class="faces faces-ops">
     <button class="face" onclick="irAResumen()">Resumen</button>
     <button class="face face-desk" onclick="irAProduccion()">Producción</button>
     <button class="face on face-desk">Mermas</button>
     <button class="face" onclick="irAConteo()">Inventario</button>
+    <button class="face" onclick="irAConteoLote()">Conteo por lote</button>
     <button class="face face-desk" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
@@ -1756,6 +1777,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face face-desk" onclick="irAProduccion()">Producción</button>
     <button class="face face-desk" onclick="irAMermas()">Mermas</button>
     <button class="face on">Inventario</button>
+    <button class="face" onclick="irAConteoLote()">Conteo por lote</button>
     <button class="face face-desk" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
@@ -1898,6 +1920,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face face-desk" onclick="irAProduccion()">Producción</button>
     <button class="face face-desk" onclick="irAMermas()">Mermas</button>
     <button class="face" onclick="irAConteo()">Inventario</button>
+    <button class="face" onclick="irAConteoLote()">Conteo por lote</button>
     <button class="face on face-desk">Plan</button>
   </div>
   <div>
@@ -1998,6 +2021,25 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vResumen .rz-cal2 .rz-days{grid-auto-flow:column;grid-auto-columns:132px;grid-template-columns:none;overflow-x:auto;padding-bottom:6px}
   #vResumen .rz-vernext{display:inline-block;margin-top:12px;background:none;border:.5px solid var(--border);color:var(--text-2);font-size:12px;border-radius:6px;padding:5px 12px;cursor:pointer}
   #vResumen .rz-vernext:hover{border-color:#3A3A42;color:var(--text)}
+}
+
+/* ── Conteo por lote ── */
+.cl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.cl-card{padding:14px 16px}
+.cl-none{font-size:12.5px;color:var(--text-3);padding:6px 0}
+.cl-tbl{width:100%;border-collapse:collapse;margin-top:4px}
+.cl-tbl th{text-align:left;font-size:10.5px;font-weight:400;letter-spacing:.03em;color:var(--text-3);padding:4px 6px 6px 0;border-bottom:1px solid var(--border)}
+.cl-tbl td{padding:5px 6px 5px 0;font-size:12.5px;color:var(--text-2);vertical-align:middle}
+.cl-tbl td.cl-uds{color:var(--text);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.cl-in{width:62px;background:#0E0E11;border:1px solid var(--border-strong);border-radius:7px;color:var(--text);
+  font:inherit;font-size:13px;padding:6px 8px;text-align:right}
+.cl-in:focus{outline:none;border-color:#7F77DD}
+.cl-tag{font-size:10px;color:var(--text-3);border:1px solid var(--border);border-radius:999px;padding:1px 6px;margin-left:4px}
+.cl-add{margin-top:10px}
+@media(max-width:700px){
+  .cl-grid{grid-template-columns:1fr;gap:10px}
+  .cl-in{width:100%;min-width:0;font-size:16px;padding:9px 8px}   /* 16px: iOS no hace zoom al enfocar */
+  .cl-tbl th:nth-child(4),.cl-tbl td:nth-child(4){display:none}   /* el total vive en el pie, no por fila */
 }
 /* chip de capacidad por personas (marca manual de la semana) */
 #vResumen .rz-chip,#vPlan .rz-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text-2);background:var(--surface-2);border:.5px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;white-space:nowrap}
@@ -2248,6 +2290,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face face-desk" onclick="irAProduccion()">Producción</button>
     <button class="face face-desk" onclick="irAMermas()">Mermas</button>
     <button class="face" onclick="irAConteo()">Inventario</button>
+    <button class="face" onclick="irAConteoLote()">Conteo por lote</button>
     <button class="face face-desk" onclick="irAPlan()">Plan</button>
   </div>
   <div id="rzBody" style="margin-top:6px"></div>
@@ -2367,6 +2410,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face face-desk" onclick="irAProduccion()">Producción</button>
     <button class="face face-desk" onclick="irAMermas()">Mermas</button>
     <button class="face on">Inventario</button>
+    <button class="face" onclick="irAConteoLote()">Conteo por lote</button>
     <button class="face face-desk" onclick="irAPlan()">Plan</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
@@ -5762,6 +5806,197 @@ function _entAgrupar(crudo, anioSet){
     else buckets[r.estado].push(rec);
   });
   return {lotes, buckets};
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// CONTEO POR LOTE — el ANCLA de saldos del módulo de Entregas (Pieza 4).
+// Es una FOTO del congelador: qué lotes hay y cuánto de cada uno. Todo lo
+// fabricado (Odoo) y lo entregado (este módulo) se cuenta DESPUÉS del corte.
+// Append-only: cada guardado inserta un conteo nuevo; el más reciente manda.
+// Odoo sigue SOLO LECTURA — acá solo se escribe en Supabase.
+// ════════════════════════════════════════════════════════════════════════
+let _clLotes=null, _clExtra={}, _clGuardando=false;
+
+function irAConteoLote(){
+  _modShow('vConteoLote'); crumbSet('Operaciones','Conteo por lote');
+  cargarConteoLote(false);
+}
+
+// uds individuales = cajas × unidades por caja + sueltas × unidades por presentación.
+// (Francés/Buns: la "suelta" es un paquete de 4 · Pizza: paquete de 2 · resto: la unidad.)
+function _clUds(pid, cajas, sueltas){
+  const I=NIV_INFO[pid]||{cajaU:1,presDiv:1};
+  return (+cajas||0)*I.cajaU + (+sueltas||0)*I.presDiv;
+}
+
+async function cargarConteoLote(force){
+  const st=document.getElementById('clStatus'), body=document.getElementById('clBody');
+  if(_clLotes && !force){ _clRender(); return; }
+  st.className='status s-info'; st.classList.remove('hidden');
+  st.innerHTML='<span class="spin"></span>Leyendo los lotes de los últimos 3 meses del chatter de Odoo (solo lectura)…';
+  body.style.display='none';
+  try{
+    _clLotes=await entLotesActivos(3);
+    st.classList.add('hidden'); _clRender();
+  }catch(e){
+    st.className='status s-err';
+    st.innerHTML='No pude leer los lotes: '+esc((e&&e.message)||e)+'. Podés contar igual agregando los lotes a mano.';
+    _clLotes={lotes:{},buckets:{sin_lote:[],ambiguo:[],anio_invalido:[]}}; _clRender();
+  }
+}
+
+function _clRender(){
+  const body=document.getElementById('clBody'); if(!body) return;
+  const porProd={}; ENT_PROD.forEach(function(pid){ porProd[pid]=[]; });
+  Object.values(_clLotes.lotes||{}).forEach(function(L){
+    const pid=L.ordenes&&L.ordenes[0]&&L.ordenes[0].producto&&L.ordenes[0].producto[0];
+    if(pid && porProd[pid]) porProd[pid].push(L);
+  });
+  ENT_PROD.forEach(function(pid){
+    (_clExtra[pid]||[]).forEach(function(x){ porProd[pid].push({key:'x:'+pid+':'+x, canon:x, extra:true}); });
+    porProd[pid].sort(function(a,z){ return String(a.canon).localeCompare(String(z.canon),'es'); });
+  });
+
+  let h='<div class="cl-grid">';
+  ENT_PROD.forEach(function(pid){
+    const I=NIV_INFO[pid]||{nom:'id '+pid,cajaU:1,presDiv:1,presLbl:'uds'};
+    const ls=porProd[pid]||[];
+    h+='<div class="card cl-card"><div class="card-title">'+esc(I.nom)
+      +' <span class="muted" style="font-weight:400;font-size:11.5px">· caja de '+I.cajaU+' u'
+      +(I.presDiv>1?(' · suelta = '+I.presLbl+' de '+I.presDiv):'')+'</span></div>';
+    if(!ls.length) h+='<div class="cl-none">Sin lotes en la ventana de 3 meses. Si hay producto físico, agregalo abajo.</div>';
+    else{
+      h+='<table class="cl-tbl"><tr><th>Lote</th><th>Cajas</th><th>Sueltas</th><th>Unidades</th></tr>';
+      ls.forEach(function(L){
+        const id='cl_'+L.key.replace(/[^A-Za-z0-9]/g,'_');
+        h+='<tr data-pid="'+pid+'" data-lote="'+esc(L.canon)+'">'
+          +'<td>'+esc(L.canon)+(L.extra?' <span class="cl-tag">agregado</span>':'')+'</td>'
+          +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_c" oninput="_clRecalc(this)"></td>'
+          +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_s" oninput="_clRecalc(this)"></td>'
+          +'<td class="cl-uds" id="'+id+'_u">—</td></tr>';
+      });
+      h+='</table>';
+    }
+    h+='<button class="btn btn-sm cl-add" onclick="_clAgregar('+pid+')">Agregar un lote que no está</button></div>';
+  });
+  h+='</div>';
+
+  // Los casos que el extractor NO pudo resolver van a la vista, nunca escondidos (regla de la ESPEC).
+  const b=_clLotes.buckets||{};
+  const nb=(b.sin_lote||[]).length+(b.ambiguo||[]).length+(b.anio_invalido||[]).length;
+  if(nb){
+    h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-top:16px">'
+      +'<div style="font-weight:700;color:#E9A23B;font-size:12.5px">'+nb+' órdenes sin lote legible</div>'
+      +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.6">'
+      +'El extractor no pudo sacar el lote del chatter de estas órdenes. No se asumen ni se esconden: '
+      +'si hay producto de alguna en el congelador, agregá el lote a mano en el producto que corresponda.</div>'
+      +'<table class="cl-tbl" style="margin-top:8px"><tr><th>Orden</th><th>Producto</th><th>Fecha</th><th>Caso</th></tr>';
+    ['sin_lote','ambiguo','anio_invalido'].forEach(function(k){
+      const lbl={sin_lote:'sin lote en el chatter',ambiguo:'ambiguo (más de un candidato)',anio_invalido:'año fuera de rango'}[k];
+      (b[k]||[]).slice(0,40).forEach(function(r){
+        h+='<tr><td>'+esc(r.orden||'')+'</td><td>'+esc((r.producto&&r.producto[1])||'')+'</td>'
+          +'<td>'+esc(r.fecha||'')+'</td><td class="muted">'+lbl+'</td></tr>';
+      });
+    });
+    h+='</table></div>';
+  }
+
+  h+='<div class="card" style="margin-top:16px"><div class="card-title">Guardar el conteo</div>'
+    +'<div style="font-size:11.5px;color:var(--text-3);margin:-4px 0 10px;line-height:1.6">'
+    +'Al guardar se fija el <strong>corte</strong>: el instante exacto en que esta foto fue verdad. '
+    +'Lo entregado antes del corte ya está descontado en los números que anotes; lo de después se resta encima. '
+    +'No se edita nada: si hay que corregir, se guarda un conteo nuevo y manda el más reciente.</div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">'
+    +'<div class="field" style="min-width:190px"><label>Quién contó</label>'
+    +'<input id="clResp" class="cl-in" style="width:100%" placeholder="Daniel"></div>'
+    +'<div class="field" style="flex:1;min-width:220px"><label>Nota (opcional)</label>'
+    +'<input id="clNota" class="cl-in" style="width:100%" placeholder="lo que valga la pena recordar"></div>'
+    +'<button class="btn" id="clSave" onclick="guardarConteoLote()">Guardar conteo</button></div>'
+    +'<div id="clSaveMsg" style="margin-top:10px;font-size:12.5px"></div>'
+    +'<div id="clResumen" style="margin-top:10px;font-size:12.5px;color:var(--text-2)"></div></div>';
+
+  body.innerHTML=h; body.style.display='block';
+  _clTotales();
+}
+
+function _clRecalc(inp){
+  const tr=inp.closest('tr'); if(!tr) return;
+  const pid=+tr.getAttribute('data-pid');
+  const base=inp.id.replace(/_(c|s)$/,'');
+  const c=document.getElementById(base+'_c'), s=document.getElementById(base+'_s'), u=document.getElementById(base+'_u');
+  const uds=_clUds(pid, c&&c.value, s&&s.value);
+  if(u) u.textContent = uds ? _rzN(uds) : '—';
+  _clTotales();
+}
+
+// Total vivo por producto: sirve de chequeo grueso contra lo que Daniel ve en el congelador.
+function _clTotales(){
+  const el=document.getElementById('clResumen'); if(!el) return;
+  const t=_clLeer(), por={};
+  t.forEach(function(r){ por[r.producto_id]=(por[r.producto_id]||0)+r.uds; });
+  const parts=ENT_PROD.filter(function(p){return por[p];}).map(function(p){
+    return (NIV_INFO[p]?NIV_INFO[p].nom:p)+' '+_rzN(por[p])+' u'; });
+  el.innerHTML = parts.length ? ('Contado hasta ahora: '+esc(parts.join(' · '))) : '';
+}
+
+// Lee la pantalla. Solo las filas con algo anotado — un lote en cero no se guarda:
+// "no se contó" y "se contó y había cero" son lo mismo para el saldo, y guardar
+// ceros ensucia la foto con lotes que ya no existen.
+function _clLeer(){
+  const out=[];
+  document.querySelectorAll('#clBody tr[data-pid]').forEach(function(tr){
+    const pid=+tr.getAttribute('data-pid'), lote=tr.getAttribute('data-lote');
+    const ins=tr.querySelectorAll('input.cl-in');
+    const cajas=+(ins[0]&&ins[0].value||0), sueltas=+(ins[1]&&ins[1].value||0);
+    if(!cajas && !sueltas) return;
+    out.push({producto_id:pid, lote:lote, cajas:cajas, sueltas:sueltas, uds:_clUds(pid,cajas,sueltas)});
+  });
+  return out;
+}
+
+function _clAgregar(pid){
+  const v=prompt('Lote de '+((NIV_INFO[pid]&&NIV_INFO[pid].nom)||pid)+' que no está en la lista\n(forma "154 / 12-26"):');
+  if(!v) return;
+  const canon=String(v).trim(); if(!canon) return;
+  _clExtra[pid]=_clExtra[pid]||[];
+  if(_clExtra[pid].indexOf(canon)<0) _clExtra[pid].push(canon);
+  _clRender();
+}
+
+async function guardarConteoLote(){
+  if(_clGuardando) return;
+  const msg=document.getElementById('clSaveMsg'), btn=document.getElementById('clSave');
+  const lineas=_clLeer();
+  if(!lineas.length){ msg.style.color='#E9A23B'; msg.textContent='No hay nada anotado todavía.'; return; }
+  const resp=(document.getElementById('clResp').value||'').trim();
+  if(!resp){ msg.style.color='#E9A23B'; msg.textContent='Falta quién contó.'; return; }
+  const c=sbClient();
+  if(!c){ msg.style.color='#FF8A8A'; msg.textContent='No hay sesión de Supabase.'; return; }
+  if(!confirm('Guardar el conteo con '+lineas.length+' lote'+(lineas.length===1?'':'s')+'?\n\nEsto fija el corte: los saldos se calculan desde este instante.')) return;
+  _clGuardando=true; btn.disabled=true;
+  msg.style.color='#A8A6A0'; msg.textContent='Guardando…';
+  try{
+    const {data:{user}}=await c.auth.getUser();
+    const email=(user&&user.email)||'desconocido';
+    const {data:cab,error:e1}=await c.from('ent_conteo').insert({
+      fecha:_ymd(new Date()), responsable:resp,
+      nota:(document.getElementById('clNota').value||'').trim()||null, creado_por:email
+    }).select('id,corte').single();
+    if(e1) throw e1;
+    const {error:e2}=await c.from('ent_conteo_linea')
+      .insert(lineas.map(function(r){ return Object.assign({conteo_id:cab.id}, r); }));
+    if(e2) throw e2;
+    msg.style.color='#8FBF6A';
+    msg.innerHTML='Conteo guardado (#'+cab.id+', '+lineas.length+' lotes). '
+      +'Corte: '+esc(String(cab.corte||'').replace('T',' ').slice(0,16))+'. '
+      +'A partir de acá los saldos se calculan solos.';
+    btn.textContent='Guardado';
+  }catch(e){
+    msg.style.color='#FF8A8A';
+    msg.textContent='No se pudo guardar: '+((e&&e.message)||e);
+    btn.disabled=false; btn.textContent='Guardar conteo';
+  }
+  _clGuardando=false;
 }
 
 // ── VALIDACIÓN (index.html?diag=lotes): cobertura del extractor con las DOS reglas. Solo lectura.
