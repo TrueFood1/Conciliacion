@@ -823,7 +823,7 @@ tr.r-ing td{background:#eff6ff}
    OJO con el ámbar: #E9A23B / #C99A4E avisan, el lima identifica. Conviven cerca ahora,
    así que el lima NUNCA se usa de fondo lavado — los bloques de alerta conservan su
    lavado naranja, que es lo que los separa de un vistazo. */
-#vConteoLote,#vReporte,#vPendientes{--mod:#E9FE60;--accent:#E9FE60;--blue:#E9FE60;--blue-l:rgba(233,254,96,.14)}
+#vConteoLote,#vReporte,#vPendientes,#vDespachos{--mod:#E9FE60;--accent:#E9FE60;--blue:#E9FE60;--blue-l:rgba(233,254,96,.14)}
 .faces .face.on{color:var(--text);border-bottom-color:var(--mod)}
 .m3nav .m3tab.on{background:transparent;color:var(--mod);border-bottom-color:var(--mod)}
 .home-mod-dot{width:9px;height:9px;border-radius:3px;display:inline-block}
@@ -1514,6 +1514,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- MERMAS (módulo Operaciones) -->
 <div id="vReporte" class="hidden">
   <div class="faces faces-ent">
+    <button class="face" onclick="irADespachos()">Despachos</button>
     <button class="face" onclick="irAConteoLote()">Conteo por lote</button>
     <button class="face on">Reporte</button>
     <button class="face face-soon" disabled title="Fase 2">Preparar</button>
@@ -1526,11 +1527,28 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   <div id="rpBody" style="margin-top:14px"></div>
 </div>
 
-<div id="vPendientes" class="hidden">
+<!-- ── DESPACHOS: el lector de facturas (Daniel, 6:30 am) ────────────────── -->
+<div id="vDespachos" class="hidden">
   <div class="faces faces-ent">
+    <button class="face on">Despachos</button>
     <button class="face" onclick="irAConteoLote()">Conteo por lote</button>
     <button class="face" onclick="irAReporte()">Reporte</button>
-    <button class="face face-soon" disabled title="Fase 2">Preparar</button>
+    <button class="face face-soon" disabled title="Después del viernes">Buscar</button>
+    <button class="face" onclick="irAPendientes()">Pendientes</button>
+  </div>
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div class="m3title" style="font-size:24px">Despachos</div>
+    <button class="btn btn-sm" onclick="despCargar(true)">Recargar</button>
+  </div>
+  <div id="despStatus" class="status hidden" style="margin-top:14px"></div>
+  <div id="despBody" style="margin-top:14px"></div>
+</div>
+
+<div id="vPendientes" class="hidden">
+  <div class="faces faces-ent">
+    <button class="face" onclick="irADespachos()">Despachos</button>
+    <button class="face" onclick="irAConteoLote()">Conteo por lote</button>
+    <button class="face" onclick="irAReporte()">Reporte</button>
     <button class="face face-soon" disabled title="Después del viernes">Buscar</button>
     <button class="face on">Pendientes</button>
   </div>
@@ -1547,6 +1565,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <div id="vConteoLote" class="hidden">
   <div class="faces faces-ent">
+    <button class="face" onclick="irADespachos()">Despachos</button>
     <button class="face on">Conteo por lote</button>
     <button class="face" onclick="irAReporte()">Reporte</button>
     <button class="face face-soon" disabled title="Fase 2">Preparar</button>
@@ -2277,6 +2296,66 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   .cl-pie{margin:8px -13px -10px;padding:9px 13px}
   .cl-form{grid-template-columns:1fr;gap:10px}
   .cl-pres{display:none}       /* la presentación se ve al abrir; en la fila colapsada estorba */
+}
+
+/* ── DESPACHOS · el lector de facturas ──────────────────────────────────
+   Misma densidad y mismo criterio que el Conteo: filas de tabla, nada anidado,
+   el lote angosto y sin protagonismo. Se usa a las 6:30 con una mano. */
+.dp-lista{display:flex;flex-direction:column;gap:6px}
+.dp-sep{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--text-3);padding-top:6px}
+.dp-ped{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;cursor:pointer;
+  border:1px solid var(--border);border-radius:10px;background:#141417;padding:10px 12px;
+  color:var(--text);font:inherit}
+.dp-ped.hoy{border-color:#3F4A16}
+.dp-ped.vieja{background:transparent}
+.dp-ped.vieja .dp-cli{font-weight:400;color:var(--text-2)}
+.dp-top,.dp-bot{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.dp-cli{font-size:13.5px;font-weight:500}
+.dp-fac{font-family:var(--mono);font-size:10.5px;color:var(--text-3)}
+.dp-n{font-size:11.5px;color:var(--text-3)}
+.dp-dia{font-size:9.5px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;
+  padding:1px 7px;border-radius:999px;border:1px solid var(--border-strong);color:var(--text-3)}
+.dp-dia.hoy{color:#2C3A00;background:#E9FE60;border-color:#E9FE60}
+/* Lo anterior a la ventana no compite: encabezado propio, gris, y un punto menos
+   de contraste. La regla es que nada desaparece, no que todo grite igual. */
+.dp-antes{margin-top:8px;border-top:1px solid var(--border);padding-top:9px;
+  display:flex;flex-direction:column;gap:6px}
+.dp-antes-h{display:flex;justify-content:space-between;align-items:baseline;font-size:10px;
+  font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)}
+.dp-antes-n{font-family:var(--mono);letter-spacing:0}
+.dp-cab{margin:12px 0 4px}
+.dp-cab-cli{font-size:22px;font-weight:600;letter-spacing:-.02em}
+.dp-cab-sub{font-size:12px;color:var(--text-2);margin-top:2px}
+.lt-desp{width:100%;border-collapse:collapse;margin-top:8px}
+.lt-desp th{text-align:left;font-size:11px;font-weight:400;letter-spacing:.03em;color:var(--text-3);
+  padding:0 5px 5px 0;border-bottom:1px solid var(--border);white-space:nowrap}
+.lt-desp th.num,.lt-desp td.num{text-align:right}
+.lt-desp th.mid,.lt-desp td.mid{text-align:center}
+.lt-desp td{padding:6px 5px 6px 0;border-bottom:1px solid var(--border);vertical-align:middle}
+.lt-desp col.c1{width:108px} .lt-desp col.c2{width:120px} .lt-desp col.c3{width:52px}
+.lt-desp td.pr{color:var(--text);font-size:12.5px}
+.lt-desp tr.dif td.num .dp-cant{border-color:rgba(233,162,59,.55);color:#E9A23B}
+.dp-cant{width:56px;background:#0E0E11;border:1px solid var(--border-strong);border-radius:6px;
+  color:var(--text);font:inherit;font-size:16px;padding:5px 4px;text-align:center;
+  font-variant-numeric:tabular-nums}
+.dp-uom{display:block;font-size:10px;color:var(--text-3);margin-top:2px}
+.dp-fact{display:block;font-size:10px;color:#E9A23B;margin-top:1px}
+.dp-lsel{width:100%;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:6px;
+  color:var(--text);font:inherit;font-size:12px;padding:5px 4px;font-family:var(--mono)}
+.dp-lq{width:46px;background:#0E0E11;border:1px solid var(--border-strong);border-radius:6px;
+  color:var(--text);font:inherit;font-size:16px;padding:5px 2px;text-align:center;
+  font-variant-numeric:tabular-nums}
+.dp-nolote{display:block;font-size:9.5px;color:var(--text-3);margin-top:2px}
+.dp-add td{border-bottom:1px solid var(--border);padding-bottom:8px}
+.dp-mas{background:none;border:none;padding:0;font:inherit;font-size:10.5px;color:#E9FE60;cursor:pointer}
+.dp-ok{font-size:10.5px;color:var(--text-3);margin-left:10px}
+.dp-mal{font-size:10.5px;color:#E9A23B;margin-left:10px}
+.dp-pie{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+@media(max-width:700px){
+  .lt-desp col.c1{width:94px} .lt-desp col.c2{width:104px} .lt-desp col.c3{width:46px}
+  .lt-desp td{padding:5px 4px 5px 0}
+  .dp-cab-cli{font-size:20px}
 }
 /* chip de capacidad por personas (marca manual de la semana) */
 #vResumen .rz-chip,#vPlan .rz-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text-2);background:var(--surface-2);border:.5px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;white-space:nowrap}
@@ -3178,7 +3257,7 @@ const ACCESO_VISTAS = {
   finanzas:     ['vFacturado','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vResults'],
   conciliacion: ['vUpload'],
   operaciones:  ['vProduccion','vMermas','vInventario','vPlan','vResumen','vConteo'],
-  entregas:     ['vConteoLote','vReporte','vPendientes'],
+  entregas:     ['vConteoLote','vReporte','vPendientes','vDespachos'],
 };
 let _accesoMods=null;   // se llena al entrar; null = todavía no se sabe → no se restringe
 function accesoPuede(mod){ return !_accesoMods || _accesoMods==='todo' || _accesoMods.indexOf(mod)>=0; }
@@ -3245,7 +3324,7 @@ function aplicarModoProduccion(){
   });
 }
 // Vistas de módulo (Contabilidad + Conciliación + Operaciones). Muestra UNA, oculta el resto.
-const _MOD_VIEWS=['vUpload','vFacturado','vProduccion','vMermas','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vInventario','vPlan','vResumen','vConteo','vConteoLote','vReporte','vPendientes','vResults'];
+const _MOD_VIEWS=['vUpload','vFacturado','vProduccion','vMermas','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vInventario','vPlan','vResumen','vConteo','vConteoLote','vReporte','vPendientes','vDespachos','vResults'];
 function _modShow(id){
   // Guardia COSMÉTICO (ver ACCESO_USUARIOS): navegar directo a una vista ajena
   // devuelve al lobby. No protege los datos — eso lo hará "Roles y accesos".
@@ -6620,6 +6699,329 @@ async function rpCalcSaldos(g){
   const {data:ent}=await c.from('ent_entregado_desde_ancla').select('lote,producto_id,uds');
   (ent||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote; s[k]=(s[k]||0)-(+r.uds||0); });
   return s;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// DESPACHOS · el lector de facturas. La factura arma el pedido; Daniel agrega
+// lotes y confirma. Pensado para las 6:30 am con una sola mano libre.
+//
+// REUSA lo que ya existe y no lo reimplementa: entLotesActivos() para los lotes
+// del chatter, rpCalcSaldos() para el saldo por lote contra el ancla, y las
+// tablas ent_pedido / ent_alisto del 12-ago (extendidas por ENTREGAS_DESPACHOS.sql).
+//
+// ⚠️ LA UNIDAD SE LEE POR ID, NUNCA POR NOMBRE. `Paquete de 4` [37] y `Docenas`
+// [2] se llaman los dos "Dozens" en inglés (4 u vs 12 u); `Caja` [46] y
+// `Caja (Hamburguesa)` [42] se llaman los dos "Caja" (6 u vs 24 u). El factor
+// sale de uom.uom por id y se guarda congelado en la línea.
+// ════════════════════════════════════════════════════════════════════════
+const DESP_VENTANA = 3;              // días hacia atrás, contando hoy
+// ARRANQUE DEL MÓDULO. Sin esto la bandeja del lunes abre con 82 facturas de
+// semanas anteriores que ya se despacharon a mano, y Daniel no puede distinguir
+// lo que le toca de lo que es historia. Todo lo anterior a esta fecha NO existe
+// para Despachos. Medido el 14-ago: 82 facturas quedaban "pendientes" solo por
+// no haber pasado nunca por el módulo.
+const DESP_DESDE = '2026-08-17';
+let _despFac=null, _despUom=null, _despErr='', _despAbierto=null, _despLotes=null,
+    _despSaldo=null, _despEdit={}, _despGuardando=false;
+
+function _despYmd(d){ return d.toISOString().slice(0,10); }
+function _despHoy(){ return _despYmd(new Date()); }
+
+function _despAviso(cls,html){
+  const st=document.getElementById('despStatus'); if(!st) return;
+  st.className='status '+cls; st.innerHTML=html; st.classList.remove('hidden');
+}
+
+// ── LECTURA ─────────────────────────────────────────────────────────────
+async function despCargar(force){
+  const body=document.getElementById('despBody');
+  if(_despFac && !force){ despRender(); return; }
+  _despErr='';
+  _despAviso('s-info','Leyendo facturas de Odoo… la primera consulta del día puede tardar ~40 s.');
+  if(body) body.innerHTML='';
+  try{
+    if(!_despUom){
+      const us=await odooCall('uom.uom','search_read',[[['category_id.name','=','Unidad']]],
+        {fields:['id','name','factor'],limit:100,context:{lang:'es_CR'}});
+      _despUom={}; us.forEach(function(u){ _despUom[u.id]=u; });
+    }
+    const hoy=new Date(), d0=new Date(); d0.setDate(d0.getDate()-(DESP_VENTANA-1));
+    const desde = _despYmd(d0) < DESP_DESDE ? DESP_DESDE : _despYmd(d0);
+    _despFac = await despLeerFacturas(DESP_DESDE, _despYmd(hoy), desde);
+    const st=document.getElementById('despStatus'); if(st) st.classList.add('hidden');
+  }catch(e){
+    _despErr=(e&&e.message)||String(e); _despFac=[];
+    _despAviso('s-err','No pude leer las facturas de Odoo: '+esc(_despErr)
+      +' — probá "Recargar". Si sigue, registrá la salida por Reporte de despacho.');
+  }
+  // los lotes van aparte y NO bloquean la bandeja: si fallan, se escribe el lote a mano
+  despCargarLotes();
+  despRender();
+}
+
+// Facturas posted del período con al menos una línea de los 6 terminados, menos
+// las que ya tienen despacho confirmado.
+async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
+  const mv=await odooCall('account.move','search_read',
+    [[['move_type','=','out_invoice'],['state','=','posted'],
+      ['invoice_date','>=',desdeTodo],['invoice_date','<=',hasta]]],
+    {fields:['id','name','invoice_date','partner_id'],limit:500,
+     order:'invoice_date desc, id desc',context:{lang:'es_CR'}});
+  if(!mv.length) return [];
+  const ids=mv.map(function(m){return m.id;});
+  const ls=await odooCall('account.move.line','search_read',
+    [[['move_id','in',ids],['display_type','=','product'],['product_id','in',ENT_PROD]]],
+    {fields:['move_id','product_id','product_uom_id','quantity'],limit:5000,context:{lang:'es_CR'}});
+  const por={};
+  ls.forEach(function(l){ (por[l.move_id[0]]=por[l.move_id[0]]||[]).push(l); });
+  // ya despachadas (Supabase). Si falla, se muestran todas: mejor de más que de menos.
+  let ya={};
+  try{
+    const c=sbClient();
+    if(c){ const {data}=await c.from('v_ent_factura_despachada').select('factura_id');
+           (data||[]).forEach(function(r){ ya[r.factura_id]=1; }); }
+  }catch(e){}
+  const out=[];
+  mv.forEach(function(m){
+    if(ya[m.id]) return;
+    const lin=por[m.id]; if(!lin) return;      // factura sin terminado: no es despacho
+    out.push({
+      factura_id:m.id, factura:m.name, fecha:m.invoice_date,
+      cliente:(m.partner_id&&m.partner_id[1])||'—', cliente_id:(m.partner_id&&m.partner_id[0])||0,
+      enVentana: m.invoice_date >= desdeVentana,
+      lineas: lin.map(function(l){
+        const uid=(l.product_uom_id&&l.product_uom_id[0])||1;
+        const u=_despUom[uid], f=(u&&u.factor)||1;
+        const q=l.quantity||0;
+        return {producto_id:l.product_id[0], producto:(NIV_INFO[l.product_id[0]]||{}).nom||l.product_id[1],
+                uom_id:uid, uom_nombre:(u&&u.name)||'?', uom_factor:f,
+                cant_uom:q, cant_uds:q/f};
+      })
+    });
+  });
+  return out;
+}
+
+async function despCargarLotes(){
+  try{ _despLotes = await entLotesActivos(3); }catch(e){ _despLotes={lotes:{}}; }
+  try{ _despSaldo = await rpCalcSaldos(_despLotes); }catch(e){ _despSaldo=null; }
+  if(_despAbierto) despRender();
+}
+
+// ── BANDEJA ─────────────────────────────────────────────────────────────
+function despRender(){
+  const body=document.getElementById('despBody'); if(!body) return;
+  if(_despAbierto){ despRenderPedido(body); return; }
+  const fs=_despFac||[];
+  if(!fs.length){
+    body.innerHTML='<div class="cl-none">'+(_despErr?'':'No hay facturas sin despachar.')+'</div>';
+    return;
+  }
+  const hoy=_despHoy();
+  const dHoy=fs.filter(function(f){ return f.fecha===hoy; });
+  const dVen=fs.filter(function(f){ return f.fecha!==hoy && f.enVentana; });
+  const dVie=fs.filter(function(f){ return !f.enVentana; });
+  const tarjeta=function(f,vieja){
+    const uds=f.lineas.reduce(function(s,x){ return s+x.cant_uds; },0);
+    return '<button class="dp-ped'+(vieja?' vieja':(f.fecha===hoy?' hoy':''))+'" onclick="despAbrir('+f.factura_id+')">'
+      +'<span class="dp-top"><span class="dp-cli">'+esc(f.cliente)+'</span>'
+      +'<span class="dp-dia'+(f.fecha===hoy?' hoy':'')+'">'+esc(_despDia(f.fecha))+'</span></span>'
+      +'<span class="dp-bot"><span class="dp-n">'+f.lineas.length+' productos · '+_rzN(uds)+' u</span>'
+      +'<span class="dp-fac">'+esc(f.factura.slice(-10))+'</span></span></button>';
+  };
+  let h='<div class="dp-lista">';
+  if(dHoy.length){ h+='<div class="dp-sep">Hoy</div>'+dHoy.map(function(f){return tarjeta(f,false);}).join(''); }
+  if(dVen.length){ h+='<div class="dp-sep">Días anteriores</div>'+dVen.map(function(f){return tarjeta(f,false);}).join(''); }
+  if(dVie.length){
+    h+='<div class="dp-antes"><div class="dp-antes-h"><span>Anteriores sin despachar</span>'
+      +'<span class="dp-antes-n">'+dVie.length+'</span></div>'
+      +dVie.map(function(f){return tarjeta(f,true);}).join('')+'</div>';
+  }
+  h+='</div>';
+  body.innerHTML=h;
+}
+function _despDia(ymd){
+  const hoy=_despHoy();
+  if(ymd===hoy) return 'hoy';
+  const D=['dom','lun','mar','mié','jue','vie','sáb'];
+  const d=new Date(ymd+'T12:00:00');
+  return D[d.getDay()]+' '+d.getDate();
+}
+
+// ── UN PEDIDO ───────────────────────────────────────────────────────────
+function despAbrir(fid){ _despAbierto=fid; _despEdit={}; despRender(); window.scrollTo(0,0); }
+function despCerrar(){ _despAbierto=null; _despEdit={}; despRender(); }
+
+function _despKey(fid,i){ return fid+':'+i; }
+// Estado editable de una línea: cantidad entregada + lotes. Nace de la factura.
+function _despEst(f,i){
+  const k=_despKey(f.factura_id,i);
+  if(!_despEdit[k]) _despEdit[k]={cant:f.lineas[i].cant_uom, lotes:[{lote:'',cant:null}]};
+  return _despEdit[k];
+}
+// Lotes con saldo para un producto, del más viejo al más nuevo. [] si no se sabe.
+function _despLotesDe(pid){
+  if(!_despLotes||!_despLotes.lotes) return [];
+  const out=[];
+  Object.values(_despLotes.lotes).forEach(function(L){
+    if(+L.producto!==+pid) return;
+    const k=pid+'|'+L.canon;
+    const saldo=_despSaldo?(_despSaldo[k]||0):null;
+    if(_despSaldo && saldo<=0) return;          // sin saldo: no se ofrece
+    out.push({lote:L.canon, saldo:saldo});
+  });
+  out.sort(function(a,z){ return String(a.lote).localeCompare(String(z.lote),'es'); });
+  return out;
+}
+
+function despRenderPedido(body){
+  const f=(_despFac||[]).find(function(x){ return x.factura_id===_despAbierto; });
+  if(!f){ _despAbierto=null; despRender(); return; }
+  let h='<button class="btn btn-sm" onclick="despCerrar()">← Bandeja</button>'
+    +'<div class="dp-cab"><div class="dp-cab-cli">'+esc(f.cliente)+'</div>'
+    +'<div class="dp-cab-sub">'+esc(f.factura.slice(-10))+' · '+esc(_despDia(f.fecha))+' · '
+    +f.lineas.length+' productos</div></div>';
+  h+='<table class="lt-desp"><colgroup><col><col class="c1"><col class="c2"><col class="c3"></colgroup>'
+    +'<tr><th>Producto</th><th class="num">Cantidad</th><th class="mid">Lote</th><th class="num"></th></tr>';
+  f.lineas.forEach(function(L,i){
+    const e=_despEst(f,i);
+    const dif = Math.abs(e.cant-L.cant_uom)>1e-9;
+    const disp=_despLotesDe(L.producto_id);
+    e.lotes.forEach(function(lt,j){
+      h+='<tr'+(dif&&j===0?' class="dif"':'')+'>';
+      if(j===0){
+        h+='<td class="pr" rowspan="'+e.lotes.length+'">'+esc(L.producto)+'</td>'
+          +'<td class="num" rowspan="'+e.lotes.length+'">'
+          +'<input class="dp-cant" type="number" min="0" step="any" inputmode="decimal" value="'+e.cant+'" '
+          +'oninput="despSetCant('+i+',this.value)"> '
+          +'<span class="dp-uom">'+esc(L.uom_nombre)+'</span>'
+          +(dif?'<span class="dp-fact">facturado '+_rzN(L.cant_uom,0)+'</span>':'')
+          +'</td>';
+      }
+      h+='<td class="mid">'+_despLoteCtrl(i,j,lt,disp)+'</td>'
+        +'<td class="num"><input class="dp-lq" type="number" min="0" step="any" inputmode="decimal" '
+        +'value="'+(lt.cant==null?'':lt.cant)+'" oninput="despSetLoteCant('+i+','+j+',this.value)"></td></tr>';
+    });
+    h+='<tr class="dp-add"><td colspan="4">'
+      +'<button class="dp-mas" onclick="despMasLote('+i+')">+ partir entre otro lote</button>'
+      +_despSumaMsg(e,L)+'</td></tr>';
+  });
+  h+='</table>';
+  const pend=_despPendientes(f);
+  h+='<div class="dp-pie">'
+    +(pend? '<div class="cl-none">'+esc(pend)+'</div>' : '')
+    +'<button class="btn btn-amarillo" id="despOk"'+(pend?' disabled':'')
+    +' onclick="despConfirmar()">Confirmar despacho</button></div>';
+  body.innerHTML=h;
+}
+
+// Selector si hay lotes con saldo; campo libre si no. SIEMPRE se puede escribir:
+// el fallback no es solo para cuando falla el ancla, es el seguro permanente.
+function _despLoteCtrl(i,j,lt,disp){
+  let h='<select class="dp-lsel" onchange="despSetLote('+i+','+j+',this.value)">'
+    +'<option value="">— elegir —</option>';
+  let hay=false;
+  disp.forEach(function(d){
+    hay=true;
+    h+='<option value="'+esc(d.lote)+'"'+(lt.lote===d.lote?' selected':'')+'>'+esc(d.lote)
+      +(d.saldo!=null?(' · '+_rzN(d.saldo)+' u'):'')+'</option>';
+  });
+  if(lt.lote && !disp.some(function(d){return d.lote===lt.lote;}))
+    h+='<option value="'+esc(lt.lote)+'" selected>'+esc(lt.lote)+' · a mano</option>';
+  h+='<option value="__">escribir a mano…</option></select>';
+  if(!hay) h+='<span class="dp-nolote">sin saldo — escribilo</span>';
+  return h;
+}
+function _despSumaMsg(e,L){
+  const suma=e.lotes.reduce(function(s,x){ return s+(+x.cant||0); },0);
+  const objetivo=(+e.cant||0)*L.uom_factor ? (+e.cant||0) : 0;
+  if(!suma) return '';
+  if(Math.abs(suma-(+e.cant||0))<1e-9) return '<span class="dp-ok">'+_rzN(suma)+' de '+_rzN(+e.cant||0)+' ✓</span>';
+  return '<span class="dp-mal">'+_rzN(suma)+' de '+_rzN(+e.cant||0)+'</span>';
+}
+function _despPendientes(f){
+  let sinLote=0, mal=0;
+  f.lineas.forEach(function(L,i){
+    const e=_despEst(f,i);
+    const con=e.lotes.filter(function(x){ return x.lote && +x.cant>0; });
+    if(!con.length){ sinLote++; return; }
+    const suma=con.reduce(function(s,x){ return s+(+x.cant||0); },0);
+    if(Math.abs(suma-(+e.cant||0))>1e-9) mal++;
+  });
+  if(sinLote) return 'Faltan lotes en '+sinLote+(sinLote===1?' línea':' líneas');
+  if(mal)     return 'La suma de lotes no da la cantidad en '+mal+(mal===1?' línea':' líneas');
+  return '';
+}
+function despSetCant(i,v){ const f=_despFacAbierta(); if(!f) return;
+  _despEst(f,i).cant=(v===''?0:+v); despRender(); }
+function despSetLote(i,j,v){ const f=_despFacAbierta(); if(!f) return;
+  const e=_despEst(f,i);
+  if(v==='__'){ const t=prompt('Lote (forma "154 / 12-26"):',e.lotes[j].lote||''); if(t==null) { despRender(); return; } v=String(t).trim(); }
+  e.lotes[j].lote=v; despRender(); }
+function despSetLoteCant(i,j,v){ const f=_despFacAbierta(); if(!f) return;
+  _despEst(f,i).lotes[j].cant=(v===''?null:+v); despRender(); }
+function despMasLote(i){ const f=_despFacAbierta(); if(!f) return;
+  _despEst(f,i).lotes.push({lote:'',cant:null}); despRender(); }
+function _despFacAbierta(){ return (_despFac||[]).find(function(x){ return x.factura_id===_despAbierto; }); }
+
+// ── CONFIRMAR ───────────────────────────────────────────────────────────
+// Cinco inserts encadenados, todos append-only. Si algo falla a mitad, queda el
+// pedido sin alisto: la factura VUELVE a la bandeja (la vista pide alisto
+// vigente), que es exactamente lo que hay que hacer — reintentar.
+async function despConfirmar(){
+  if(_despGuardando) return;
+  const f=_despFacAbierta(); if(!f) return;
+  const pend=_despPendientes(f); if(pend){ alert(pend); return; }
+  const btn=document.getElementById('despOk');
+  const dif=f.lineas.filter(function(L,i){ return Math.abs(_despEst(f,i).cant-L.cant_uom)>1e-9; }).length;
+  if(!confirm('Confirmar el despacho de '+f.cliente+'?'
+    +(dif?('\n\n'+dif+(dif===1?' línea sale':' líneas salen')+' con cantidad distinta a la facturada.'):''))) return;
+  _despGuardando=true; if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+  try{
+    const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
+    const {data:{user}}=await c.auth.getUser();
+    const quien=(user&&user.email)||'desconocido';
+    const {data:ped,error:e1}=await c.from('ent_pedido').insert({
+      fecha_despacho:_despHoy(), origen:'factura', factura_id:f.factura_id,
+      factura_nombre:f.factura, cliente_id:f.cliente_id, cliente_nombre:f.cliente,
+      motivo:'venta', creado_por:quien}).select('id').single();
+    if(e1) throw e1;
+    const lineasPed=f.lineas.map(function(L){
+      return {pedido_id:ped.id, producto_id:L.producto_id, cant_uds:L.cant_uds,
+              presentacion:(L.uom_factor===1?'uds':'cj'), cant_present:L.cant_uom,
+              uom_id:L.uom_id, uom_nombre:L.uom_nombre, cant_uom:L.cant_uom, uom_factor:L.uom_factor};
+    });
+    const {error:e2}=await c.from('ent_pedido_linea').insert(lineasPed); if(e2) throw e2;
+    const {data:ali,error:e3}=await c.from('ent_alisto').insert({
+      pedido_id:ped.id, responsable:quien, creado_por:quien}).select('id').single();
+    if(e3) throw e3;
+    for(let i=0;i<f.lineas.length;i++){
+      const L=f.lineas[i], e=_despEst(f,i);
+      const {data:al,error:e4}=await c.from('ent_alisto_linea').insert({
+        alisto_id:ali.id, producto_id:L.producto_id,
+        cant_uds:(+e.cant||0)/L.uom_factor, cant_uom:(+e.cant||0)}).select('id').single();
+      if(e4) throw e4;
+      const lotes=e.lotes.filter(function(x){ return x.lote && +x.cant>0; })
+        .map(function(x,k){ return {linea_id:al.id, lote:x.lote,
+                                    cant_uds:(+x.cant||0)/L.uom_factor, orden:k}; });
+      if(lotes.length){ const {error:e5}=await c.from('ent_alisto_lote').insert(lotes); if(e5) throw e5; }
+    }
+    _despFac=_despFac.filter(function(x){ return x.factura_id!==f.factura_id; });
+    _despAbierto=null; _despEdit={};
+    despRender();
+    despCargarLotes();     // el saldo por lote cambió
+  }catch(e){
+    alert('No se pudo guardar el despacho: '+((e&&e.message)||e)
+      +'\n\nLa factura sigue en la bandeja: probá de nuevo.');
+  }finally{
+    _despGuardando=false;
+    if(btn){ btn.disabled=false; btn.textContent='Confirmar despacho'; }
+  }
+}
+
+function irADespachos(){
+  _modShow('vDespachos'); crumbSet('Entregas','Despachos');
+  despCargar(false);
 }
 
 // ── La hoja de clientes: frecuentes primero (facturas de los últimos 90 días) ──
