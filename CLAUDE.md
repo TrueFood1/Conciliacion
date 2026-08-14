@@ -89,6 +89,20 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
   Ojo: alias muy parecidos pueden ser clientes DISTINTOS, y algunos alias no
   están registrados en Odoo. (Ejemplos concretos: ver documento privado.)
 - **Fechas**: convertir a hora CR (UTC−6) antes de agrupar por día/mes.
+- **UoM — NUNCA leer el nombre, SIEMPRE el id** (regla hermana de "buscar
+  productos por ID, nunca por nombre"). Dos pares distintos **comparten nombre en
+  inglés**, y en español no: `Paquete de 4` [37] y `Docenas` [2] se muestran los
+  dos como **"Dozens"** (4 u vs 12 u), y `Caja` [46] y `Caja (Hamburguesa)` [42]
+  se muestran los dos como **"Caja"** (6 u vs 24 u). Siempre
+  `product_uom_id` → `factor`, y `1 unidad de esa UoM = 1/factor unidades base`.
+  Ejemplo real (factura de Abner, 13-ago-2026): "Buns · 9,00 **Dozens**" son
+  **36 unidades, no 108** — la línea usa `Paquete de 4`, que en inglés se
+  muestra "Dozens". Leer el nombre descuenta el triple. Al revés pasa en la
+  factura de Automercado: "Caja (Hamburguesa)" se muestra "Caja" en inglés, y
+  leerlo así da 6 u donde son 24.
+  Factores verificados (11-ago-2026): Unidades 1 · Paquete de 2 = 2 ·
+  Caja PQ 4 = 3 · Paquete de 4 = 4 · Caja = 6 · Caja (Pizza) = 12 ·
+  Paquete de 12 = 12 · Docenas = 12 · Caja (Frances) = 24 · Caja (Hamburguesa) = 24.
 - **UoM**: `stock.quant` devuelve la UoM por defecto del producto (paquetes
   para Francés/Buns/Pizza). "Dozens" en esta instancia vale 4, no 12
   (cosmético al facturar Buns/Francés). `standard_price` es por kg/L; las
@@ -151,6 +165,51 @@ Productos terminados (IDs de producción):
   bloques de alerta conservan su lavado naranja y su borde. No poner fondos lima.
 - Tablas: encabezado 11px gris terciario con línea 1px debajo, sin bordes entre
   filas, padding vertical ~11px, número principal de la fila en blanco hueso.
+
+### Sin explicaciones en pantalla (estándar del sistema, 14-ago-2026)
+
+**La herramienta no le explica a Andrea su propio trabajo.** Si una pantalla
+necesita un párrafo para entenderse, el problema es el diseño, no la falta de
+texto. Nada de "para qué sirve esta vista", nada de "tocá X para ver Y", nada de
+"arrastrá el archivo", nada de "mové las perillas".
+
+**La línea que separa:**
+
+| Se va | Se queda |
+|---|---|
+| Instrucciones de uso ("Tocá un canal para ver sus clientes") | **Estado de los datos** ("1 órdenes sin lote legible") |
+| Descripción de la pantalla ("La foto del congelador que ancla los saldos…") | **Anomalías** ("facturado 26 · sale 24 — diferencia registrada") |
+| Justificaciones de diseño ("Cada cierre se inserta — nada se edita") | **Lo que cambia cómo se LEE un número**: con/sin IVA, qué fecha, qué unidad, solo lectura |
+
+Estado sí, instrucciones no. Y lo que se queda va **comprimido a etiqueta**, no a
+párrafo: `Del mes, con IVA · solo lectura.` en vez de tres renglones.
+
+⚠️ Ojo al podar: quitar "con IVA", "por `date_done`" o "en la unidad del
+producto" NO es limpieza — deja el número ambiguo. Eso no es explicación, es
+definición del dato.
+
+### Alertas del lobby — 5 reglas (estándar del sistema, 13-ago-2026)
+
+Aplican a **todas** las alertas, no al módulo que las inventó. Una alerta que no
+cumple las cinco no es una alerta: es información, y la información vive adentro
+del módulo.
+
+1. **Una alerta solo existe si hay algo que hacer.** Informar no es alertar.
+   Corolario: si no hay nada pendiente, la alerta **no aparece** — no se muestra
+   diciendo "todo al día".
+2. **Tiene fecha o no es alerta.** Lo que no vence no urge; eso vive adentro
+   del módulo.
+3. **Se apaga sola al resolverse.** Nunca "marcar como visto": el estado sale
+   del dato, no de un gesto.
+4. **Máximo 3 visibles.** De la cuarta en adelante, "y N más →".
+5. **Ámbar solo lo que vence hoy o mañana.** El resto en gris. El ámbar no
+   significa "existe", significa "se te viene encima".
+
+Auditoría de lo que ya existía (13-ago): la tarjeta de **Entregas pendientes**
+incumple 1 (muestra "Todo al día." cuando no hay nada), 2 (no tiene fecha de
+vencimiento en ninguna parte), 4 (no tiene el colapso "y N más") y 5 (pinta el
+contador de ámbar por existir, no por urgir). Sin corregir todavía — el detalle
+y las opciones están en `BITACORA.md`.
 - Jerarquía tipográfica moderada: títulos de página contenidos, no gigantes.
 - Alertas/estados: lo que está OK no muestra texto (celda vacía o punto verde);
   solo lo anómalo llama la atención.
