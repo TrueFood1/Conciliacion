@@ -89,9 +89,10 @@ grant select on v_acceso_usuario to authenticated;
 
 -- ── SEMILLA ─────────────────────────────────────────────────────────────
 -- ⚠️ ANDREA: cambiá los tres correos de abajo por los reales antes de pegar.
--- El de Daniel ya lo confirmaste (danielnu051105@gmail.com); los de Daniela y
--- Ney faltan. Y NO pegues esto en un chat ni lo mandes por correo: va directo
--- del SQL Editor de Supabase, que es privado.
+-- El de Daniel ya está confirmado (lo tiene Andrea); los de Daniela y Ney faltan.
+-- Los correos NO se escriben en este archivo — el repo es público y este archivo
+-- vive en él. Van directo en el SQL Editor de Supabase, que es privado, y nunca
+-- por chat ni por correo.
 insert into acceso_usuario (email, nombre, perfil, nota, creado_por) values
   ('andrea@truefoodcr.com',        'Andrea',  'socias', 'socia',            'semilla'),
   ('lorena@truefoodcr.com',        'Lorena',  'socias', 'socia',            'semilla'),
