@@ -6720,7 +6720,15 @@ const DESP_VENTANA = 3;              // días hacia atrás, contando hoy
 // lo que le toca de lo que es historia. Todo lo anterior a esta fecha NO existe
 // para Despachos. Medido el 14-ago: 82 facturas quedaban "pendientes" solo por
 // no haber pasado nunca por el módulo.
-const DESP_DESDE = '2026-08-17';
+let DESP_DESDE = '2026-08-17';
+// ENSAYO. Con la fecha de arranque en el lunes, la bandeja está VACÍA hasta el
+// lunes — correcto en producción, pero imposible de ensayar antes. Con
+// ?despdesde=2026-08-12 la ventana se corre hacia atrás solo en esa pestaña, sin
+// tocar el código ni publicar. Solo lectura: ensayar no confirma nada solo.
+try{
+  const _dd=new URLSearchParams(location.search).get('despdesde');
+  if(_dd && /^\d{4}-\d{2}-\d{2}$/.test(_dd)) DESP_DESDE=_dd;
+}catch(e){}
 let _despFac=null, _despUom=null, _despErr='', _despAbierto=null, _despLotes=null,
     _despSaldo=null, _despEdit={}, _despGuardando=false;
 
