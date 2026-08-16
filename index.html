@@ -2215,6 +2215,8 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .cl-tot{color:var(--text-3);font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .cl-tot.hay{color:#E9FE60;font-weight:600}
 .cl-tot-u,.cl-pie .cl-tot-u{font-size:10.5px;color:var(--text-3);font-weight:400;margin-left:4px}
+.cl-cuadra{display:block;font-size:10.5px;color:#8FBF6A;margin-top:2px}
+.cl-nocuadra{display:block;font-size:11px;color:#E9A23B;font-weight:600;margin-top:2px}
 .cl-cuerpo{padding:0 16px 12px}
 /* El LOTE no se parte nunca: es el identificador que se busca con la vista.
    Va en MONO y en secundario: es un código, no una cifra — el ojo lo usa para
@@ -2819,7 +2821,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 14 ago 2026 · b15';
+const BUILD = 'v 14 ago 2026 · b16';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -6280,6 +6282,7 @@ let _clLotes=null, _clExtra={}, _clGuardando=false, _clHuerfanos=[];
 // de _clVal. Nunca al revés. Cualquier lectura (totales, guardar) va a _clVal,
 // jamás al DOM.
 let _clVal={};
+let _clStock=null;      // {producto_id: unidades} según Odoo, para cuadrar en vivo
 const _clK=(pid,lote)=>pid+'|'+lote;
 function _clGet(pid,lote){ return _clVal[_clK(pid,lote)] || {c:'',s:''}; }
 function _clSet(pid,lote,campo,v){
@@ -6322,6 +6325,9 @@ async function cargarConteoLote(force){
   }catch(e){
     _clLotes={lotes:{},buckets:{sin_lote:[],ambiguo:[],anio_invalido:[]}, _err:(e&&e.message)||String(e)};
   }
+  // El stock de Odoo, para que la pantalla cuadre SOLA mientras se cuenta. Si falla,
+  // no pasa nada: se cuenta igual y no se muestra la comparación.
+  try{ _clStock=await _clLeerStock(); }catch(e){ _clStock=null; }
   // El render va SIEMPRE, haya fallado la lectura o no: la pantalla tiene que poder
   // usarse a mano aunque Odoo no conteste. Y si el propio render revienta, se dice.
   try{ _clRender(); }
@@ -6410,7 +6416,7 @@ function _clRender(){
       h+='<button class="btn btn-sm cl-add" onclick="_clAgregar('+pid+')">Agregar un lote que no está</button>'
         // El total del producto abierto viaja pegado al pie mientras se cuenta:
         // no hay que ir al final de la lista para saber cómo va.
-        +'<div class="cl-pie" id="clPie'+pid+'">'+esc(I.nom)+' · contado hasta ahora <strong>'+_clFmtTot(pid,t)+'</strong></div>'
+        +'<div class="cl-pie" id="clPie'+pid+'">'+esc(I.nom)+' · contado hasta ahora <strong>'+_clFmtTot(pid,t)+'</strong>'+_clCuadre(pid,t)+'</div>'
         +'</div>';
     }
     h+='</div>';
@@ -6532,9 +6538,12 @@ function _clHistPintar(){
   h+='<table class="cl-tbl"><tr class="cl-hhead"><th>Guardado</th><th>Quién</th><th class="num">Lotes</th><th>Totales</th><th class="num"></th></tr>';
   _clHist.forEach(function(x){
     const cuando=String(x.creado_en||'').replace('T',' ').slice(0,16);
+    const cs={};
+    (x.lineas||[]).forEach(function(r){ const o=cs[r.producto_id]=cs[r.producto_id]||{c:0,s:0};
+      o.c+=(+r.cajas||0); o.s+=(+r.sueltas||0); });
     const tot=ENT_PROD.filter(function(p){return x.tot[p];})
-      .map(function(p){ const k=_clCajas(p,x.tot[p]);
-        return _clNom(p).replace(/^Pan /,'')+' '+_rzN(k.cajas)+'cj'+(k.resto?('+'+_rzN(k.resto)):''); }).join(' · ');
+      .map(function(p){ const o=cs[p]||{c:0,s:0};
+        return _clNom(p).replace(/^Pan /,'')+' '+_rzN(o.c)+'cj'+(o.s?('+'+_rzN(o.s)):''); }).join(' · ');
     h+='<tr class="cl-hrow" onclick="_clVerDetalle('+x.id+')">'
       +'<td>'+esc(cuando)+(x.ancla?' <span class="cl-badge-a">ancla</span>':' <span class="cl-badge-b">borrador</span>')+'</td>'
       +'<td>'+esc(x.responsable||'')+'</td>'
@@ -6583,9 +6592,12 @@ async function _clAnclaInsert(id, anulada, texto){
 }
 function _clConfirmarAncla(id){
   const x=(_clHist||[]).find(function(y){return y.id===id;}); if(!x) return;
+  const cs={};
+  (x.lineas||[]).forEach(function(r){ const o=cs[r.producto_id]=cs[r.producto_id]||{c:0,s:0};
+    o.c+=(+r.cajas||0); o.s+=(+r.sueltas||0); });
   const tot=ENT_PROD.filter(function(p){return x.tot[p];})
-    .map(function(p){ const k=_clCajas(p,x.tot[p]);
-      return '  '+_clNom(p)+': '+_rzN(k.cajas)+' cajas'+(k.resto?(' + '+_rzN(k.resto)+' u'):'')
+    .map(function(p){ const o=cs[p]||{c:0,s:0};
+      return '  '+_clNom(p)+': '+_rzN(o.c)+' cajas'+(o.s?(' + '+_rzN(o.s)+' '+_clSueltaLbl(p)):'')
              +'  ('+_rzN(x.tot[p])+' u)'; }).join('\n');
   if(!confirm('Confirmar el conteo #'+id+' como ANCLA?\n\n'+tot
     +'\n\nDesde este momento todos los saldos por lote se calculan contra esta foto.')) return;
@@ -6611,7 +6623,7 @@ function _clRecalc(inp){
   // foco del input y el teclado del teléfono se cerraría en cada dígito.
   const t=_clTotalPorProd(), tp=t[pid]||0;
   const pie=document.getElementById('clPie'+pid);
-  if(pie) pie.innerHTML=esc((NIV_INFO[pid]&&NIV_INFO[pid].nom)||pid)+' · contado hasta ahora <strong>'+_clFmtTot(pid,tp)+'</strong>';
+  if(pie) pie.innerHTML=esc((NIV_INFO[pid]&&NIV_INFO[pid].nom)||pid)+' · contado hasta ahora <strong>'+_clFmtTot(pid,tp)+'</strong>'+_clCuadre(pid,tp);
   const cab=tr.closest('.cl-prod'); const tot=cab&&cab.querySelector('.cl-tot');
   if(tot){ tot.textContent = tp ? _clFmtTot(pid,tp) : '—'; tot.classList.toggle('hay', !!tp); }
   _clTotales();
@@ -6619,18 +6631,74 @@ function _clRecalc(inp){
 
 // TOTAL EN CAJAS Y EN UNIDADES. Andrea cuenta y piensa el congelador en cajas;
 // las unidades son para cruzar contra Odoo. Se muestran las dos, la caja primero.
-// El resto (uds que no completan caja) se dice aparte en vez de redondear.
-function _clCajas(pid, uds){
-  const I=NIV_INFO[pid]||{cajaU:1};
-  const cu=I.cajaU||1;
+//
+// ⚠️ EL TOTAL EN CAJAS ES LA SUMA DE LO CONTADO, NO UNA DERIVACIÓN. Tentador es
+// dividir las unidades entre las que caben en una caja, pero eso MIENTE sobre lo
+// que hay: en Pizza, 39 cajas + 13 paquetes sueltos son 494 u, y dividir da
+// "41 cj + 2 u" — aritméticamente igual, pero en el congelador no hay 41 cajas.
+// Se suman las cajas por un lado y las sueltas por otro, que es como se contó y
+// como se puede volver a verificar.
+function _clCajas(pid, uds){       // solo para diferencias, donde no hay conteo detrás
+  const cu=(NIV_INFO[pid]||{cajaU:1}).cajaU||1;
   return {cajas:Math.floor(uds/cu), resto:uds%cu, cajaU:cu};
 }
-function _clFmtTot(pid, uds){
+// Suma cajas / sueltas / unidades de un producto, desde el ESTADO.
+function _clTotCS(pid){
+  let cj=0, su=0;
+  Object.keys(_clVal).forEach(function(k){
+    if(+k.slice(0,k.indexOf('|'))!==+pid) return;
+    const v=_clVal[k]; cj+=(+v.c||0); su+=(+v.s||0);
+  });
+  return {cajas:cj, sueltas:su, uds:_clUds(pid,cj,su)};
+}
+// El rótulo de la "suelta" cambia por producto: paquete en Francés/Buns/Pizza,
+// unidad en Blanco/Semillas/Galletas.
+function _clSueltaLbl(pid){ return ((NIV_INFO[pid]||{}).presLbl==='paq') ? 'paq' : 'u'; }
+function _clFmtCS(pid, cajas, sueltas, uds){
+  if(!cajas && !sueltas) return '—';
+  const a=cajas?(_rzN(cajas)+' cj'):'';
+  const b=sueltas?((a?' + ':'')+_rzN(sueltas)+' '+_clSueltaLbl(pid)):'';
+  return (a+b)+' <span class="cl-tot-u">'+_rzN(uds)+' u</span>';
+}
+function _clFmtTot(pid, uds){      // compat: cuando solo se tienen unidades
+  const t=_clTotCS(pid);
+  if(t.uds===uds) return _clFmtCS(pid,t.cajas,t.sueltas,uds);
   if(!uds) return '—';
   const k=_clCajas(pid,uds);
-  const cj = k.cajas ? (_rzN(k.cajas)+' cj') : '';
-  const rt = k.resto ? ((cj?' + ':'')+_rzN(k.resto)+' u') : '';
-  return (cj+rt||'—')+' <span class="cl-tot-u">'+_rzN(uds)+' u</span>';
+  return (k.cajas?(_rzN(k.cajas)+' cj'):'')+(k.resto?((k.cajas?' + ':'')+_rzN(k.resto)+' u'):'')
+    +' <span class="cl-tot-u">'+_rzN(uds)+' u</span>';
+}
+
+// ── STOCK DE ODOO, en unidades individuales ─────────────────────────────
+// ⚠️ qty_available viene en la UoM POR DEFECTO del producto, no en unidades:
+// Pizza está en "Paquete de 2" y Francés/Buns en "Paquete de 4". Se convierte
+// con el FACTOR de uom.uom leído por id — nunca por el nombre.
+async function _clLeerStock(){
+  const ps=await odooCall('product.product','read',[ENT_PROD],
+    {fields:['id','qty_available','uom_id'],context:{lang:'es_CR'}});
+  const uids=[...new Set(ps.map(function(p){ return p.uom_id&&p.uom_id[0]; }).filter(Boolean))];
+  const us=await odooCall('uom.uom','read',[uids],{fields:['id','factor'],context:{lang:'es_CR'}});
+  const F={}; us.forEach(function(u){ F[u.id]=u.factor||1; });
+  const out={};
+  ps.forEach(function(p){
+    const f=F[p.uom_id&&p.uom_id[0]]||1;
+    out[p.id]=(p.qty_available||0)/f;            // → unidades individuales
+  });
+  return out;
+}
+// El renglón que atrapa el error DONDE TODAVÍA SE PUEDE CORREGIR. Andrea recibió
+// el conteo de Daniel y tuvo que cruzar a mano el detalle por lote contra el
+// total: en Pizza no cuadró (247 paquetes contados contra 251 de Odoo) y para
+// entonces él ya no estaba frente al congelador. Ahora la diferencia se ve
+// mientras se cuenta. NO bloquea nada: contar y que no cuadre es información
+// legítima —para eso se cuenta—, pero tiene que verse en el momento.
+function _clCuadre(pid, contado){
+  if(!_clStock || _clStock[pid]==null || !contado) return '';
+  const odoo=_clStock[pid], dif=contado-odoo;
+  if(Math.abs(dif)<0.5) return '<span class="cl-cuadra">cuadra con Odoo</span>';
+  const k=_clCajas(pid,Math.abs(dif));
+  const txt=(dif>0?'+':'−')+(k.cajas?(_rzN(k.cajas)+' cj'):'')+(k.resto?((k.cajas?' + ':'')+_rzN(k.resto)+' u'):'');
+  return '<span class="cl-nocuadra">Odoo dice '+_clFmtTot(pid,odoo).replace(/<[^>]*>.*/,'')+'· '+txt+'</span>';
 }
 
 // Total vivo por producto: sirve de chequeo grueso contra lo que Daniel ve en el congelador.
@@ -6639,9 +6707,9 @@ function _clTotales(){
   const t=_clLeer(), por={};
   t.forEach(function(r){ por[r.producto_id]=(por[r.producto_id]||0)+r.uds; });
   const parts=ENT_PROD.filter(function(p){return por[p];}).map(function(p){
-    const k=_clCajas(p,por[p]);
-    return esc(NIV_INFO[p]?NIV_INFO[p].nom:p)+' <b>'+_rzN(k.cajas)+' cj'
-      +(k.resto?(' + '+_rzN(k.resto)+' u'):'')+'</b> ('+_rzN(por[p])+' u)'; });
+    const t=_clTotCS(p);
+    return esc(NIV_INFO[p]?NIV_INFO[p].nom:p)+' <b>'+_rzN(t.cajas)+' cj'
+      +(t.sueltas?(' + '+_rzN(t.sueltas)+' '+_clSueltaLbl(p)):'')+'</b> ('+_rzN(t.uds)+' u)'; });
   el.innerHTML = parts.length ? ('Contado hasta ahora: '+parts.join(' · ')) : '';
 }
 
