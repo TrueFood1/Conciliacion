@@ -71,6 +71,18 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
   está en el cliente (`res.partner.team_id`), NO en `account.move`.
 - **Producción y mermas**: filtrar por `date_finished` (calza con el pivot
   nativo de Odoo), no `date_start`.
+- **El lote de producto terminado vive SOLO en el chatter, en texto libre**, y se
+  transcribe a mano del reporte de papel. No hay campo estructurado (`tracking`
+  está en `none` en los seis terminados). Dos consecuencias medidas el 15-ago:
+  1. **Una corrección en el papel puede no llegar al sistema.** Caso real: el
+     reporte del 11-ago-2026 tiene el lote tachado y corregido de 222 a 223; el
+     chatter de `WH/MO/01408` quedó con el 222. El congelador dice 223 y Odoo
+     dice 222 — la misma tanda con dos números. Se identificó cruzando fecha de
+     inicio y mermas (3 unidades en `SP/00355` sobre 01408, ninguna en 01409).
+  2. **Corregirlo agregando un comentario EMPEORA las cosas.** `_entParseLote`
+     junta todos los lotes válidos del chatter y, si encuentra más de uno, marca
+     la orden `ambiguo` — y el lote **desaparece** de la lista del conteo. Para
+     corregir hay que **editar o borrar** el mensaje equivocado, nunca sumar otro.
 - **Despachos**: la fecha real es `scheduled_date`; `date_done` es cuando se
   validó en el sistema (llega 3–7 días tarde).
 - **Nombres traducidos** (es_CR / en_US): una consulta sin contexto de idioma
