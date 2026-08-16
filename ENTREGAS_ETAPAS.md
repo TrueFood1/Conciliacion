@@ -236,7 +236,5 @@ secas). Lima `#E9FE60` como acento; el ámbar sigue siendo el que avisa.
 
 ---
 
-**Nota de higiene, aparte:** `ESPEC_MODULO_ENTREGAS.md` §8 todavía dice que el
-color del módulo es el morado `#7F77DD`. Quedó viejo el 13-ago: Entregas es lima
-`#E9FE60`, y el morado hoy es color de PRODUCTO (Buns). Corregir cuando se toque
-ese documento.
+**Nota de higiene, aparte:** el color viejo de `ESPEC_MODULO_ENTREGAS.md` §8 pasó
+a [`LIMPIEZA_DOC.md`](LIMPIEZA_DOC.md), que es donde va.
