@@ -13,6 +13,28 @@
 --      otra hora, cambialo.
 --   2. La NOTA dice que Pizza SÍ cuadra. Ver la explicación abajo.
 --
+-- ⚠️⚠️ EL LOTE 223 DE PAN BLANCO — LEER ANTES DE PEGAR
+-- El conteo trae `223 / 2-27` con 20 cajas + 1 unidad, que es lo que hay en el
+-- congelador. Pero **Odoo no conoce el 223**: la orden WH/MO/01408 (arrancó el
+-- 11-ago 22:47, 126 unidades, 3 mermas) tiene en su chatter el número **222**.
+--
+-- Qué pasó, confirmado el 15-ago: en el reporte manual del 11-8-26 el lote está
+-- TACHADO y corregido de 222 a 223. Keylor transcribió al chatter el número sin
+-- corregir. No falta ninguna orden de producción: es la misma tanda con dos
+-- números. Lo corrobora todo: la fecha (01408 arrancó el 11-ago), las mermas
+-- (la hoja dice 3 por cortada en el 223 y 0 en el 224; Odoo tiene SP/00355 con
+-- 3 unidades en 01408 y ninguna en 01409) y que no existe ningún otro 222.
+--
+-- CONSECUENCIA SI SE PEGA ASÍ, SIN TOCAR ODOO: el saldo por lote va a mostrar un
+-- 222 fantasma con 126 unidades que nadie contó, y un 223 con 121 unidades que
+-- Odoo nunca fabricó. Los dos números están mal.
+--
+-- ⚠️ Y CUIDADO CÓMO SE CORRIGE EN ODOO: **NO agregar un comentario nuevo con el
+-- 223.** El extractor junta TODOS los lotes que encuentra en el chatter, y si
+-- encuentra dos válidos marca la orden como `ambiguo` y **el lote desaparece de
+-- la lista del conteo**. Hay que EDITAR o BORRAR el mensaje que dice 222, no
+-- sumarle otro.
+--
 -- ── SOBRE PIZZA, QUE SE CREÍA DESCUADRADA ───────────────────────────────
 -- El resumen decía "39 CJ y 13 Uds" = 247 paquetes contra 251 esperados, y se
 -- pidió cargarlo con una nota de discrepancia. **No hay discrepancia.** El

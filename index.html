@@ -2821,7 +2821,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 14 ago 2026 · b16';
+const BUILD = 'v 15 ago 2026 · b17';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -6143,7 +6143,11 @@ async function rzDiagEscenarios(body){
 // SOLO LECTURA de Odoo (candado intacto). Nada escribe acá.
 // ════════════════════════════════════════════════════════════════════════
 const ENT_PROD=[451,452,453,503,472,519];                     // los 6 productos
-const ENT_COD={451:2,452:4,453:1,503:3,472:5,519:null};       // código en el lote (Cookie Dough: sin confirmar)
+// Código de producto dentro del lote, formato DDD C / M AA. Cookie Dough = 6,
+// CONFIRMADO el 15-ago leyendo el chatter de WH/MO/01226 y 01228 ("089 6/9 26").
+// Hasta entonces figuraba como null y el regex solo aceptaba códigos 1-5, con lo
+// cual descartaba el juliano 089 y tomaba el 6 como si fuera el día.
+const ENT_COD={451:2,452:4,453:1,503:3,472:5,519:6};
 // ── VENTANA DE VENCIMIENTO (regla derivada, Andrea 12-ago-2026) ──────────
 // El AA del lote es el VENCIMIENTO, no la producción. Una lista fija de años
 // (24-27) se vencía cada enero Y dejaba pasar errores: con 6 meses de vida útil,
@@ -6189,12 +6193,15 @@ function _julian(d){ const dt=(d instanceof Date)?d:new Date(String(d).slice(0,1
   const ini=new Date(dt.getFullYear(),0,0); return Math.floor((dt-ini)/86400000); }
 // Parsea el chatter → candidatos válidos + estado. prodYear/prodJulian anclan la PRODUCCIÓN.
 // anioSet: sin pasar nada usa la ventana de vencimiento (motor). Un Set fuerza una regla fija (diag).
-function _entParseLote(chatterTxt, prodYear, prodJulian, anioSet){
+function _entParseLote(chatterTxt, prodYear, prodJulian, anioSet, productoId){
   const _ok=_entReglaOk(anioSet);
   const t=_entLimpiarChatter(chatterTxt);
   // DDD [C] sep M sep AA — código opcional (1 díg), separadores flexibles, ancla opcional "Lote:".
   // (?!\d) al final rechaza el año de 4 díg (una fecha DD/MM/AAAA no se cuela como lote).
-  const rx=/(?:lote\s*:?\s*)?\b(\d{1,3})\s*([1-5])?\s*[\/.\-]\s*(\d{1,2})\s*[\/.\-\s]\s*(\d{2})(?!\d)/gi;
+  // El código va de 1 a 9, no de 1 a 5. Con [1-5] el lote de Cookie Dough
+  // ("089 6/9 26") no matcheaba entero: el regex saltaba el 089 y agarraba el
+  // 6 como juliano, inventando un lote "6 / 9-26" que no existe.
+  const rx=/(?:lote\s*:?\s*)?\b(\d{1,3})\s*([1-9])?\s*[\/.\-]\s*(\d{1,2})\s*[\/.\-\s]\s*(\d{2})(?!\d)/gi;
   const vistos={}, cands=[]; let m;
   while((m=rx.exec(t))){
     const ddd=+m[1], cod=m[2]?+m[2]:null, mesV=+m[3], anioV=+m[4];
@@ -6204,12 +6211,33 @@ function _entParseLote(chatterTxt, prodYear, prodJulian, anioSet){
     if(vistos[canon]) continue; vistos[canon]=1;
     cands.push({ddd,cod,mesV,anioV,canon,anioOK:_ok(mesV,anioV)});
   }
-  const validos=cands.filter(c=>c.anioOK);
-  const coincideJul = prodJulian!=null ? validos.some(c=>Math.abs(c.ddd-prodJulian)<=3) : null;
+  // ── EL JULIANO TIENE QUE SER PLAUSIBLE ────────────────────────────────
+  // El DDD del lote ES el día juliano de producción: medido el 15-ago sobre las
+  // 165 órdenes de 2026 con lote legible, 93,9% coincide EXACTO con el juliano
+  // de date_start en hora CR y 2,4% se aparta un día (producción que cruza la
+  // medianoche). El desvío legítimo más grande fue de 2 días.
+  // Con una ventana de ±10 se separa lo legítimo del ruido con margen enorme, y
+  // se atrapa lo que NO es un lote: una fecha de vencimiento de materia prima
+  // ("07/03/26" → daba un lote "7 / 3-26") o un código suelto sin su juliano.
+  // Distancia CIRCULAR, para que un lote de fin de diciembre no parezca fuera de
+  // rango en una orden de enero.
+  const VENT_JUL=10;
+  const _distJul=function(a,b){ const d=Math.abs(a-b); return Math.min(d, 365-d); };
+  const julOK=function(c){ return prodJulian==null || _distJul(c.ddd, prodJulian)<=VENT_JUL; };
+  // Y el CÓDIGO, si viene, tiene que ser el del producto de la orden: un lote de
+  // Cookie Dough con código 2 es de Pan Blanco y no pertenece a esta orden.
+  const codEsp = ENT_COD[productoId]!=null ? ENT_COD[productoId] : null;
+  const codOK=function(c){ return c.cod==null || codEsp==null || c.cod===codEsp; };
+
+  const conAnio=cands.filter(c=>c.anioOK);
+  const validos=conAnio.filter(c=>julOK(c)&&codOK(c));
+  const coincideJul = prodJulian!=null ? validos.some(c=>_distJul(c.ddd,prodJulian)<=3) : null;
   let estado, lote=null;
   if(validos.length===1){ estado='ok'; lote=Object.assign({}, validos[0], {prodYear, key:prodYear+'-'+validos[0].ddd}); }
   else if(validos.length>1) estado='ambiguo';       // dos lotes distintos en el chatter → no se asume
-  else if(cands.length>0) estado='anio_invalido';   // parseó algo lote-forma pero el año no valida
+  else if(conAnio.some(c=>!codOK(c))) estado='codigo_ajeno';    // el código no es el del producto
+  else if(conAnio.length>0)           estado='juliano_invalido';// hay forma de lote pero el día no calza
+  else if(cands.length>0)             estado='anio_invalido';   // parseó algo lote-forma pero el año no valida
   else estado='sin_lote';
   return {estado, lote, cands, validos, coincideJul};
 }
@@ -6247,9 +6275,9 @@ async function entLotesActivos(meses, anioSet){
   return _entAgrupar(crudo, anioSet);
 }
 function _entAgrupar(crudo, anioSet){
-  const lotes={}, buckets={sin_lote:[], ambiguo:[], anio_invalido:[]};
+  const lotes={}, buckets={sin_lote:[], ambiguo:[], anio_invalido:[], juliano_invalido:[], codigo_ajeno:[]};
   crudo.forEach(function(o){
-    const r=_entParseLote(o.cmts, o.py, o.pj, anioSet);
+    const r=_entParseLote(o.cmts, o.py, o.pj, anioSet, o.producto);
     const rec={orden:o.orden, ordenId:o.ordenId, producto:o.producto, fecha:o.fecha, uds:o.uds, dfUtc:o.dfUtc, r:r};
     if(r.estado==='ok'){ const k=r.lote.key;
       const L=lotes[k]=lotes[k]||{key:k, canon:r.lote.canon, producto:o.producto, prodYear:o.py, ddd:r.lote.ddd, ordenes:[]};
@@ -6425,7 +6453,8 @@ function _clRender(){
 
   // Los casos que el extractor NO pudo resolver van a la vista, nunca escondidos (regla de la ESPEC).
   const b=_clLotes.buckets||{};
-  const nb=(b.sin_lote||[]).length+(b.ambiguo||[]).length+(b.anio_invalido||[]).length;
+  const nb=['sin_lote','ambiguo','anio_invalido','juliano_invalido','codigo_ajeno']
+    .reduce(function(n,k){ return n+((b[k]||[]).length); },0);
   if(nb){
     h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-top:16px">'
       +'<div style="font-weight:700;color:#E9A23B;font-size:12.5px">'+nb+' órdenes sin lote legible</div>'
@@ -6433,8 +6462,12 @@ function _clRender(){
       +'El extractor no pudo sacar el lote del chatter de estas órdenes. No se asumen ni se esconden: '
       +'si hay producto de alguna en el congelador, agregá el lote a mano en el producto que corresponda.</div>'
       +'<table class="cl-tbl" style="margin-top:8px"><tr><th>Orden</th><th>Producto</th><th>Fecha</th><th>Caso</th></tr>';
-    ['sin_lote','ambiguo','anio_invalido'].forEach(function(k){
-      const lbl={sin_lote:'sin lote en el chatter',ambiguo:'ambiguo (más de un candidato)',anio_invalido:'año fuera del rango de vida útil'}[k];
+    ['sin_lote','ambiguo','anio_invalido','juliano_invalido','codigo_ajeno'].forEach(function(k){
+      const lbl={sin_lote:'sin lote en el chatter',
+                 ambiguo:'ambiguo (más de un candidato)',
+                 anio_invalido:'año fuera del rango de vida útil',
+                 juliano_invalido:'lote incompleto: el día no calza con la producción',
+                 codigo_ajeno:'el código del lote no es el de este producto'}[k];
       (b[k]||[]).slice(0,40).forEach(function(r){
         h+='<tr><td class="cl-lote">'+esc(r.orden||'')+'</td><td>'+esc(_clNom(r.producto))+'</td>'
           +'<td class="cl-nw">'+esc(r.fecha||'')+'</td><td class="muted">'+lbl+'</td></tr>';
