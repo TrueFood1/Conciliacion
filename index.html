@@ -2852,7 +2852,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 15 ago 2026 · b18';
+const BUILD = 'v 15 ago 2026 · b19';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -6358,9 +6358,19 @@ function _clAviso(tipo, html){
   st.className='status '+tipo; st.classList.remove('hidden'); st.innerHTML=html;
 }
 
-// Entrada del módulo desde el lobby. Hoy Entregas tiene UNA pantalla viva, así que
-// abrir el módulo es abrir el conteo; cuando entre Reporte, acá va la elección.
-function abrirEntregas(){ irAConteoLote(); }
+// Entrada del módulo desde el lobby. LA PESTAÑA DEPENDE DE QUIÉN ENTRA, porque la
+// primera pregunta del día no es la misma (confirmado por Andrea, 15-ago):
+//   · Daniel   → Despachos. Es lo único que hace, y a las 6:30 am no debe buscarlo.
+//   · Socias   → Pendientes. Su pregunta diaria es qué falta validar, facturar o
+//                clasificar; Despachos es de Daniel y ellas lo miran de rebote.
+// Se decide por el ACCESO, no por el correo: quien ve TODO es socia; el resto cae
+// en el default (`ACCESO_DEFAULT`), que es el caso de Daniel. Así no hay que
+// nombrar su gmail personal en un repo público (ver pendiente 2 de la bitácora)
+// y una cuenta nueva de bodega hereda el destino correcto sin tocar código.
+// _accesoMods null = todavía no cargó: se trata como Daniel, igual que el default.
+function abrirEntregas(){
+  return (_accesoMods==='todo') ? irAPendientes() : irADespachos();
+}
 function irAConteoLote(){
   _modShow('vConteoLote'); crumbSet('Entregas','Conteo por lote');
   cargarConteoLote(false);
@@ -6907,7 +6917,12 @@ const DESP_VENTANA = 3;              // días hacia atrás, contando hoy
 // lo que le toca de lo que es historia. Todo lo anterior a esta fecha NO existe
 // para Despachos. Medido el 14-ago: 82 facturas quedaban "pendientes" solo por
 // no haber pasado nunca por el módulo.
-let DESP_DESDE = '2026-08-17';
+// 15-ago: se corre al sábado 15 —no al lunes 17— porque Andrea facturó ese día un
+// pedido REAL que se entrega, y con el 17 quedaba fuera de la bandeja. Medido
+// antes de publicar: del 15 al 17 entra UNA sola factura (Automercado
+// …3476, 5 líneas). Las 82 históricas siguen fuera, que es para lo que existe
+// esta constante.
+let DESP_DESDE = '2026-08-15';
 // ENSAYO. Con la fecha de arranque en el lunes, la bandeja está VACÍA hasta el
 // lunes — correcto en producción, pero imposible de ensayar antes. Con
 // ?despdesde=2026-08-12 la ventana se corre hacia atrás solo en esa pestaña, sin
