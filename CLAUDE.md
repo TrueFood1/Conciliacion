@@ -83,6 +83,14 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
      junta todos los lotes válidos del chatter y, si encuentra más de uno, marca
      la orden `ambiguo` — y el lote **desaparece** de la lista del conteo. Para
      corregir hay que **editar o borrar** el mensaje equivocado, nunca sumar otro.
+- **El número del lote es el DÍA JULIANO de producción, no un correlativo.**
+  Medido sobre las 165 órdenes de 2026 con lote legible: **93,9% coincide exacto**
+  con el juliano de `date_start` pasado a hora CR, y 2,4% se aparta un día
+  (producción que cruza la medianoche). Consecuencia práctica: **los "saltos" en
+  la numeración son días sin producir**, no lotes perdidos — 206 y 207 son el
+  sábado y domingo 25-26 de julio. No buscar huecos en la secuencia; comparar el
+  lote contra el juliano de la orden, que es lo que `_entParseLote` ya calcula en
+  `coincideJul` (hoy con tolerancia ±3 y sin que nadie mire el resultado).
 - **Despachos**: la fecha real es `scheduled_date`; `date_done` es cuando se
   validó en el sistema (llega 3–7 días tarde).
 - **Nombres traducidos** (es_CR / en_US): una consulta sin contexto de idioma
