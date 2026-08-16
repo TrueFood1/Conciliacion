@@ -2214,6 +2214,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .cl-pres{color:var(--text-3);font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cl-tot{color:var(--text-3);font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .cl-tot.hay{color:#E9FE60;font-weight:600}
+.cl-tot-u,.cl-pie .cl-tot-u{font-size:10.5px;color:var(--text-3);font-weight:400;margin-left:4px}
 .cl-cuerpo{padding:0 16px 12px}
 /* El LOTE no se parte nunca: es el identificador que se busca con la vista.
    Va en MONO y en secundario: es un código, no una cifra — el ojo lo usa para
@@ -2818,7 +2819,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 14 ago 2026 · b14';
+const BUILD = 'v 14 ago 2026 · b15';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -6264,6 +6265,29 @@ function _entAgrupar(crudo, anioSet){
 // Odoo sigue SOLO LECTURA — acá solo se escribe en Supabase.
 // ════════════════════════════════════════════════════════════════════════
 let _clLotes=null, _clExtra={}, _clGuardando=false, _clHuerfanos=[];
+// ⚠️ EL ESTADO DEL CONTEO VIVE ACÁ, NO EN EL DOM. Clave 'producto|lote', valor
+// {c:'cajas', s:'sueltas'} tal como se escribieron (texto, para no perder la
+// diferencia entre "" y "0").
+//
+// POR QUÉ. Hasta el 14-ago los valores vivían SOLO en los <input>, y como el
+// acordeón renderiza únicamente el producto abierto, cerrar uno borraba lo
+// escrito. Peor: `_clLeer()` recorría `#clBody tr[data-pid]`, que son las filas
+// del producto ABIERTO, así que **guardar guardaba un solo producto** y los
+// demás se perdían sin avisar. Lo reportó Andrea contando de verdad frente al
+// congelador; en escritorio no aparece porque uno no cierra productos.
+//
+// LA REGLA, de ahora en adelante: se escribe → va a _clVal; se renderiza → sale
+// de _clVal. Nunca al revés. Cualquier lectura (totales, guardar) va a _clVal,
+// jamás al DOM.
+let _clVal={};
+const _clK=(pid,lote)=>pid+'|'+lote;
+function _clGet(pid,lote){ return _clVal[_clK(pid,lote)] || {c:'',s:''}; }
+function _clSet(pid,lote,campo,v){
+  const k=_clK(pid,lote);
+  const o=_clVal[k]||{c:'',s:''};
+  o[campo]=v;
+  if(o.c==='' && o.s==='') delete _clVal[k]; else _clVal[k]=o;
+}
 // Nombre legible de un producto por id (los buckets traen el id pelado).
 function _clNom(pid){ const I=NIV_INFO[+pid]; return I?I.nom:('producto '+pid); }
 // Aviso de pantalla. NUNCA se deja el cuerpo mudo: si algo falla, se dice y se sigue.
@@ -6358,7 +6382,7 @@ function _clRender(){
       +'<span class="cl-fl">'+(abierto?'▾':'▸')+'</span>'
       +'<span class="cl-nom">'+esc(I.nom)+'</span>'
       +'<span class="cl-pres">'+esc(pres)+'</span>'
-      +'<span class="cl-tot'+(t?' hay':'')+'">'+(t?(_rzN(t)+' u'):'—')+'</span>'
+      +'<span class="cl-tot'+(t?' hay':'')+'">'+(t?_clFmtTot(pid,t):'—')+'</span>'
       +'</button>';
     if(abierto){
       h+='<div class="cl-cuerpo">';
@@ -6371,18 +6395,22 @@ function _clRender(){
           +'<tr><th>Lote</th><th class="mid">Cajas</th><th class="mid">Sueltas</th><th class="num">Unidades</th></tr>';
         ls.forEach(function(L){
           const id='cl_'+L.key.replace(/[^A-Za-z0-9]/g,'_');
+          // value SIEMPRE desde _clVal: es lo que hace que cerrar y volver a abrir
+          // un producto muestre lo que ya se había contado.
+          const V=_clGet(pid,L.canon);
+          const u0=_clUds(pid,V.c,V.s);
           h+='<tr data-pid="'+pid+'" data-lote="'+esc(L.canon)+'">'
             +'<td class="cl-lote">'+esc(L.canon)+(L.extra?' <span class="cl-tag">agregado</span>':'')+'</td>'
-            +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_c" oninput="_clRecalc(this)"></td>'
-            +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_s" oninput="_clRecalc(this)"></td>'
-            +'<td class="cl-uds" id="'+id+'_u">—</td></tr>';
+            +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_c" value="'+esc(V.c)+'" oninput="_clRecalc(this)"></td>'
+            +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_s" value="'+esc(V.s)+'" oninput="_clRecalc(this)"></td>'
+            +'<td class="cl-uds" id="'+id+'_u">'+(u0?_rzN(u0):'—')+'</td></tr>';
         });
         h+='</table>';
       }
       h+='<button class="btn btn-sm cl-add" onclick="_clAgregar('+pid+')">Agregar un lote que no está</button>'
         // El total del producto abierto viaja pegado al pie mientras se cuenta:
         // no hay que ir al final de la lista para saber cómo va.
-        +'<div class="cl-pie" id="clPie'+pid+'">'+esc(I.nom)+' · contado hasta ahora <strong>'+_rzN(t)+' u</strong></div>'
+        +'<div class="cl-pie" id="clPie'+pid+'">'+esc(I.nom)+' · contado hasta ahora <strong>'+_clFmtTot(pid,t)+'</strong></div>'
         +'</div>';
     }
     h+='</div>';
@@ -6505,7 +6533,8 @@ function _clHistPintar(){
   _clHist.forEach(function(x){
     const cuando=String(x.creado_en||'').replace('T',' ').slice(0,16);
     const tot=ENT_PROD.filter(function(p){return x.tot[p];})
-      .map(function(p){ return _clNom(p).replace(/^Pan /,'')+' '+_rzN(x.tot[p]); }).join(' · ');
+      .map(function(p){ const k=_clCajas(p,x.tot[p]);
+        return _clNom(p).replace(/^Pan /,'')+' '+_rzN(k.cajas)+'cj'+(k.resto?('+'+_rzN(k.resto)):''); }).join(' · ');
     h+='<tr class="cl-hrow" onclick="_clVerDetalle('+x.id+')">'
       +'<td>'+esc(cuando)+(x.ancla?' <span class="cl-badge-a">ancla</span>':' <span class="cl-badge-b">borrador</span>')+'</td>'
       +'<td>'+esc(x.responsable||'')+'</td>'
@@ -6555,7 +6584,9 @@ async function _clAnclaInsert(id, anulada, texto){
 function _clConfirmarAncla(id){
   const x=(_clHist||[]).find(function(y){return y.id===id;}); if(!x) return;
   const tot=ENT_PROD.filter(function(p){return x.tot[p];})
-    .map(function(p){ return '  '+_clNom(p)+': '+_rzN(x.tot[p])+' u'; }).join('\n');
+    .map(function(p){ const k=_clCajas(p,x.tot[p]);
+      return '  '+_clNom(p)+': '+_rzN(k.cajas)+' cajas'+(k.resto?(' + '+_rzN(k.resto)+' u'):'')
+             +'  ('+_rzN(x.tot[p])+' u)'; }).join('\n');
   if(!confirm('Confirmar el conteo #'+id+' como ANCLA?\n\n'+tot
     +'\n\nDesde este momento todos los saldos por lote se calculan contra esta foto.')) return;
   _clAnclaInsert(id, false, 'confirmar');
@@ -6567,19 +6598,39 @@ function _clDesanclar(id){
 
 function _clRecalc(inp){
   const tr=inp.closest('tr'); if(!tr) return;
-  const pid=+tr.getAttribute('data-pid');
+  const pid=+tr.getAttribute('data-pid'), lote=tr.getAttribute('data-lote');
+  // PRIMERO el estado. Esto es lo que hace que cerrar el producto, abrir otro o
+  // agregar un lote no borre nada.
+  _clSet(pid, lote, inp.id.endsWith('_s')?'s':'c', inp.value);
   const base=inp.id.replace(/_(c|s)$/,'');
-  const c=document.getElementById(base+'_c'), s=document.getElementById(base+'_s'), u=document.getElementById(base+'_u');
-  const uds=_clUds(pid, c&&c.value, s&&s.value);
+  const V=_clGet(pid,lote);
+  const u=document.getElementById(base+'_u');
+  const uds=_clUds(pid, V.c, V.s);
   if(u) u.textContent = uds ? _rzN(uds) : '—';
-  // Se actualizan el pie y la cabecera del producto SIN re-renderizar: un re-render
-  // mataría el foco del input y el teclado del teléfono se cerraría en cada dígito.
+  // El pie y la cabecera se PARCHAN, no se re-renderizan: un re-render mataría el
+  // foco del input y el teclado del teléfono se cerraría en cada dígito.
   const t=_clTotalPorProd(), tp=t[pid]||0;
   const pie=document.getElementById('clPie'+pid);
-  if(pie) pie.innerHTML=esc((NIV_INFO[pid]&&NIV_INFO[pid].nom)||pid)+' · contado hasta ahora <strong>'+_rzN(tp)+' u</strong>';
+  if(pie) pie.innerHTML=esc((NIV_INFO[pid]&&NIV_INFO[pid].nom)||pid)+' · contado hasta ahora <strong>'+_clFmtTot(pid,tp)+'</strong>';
   const cab=tr.closest('.cl-prod'); const tot=cab&&cab.querySelector('.cl-tot');
-  if(tot){ tot.textContent = tp ? (_rzN(tp)+' u') : '—'; tot.classList.toggle('hay', !!tp); }
+  if(tot){ tot.textContent = tp ? _clFmtTot(pid,tp) : '—'; tot.classList.toggle('hay', !!tp); }
   _clTotales();
+}
+
+// TOTAL EN CAJAS Y EN UNIDADES. Andrea cuenta y piensa el congelador en cajas;
+// las unidades son para cruzar contra Odoo. Se muestran las dos, la caja primero.
+// El resto (uds que no completan caja) se dice aparte en vez de redondear.
+function _clCajas(pid, uds){
+  const I=NIV_INFO[pid]||{cajaU:1};
+  const cu=I.cajaU||1;
+  return {cajas:Math.floor(uds/cu), resto:uds%cu, cajaU:cu};
+}
+function _clFmtTot(pid, uds){
+  if(!uds) return '—';
+  const k=_clCajas(pid,uds);
+  const cj = k.cajas ? (_rzN(k.cajas)+' cj') : '';
+  const rt = k.resto ? ((cj?' + ':'')+_rzN(k.resto)+' u') : '';
+  return (cj+rt||'—')+' <span class="cl-tot-u">'+_rzN(uds)+' u</span>';
 }
 
 // Total vivo por producto: sirve de chequeo grueso contra lo que Daniel ve en el congelador.
@@ -6588,22 +6639,26 @@ function _clTotales(){
   const t=_clLeer(), por={};
   t.forEach(function(r){ por[r.producto_id]=(por[r.producto_id]||0)+r.uds; });
   const parts=ENT_PROD.filter(function(p){return por[p];}).map(function(p){
-    return esc(NIV_INFO[p]?NIV_INFO[p].nom:p)+' <b>'+_rzN(por[p])+'</b>'; });
+    const k=_clCajas(p,por[p]);
+    return esc(NIV_INFO[p]?NIV_INFO[p].nom:p)+' <b>'+_rzN(k.cajas)+' cj'
+      +(k.resto?(' + '+_rzN(k.resto)+' u'):'')+'</b> ('+_rzN(por[p])+' u)'; });
   el.innerHTML = parts.length ? ('Contado hasta ahora: '+parts.join(' · ')) : '';
 }
 
 // Lee la pantalla. Solo las filas con algo anotado — un lote en cero no se guarda:
 // "no se contó" y "se contó y había cero" son lo mismo para el saldo, y guardar
 // ceros ensucia la foto con lotes que ya no existen.
+// Lee EL ESTADO, no la pantalla. Antes recorría las filas del DOM y por eso
+// guardaba solo el producto abierto (bug del 14-ago).
 function _clLeer(){
   const out=[];
-  document.querySelectorAll('#clBody tr[data-pid]').forEach(function(tr){
-    const pid=+tr.getAttribute('data-pid'), lote=tr.getAttribute('data-lote');
-    const ins=tr.querySelectorAll('input.cl-in');
-    const cajas=+(ins[0]&&ins[0].value||0), sueltas=+(ins[1]&&ins[1].value||0);
+  Object.keys(_clVal).forEach(function(k){
+    const i=k.indexOf('|'), pid=+k.slice(0,i), lote=k.slice(i+1);
+    const v=_clVal[k], cajas=+(v.c||0), sueltas=+(v.s||0);
     if(!cajas && !sueltas) return;
     out.push({producto_id:pid, lote:lote, cajas:cajas, sueltas:sueltas, uds:_clUds(pid,cajas,sueltas)});
   });
+  out.sort(function(a,z){ return a.producto_id-z.producto_id || String(a.lote).localeCompare(String(z.lote),'es'); });
   return out;
 }
 
@@ -6912,12 +6967,12 @@ function despRenderPedido(body){
     });
     h+='<tr class="dp-add"><td colspan="4">'
       +'<button class="dp-mas" onclick="despMasLote('+i+')">+ partir entre otro lote</button>'
-      +_despSumaMsg(e,L)+'</td></tr>';
+      +'<span id="dpSum'+i+'">'+_despSumaMsg(e,L)+'</span></td></tr>';
   });
   h+='</table>';
   const pend=_despPendientes(f);
   h+='<div class="dp-pie">'
-    +(pend? '<div class="cl-none">'+esc(pend)+'</div>' : '')
+    +'<div class="cl-none" id="dpPend">'+(pend?esc(pend):'')+'</div>'
     +'<button class="btn btn-amarillo" id="despOk"'+(pend?' disabled':'')
     +' onclick="despConfirmar()">Confirmar despacho</button></div>';
   body.innerHTML=h;
@@ -6960,14 +7015,43 @@ function _despPendientes(f){
   if(mal)     return 'La suma de lotes no da la cantidad en '+mal+(mal===1?' línea':' líneas');
   return '';
 }
-function despSetCant(i,v){ const f=_despFacAbierta(); if(!f) return;
-  _despEst(f,i).cant=(v===''?0:+v); despRender(); }
+// oninput: se escribe al estado y se PARCHA. Nada de despRender() acá — un
+// re-render en cada tecla mata el foco y cierra el teclado del teléfono.
+function despSetCant(i,v){
+  const f=_despFacAbierta(); if(!f) return;
+  const e=_despEst(f,i), L=f.lineas[i];
+  e.cant=(v===''?0:+v);
+  const dif=Math.abs(e.cant-L.cant_uom)>1e-9;
+  const inp=document.querySelectorAll('#despBody .dp-cant')[i];
+  const tr=inp&&inp.closest('tr'); if(tr) tr.classList.toggle('dif',dif);
+  const td=inp&&inp.closest('td');
+  if(td){
+    let m=td.querySelector('.dp-fact');
+    if(dif && !m){ m=document.createElement('span'); m.className='dp-fact'; td.appendChild(m); }
+    if(m) m.textContent = dif ? ('facturado '+_rzN(L.cant_uom,0)) : '';
+    if(!dif && m) m.remove();
+  }
+  _despPatch(f,i);
+}
 function despSetLote(i,j,v){ const f=_despFacAbierta(); if(!f) return;
   const e=_despEst(f,i);
   if(v==='__'){ const t=prompt('Lote (forma "154 / 12-26"):',e.lotes[j].lote||''); if(t==null) { despRender(); return; } v=String(t).trim(); }
   e.lotes[j].lote=v; despRender(); }
-function despSetLoteCant(i,j,v){ const f=_despFacAbierta(); if(!f) return;
-  _despEst(f,i).lotes[j].cant=(v===''?null:+v); despRender(); }
+function despSetLoteCant(i,j,v){
+  const f=_despFacAbierta(); if(!f) return;
+  _despEst(f,i).lotes[j].cant=(v===''?null:+v);
+  _despPatch(f,i);
+}
+// Actualiza solo el mensaje de suma de la línea y el pie. El resto de la tabla
+// no se toca, así que el input que está usando Daniel conserva el foco.
+function _despPatch(f,i){
+  const e=_despEst(f,i), L=f.lineas[i];
+  const sp=document.getElementById('dpSum'+i);
+  if(sp) sp.innerHTML=_despSumaMsg(e,L);
+  const pend=_despPendientes(f);
+  const pd=document.getElementById('dpPend'); if(pd) pd.textContent=pend||'';
+  const ok=document.getElementById('despOk'); if(ok) ok.disabled=!!pend;
+}
 function despMasLote(i){ const f=_despFacAbierta(); if(!f) return;
   _despEst(f,i).lotes.push({lote:'',cant:null}); despRender(); }
 function _despFacAbierta(){ return (_despFac||[]).find(function(x){ return x.factura_id===_despAbierto; }); }
