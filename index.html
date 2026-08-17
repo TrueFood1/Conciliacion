@@ -1531,9 +1531,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- MERMAS (módulo Operaciones) -->
 <div id="vReporte" class="hidden">
   <div class="faces faces-ent">
-    <button class="face" onclick="irADespachos()">Despachos</button>
+    <button class="face" onclick="irADespachos()">Resumen</button>
     <button class="face" onclick="irAPendientes()">Pendientes</button>
-    <button class="face face-soon" disabled title="Fase 2">Buscar</button>
+    <button class="face" onclick="irAEntBuscar()">Buscar</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div class="m3title" style="font-size:24px">Reporte de despacho</div>
@@ -1545,13 +1545,13 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- ── DESPACHOS: el lector de facturas (Daniel, 6:30 am) ────────────────── -->
 <div id="vDespachos" class="hidden">
   <div class="faces faces-ent">
-    <button class="face on">Despachos</button>
+    <button class="face on">Resumen</button>
     <button class="face" onclick="irAPendientes()">Pendientes</button>
-    <button class="face face-soon" disabled title="Fase 2">Buscar</button>
+    <button class="face" onclick="irAEntBuscar()">Buscar</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
-    <div class="m3title" style="font-size:24px">Despachos</div>
+    <div class="m3title" style="font-size:24px">Resumen</div>
     <button class="btn btn-sm" onclick="despCargar(true)">Recargar</button>
   </div>
   <div id="despStatus" class="status hidden" style="margin-top:14px"></div>
@@ -1560,9 +1560,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <div id="vPendientes" class="hidden">
   <div class="faces faces-ent">
-    <button class="face" onclick="irADespachos()">Despachos</button>
+    <button class="face" onclick="irADespachos()">Resumen</button>
     <button class="face on">Pendientes</button>
-    <button class="face face-soon" disabled title="Fase 2">Buscar</button>
+    <button class="face" onclick="irAEntBuscar()">Buscar</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
@@ -1576,11 +1576,27 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   <div id="pdBody" style="margin-top:14px"></div>
 </div>
 
+<!-- ── BUSCAR: el historial. UN campo, y al tocarlo se elige por qué se busca. ── -->
+<div id="vEntBuscar" class="hidden">
+  <div class="faces faces-ent">
+    <button class="face" onclick="irADespachos()">Resumen</button>
+    <button class="face" onclick="irAPendientes()">Pendientes</button>
+    <button class="face on">Buscar</button>
+    <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
+  </div>
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div class="m3title" style="font-size:24px">Buscar</div>
+    <button class="btn btn-sm" onclick="bsCargar(true)">Recargar</button>
+  </div>
+  <div id="bsStatus" class="status hidden" style="margin-top:14px"></div>
+  <div id="bsBody" style="margin-top:14px"></div>
+</div>
+
 <div id="vConteoLote" class="hidden">
   <div class="faces faces-ent">
-    <button class="face" onclick="irADespachos()">Despachos</button>
+    <button class="face" onclick="irADespachos()">Resumen</button>
     <button class="face" onclick="irAPendientes()">Pendientes</button>
-    <button class="face face-soon" disabled title="Fase 2">Buscar</button>
+    <button class="face" onclick="irAEntBuscar()">Buscar</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
@@ -2315,9 +2331,46 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* ── DESPACHOS · el lector de facturas ──────────────────────────────────
    Misma densidad y mismo criterio que el Conteo: filas de tabla, nada anidado,
    el lote angosto y sin protagonismo. Se usa a las 6:30 con una mano. */
-.dp-lista{display:flex;flex-direction:column;gap:6px}
+/* En escritorio la bandeja NO se estira a 1180px: una tarjeta de un metro de ancho
+   con dos datos adentro se lee peor, no mejor. Misma medida que las líneas del
+   pedido, para que las dos pantallas se sientan del mismo módulo. */
+.dp-lista{display:flex;flex-direction:column;gap:6px;max-width:620px}
 .dp-sep{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
   color:var(--text-3);padding-top:6px}
+/* ── LAS DOS SECCIONES VIVAS ──
+   POR PREPARAR y PREPARADO, cada una con su contador. El contador no decora:
+   es la respuesta a "¿cuánto me falta?" sin contar tarjetas con el dedo.
+   Los ENTREGADOS no ocupan espacio — una línea al pie y se van al historial. */
+.dp-secc{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--text-3);padding-top:14px}
+.dp-secc:first-child{padding-top:2px}
+.dp-secc-n{font-family:var(--mono);letter-spacing:0;font-size:11px}
+.dp-vacia{font-size:12px;color:var(--text-3);padding:2px 0 4px}
+/* La tarjeta de un PREPARADO. No es un botón entero: el botón está adentro, a la
+   derecha, porque tocar la tarjeta por accidente no puede marcar una salida. */
+.dp-prep{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  border:1px solid var(--border);border-left:2px solid #E9FE60;border-radius:10px;
+  background:#141417;padding:9px 10px 9px 12px}
+.dp-prep-i{display:flex;flex-direction:column;gap:2px;min-width:0}
+.dp-prep-cli{font-size:13.5px;font-weight:500;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dp-prep-h{font-size:11.5px;color:var(--text-3)}
+/* Ámbar solo lo que urge: preparado AYER o antes es lo que hay que sacar o
+   devolver al congelador. Preparado hoy es normal y va en gris. */
+.dp-prep.vieja{border-left-color:#E9A23B}
+.dp-prep.vieja .dp-prep-h{color:#E9A23B}
+.dp-entregar{flex:none;height:34px;padding:0 14px;border-radius:9px;border:1px solid #3F4A16;
+  background:transparent;color:#E9FE60;font-family:var(--font);font-size:12.5px;
+  font-weight:600;cursor:pointer}
+.dp-entregar:hover{background:rgba(233,254,96,.08)}
+.dp-entregar:disabled{opacity:.5;cursor:default}
+/* El pie de entregados: una línea, no una lista. Lleva al historial. */
+.dp-hoy{margin-top:16px;border-top:1px solid var(--border);padding-top:10px;max-width:620px}
+.dp-hoy button{background:none;border:none;padding:0;font:inherit;font-size:12px;
+  color:var(--text-3);cursor:pointer;font-family:var(--font)}
+.dp-hoy button:hover{color:var(--text-2)}
+.dp-hoy b{font-family:var(--mono);font-weight:500;color:var(--text-2)}
 .dp-ped{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;cursor:pointer;
   border:1px solid var(--border);border-radius:10px;background:#141417;padding:10px 12px;
   color:var(--text);font:inherit}
@@ -2348,19 +2401,47 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    TIPOGRAFÍA DEL SISTEMA, sin excepciones: nada de monospace en un control. */
 /* El móvil es la referencia. En escritorio las líneas NO se estiran a 1180px:
    un selector de lote de un metro de ancho se ve peor, no mejor. */
-.dp-lin{display:flex;flex-direction:column;gap:8px;margin-top:12px;max-width:620px}
+/* DOS COLUMNAS TAMBIÉN EN EL TELÉFONO (decisión de Andrea). El pedido entero
+   cabe en una pantalla y se ve de un vistazo cuáles ya tienen lote y cuáles no;
+   con una columna hay que hacer scroll para saberlo, que es justo lo que la
+   vista existe para evitar. A 390px cada tarjeta queda en ~171px y el selector
+   muestra "224 / 2-27" completo (medido en el navegador, no supuesto).
+   EXCEPCIÓN: la tarjeta con lote PARTIDO ocupa el ancho entero — necesita
+   selector + cantidad + quitar por fila, y eso no cabe en media pantalla. */
+.dp-lin{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px;max-width:620px}
 .dp-pie{max-width:620px}
 .dp-l{border:1px solid var(--border);border-left:2px solid var(--border-strong);
   border-radius:10px;background:var(--surface);padding:10px 12px;
-  display:flex;flex-direction:column;gap:8px}
+  display:flex;flex-direction:column;gap:8px;min-width:0}
+.dp-l.full{grid-column:1/-1}
 .dp-l.ok{border-left-color:#E9FE60}
 .dp-l.dif{border-left-color:#E9A23B}
-.dp-l-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.dp-l-pr{font-size:14px;color:var(--text);font-weight:500}
+/* Compacta: producto arriba, cantidad debajo — apiladas, porque en 171px una
+   fila con las dos deja al selector sin aire. Partida: vuelven a la misma fila,
+   que ahí sí hay ancho. */
+.dp-l-top{display:flex;flex-direction:column;align-items:flex-start;gap:0;min-width:0}
+.dp-l.full .dp-l-top{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+.dp-l-pr{font-size:14px;color:var(--text);font-weight:500;line-height:1.35;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+/* Fila de un lote partido, y el pie de la tarjeta partida. */
+.dp-l-fin{display:flex;align-items:center;justify-content:space-between;gap:10px}
+/* Quitar una línea agregada por error. ANTES NO SE PODÍA —bug reportado por
+   Andrea—: se agregaba un lote de más y no había forma de sacarlo salvo salir
+   del pedido y perder todo lo elegido. Al bajar a un solo lote la tarjeta vuelve
+   sola al caso simple: un lote no es un reparto. */
+.dp-x{flex:none;width:34px;height:40px;border:none;background:none;cursor:pointer;
+  color:var(--text-3);font-family:var(--font);font-size:17px;line-height:1;padding:0}
+.dp-x:hover{color:#E9A23B}
+/* "+ otro lote" dice lo que hace. "+ partir" describía la mecánica interna. */
+.dp-otro{align-self:flex-end;background:none;border:none;padding:2px 0;cursor:pointer;
+  font-family:var(--font);font-size:11.5px;color:#E9FE60}
+.dp-l-fin .dp-otro{align-self:auto}
+.dp-otro:hover{text-decoration:underline}
 /* La cantidad es un botón que PARECE texto hasta que se toca. Sin edición no
    hay ruido; el lápiz dice que se puede sin gritar. */
-.dp-l-cant{background:none;border:none;padding:2px 0;font:inherit;font-size:14px;
-  color:var(--text-2);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:baseline;gap:5px}
+.dp-l-cant{background:none;border:none;padding:1px 0 2px;font-family:var(--font);font-size:12.5px;
+  color:var(--text-2);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:baseline;gap:5px;
+  max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .dp-l-cant b{color:var(--text);font-weight:600;font-size:15px;font-variant-numeric:tabular-nums}
 .dp-lapiz{font-size:11px;color:var(--text-3)}
 .dp-l-cant:hover .dp-lapiz{color:var(--text-2)}
@@ -2379,18 +2460,68 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .dp-lsel.p{flex:1}
 .dp-lq{width:74px;flex:none;text-align:center;font-variant-numeric:tabular-nums}
 .dp-cant{width:74px;text-align:center;font-variant-numeric:tabular-nums}
-.dp-mas{flex:none;min-width:40px;height:40px;border-radius:9px;border:1px dashed var(--border-strong);
-  background:none;color:#E9FE60;font-family:var(--font);font-size:13px;cursor:pointer;padding:0 10px}
-.dp-mas-x{flex:none;min-width:40px}
-.dp-suma{font-size:11.5px;color:var(--text-3)}
+.dp-suma{font-size:11.5px;color:var(--text-3);white-space:nowrap}
 .dp-ok{color:var(--text-3)}
 .dp-mal{color:#E9A23B;font-weight:600}
 .dp-pie{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+/* PREPARAR es el primario y PREPARAR Y ENTREGAR el secundario. El riesgo no es
+   simétrico: una hora de salida falsa no la ve nadie; un pendiente fantasma se
+   ve y se corrige solo. Van apilados, no lado a lado — el secundario al lado del
+   primario compite, y el volumen grande (Auto y Walmart) es de dos etapas. */
+.dp-btns{display:flex;flex-direction:column;gap:8px}
+.dp-btns .btn{height:46px;font-size:14px}
 @media(max-width:700px){
   .dp-cab-cli{font-size:20px}
-  .dp-l{padding:10px}
+  .dp-l{padding:9px 10px}
   .dp-lq,.dp-cant{width:66px}
+  /* En la tarjeta angosta el selector recupera ancho útil: menos padding y la
+     flecha más pegada al borde. Lo que NO baja es la letra — 16px o menos
+     reintroduce el zoom automático de iOS al tocar el campo. */
+  .dp-lin .dp-l:not(.full) .dp-lsel{padding-left:9px;padding-right:24px;
+    background-position:calc(100% - 12px) 17px,calc(100% - 7px) 17px}
 }
+/* ── BUSCAR ──
+   UN campo. Al tocarlo se elige por qué se busca —cliente, lote, producto,
+   fecha—, en vez de cuatro campos que obligan a decidir antes de escribir.
+   El detalle del AB-RE-04 se ve SOLO si se pide: la lista responde "cuándo y a
+   quién", y el papel se arma al abrir la fila. */
+.bs-caja{max-width:620px}
+.bs-in{width:100%;background:var(--surface-2);border:1px solid var(--border-strong);
+  border-radius:10px;color:var(--text);font-family:var(--font);font-size:16px;
+  height:44px;padding:0 13px;box-sizing:border-box;outline:none}
+.bs-in:focus{border-color:#E9FE60}
+.bs-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.bs-chip{background:var(--surface-2);border:1px solid var(--border);border-radius:999px;
+  color:var(--text-2);font-family:var(--font);font-size:12px;padding:5px 13px;cursor:pointer}
+.bs-chip:hover{border-color:var(--border-strong)}
+.bs-chip.on{background:#E9FE60;border-color:#E9FE60;color:#2C3A00;font-weight:600}
+.bs-lista{display:flex;flex-direction:column;gap:6px;margin-top:14px;max-width:620px}
+.bs-fila{width:100%;text-align:left;background:#141417;border:1px solid var(--border);
+  border-radius:10px;color:var(--text);font:inherit;font-family:var(--font);
+  padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:3px}
+.bs-fila.on{border-color:#3F4A16;border-bottom-color:var(--border);border-radius:10px 10px 0 0}
+.bs-f1,.bs-f2{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.bs-cli{font-size:13.5px;font-weight:500}
+.bs-fec{font-size:11px;color:var(--text-3);white-space:nowrap}
+.bs-sub{font-size:11.5px;color:var(--text-3)}
+.bs-fac{font-family:var(--mono);font-size:10.5px;color:var(--text-3)}
+/* El detalle: el AB-RE-04 tal cual, en filas de tabla. Misma densidad que el
+   resto del módulo — encabezado 11px terciario y una línea debajo. */
+.bs-det{max-width:620px;border:1px solid var(--border);border-top:none;
+  border-radius:0 0 10px 10px;background:var(--surface);padding:10px 12px 12px}
+.bs-det table{width:100%;border-collapse:collapse}
+.bs-det th{font-size:11px;font-weight:500;color:var(--text-3);text-align:left;
+  padding:0 8px 6px 0;border-bottom:1px solid var(--border);white-space:nowrap}
+.bs-det th.r{text-align:right}
+.bs-det td{font-size:12.5px;padding:9px 8px 9px 0;vertical-align:top}
+.bs-det td.n{text-align:right;font-variant-numeric:tabular-nums;color:var(--text);white-space:nowrap}
+.bs-det th:last-child,.bs-det td:last-child{padding-right:0}
+/* La unidad viaja con el número, en secundario: es su etiqueta, no otra columna. */
+.bs-det .bs-uni{color:var(--text-3);font-variant-numeric:normal}
+/* El lote NO se parte. Es el dato que se viene a leer; en tres renglones deja
+   de ser legible de un vistazo, que es todo lo que esta pantalla ofrece. */
+.bs-det .bs-lote{color:var(--text-2);white-space:nowrap}
+.bs-meta{font-size:11.5px;color:var(--text-3);margin-top:9px;line-height:1.6}
 /* chip de capacidad por personas (marca manual de la semana) */
 #vResumen .rz-chip,#vPlan .rz-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text-2);background:var(--surface-2);border:.5px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;white-space:nowrap}
 #vResumen .rz-chip:hover,#vPlan .rz-chip:hover{border-color:#3A3A42}
@@ -2399,6 +2530,14 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-note2p{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:var(--text-3)}
 #vResumen .rz-note2p svg{width:14px;height:14px;color:var(--text-3);flex:none}
 #vPlan .pl-note2p{margin-left:8px;font-size:10.5px;color:var(--text-3)}
+/* Recorte por dotación: los días editados que no cabían en la capacidad de la semana. Va pegado
+   al chip de personas (debajo, en su propia línea, para no romper la cabecera en teléfono). */
+#vResumen .rz-recorte,#vPlan .rz-recorte{margin:0 0 9px;font-size:11.5px;line-height:1.35;color:#C99A4E;
+  background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.35);border-radius:7px;padding:5px 8px}
+/* Picado: consecuencia, no marca. Ámbar porque cambia el techo del día. */
+#vResumen .rz-picchip,#vPlan .rz-picchip{display:inline-block;margin-top:5px;font-size:9.5px;font-weight:600;
+  color:#C99A4E;background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.4);border-radius:5px;
+  padding:1px 5px;line-height:1.5;white-space:normal}
 /* barra de confirmación del cambio manual de personas */
 #vResumen .rz-confirm,#vPlan .rz-confirm{margin-top:12px;background:rgba(199,125,160,.08);border:.5px solid rgba(199,125,160,.35);border-radius:9px;padding:10px 14px;font-size:13px;color:var(--text-2);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 #vResumen .rz-confirm b,#vPlan .rz-confirm b{color:var(--text)}
@@ -2852,7 +2991,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 15 ago 2026 · b19';
+const BUILD = 'v 17 ago 2026 · b21';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -3291,7 +3430,7 @@ const ACCESO_VISTAS = {
   finanzas:     ['vFacturado','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vResults'],
   conciliacion: ['vUpload'],
   operaciones:  ['vProduccion','vMermas','vInventario','vPlan','vResumen','vConteo'],
-  entregas:     ['vConteoLote','vReporte','vPendientes','vDespachos'],
+  entregas:     ['vConteoLote','vReporte','vPendientes','vDespachos','vEntBuscar'],
 };
 let _accesoMods=null;   // se llena al entrar; null = todavía no se sabe → no se restringe
 function accesoPuede(mod){ return !_accesoMods || _accesoMods==='todo' || _accesoMods.indexOf(mod)>=0; }
@@ -3358,7 +3497,7 @@ function aplicarModoProduccion(){
   });
 }
 // Vistas de módulo (Contabilidad + Conciliación + Operaciones). Muestra UNA, oculta el resto.
-const _MOD_VIEWS=['vUpload','vFacturado','vProduccion','vMermas','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vInventario','vPlan','vResumen','vConteo','vConteoLote','vReporte','vPendientes','vDespachos','vResults'];
+const _MOD_VIEWS=['vUpload','vFacturado','vProduccion','vMermas','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vInventario','vPlan','vResumen','vConteo','vConteoLote','vReporte','vPendientes','vDespachos','vEntBuscar','vResults'];
 function _modShow(id){
   // Guardia COSMÉTICO (ver ACCESO_USUARIOS): navegar directo a una vista ajena
   // devuelve al lobby. No protege los datos — eso lo hará "Roles y accesos".
@@ -5115,6 +5254,56 @@ function _esFeriado(ds){ return FERIADOS[ds]||''; }
 // semanas del 21-dic al 8-ene no existen en el plan.
 const CIERRE='2026-12-18', REAPERTURA='2027-01-11';
 
+// ── PICADO — DERIVADO, nunca guardado ────────────────────────────────────────────
+// El picado NO es un dato: no vive en plan_overrides ni en el objeto del día. Se deriva en
+// cada render de dónde quedó Semillas. Si Semillas se mueve, el picado se mueve con ella; si
+// Semillas se va de la semana, no queda ningún picado. No hay nada que borrar ni que limpiar.
+//
+// Semillas se pica al DÍA SIGUIENTE, y ese día tiene que trabajarse. De ahí sale UNA sola
+// regla, que reemplaza al viejo candado "solo jueves":
+//     Semillas puede ir el día D  ⟺  D+1 (calendario) es día productivo.
+//   · viernes                    → D+1 = sábado  → no
+//   · el día antes de un feriado → D+1 = feriado → no
+//   · 18-dic y el cierre         → D+1 cerrado   → no
+// El jueves deja de ser candado y pasa a ser PREFERENCIA del motor (su picado cae en viernes,
+// que ya es día de limpieza y no cuesta un día de horno). Lun–mié son destinos válidos.
+function _esProductivo(ds){
+  const dow=new Date(ds+'T00:00:00').getDay();
+  if(dow===0||dow===6) return false;              // fin de semana
+  if(_esFeriado(ds)) return false;                // feriado
+  if(ds>CIERRE && ds<REAPERTURA) return false;    // cierre de diciembre
+  return true;
+}
+function _diaSig(ds){ const d=new Date(ds+'T00:00:00'); d.setDate(d.getDate()+1); return _ymd(d); }
+const SEMILLAS_MSG='Pan Semillas no puede ir un viernes, ni el día antes de un feriado o del cierre de diciembre: se pica al día siguiente y ese día no se trabaja. Puede ir lunes, martes, miércoles o jueves, según la semana.';
+// '' si Semillas puede ir ese día; el motivo (ámbar) si no. Único portero: lo usan el
+// intercambio, la edición del Resumen, la edición del Plan y el auto-relleno.
+function _semillasVeto(ds){ return _esProductivo(_diaSig(ds)) ? '' : SEMILLAS_MSG; }
+
+// picado(D) = el día ANTERIOR produce Semillas. Como Semillas solo entra donde el día siguiente
+// es productivo, el picado siempre cae en el día calendario siguiente y dentro de la misma
+// semana lun–vie (nunca cruza el fin de semana). Se aplica sobre las celdas EFECTIVAS —base +
+// overrides + auto-relleno—, NUNCA sobre la propuesta base del motor: ahí estaba el bug, el
+// picado se leía de un layout que no ve las ediciones y por eso sobrevivía a que Semillas se
+// fuera del día. El día del picado RINDE COMO 2 PERSONAS: la misma gente pica y hornea.
+function _aplicarPicado(cells){
+  cells=cells||[];
+  return cells.map(function(c,i){
+    const prev=i>0?cells[i-1]:null;
+    if(!prev || !prev.prods || !(prev.prods[452]>0)) return c;
+    if(c.kind==='real' || c.kind==='feriado') return c;   // lo registrado en Odoo y los feriados no se tocan
+    const nc=Object.assign({}, c); nc.picado=true; nc.prods=Object.assign({}, c.prods||{});
+    let recortado=false;
+    for(const k in nc.prods){ const pid=+k, tope=_capDe(pid,2);
+      if(nc.prods[pid]>tope){ nc.prods[pid]=tope; recortado=true; } }
+    if(nc.pid!=null && nc.prods[nc.pid]!=null) nc.batches=nc.prods[nc.pid];
+    const ks=Object.keys(nc.prods);
+    if(!ks.length){ nc.prod='Picado'; return nc; }        // día sin producción → el picado ES el día
+    nc.prod='Picado · '+(recortado ? ks.map(function(k){ return _rzBP(nc.prods[k], +k); }).join(' · ') : c.prod);
+    return nc;
+  });
+}
+
 function _isoWk(dt){
   const t=new Date(Date.UTC(dt.getFullYear(),dt.getMonth(),dt.getDate()));
   const day=t.getUTCDay()||7; t.setUTCDate(t.getUTCDate()+4-day);
@@ -5313,8 +5502,12 @@ function _weekLayout(stock, ritmo, colDe, H, personas, rampa){
   // ── VIERNES: día productivo para PAN (Blanco, Francés, Buns, Pizza) y Galletas —
   // TODO menos Semillas (su picado cae en sábado, que no se trabaja). La única regla:
   // producción y limpieza profunda NO caben el mismo día.
-  // (1) PICADO: solo si hubo Semillas el jueves (Blanco pica el MISMO día, no acá).
-  const picado = semillas>0;
+  // (1) PICADO: ya NO se decide acá. Es derivado — sale de _aplicarPicado sobre las celdas
+  //     efectivas, que son las que saben en qué día quedó Semillas después de las ediciones.
+  //     Lo único que el motor necesita saber es que si esta semana lleva Semillas, el día que
+  //     la sigue RINDE COMO 2 PERSONAS. En el layout base Semillas va al jueves, así que ese
+  //     día es el viernes: por eso el techo del viernes se recorta acá.
+  const capVie=function(p){ const c=_capDe(p,personas); return semillas>0?Math.min(c,_capDe(p,2)):c; };
   // (2) PRODUCCIÓN. El viernes es un 5º día de producción, no un día exclusivo de Galletas.
   //   · Viernes PRODUCTIVO (vieRampa): MISMA selección que lun–jue sobre el set del viernes —
   //     quiebre (cobertura < colchón) > deuda de rampa > jalar del horizonte (cobertura < H).
@@ -5336,18 +5529,18 @@ function _weekLayout(stock, ritmo, colDe, H, personas, rampa){
       const rank=u?2:(debe>0?1:0);                       // mismo orden que lun–jue
       const gana=(rank>mejorRank) || (rank===mejorRank && (rank===1 ? debe>mejorDebe : c<pc));
       if(gana){ mejorRank=rank; mejorDebe=debe; pc=c; peor=p; } }
-    if(peor!==null){ const cap=_capDe(peor,personas); stock[peor]+=cap*NIV_INFO[peor].rend; prod={p:peor, batches:cap}; asign[peor]=(asign[peor]||0)+1; }
+    if(peor!==null){ const cap=capVie(peor); stock[peor]+=cap*NIV_INFO[peor].rend; prod={p:peor, batches:cap}; asign[peor]=(asign[peor]||0)+1; }
   } else {
     let peor=null, pc=1e9;                               // motor de siempre: viernes solo ante quiebre
     for(const p of vieCand){ const r=ritmo[p]||0; if(r<=0)continue; const c=(stock[p]-r)/r;
       const th = personas<3 ? colDe(p) : NIV_DERRAME_MIN;
       if(c<th && c<pc){ pc=c; peor=p; } }
-    if(peor!==null){ const cap=_capDe(peor,personas); stock[peor]+=cap*NIV_INFO[peor].rend; prod={p:peor, batches:cap}; asign[peor]=(asign[peor]||0)+1; }
+    if(peor!==null){ const cap=capVie(peor); stock[peor]+=cap*NIV_INFO[peor].rend; prod={p:peor, batches:cap}; asign[peor]=(asign[peor]||0)+1; }
   }
   // (3) LIMPIEZA PROFUNDA: solo si el viernes NO quedó cargado (lo decide _celdasSemana/rzCeldas al
   //     armar la etiqueta: si no hay picado ni producción ni corridos → "Limpieza").
   NIV_PROD.forEach(p=>stock[p]-=(ritmo[p]||0));    // consumo de la semana
-  return {otros, semillas, viernes:{picado, prod}, personas, rampaOn:!!rOn};
+  return {otros, semillas, viernes:{prod}, personas, rampaOn:!!rOn};
 }
 function _semanaBatches(layout){
   const b={}; (layout.otros||[]).forEach(d=>b[d.p]=(b[d.p]||0)+d.batches);
@@ -6893,7 +7086,12 @@ async function rpCalcSaldos(g){
   Object.values((g&&g.lotes)||{}).forEach(function(L){ (L.ordenes||[]).forEach(function(rec){
     if(rec.dfUtc && Date.parse(rec.dfUtc.replace(' ','T')+'Z')>corteMs){
       const k=(+L.producto)+'|'+L.canon; s[k]=(s[k]||0)+(rec.uds||0); } }); });
-  const {data:ent}=await c.from('ent_entregado_desde_ancla').select('lote,producto_id,uds');
+  // El nombre dice lo que resta: lo que SALIÓ DEL CONGELADOR, que es lo que se
+  // descuenta al PREPARAR — no al entregar. El ancla cuenta lo que está adentro,
+  // y un pedido preparado ya salió de ahí. (Se llamaba ent_entregado_desde_ancla
+  // y el nombre pasó a ser mentira el día que preparar y entregar se separaron;
+  // el alias viejo sigue vivo en Supabase un build por si algo quedó apuntando.)
+  const {data:ent}=await c.from('ent_salido_del_congelador_desde_ancla').select('lote,producto_id,uds');
   (ent||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote; s[k]=(s[k]||0)-(+r.uds||0); });
   return s;
 }
@@ -6933,9 +7131,32 @@ try{
 }catch(e){}
 let _despFac=null, _despUom=null, _despErr='', _despAbierto=null, _despLotes=null,
     _despSaldo=null, _despEdit={}, _despGuardando=false;
+// El estado de los pedidos YA preparados. Sale de v_ent_pedido_estado, o sea
+// ENTERO de Supabase: se dibuja al instante, sin esperar los ~40 s del arranque
+// en frío del proxy de Odoo. Es a propósito — lo que hay que hacer AHORA MISMO
+// (sacar lo que ya está armado) no puede depender de que despierte un servidor.
+let _despEstado=null, _despEstErr='', _despEntregando=0;
 
-function _despYmd(d){ return d.toISOString().slice(0,10); }
+// ⚠️ EN HORA LOCAL, NO UTC. Antes esto era toISOString().slice(0,10), que en
+// Costa Rica (UTC−6) devuelve el día SIGUIENTE a partir de las 18:00. Nunca se
+// notó porque Despachos se usa a las 6:30 am, pero "Entregados hoy" se mira a
+// cualquier hora y con UTC habría dejado de contar a las 6 de la tarde.
+function _despYmd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')
+                            +'-'+String(d.getDate()).padStart(2,'0'); }
 function _despHoy(){ return _despYmd(new Date()); }
+// El día de un timestamptz de Supabase, en hora de acá.
+function _despDiaDe(ts){ if(!ts) return ''; const d=new Date(ts);
+  return isNaN(d)?'':_despYmd(d); }
+// La hora sola: "6:22". 24 h a propósito — la operación es de madrugada y un
+// "a. m." en cada tarjeta es ruido que no distingue nada.
+function _despHora(ts){ if(!ts) return ''; const d=new Date(ts); if(isNaN(d)) return '';
+  return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0'); }
+// Hora con el día por delante cuando NO es hoy: "ayer 6:42", "vie 15 6:42".
+function _despCuando(ts){
+  const ymd=_despDiaDe(ts); if(!ymd) return '';
+  const h=_despHora(ts);
+  return ymd===_despHoy() ? h : (_despDia(ymd)+' '+h);
+}
 
 function _despAviso(cls,html){
   const st=document.getElementById('despStatus'); if(!st) return;
@@ -6945,10 +7166,15 @@ function _despAviso(cls,html){
 // ── LECTURA ─────────────────────────────────────────────────────────────
 async function despCargar(force){
   const body=document.getElementById('despBody');
+  // El estado se refresca SIEMPRE, aunque las facturas estén en caché: la lista
+  // de "preparado" es la que puede haber cambiado desde otro teléfono, y es
+  // barata (una vista de Supabase, sin Odoo).
+  despCargarEstado();
   if(_despFac && !force){ despRender(); return; }
-  _despErr='';
+  _despErr=''; _despFac=null;
   _despAviso('s-info','Leyendo facturas de Odoo… la primera consulta del día puede tardar ~40 s.');
   if(body) body.innerHTML='';
+  despRender();                 // la sección "Preparado" no espera a Odoo
   try{
     if(!_despUom){
       const us=await odooCall('uom.uom','search_read',[[['category_id.name','=','Unidad']]],
@@ -7018,19 +7244,38 @@ async function despCargarLotes(){
   if(_despAbierto) despRender();
 }
 
-// ── BANDEJA ─────────────────────────────────────────────────────────────
+// Lo preparado y lo entregado, de Supabase. No toca Odoo y por eso no espera.
+async function despCargarEstado(){
+  try{
+    const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
+    const {data,error}=await c.from('v_ent_pedido_estado')
+      .select('pedido_id,cliente_nombre,factura_nombre,alisto_id,estado,preparado_en,salida_en,n_lineas')
+      .order('preparado_en',{ascending:false}).limit(200);
+    if(error) throw error;
+    _despEstado=data||[]; _despEstErr='';
+  }catch(e){
+    _despEstado=_despEstado||[];
+    _despEstErr=(e&&e.message)||String(e);
+  }
+  if(!_despAbierto) despRender();     // sin pisar un pedido a medio llenar
+}
+
+// ── LA BANDEJA · DOS SECCIONES VIVAS ────────────────────────────────────
+// POR PREPARAR (facturas de Odoo sin pedido) y PREPARADO (armado, esperando el
+// camión). Los ENTREGADOS no ocupan espacio: una línea al pie que lleva al
+// historial. Son los tres estados del flujo, y dos de ellos se derivan de una
+// AUSENCIA — por eso no hay tres listas que mantener sincronizadas.
 function despRender(){
   const body=document.getElementById('despBody'); if(!body) return;
   if(_despAbierto){ despRenderPedido(body); return; }
-  const fs=_despFac||[];
-  if(!fs.length){
-    body.innerHTML='<div class="cl-none">'+(_despErr?'':'No hay facturas sin despachar.')+'</div>';
-    return;
-  }
   const hoy=_despHoy();
-  const dHoy=fs.filter(function(f){ return f.fecha===hoy; });
-  const dVen=fs.filter(function(f){ return f.fecha!==hoy && f.enVentana; });
-  const dVie=fs.filter(function(f){ return !f.enVentana; });
+  const est=_despEstado||[];
+  const prep=est.filter(function(r){ return r.estado==='preparado'; });
+  const entHoy=est.filter(function(r){ return r.estado==='entregado' && _despDiaDe(r.salida_en)===hoy; });
+  const fs=_despFac||[];
+  const enVentana=fs.filter(function(f){ return f.enVentana; });
+  const viejas  =fs.filter(function(f){ return !f.enVentana; });
+
   const tarjeta=function(f,vieja){
     return '<button class="dp-ped'+(vieja?' vieja':(f.fecha===hoy?' hoy':''))+'" onclick="despAbrir('+f.factura_id+')">'
       +'<span class="dp-top"><span class="dp-cli">'+esc(f.cliente)+'</span>'
@@ -7039,20 +7284,63 @@ function despRender(){
       +(f.lineas.length===1?' producto':' productos')+'</span>'
       +'<span class="dp-fac">'+esc(f.factura.slice(-10))+'</span></span></button>';
   };
+
   let h='<div class="dp-lista">';
-  if(dHoy.length){ h+='<div class="dp-sep">Hoy</div>'+dHoy.map(function(f){return tarjeta(f,false);}).join(''); }
-  if(dVen.length){ h+='<div class="dp-sep">Días anteriores</div>'+dVen.map(function(f){return tarjeta(f,false);}).join(''); }
-  if(dVie.length){
-    h+='<div class="dp-antes"><div class="dp-antes-h"><span>Anteriores sin despachar</span>'
-      +'<span class="dp-antes-n">'+dVie.length+'</span></div>'
-      +dVie.map(function(f){return tarjeta(f,true);}).join('')+'</div>';
+
+  // 1 · POR PREPARAR
+  h+='<div class="dp-secc"><span>Por preparar</span><span class="dp-secc-n">'
+    +(_despFac===null?'·':fs.length)+'</span></div>';
+  if(_despFac===null){
+    h+='<div class="dp-vacia">Leyendo facturas de Odoo…</div>';
+  }else if(!fs.length){
+    h+='<div class="dp-vacia">'+(_despErr?'No se pudieron leer las facturas de Odoo.':'Nada por preparar.')+'</div>';
+  }else{
+    h+=enVentana.map(function(f){ return tarjeta(f,false); }).join('');
+    // Lo anterior a la ventana no compite: encabezado propio y un punto menos de
+    // contraste. La regla es que nada desaparece, no que todo grite igual.
+    if(viejas.length){
+      h+='<div class="dp-antes"><div class="dp-antes-h"><span>Anteriores sin despachar</span>'
+        +'<span class="dp-antes-n">'+viejas.length+'</span></div>'
+        +viejas.map(function(f){ return tarjeta(f,true); }).join('')+'</div>';
+    }
+  }
+
+  // 2 · PREPARADO
+  h+='<div class="dp-secc"><span>Preparado</span><span class="dp-secc-n">'
+    +(_despEstado===null?'·':prep.length)+'</span></div>';
+  if(_despEstErr){
+    h+='<div class="dp-vacia dp-mal">No pude leer el estado de los pedidos: '+esc(_despEstErr)
+      +(/pedido_estado|ent_salida|schema cache/i.test(_despEstErr)
+        ? ' — falta pegar ENTREGAS_ETAPAS.sql en Supabase.' : '')+'</div>';
+  }else if(_despEstado===null){
+    h+='<div class="dp-vacia">Leyendo…</div>';
+  }else if(!prep.length){
+    h+='<div class="dp-vacia">Nada esperando salir.</div>';
+  }else{
+    h+=prep.map(function(r){
+      // Ámbar solo lo que urge: preparado ayer o antes hay que sacarlo o
+      // devolverlo al congelador. Preparado hoy es lo normal y va en gris.
+      const vieja=_despDiaDe(r.preparado_en)<hoy, ocupado=(_despEntregando===r.pedido_id);
+      return '<div class="dp-prep'+(vieja?' vieja':'')+'">'
+        +'<div class="dp-prep-i"><span class="dp-prep-cli">'+esc(r.cliente_nombre||'—')+'</span>'
+        +'<span class="dp-prep-h">preparado '+esc(_despCuando(r.preparado_en))+'</span></div>'
+        +'<button class="dp-entregar"'+(ocupado?' disabled':'')
+        +' onclick="despEntregar('+r.pedido_id+')">'+(ocupado?'Guardando…':'Entregar')+'</button></div>';
+    }).join('');
   }
   h+='</div>';
+
+  // 3 · ENTREGADOS: una línea, no una lista. Si no hay, no se dice nada.
+  if(entHoy.length){
+    h+='<div class="dp-hoy"><button onclick="irAEntBuscar(\'hoy\')">Entregados hoy · <b>'
+      +entHoy.length+'</b></button></div>';
+  }
   body.innerHTML=h;
 }
 function _despDia(ymd){
-  const hoy=_despHoy();
-  if(ymd===hoy) return 'hoy';
+  const hoy=new Date(), ayer=new Date(); ayer.setDate(ayer.getDate()-1);
+  if(ymd===_despYmd(hoy))  return 'hoy';
+  if(ymd===_despYmd(ayer)) return 'ayer';
   const D=['dom','lun','mar','mié','jue','vie','sáb'];
   const d=new Date(ymd+'T12:00:00');
   return D[d.getDay()]+' '+d.getDate();
@@ -7110,7 +7398,9 @@ function _despLotesDe(pid){
 function despRenderPedido(body){
   const f=(_despFac||[]).find(function(x){ return x.factura_id===_despAbierto; });
   if(!f){ _despAbierto=null; despRender(); return; }
-  let h='<button class="btn btn-sm" onclick="despCerrar()">← Bandeja</button>'
+  // "← Volver" y no "← Resumen": el título de la pantalla ya dice Resumen y
+  // repetirlo dos veces en la misma esquina no orienta, confunde.
+  let h='<button class="btn btn-sm" onclick="despCerrar()">← Volver</button>'
     +'<div class="dp-cab"><div class="dp-cab-cli">'+esc(f.cliente)+'</div>'
     +'<div class="dp-cab-sub">'+esc(f.factura.slice(-10))+' · '+esc(_despDia(f.fecha))+' · '
     +f.lineas.length+(f.lineas.length===1?' producto':' productos')+'</div></div>';
@@ -7118,7 +7408,9 @@ function despRenderPedido(body){
   f.lineas.forEach(function(L,i){
     const e=_despEst(f,i), disp=_despLotesDe(L.producto_id);
     const dif=Math.abs(e.cant-L.cant_uom)>1e-9, ok=_despLineaOK(f,i);
-    h+='<div class="dp-l'+(ok?' ok':'')+(dif?' dif':'')+'">'
+    // El borde izquierdo es TODO el estado que hace falta: lima = tiene lote,
+    // gris = falta. De un vistazo se ve qué queda, sin leer una palabra.
+    h+='<div class="dp-l'+(e.partido?' full':'')+(ok?' ok':'')+(dif?' dif':'')+'">'
       +'<div class="dp-l-top">'
       +'<span class="dp-l-pr">'+esc(L.producto)+'</span>'
       +(e.editando
@@ -7131,20 +7423,22 @@ function despRenderPedido(body){
       +'</div>'
       +(dif?'<div class="dp-fact">facturado '+_rzN(L.cant_uom)+'</div>':'');
     if(!e.partido){
-      h+='<div class="dp-l-bot">'+_despSel(i,0,e.lotes[0],disp,'')
-        +'<button class="dp-mas" onclick="despPartir('+i+')">+ partir</button></div>';
+      // EL CASO NORMAL ES UNA LÍNEA: un solo selector, sin campo de cantidad —
+      // la cantidad es la de la factura y ya está arriba.
+      h+='<div class="dp-l-bot">'+_despSel(i,0,e.lotes[0],disp,'')+'</div>'
+        +'<button class="dp-otro" onclick="despPartir('+i+')">+ otro lote</button>';
     }else{
       e.lotes.forEach(function(lt,j){
         h+='<div class="dp-l-bot">'+_despSel(i,j,lt,disp,'p')
           +'<input class="dp-lq" type="number" min="0" step="any" inputmode="decimal" '
           +'placeholder="0" value="'+(lt.cant==null?'':lt.cant)+'" '
           +'oninput="despSetLoteCant('+i+','+j+',this.value)">'
-          +(j===e.lotes.length-1
-             ? '<button class="dp-mas" onclick="despMasLote('+i+')">+</button>'
-             : '<span class="dp-mas-x"></span>')
+          +'<button class="dp-x" onclick="despQuitarLote('+i+','+j+')" '
+          +'title="Quitar este lote" aria-label="Quitar este lote">×</button>'
           +'</div>';
       });
-      h+='<div class="dp-suma" id="dpSum'+i+'">'+_despSumaMsg(f,i)+'</div>';
+      h+='<div class="dp-l-fin"><button class="dp-otro" onclick="despMasLote('+i+')">+ otro lote</button>'
+        +'<span class="dp-suma" id="dpSum'+i+'">'+_despSumaMsg(f,i)+'</span></div>';
     }
     h+='</div>';
   });
@@ -7152,8 +7446,12 @@ function despRenderPedido(body){
   const pend=_despPendientes(f);
   h+='<div class="dp-pie">'
     +'<div class="cl-none" id="dpPend">'+(pend?esc(pend):'')+'</div>'
+    +'<div class="dp-btns">'
     +'<button class="btn btn-amarillo" id="despOk"'+(pend?' disabled':'')
-    +' onclick="despConfirmar()">Confirmar despacho</button></div>';
+    +' onclick="despConfirmar(false)">Preparar</button>'
+    +'<button class="btn" id="despOk2"'+(pend?' disabled':'')
+    +' onclick="despConfirmar(true)">Preparar y entregar</button>'
+    +'</div></div>';
   body.innerHTML=h;
 }
 
@@ -7189,9 +7487,12 @@ function _despPendientes(f){
     if(_despLineaOK(f,i)) return;
     if(!_despLotesEfectivos(f,i).length) sinLote++; else mal++;
   });
+  // "productos" y no "líneas": desde el rediseño lo que se ve en pantalla es una
+  // tarjeta por producto. Nombrar en pantalla algo que la pantalla no muestra
+  // obliga a traducir mentalmente para encontrar lo que falta.
   const p=[];
-  if(sinLote) p.push('Faltan lotes en '+sinLote+(sinLote===1?' línea':' líneas'));
-  if(mal)     p.push('La suma de lotes no da la cantidad en '+mal+(mal===1?' línea':' líneas'));
+  if(sinLote) p.push('Falta'+(sinLote===1?' el lote de 1 producto':'n lotes en '+sinLote+' productos'));
+  if(mal)     p.push('La suma de lotes no da la cantidad en '+mal+(mal===1?' producto':' productos'));
   return p.join(' · ');
 }
 function despEditar(i){ const f=_despFacAbierta(); if(!f) return;
@@ -7223,9 +7524,24 @@ function _despPatch(f,i){
   if(sp) sp.innerHTML=_despSumaMsg(f,i);
   const pend=_despPendientes(f);
   const pd=document.getElementById('dpPend'); if(pd) pd.textContent=pend||'';
-  const ok=document.getElementById('despOk'); if(ok) ok.disabled=!!pend;
+  const ok=document.getElementById('despOk');   if(ok)  ok.disabled=!!pend;
+  const ok2=document.getElementById('despOk2'); if(ok2) ok2.disabled=!!pend;
   const caja=document.querySelectorAll('#despBody .dp-l')[i];
   if(caja) caja.classList.toggle('ok', _despLineaOK(f,i));
+}
+// QUITAR UNA LÍNEA AGREGADA POR ERROR. Antes no se podía: se agregaba un lote de
+// más y la única salida era abandonar el pedido y volver a elegir todo.
+// Al quedar UN solo lote la tarjeta vuelve sola al caso simple —un lote no es un
+// reparto— y con eso desaparece también el "1 de 6" que no cuadraría nunca.
+function despQuitarLote(i,j){
+  const f=_despFacAbierta(); if(!f) return;
+  const e=_despEst(f,i);
+  e.lotes.splice(j,1);
+  if(e.lotes.length<=1){
+    e.partido=false;
+    e.lotes=[{lote:(e.lotes[0]&&e.lotes[0].lote)||'', cant:e.cant}];
+  }
+  despRender();
 }
 function despSetLote(i,j,v){ const f=_despFacAbierta(); if(!f) return;
   const e=_despEst(f,i);
@@ -7238,19 +7554,30 @@ function despMasLote(i){ const f=_despFacAbierta(); if(!f) return;
   _despEst(f,i).lotes.push({lote:'',cant:null}); despRender(); }
 function _despFacAbierta(){ return (_despFac||[]).find(function(x){ return x.factura_id===_despAbierto; }); }
 
-// ── CONFIRMAR ───────────────────────────────────────────────────────────
-// Cinco inserts encadenados, todos append-only. Si algo falla a mitad, queda el
-// pedido sin alisto: la factura VUELVE a la bandeja (la vista pide alisto
-// vigente), que es exactamente lo que hay que hacer — reintentar.
-async function despConfirmar(){
+// ── CONFIRMAR · DOS CAMINOS ─────────────────────────────────────────────
+// PREPARAR corta antes de la salida; PREPARAR Y ENTREGAR escribe las dos cosas.
+// La diferencia son dos filas en Supabase, pero es toda la diferencia del módulo:
+// sin ella no se puede saber si algo está armado esperando el camión o si ya
+// salió — y ese es justo el estado que alguien mira entre las 6:30 y las 7:30.
+//
+// Cinco inserts encadenados (seis al entregar), todos append-only. Si algo falla
+// a mitad, queda el pedido sin alisto: la factura VUELVE a "Por preparar" (la
+// vista pide alisto vigente), que es exactamente lo que hay que hacer —
+// reintentar. Y si lo que falla es la SALIDA, el pedido queda en "Preparado" con
+// su botón Entregar: tampoco se pierde nada.
+async function despConfirmar(entregar){
   if(_despGuardando) return;
   const f=_despFacAbierta(); if(!f) return;
   const pend=_despPendientes(f); if(pend){ alert(pend); return; }
-  const btn=document.getElementById('despOk');
+  const btn=document.getElementById('despOk'), btn2=document.getElementById('despOk2');
   const dif=f.lineas.filter(function(L,i){ return Math.abs(_despEst(f,i).cant-L.cant_uom)>1e-9; }).length;
-  if(!confirm('Confirmar el despacho de '+f.cliente+'?'
+  if(!confirm((entregar
+      ? '¿Preparar y marcar la salida de '+f.cliente+'?\n\nQueda registrado que salió a las '+_despHora(new Date())+'.'
+      : '¿Preparar el pedido de '+f.cliente+'?\n\nQueda esperando salir; la salida se marca después.')
     +(dif?('\n\n'+dif+(dif===1?' línea sale':' líneas salen')+' con cantidad distinta a la facturada.'):''))) return;
-  _despGuardando=true; if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+  _despGuardando=true;
+  if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+  if(btn2){ btn2.disabled=true; }
   try{
     const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
     const {data:{user}}=await c.auth.getUser();
@@ -7280,22 +7607,267 @@ async function despConfirmar(){
                                     cant_uds:(+x.cant||0)/L.uom_factor, orden:k}; });
       if(lotes.length){ const {error:e5}=await c.from('ent_alisto_lote').insert(lotes); if(e5) throw e5; }
     }
-    _despFac=_despFac.filter(function(x){ return x.factura_id!==f.factura_id; });
+    // La segunda etapa, solo si se pidió. `salida_en` queda en el now() de la
+    // base: la hora real de salida es ESTA, no la de preparación.
+    if(entregar){
+      const {error:e6}=await c.from('ent_salida').insert({alisto_id:ali.id, creado_por:quien});
+      if(e6) throw new Error('el pedido quedó PREPARADO pero no pude marcar la salida: '
+        +((e6&&e6.message)||e6)+' — marcala con el botón Entregar.');
+    }
+    _despFac=(_despFac||[]).filter(function(x){ return x.factura_id!==f.factura_id; });
     _despAbierto=null; _despEdit={};
     despRender();
+    despCargarEstado();    // pasa a "Preparado" (o a "Entregados hoy")
     despCargarLotes();     // el saldo por lote cambió
   }catch(e){
-    alert('No se pudo guardar el despacho: '+((e&&e.message)||e)
-      +'\n\nLa factura sigue en la bandeja: probá de nuevo.');
+    alert('No se pudo guardar: '+((e&&e.message)||e)
+      +'\n\nSi la factura sigue en "Por preparar", probá de nuevo.');
+    despCargarEstado();
   }finally{
     _despGuardando=false;
-    if(btn){ btn.disabled=false; btn.textContent='Confirmar despacho'; }
+    if(btn){ btn.disabled=false; btn.textContent='Preparar'; }
+    if(btn2){ btn2.disabled=false; }
   }
 }
 
+// ── ENTREGAR DESDE LA TARJETA ───────────────────────────────────────────
+// Sin abrir el pedido: a las 7:30 lo único que pasa es que el camión se fue.
+// PIDE CONFIRMACIÓN (decisión de Andrea): un toque accidental no puede marcar
+// una salida, porque una hora de salida falsa no la ve nadie después.
+async function despEntregar(pedidoId){
+  if(_despEntregando) return;
+  const r=(_despEstado||[]).find(function(x){ return x.pedido_id===pedidoId; });
+  if(!r || r.estado!=='preparado') return;
+  if(!confirm('¿Marcar la salida de '+(r.cliente_nombre||'este pedido')+'?'
+    +'\n\nSe registra que salió a las '+_despHora(new Date())+'.')) return;
+  _despEntregando=pedidoId; despRender();
+  try{
+    const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
+    const {data:{user}}=await c.auth.getUser();
+    const {error}=await c.from('ent_salida').insert({
+      alisto_id:r.alisto_id, creado_por:(user&&user.email)||'desconocido'});
+    if(error) throw error;
+  }catch(e){
+    alert('No se pudo marcar la salida: '+((e&&e.message)||e)
+      +'\n\nEl pedido sigue en Preparado: probá de nuevo.');
+  }
+  _despEntregando=0;
+  await despCargarEstado();   // la verdad la dice la vista, no el navegador
+}
+
 function irADespachos(){
-  _modShow('vDespachos'); crumbSet('Entregas','Despachos');
+  _modShow('vDespachos'); crumbSet('Entregas','Resumen');
   despCargar(false);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// BUSCAR — el historial de entregas.
+//
+// UN SOLO CAMPO, y al lado se elige POR QUÉ se busca: cliente · lote · producto
+// · fecha. Cuatro campos separados obligan a decidir antes de escribir y dejan
+// tres vacíos en pantalla que no hacen nada.
+//
+// NO TOCA ODOO: todo sale de Supabase, igual que la sección "Preparado". El
+// detalle del AB-RE-04 se arma SOLO al abrir una fila — la pregunta normal es
+// "¿cuándo y a quién?", y el papel es la excepción.
+// ════════════════════════════════════════════════════════════════════════
+const BS_CAMPOS=[{k:'cliente',n:'Cliente'},{k:'lote',n:'Lote'},
+                 {k:'producto',n:'Producto'},{k:'fecha',n:'Fecha'}];
+const BS_TOPE=60;                    // filas dibujadas; el resto se DICE, no se esconde
+let _bs=null, _bsErr='', _bsCampo='cliente', _bsQ='', _bsAbierto=0, _bsCargando=false;
+
+function irAEntBuscar(preset){
+  _modShow('vEntBuscar'); crumbSet('Entregas','Buscar');
+  // "Entregados hoy" del Resumen entra acá con la fecha ya puesta.
+  if(preset==='hoy'){ _bsCampo='fecha'; _bsQ=_despHoy(); _bsAbierto=0; }
+  bsCargar(false);
+}
+
+async function bsCargar(force){
+  const st=document.getElementById('bsStatus');
+  if(_bs && !force){ bsRender(); return; }
+  if(_bsCargando) return;
+  _bsCargando=true;
+  if(st){ st.className='status s-info'; st.classList.remove('hidden');
+          st.innerHTML='<span class="spin"></span>Leyendo el historial de entregas…'; }
+  bsRender();
+  try{ _bs=await bsLeer(); _bsErr=''; if(st) st.classList.add('hidden'); }
+  catch(e){
+    _bs=_bs||[]; _bsErr=(e&&e.message)||String(e);
+    if(st){ st.className='status s-err';
+      st.innerHTML='No pude leer el historial: '+esc(_bsErr)
+        +(/pedido_estado|ent_salida|schema cache/i.test(_bsErr)
+          ?' — falta pegar <strong>ENTREGAS_ETAPAS.sql</strong> en Supabase.':''); }
+  }
+  _bsCargando=false;
+  bsRender();
+}
+
+// Cuatro consultas y el armado en el navegador. Se filtra ACÁ y no en Supabase
+// porque el volumen es chico (cientos de filas) y así escribir en el campo
+// responde sin ida y vuelta por cada tecla.
+async function bsLeer(){
+  const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
+  const {data:peds,error:e1}=await c.from('v_ent_pedido_estado')
+    .select('pedido_id,fecha_despacho,factura_nombre,cliente_nombre,origen,motivo,'
+           +'alisto_id,responsable,preparado_en,salida_en,estado,fecha_ab_re_04')
+    .order('fecha_ab_re_04',{ascending:false}).limit(300);
+  if(e1) throw e1;
+  const P=peds||[]; if(!P.length) return [];
+  const alis=P.map(function(p){ return p.alisto_id; });
+  const pids=P.map(function(p){ return p.pedido_id; });
+
+  const {data:lins,error:e2}=await c.from('ent_alisto_linea')
+    .select('id,alisto_id,producto_id,cant_uds,cant_uom').in('alisto_id',alis);
+  if(e2) throw e2;
+  const L=lins||[];
+
+  let LT=[];
+  if(L.length){
+    const {data:lots,error:e3}=await c.from('ent_alisto_lote')
+      .select('linea_id,lote,cant_uds,orden').in('linea_id',L.map(function(x){return x.id;}));
+    if(e3) throw e3; LT=lots||[];
+  }
+  // La UNIDAD y su factor viven en la línea del PEDIDO, no en la del alisto:
+  // es la unidad tal como la pidió el cliente, que es la que va al AB-RE-04.
+  const {data:pl,error:e4}=await c.from('ent_pedido_linea')
+    .select('pedido_id,producto_id,uom_nombre,uom_factor,presentacion').in('pedido_id',pids);
+  if(e4) throw e4;
+  const uom={};
+  (pl||[]).forEach(function(r){ uom[r.pedido_id+'|'+r.producto_id]=r; });
+
+  const porLinea={};
+  LT.forEach(function(x){ (porLinea[x.linea_id]=porLinea[x.linea_id]||[]).push(x); });
+  const porAlisto={};
+  L.forEach(function(l){
+    l.lotes=(porLinea[l.id]||[]).sort(function(a,z){ return (a.orden||0)-(z.orden||0); });
+    (porAlisto[l.alisto_id]=porAlisto[l.alisto_id]||[]).push(l);
+  });
+  P.forEach(function(p){
+    p.lineas=(porAlisto[p.alisto_id]||[]).map(function(l){
+      const u=uom[p.pedido_id+'|'+l.producto_id]||{};
+      return {producto_id:l.producto_id, cant_uds:l.cant_uds, cant_uom:l.cant_uom,
+              lotes:l.lotes, uom_nombre:u.uom_nombre||'', uom_factor:u.uom_factor||null,
+              presentacion:u.presentacion||''};
+    });
+  });
+  return P;
+}
+
+// Sin tildes y en minúscula: "Automercado" tiene que encontrarse escribiendo
+// "automercado", y "Buñuelo" escribiendo "bunuelo".
+function _bsNorm(s){ return String(s==null?'':s).toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function _bsProd(pid){ return (NIV_INFO[pid]||{}).nom || ('#'+pid); }
+
+function bsRender(){
+  const body=document.getElementById('bsBody'); if(!body) return;
+  const esFecha=(_bsCampo==='fecha');
+  const ph={cliente:'Nombre del cliente', lote:'Lote — 224 / 2-27',
+            producto:'Producto', fecha:''}[_bsCampo]||'';
+  let h='<div class="bs-caja">'
+    +'<input id="bsIn" class="bs-in" type="'+(esFecha?'date':'search')+'" '
+    +'value="'+esc(_bsQ)+'" placeholder="'+esc(ph)+'" autocomplete="off" '
+    +(esFecha?'onchange':'oninput')+'="bsSetQ(this.value)">'
+    +'<div class="bs-chips">'
+    +BS_CAMPOS.map(function(cp){
+      return '<button class="bs-chip'+(cp.k===_bsCampo?' on':'')+'" '
+        +'onclick="bsSetCampo(\''+cp.k+'\')">'+cp.n+'</button>'; }).join('')
+    +'</div></div>'
+    +'<div id="bsLista" class="bs-lista"></div>';
+  body.innerHTML=h;
+  bsFiltrar();
+}
+function bsSetCampo(k){
+  if(_bsCampo===k) return;
+  _bsCampo=k; _bsQ=''; _bsAbierto=0;
+  bsRender();
+  const el=document.getElementById('bsIn');
+  if(el && k!=='fecha') el.focus();
+}
+// Se redibuja SOLO la lista. Un bsRender() por tecla mata el foco y cierra el
+// teclado del teléfono — la misma lección de despSetCant().
+function bsSetQ(v){ _bsQ=String(v==null?'':v); _bsAbierto=0; bsFiltrar(); }
+function bsAbrir(id){ _bsAbierto=(_bsAbierto===id?0:id); bsFiltrar(); }
+
+function bsFiltrar(){
+  const cont=document.getElementById('bsLista'); if(!cont) return;
+  if(_bs===null){ cont.innerHTML='<div class="dp-vacia">Leyendo…</div>'; return; }
+  const q=_bsNorm(_bsQ).trim();
+  let rs=_bs;
+  if(q){
+    rs=_bs.filter(function(p){
+      if(_bsCampo==='cliente')  return _bsNorm(p.cliente_nombre).indexOf(q)>=0;
+      if(_bsCampo==='fecha')    return _despDiaDe(p.fecha_ab_re_04)===_bsQ;
+      if(_bsCampo==='lote')     return (p.lineas||[]).some(function(l){
+        return (l.lotes||[]).some(function(x){ return _bsNorm(x.lote).indexOf(q)>=0; }); });
+      if(_bsCampo==='producto') return (p.lineas||[]).some(function(l){
+        return _bsNorm(_bsProd(l.producto_id)).indexOf(q)>=0; });
+      return true;
+    });
+  }
+  if(!rs.length){
+    cont.innerHTML='<div class="dp-vacia">'+(_bs.length?'Ninguna entrega con eso.':'Todavía no hay entregas registradas.')+'</div>';
+    return;
+  }
+  const vis=rs.slice(0,BS_TOPE);
+  let h=vis.map(function(p){
+    const ab=(_bsAbierto===p.pedido_id), n=(p.lineas||[]).length;
+    const cuando = p.estado==='entregado'
+      ? _despCuando(p.salida_en)
+      : _despCuando(p.preparado_en);
+    return '<button class="bs-fila'+(ab?' on':'')+'" onclick="bsAbrir('+p.pedido_id+')">'
+      +'<span class="bs-f1"><span class="bs-cli">'+esc(p.cliente_nombre||'—')+'</span>'
+      +'<span class="bs-fec">'+esc(cuando)+'</span></span>'
+      +'<span class="bs-f2"><span class="bs-sub">'+n+(n===1?' producto':' productos')
+      +(p.estado==='preparado'?' · preparado, sin salir':'')+'</span>'
+      +'<span class="bs-fac">'+esc((p.factura_nombre||'').slice(-10))+'</span></span></button>'
+      +(ab?bsDetalle(p):'');
+  }).join('');
+  // Tope explícito: lo que no se dibuja se DICE. Un corte callado se lee como
+  // "esto es todo", que es la peor respuesta posible en una búsqueda.
+  if(rs.length>vis.length)
+    h+='<div class="dp-vacia">y '+(rs.length-vis.length)+' más — afiná la búsqueda.</div>';
+  cont.innerHTML=h;
+}
+
+// El AB-RE-04 tal cual: una fila por lote, con el producto y la cantidad total
+// solo en la primera de cada producto.
+function bsDetalle(p){
+  // CUATRO columnas, no cinco: la unidad va pegada a la cantidad. Con una columna
+  // propia, a 390px el lote se partía en tres renglones ("224 / 2-" / "27") —
+  // medido en el navegador— y el lote es justo el dato que se viene a leer.
+  let h='<div class="bs-det"><table><thead><tr><th>Producto</th>'
+    +'<th class="r">Cantidad</th><th>Lote</th>'
+    +'<th class="r">Cant. lote</th></tr></thead><tbody>';
+  (p.lineas||[]).forEach(function(l){
+    // Con unidad de factura se muestra TODO en esa unidad (es lo que pidió el
+    // cliente y lo que Daniel cuenta). Sin ella —los registros manuales viejos—
+    // se muestra en unidades individuales y se dice que son uds: convertir sin
+    // el factor guardado sería inventarlo.
+    const f=l.uom_factor||null;
+    const uni=l.uom_nombre||'uds';
+    const tot=(f!=null && l.cant_uom!=null) ? l.cant_uom : l.cant_uds;
+    const lts=l.lotes||[];
+    const cab='<td>'+esc(_bsProd(l.producto_id))+'</td>'
+             +'<td class="n">'+_rzN(tot)+' <span class="bs-uni">'+esc(uni)+'</span></td>';
+    if(!lts.length){
+      h+='<tr>'+cab+'<td class="bs-lote">sin lote</td><td class="n">—</td></tr>';
+      return;
+    }
+    lts.forEach(function(x,k){
+      const cl=(f!=null)?(+x.cant_uds||0)*f:(+x.cant_uds||0);
+      h+='<tr>'+(k===0?cab:'<td></td><td></td>')
+        +'<td class="bs-lote">'+esc(x.lote)+'</td><td class="n">'+_rzN(cl)+'</td></tr>';
+    });
+  });
+  h+='</tbody></table><div class="bs-meta">'
+    +'Preparó '+esc(p.responsable||'—')+' · preparado '+esc(_despCuando(p.preparado_en))
+    +(p.salida_en ? ' · salió '+esc(_despCuando(p.salida_en)) : ' · sin salida registrada')
+    +(p.factura_nombre?' · factura '+esc(p.factura_nombre):'')
+    +(p.motivo&&p.motivo!=='venta'?' · '+esc(p.motivo.replace(/_/g,' ')):'')
+    +'</div></div>';
+  return h;
 }
 
 // ── La hoja de clientes: frecuentes primero (facturas de los últimos 90 días) ──
@@ -7526,6 +8098,20 @@ async function rpGuardar(){
         return {linea_id:ali.id, lote:x.lote, cant_uds:x.cant_uds, orden:x.orden}; }));
       if(e5) throw e5;
     }
+    // El Reporte de despacho se llena DESPUÉS de que la salida ocurrió: no es una
+    // preparación esperando el camión, es un hecho consumado. Por eso escribe las
+    // dos etapas de una. Sin esto quedaría en "Preparado" para siempre.
+    //
+    // La FECHA es la que se eligió arriba (el reporte puede llenarse al día
+    // siguiente), y esa fecha es la que va al AB-RE-04. La HORA no se sabe: se
+    // pone mediodía, que no se parece a ninguna hora de despacho real, y la nota
+    // lo deja escrito. Un now() acá pondría una hora con pinta de medida.
+    paso='salida';
+    const {error:e6}=await c.from('ent_salida').insert({
+      alisto_id:al.id, salida_en:_rp.fecha+'T12:00:00-06:00',
+      nota:'Reporte de despacho: la fecha es la registrada, la hora NO es medida',
+      creado_por:email});
+    if(e6) throw e6;
     pon('#8FBF6A','Despacho #'+ped.id+' guardado — '+_rp.lineas.length+' línea'
       +(_rp.lineas.length===1?'':'s')+' de '+esc(_rp.cliente.nombre)
       +(_rp.motivo==='sin_clasificar'?' · quedó pendiente de clasificar':'')+'.');
@@ -8042,6 +8628,9 @@ function _rzConfirmBar(iso){
 function rzCeldas(monday, layout, real, hoyStr, overrides){
   const days=_weekDays(monday);
   const otros=(layout.otros||[]).slice(), semB=layout.semillas||0, v=layout.viernes||{};
+  // Dotación de ESTA semana: es el techo físico del día y por eso tiene que estar acá, donde se
+  // arma la celda. El layout ya la trae; si viene un layout vacío (fallback), se relee.
+  const pers=layout.personas||_personasDe(_isoWk(monday));
   const slot=[null,null,null,null];
   if(semB>0) slot[3]={p:452, batches:semB};
   for(let i=0;i<4 && otros.length;i++){ if(!slot[i]) slot[i]=otros.shift(); }
@@ -8058,13 +8647,18 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
       c.prod=Object.keys(realDay).map(function(pp){return _rzBP(Math.round(realDay[pp]/NIV_INFO[+pp].rend), +pp);}).join(' + '); return c; }
     if(i<4 && slot[i] && slot[i].feriado){ c.kind='feriado'; c.editable=false; c.prod='Feriado'; c.bt=slot[i].feriado; return c; }
     if(ov && fut){ c.editable=true; c.edited=true; c.swappable=true;
-      // El PICADO del viernes es del día (depende de que haya Semillas el jueves), no del producto
-      // que se produzca ese día: una edición o un intercambio sobre el viernes no debe borrarlo.
-      const vPic=(i===4 && !!v.picado);
       if(ov.producto_id==null || !(ov.batches>0)){ c.kind='edit-empty';
-        c.prod=vPic?'Picado':(i===4?'Limpieza':'—'); c.bt=''; return c; }
-      c.kind='edit'; c.pid=ov.producto_id; c.batches=ov.batches; c.prods[ov.producto_id]=ov.batches;
-      c.prod=(vPic?'Picado · ':'')+_rzBP(ov.batches, ov.producto_id); c.bt=''; return c; }
+        c.prod=(i===4?'Limpieza':'—'); c.bt=''; return c; }
+      // LA CAPACIDAD PISA EL OVERRIDE. Un día de 2 personas tiene un techo físico: antes esta
+      // rama devolvía ov.batches crudo y retornaba ANTES de mirar lo que el nivelador acababa de
+      // recalcular, así que un día editado se congelaba —mismo producto y mismos batches a 3 o a
+      // 2 personas— y ese número inflado se sumaba de vuelta al stock en _rzMetaEfectiva y en
+      // planColchonOv. El override NO se toca en la base: se recorta lo que el plan EJECUTA y
+      // SUMA. Si la semana vuelve a 3 personas, el número original revive solo.
+      const tope=_capDe(ov.producto_id, pers), bt=Math.min(ov.batches, tope);
+      if(bt<ov.batches) c.recorte={pid:ov.producto_id, de:ov.batches, a:bt};
+      c.kind='edit'; c.pid=ov.producto_id; c.batches=bt; c.prods[ov.producto_id]=bt;
+      c.prod=_rzBP(bt, ov.producto_id); c.bt=''; return c; }
     if(i<4){
       const e=slot[i];
       if(e&&e.p){ c.kind=fut?'prop':(past?'pend':'prop'); c.editable=fut; c.swappable=fut; c.pid=e.p; c.batches=e.batches; c.prods[e.p]=e.batches; c.prod=_rzBP(e.batches, e.p); c.bt=''; c.today=ds===hoyStr; return c; }
@@ -8080,7 +8674,7 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
     // el pan (otro proceso/otra tarea), nunca cuentan como "segundo pan".
     const PAN_VIE=new Set([451,452,453,503,472]);   // panes (Semillas nunca cae acá; va por completitud)
     const parts=[]; let panEnVie=false;
-    if(v.picado) parts.push('Picado');
+    // (el picado ya no se arma acá: lo pone _aplicarPicado sobre las celdas efectivas)
     corridos.forEach(function(x){ parts.push(_rzBP(x.batches, x.p)); c.prods[x.p]=(c.prods[x.p]||0)+x.batches; if(PAN_VIE.has(x.p)) panEnVie=true; });
     if(v.prod && !(panEnVie && v.prod.p!==519)){   // el v.prod-pan se cae si ya hay un pan corrido; Galletas [519] siempre entra
       parts.push(_rzBP(v.prod.batches, v.prod.p)); c.prods[v.prod.p]=(c.prods[v.prod.p]||0)+v.prod.batches; if(PAN_VIE.has(v.prod.p)) panEnVie=true; }
@@ -8161,7 +8755,8 @@ function _rzAutoFill(){
   // en la ventana consigue un DÍA concreto de destino (el próximo día productivo libre). También
   // se anota el ESTADO de cada día futuro (dayStates) para poder explicar la búsqueda del destino.
   const H=(_rzCtx.weeks&&_rzCtx.weeks.length)||2;
-  for(let o=0;o<H;o++){ const cells=_rzCellsBase(o);
+  for(let o=0;o<H;o++){ const cells=_aplicarPicado(_rzCellsBase(o));
+    const persO=_personasDe(_isoWk(_rzMonday(o)));   // el techo del slot es el de SU semana
     cells.forEach(function(cc,i){ if(cc.ds<_rzCtx.hoyStr) return;
       let libre=false, estado;
       if(i<4){ if(cc.kind==='libre'){ libre=true; estado='libre'; } else if(cc.kind==='feriado'){ estado='feriado (no se produce)'; } else if(cc.kind==='edit-empty'){ estado='vaciado por vos (respeta el "nada")'; } else { estado='ocupado ('+(cc.prod||'')+')'; } }
@@ -8170,7 +8765,7 @@ function _rzAutoFill(){
       else { if(cc.kind==='viernes' && !Object.keys(cc.prods||{}).length){ libre=true; estado='viernes libre (limpieza)'; } else if(cc.kind==='edit-empty'){ estado='vaciado por vos (respeta el "nada")'; } else { estado='viernes ocupado ('+(cc.prod||'')+')'; } }
       dayStates.push({ds:cc.ds, dow:cc.dow, dnum:cc.dnum, i:i, o:o, estado:estado, libre:libre});
       // El viernes SOLO se ofrece como slot si está LIBRE (limpieza) — nunca amontonar sobre lo que ya lleva.
-      if(libre) slots.push({ds:cc.ds, ord:o*10+(i<4?i:5), dow:i, viernes:i>=4, o:o});
+      if(libre) slots.push({ds:cc.ds, ord:o*10+(i<4?i:5), dow:i, viernes:i>=4, o:o, pers:persO, pic:!!cc.picado});
     });
   }
   slots.sort(function(a,b){ return a.ord-b.ord; });
@@ -8181,10 +8776,20 @@ function _rzAutoFill(){
     // Lo REGISTRADO en Odoo + lo ASUMIDO (día pasado con plan y sin registro) cuenta contra la
     // meta → no se re-agenda. Si Keylor registra algo distinto, lo real manda y esto se reajusta.
     if(o===0){ const hb=_rzHechoOAsumido(); for(const k in hb) cur[+k]=(cur[+k]||0)+hb[+k]; }
-    for(const p of NIV_PROD){ let falta=(meta[p]||0)-(cur[p]||0); if(falta<=0.0001) continue; const cap=NIV_INFO[p].cap;
-      for(const s of slots){ if(falta<=0.0001) break; if(s.ord < o*10) continue; if(usados[s.ds]) continue;   // un producto por día (incl. viernes)
-        if(p===452 && (s.viernes || s.dow!==3)) continue;   // Semillas SOLO al jueves (nunca viernes ni otro día)
-        const put=Math.min(falta, cap);                     // CAPACIDAD MÁXIMA por día — también el viernes ("20 Francés/día" es imposible)
+    for(const p of NIV_PROD){ let falta=(meta[p]||0)-(cur[p]||0); if(falta<=0.0001) continue;
+      // SEMILLAS: el jueves sigue siendo la PREFERENCIA (su picado cae en viernes, que ya es día
+      // de limpieza y no cuesta un día de horno), pero dejó de ser candado: si el jueves está
+      // ocupado, entra cualquier día que admita el picado al día siguiente en vez de quedarse
+      // sin agendar. El portero es el mismo _semillasVeto que usan el intercambio y la edición.
+      const cand=(p===452) ? slots.filter(function(s){ return !s.viernes && !_semillasVeto(s.ds); })
+                                  .slice().sort(function(a,b){ return (a.dow===3?0:1)-(b.dow===3?0:1) || a.ord-b.ord; })
+                           : slots;
+      for(const s of cand){ if(falta<=0.0001) break; if(s.ord < o*10) continue; if(usados[s.ds]) continue;   // un producto por día (incl. viernes)
+        // CAPACIDAD MÁXIMA por día ("20 Francés/día" es imposible): la de SU semana —no la de 3
+        // personas fija de antes, que volvía a inflar justo lo que el recorte acababa de corregir—
+        // y si el día lleva picado, la de 2 personas.
+        const capDia=s.pic?Math.min(_capDe(p,s.pers),_capDe(p,2)):_capDe(p,s.pers);
+        const put=Math.min(falta, capDia);
         (auto[s.ds]=auto[s.ds]||[]).push({pid:+p, batches:Math.round(put)});   // SIEMPRE se registra → se pinta en su día (Resumen visible Y detalle del Plan)
         if(s.o>o) derrame.push({pid:+p, batches:Math.round(put), ds:s.ds});    // se corrió a una semana POSTERIOR → derrame con día real
         usados[s.ds]=1; falta-=put; }
@@ -8208,7 +8813,18 @@ function _rzOverlayAuto(cells, auto){ auto=auto||{};
     nc.kind='auto'; nc.auto=true; nc.editable=fut; nc.swappable=fut; nc.pid=a[0].pid; nc.batches=a[0].batches; nc.prod=txt; nc.bt=''; return nc; });
 }
 // Celdas de la semana del Resumen con el auto-relleno superpuesto (para render y para alistar).
-function _rzCellsFull(offset){ return _rzOverlayAuto(_rzCellsBase(offset), _rzAuto); }
+// El picado va AL FINAL, sobre las celdas ya efectivas (base + overrides + auto-relleno): es lo
+// último que se deriva porque depende de dónde quedó Semillas después de todo lo demás.
+function _rzCellsFull(offset){ return _aplicarPicado(_rzOverlayAuto(_rzCellsBase(offset), _rzAuto)); }
+// Aviso de RECORTE por dotación: qué días editados no cabían en la capacidad de la semana.
+// Se dice en pantalla — recortar en silencio sería mentirle al plan.
+function _rzRecorteAviso(cells, personas){
+  const rs=(cells||[]).filter(function(c){ return c.recorte; });
+  if(!rs.length) return '';
+  const det=rs.map(function(c){ return _fechaCorta(c.ds)+' '+_nomCorto(c.recorte.pid)+' '+_rzN(c.recorte.de)+' → '+_rzN(c.recorte.a); }).join(', ');
+  return '<div class="rz-recorte">'+personas+' persona'+(personas===1?'':'s')+': se '
+    +(rs.length===1?'recortó 1 día':('recortaron '+rs.length+' días'))+' — '+esc(det)+'</div>';
+}
 function rzWeekBatchesFull(offset){ return _rzFutBatches(_rzCellsFull(offset)); }
 // Producción planeada por fecha (2 semanas, con ediciones + auto) → base de la lógica de compras.
 function _rzPerDate(){ const m={}; for(let o=0;o<2;o++){ _rzCellsFull(o).forEach(function(c){ const pr=c.prods||{}; if(!Object.keys(pr).length) return; const t=m[c.ds]=m[c.ds]||{}; for(const k in pr) t[+k]=(t[+k]||0)+pr[k]; }); } return m; }
@@ -8320,7 +8936,7 @@ function _rzWeekBlock(offset){
     +'<span class="rz-wrange">'+_rangeLbl(mon)+'</span>'+_rzChipPersonas(iso, pers)+'</div>';
   const days='<div class="rz-days">'+cells.map(rzCellHtml).join('')+'</div>';
   const aviso=(pers===2 && w.viernes && w.viernes.prod)?'<div class="rz-note2p">'+_SVG_PPL+'Semana de 2 personas: el viernes entra a producir para cubrir el plan.</div>':'';
-  return '<div class="rz-wk'+(now?'':' rz-wk-next')+'">'+head+days+_rzConfirmBar(iso)+aviso+'</div>';
+  return '<div class="rz-wk'+(now?'':' rz-wk-next')+'">'+head+_rzRecorteAviso(cells, pers)+days+_rzConfirmBar(iso)+aviso+'</div>';
 }
 // Fecha corta "lun 20" a partir de un ds (para el aviso de derrame).
 function _fechaCorta(ds){ const d=new Date(ds+'T00:00:00'); return _DOW[d.getDay()]+' '+d.getDate(); }
@@ -8497,6 +9113,8 @@ function rzCellHtml(cell){
   const m=RZ[cell.kind]||RZ.libre;
   const dd='<div class="rz-dd">'+cell.dow+' '+cell.dnum+'</div>';
   const dp='<div class="rz-dp">'+esc(cell.prod)+'</div>';
+  // El picado no es editable ni removible: es consecuencia de dónde quedó Semillas, no una marca.
+  const pic=cell.picado?'<div class="rz-picchip">picado · rinde como 2 personas</div>':'';
   const db=cell.bt?('<div class="rz-db">'+esc(cell.bt)+'</div>'):'';
   const sel=_rzSel===ds;
   const estado=(cell.auto&&cell.kind==='viernes'?'Para cumplir la meta':m[1])+(cell.edited?' · editado':'')
@@ -8515,7 +9133,7 @@ function rzCellHtml(cell){
   const tip=cell.editable?(sel?'Tocá otro día para intercambiar, o este mismo para cancelar':'Tocá para seleccionar e intercambiar')
                          :(cell.nav?'Ver esta producción en Odoo':'');
   return '<div class="rz-day '+cls+(cell.nav?' rz-nav':'')+'" data-ds="'+ds+'"'
-    +(tip?(' title="'+tip+'"'):'')+' onclick="rzTapDia(\''+ds+'\')">'+pen+dd+dp+db+st+'</div>';
+    +(tip?(' title="'+tip+'"'):'')+' onclick="rzTapDia(\''+ds+'\')">'+pen+dd+dp+pic+db+st+'</div>';
 }
 function rzFormHtml(cell){
   const opts=NIV_PROD.map(p=>'<option value="'+p+'"'+(cell.pid===p?' selected':'')+'>'+esc(NIV_INFO[p].nom)+'</option>').join('');
@@ -8537,8 +9155,12 @@ async function rzSaveEdit(ds){
   const pid=sel&&sel.value?+sel.value:null;
   const batches=(bt&&bt.value!=='')?Math.max(0,Math.round(+bt.value)):0;
   const val=(pid&&batches>0)?{producto_id:pid, batches:batches}:{producto_id:null, batches:0};
+  // La edición pasa por el MISMO portero que el intercambio. Antes no lo hacía: el selector
+  // ofrecía Semillas para cualquier día y el veto solo cubría el swap, así que por edición se
+  // podía dejar Semillas donde su picado caía en sábado.
+  if(pid===452){ const m=_semillasVeto(ds); if(m){ _rzAviso=m; rzRender(); return; } }
   _rzOverrides[ds]={producto_id:val.producto_id, batches:val.batches, tipo:'edicion'};
-  _rzEdit=null; _rzRecalcAuto(); rzRender();                  // pinta ya (con re-agendado del faltante)
+  _rzEdit=null; _rzAviso=''; _rzRecalcAuto(); rzRender();     // pinta ya (con re-agendado del faltante)
   rzPersist([{fecha:ds, producto_id:val.producto_id, batches:val.batches, tipo:'edicion'}]);
   await rzRecalcAlistar(); rzRender();                        // recalcula MP/premezclas sobre la meta
 }
@@ -8563,7 +9185,6 @@ function _rzCarga(c){
   if(ks.length>1) return null;
   return {pid:+ks[0], batches:pr[ks[0]]};
 }
-function _rzDow(ds){ return new Date(ds+'T00:00:00').getDay(); }   // 4 = jueves
 function _rzFechaLbl(ds){ const d=new Date(ds+'T00:00:00'); return _DOW[d.getDay()]+' '+d.getDate(); }
 // ¿Este día admite intercambio? (día futuro editable que no sea feriado ni pasado)
 function _rzSwapOk(c){ return !!(c && c.swappable); }
@@ -8583,11 +9204,10 @@ function _rzSwapVeto(a, b){
   const ca=_rzCarga(a), cb=_rzCarga(b);
   if(!ca) return 'El '+_rzFechaLbl(a.ds)+' lleva más de un producto ('+a.prod+'). El intercambio mueve un producto por día — editalo primero.';
   if(!cb) return 'El '+_rzFechaLbl(b.ds)+' lleva más de un producto ('+b.prod+'). El intercambio mueve un producto por día — editalo primero.';
-  // SEMILLAS [452] queda clavado al jueves: se pica al día siguiente y el sábado no se trabaja.
-  if(ca.pid===452 && _rzDow(b.ds)!==4)
-    return 'Pan Semillas solo puede ir un jueves: se pica al día siguiente y el sábado no se trabaja. El '+_rzFechaLbl(b.ds)+' no sirve de destino.';
-  if(cb.pid===452 && _rzDow(a.ds)!==4)
-    return 'Pan Semillas solo puede ir un jueves: se pica al día siguiente y el sábado no se trabaja. El '+_rzFechaLbl(a.ds)+' no sirve de destino.';
+  // SEMILLAS [452] ya no está clavado al jueves: puede ir a cualquier día cuyo día SIGUIENTE se
+  // trabaje (ahí cae el picado). Un solo portero, compartido con la edición y el auto-relleno.
+  if(ca.pid===452){ const m=_semillasVeto(b.ds); if(m) return m; }
+  if(cb.pid===452){ const m=_semillasVeto(a.ds); if(m) return m; }
   return '';
 }
 // Un solo handler para TODO toque sobre un día — editable o no.
@@ -8990,6 +9610,7 @@ async function nivRealRango(D1,D2){
 
 let _planProj=[], _planReal={}, _planInputs=null;
 let _planEdit=null, _planEditMes=null;   // edición inline del Plan (ds en edición · mes abierto)
+let _planAviso='';                       // motivo visible cuando una edición del Plan no se puede hacer
 async function cargarPlanMeses(){
   const st=document.getElementById('planStatus'); st.className='status s-info'; st.classList.remove('hidden');
   st.innerHTML='<span class="spin"></span>Proyectando el plan con el nivelador (solo lectura)…';
@@ -9186,20 +9807,25 @@ function planVerDetalle(m, noScroll){
   const wks=_planProj.filter(wk=>wk.monday.getMonth()===m);
   let html='<div class="pl-det"><div class="pl-det-h"><span>Detalle de '+_MESNOM2[m]+'</span><button class="pl-volver" onclick="planVolver()">‹ volver a los meses</button></div>';
   html+='<div class="pl-edithint">Tocá cualquier día futuro para editarlo: producto y batches, o dejá el producto en “limpieza / nada”. La edición manda y el motor reconcilia; se guarda en el plan.</div>';
+  if(_planAviso) html+='<div class="rz-aviso">'+esc(_planAviso)+'</div>';
   html+=planColchonAviso();   // impacto de las ediciones sobre el colchón (motor reconciliado)
   // MISMA verdad que el Resumen: motor + overrides (ediciones) + auto-relleno de la meta.
   const PLK={real:'pl-d-real', today:'pl-d-prop', pend:'pl-d-pend', prop:'pl-d-prop', edit:'pl-d-prop', auto:'pl-d-prop', clean:'pl-d-clean', 'edit-empty':'pl-d-clean', viernes:'pl-d-clean', feriado:'pl-d-fer', libre:'pl-d-clean'};
   wks.forEach(wk=>{
     const iso=_isoWk(wk.monday), pers=wk.personas||_personasDe(iso);
+    // MISMAS celdas efectivas que el Resumen, picado incluido — una sola verdad.
+    const cells=_aplicarPicado(_rzOverlayAuto(rzCeldas(wk.monday, wk, _planReal, hoyStr, _rzOverrides), _rzAuto));
     html+='<div class="pl-wk"><div class="pl-wr">'+_rangeLbl(wk.monday)+' '+_rzChipPersonas(iso, pers)
-      +(pers===2 && wk.viernes && wk.viernes.prod?'<span class="pl-note2p">2 personas · viernes productivo</span>':'')+'</div><div class="pl-days">';
-    _rzOverlayAuto(rzCeldas(wk.monday, wk, _planReal, hoyStr, _rzOverrides), _rzAuto).forEach(c=>{
+      +(pers===2 && wk.viernes && wk.viernes.prod?'<span class="pl-note2p">2 personas · viernes productivo</span>':'')+'</div>'
+      +_rzRecorteAviso(cells, pers)+'<div class="pl-days">';
+    cells.forEach(c=>{
       if(_planEdit===c.ds && c.editable){ html+=planFormHtml(c); return; }   // día en edición → mini-form
       const txt=c.prod+(c.bt?' '+c.bt:'');
       const tag=(c.kind==='pend')?'<div class="pl-dtag">sin registrar</div>':(c.edited?'<div class="pl-dtag pl-dtag-ed">editado</div>':(c.auto?'<div class="pl-dtag pl-dtag-auto">meta</div>':''));
       const cls='pl-d '+(PLK[c.kind]||'pl-d-clean')+(c.edited?' pl-d-ed':'')+(c.editable?' pl-d-editable':'');
       const click=c.editable?(' onclick="planOpenEdit(\''+c.ds+'\')"'):'';
-      html+='<div class="'+cls+'" data-ds="'+c.ds+'"'+click+'><div class="pl-dd">'+c.dow+' '+c.dnum+'</div><div class="pl-dp">'+esc(txt)+'</div>'+tag+'</div>';
+      const pic=c.picado?'<div class="rz-picchip">picado · rinde como 2 personas</div>':'';
+      html+='<div class="'+cls+'" data-ds="'+c.ds+'"'+click+'><div class="pl-dd">'+c.dow+' '+c.dnum+'</div><div class="pl-dp">'+esc(txt)+'</div>'+pic+tag+'</div>';
     });
     html+='</div>'+_rzConfirmBar(iso)+'</div>';
   });
@@ -9217,15 +9843,16 @@ function planFormHtml(cell){
     +'<div class="pl-frow"><button class="pl-fok" title="Guardar" onclick="planSaveEdit(\''+cell.ds+'\')">✓</button>'
     +'<button class="pl-fx" title="Cancelar" onclick="planCancelEdit()">✕</button></div></div>';
 }
-function planOpenEdit(ds){ if(_planEdit===ds) return; _planEdit=ds; planVerDetalle(_planEditMes, true); const s=document.getElementById('planFsel'); if(s)s.focus(); }
-function planCancelEdit(){ _planEdit=null; planVerDetalle(_planEditMes, true); }
+function planOpenEdit(ds){ if(_planEdit===ds) return; _planEdit=ds; _planAviso=''; planVerDetalle(_planEditMes, true); const s=document.getElementById('planFsel'); if(s)s.focus(); }
+function planCancelEdit(){ _planEdit=null; _planAviso=''; planVerDetalle(_planEditMes, true); }
 async function planSaveEdit(ds){
   const sel=document.getElementById('planFsel'), bt=document.getElementById('planFbt');
   const pid=sel&&sel.value?+sel.value:null;
   const batches=(bt&&bt.value!=='')?Math.max(0,Math.round(+bt.value)):0;
   const val=(pid&&batches>0)?{producto_id:pid, batches:batches}:{producto_id:null, batches:0};   // sin producto o 0 batches = limpieza
+  if(pid===452){ const m=_semillasVeto(ds); if(m){ _planAviso=m; planVerDetalle(_planEditMes, true); return; } }
   _rzOverrides[ds]={producto_id:val.producto_id, batches:val.batches, tipo:'edicion'};
-  _planEdit=null;
+  _planEdit=null; _planAviso='';
   if(_rzCtx) _rzRecalcAuto();                    // el Resumen comparte overrides → mantené su auto-relleno coherente
   planVerDetalle(_planEditMes, true);            // repinta el detalle (rzCeldas honra el override) + recomputa el aviso de colchón
   planRefreshReaco();                            // el aviso "reacomodar" aparece si esta edición dejó un descuadre (sin colapsar el detalle)
@@ -9253,7 +9880,9 @@ function planColchonOv(overrides){
     if(Rr){ rampaOn=rampaOn||_rampaEstado(stock, ritmo, Rr.meta, Rr.k).on; Rr.on=rampaOn; }
     const pre={}; NIV_PROD.forEach(p=>pre[p]=stock[p]);
     const L=_weekLayout(stock, ritmo, colDe, H, pers, Rr);           // decide la semana con el stock de inicio (muta stock: se descarta)
-    const cells=rzCeldas(mon, L, {}, hoyStr, overrides);             // colocación en días honrando overrides
+    const cells=_aplicarPicado(rzCeldas(mon, L, {}, hoyStr, overrides));   // colocación honrando overrides + picado derivado
+    // (el recorte por dotación y el del picado ya vienen aplicados en las celdas: el colchón
+    //  proyectado deja de contar producción que la gente de esa semana no puede hacer)
     const prodB={}; cells.forEach(c=>{ const pr=c.prods||{}; for(const k in pr) prodB[+k]=(prodB[+k]||0)+pr[k]; });
     NIV_PROD.forEach(p=>{ stock[p]=pre[p]+(prodB[p]||0)*NIV_INFO[p].rend-(ritmo[p]||0); });   // consumo = ritmo (fijo)
   }
