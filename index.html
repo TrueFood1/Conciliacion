@@ -2530,6 +2530,14 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-note2p{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:var(--text-3)}
 #vResumen .rz-note2p svg{width:14px;height:14px;color:var(--text-3);flex:none}
 #vPlan .pl-note2p{margin-left:8px;font-size:10.5px;color:var(--text-3)}
+/* Recorte por dotación: los días editados que no cabían en la capacidad de la semana. Va pegado
+   al chip de personas (debajo, en su propia línea, para no romper la cabecera en teléfono). */
+#vResumen .rz-recorte,#vPlan .rz-recorte{margin:0 0 9px;font-size:11.5px;line-height:1.35;color:#C99A4E;
+  background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.35);border-radius:7px;padding:5px 8px}
+/* Picado: consecuencia, no marca. Ámbar porque cambia el techo del día. */
+#vResumen .rz-picchip,#vPlan .rz-picchip{display:inline-block;margin-top:5px;font-size:9.5px;font-weight:600;
+  color:#C99A4E;background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.4);border-radius:5px;
+  padding:1px 5px;line-height:1.5;white-space:normal}
 /* barra de confirmación del cambio manual de personas */
 #vResumen .rz-confirm,#vPlan .rz-confirm{margin-top:12px;background:rgba(199,125,160,.08);border:.5px solid rgba(199,125,160,.35);border-radius:9px;padding:10px 14px;font-size:13px;color:var(--text-2);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 #vResumen .rz-confirm b,#vPlan .rz-confirm b{color:var(--text)}
@@ -5246,6 +5254,56 @@ function _esFeriado(ds){ return FERIADOS[ds]||''; }
 // semanas del 21-dic al 8-ene no existen en el plan.
 const CIERRE='2026-12-18', REAPERTURA='2027-01-11';
 
+// ── PICADO — DERIVADO, nunca guardado ────────────────────────────────────────────
+// El picado NO es un dato: no vive en plan_overrides ni en el objeto del día. Se deriva en
+// cada render de dónde quedó Semillas. Si Semillas se mueve, el picado se mueve con ella; si
+// Semillas se va de la semana, no queda ningún picado. No hay nada que borrar ni que limpiar.
+//
+// Semillas se pica al DÍA SIGUIENTE, y ese día tiene que trabajarse. De ahí sale UNA sola
+// regla, que reemplaza al viejo candado "solo jueves":
+//     Semillas puede ir el día D  ⟺  D+1 (calendario) es día productivo.
+//   · viernes                    → D+1 = sábado  → no
+//   · el día antes de un feriado → D+1 = feriado → no
+//   · 18-dic y el cierre         → D+1 cerrado   → no
+// El jueves deja de ser candado y pasa a ser PREFERENCIA del motor (su picado cae en viernes,
+// que ya es día de limpieza y no cuesta un día de horno). Lun–mié son destinos válidos.
+function _esProductivo(ds){
+  const dow=new Date(ds+'T00:00:00').getDay();
+  if(dow===0||dow===6) return false;              // fin de semana
+  if(_esFeriado(ds)) return false;                // feriado
+  if(ds>CIERRE && ds<REAPERTURA) return false;    // cierre de diciembre
+  return true;
+}
+function _diaSig(ds){ const d=new Date(ds+'T00:00:00'); d.setDate(d.getDate()+1); return _ymd(d); }
+const SEMILLAS_MSG='Pan Semillas no puede ir un viernes, ni el día antes de un feriado o del cierre de diciembre: se pica al día siguiente y ese día no se trabaja. Puede ir lunes, martes, miércoles o jueves, según la semana.';
+// '' si Semillas puede ir ese día; el motivo (ámbar) si no. Único portero: lo usan el
+// intercambio, la edición del Resumen, la edición del Plan y el auto-relleno.
+function _semillasVeto(ds){ return _esProductivo(_diaSig(ds)) ? '' : SEMILLAS_MSG; }
+
+// picado(D) = el día ANTERIOR produce Semillas. Como Semillas solo entra donde el día siguiente
+// es productivo, el picado siempre cae en el día calendario siguiente y dentro de la misma
+// semana lun–vie (nunca cruza el fin de semana). Se aplica sobre las celdas EFECTIVAS —base +
+// overrides + auto-relleno—, NUNCA sobre la propuesta base del motor: ahí estaba el bug, el
+// picado se leía de un layout que no ve las ediciones y por eso sobrevivía a que Semillas se
+// fuera del día. El día del picado RINDE COMO 2 PERSONAS: la misma gente pica y hornea.
+function _aplicarPicado(cells){
+  cells=cells||[];
+  return cells.map(function(c,i){
+    const prev=i>0?cells[i-1]:null;
+    if(!prev || !prev.prods || !(prev.prods[452]>0)) return c;
+    if(c.kind==='real' || c.kind==='feriado') return c;   // lo registrado en Odoo y los feriados no se tocan
+    const nc=Object.assign({}, c); nc.picado=true; nc.prods=Object.assign({}, c.prods||{});
+    let recortado=false;
+    for(const k in nc.prods){ const pid=+k, tope=_capDe(pid,2);
+      if(nc.prods[pid]>tope){ nc.prods[pid]=tope; recortado=true; } }
+    if(nc.pid!=null && nc.prods[nc.pid]!=null) nc.batches=nc.prods[nc.pid];
+    const ks=Object.keys(nc.prods);
+    if(!ks.length){ nc.prod='Picado'; return nc; }        // día sin producción → el picado ES el día
+    nc.prod='Picado · '+(recortado ? ks.map(function(k){ return _rzBP(nc.prods[k], +k); }).join(' · ') : c.prod);
+    return nc;
+  });
+}
+
 function _isoWk(dt){
   const t=new Date(Date.UTC(dt.getFullYear(),dt.getMonth(),dt.getDate()));
   const day=t.getUTCDay()||7; t.setUTCDate(t.getUTCDate()+4-day);
@@ -5444,8 +5502,12 @@ function _weekLayout(stock, ritmo, colDe, H, personas, rampa){
   // ── VIERNES: día productivo para PAN (Blanco, Francés, Buns, Pizza) y Galletas —
   // TODO menos Semillas (su picado cae en sábado, que no se trabaja). La única regla:
   // producción y limpieza profunda NO caben el mismo día.
-  // (1) PICADO: solo si hubo Semillas el jueves (Blanco pica el MISMO día, no acá).
-  const picado = semillas>0;
+  // (1) PICADO: ya NO se decide acá. Es derivado — sale de _aplicarPicado sobre las celdas
+  //     efectivas, que son las que saben en qué día quedó Semillas después de las ediciones.
+  //     Lo único que el motor necesita saber es que si esta semana lleva Semillas, el día que
+  //     la sigue RINDE COMO 2 PERSONAS. En el layout base Semillas va al jueves, así que ese
+  //     día es el viernes: por eso el techo del viernes se recorta acá.
+  const capVie=function(p){ const c=_capDe(p,personas); return semillas>0?Math.min(c,_capDe(p,2)):c; };
   // (2) PRODUCCIÓN. El viernes es un 5º día de producción, no un día exclusivo de Galletas.
   //   · Viernes PRODUCTIVO (vieRampa): MISMA selección que lun–jue sobre el set del viernes —
   //     quiebre (cobertura < colchón) > deuda de rampa > jalar del horizonte (cobertura < H).
@@ -5467,18 +5529,18 @@ function _weekLayout(stock, ritmo, colDe, H, personas, rampa){
       const rank=u?2:(debe>0?1:0);                       // mismo orden que lun–jue
       const gana=(rank>mejorRank) || (rank===mejorRank && (rank===1 ? debe>mejorDebe : c<pc));
       if(gana){ mejorRank=rank; mejorDebe=debe; pc=c; peor=p; } }
-    if(peor!==null){ const cap=_capDe(peor,personas); stock[peor]+=cap*NIV_INFO[peor].rend; prod={p:peor, batches:cap}; asign[peor]=(asign[peor]||0)+1; }
+    if(peor!==null){ const cap=capVie(peor); stock[peor]+=cap*NIV_INFO[peor].rend; prod={p:peor, batches:cap}; asign[peor]=(asign[peor]||0)+1; }
   } else {
     let peor=null, pc=1e9;                               // motor de siempre: viernes solo ante quiebre
     for(const p of vieCand){ const r=ritmo[p]||0; if(r<=0)continue; const c=(stock[p]-r)/r;
       const th = personas<3 ? colDe(p) : NIV_DERRAME_MIN;
       if(c<th && c<pc){ pc=c; peor=p; } }
-    if(peor!==null){ const cap=_capDe(peor,personas); stock[peor]+=cap*NIV_INFO[peor].rend; prod={p:peor, batches:cap}; asign[peor]=(asign[peor]||0)+1; }
+    if(peor!==null){ const cap=capVie(peor); stock[peor]+=cap*NIV_INFO[peor].rend; prod={p:peor, batches:cap}; asign[peor]=(asign[peor]||0)+1; }
   }
   // (3) LIMPIEZA PROFUNDA: solo si el viernes NO quedó cargado (lo decide _celdasSemana/rzCeldas al
   //     armar la etiqueta: si no hay picado ni producción ni corridos → "Limpieza").
   NIV_PROD.forEach(p=>stock[p]-=(ritmo[p]||0));    // consumo de la semana
-  return {otros, semillas, viernes:{picado, prod}, personas, rampaOn:!!rOn};
+  return {otros, semillas, viernes:{prod}, personas, rampaOn:!!rOn};
 }
 function _semanaBatches(layout){
   const b={}; (layout.otros||[]).forEach(d=>b[d.p]=(b[d.p]||0)+d.batches);
@@ -8566,6 +8628,9 @@ function _rzConfirmBar(iso){
 function rzCeldas(monday, layout, real, hoyStr, overrides){
   const days=_weekDays(monday);
   const otros=(layout.otros||[]).slice(), semB=layout.semillas||0, v=layout.viernes||{};
+  // Dotación de ESTA semana: es el techo físico del día y por eso tiene que estar acá, donde se
+  // arma la celda. El layout ya la trae; si viene un layout vacío (fallback), se relee.
+  const pers=layout.personas||_personasDe(_isoWk(monday));
   const slot=[null,null,null,null];
   if(semB>0) slot[3]={p:452, batches:semB};
   for(let i=0;i<4 && otros.length;i++){ if(!slot[i]) slot[i]=otros.shift(); }
@@ -8582,13 +8647,18 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
       c.prod=Object.keys(realDay).map(function(pp){return _rzBP(Math.round(realDay[pp]/NIV_INFO[+pp].rend), +pp);}).join(' + '); return c; }
     if(i<4 && slot[i] && slot[i].feriado){ c.kind='feriado'; c.editable=false; c.prod='Feriado'; c.bt=slot[i].feriado; return c; }
     if(ov && fut){ c.editable=true; c.edited=true; c.swappable=true;
-      // El PICADO del viernes es del día (depende de que haya Semillas el jueves), no del producto
-      // que se produzca ese día: una edición o un intercambio sobre el viernes no debe borrarlo.
-      const vPic=(i===4 && !!v.picado);
       if(ov.producto_id==null || !(ov.batches>0)){ c.kind='edit-empty';
-        c.prod=vPic?'Picado':(i===4?'Limpieza':'—'); c.bt=''; return c; }
-      c.kind='edit'; c.pid=ov.producto_id; c.batches=ov.batches; c.prods[ov.producto_id]=ov.batches;
-      c.prod=(vPic?'Picado · ':'')+_rzBP(ov.batches, ov.producto_id); c.bt=''; return c; }
+        c.prod=(i===4?'Limpieza':'—'); c.bt=''; return c; }
+      // LA CAPACIDAD PISA EL OVERRIDE. Un día de 2 personas tiene un techo físico: antes esta
+      // rama devolvía ov.batches crudo y retornaba ANTES de mirar lo que el nivelador acababa de
+      // recalcular, así que un día editado se congelaba —mismo producto y mismos batches a 3 o a
+      // 2 personas— y ese número inflado se sumaba de vuelta al stock en _rzMetaEfectiva y en
+      // planColchonOv. El override NO se toca en la base: se recorta lo que el plan EJECUTA y
+      // SUMA. Si la semana vuelve a 3 personas, el número original revive solo.
+      const tope=_capDe(ov.producto_id, pers), bt=Math.min(ov.batches, tope);
+      if(bt<ov.batches) c.recorte={pid:ov.producto_id, de:ov.batches, a:bt};
+      c.kind='edit'; c.pid=ov.producto_id; c.batches=bt; c.prods[ov.producto_id]=bt;
+      c.prod=_rzBP(bt, ov.producto_id); c.bt=''; return c; }
     if(i<4){
       const e=slot[i];
       if(e&&e.p){ c.kind=fut?'prop':(past?'pend':'prop'); c.editable=fut; c.swappable=fut; c.pid=e.p; c.batches=e.batches; c.prods[e.p]=e.batches; c.prod=_rzBP(e.batches, e.p); c.bt=''; c.today=ds===hoyStr; return c; }
@@ -8604,7 +8674,7 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
     // el pan (otro proceso/otra tarea), nunca cuentan como "segundo pan".
     const PAN_VIE=new Set([451,452,453,503,472]);   // panes (Semillas nunca cae acá; va por completitud)
     const parts=[]; let panEnVie=false;
-    if(v.picado) parts.push('Picado');
+    // (el picado ya no se arma acá: lo pone _aplicarPicado sobre las celdas efectivas)
     corridos.forEach(function(x){ parts.push(_rzBP(x.batches, x.p)); c.prods[x.p]=(c.prods[x.p]||0)+x.batches; if(PAN_VIE.has(x.p)) panEnVie=true; });
     if(v.prod && !(panEnVie && v.prod.p!==519)){   // el v.prod-pan se cae si ya hay un pan corrido; Galletas [519] siempre entra
       parts.push(_rzBP(v.prod.batches, v.prod.p)); c.prods[v.prod.p]=(c.prods[v.prod.p]||0)+v.prod.batches; if(PAN_VIE.has(v.prod.p)) panEnVie=true; }
@@ -8685,7 +8755,8 @@ function _rzAutoFill(){
   // en la ventana consigue un DÍA concreto de destino (el próximo día productivo libre). También
   // se anota el ESTADO de cada día futuro (dayStates) para poder explicar la búsqueda del destino.
   const H=(_rzCtx.weeks&&_rzCtx.weeks.length)||2;
-  for(let o=0;o<H;o++){ const cells=_rzCellsBase(o);
+  for(let o=0;o<H;o++){ const cells=_aplicarPicado(_rzCellsBase(o));
+    const persO=_personasDe(_isoWk(_rzMonday(o)));   // el techo del slot es el de SU semana
     cells.forEach(function(cc,i){ if(cc.ds<_rzCtx.hoyStr) return;
       let libre=false, estado;
       if(i<4){ if(cc.kind==='libre'){ libre=true; estado='libre'; } else if(cc.kind==='feriado'){ estado='feriado (no se produce)'; } else if(cc.kind==='edit-empty'){ estado='vaciado por vos (respeta el "nada")'; } else { estado='ocupado ('+(cc.prod||'')+')'; } }
@@ -8694,7 +8765,7 @@ function _rzAutoFill(){
       else { if(cc.kind==='viernes' && !Object.keys(cc.prods||{}).length){ libre=true; estado='viernes libre (limpieza)'; } else if(cc.kind==='edit-empty'){ estado='vaciado por vos (respeta el "nada")'; } else { estado='viernes ocupado ('+(cc.prod||'')+')'; } }
       dayStates.push({ds:cc.ds, dow:cc.dow, dnum:cc.dnum, i:i, o:o, estado:estado, libre:libre});
       // El viernes SOLO se ofrece como slot si está LIBRE (limpieza) — nunca amontonar sobre lo que ya lleva.
-      if(libre) slots.push({ds:cc.ds, ord:o*10+(i<4?i:5), dow:i, viernes:i>=4, o:o});
+      if(libre) slots.push({ds:cc.ds, ord:o*10+(i<4?i:5), dow:i, viernes:i>=4, o:o, pers:persO, pic:!!cc.picado});
     });
   }
   slots.sort(function(a,b){ return a.ord-b.ord; });
@@ -8705,10 +8776,20 @@ function _rzAutoFill(){
     // Lo REGISTRADO en Odoo + lo ASUMIDO (día pasado con plan y sin registro) cuenta contra la
     // meta → no se re-agenda. Si Keylor registra algo distinto, lo real manda y esto se reajusta.
     if(o===0){ const hb=_rzHechoOAsumido(); for(const k in hb) cur[+k]=(cur[+k]||0)+hb[+k]; }
-    for(const p of NIV_PROD){ let falta=(meta[p]||0)-(cur[p]||0); if(falta<=0.0001) continue; const cap=NIV_INFO[p].cap;
-      for(const s of slots){ if(falta<=0.0001) break; if(s.ord < o*10) continue; if(usados[s.ds]) continue;   // un producto por día (incl. viernes)
-        if(p===452 && (s.viernes || s.dow!==3)) continue;   // Semillas SOLO al jueves (nunca viernes ni otro día)
-        const put=Math.min(falta, cap);                     // CAPACIDAD MÁXIMA por día — también el viernes ("20 Francés/día" es imposible)
+    for(const p of NIV_PROD){ let falta=(meta[p]||0)-(cur[p]||0); if(falta<=0.0001) continue;
+      // SEMILLAS: el jueves sigue siendo la PREFERENCIA (su picado cae en viernes, que ya es día
+      // de limpieza y no cuesta un día de horno), pero dejó de ser candado: si el jueves está
+      // ocupado, entra cualquier día que admita el picado al día siguiente en vez de quedarse
+      // sin agendar. El portero es el mismo _semillasVeto que usan el intercambio y la edición.
+      const cand=(p===452) ? slots.filter(function(s){ return !s.viernes && !_semillasVeto(s.ds); })
+                                  .slice().sort(function(a,b){ return (a.dow===3?0:1)-(b.dow===3?0:1) || a.ord-b.ord; })
+                           : slots;
+      for(const s of cand){ if(falta<=0.0001) break; if(s.ord < o*10) continue; if(usados[s.ds]) continue;   // un producto por día (incl. viernes)
+        // CAPACIDAD MÁXIMA por día ("20 Francés/día" es imposible): la de SU semana —no la de 3
+        // personas fija de antes, que volvía a inflar justo lo que el recorte acababa de corregir—
+        // y si el día lleva picado, la de 2 personas.
+        const capDia=s.pic?Math.min(_capDe(p,s.pers),_capDe(p,2)):_capDe(p,s.pers);
+        const put=Math.min(falta, capDia);
         (auto[s.ds]=auto[s.ds]||[]).push({pid:+p, batches:Math.round(put)});   // SIEMPRE se registra → se pinta en su día (Resumen visible Y detalle del Plan)
         if(s.o>o) derrame.push({pid:+p, batches:Math.round(put), ds:s.ds});    // se corrió a una semana POSTERIOR → derrame con día real
         usados[s.ds]=1; falta-=put; }
@@ -8732,7 +8813,18 @@ function _rzOverlayAuto(cells, auto){ auto=auto||{};
     nc.kind='auto'; nc.auto=true; nc.editable=fut; nc.swappable=fut; nc.pid=a[0].pid; nc.batches=a[0].batches; nc.prod=txt; nc.bt=''; return nc; });
 }
 // Celdas de la semana del Resumen con el auto-relleno superpuesto (para render y para alistar).
-function _rzCellsFull(offset){ return _rzOverlayAuto(_rzCellsBase(offset), _rzAuto); }
+// El picado va AL FINAL, sobre las celdas ya efectivas (base + overrides + auto-relleno): es lo
+// último que se deriva porque depende de dónde quedó Semillas después de todo lo demás.
+function _rzCellsFull(offset){ return _aplicarPicado(_rzOverlayAuto(_rzCellsBase(offset), _rzAuto)); }
+// Aviso de RECORTE por dotación: qué días editados no cabían en la capacidad de la semana.
+// Se dice en pantalla — recortar en silencio sería mentirle al plan.
+function _rzRecorteAviso(cells, personas){
+  const rs=(cells||[]).filter(function(c){ return c.recorte; });
+  if(!rs.length) return '';
+  const det=rs.map(function(c){ return _fechaCorta(c.ds)+' '+_nomCorto(c.recorte.pid)+' '+_rzN(c.recorte.de)+' → '+_rzN(c.recorte.a); }).join(', ');
+  return '<div class="rz-recorte">'+personas+' persona'+(personas===1?'':'s')+': se '
+    +(rs.length===1?'recortó 1 día':('recortaron '+rs.length+' días'))+' — '+esc(det)+'</div>';
+}
 function rzWeekBatchesFull(offset){ return _rzFutBatches(_rzCellsFull(offset)); }
 // Producción planeada por fecha (2 semanas, con ediciones + auto) → base de la lógica de compras.
 function _rzPerDate(){ const m={}; for(let o=0;o<2;o++){ _rzCellsFull(o).forEach(function(c){ const pr=c.prods||{}; if(!Object.keys(pr).length) return; const t=m[c.ds]=m[c.ds]||{}; for(const k in pr) t[+k]=(t[+k]||0)+pr[k]; }); } return m; }
@@ -8844,7 +8936,7 @@ function _rzWeekBlock(offset){
     +'<span class="rz-wrange">'+_rangeLbl(mon)+'</span>'+_rzChipPersonas(iso, pers)+'</div>';
   const days='<div class="rz-days">'+cells.map(rzCellHtml).join('')+'</div>';
   const aviso=(pers===2 && w.viernes && w.viernes.prod)?'<div class="rz-note2p">'+_SVG_PPL+'Semana de 2 personas: el viernes entra a producir para cubrir el plan.</div>':'';
-  return '<div class="rz-wk'+(now?'':' rz-wk-next')+'">'+head+days+_rzConfirmBar(iso)+aviso+'</div>';
+  return '<div class="rz-wk'+(now?'':' rz-wk-next')+'">'+head+_rzRecorteAviso(cells, pers)+days+_rzConfirmBar(iso)+aviso+'</div>';
 }
 // Fecha corta "lun 20" a partir de un ds (para el aviso de derrame).
 function _fechaCorta(ds){ const d=new Date(ds+'T00:00:00'); return _DOW[d.getDay()]+' '+d.getDate(); }
@@ -9021,6 +9113,8 @@ function rzCellHtml(cell){
   const m=RZ[cell.kind]||RZ.libre;
   const dd='<div class="rz-dd">'+cell.dow+' '+cell.dnum+'</div>';
   const dp='<div class="rz-dp">'+esc(cell.prod)+'</div>';
+  // El picado no es editable ni removible: es consecuencia de dónde quedó Semillas, no una marca.
+  const pic=cell.picado?'<div class="rz-picchip">picado · rinde como 2 personas</div>':'';
   const db=cell.bt?('<div class="rz-db">'+esc(cell.bt)+'</div>'):'';
   const sel=_rzSel===ds;
   const estado=(cell.auto&&cell.kind==='viernes'?'Para cumplir la meta':m[1])+(cell.edited?' · editado':'')
@@ -9039,7 +9133,7 @@ function rzCellHtml(cell){
   const tip=cell.editable?(sel?'Tocá otro día para intercambiar, o este mismo para cancelar':'Tocá para seleccionar e intercambiar')
                          :(cell.nav?'Ver esta producción en Odoo':'');
   return '<div class="rz-day '+cls+(cell.nav?' rz-nav':'')+'" data-ds="'+ds+'"'
-    +(tip?(' title="'+tip+'"'):'')+' onclick="rzTapDia(\''+ds+'\')">'+pen+dd+dp+db+st+'</div>';
+    +(tip?(' title="'+tip+'"'):'')+' onclick="rzTapDia(\''+ds+'\')">'+pen+dd+dp+pic+db+st+'</div>';
 }
 function rzFormHtml(cell){
   const opts=NIV_PROD.map(p=>'<option value="'+p+'"'+(cell.pid===p?' selected':'')+'>'+esc(NIV_INFO[p].nom)+'</option>').join('');
@@ -9061,8 +9155,12 @@ async function rzSaveEdit(ds){
   const pid=sel&&sel.value?+sel.value:null;
   const batches=(bt&&bt.value!=='')?Math.max(0,Math.round(+bt.value)):0;
   const val=(pid&&batches>0)?{producto_id:pid, batches:batches}:{producto_id:null, batches:0};
+  // La edición pasa por el MISMO portero que el intercambio. Antes no lo hacía: el selector
+  // ofrecía Semillas para cualquier día y el veto solo cubría el swap, así que por edición se
+  // podía dejar Semillas donde su picado caía en sábado.
+  if(pid===452){ const m=_semillasVeto(ds); if(m){ _rzAviso=m; rzRender(); return; } }
   _rzOverrides[ds]={producto_id:val.producto_id, batches:val.batches, tipo:'edicion'};
-  _rzEdit=null; _rzRecalcAuto(); rzRender();                  // pinta ya (con re-agendado del faltante)
+  _rzEdit=null; _rzAviso=''; _rzRecalcAuto(); rzRender();     // pinta ya (con re-agendado del faltante)
   rzPersist([{fecha:ds, producto_id:val.producto_id, batches:val.batches, tipo:'edicion'}]);
   await rzRecalcAlistar(); rzRender();                        // recalcula MP/premezclas sobre la meta
 }
@@ -9087,7 +9185,6 @@ function _rzCarga(c){
   if(ks.length>1) return null;
   return {pid:+ks[0], batches:pr[ks[0]]};
 }
-function _rzDow(ds){ return new Date(ds+'T00:00:00').getDay(); }   // 4 = jueves
 function _rzFechaLbl(ds){ const d=new Date(ds+'T00:00:00'); return _DOW[d.getDay()]+' '+d.getDate(); }
 // ¿Este día admite intercambio? (día futuro editable que no sea feriado ni pasado)
 function _rzSwapOk(c){ return !!(c && c.swappable); }
@@ -9107,11 +9204,10 @@ function _rzSwapVeto(a, b){
   const ca=_rzCarga(a), cb=_rzCarga(b);
   if(!ca) return 'El '+_rzFechaLbl(a.ds)+' lleva más de un producto ('+a.prod+'). El intercambio mueve un producto por día — editalo primero.';
   if(!cb) return 'El '+_rzFechaLbl(b.ds)+' lleva más de un producto ('+b.prod+'). El intercambio mueve un producto por día — editalo primero.';
-  // SEMILLAS [452] queda clavado al jueves: se pica al día siguiente y el sábado no se trabaja.
-  if(ca.pid===452 && _rzDow(b.ds)!==4)
-    return 'Pan Semillas solo puede ir un jueves: se pica al día siguiente y el sábado no se trabaja. El '+_rzFechaLbl(b.ds)+' no sirve de destino.';
-  if(cb.pid===452 && _rzDow(a.ds)!==4)
-    return 'Pan Semillas solo puede ir un jueves: se pica al día siguiente y el sábado no se trabaja. El '+_rzFechaLbl(a.ds)+' no sirve de destino.';
+  // SEMILLAS [452] ya no está clavado al jueves: puede ir a cualquier día cuyo día SIGUIENTE se
+  // trabaje (ahí cae el picado). Un solo portero, compartido con la edición y el auto-relleno.
+  if(ca.pid===452){ const m=_semillasVeto(b.ds); if(m) return m; }
+  if(cb.pid===452){ const m=_semillasVeto(a.ds); if(m) return m; }
   return '';
 }
 // Un solo handler para TODO toque sobre un día — editable o no.
@@ -9514,6 +9610,7 @@ async function nivRealRango(D1,D2){
 
 let _planProj=[], _planReal={}, _planInputs=null;
 let _planEdit=null, _planEditMes=null;   // edición inline del Plan (ds en edición · mes abierto)
+let _planAviso='';                       // motivo visible cuando una edición del Plan no se puede hacer
 async function cargarPlanMeses(){
   const st=document.getElementById('planStatus'); st.className='status s-info'; st.classList.remove('hidden');
   st.innerHTML='<span class="spin"></span>Proyectando el plan con el nivelador (solo lectura)…';
@@ -9710,20 +9807,25 @@ function planVerDetalle(m, noScroll){
   const wks=_planProj.filter(wk=>wk.monday.getMonth()===m);
   let html='<div class="pl-det"><div class="pl-det-h"><span>Detalle de '+_MESNOM2[m]+'</span><button class="pl-volver" onclick="planVolver()">‹ volver a los meses</button></div>';
   html+='<div class="pl-edithint">Tocá cualquier día futuro para editarlo: producto y batches, o dejá el producto en “limpieza / nada”. La edición manda y el motor reconcilia; se guarda en el plan.</div>';
+  if(_planAviso) html+='<div class="rz-aviso">'+esc(_planAviso)+'</div>';
   html+=planColchonAviso();   // impacto de las ediciones sobre el colchón (motor reconciliado)
   // MISMA verdad que el Resumen: motor + overrides (ediciones) + auto-relleno de la meta.
   const PLK={real:'pl-d-real', today:'pl-d-prop', pend:'pl-d-pend', prop:'pl-d-prop', edit:'pl-d-prop', auto:'pl-d-prop', clean:'pl-d-clean', 'edit-empty':'pl-d-clean', viernes:'pl-d-clean', feriado:'pl-d-fer', libre:'pl-d-clean'};
   wks.forEach(wk=>{
     const iso=_isoWk(wk.monday), pers=wk.personas||_personasDe(iso);
+    // MISMAS celdas efectivas que el Resumen, picado incluido — una sola verdad.
+    const cells=_aplicarPicado(_rzOverlayAuto(rzCeldas(wk.monday, wk, _planReal, hoyStr, _rzOverrides), _rzAuto));
     html+='<div class="pl-wk"><div class="pl-wr">'+_rangeLbl(wk.monday)+' '+_rzChipPersonas(iso, pers)
-      +(pers===2 && wk.viernes && wk.viernes.prod?'<span class="pl-note2p">2 personas · viernes productivo</span>':'')+'</div><div class="pl-days">';
-    _rzOverlayAuto(rzCeldas(wk.monday, wk, _planReal, hoyStr, _rzOverrides), _rzAuto).forEach(c=>{
+      +(pers===2 && wk.viernes && wk.viernes.prod?'<span class="pl-note2p">2 personas · viernes productivo</span>':'')+'</div>'
+      +_rzRecorteAviso(cells, pers)+'<div class="pl-days">';
+    cells.forEach(c=>{
       if(_planEdit===c.ds && c.editable){ html+=planFormHtml(c); return; }   // día en edición → mini-form
       const txt=c.prod+(c.bt?' '+c.bt:'');
       const tag=(c.kind==='pend')?'<div class="pl-dtag">sin registrar</div>':(c.edited?'<div class="pl-dtag pl-dtag-ed">editado</div>':(c.auto?'<div class="pl-dtag pl-dtag-auto">meta</div>':''));
       const cls='pl-d '+(PLK[c.kind]||'pl-d-clean')+(c.edited?' pl-d-ed':'')+(c.editable?' pl-d-editable':'');
       const click=c.editable?(' onclick="planOpenEdit(\''+c.ds+'\')"'):'';
-      html+='<div class="'+cls+'" data-ds="'+c.ds+'"'+click+'><div class="pl-dd">'+c.dow+' '+c.dnum+'</div><div class="pl-dp">'+esc(txt)+'</div>'+tag+'</div>';
+      const pic=c.picado?'<div class="rz-picchip">picado · rinde como 2 personas</div>':'';
+      html+='<div class="'+cls+'" data-ds="'+c.ds+'"'+click+'><div class="pl-dd">'+c.dow+' '+c.dnum+'</div><div class="pl-dp">'+esc(txt)+'</div>'+pic+tag+'</div>';
     });
     html+='</div>'+_rzConfirmBar(iso)+'</div>';
   });
@@ -9741,15 +9843,16 @@ function planFormHtml(cell){
     +'<div class="pl-frow"><button class="pl-fok" title="Guardar" onclick="planSaveEdit(\''+cell.ds+'\')">✓</button>'
     +'<button class="pl-fx" title="Cancelar" onclick="planCancelEdit()">✕</button></div></div>';
 }
-function planOpenEdit(ds){ if(_planEdit===ds) return; _planEdit=ds; planVerDetalle(_planEditMes, true); const s=document.getElementById('planFsel'); if(s)s.focus(); }
-function planCancelEdit(){ _planEdit=null; planVerDetalle(_planEditMes, true); }
+function planOpenEdit(ds){ if(_planEdit===ds) return; _planEdit=ds; _planAviso=''; planVerDetalle(_planEditMes, true); const s=document.getElementById('planFsel'); if(s)s.focus(); }
+function planCancelEdit(){ _planEdit=null; _planAviso=''; planVerDetalle(_planEditMes, true); }
 async function planSaveEdit(ds){
   const sel=document.getElementById('planFsel'), bt=document.getElementById('planFbt');
   const pid=sel&&sel.value?+sel.value:null;
   const batches=(bt&&bt.value!=='')?Math.max(0,Math.round(+bt.value)):0;
   const val=(pid&&batches>0)?{producto_id:pid, batches:batches}:{producto_id:null, batches:0};   // sin producto o 0 batches = limpieza
+  if(pid===452){ const m=_semillasVeto(ds); if(m){ _planAviso=m; planVerDetalle(_planEditMes, true); return; } }
   _rzOverrides[ds]={producto_id:val.producto_id, batches:val.batches, tipo:'edicion'};
-  _planEdit=null;
+  _planEdit=null; _planAviso='';
   if(_rzCtx) _rzRecalcAuto();                    // el Resumen comparte overrides → mantené su auto-relleno coherente
   planVerDetalle(_planEditMes, true);            // repinta el detalle (rzCeldas honra el override) + recomputa el aviso de colchón
   planRefreshReaco();                            // el aviso "reacomodar" aparece si esta edición dejó un descuadre (sin colapsar el detalle)
@@ -9777,7 +9880,9 @@ function planColchonOv(overrides){
     if(Rr){ rampaOn=rampaOn||_rampaEstado(stock, ritmo, Rr.meta, Rr.k).on; Rr.on=rampaOn; }
     const pre={}; NIV_PROD.forEach(p=>pre[p]=stock[p]);
     const L=_weekLayout(stock, ritmo, colDe, H, pers, Rr);           // decide la semana con el stock de inicio (muta stock: se descarta)
-    const cells=rzCeldas(mon, L, {}, hoyStr, overrides);             // colocación en días honrando overrides
+    const cells=_aplicarPicado(rzCeldas(mon, L, {}, hoyStr, overrides));   // colocación honrando overrides + picado derivado
+    // (el recorte por dotación y el del picado ya vienen aplicados en las celdas: el colchón
+    //  proyectado deja de contar producción que la gente de esa semana no puede hacer)
     const prodB={}; cells.forEach(c=>{ const pr=c.prods||{}; for(const k in pr) prodB[+k]=(prodB[+k]||0)+pr[k]; });
     NIV_PROD.forEach(p=>{ stock[p]=pre[p]+(prodB[p]||0)*NIV_INFO[p].rend-(ritmo[p]||0); });   // consumo = ritmo (fijo)
   }
