@@ -2111,7 +2111,15 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-gnote{font-size:10px;color:#C99A4E;margin-top:3px}
 #vResumen .rz-ds{margin-top:auto;font-size:11px;font-weight:600;padding-top:8px}
 #vResumen .rz-dsm{display:none}   /* estado en una palabra: solo teléfono (ver @media 700px) */
-#vResumen .rz-edwrap{display:none}   /* "N días editados": solo teléfono */
+/* La lista de días editados va en las DOS pantallas, colgada de la leyenda de la cabecera.
+   Antes era solo de teléfono porque el escritorio tenía su propia etiqueta "editado"; ahora la
+   leyenda es una sola y el desplegable tiene que existir donde está esa leyenda. */
+#vResumen .rz-edwrap{display:block}
+#vResumen .rz-edlista{margin-top:7px}
+#vResumen .rz-edlista.hidden{display:none}
+#vResumen .rz-edrow{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11.5px;color:var(--text-3)}
+#vResumen .rz-edd{flex:none;min-width:52px}
+#vResumen .rz-edp{color:var(--text-2);min-width:0}
 #vResumen .rz-c4-mov{display:none}   /* texto de tarjeta vacía: solo teléfono */
 #vResumen .rz-day.rz-done{border-color:var(--border)} #vResumen .rz-day.rz-done .rz-ds{color:#7A7A72}
 #vResumen .rz-day.rz-today{border-color:#C77DA0;box-shadow:0 0 0 1px rgba(199,125,160,.4)} #vResumen .rz-day.rz-today .rz-ds{color:#C77DA0}
@@ -2132,7 +2140,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* Lápiz de edición: el glifo se dibuja a 15px pero el blanco táctil es de 44×44 (dedo), sin
    salirse de la celda — el resto del día queda libre para el toque de intercambio. Siempre
    visible (en pantalla táctil no hay hover) y solo en días editables. */
-#vResumen .rz-pen{position:absolute;top:2px;right:2px;width:44px;height:44px;display:flex;
+/* top/right en 0 —la geometría que ya tenía el teléfono— para que el lápiz y el punto rosa no
+   se monten. Con los 2px de antes el ícono se corría hacia adentro y pisaba el punto. */
+#vResumen .rz-pen{position:absolute;top:0;right:0;width:44px;height:44px;display:flex;
   align-items:center;justify-content:center;color:#4A4A50;cursor:pointer;transition:color .12s}
 #vResumen .rz-pen svg{width:15px;height:15px;display:block;pointer-events:none}
 #vResumen .rz-day.rz-ed:hover .rz-pen{color:#6E6C68}
@@ -2544,6 +2554,8 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-sh .rz-edtag{display:inline-flex;align-items:center;gap:6px;background:none;border:none;
   padding:0;font-size:11.5px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit}
 #vResumen .rz-sh .rz-edtag:hover{color:var(--text)}
+#vResumen .rz-sh .rz-edtag::after{content:'⌄';font-size:12px;line-height:1;color:var(--text-3)}
+#vResumen .rz-sh .rz-edtag.rz-abierto::after{content:'⌃'}
 #vResumen .rz-edrow .rz-dot{margin-right:7px}
 #vResumen .rz-picchip,#vPlan .rz-picchip{display:inline-block;margin-top:5px;font-size:9.5px;font-weight:600;
   color:#C99A4E;background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.4);border-radius:5px;
@@ -2588,9 +2600,13 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-icard{flex:0 0 240px;background:#161619;border:.5px solid #26262C;border-radius:11px;padding:12px 14px}
 #vResumen .rz-icard-sm{flex:0 0 180px}
 #vResumen .rz-ith{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);font-weight:600;margin-bottom:8px}
-#vResumen .rz-ir{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:4px 0;font-size:13px}
+/* Escritorio: la fila de inventario baja a la escala del resto de la pantalla y el número deja
+   de ir en negrita. Se distinguen por TONO —nombre gris medio, número blanco hueso, contraste
+   en gris terciario—, que es el estándar de las tablas del sistema.
+   (En teléfono el número sigue grande a propósito: se lee de lejos, frente a la cámara.) */
+#vResumen .rz-ir{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:4px 0;font-size:12.5px}
 #vResumen .rz-irn{color:var(--text-2);text-transform:capitalize}
-#vResumen .rz-irv{color:var(--text);font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+#vResumen .rz-irv{color:var(--text);font-weight:400;font-variant-numeric:tabular-nums;white-space:nowrap}
 /* Sub-línea del ítem: el conteo físico guardado contra la existencia de Odoo. Ocupa el ancho
    completo debajo del nombre y el número — por eso .rz-ir envuelve. En gris terciario: es
    contexto, no alarma. Si el ítem no se contó, no se dibuja. */
@@ -2690,8 +2706,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-inv3{display:flex;flex-direction:column;gap:10px}
 #vResumen .rz-i3{background:#141417;border:.5px solid #26262C;border-radius:11px;padding:11px 14px}
 #vResumen .rz-i3h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-#vResumen .rz-i3t{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);font-weight:600}
-#vResumen .rz-i3sum{font-size:12.5px;color:var(--text-2);cursor:pointer;user-select:none}
+/* Mismo encabezado que las tarjetas de arriba (rz-c4h): sin VERSALITA y sin 600. El bloque
+   gritaba por tamaño y peso; la jerarquía la hacen los tonos de gris, no la tipografía. */
+#vResumen .rz-i3t{font-size:11px;letter-spacing:.02em;color:var(--text-3);font-weight:500}
+#vResumen .rz-i3sum{font-size:12px;color:var(--text-2);cursor:pointer;user-select:none}
 #vResumen .rz-i3sum:hover{color:var(--text)}
 #vResumen .rz-i3body{margin-top:9px;border-top:.5px solid #232329;padding-top:8px}
 #vResumen .rz-i3body.hidden{display:none}
@@ -2721,19 +2739,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   /* "Editado" ya no es una señal de la tarjeta: sin borde ámbar. Lo excepcional de verdad
      (hoy, feriado, sin registrar, seleccionado) conserva el suyo. */
   #vResumen .rz-day.rz-edited{border-color:var(--border)}
-  /* Pie del calendario: "N días editados" en gris con chevron, y la lista al tocarla. */
-  #vResumen .rz-edtoggle{display:flex;width:100%;align-items:center;gap:6px;margin-top:11px;
-    padding:0;border:none;background:none;color:var(--text-3);font-family:inherit;font-size:11px;
-    text-align:left;cursor:pointer}
-  #vResumen .rz-edtoggle::after{content:'⌄';font-size:13px;line-height:1;color:var(--text-3)}
-  #vResumen .rz-edtoggle.rz-abierto::after{content:'⌃'}
-  #vResumen .rz-edlista{margin-top:7px}
-  #vResumen .rz-edlista.hidden{display:none}
-  #vResumen .rz-edrow{display:flex;gap:8px;padding:4px 0;font-size:11.5px;color:var(--text-3)}
-  #vResumen .rz-edd{flex:none;min-width:52px}
-  #vResumen .rz-edp{color:var(--text-2);min-width:0}
+  /* (la leyenda y la lista de días editados viven en las reglas base: son las mismas en las dos
+     pantallas desde que la leyenda quedó una sola vez, en la cabecera) */
   /* El lápiz mantiene su blanco táctil de 44×44 aunque la tarjeta sea más baja. */
-  #vResumen .rz-pen{top:0;right:0}
+  /* (el lápiz ya va en 0,0 en la regla base — el teléfono era la referencia) */
   /* Mismo motivo: menos de 16px y iOS hace zoom al enfocar. */
   #vResumen .rz-fsel,#vResumen .rz-fbt{font-size:16px;padding:5px 6px}
   /* Encabezado de semana en UNA línea de texto, sin píldora con caja.
@@ -2756,10 +2765,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vResumen .rz-cal2 .rz-wk-next .rz-day{background:var(--surface-2);border-style:solid}
   /* Fuera del teléfono: el aviso de meta (derrame) y el bloque de Inventario, que vive en
      su propia pestaña. */
-  /* La etiqueta ámbar "editado" del encabezado decía lo mismo que la línea de abajo, y en
-     ámbar. Queda solo "Volver al plan", que es una acción. */
-  #vResumen .rz-edtag{display:none}
-  #vResumen .rz-edwrap{display:block}
+  /* La leyenda "N días editados" con su punto rosa se queda TAMBIÉN en el teléfono: es la única
+     que hay. (Escondida como estaba —herencia de cuando el encabezado tenía una etiqueta ámbar
+     que duplicaba la línea de abajo— el teléfono quedaba sin conteo y sin forma de abrir la
+     lista, porque el desplegable cuelga de ella.) */
   #vResumen .rz-leftnote{display:none}
   /* El bloque de Inventario VUELVE al teléfono (se había escondido el 10-ago para calmar la
      pantalla). Sigue colapsado —tres tarjetas que se abren al tocar—, así que no pesa hasta
@@ -2773,8 +2782,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   /* Tarjetas 2×2 — fila 1: Por medir · Comprar·medir | fila 2: Producciones · Comprar·producir */
   #vResumen .rz-cards4{gap:10px;margin-top:20px;align-items:start}   /* sin estirar: nada de cajas medio vacías */
   #vResumen .rz-c4h{font-size:10.5px;letter-spacing:.02em;line-height:1.3}
-  /* El plazo ya lo dice la pantalla una vez: no hace falta repetirlo en cada tarjeta. */
-  #vResumen .rz-c4fecha{display:none}
+  /* La ventana de cobertura VA en el teléfono, en las cuatro tarjetas. Estaba oculta desde
+     cuando las tres decían lo mismo; ahora "Por medir" y "Comprar" cubren ventanas DISTINTAS
+     (el lunes al 50% contra el lunes completo), así que esconderla dejaba el número ambiguo. */
+  #vResumen .rz-c4fecha{font-size:10.5px;margin:-2px 0 8px;line-height:1.3}
   #vResumen .rz-c4-desk{display:none} #vResumen .rz-c4-mov{display:inline}
   #vResumen .rz-c4-medir{order:1} #vResumen .rz-c4-cmedir{order:2}
   #vResumen .rz-c4-prod{order:3}  #vResumen .rz-c4-cprod{order:4}
@@ -3001,7 +3012,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 17 ago 2026 · b22';
+const BUILD = 'v 17 ago 2026 · b23';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -5742,11 +5753,16 @@ async function nivCompras(stock){
       // líneas obligaría a repartir el stock on-hand entre etapas con una regla arbitraria y
       // las dos líneas sumarían mal: la lista es de COMPRA, y se compra una vez.
       const otra=(grupo==='medir' ? (bolsas.direct[pid]||0) : (bolsas.prem[pid]||0));
-      const nota=otra>0.0001 ? ('incluye '+_cant(otra,uom)+' de '+(grupo==='medir'?'producción':'premezclas')) : '';
+      // "incluye X de producción" obligaba a deducir qué era el resto. Se dice completo: de dónde
+      // viene esa parte Y de dónde no. Vale para cualquier ingrediente que aparezca en las dos etapas.
+      const nota=otra>0.0001 ? (_cant(otra,uom)+' son de '+(grupo==='medir'?'producción, no de premezcla':'premezcla, no de producción')) : '';
       out.push({pid, nombre:nm, uom:uom, need:nq, have:have, falta:falta,
                 accion:_mpFuente(_mpTipo(nm)), nota:nota}); }
     return out; }
-  const fecha='comprar hoy · cubre hasta el lun '+nextMon.getDate();
+  // "comprar hoy" sobraba: el título de la tarjeta ya dice Comprar, y la línea rosa está para
+  // decir la VENTANA, que es el dato. El lunes entra COMPLETO acá — a diferencia de "Por medir",
+  // que lo cuenta al 50%. Son ventanas distintas y por eso cada una lo dice.
+  const fecha='cubre hasta el lun '+nextMon.getDate()+' · ese día completo';
   return {
     premezclas:{fecha:fecha, items:items('medir')},
     produccion:{fecha:fecha, items:items('producir')}
@@ -8901,15 +8917,17 @@ function _rzRecorteAviso(cells, personas){
   const lbl=function(x){ return _fechaCorta(x.ds)+' '+_nomCorto(x.r.pid)+' '+_rzN(x.r.de)+(x.r.a>0?(' → '+_rzN(x.r.a)):' fuera'); };
   const sub=todos.filter(function(x){ return x.r.motivo==='suba'; });
   const dot=todos.filter(function(x){ return x.r.motivo==='dotacion'; });
-  const pic=todos.filter(function(x){ return x.r.motivo==='picado'; });
   const p2p=todos.filter(function(x){ return x.r.motivo==='picado2p'; });
   const fr=[];
   if(dot.length) fr.push(personas+' persona'+(personas===1?'':'s')+': se '
     +(dot.length===1?'recortó 1 día':('recortaron '+dot.length+' días'))+' — '+esc(dot.map(lbl).join(', ')));
   if(sub.length) fr.push(personas+' persona'+(personas===1?'':'s')+': se '
     +(sub.length===1?'subió 1 día':('subieron '+sub.length+' días'))+' al techo de hoy — '+esc(sub.map(lbl).join(', ')));
-  if(pic.length) fr.push('Día de picado (rinde como 2): '+esc(pic.map(lbl).join(', ')));
+  // El recorte por picado NO se avisa acá: el chip de la tarjeta ya lo dice y el número recortado
+  // está a la vista en la celda. Repetirlo era ruido. (El caso de 2 personas SÍ se avisa: ahí el
+  // producto SALE del día y eso no se ve en ninguna celda — no hay número que mirar.)
   if(p2p.length) fr.push('2 personas + picado: ese día solo entran Galletas — sale '+esc(p2p.map(lbl).join(', ')));
+  if(!fr.length) return '';   // había recortes, pero ninguno de los que se avisan → NADA, ni la caja vacía
   return '<div class="rz-recorte">'+fr.join('<br>')+'</div>';
 }
 function rzWeekBatchesFull(offset){ return _rzFutBatches(_rzCellsFull(offset)); }
