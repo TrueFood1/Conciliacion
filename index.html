@@ -2535,6 +2535,16 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-recorte,#vPlan .rz-recorte{margin:0 0 9px;font-size:11.5px;line-height:1.35;color:#C99A4E;
   background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.35);border-radius:7px;padding:5px 8px}
 /* Picado: consecuencia, no marca. Ámbar porque cambia el techo del día. */
+/* "Editado" = un punto rosa de 6px, sin texto. Rosa #D4537E (acento de Operaciones), NO ámbar:
+   el ámbar queda reservado a advertencias (picado, recorte de capacidad, sin registrar). */
+#vResumen .rz-dot,#vPlan .rz-dot{display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:#D4537E;flex:none}
+#vResumen .rz-day .rz-dot{position:absolute;top:10px;right:30px}   /* a la izquierda del lápiz (44px) */
+#vResumen .rz-day:not(.rz-ed) .rz-dot{right:10px}                  /* sin lápiz → a la esquina */
+#vResumen .rz-sh .rz-edtag{display:inline-flex;align-items:center;gap:6px;background:none;border:none;
+  padding:0;font-size:11.5px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit}
+#vResumen .rz-sh .rz-edtag:hover{color:var(--text)}
+#vResumen .rz-edrow .rz-dot{margin-right:7px}
 #vResumen .rz-picchip,#vPlan .rz-picchip{display:inline-block;margin-top:5px;font-size:9.5px;font-weight:600;
   color:#C99A4E;background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.4);border-radius:5px;
   padding:1px 5px;line-height:1.5;white-space:normal}
@@ -2991,7 +3001,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 17 ago 2026 · b21';
+const BUILD = 'v 17 ago 2026 · b22';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -5360,10 +5370,16 @@ async function nivConfig(){
              horizonte:NIV_CFG_DEF.horizonte, medirLunesFrac:NIV_CFG_DEF.medirLunesFrac,
              colchon:{}, ventanas:[], sembrado:false};
   NIV_PROD.forEach(p=>cfg.colchon[p]=NIV_CFG_DEF.colchon);
-  try{
-    const c=sbClient(); if(!c) return cfg;
+  // SIN atrapa-errores: `plan_config` existe desde el 17-ago-2026 y está sembrada. Antes había un
+  // catch mudo acá porque la tabla no existía y el 404 era esperado — pero eso también se tragaba
+  // cualquier falla REAL (RLS mal puesta, sesión vencida, la tabla borrada) y el Planificador
+  // seguía con los defaults del código como si nada, sin que nadie se enterara. Ahora si falla,
+  // revienta hacia el caller, que ya pinta el error en pantalla.
+  {
+    const c=sbClient(); if(!c) return cfg;                       // sin sesión: defaults, eso no es una falla
     const {data,error}=await c.from('plan_config').select('clave,valor,creado_en').order('creado_en',{ascending:false});
-    if(error||!data||!data.length) return cfg;
+    if(error) throw new Error('No pude leer la configuración del plan (plan_config): '+(error.message||error));
+    if(!data||!data.length) return cfg;
     cfg.sembrado=true; const seen={};
     for(const r of data){ if(seen[r.clave])continue; seen[r.clave]=1; const v=r.valor;
       if(r.clave==='ritmo_ventana') cfg.ritmoVentana=+v||cfg.ritmoVentana;
@@ -5372,7 +5388,7 @@ async function nivConfig(){
       else if(r.clave==='ventanas_estacionales' && Array.isArray(v)) cfg.ventanas=v;
       else if(r.clave==='medir_lunes_frac' && v!=null && +v>=0 && +v<=1) cfg.medirLunesFrac=+v;
     }
-  }catch(e){ /* tabla no sembrada aún → defaults */ }
+  }
   return cfg;
 }
 
@@ -8606,13 +8622,13 @@ async function rzDiagCierre(body){
 async function nivOverrides(){
   const c=sbClient(); if(!c) return {};
   try{
-    const {data,error}=await c.from('plan_overrides').select('fecha,producto_id,batches,tipo,creado_en').order('creado_en',{ascending:false});
+    const {data,error}=await c.from('plan_overrides').select('fecha,producto_id,batches,tipo,personas,creado_en').order('creado_en',{ascending:false});
     if(error||!data) return {};
     const hoyStr=_ymd(new Date()), seen={}, ov={};
     for(const r of data){ const f=r.fecha; if(!f||seen[f])continue; seen[f]=1;
       if(f<hoyStr) continue;                    // el pasado lo dicta Odoo, no un override
       if(r.tipo==='anulacion') continue;        // la última fila es "volver al plan" → sin override
-      ov[f]={producto_id:r.producto_id, batches:r.batches, tipo:r.tipo}; }
+      ov[f]={producto_id:r.producto_id, batches:r.batches, tipo:r.tipo, personas:(r.personas!=null?+r.personas:null)}; }
     return ov;
   }catch(e){ return {}; }   // tabla no creada aún → sin overrides (degradación limpia, como plan_config)
 }
@@ -8697,14 +8713,23 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
     if(ov && fut){ c.editable=true; c.edited=true; c.swappable=true;
       if(ov.producto_id==null || !(ov.batches>0)){ c.kind='edit-empty';
         c.prod=(i===4?'Limpieza':'—'); c.bt=''; return c; }
-      // LA CAPACIDAD PISA EL OVERRIDE. Un día de 2 personas tiene un techo físico: antes esta
-      // rama devolvía ov.batches crudo y retornaba ANTES de mirar lo que el nivelador acababa de
-      // recalcular, así que un día editado se congelaba —mismo producto y mismos batches a 3 o a
-      // 2 personas— y ese número inflado se sumaba de vuelta al stock en _rzMetaEfectiva y en
-      // planColchonOv. El override NO se toca en la base: se recorta lo que el plan EJECUTA y
-      // SUMA. Si la semana vuelve a 3 personas, el número original revive solo.
-      const tope=_capDe(ov.producto_id, pers), bt=Math.min(ov.batches, tope);
-      if(bt<ov.batches) c.recortes=[{pid:ov.producto_id, de:ov.batches, a:bt, motivo:'dotacion'}];
+      // LA CAPACIDAD MANDA EN LOS DOS SENTIDOS. b21 solo recortaba (Math.min), así que un
+      // override guardado en una semana de 2 se quedaba clavado abajo cuando la semana volvía a
+      // 3: "6 Francés" en una semana de 3, cuyo techo son 10. Pero subir siempre sería peor —
+      // pisaría un 6 que Andrea puso a propósito. Lo que distingue los dos casos es `personas`,
+      // la dotación con la que se creó la fila:
+      //   · misma dotación que hoy      → su cifra manda tal cual (el techo físico igual aplica).
+      //   · otra dotación, y era EL TECHO de esa dotación → era "lo que cabía": se reajusta al
+      //     techo de hoy, para arriba o para abajo.
+      //   · otra dotación, y era otro número → fue deliberado: solo se recorta, nunca se sube.
+      //   · sin dato (filas anteriores a la columna) → se trata como deliberado: solo se recorta.
+      // El override NO se toca en la base: esto ajusta lo que el plan EJECUTA y SUMA.
+      const hoyCap=_capDe(ov.producto_id, pers);
+      const opers=(ov.personas!=null)?+ov.personas:null;
+      const eraTecho=(opers!=null && ov.batches===_capDe(ov.producto_id, opers));
+      const bt=(opers!==pers && eraTecho) ? hoyCap : Math.min(ov.batches, hoyCap);
+      if(bt!==ov.batches) c.recortes=[{pid:ov.producto_id, de:ov.batches, a:bt,
+                                       motivo:(bt>ov.batches?'suba':'dotacion')}];
       c.kind='edit'; c.pid=ov.producto_id; c.batches=bt; c.prods[ov.producto_id]=bt;
       c.prod=_rzBP(bt, ov.producto_id); c.bt=''; return c; }
     if(i<4){
@@ -8874,12 +8899,15 @@ function _rzRecorteAviso(cells, personas){
   const todos=[]; (cells||[]).forEach(function(c){ (c.recortes||[]).forEach(function(r){ todos.push({ds:c.ds, r:r}); }); });
   if(!todos.length) return '';
   const lbl=function(x){ return _fechaCorta(x.ds)+' '+_nomCorto(x.r.pid)+' '+_rzN(x.r.de)+(x.r.a>0?(' → '+_rzN(x.r.a)):' fuera'); };
+  const sub=todos.filter(function(x){ return x.r.motivo==='suba'; });
   const dot=todos.filter(function(x){ return x.r.motivo==='dotacion'; });
   const pic=todos.filter(function(x){ return x.r.motivo==='picado'; });
   const p2p=todos.filter(function(x){ return x.r.motivo==='picado2p'; });
   const fr=[];
   if(dot.length) fr.push(personas+' persona'+(personas===1?'':'s')+': se '
     +(dot.length===1?'recortó 1 día':('recortaron '+dot.length+' días'))+' — '+esc(dot.map(lbl).join(', ')));
+  if(sub.length) fr.push(personas+' persona'+(personas===1?'':'s')+': se '
+    +(sub.length===1?'subió 1 día':('subieron '+sub.length+' días'))+' al techo de hoy — '+esc(sub.map(lbl).join(', ')));
   if(pic.length) fr.push('Día de picado (rinde como 2): '+esc(pic.map(lbl).join(', ')));
   if(p2p.length) fr.push('2 personas + picado: ese día solo entran Galletas — sale '+esc(p2p.map(lbl).join(', ')));
   return '<div class="rz-recorte">'+fr.join('<br>')+'</div>';
@@ -8911,7 +8939,9 @@ function _rzMedirLbl(){
   return 'cubre hasta el lun '+nextMon.getDate()+' · ese día al '+_rzN(frac*100)+'%';
 }
 async function rzRecalcAlistar(){ _rzRecalcAuto();
-  _rzAlistar=await nivAlistar([_rzMedirBatches(), rzWeekBatchesFull(1)], _rzCtx.stock);
+  // UN solo mapa: el de la ventana. El segundo (semana 1) se calculaba y no lo leía nadie, y con
+  // la ventana nueva —que ya se mete en la semana siguiente— habría contado el traslape dos veces.
+  _rzAlistar=await nivAlistar([_rzMedirBatches()], _rzCtx.stock);
   _rzCompras=await nivCompras(_rzCtx.stock); }
 
 function rzRender(){
@@ -8984,21 +9014,21 @@ function _rzChipPersonas(iso, personas){
 // línea gris al pie del calendario y se despliega en una lista chica: fecha y qué quedó.
 // Sin colores, sin badges, sin tabla. Si no hay días editados, la línea no existe.
 let _rzEdListaOpen=false;
-function _rzEditadosHtml(){
-  const eds=[];
-  // Cuenta SOLO los días VISIBLES: si la próxima semana está colapsada, sus ediciones no
-  // entran (decían "6 días editados" con 5 días en pantalla). Al desplegarla, entran las dos.
-  const semanas = _rzShowNext ? 2 : 1;
+// Días editados VISIBLES: si la próxima semana está colapsada, sus ediciones no entran (decían
+// "6 días editados" con 5 días en pantalla). Al desplegarla, entran las dos.
+function _rzEditados(){
+  const eds=[], semanas=_rzShowNext?2:1;
   for(let o=0;o<semanas;o++) _rzCellsFull(o).forEach(function(c){ if(c.edited) eds.push(c); });
+  return eds;
+}
+// Solo la LISTA (fecha + qué quedó). El conteo y el punto viven en la cabecera, una sola vez.
+function _rzEditadosHtml(){
+  const eds=_rzEditados();
   if(!eds.length) return '';
   const filas=eds.map(function(c){
-    return '<div class="rz-edrow"><span class="rz-edd">'+c.dow+' '+c.dnum+'</span>'
+    return '<div class="rz-edrow"><span class="rz-dot"></span><span class="rz-edd">'+c.dow+' '+c.dnum+'</span>'
       +'<span class="rz-edp">'+esc(c.prod)+'</span></div>'; }).join('');
-  const n=eds.length;
-  return '<div class="rz-edwrap">'
-    +'<button class="rz-edtoggle'+(_rzEdListaOpen?' rz-abierto':'')+'" onclick="rzToggleEditados(this)">'
-      +n+' día'+(n===1?'':'s')+' editado'+(n===1?'':'s')+'</button>'
-    +'<div class="rz-edlista'+(_rzEdListaOpen?'':' hidden')+'" id="rzEdLista">'+filas+'</div></div>';
+  return '<div class="rz-edwrap"><div class="rz-edlista'+(_rzEdListaOpen?'':' hidden')+'" id="rzEdLista">'+filas+'</div></div>';
 }
 function rzToggleEditados(btn){
   _rzEdListaOpen=!_rzEdListaOpen;
@@ -9063,9 +9093,14 @@ function _rzAlertaHtml(){
   return '<div class="rz-alert">'+_SVG_ALERT+'<span>'+txt+'</span></div>';
 }
 function rzStripHtml(){
-  const edited=_rzCellsFull(0).concat(_rzCellsFull(1)).some(c=>c.edited);
-  // Botón "Volver al plan" ARRIBA A LA DERECHA, junto a "editado" — SOLO si hay ediciones que revertir.
-  const right=edited?('<span class="rz-shr"><span class="rz-edtag" title="Editado por vos">'+_SVG_PENCIL+'editado</span>'
+  // LA LEYENDA VA UNA SOLA VEZ, acá: el mismo punto rosa que llevan los días + el conteo. Antes
+  // estaba dos veces (esta cabecera decía "editado" y abajo había otro botón "N días editados") y
+  // encima cada tarjeta lo repetía en texto. Cuenta los días VISIBLES, igual que antes: si la
+  // próxima semana está colapsada, sus ediciones no entran.
+  const nEd=_rzEditados().length;
+  const right=nEd?('<span class="rz-shr"><button class="rz-edtag'+(_rzEdListaOpen?' rz-abierto':'')+'"'
+    +' onclick="rzToggleEditados(this)" title="Ver qué días cambiaste"><span class="rz-dot"></span>'
+    +nEd+' día'+(nEd===1?'':'s')+' editado'+(nEd===1?'':'s')+'</button>'
     +'<button class="rz-revert" onclick="rzVolverPlanStrip()">Volver al plan</button></span>'):'';
   const head='<div class="rz-sh"><span class="rz-st">Pendiente de fabricar</span>'
     +right+'</div>';
@@ -9178,19 +9213,21 @@ async function rzVolverPlanStrip(){
 }
 // Estado del día en UNA palabra minúscula (tarjeta compacta de teléfono). "editado" gana sobre
 // el estado base: en escritorio se lee "Editado · editado", acá tiene que decirlo una sola vez.
+// "editado" ya NO es texto en ninguna de las dos pantallas: lo dice el punto rosa de la esquina.
+// Antes el mapa de estados traía 'Editado' Y además se concatenaba ' · editado' porque cell.edited
+// también era true — la tarjeta decía "Editado · editado". Se quitan los dos.
 const _RZ_CORTO={real:'hecho', pend:'sin registrar', prop:'propuesto', libre:'libre',
-                 feriado:'feriado', viernes:'libre', edit:'editado', 'edit-empty':'editado',
+                 feriado:'feriado', viernes:'libre', edit:'', 'edit-empty':'',
                  auto:'para la meta'};
 function _rzEstadoCorto(cell, sel){
   if(sel) return 'seleccionado';
-  if(cell.edited) return 'editado';
   if(cell.auto) return 'para la meta';
   return _RZ_CORTO[cell.kind]||'';
 }
 function rzCellHtml(cell){
   // 'pend' = día pasado con plan y sin registro en Odoo → se ASUME hecho según el plan
   // ("sin registrar aún" ≠ "Hecho ✓", que es lo confirmado por Odoo).
-  const RZ={real:['rz-done','Hecho ✓'], today:['rz-today','En curso'], pend:['rz-miss','Sin registrar aún'], prop:['rz-plan','Propuesto'], libre:['rz-clean','Libre'], feriado:['rz-fer','Feriado'], viernes:['rz-clean','—'], edit:['rz-plan','Editado'], 'edit-empty':['rz-clean','Editado'], auto:['rz-plan','Para cumplir la meta']};
+  const RZ={real:['rz-done','Hecho ✓'], today:['rz-today','En curso'], pend:['rz-miss','Sin registrar aún'], prop:['rz-plan','Propuesto'], libre:['rz-clean','Libre'], feriado:['rz-fer','Feriado'], viernes:['rz-clean','—'], edit:['rz-plan',''], 'edit-empty':['rz-clean',''], auto:['rz-plan','Para cumplir la meta']};
   const ds=cell.ds;
   if(_rzEdit===ds && cell.editable) return rzFormHtml(cell);
   const m=RZ[cell.kind]||RZ.libre;
@@ -9201,8 +9238,11 @@ function rzCellHtml(cell){
   const pic=cell.picadoChip?('<div class="rz-picchip">'+esc(cell.picadoChip)+'</div>'):'';
   const db=cell.bt?('<div class="rz-db">'+esc(cell.bt)+'</div>'):'';
   const sel=_rzSel===ds;
-  const estado=(cell.auto&&cell.kind==='viernes'?'Para cumplir la meta':m[1])+(cell.edited?' · editado':'')
-    +(sel?' · seleccionado':'');
+  const estado=(cell.auto&&cell.kind==='viernes'?'Para cumplir la meta':m[1])+(sel?' · seleccionado':'');
+  // El punto rosa dice "editado" — SIN texto. Va también en el día vaciado a mano ('edit-empty'),
+  // que hasta ahora se veía igual que un día vacío del plan y no es lo mismo: uno lo decidió Andrea.
+  // Rosa #D4537E (acento de Operaciones) y no ámbar: el ámbar avisa, y "editado" no es advertencia.
+  const pt=cell.edited?'<span class="rz-dot" title="Editado por vos"></span>':'';
   // En teléfono el estado va en UNA palabra minúscula. Se emiten los dos textos y el CSS
   // muestra el que corresponde al ancho: así no hay rama por viewport en JS (que se rompería
   // al rotar el teléfono) y el HTML es el mismo para las dos pantallas.
@@ -9217,7 +9257,7 @@ function rzCellHtml(cell){
   const tip=cell.editable?(sel?'Tocá otro día para intercambiar, o este mismo para cancelar':'Tocá para seleccionar e intercambiar')
                          :(cell.nav?'Ver esta producción en Odoo':'');
   return '<div class="rz-day '+cls+(cell.nav?' rz-nav':'')+'" data-ds="'+ds+'"'
-    +(tip?(' title="'+tip+'"'):'')+' onclick="rzTapDia(\''+ds+'\')">'+pen+dd+dp+pic+db+st+'</div>';
+    +(tip?(' title="'+tip+'"'):'')+' onclick="rzTapDia(\''+ds+'\')">'+pt+pen+dd+dp+pic+db+st+'</div>';
 }
 function rzFormHtml(cell){
   const opts=NIV_PROD.map(p=>'<option value="'+p+'"'+(cell.pid===p?' selected':'')+'>'+esc(NIV_INFO[p].nom)+'</option>').join('');
@@ -9328,8 +9368,12 @@ async function rzSwap(fromDs, toDs){
 async function rzPersist(filas){
   const c=sbClient(); if(!c){ alert('Sin conexión con la base — el cambio no se guardó. Reintentá.'); return; }
   let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
-  const payload=filas.map(r=>({fecha:r.fecha, producto_id:r.producto_id, batches:r.batches, tipo:r.tipo,
-    semana_iso:_isoWk(new Date(r.fecha+'T00:00:00')), usuario:email||null}));
+  // `personas` = la dotación VIGENTE al crear la fila. Sin ella no se puede distinguir "6 porque
+  // la semana era de 2" de "6 porque Andrea quiso 6", y esa diferencia decide si el override se
+  // ajusta o se respeta cuando cambia la dotación (ver rzCeldas).
+  const payload=filas.map(function(r){ const iso=_isoWk(new Date(r.fecha+'T00:00:00'));
+    return {fecha:r.fecha, producto_id:r.producto_id, batches:r.batches, tipo:r.tipo,
+            semana_iso:iso, personas:_personasDe(iso), usuario:email||null}; });
   try{ const {error}=await c.from('plan_overrides').insert(payload);
     if(error) alert('No se pudo guardar el cambio del plan: '+error.message); }
   catch(e){ alert('No se pudo guardar el cambio del plan: '+(e&&e.message||e)); }
