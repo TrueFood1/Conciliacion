@@ -12,13 +12,13 @@ línea es barrer para adentro; dejarlo mintiendo tres meses también.
 
 ## Abiertos
 
-- **`ESPEC_MODULO_ENTREGAS.md` §8 — el color del módulo.** Dice que Entregas es
-  el morado `#7F77DD`. Quedó viejo el **13-ago-2026**: Entregas es lima
-  `#E9FE60`, y el morado hoy es color de **producto** (Buns) en las tablas. Son
-  dos paletas distintas, así que la línea vieja no solo está desactualizada:
-  manda al lugar equivocado. Detectado el 15-ago-2026.
-  Fuente de verdad: `CLAUDE.md`, "Estándar visual".
+_(nada abierto)_
 
 ## Cerrados
 
-_(nada todavía)_
+- ~~**`ESPEC_MODULO_ENTREGAS.md` §8 — el color del módulo.**~~ Decía que
+  Entregas era el morado `#7F77DD`; quedó viejo el **13-ago-2026** (Entregas es
+  lima `#E9FE60`, y el morado hoy es color de **producto** — Buns — en las
+  tablas). Detectado el 15-ago. **Corregido el 16-ago-2026**, según la regla:
+  se tocó ese documento por otra razón (registrar el flujo real en §0) y se
+  arregló de paso.

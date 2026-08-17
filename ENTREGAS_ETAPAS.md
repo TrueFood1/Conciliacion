@@ -1,12 +1,44 @@
 # ENTREGAS · PREPARAR y ENTREGAR como dos etapas
 
-> **Estado: DISEÑO APROBADO POR ANDREA, SIN CONSTRUIR.** 15-ago-2026.
+> **Estado: CONSTRUIDO el 16-ago-2026 (`b20`), en `dev`.** El SQL es
+> [`ENTREGAS_ETAPAS.sql`](ENTREGAS_ETAPAS.sql) — **hay que pegarlo en Supabase
+> ANTES de publicar el build**: el código escribe en `ent_salida` y sin la tabla
+> el botón "Preparar y entregar" falla a mitad de la cadena.
 >
-> ⛔ **NO va antes del lunes 17.** El lunes corre lo que ya está probado (`b19`).
-> Esto se construye el **lunes por la tarde o el martes**, con lo que se vea el
-> lunes ya sabido. El pegado de SQL (`ENTREGAS_ETAPAS.sql`) **todavía no existe a
-> propósito**: escribirlo hoy lo congelaría antes de la única corrida real que
-> puede corregirlo.
+> Andrea revisó el módulo con el flujo real en la mano y el resultado fue un
+> **rediseño completo**, no solo las dos etapas. Lo que cambió respecto de este
+> documento está marcado abajo en **§9 (la pantalla)**; el resto —los tres
+> estados, el esquema, el saldo, la anulación— quedó tal cual se había aprobado.
+> El flujo real, que es el norte, quedó registrado abajo en **§0**.
+>
+> Se adelantó al domingo 16 (estaba previsto para el lunes por la tarde) por
+> decisión de Andrea. Consecuencia asumida: **§11 no se pudo mirar antes de
+> construir** — la mezcla real de pedidos de dos etapas vs simultáneos sigue sin
+> medir, y el botón primario se eligió por el razonamiento de §4.1, no por dato.
+
+---
+
+## 0 · EL FLUJO REAL — el norte
+
+*Dictado por Andrea el 16-ago-2026 con la operación en la mano. Es la referencia
+contra la que se mide cualquier cambio al módulo: si una pantalla no cae en uno
+de estos diez pasos, sobra; si un paso no tiene pantalla, falta.*
+
+1. **Andrea o Lorena reciben pedidos** por WhatsApp o correo.
+2. **Preparan el pedido de venta y confirman la factura** en Odoo.
+3. **Llega a Truefie.**
+4. **Daniel (o las socias) entra a la bandeja "Resumen".**
+5. Ahí están separados por **POR PREPARAR / PREPARADO**.
+6. **Daniel abre el pedido y asigna lote a cada producto.**
+7. **Confirma preparado** → pasa a la lista de pendientes por entregar.
+8. **Cuando entrega, confirma la entrega.**
+9. **Se guarda con fecha y hora de preparación Y de entrega**, en el formato del
+   Excel **AB-RE-04**. Ese detalle **se ve solo si se pide**.
+10. **En Buscar:** por cliente, por lote, por producto, por fecha.
+
+> Vive acá y no en `ESPEC_MODULO_ENTREGAS.md` **a propósito**: la ESPEC está en
+> `.gitignore` (insumo interno) y el norte del módulo no puede vivir en un
+> archivo que el repo no guarda.
 
 ---
 
@@ -186,44 +218,96 @@ fecha de vencimiento, no tiene el colapso "y N más", y pinta el contador de ám
 por existir y no por urgir). Decidir al construir: si esta la reemplaza, el
 pendiente 12 se cierra por sustitución en vez de por corrección.
 
-## 9 · La pantalla
+## 9 · La pantalla — REDISEÑADA el 16-ago (esto reemplaza lo que decía acá)
 
-**Al confirmar los lotes, dos botones** en lugar de uno:
+Lo de abajo es lo que se construyó. Donde difiere de lo aprobado el 15-ago se
+dice por qué.
 
-- **Preparar** — *primario*. Inserta la cadena de alisto. El pedido pasa a
-  "Preparados".
-- **Preparar y entregar** — *secundario*. Inserta la cadena **y** la salida.
+### 9.1 · Pantalla 1 — "Resumen" (la bandeja)
 
-**La bandeja pasa a cuatro secciones, con "Preparados" ARRIBA de todo:**
+**DOS secciones vivas, cada una con su contador:**
 
 ```
-Preparados                  ← armado, esperando el camión
-Hoy
-Días anteriores
-Anteriores sin despachar
+POR PREPARAR        n     ← facturas de Odoo sin pedido
+  · · ·
+  Anteriores sin despachar   n     (subgrupo demotado, no compite)
+PREPARADO           n     ← armado, esperando el camión
+  · · ·
+Entregados hoy · n        ← una línea al pie, lleva al historial
 ```
 
-Arriba porque es la lista más corta y la única con algo que hacer *ahora mismo*.
+**Cambios respecto de lo aprobado el 15-ago, y por qué:**
 
-**La tarjeta de un preparado** muestra cliente y hora (`preparado 6:42`), y **el
-segundo toque marca la salida sin abrir pantalla** — tocar la tarjeta la
-despacha. Abrirla para revisar lotes o corregir es un gesto aparte.
+- **Dos secciones, no cuatro, y POR PREPARAR va PRIMERO.** El 15-ago se había
+  decidido "Preparados arriba de todo" porque es la lista más corta. Con el
+  flujo real en la mano gana el orden del día: a las 6:30 se prepara y a las
+  7:30 se saca. Las separaciones "Hoy / Días anteriores" se fueron: **cada
+  tarjeta ya trae su día** (`hoy`, `ayer`, `vie 15`), así que el rótulo era el
+  mismo dato dos veces. "Anteriores sin despachar" **se queda**, porque su
+  trabajo no es agrupar sino DEMOTAR.
+- **Los entregados no ocupan espacio:** una línea al pie, no una tercera lista.
+- **La tarjeta de preparado NO se despacha al tocarla.** Se había aprobado
+  "el segundo toque marca la salida". Andrea lo cambió al revisarlo: la tarjeta
+  lleva un **botón Entregar** y **pide confirmación**. Un toque accidental no
+  puede marcar una salida — y como una hora de salida falsa **no la ve nadie
+  después**, el costo de equivocarse es invisible, que es el peor tipo.
+- La tarjeta muestra cliente y **`preparado 6:22`**; en ámbar desde
+  `preparado ayer 6:42` (regla 5 del lobby: ámbar solo lo que urge).
 
-Estilo: sin explicaciones en pantalla (el rótulo de sección es `Preparados` a
-secas). Lima `#E9FE60` como acento; el ámbar sigue siendo el que avisa.
+### 9.2 · Pantalla 2 — Preparar el pedido
 
-## 10 · Checklist de construcción (lunes tarde / martes)
+- **Productos en grilla de DOS COLUMNAS, también en móvil.** El pedido entero
+  entra en una pantalla y se ve de un vistazo qué falta. **Medido en el
+  navegador, no supuesto:** a 390px cada tarjeta queda en **175px**, el selector
+  en **152px** y `224 / 2-27` mide **78px** sobre 117px disponibles — entra
+  completo, y también entraría un juliano de 4 dígitos (90px).
+- **Borde izquierdo = estado:** lima = tiene lote · gris = falta.
+- **El caso normal es una línea:** un solo selector, **sin campo de cantidad**
+  (la cantidad es la de la factura y está arriba, editable al tocarla).
+- **La tarjeta con lote partido ocupa el ancho completo.** Necesita selector +
+  cantidad + quitar por fila, y eso no cabe en media pantalla.
+- **`+ partir` → `+ otro lote`**: dice lo que hace, no la mecánica interna.
+- **Se puede QUITAR una línea agregada por error** (× en cada fila del reparto).
+  Era un **bug reportado por Andrea**: se agregaba un lote de más y la única
+  salida era abandonar el pedido y volver a elegir todo. Al bajar a un solo lote
+  la tarjeta **vuelve sola al caso simple** — un lote no es un reparto.
+- Al partir aparecen las cantidades por lote y el contador (`6 de 6`).
+- **Dos botones al pie, apilados:** `Preparar` (primario) y
+  `Preparar y entregar` (secundario). Apilados y no lado a lado: el secundario
+  al lado del primario compite, y el volumen grande es de dos etapas.
 
-1. Escribir `ENTREGAS_ETAPAS.sql` con §5.1 a §5.5, re-ejecutable
-   (`if not exists` / `or replace`), y que Andrea lo pegue y verifique.
-2. `_despEst` / `despConfirmar()` → dos caminos; el de "preparar" corta antes de
+### 9.3 · Pantalla 3 — Buscar
+
+**UN solo campo**, y al lado se elige por qué se busca: **cliente · lote ·
+producto · fecha**. No cuatro campos, que obligan a decidir antes de escribir y
+dejan tres huecos inertes en pantalla. Búsqueda sin tildes y sin mayúsculas.
+
+La lista responde *cuándo y a quién*; **el AB-RE-04 se arma solo al abrir una
+fila**. Tope de 60 filas dibujadas, y lo que queda afuera **se dice** (`y N más
+— afiná la búsqueda`): un corte callado se lee como "esto es todo".
+
+Estilo: sin explicaciones en pantalla. Lima `#E9FE60` como acento; el ámbar
+sigue siendo el que avisa.
+
+## 10 · Checklist de construcción — estado al 16-ago
+
+1. ✅ `ENTREGAS_ETAPAS.sql` escrito con §5.1 a §5.5, re-ejecutable. **Falta que
+   Andrea lo pegue y verifique.**
+2. ✅ `despConfirmar(entregar)` → dos caminos; el de "preparar" corta antes de
    `ent_salida`.
-3. Sección "Preparados" en la bandeja, alimentada por `v_ent_pedido_estado`
-   (sin Odoo — se dibuja antes que el resto).
-4. "Deshacer preparación" contra `ent_anulacion`.
-5. AB-RE-04: la fecha sale de `ent_salida.salida_en` con fallback.
-6. Renombre de la vista + alias, y borrar el alias el build siguiente.
-7. `python3 loadcheck.py` antes de publicar. Subir `BUILD`.
+3. ✅ Sección "Preparado" alimentada por `v_ent_pedido_estado` (sin Odoo — se
+   dibuja antes que el resto).
+4. ❌ **"Deshacer preparación" NO se construyó.** `ent_anulacion` existe y
+   funciona en la base, pero **no hay botón**. Queda pendiente: hasta que exista,
+   un pedido devuelto al congelador sigue dejando el saldo mal (§7b).
+5. ✅ AB-RE-04: la fecha sale de `ent_salida.salida_en` con fallback
+   (`v_ent_pedido_estado.fecha_ab_re_04`).
+6. ✅ Renombre de la vista + alias vivo. **Borrar el alias el build siguiente:**
+   `drop view if exists ent_entregado_desde_ancla;`
+7. ✅ `python3 loadcheck.py` pasa. `BUILD` subido a `b20`.
+8. ✅ Registro manual (Reporte de despacho) inserta también la salida — si no,
+   quedaría en "Preparado" para siempre. La FECHA es la elegida; la HORA se pone
+   a mediodía y la nota dice que **no es medida**.
 
 ## 11 · Lo que hay que MIRAR el lunes antes de construir esto
 
