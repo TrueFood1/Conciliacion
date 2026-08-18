@@ -2109,6 +2109,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   display:flex;align-items:center;gap:6px}
 #vResumen .rz-dp{font-size:13px;font-weight:600;color:var(--text);margin-top:6px;line-height:1.25}
 #vResumen .rz-db{font-size:11px;color:var(--text-2);margin-top:2px}
+/* Desacuerdo con lo que Odoo registró ese día. Ámbar porque avisa, y compacto porque es un dato
+   de contraste, no el número principal de la celda. */
+#vResumen .rz-dodoo{font-size:10px;color:#C99A4E;margin-top:3px;line-height:1.3}
 #vResumen .rz-gnote{font-size:10px;color:#C99A4E;margin-top:3px}
 #vResumen .rz-ds{margin-top:auto;font-size:11px;font-weight:600;padding-top:8px}
 #vResumen .rz-dsm{display:none}   /* estado en una palabra: solo teléfono (ver @media 700px) */
@@ -2990,7 +2993,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 17 ago 2026 · b25';
+const BUILD = 'v 17 ago 2026 · b26';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -5895,7 +5898,10 @@ async function _rzSetup(){
   _rzEdit=null; _rzSel=null; _rzAviso='';
   _rzOverrides=await nivOverrides();          // ediciones futuras guardadas en Supabase
   // ÚLTIMAS producciones: plan del motor (sin real, sin override) de la semana vs Odoo real.
-  const planW0={}; rzCeldas(_rzCtx.mon0, weeks[0], {}, _rzCtx.hoyStr, {}).forEach(function(cc){ if(cc.prods&&Object.keys(cc.prods).length) planW0[cc.ds]=cc.prods; });
+  // Con overrides: lo que se compara contra Odoo es el registro tal como quedó —plan del motor
+  // MÁS las correcciones de Andrea—, que es el desacuerdo que importa. Sin ellos la tarjeta
+  // seguía marcando "Odoo ≠ plan" contra una propuesta que ella ya había corregido.
+  const planW0={}; rzCeldas(_rzCtx.mon0, weeks[0], {}, _rzCtx.hoyStr, _rzOverrides).forEach(function(cc){ if(cc.prods&&Object.keys(cc.prods).length) planW0[cc.ds]=cc.prods; });
   _rzUltimas=nivUltimas(planW0, real.byDate, _rzCtx.hoyStr);
   await rzRecalcAlistar();                     // alistar + compras (usa _rzCtx)
 }
@@ -8618,9 +8624,13 @@ async function nivOverrides(){
   try{
     const {data,error}=await c.from('plan_overrides').select('fecha,producto_id,batches,tipo,personas,creado_en').order('creado_en',{ascending:false});
     if(error||!data) return {};
-    const hoyStr=_ymd(new Date()), seen={}, ov={};
+    // Se leen también los días PASADOS de la semana de producción en curso: son correcciones de
+    // REGISTRO (el plan decía 6 Francés y en planta se hizo limpieza). Antes se descartaban acá y
+    // la corrección se perdía al recargar. El tope es el lunes de esta semana: más atrás no hay
+    // pantalla donde verlos y Odoo ya es la verdad — no tiene sentido arrastrarlos para siempre.
+    const desdeStr=_ymd(_mondayProd(new Date())), seen={}, ov={};
     for(const r of data){ const f=r.fecha; if(!f||seen[f])continue; seen[f]=1;
-      if(f<hoyStr) continue;                    // el pasado lo dicta Odoo, no un override
+      if(f<desdeStr) continue;
       if(r.tipo==='anulacion') continue;        // la última fila es "volver al plan" → sin override
       ov[f]={producto_id:r.producto_id, batches:r.batches, tipo:r.tipo, personas:(r.personas!=null?+r.personas:null)}; }
     return ov;
@@ -8683,6 +8693,13 @@ function _rzConfirmBar(iso){
 // ── Celdas de UNA semana con overrides + metadatos de interacción (Resumen editable) ──
 // ÚNICA función de colocación en celdas lun–vie (Resumen Y Plan): ds, editable, nav, swappable,
 // edited y prods={pid:batches} (para recalcular MP/premezclas). El Plan la reusa con sus overrides.
+// ¿Dos mapas de batches dicen lo mismo? (mismos productos, mismas cantidades redondeadas)
+function _mismosBatches(a, b){
+  a=a||{}; b=b||{}; const ks={};
+  Object.keys(a).forEach(function(k){ if(a[k]>0) ks[+k]=1; });
+  Object.keys(b).forEach(function(k){ if(b[k]>0) ks[+k]=1; });
+  return Object.keys(ks).every(function(k){ return Math.round(a[k]||0)===Math.round(b[k]||0); });
+}
 function rzCeldas(monday, layout, real, hoyStr, overrides){
   const days=_weekDays(monday);
   const otros=(layout.otros||[]).slice(), semB=layout.semillas||0, v=layout.viernes||{};
@@ -8701,8 +8718,26 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
     const ds=day.ds, realDay=(real&&real[ds])||null, past=ds<hoyStr, fut=ds>=hoyStr;
     const ov=overrides&&overrides[ds];
     const c={dow:day.dow, dnum:day.dnum, ds:ds, prods:{}};
-    if(realDay){ c.kind='real'; c.editable=false; c.nav=true;
-      c.prod=Object.keys(realDay).map(function(pp){return _rzBP(Math.round(realDay[pp]/NIV_INFO[+pp].rend), +pp);}).join(' + '); return c; }
+    // Lo que Odoo REGISTRÓ ese día, en batches. Es la verdad de lo que se produjo (regla madre) y
+    // acá se usa para dos cosas: pintar el día pasado sin corregir, y delatar el desacuerdo cuando
+    // la corrección de Andrea dice otra cosa.
+    const realB={}; if(realDay) for(const pp in realDay) realB[+pp]=Math.round(realDay[pp]/NIV_INFO[+pp].rend);
+    const odooTxt=realDay?Object.keys(realB).map(function(k){ return _rzBP(realB[k], +k); }).join(' + '):'';
+    // DÍA PASADO CORREGIDO A MANO. Va antes que el registro de Odoo porque es lo que Andrea afirma
+    // que pasó; Odoo no se toca ni se contradice en silencio: si discrepan, se dice en la celda.
+    if(ov && past){
+      c.kind=ov.producto_id==null||!(ov.batches>0)?'edit-empty':'edit';
+      c.editable=true; c.edited=true; c.swappable=false; c.nav=!!realDay; c.pasado=true;
+      if(c.kind==='edit'){ const tope=_capDe(ov.producto_id, pers), bt=Math.min(ov.batches, tope);
+        c.pid=ov.producto_id; c.batches=bt; c.prods[ov.producto_id]=bt; c.prod=_rzBP(bt, ov.producto_id); }
+      else { c.prod=i===4?'Limpieza':'—'; }
+      if(!_mismosBatches(c.prods, realB)) c.odoo=realDay?('Odoo: '+odooTxt):'Odoo: sin registro';
+      c.bt=''; return c;
+    }
+    // El día pasado que Odoo registró se pinta con lo real, y AHORA es editable: es la única forma
+    // de corregir el registro cuando la producción de planta no fue la del plan.
+    if(realDay){ c.kind='real'; c.editable=true; c.nav=true; c.pasado=true;
+      c.prod=odooTxt; return c; }
     if(i<4 && slot[i] && slot[i].feriado){ c.kind='feriado'; c.editable=false; c.prod='Feriado'; c.bt=slot[i].feriado; return c; }
     if(ov && fut){ c.editable=true; c.edited=true; c.swappable=true;
       if(ov.producto_id==null || !(ov.batches>0)){ c.kind='edit-empty';
@@ -8728,7 +8763,7 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
       c.prod=_rzBP(bt, ov.producto_id); c.bt=''; return c; }
     if(i<4){
       const e=slot[i];
-      if(e&&e.p){ c.kind=fut?'prop':(past?'pend':'prop'); c.editable=fut; c.swappable=fut; c.pid=e.p; c.batches=e.batches; c.prods[e.p]=e.batches; c.prod=_rzBP(e.batches, e.p); c.bt=''; c.today=ds===hoyStr; return c; }
+      if(e&&e.p){ c.kind=fut?'prop':(past?'pend':'prop'); c.editable=true; c.swappable=fut; if(past) c.pasado=true; c.pid=e.p; c.batches=e.batches; c.prods[e.p]=e.batches; c.prod=_rzBP(e.batches, e.p); c.bt=''; c.today=ds===hoyStr; return c; }
       c.kind='libre'; c.editable=fut; c.swappable=fut; c.prod='—'; c.bt=''; return c;
     }
     // VIERNES: picado (si Semillas jueves) + UN pan/galletas + corridos por feriado; la
@@ -8753,7 +8788,12 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
   });
 }
 // Suma prods de las celdas de producción de la semana (editables o auto-relleno).
-function _rzFutBatches(cells){ const b={}; cells.forEach(function(c){ if(!c.editable && !c.auto)return; const pr=c.prods||{}; for(const k in pr) b[+k]=(b[+k]||0)+pr[k]; }); return b; }
+// Los días PASADOS quedan afuera aunque ahora sean editables: su producción ya la cuenta
+// _rzHechoOAsumido. Antes bastaba con `editable` para separarlos —el pasado no lo era—; desde que
+// se corrige el registro hay que decirlo explícito o el día se suma dos veces a la meta.
+function _rzFutBatches(cells){ const hoy=(_rzCtx&&_rzCtx.hoyStr)||'';
+  const b={}; cells.forEach(function(c){ if(c.ds<hoy) return; if(!c.editable && !c.auto)return;
+    const pr=c.prods||{}; for(const k in pr) b[+k]=(b[+k]||0)+pr[k]; }); return b; }
 // Batches YA producidos esta semana según Odoo (real.byDate, días pasados) → en batches por producto.
 // Odoo manda sobre los días pasados: lo ya registrado cuenta contra la meta y NO se re-planifica.
 function _rzRealBatches(){ const b={}, bd=(_rzCtx&&_rzCtx.real&&_rzCtx.real.byDate)||{};
@@ -8790,8 +8830,14 @@ function _rzMetaEfectiva(offset){
 // creía que no se hicieron y metía días de más). La alerta avisa para que Keylor los registre;
 // cuando registre, manda lo real y el motor reajusta solo.
 // Usa _rzCells (base cruda) a propósito: _rzCellsBase llamaría a _creditRealIntoBase → recursión.
-function _rzAsumido(){ const b={};
-  _rzCells(0).forEach(function(c){ if(c.ds>=_rzCtx.hoyStr || c.kind!=='pend') return;
+// ASUMIDO = lo que se da por producido en un día pasado SIN registro en Odoo: el plan ('pend') o
+// la corrección de Andrea ('edit'). Si Odoo SÍ tiene registro ese día, no entra acá — lo cuenta
+// _rzRealBatches y Odoo es la verdad de lo que se produjo, incluso si la corrección dice otra cosa
+// (ese desacuerdo se MUESTRA en la celda, no se resuelve inventando un número).
+function _rzAsumido(){ const b={}, bd=(_rzCtx&&_rzCtx.real&&_rzCtx.real.byDate)||{};
+  _rzCells(0).forEach(function(c){ if(c.ds>=_rzCtx.hoyStr) return;
+    if(bd[c.ds] && Object.keys(bd[c.ds]).length) return;        // Odoo manda
+    if(c.kind!=='pend' && c.kind!=='edit') return;
     const pr=c.prods||{}; for(const k in pr) b[+k]=(b[+k]||0)+pr[k]; });
   return b; }
 // Real + asumido = lo que la semana ya dio por producido (contra la meta).
@@ -9080,10 +9126,11 @@ function _rzAlertaHtml(){
   return '<div class="rz-alert">'+_SVG_ALERT+'<span>'+txt+'</span></div>';
 }
 function rzStripHtml(){
-  // "Volver al plan" es la única señal de que el plan fue modificado, y solo aparece si hay algo
-  // que revertir. Mira las DOS semanas aunque la próxima esté colapsada: el botón descarta todos
-  // los overrides futuros, no solo los que se ven.
-  const edited=_rzCellsFull(0).concat(_rzCellsFull(1)).some(function(c){ return c.edited; });
+  // "Volver al plan" descarta los overrides FUTUROS y NO toca las correcciones de días pasados:
+  // esas son registro de lo que ocurrió, no una preferencia de plan, y perderlas al reacomodar la
+  // semana sería destruir información. Por eso la condición cuenta solo lo futuro — con `c.edited`
+  // a secas el botón aparecía por una corrección del pasado y al tocarlo no hacía nada.
+  const edited=Object.keys(_rzOverrides||{}).some(function(ds){ return ds>=_rzCtx.hoyStr; });
   const right=edited?('<span class="rz-shr">'
     +'<button class="rz-revert" onclick="rzVolverPlanStrip()">Volver al plan</button></span>'):'';
   const head='<div class="rz-sh"><span class="rz-st">Pendiente de fabricar</span>'
@@ -9226,6 +9273,9 @@ function rzCellHtml(cell){
   // El chip solo aparece si la restricción muerde — el texto lo decide _aplicarPicado.
   const pic=cell.picadoChip?('<div class="rz-picchip">'+esc(cell.picadoChip)+'</div>'):'';
   const db=cell.bt?('<div class="rz-db">'+esc(cell.bt)+'</div>'):'';
+  // Desacuerdo con Odoo en un día corregido: se DICE, no se bloquea. Odoo sigue siendo la verdad
+  // de lo que se produjo; la corrección es lo que Andrea afirma. Ver los dos es la información.
+  const od=cell.odoo?('<div class="rz-dodoo">'+esc(cell.odoo)+'</div>'):'';
   const sel=_rzSel===ds;
   const estado=(cell.auto&&cell.kind==='viernes'?'Para cumplir la meta':m[1])+(sel?' · seleccionado':'');
   // En teléfono el estado va en UNA palabra minúscula. Se emiten los dos textos y el CSS
@@ -9239,10 +9289,11 @@ function rzCellHtml(cell){
   const pen=cell.editable?('<span class="rz-pen" title="Editar este día"'
     +' onclick="event.stopPropagation();rzOpenEdit(\''+ds+'\')">'+_SVG_PENCIL+'</span>'):'';
   // Toda celda responde al toque — las no editables para decir POR QUÉ no se pueden intercambiar.
-  const tip=cell.editable?(sel?'Tocá otro día para intercambiar, o este mismo para cancelar':'Tocá para seleccionar e intercambiar')
-                         :(cell.nav?'Ver esta producción en Odoo':'');
+  const tip=cell.pasado?(cell.nav?'Tocá para ver esta producción en Odoo · el lápiz corrige el registro':'El lápiz corrige el registro de este día')
+    :cell.editable?(sel?'Tocá otro día para intercambiar, o este mismo para cancelar':'Tocá para seleccionar e intercambiar')
+    :(cell.nav?'Ver esta producción en Odoo':'');
   return '<div class="rz-day '+cls+(cell.nav?' rz-nav':'')+'" data-ds="'+ds+'"'
-    +(tip?(' title="'+tip+'"'):'')+' onclick="rzTapDia(\''+ds+'\')">'+pen+dd+dp+pic+db+st+'</div>';
+    +(tip?(' title="'+tip+'"'):'')+' onclick="rzTapDia(\''+ds+'\')">'+pen+dd+dp+pic+od+db+st+'</div>';
 }
 function rzFormHtml(cell){
   const opts=NIV_PROD.map(p=>'<option value="'+p+'"'+(cell.pid===p?' selected':'')+'>'+esc(NIV_INFO[p].nom)+'</option>').join('');
