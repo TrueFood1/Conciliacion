@@ -2995,7 +2995,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 17 ago 2026 · b27';
+const BUILD = 'v 18 ago 2026 · b28';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -6573,8 +6573,13 @@ function _entAgrupar(crudo, anioSet){
   crudo.forEach(function(o){
     const r=_entParseLote(o.cmts, o.py, o.pj, anioSet, o.producto);
     const rec={orden:o.orden, ordenId:o.ordenId, producto:o.producto, fecha:o.fecha, uds:o.uds, dfUtc:o.dfUtc, r:r};
-    if(r.estado==='ok'){ const k=r.lote.key;
-      const L=lotes[k]=lotes[k]||{key:k, canon:r.lote.canon, producto:o.producto, prodYear:o.py, ddd:r.lote.ddd, ordenes:[]};
+    if(r.estado==='ok'){ const k=o.producto+'-'+r.lote.key;
+      // LA CLAVE LLEVA EL PRODUCTO. Antes era solo añoProd-ddd, así que dos productos hechos el
+      // MISMO día compartían entrada y la entrada guardaba UN solo `producto` — el primero que
+      // llegara. El otro desaparecía del selector de su producto. Medido el 18-ago sobre 3 meses:
+      // dos lotes reales invisibles, Galletas 163/12-26 (tapado por Pizza) y Buns 168/12-26
+      // (tapado por Semillas). El orden FIFO sigue saliendo de `key`, que no cambia.
+      const L=lotes[k]=lotes[k]||{key:r.lote.key, canon:r.lote.canon, producto:o.producto, prodYear:o.py, ddd:r.lote.ddd, ordenes:[]};
       L.ordenes.push(rec); }
     else buckets[r.estado].push(rec);
   });
@@ -7458,10 +7463,19 @@ function _despLotesDe(pid){
   Object.values(_despLotes.lotes).forEach(function(L){
     if(+L.producto!==+pid) return;
     const k=pid+'|'+L.canon;
-    if(_despSaldo && (_despSaldo[k]||0)<=0) return;    // sin saldo: no se ofrece
-    out.push({lote:L.canon});
+    // NUNCA se esconde un lote. Antes esta línea lo sacaba de la lista cuando el saldo daba ≤ 0,
+    // que es lo contrario de lo que hace el Reporte —"agotados al fondo, en gris, NUNCA ocultos:
+    // el congelador físico manda sobre el sistema"—. Dos pantallas con la regla al revés sobre el
+    // mismo dato, y el resultado fue que Andrea tuvo que escribir un lote a mano el 18-ago.
+    // Va a importar más todavía: hoy nada se descuenta porque falta la vista de saldos, así que
+    // en cuanto empiece a descontarse habría desaparecido medio selector.
+    out.push({lote:L.canon, saldo:(_despSaldo?(_despSaldo[k]!=null?_despSaldo[k]:null):null)});
   });
-  out.sort(function(a,z){ return String(a.lote).localeCompare(String(z.lote),'es'); });
+  out.sort(function(a,z){
+    const aa=(a.saldo!=null&&a.saldo<=0)?1:0, zz=(z.saldo!=null&&z.saldo<=0)?1:0;
+    if(aa!==zz) return aa-zz;                                       // agotados al fondo
+    return String(a.lote).localeCompare(String(z.lote),'es');
+  });
   return out;
 }
 
@@ -7533,7 +7547,8 @@ function _despSel(i,j,lt,disp,cls){
   let h='<select class="dp-lsel '+cls+'" onchange="despSetLote('+i+','+j+',this.value)">'
     +'<option value="">Elegir lote</option>';
   disp.forEach(function(d){
-    h+='<option value="'+esc(d.lote)+'"'+(lt.lote===d.lote?' selected':'')+'>'+esc(d.lote)+'</option>';
+    const ago=(d.saldo!=null&&d.saldo<=0)?' — agotado según sistema':'';
+    h+='<option value="'+esc(d.lote)+'"'+(lt.lote===d.lote?' selected':'')+'>'+esc(d.lote+ago)+'</option>';
   });
   if(lt.lote && !disp.some(function(d){return d.lote===lt.lote;}))
     h+='<option value="'+esc(lt.lote)+'" selected>'+esc(lt.lote)+'</option>';
@@ -7616,13 +7631,33 @@ function despQuitarLote(i,j){
 function despSetLote(i,j,v){ const f=_despFacAbierta(); if(!f) return;
   const e=_despEst(f,i);
   if(v==='__'){ const t=prompt('Lote (forma "154 / 12-26"):',e.lotes[j].lote||'');
-    if(t==null){ despRender(); return; } v=String(t).trim(); }
+    if(t==null){ despRender(); return; } v=String(t).trim();
+    const L=f.lineas[i], m=v?_loteConocido(L.producto_id, v):'';
+    if(m && !confirm(m+'\n\n¿Lo dejo igual? Si el lote no existe, esa salida no se resta de ningún lote real.')){ despRender(); return; } }
   e.lotes[j].lote=v;
   if(!e.partido) e.lotes[0].cant=e.cant;
   despRender(); }
 function despMasLote(i){ const f=_despFacAbierta(); if(!f) return;
   _despEst(f,i).lotes.push({lote:'',cant:null}); despRender(); }
 function _despFacAbierta(){ return (_despFac||[]).find(function(x){ return x.factura_id===_despAbierto; }); }
+
+// ¿Este lote escrito a mano existe de verdad? Un lote inventado no es un registro sin efecto:
+// las unidades salen del congelador contra una clave `producto|lote` que no le corresponde a
+// ninguna orden de Odoo, así que el lote REAL conserva su saldo completo para siempre y la
+// disponibilidad queda inflada. Pasó el 18-ago: se escribió "183 - 12/26" y el lote real era
+// "183 / 1-27". No se bloquea —el congelador físico manda sobre el sistema— pero se avisa, y el
+// aviso ofrece el lote parecido, que en ese caso era el correcto con otro vencimiento.
+function _loteConocido(pid, canon){
+  const ls=(_despLotes&&_despLotes.lotes)?Object.values(_despLotes.lotes).filter(function(L){ return +L.producto===+pid; }):[];
+  if(ls.some(function(L){ return L.canon===canon; })) return '';
+  if(!ls.length) return 'No hay lotes de este producto leídos de Odoo, así que no puedo verificarlo.';
+  // Mismo día juliano y distinto vencimiento = casi seguro el mismo lote, mal transcrito.
+  const ddd=(String(canon).match(/\d{1,3}/)||[])[0];
+  const casi=ddd?ls.filter(function(L){ return String(L.ddd)===String(+ddd); }).map(function(L){ return L.canon; }):[];
+  return casi.length
+    ? ('Ese lote no existe en Odoo. Con el día '+(+ddd)+' hay: '+casi.join(' · ')+'.')
+    : ('Ese lote no existe en Odoo para este producto. Los que hay: '+ls.map(function(L){return L.canon;}).join(' · ')+'.');
+}
 
 // ── CONFIRMAR · DOS CAMINOS ─────────────────────────────────────────────
 // PREPARAR corta antes de la salida; PREPARAR Y ENTREGAR escribe las dos cosas.
