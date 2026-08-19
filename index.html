@@ -2663,7 +2663,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* Rótulo = etiqueta, no titular: sin mayúsculas, tracking corto, peso 500. La jerarquía la
    hace el TONO (terciario rótulo → secundario apoyo → blanco hueso el dato), no el tamaño. */
 #vResumen .rz-c4h{font-size:11px;letter-spacing:.02em;color:var(--text-3);font-weight:500;margin-bottom:9px}
-#vResumen .rz-c4fecha{font-size:11px;font-weight:600;color:var(--accent);margin:-4px 0 9px}
+/* Texto de apoyo, no acento: gris secundario. En rosa y en 600 competia con el numero de la
+   tarjeta y ademas se repetia en las cuatro — el acento deja de señalar cuando esta en todas. */
+#vResumen .rz-c4fecha{font-size:11px;font-weight:500;color:var(--text-2);margin:-4px 0 9px}
 #vResumen .rz-c4fecha span{display:block;line-height:1.35}
 #vResumen .rz-c4line{font-size:13px;color:var(--text);line-height:1.5}
 #vResumen .rz-c4line.rz-ok{color:#7E8C5A}
@@ -2993,7 +2995,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 17 ago 2026 · b26';
+const BUILD = 'v 17 ago 2026 · b27';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -5599,6 +5601,10 @@ function _weekLayout(stock, ritmo, colDe, H, personas, rampa){
   return {otros, semillas, viernes:{prod}, personas, rampaOn:!!rOn};
 }
 function _semanaBatches(layout){
+  // Si la proyección ya calculó los batches EFECTIVOS de la semana (colocación + ediciones +
+  // picado), esos mandan: son los mismos que pinta el detalle del Plan. El camino de abajo es la
+  // propuesta cruda del motor, que es lo correcto cuando no hay celdas de por medio (nivLevel).
+  if(layout && layout.batches) return Object.assign({}, layout.batches);
   const b={}; (layout.otros||[]).forEach(d=>b[d.p]=(b[d.p]||0)+d.batches);
   if(layout.semillas) b[452]=(b[452]||0)+layout.semillas;
   const v=layout.viernes||{};
@@ -8619,16 +8625,20 @@ async function rzDiagCierre(body){
   }catch(e){ body.innerHTML='<div class="rz-err">No pude calcular la meta de cierre: '+esc(e&&e.message||e)+'</div>'; }
 }
 // ── Overrides guardados (Supabase plan_overrides; append-only, la fila más reciente por fecha manda) ──
+const OV_DIAS_ATRAS=120;   // ventana de lectura de plan_overrides hacia atrás (días corridos)
 async function nivOverrides(){
   const c=sbClient(); if(!c) return {};
   try{
     const {data,error}=await c.from('plan_overrides').select('fecha,producto_id,batches,tipo,personas,creado_en').order('creado_en',{ascending:false});
     if(error||!data) return {};
-    // Se leen también los días PASADOS de la semana de producción en curso: son correcciones de
-    // REGISTRO (el plan decía 6 Francés y en planta se hizo limpieza). Antes se descartaban acá y
-    // la corrección se perdía al recargar. El tope es el lunes de esta semana: más atrás no hay
-    // pantalla donde verlos y Odoo ya es la verdad — no tiene sentido arrastrarlos para siempre.
-    const desdeStr=_ymd(_mondayProd(new Date())), seen={}, ov={};
+    // Se leen también los días PASADOS: son correcciones de REGISTRO (el plan decía 6 Francés y
+    // en planta se hizo limpieza). El tope era el lunes de ESTA semana, y eso las hacía
+    // desaparecer al pasar de semana — no se borraban, dejaban de leerse. Ahora es una ventana
+    // fija de OV_DIAS_ATRAS días: no se mueve sola, no hay que mantenerla, y da margen de sobra
+    // sobre lo que cualquier pantalla llega a mostrar (el Resumen ve 2 semanas; el Plan, del mes
+    // en curso en adelante).
+    const desde=new Date(); desde.setDate(desde.getDate()-OV_DIAS_ATRAS);
+    const desdeStr=_ymd(desde), seen={}, ov={};
     for(const r of data){ const f=r.fecha; if(!f||seen[f])continue; seen[f]=1;
       if(f<desdeStr) continue;
       if(r.tipo==='anulacion') continue;        // la última fila es "volver al plan" → sin override
@@ -8658,7 +8668,7 @@ async function rzPersistPersonas(iso, n){
 function _rzRenivelar(){
   if(_rzCtx){ const lvl=nivLevel(_rzCtx.ritmo, _rzCtx.stock.finPlan||_rzCtx.stock.fin, _rzCtx.cfg); _rzCtx.weeks=lvl.weeks; _rzCtx.w0=lvl.w0; _rzRecalcAuto(); }
   if(_planInputs){ const sem=Math.max(0, Math.round((_mondayProd(new Date(2026,11,18))-_mondayProd(new Date()))/(7*86400000))+1);
-    _planProj=nivProyeccion(_planInputs.ritmo, _planInputs.fin, _planInputs.cfg, sem); }
+    _planProj=_planProyectar(_planInputs.ritmo, _planInputs.fin, _planInputs.cfg, sem); }
 }
 function _rzRepintar(){ if(_rzCtx && document.getElementById('rzBody')) rzRender(); if(_planProj.length && document.getElementById('planBody')) planRenderMeses(); }
 // Cambio MANUAL de personas: NO recalcula/guarda de una. Primero PREVISUALIZA y pide confirmar.
@@ -9793,12 +9803,13 @@ async function cargarPlanMeses(){
     // Semanas hasta el cierre duro (lun 14-dic, viernes 18-dic incluido). nivProyeccion vuelve a cortar por seguridad.
     const semDic=Math.max(0, Math.round((_mondayProd(new Date(2026,11,18))-_mondayProd(hoy))/(7*86400000))+1);
     _rzOverrides=await nivOverrides();     // ediciones ANTES de proyectar (MISMA fuente que el Resumen)
-    const hoyStr0=_ymd(hoy), hayEd=Object.keys(_rzOverrides).some(function(d){ return d>=hoyStr0; });
+    // Lo REAL de Odoo se carga ANTES de proyectar: la proyección lo necesita para los días pasados
+    // de la semana en curso (antes se cargaba después y la primera pasada iba a ciegas).
+    _planReal=await nivRealRango(hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-01', _ymd(hoy));
     // Plan RECALCULADO (no pegado): si hay ediciones guardadas, la proyección de carga las honra y ya queda
     // NIVELADA hacia la meta; si no, la proyección cruda del motor. Así al recargar el plan ya está nivelado
     // desde las ediciones (el aviso de "reacomodar" no reaparece), sin guardar ningún plan aparte.
-    _planProj = hayEd ? planProyeccionOv(_rzOverrides) : nivProyeccion(ritmo, stk.fin, cfg, semDic);
-    _planReal=await nivRealRango(hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-01', _ymd(hoy));
+    _planProj = _planProyectar(ritmo, stk.fin, cfg, semDic);
     if(_rzCtx) _rzRecalcAuto();             // si el Resumen ya corrió, refresca el auto-relleno de la meta
     st.classList.add('hidden');
     planRenderMeses();
@@ -10051,10 +10062,11 @@ function planColchonOv(overrides){
     if(Rr){ rampaOn=rampaOn||_rampaEstado(stock, ritmo, Rr.meta, Rr.k).on; Rr.on=rampaOn; }
     const pre={}; NIV_PROD.forEach(p=>pre[p]=stock[p]);
     const L=_weekLayout(stock, ritmo, colDe, H, pers, Rr);           // decide la semana con el stock de inicio (muta stock: se descarta)
-    const cells=_aplicarPicado(rzCeldas(mon, L, {}, hoyStr, overrides), pers);   // overrides + picado derivado (NO indexa: es simulación)
+    const cells=_aplicarPicado(rzCeldas(mon, L, _planReal||{}, hoyStr, overrides), pers);   // overrides + picado (NO indexa: es simulación)
     // (el recorte por dotación y el del picado ya vienen aplicados en las celdas: el colchón
     //  proyectado deja de contar producción que la gente de esa semana no puede hacer)
-    const prodB={}; cells.forEach(c=>{ const pr=c.prods||{}; for(const k in pr) prodB[+k]=(prodB[+k]||0)+pr[k]; });
+    // Los días pasados NO se suman al stock, por lo mismo que en planProyeccionOv: ya están en `fin`.
+    const prodB={}; cells.forEach(c=>{ if(c.ds<hoyStr) return; const pr=c.prods||{}; for(const k in pr) prodB[+k]=(prodB[+k]||0)+pr[k]; });
     NIV_PROD.forEach(p=>{ stock[p]=pre[p]+(prodB[p]||0)*NIV_INFO[p].rend-(ritmo[p]||0); });   // consumo = ritmo (fijo)
   }
   return escColchon(stock, R.M);
@@ -10062,13 +10074,15 @@ function planColchonOv(overrides){
 // Aviso discreto del impacto en el colchón de las ediciones futuras (solo si hay ediciones).
 function planColchonAviso(){
   if(!_planCierre || !_planInputs) return '';
-  const hoyStr=_ymd(new Date());
-  const futOv=Object.keys(_rzOverrides).filter(function(ds){ return ds>=hoyStr; });
-  if(!futOv.length) return '';
+  // Cuenta TODAS las ediciones, no solo las futuras: una corrección de un día pasado también
+  // mueve el colchón (la producción que no ocurrió no está), y la puerta vieja hacía que el aviso
+  // ni se calculara en ese caso.
+  const eds=Object.keys(_rzOverrides);
+  if(!eds.length) return '';
   const base=planColchonOv({}), ed=planColchonOv(_rzOverrides);
   if(!base || !ed) return '';
-  const nLimp=futOv.filter(function(ds){ const o=_rzOverrides[ds]; return !o.producto_id || !(o.batches>0); }).length;
-  const nProd=futOv.length-nLimp;
+  const nLimp=eds.filter(function(ds){ const o=_rzOverrides[ds]; return !o.producto_id || !(o.batches>0); }).length;
+  const nProd=eds.length-nLimp;
   const partes=[];
   if(nLimp) partes.push('<b>'+nLimp+'</b> '+(nLimp>1?'limpiezas':'limpieza'));
   if(nProd) partes.push('<b>'+nProd+'</b> '+(nProd>1?'cambios de producción':'cambio de producción'));
@@ -10086,6 +10100,12 @@ function planColchonAviso(){
 // honrando los overrides (ediciones de Andrea) y dejando que la rampa reacomode los días NO editados
 // hacia la meta. Devuelve los layouts por semana (misma forma que nivProyeccion) → reemplazan _planProj.
 // El re-nivelado es DETERMINISTA a partir de las ediciones (ya persistidas), no se guarda nada nuevo.
+// UNA sola puerta para elegir proyección. La condición cuenta CUALQUIER override, no solo los
+// futuros: con una corrección del pasado y nada más, la puerta vieja caía en la proyección cruda
+// y el panorama de meses ignoraba la corrección — que es justo el caso que la hace falta.
+function _planProyectar(ritmo, fin, cfg, nWeeks){
+  return Object.keys(_rzOverrides||{}).length ? planProyeccionOv(_rzOverrides) : nivProyeccion(ritmo, fin, cfg, nWeeks);
+}
 function planProyeccionOv(fixedOv){
   if(!_planInputs) return [];
   const cfg=_planInputs.cfg, ritmo=_planInputs.ritmo, fin=_planInputs.fin, hoyStr=_ymd(new Date());
@@ -10101,10 +10121,23 @@ function planProyeccionOv(fixedOv){
     if(R){ rampaOn=rampaOn||_rampaEstado(stock, ritmo, R.meta, R.k).on; R.on=rampaOn; }
     const pre={}; NIV_PROD.forEach(p=>pre[p]=stock[p]);
     const L=_weekLayout(stock, ritmo, colDe, H, pers, R);              // decide la semana (muta stock, se descarta)
-    out.push({monday:mon, otros:L.otros, semillas:L.semillas, viernes:L.viernes, personas:L.personas, rampa:L.rampaOn});
-    const cells=rzCeldas(mon, L, {}, hoyStr, fixedOv);                 // coloca honrando las ediciones fijas
-    const prodB={}; cells.forEach(c=>{ const pr=c.prods||{}; for(const k in pr) prodB[+k]=(prodB[+k]||0)+pr[k]; });
-    NIV_PROD.forEach(p=>{ stock[p]=pre[p]+(prodB[p]||0)*NIV_INFO[p].rend-(ritmo[p]||0); });   // stock = honra overrides → la rampa reacciona
+    // Celdas EFECTIVAS: colocación + lo REAL de Odoo en los días pasados + las ediciones + el
+    // picado. Es la misma verdad que pinta el detalle del Plan — antes esta función ya las
+    // calculaba para el stock, pero al `out` empujaba el layout CRUDO, así que las tarjetas de
+    // mes seguían mostrando la propuesta del motor y no lo que Andrea había corregido.
+    const cells=_aplicarPicado(rzCeldas(mon, L, _planReal||{}, hoyStr, fixedOv), pers);
+    // DOS sumas distintas, y la diferencia importa:
+    //  · mes  = TODOS los días. Es lo que la tarjeta del mes tiene que decir: lo ya producido más
+    //           lo que falta. Para los días pasados son lo real de Odoo o la corrección de Andrea.
+    //  · fut  = solo de HOY en adelante. Es lo único que puede SUMARSE al stock: `fin` es el
+    //           on-hand de Odoo de hoy y ya trae adentro lo que se produjo en los días pasados de
+    //           esta semana. Sumarlos otra vez inflaba el stock proyectado justo en la semana que
+    //           más se mira. De la semana 1 en adelante no hay días pasados y las dos coinciden.
+    const bMes={}, bFut={};
+    cells.forEach(function(c){ const pr=c.prods||{};
+      for(const k in pr){ bMes[+k]=(bMes[+k]||0)+pr[k]; if(c.ds>=hoyStr) bFut[+k]=(bFut[+k]||0)+pr[k]; } });
+    out.push({monday:mon, otros:L.otros, semillas:L.semillas, viernes:L.viernes, personas:L.personas, rampa:L.rampaOn, batches:bMes});
+    NIV_PROD.forEach(p=>{ stock[p]=pre[p]+(bFut[p]||0)*NIV_INFO[p].rend-(ritmo[p]||0); });   // stock = honra overrides → la rampa reacciona
   }
   return out;
 }
