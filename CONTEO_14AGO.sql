@@ -7,12 +7,31 @@
 -- es un segundo gesto, desde la pantalla, cuando Andrea lo dé por bueno.
 --
 -- ⚠️ REVISAR ANTES DE PEGAR:
---   1. `corte` está puesto a las 18:00 del 14-ago (hora CR). ES LA LÍNEA
---      DIVISORIA de todos los saldos por lote: todo lo fabricado y entregado
---      después de ese instante se cuenta contra esta foto. Si Daniel contó a
---      otra hora, cambialo.
+--   1. `corte` = 16:00 del 14-ago (hora CR). CORREGIDO el 18-ago: estaba en
+--      18:00, y Daniel contó a las 4 de la tarde. ES LA LÍNEA DIVISORIA de
+--      todos los saldos por lote: todo lo fabricado y entregado después de ese
+--      instante se cuenta contra esta foto. Dos horas de más metían dentro del
+--      ancla cualquier producción de esa tarde, y la habrían contado dos veces.
 --   2. La NOTA dice que Pizza SÍ cuadra. Ver la explicación abajo.
 --
+-- ⚠️⚠️ EL LOTE 183 DE PIZZA — CORREGIDO EL 18-AGO
+-- El papel del conteo traía `183 / 12-26`. Odoo dice `183 / 1-27`, y Odoo tiene
+-- razón: el chatter de WH/MO/01359 (producida el 2-jul-2026) lo escribió Keylor
+-- el mismo día de producción, 2-jul 22:51, y dice literal "183/01 27".
+--
+-- Además cuadra solo: el AA-MM del lote es el VENCIMIENTO, y la vida útil son 6
+-- meses. Producción 2-jul + 6 = enero 2027 → `1-27`. Los lotes vecinos lo
+-- confirman: 163 (producido el 12-jun) vence 12-26, y 190 (producido el 9-jul)
+-- vence 1-27. Un 183 venciendo en 12-26 sería el único fuera de la regla.
+--
+-- Lo que pasó es lo mismo que con el 223: una transcripción a mano equivocada,
+-- esta vez en la hoja del conteo y no en el chatter. Se corrige ACÁ porque acá
+-- está el error — Odoo no se toca.
+--
+-- CONSECUENCIA SI SE PEGABA SIN CORREGIR: se sembraban 4 cajas contra un lote
+-- que no existe, y el lote real `183 / 1-27` arrancaba en cero. Es exactamente
+-- el agujero por el que Andrea terminó escribiendo un lote a mano el 18-ago.
+
 -- ⚠️⚠️ EL LOTE 223 DE PAN BLANCO — LEER ANTES DE PEGAR
 -- El conteo trae `223 / 2-27` con 20 cajas + 1 unidad, que es lo que hay en el
 -- congelador. Pero **Odoo no conoce el 223**: la orden WH/MO/01408 (arrancó el
@@ -63,7 +82,7 @@
 
 with c as (
   insert into ent_conteo (fecha, corte, responsable, nota, creado_por)
-  values ('2026-08-14', '2026-08-14 18:00:00-06', 'Daniel',
+  values ('2026-08-14', '2026-08-14 16:00:00-06', 'Daniel',
           'Transcrito del conteo manual de Daniel del 14-ago. Pizza VERIFICADA: el '
           'detalle suma 251 paquetes (39 cj × 6 + 17 sueltas), igual que Odoo. El '
           '"39 CJ y 13 Uds" del resumen dejaba fuera las 4 sueltas del renglón '
@@ -103,7 +122,7 @@ select c.id, v.producto_id, v.lote, v.cajas, v.sueltas, v.uds from c, (values
   -- Pizza Crust: 39 cajas + 17 paq = 502 u
   (472, '211 / 1-27', 19, 4, 236),
   (472, '190 / 1-27', 16, 0, 192),
-  (472, '183 / 12-26', 4, 0, 48),
+  (472, '183 / 1-27',  4, 0, 48),   -- CORREGIDO: el papel decía 12-26 (ver nota abajo)
   (472, '120 / 10-26', 0, 4, 8),
   (472, '146 / 11-26', 0, 3, 6),
   (472, '163 / 12-26', 0, 3, 6),
