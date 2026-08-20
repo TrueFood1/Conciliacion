@@ -99,7 +99,27 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
     O sea: la de Semillas **nunca estuvo doble** con ninguno de los dos campos, y
     la de Galletas queda doble con **los dos** — 160 u que ya están dentro de la
     foto y que el saldo vuelve a sumar. **Cambiar a `date_start` NO arregla este
-    caso**; lo que lo arregla es el próximo conteo, que reancla en cero.
+    caso.**
+- ⚠️ **EL CORTE DEL CONTEO ES CONTRA EL PRODUCTO FÍSICO, NO CONTRA EL REGISTRO EN
+  ODOO.** Es la regla que generaliza el caso de arriba, y va a volver a pasar.
+  Keylor registra la orden cuando la producción **termina**, así que una tanda que
+  Daniel ya contó puede quedar registrada minutos u horas **después** del corte.
+  El saldo la suma como producción nueva cuando ya está dentro de la foto: el lote
+  queda inflado, **en silencio**, porque los números cierran solos y nada avisa.
+  Pasa cada vez que se cuente cerca de una hora de cierre de producción — el
+  14-ago el conteo cerró a las 16:00 y la orden entró a las 16:06.
+  **No se arregla mirando el campo de fecha: los dos campos caen del mismo lado.**
+  Se arregla con `ENT_MO_EXCLUIDAS` (`index.html`), la lista de órdenes que NO
+  suman al saldo, hermana de `COSTOS_LINEAS_EXCLUIDAS`: id de la orden, razón
+  escrita y huella completa (nombre, producto, lote, uds, `date_start`) que
+  `verificarExclusionesMO()` confirma contra Odoo. Si la huella no calza, la
+  exclusión **no se aplica** — mejor un lote inflado y visible que una resta
+  silenciosa contra la orden equivocada.
+  ⚠️ **La exclusión se aplica SOLO en la suma del saldo (`rpCalcSaldos`), nunca en
+  `entLeerCrudo` ni en `_entAgrupar`.** Medido el 20-ago: `WH/MO/01411` es la
+  **única** orden del lote `226 / 2-27`, así que filtrarla antes lo haría
+  desaparecer del selector — y con el bloqueo duro de Despachos eso es no poder
+  despachar producto que sí está en el congelador.
   - Entonces, **por qué `date_start` igual**: por los MOs `done` con
     `date_finished` vacío o planeado a futuro (que el filtro por `date_finished`
     excluía), y por la ventana juliana de abajo. No por el doble conteo.
@@ -112,10 +132,15 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
   transcribe a mano del reporte de papel. No hay campo estructurado (`tracking`
   está en `none` en los seis terminados). Dos consecuencias medidas el 15-ago:
   1. **Una corrección en el papel puede no llegar al sistema.** Caso real: el
-     reporte del 11-ago-2026 tiene el lote tachado y corregido de 222 a 223; el
-     chatter de `WH/MO/01408` quedó con el 222. El congelador dice 223 y Odoo
-     dice 222 — la misma tanda con dos números. Se identificó cruzando fecha de
-     inicio y mermas (3 unidades en `SP/00355` sobre 01408, ninguna en 01409).
+     reporte del 11-ago-2026 tenía el lote tachado y corregido de 222 a 223, y el
+     chatter de `WH/MO/01408` había quedado con el 222 — la misma tanda con dos
+     números. Se identificó cruzando fecha de inicio y mermas (3 unidades en
+     `SP/00355` sobre 01408, ninguna en 01409).
+     **CERRADO el 20-ago-2026**: el chatter hoy dice `223/02 27`, se corrigió
+     editando el mensaje (no agregando otro, ver el punto 2). Verificado corriendo
+     `_entParseLote` real bajo `jsc`: parsea a `223 / 2-27`, `coincideJul = true`,
+     y el lote aparece en la lista de activos. El caso se deja escrito porque la
+     **trampa** sigue viva aunque esta instancia se haya cerrado.
   2. **Corregirlo agregando un comentario EMPEORA las cosas.** `_entParseLote`
      junta todos los lotes válidos del chatter y, si encuentra más de uno, marca
      la orden `ambiguo` — y el lote **desaparece** de la lista del conteo. Para
@@ -141,6 +166,16 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
   Es hermano de "buscar productos por ID, nunca por nombre": **el buscador miente
   por omisión y la lectura directa no.** Verificado sobre las 10 facturas del
   17 al 19-ago: las 10 tienen su PDF, creado el día que se facturó.
+- **El Excel de Daniel NO es salida de emergencia válida** (regla de Andrea,
+  20-ago-2026). Lo que se anota ahí **no baja nunca al saldo por lote**: el saldo
+  se arma con el ancla, la producción de Odoo y lo registrado en Truefie, y el
+  Excel no es ninguna de las tres. Y como el error no se ve en ningún número, solo
+  se limpiaría con un conteo físico que reancle — que puede no venir en meses.
+  Consecuencia de diseño: **cuando algo falla, la emergencia se resuelve DENTRO de
+  Truefie, con rastro**, nunca empujando a Daniel al papel. Por eso Despachos
+  cambió de fallar cerrado a **registrar y marcar** cuando no puede verificar la
+  factura contra Odoo: una salida marcada es un problema que se ve y se limpia
+  sola; una salida en el Excel es un descuadre invisible y permanente.
 - **Despachos**: la fecha real es `scheduled_date`; `date_done` es cuando se
   validó en el sistema (llega 3–7 días tarde).
 - **Nombres traducidos** (es_CR / en_US): una consulta sin contexto de idioma

@@ -2364,6 +2364,14 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .dp-prep-cli{font-size:13.5px;font-weight:500;color:var(--text);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dp-prep-h{font-size:11.5px;color:var(--text-3)}
+/* Anulada: gris y apagada, pero NO escondida. El producto ya está armado contra una
+   factura que dejó de existir — es lo que Daniel más necesita ver, no lo que menos. */
+.dp-prep.anulada{border-left-color:#4A4A4A;background:#131315;opacity:.72}
+.dp-prep.anulada .dp-prep-cli{color:var(--text-2)}
+.dp-prep-anul{font-size:11.5px;line-height:1.45;color:#C99A4E;margin-top:3px;
+  white-space:normal}
+.dp-prep-nc{font-family:var(--mono);color:var(--text-3)}
+.dp-prep-ver{font-size:11.5px;color:var(--text-3);margin-top:3px;white-space:normal}
 /* Ámbar solo lo que urge: preparado AYER o antes es lo que hay que sacar o
    devolver al congelador. Preparado hoy es normal y va en gris. */
 .dp-prep.vieja{border-left-color:#E9A23B}
@@ -3035,7 +3043,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 19 ago 2026 · b28';
+const BUILD = 'v 20 ago 2026 · b28';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -6559,6 +6567,63 @@ function _entCanon(txt){
   return ddd+' / '+mesV+'-'+anioV;         // el código de producto NO va en la clave (igual que canon)
 }
 
+// ── ÓRDENES QUE NO SUMAN AL SALDO (hermano de COSTOS_LINEAS_EXCLUIDAS) ──
+// EL PATRÓN, que es estructural y no un caso suelto: el corte del conteo es contra el
+// PRODUCTO FÍSICO, no contra el registro en Odoo. Keylor registra la orden cuando la
+// producción TERMINA, así que una tanda que Daniel ya contó puede quedar registrada
+// minutos u horas DESPUÉS del corte. El saldo la suma como producción nueva cuando ya
+// está dentro de la foto, y el lote queda inflado — en silencio, porque los números
+// cierran solos y nada avisa.
+//
+// Va a volver a pasar cada vez que se cuente cerca de una hora de cierre de producción.
+// Por eso esto es un mecanismo con lista, no un número metido en el motor.
+//
+// La clave es el ID de la orden y el valor lleva la HUELLA COMPLETA, para que
+// verificarExclusionesMO() pueda confirmar contra Odoo que la orden sigue siendo la que
+// se excluyó. Si algo no calza, NO se excluye y se marca rota: preferimos un lote
+// inflado y visible a una resta silenciosa contra la orden equivocada.
+const ENT_MO_EXCLUIDAS = {
+  // Conteo de Daniel del viernes 14-ago-2026, corte 16:00 CR. Esta orden se registró a
+  // las 16:06 —seis minutos después— pero el pan ya estaba hecho y contado: el conteo
+  // trae 226 / 2-27 con 13 cajas + 2 potes = 158 u. Sumar las 160 de la orden lo deja
+  // en 316 cuando el número bueno es 156.
+  // Andrea decidió NO repetir el conteo físico (20-ago), así que el inflado no se limpia
+  // solo al reanclar: hay que corregirlo en el cálculo.
+  1411: {orden:'WH/MO/01411', producto_id:519, lote:'226 / 2-27', uds:160,
+         date_start:'2026-08-14 22:06:40',
+         etiqueta:'Galletas 226 / 2-27 · 160 u',
+         razon:'Registrada 6 min DESPUÉS del corte del conteo del 14-ago (16:00 CR), pero '
+              +'el producto ya estaba terminado y contado en el físico. Sumarla lo cuenta '
+              +'dos veces: el saldo daba 316 y el correcto es 156.'},
+};
+// Verifica cada exclusión contra Odoo. Misma disciplina que verificarExclusiones() de
+// costos: si la huella no calza, la exclusión NO se aplica y se reporta.
+async function verificarExclusionesMO(){
+  const ids=Object.keys(ENT_MO_EXCLUIDAS).map(Number);
+  if(!ids.length) return [];
+  const mos=await odooCall('mrp.production','search_read',[[['id','in',ids]]],
+    {fields:['id','name','product_id','qty_produced','product_uom_id','date_start','state']});
+  const byId={}; mos.forEach(function(m){ byId[m.id]=m; });
+  const out=[];
+  for(const id of ids){
+    const d=ENT_MO_EXCLUIDAS[id], m=byId[id], fallas=[];
+    if(!m) fallas.push('la orden ya no existe en Odoo');
+    else{
+      const fac=await uomFactor(m.product_uom_id&&m.product_uom_id[0]);
+      const uds=(m.qty_produced||0)/(fac||1);
+      if(m.name!==d.orden) fallas.push('nombre: Odoo dice '+m.name+', la lista dice '+d.orden);
+      if((m.product_id&&m.product_id[0])!==d.producto_id)
+        fallas.push('producto: Odoo dice '+(m.product_id&&m.product_id[0])+', la lista dice '+d.producto_id);
+      if(Math.abs(uds-d.uds)>0.5) fallas.push('uds: Odoo dice '+uds+', la lista dice '+d.uds);
+      if(String(m.date_start||'')!==d.date_start)
+        fallas.push('date_start: Odoo dice '+m.date_start+', la lista dice '+d.date_start);
+      if(m.state!=='done') fallas.push('la orden ya no está done ('+m.state+')');
+    }
+    out.push(Object.assign({id:id}, d, {ok:!fallas.length, fallas:fallas}));
+  }
+  return out;
+}
+
 // Parsea el chatter → candidatos válidos + estado. prodYear/prodJulian anclan la PRODUCCIÓN.
 // anioSet: sin pasar nada usa la ventana de vencimiento (motor). Un Set fuerza una regla fija (diag).
 function _entParseLote(chatterTxt, prodYear, prodJulian, anioSet, productoId){
@@ -6698,6 +6763,17 @@ function _entAgrupar(crudo, anioSet){
 // Odoo sigue SOLO LECTURA — acá solo se escribe en Supabase.
 // ════════════════════════════════════════════════════════════════════════
 let _clLotes=null, _clExtra={}, _clGuardando=false, _clHuerfanos=[];
+// Exclusiones de ENT_MO_EXCLUIDAS verificadas contra Odoo. Se muestran ACÁ, en el panel
+// de lotes, porque es la pantalla donde se mira de qué está hecho el saldo. Una exclusión
+// rota no se aplica —el motor la ignora— pero tiene que verse, o el lote queda inflado
+// otra vez y en silencio, que es justo lo que la lista vino a evitar.
+let _clExcl=null;
+async function clCargarExclusiones(){
+  try{ _clExcl=await verificarExclusionesMO(); }
+  catch(e){ _clExcl=[{ok:false, etiqueta:'(no se pudo verificar)',
+                       fallas:['no pude leer Odoo: '+((e&&e.message)||e)]}]; }
+  _clRender();
+}
 // ⚠️ EL ESTADO DEL CONTEO VIVE ACÁ, NO EN EL DOM. Clave 'producto|lote', valor
 // {c:'cajas', s:'sueltas'} tal como se escribieron (texto, para no perder la
 // diferencia entre "" y "0").
@@ -6763,6 +6839,9 @@ async function cargarConteoLote(force){
   body.style.display='none';
   try{
     _clLotes=await entLotesActivos(3);
+    // Va sin await y no bloquea el panel: es una comprobación de fondo, no un insumo
+    // para pintar los lotes. Cuando conteste, _clRender() se vuelve a llamar sola.
+    clCargarExclusiones();
   }catch(e){
     _clLotes={lotes:{},buckets:{sin_lote:[],ambiguo:[],anio_invalido:[]}, _err:(e&&e.message)||String(e)};
   }
@@ -6805,6 +6884,26 @@ function _clRender(){
       +'Si el congelador tiene producto, agregá los lotes a mano — el conteo vale igual.');
   } else {
     const st=document.getElementById('clStatus'); if(st) st.classList.add('hidden');
+  }
+  // Las exclusiones: las rotas en ámbar (no se aplicaron, el lote está inflado), las
+  // buenas en una línea gris que dice qué se está descontando y por qué.
+  if(_clExcl && _clExcl.length){
+    const rotas=_clExcl.filter(function(x){ return !x.ok; });
+    const okey =_clExcl.filter(function(x){ return  x.ok; });
+    if(rotas.length){
+      h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-bottom:14px">'
+        +'<div style="font-weight:700;color:#E9A23B;font-size:12.5px">'+rotas.length
+        +(rotas.length===1?' exclusión de producción no se pudo verificar':' exclusiones de producción no se pudieron verificar')+'</div>'
+        +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.5">'
+        +rotas.map(function(x){ return esc(x.etiqueta||('orden '+x.id))+': '+esc((x.fallas||[]).join(' · ')); }).join('<br>')
+        +'<br>No se aplicaron: el saldo de esos lotes está inflado.</div></div>';
+    }
+    if(okey.length){
+      h+='<div style="font-size:11.5px;color:var(--text-3);margin-bottom:14px;line-height:1.5">'
+        +okey.length+(okey.length===1?' orden no suma al saldo: ':' órdenes no suman al saldo: ')
+        +okey.map(function(x){ return esc(x.etiqueta||x.orden); }).join(' · ')
+        +' — ya contadas en el conteo físico.</div>';
+    }
   }
   if(_clHuerfanos.length){
     h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-bottom:14px">'
@@ -7268,7 +7367,13 @@ async function rpCalcSaldos(g){
   const {data:lin}=await c.from('ent_conteo_linea').select('producto_id,lote,uds').eq('conteo_id',A.id);
   (lin||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote; s[k]=(s[k]||0)+(+r.uds||0); });
   const corteMs=Date.parse(A.corte);
+  // ⚠️ LA EXCLUSIÓN VA ACÁ Y SOLO ACÁ. En el SALDO, no en la lista de lotes: la orden
+  // excluida sigue existiendo y su lote tiene que seguir apareciendo en el selector con
+  // su saldo bueno. Si se filtrara en entLeerCrudo o en _entAgrupar, un lote cuya única
+  // orden esté excluida DESAPARECERÍA de la pantalla — y con el bloqueo duro de Despachos
+  // eso significa no poder despachar producto que sí está en el congelador.
   Object.values((g&&g.lotes)||{}).forEach(function(L){ (L.ordenes||[]).forEach(function(rec){
+    if(ENT_MO_EXCLUIDAS[rec.ordenId]) return;      // ya contada en el físico del ancla
     if(rec.prodUtc && Date.parse(rec.prodUtc.replace(' ','T')+'Z')>corteMs){
       const k=(+L.producto)+'|'+L.canon; s[k]=(s[k]||0)+(rec.uds||0); } }); });
   // El nombre dice lo que resta: lo que SALIÓ DEL CONGELADOR, que es lo que se
@@ -7323,6 +7428,76 @@ let _despFac=null, _despUom=null, _despErr='', _despAbierto=null, _despLotes=nul
 let _despEstado=null, _despEstErr='', _despEntregando=0;
 // El diálogo de Entregar: qué pedido está abierto y el error de la lectura de detalle.
 let _despEntAbierto=0, _despDetErr='';
+// ── FACTURAS ANULADAS POR NOTA DE CRÉDITO ───────────────────────────────
+// `null` = todavía no se leyó de Odoo. `{}` = leído y ninguna anulada.
+// La distinción importa: mientras sea null NO se puede entregar, porque no sabemos
+// si la factura sigue viva. Misma regla que el detalle del diálogo.
+let _despAnul=null, _despAnulErr='';
+
+// LA SEÑAL ES reversal_move_id, NO payment_state. Medido el 20-ago sobre las 497
+// facturas de venta de 2026: `reversal_move_id` no vacío caza 36; `payment_state =
+// 'reversed'` caza 35 y se le escapa la 00003181, que está reversada con una NC
+// posted por el monto completo. Confiar en payment_state deja pasar el 3%.
+// `state` no sirve para nada acá: vale 'posted' en las reversadas igual que en las vivas.
+//
+// El motivo vive en el `ref` de la NOTA DE CRÉDITO, no en la factura (el de la factura
+// viene vacío): 'Reversal of: 00100001010000003487, error en producto'. Se toma lo que
+// sigue a la PRIMERA coma — el consecutivo no lleva comas, así que el corte es seguro.
+// Solo lectura de Odoo.
+function _despMotivoNC(ref){
+  const t=String(ref==null?'':ref); const i=t.indexOf(',');
+  return i>=0 ? t.slice(i+1).trim() : '';
+}
+// REINTENTA ANTES DE RENDIRSE. La mayoría de los fallos acá no son Odoo caído: son el
+// arranque en frío del proxy, que tarda ~40 s la primera vez del día. Un solo intento
+// convierte una demora normal en "no se pudo verificar", y eso ahora tiene consecuencia
+// (la salida queda marcada). Se reintenta una vez, esperando, antes de darla por perdida.
+const DESP_ANUL_REINTENTOS = 2;      // intentos totales, no reintentos extra
+const DESP_ANUL_ESPERA_MS  = 6000;
+function _esperar(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+
+async function despCargarAnuladas(ids){
+  const pedir=[...new Set((ids||[]).filter(Boolean))];
+  if(!pedir.length){ _despAnul=_despAnul||{}; return; }
+  for(let intento=1; intento<=DESP_ANUL_REINTENTOS; intento++){
+    const ok=await _despIntentarAnuladas(pedir, intento);
+    if(ok) return;
+    if(intento<DESP_ANUL_REINTENTOS){
+      _despAnulErr='';                        // el fallo intermedio no se muestra
+      despRender();
+      await _esperar(DESP_ANUL_ESPERA_MS);
+    }
+  }
+}
+async function _despIntentarAnuladas(pedir, intento){
+  try{
+    // Se leen TODAS y se filtra en el navegador: `reversal_move_id` es un one2many y
+    // un dominio ['!=',false] sobre one2many no es de fiar en todas las versiones.
+    const mv=await odooCall('account.move','search_read',[[['id','in',pedir]]],
+      {fields:['id','name','reversal_move_id'],limit:1000,context:{lang:'es_CR'}});
+    const anul={}, ncIds=[];
+    mv.forEach(function(m){
+      const rev=m.reversal_move_id||[];
+      if(rev.length){ anul[m.id]={motivo:'', nc:rev[0]}; ncIds.push(rev[0]); }
+    });
+    if(ncIds.length){
+      const ncs=await odooCall('account.move','search_read',[[['id','in',ncIds]]],
+        {fields:['id','name','ref'],limit:1000,context:{lang:'es_CR'}});
+      const byNc={}; ncs.forEach(function(n){ byNc[n.id]=n; });
+      Object.keys(anul).forEach(function(fid){
+        const n=byNc[anul[fid].nc];
+        if(n){ anul[fid].motivo=_despMotivoNC(n.ref); anul[fid].nc_nombre=n.name; }
+      });
+    }
+    _despAnul=Object.assign(_despAnul||{}, anul); _despAnulErr='';
+    return true;
+  }catch(e){
+    _despAnulErr=(e&&e.message)||String(e);
+    // Se queda en null: no sabemos si están anuladas. Si este era el último intento,
+    // el que llama decide qué hacer con eso — hoy, deshabilitar Entregar.
+    return false;
+  }
+}
 
 // ⚠️ EN HORA LOCAL, NO UTC. Antes esto era toISOString().slice(0,10), que en
 // Costa Rica (UTC−6) devuelve el día SIGUIENTE a partir de las 18:00. Nunca se
@@ -7388,9 +7563,16 @@ async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
   const mv=await odooCall('account.move','search_read',
     [[['move_type','=','out_invoice'],['state','=','posted'],
       ['invoice_date','>=',desdeTodo],['invoice_date','<=',hasta]]],
-    {fields:['id','name','invoice_date','partner_id'],limit:500,
+    {fields:['id','name','invoice_date','partner_id','reversal_move_id'],limit:500,
      order:'invoice_date desc, id desc',context:{lang:'es_CR'}});
   if(!mv.length) return [];
+  // Las anuladas por nota de crédito NO van a "Por preparar": preparar contra una
+  // factura que dejó de existir es sacar producto del congelador contra un documento
+  // muerto. Caso del 20-ago: la 3487 anulada al lado de la 3488 buena, mismo cliente,
+  // montos casi iguales, y nada en pantalla que las distinguiera.
+  // El motivo se resuelve aparte (despCargarAnuladas): acá alcanza con saber cuáles son.
+  const anuladas={};
+  mv.forEach(function(m){ if((m.reversal_move_id||[]).length) anuladas[m.id]=1; });
   const ids=mv.map(function(m){return m.id;});
   const ls=await odooCall('account.move.line','search_read',
     [[['move_id','in',ids],['display_type','=','product'],['product_id','in',ENT_PROD]]],
@@ -7407,6 +7589,7 @@ async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
   const out=[];
   mv.forEach(function(m){
     if(ya[m.id]) return;
+    if(anuladas[m.id]) return;                 // anulada por NC y sin alisto: no se lista
     const lin=por[m.id]; if(!lin) return;      // factura sin terminado: no es despacho
     out.push({
       factura_id:m.id, factura:m.name, fecha:m.invoice_date,
@@ -7452,11 +7635,29 @@ async function despCargarEstado(){
       try{ await _entColgarDetalle(c, prep); }
       catch(e2){ _despDetErr=(e2&&e2.message)||String(e2); }
     }
+    // ¿Alguna de las PREPARADAS quedó anulada en Odoo? Es el caso peligroso: producto
+    // ya armado contra una factura que dejó de existir. Va aparte de la lectura de
+    // "Por preparar" porque un pedido preparado puede tener una factura FUERA del rango
+    // de fechas de la bandeja, y porque estas tarjetas salen de Supabase, no de Odoo.
+    // NO se espera (`await`): la bandeja se pinta con Supabase, que es instantáneo, y
+    // el estado de anulada llega después. Mientras tanto Entregar queda deshabilitado.
+    const fids=prep.map(function(r){ return r.factura_id; }).filter(Boolean);
+    if(fids.length) despCargarAnuladas(fids).then(function(){ if(!_despAbierto) despRender(); });
+    else { _despAnul=_despAnul||{}; }
   }catch(e){
     _despEstado=_despEstado||[];
     _despEstErr=(e&&e.message)||String(e);
   }
   if(!_despAbierto) despRender();     // sin pisar un pedido a medio llenar
+}
+// El estado de anulación de un pedido: null mientras no se sepa, {anulada:bool,...} después.
+// Un pedido SIN factura (traslado interno, salida manual) nunca puede estar anulado — no
+// hay documento que anular — así que se resuelve de una y no queda esperando a Odoo.
+function _despAnulDe(r){
+  if(!r || !r.factura_id) return {anulada:false};
+  if(_despAnul===null) return null;
+  const a=_despAnul[r.factura_id];
+  return a ? Object.assign({anulada:true}, a) : {anulada:false};
 }
 // Cuántos lotes distintos toca un pedido. Se cuenta por (producto, lote), no por lote
 // suelto: el mismo día juliano puede ser dos lotes de dos productos (ver _entCanon).
@@ -7533,12 +7734,31 @@ function despRender(){
       // El resumen no pide ningún gesto ni ninguna lectura extra: los datos ya vinieron
       // con la bandeja. Da contexto de lo que hay armado sin abrir nada.
       const res=_despResumen(r);
-      return '<div class="dp-prep'+(vieja?' vieja':'')+'">'
+      const an=_despAnulDe(r);              // null = todavía verificando
+      const anulada=!!(an&&an.anulada);
+      // TRES ESTADOS, y el del medio importa tanto como los otros dos:
+      //   verificando → no se sabe si la factura vive. Botón apagado y se dice por qué.
+      //   anulada     → gris, etiquetada, con el motivo. NO se puede entregar, y NO se
+      //                 esconde: el producto ya está armado y Daniel tiene que enterarse.
+      //   normal      → como siempre.
+      let etiqueta='';
+      if(anulada){
+        etiqueta='<div class="dp-prep-anul">Factura anulada'
+          +(an.motivo?(' · '+esc(an.motivo)):'')
+          +(an.nc_nombre?(' <span class="dp-prep-nc">NC '+esc(String(an.nc_nombre).slice(-6))+'</span>'):'')
+          +'<br>No se entrega. El producto ya está armado: avisale a Andrea.</div>';
+      }else if(an===null){
+        etiqueta='<div class="dp-prep-ver">Verificando en Odoo si la factura sigue vigente…</div>';
+      }
+      const btn = anulada
+        ? '<button class="dp-entregar" disabled>Anulada</button>'
+        : '<button class="dp-entregar"'+((ocupado||an===null)?' disabled':'')
+          +' onclick="despAbrirEntrega('+r.pedido_id+')">'
+          +(ocupado?'Guardando…':(an===null?'Verificando…':'Entregar'))+'</button>';
+      return '<div class="dp-prep'+(vieja?' vieja':'')+(anulada?' anulada':'')+'">'
         +'<div class="dp-prep-i"><span class="dp-prep-cli">'+esc(r.cliente_nombre||'—')+'</span>'
         +'<span class="dp-prep-h">preparado '+esc(_despCuando(r.preparado_en))
-        +(res?(' · '+esc(res)):'')+'</span></div>'
-        +'<button class="dp-entregar"'+(ocupado?' disabled':'')
-        +' onclick="despAbrirEntrega('+r.pedido_id+')">'+(ocupado?'Guardando…':'Entregar')+'</button></div>';
+        +(res?(' · '+esc(res)):'')+'</span>'+etiqueta+'</div>'+btn+'</div>';
     }).join('');
   }
   h+='</div>';
@@ -7921,6 +8141,8 @@ function despAbrirEntrega(pedidoId){
   if(_despEntregando) return;
   const r=(_despEstado||[]).find(function(x){ return x.pedido_id===pedidoId; });
   if(!r || r.estado!=='preparado') return;
+  const an=_despAnulDe(r);
+  if(an===null || an.anulada) return;      // sin verificar o anulada: no se abre
   _despEntAbierto=pedidoId; despRender();
 }
 function despCerrarEntrega(){ if(_despEntregando) return; _despEntAbierto=0; despRender(); }
@@ -7988,6 +8210,17 @@ async function despEntregar(pedidoId){
   const r=(_despEstado||[]).find(function(x){ return x.pedido_id===pedidoId; });
   if(!r || r.estado!=='preparado') return;
   if(!r.lineas || !r.lineas.length || _despDetErr) return;   // nunca a ciegas
+  // El candado también acá, no solo en el botón: entre que se abrió el diálogo y que se
+  // confirma pueden pasar minutos, y en ese rato la lectura de anuladas puede contestar.
+  const an=_despAnulDe(r);
+  if(an===null || an.anulada){
+    _despEntAbierto=0;
+    alert(an&&an.anulada
+      ? ('Esa factura quedó anulada en Odoo'+(an.motivo?(': '+an.motivo):'')
+         +'.\n\nNo se registra la salida. El producto ya está armado: avisale a Andrea.')
+      : 'Todavía no pude verificar en Odoo si la factura sigue vigente. Probá en unos segundos.');
+    despRender(); return;
+  }
   _despEntregando=pedidoId; despRender();
   try{
     const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
