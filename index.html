@@ -2105,13 +2105,16 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-days{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
 @media(max-width:520px){#vResumen .rz-days{grid-auto-flow:column;grid-auto-columns:104px;grid-template-columns:none;overflow-x:auto;padding-bottom:6px}}
 #vResumen .rz-day{background:var(--surface-2);border:.5px solid var(--border);border-radius:9px;padding:9px 8px 10px;min-height:96px;display:flex;flex-direction:column}
-#vResumen .rz-dd{font-size:10.5px;color:var(--text-3);text-transform:uppercase;letter-spacing:.03em}
+#vResumen .rz-dd{font-size:10.5px;color:var(--text-3);text-transform:uppercase;letter-spacing:.03em;
+  display:flex;align-items:center;gap:6px}
 #vResumen .rz-dp{font-size:13px;font-weight:600;color:var(--text);margin-top:6px;line-height:1.25}
 #vResumen .rz-db{font-size:11px;color:var(--text-2);margin-top:2px}
+/* Desacuerdo con lo que Odoo registró ese día. Ámbar porque avisa, y compacto porque es un dato
+   de contraste, no el número principal de la celda. */
+#vResumen .rz-dodoo{font-size:10px;color:#C99A4E;margin-top:3px;line-height:1.3}
 #vResumen .rz-gnote{font-size:10px;color:#C99A4E;margin-top:3px}
 #vResumen .rz-ds{margin-top:auto;font-size:11px;font-weight:600;padding-top:8px}
 #vResumen .rz-dsm{display:none}   /* estado en una palabra: solo teléfono (ver @media 700px) */
-#vResumen .rz-edwrap{display:none}   /* "N días editados": solo teléfono */
 #vResumen .rz-c4-mov{display:none}   /* texto de tarjeta vacía: solo teléfono */
 #vResumen .rz-day.rz-done{border-color:var(--border)} #vResumen .rz-day.rz-done .rz-ds{color:#7A7A72}
 #vResumen .rz-day.rz-today{border-color:#C77DA0;box-shadow:0 0 0 1px rgba(199,125,160,.4)} #vResumen .rz-day.rz-today .rz-ds{color:#C77DA0}
@@ -2132,8 +2135,12 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* Lápiz de edición: el glifo se dibuja a 15px pero el blanco táctil es de 44×44 (dedo), sin
    salirse de la celda — el resto del día queda libre para el toque de intercambio. Siempre
    visible (en pantalla táctil no hay hover) y solo en días editables. */
-#vResumen .rz-pen{position:absolute;top:2px;right:2px;width:44px;height:44px;display:flex;
-  align-items:center;justify-content:center;color:#4A4A50;cursor:pointer;transition:color .12s}
+/* top/right en 0 —la geometría que ya tenía el teléfono— para que el lápiz y el punto rosa no
+   se monten. Con los 2px de antes el ícono se corría hacia adentro y pisaba el punto. */
+/* El glifo se alinea con la LÍNEA DE LA FECHA (padding-top), no con el centro del blanco táctil:
+   así fecha, punto y lápiz caen en el mismo eje. El área de 44×44 para el dedo no cambia. */
+#vResumen .rz-pen{position:absolute;top:0;right:0;width:44px;height:44px;display:flex;
+  align-items:flex-start;justify-content:center;padding-top:8px;color:#4A4A50;cursor:pointer;transition:color .12s}
 #vResumen .rz-pen svg{width:15px;height:15px;display:block;pointer-events:none}
 #vResumen .rz-day.rz-ed:hover .rz-pen{color:#6E6C68}
 #vResumen .rz-pen:hover{color:#C77DA0}
@@ -2144,11 +2151,12 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* Motivo de un intercambio bloqueado: discreto, arriba del calendario. */
 #vResumen .rz-aviso{margin:0 0 10px;font-size:12px;color:#C99A4E;background:rgba(201,154,78,.08);
   border:.5px solid rgba(201,154,78,.3);border-radius:8px;padding:7px 11px;max-width:640px}
-#vResumen .rz-day.rz-edited{border-color:rgba(201,154,78,.5)}
-#vResumen .rz-day.rz-edited .rz-ds{color:#C99A4E}
+/* El día editado NO lleva borde ámbar: el punto rosa ya lo dice, y el ámbar está reservado a
+   advertencias (picado, recorte de capacidad, sin registrar). Dos señales para lo mismo, una de
+   ellas del color equivocado. */
 #vResumen .rz-day.rz-autofill{border-style:dashed;border-color:#3E3E46}   /* provisional: lo agrega el sistema para la meta */
 #vResumen .rz-day.rz-autofill .rz-ds{color:var(--text-3)}
-#vResumen .rz-leftnote{margin-top:12px;max-width:640px;font-size:12px;color:#C99A4E;background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.3);border-radius:8px;padding:8px 12px}
+#vPlan .pl-metanota{margin:12px 0 0;max-width:640px;font-size:12px;color:#C99A4E;background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.3);border-radius:8px;padding:8px 12px}
 /* ═══ REDISEÑO mobile-first del Resumen ═══ */
 /* 1 · Pendiente de fabricar (calendario de 2 semanas; ver .rz-cal2 arriba) */
 #vResumen .rz-day.rz-today{border-color:#C77DA0;box-shadow:0 0 0 1px rgba(199,125,160,.4)}
@@ -2578,17 +2586,19 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-icard{flex:0 0 240px;background:#161619;border:.5px solid #26262C;border-radius:11px;padding:12px 14px}
 #vResumen .rz-icard-sm{flex:0 0 180px}
 #vResumen .rz-ith{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);font-weight:600;margin-bottom:8px}
-#vResumen .rz-ir{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:4px 0;font-size:13px}
+/* Escritorio: la fila de inventario baja a la escala del resto de la pantalla y el número deja
+   de ir en negrita. Se distinguen por TONO —nombre gris medio, número blanco hueso, contraste
+   en gris terciario—, que es el estándar de las tablas del sistema.
+   (En teléfono el número sigue grande a propósito: se lee de lejos, frente a la cámara.) */
+#vResumen .rz-ir{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:4px 0;font-size:12.5px}
 #vResumen .rz-irn{color:var(--text-2);text-transform:capitalize}
-#vResumen .rz-irv{color:var(--text);font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+#vResumen .rz-irv{color:var(--text);font-weight:400;font-variant-numeric:tabular-nums;white-space:nowrap}
 /* Sub-línea del ítem: el conteo físico guardado contra la existencia de Odoo. Ocupa el ancho
    completo debajo del nombre y el número — por eso .rz-ir envuelve. En gris terciario: es
    contexto, no alarma. Si el ítem no se contó, no se dibuja. */
 #vResumen .rz-ir{flex-wrap:wrap}
 #vResumen .rz-irs{flex:0 0 100%;color:var(--text-3);font-size:11px;font-variant-numeric:tabular-nums;margin-top:1px}
 #vResumen .rz-vermas{margin-top:8px;background:none;border:none;color:#C77DA0;font-size:12px;cursor:pointer;padding:0}
-#vResumen .rz-edtag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;color:#C99A4E}
-#vResumen .rz-edtag svg{width:12px;height:12px}
 #vResumen .rz-revert{background:none;border:.5px solid var(--border);color:var(--text-2);font-size:10.5px;border-radius:5px;padding:2px 8px;cursor:pointer}
 #vResumen .rz-revert:hover{border-color:#3A3A42;color:var(--text)}
 #vResumen .rz-day.rz-editing{border-color:#C77DA0;box-shadow:0 0 0 1px rgba(199,125,160,.35);gap:5px}
@@ -2653,7 +2663,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* Rótulo = etiqueta, no titular: sin mayúsculas, tracking corto, peso 500. La jerarquía la
    hace el TONO (terciario rótulo → secundario apoyo → blanco hueso el dato), no el tamaño. */
 #vResumen .rz-c4h{font-size:11px;letter-spacing:.02em;color:var(--text-3);font-weight:500;margin-bottom:9px}
-#vResumen .rz-c4fecha{font-size:11px;font-weight:600;color:var(--accent);margin:-4px 0 9px}
+/* Texto de apoyo, no acento: gris secundario. En rosa y en 600 competia con el numero de la
+   tarjeta y ademas se repetia en las cuatro — el acento deja de señalar cuando esta en todas. */
+#vResumen .rz-c4fecha{font-size:11px;font-weight:500;color:var(--text-2);margin:-4px 0 9px}
+#vResumen .rz-c4fecha span{display:block;line-height:1.35}
 #vResumen .rz-c4line{font-size:13px;color:var(--text);line-height:1.5}
 #vResumen .rz-c4line.rz-ok{color:#7E8C5A}
 #vResumen .rz-c4none{font-size:12.5px;color:var(--text-3)}
@@ -2673,21 +2686,26 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-c4falta{color:var(--text);white-space:nowrap;font-weight:600;font-size:11.5px}
 #vResumen .rz-c4it.rz-c4urg .rz-c4falta{color:#C99A4E}
 /* 2 secciones abajo, 2 columnas cada una, cerrando contra el mismo borde */
-#vResumen .rz-two{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:30px;align-items:start}
+/* Una sola columna: Inventario pasó a ocupar el ancho completo con sus tres tarjetas lado a
+   lado, y con la grilla de 2 columnas quedaba encajado en media pantalla, apilado y sobrando
+   espacio a la derecha. Últimas producciones queda arriba, también a ancho completo. */
+#vResumen .rz-two{display:grid;grid-template-columns:1fr;gap:26px;margin-top:30px;align-items:start}
 #vResumen .rz-two .rz-sec{margin-top:0}
 #vResumen .rz-two .rz-ult .rz-sh{margin-bottom:6px}
 /* inventario: 3 tarjetas-resumen; "›" abre la tabla completa */
-#vResumen .rz-inv3{display:flex;flex-direction:column;gap:10px}
+#vResumen .rz-inv3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:start}
 #vResumen .rz-i3{background:#141417;border:.5px solid #26262C;border-radius:11px;padding:11px 14px}
 #vResumen .rz-i3h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-#vResumen .rz-i3t{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);font-weight:600}
-#vResumen .rz-i3sum{font-size:12.5px;color:var(--text-2);cursor:pointer;user-select:none}
+/* Mismo encabezado que las tarjetas de arriba (rz-c4h): sin VERSALITA y sin 600. El bloque
+   gritaba por tamaño y peso; la jerarquía la hacen los tonos de gris, no la tipografía. */
+#vResumen .rz-i3t{font-size:11px;letter-spacing:.02em;color:var(--text-3);font-weight:400}
+#vResumen .rz-i3sum{font-size:12px;color:var(--text-2);cursor:pointer;user-select:none}
 #vResumen .rz-i3sum:hover{color:var(--text)}
 #vResumen .rz-i3body{margin-top:9px;border-top:.5px solid #232329;padding-top:8px}
 #vResumen .rz-i3body.hidden{display:none}
 @media(max-width:760px){
   #vResumen .rz-cards4{grid-template-columns:1fr 1fr}
-  #vResumen .rz-two{grid-template-columns:1fr;gap:22px}
+  #vResumen .rz-two{gap:22px}
   #vResumen .rz-cal2 .rz-wk:first-child{padding-right:0;border-right:none}
   #vResumen .rz-cal2 .rz-wk:last-child{padding-left:0}
 }
@@ -2708,22 +2726,8 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vResumen .rz-dp{font-size:14px;margin-top:4px}
   #vResumen .rz-db{font-size:10.5px}
   #vResumen .rz-ds,#vResumen .rz-dsm{display:none}
-  /* "Editado" ya no es una señal de la tarjeta: sin borde ámbar. Lo excepcional de verdad
-     (hoy, feriado, sin registrar, seleccionado) conserva el suyo. */
-  #vResumen .rz-day.rz-edited{border-color:var(--border)}
-  /* Pie del calendario: "N días editados" en gris con chevron, y la lista al tocarla. */
-  #vResumen .rz-edtoggle{display:flex;width:100%;align-items:center;gap:6px;margin-top:11px;
-    padding:0;border:none;background:none;color:var(--text-3);font-family:inherit;font-size:11px;
-    text-align:left;cursor:pointer}
-  #vResumen .rz-edtoggle::after{content:'⌄';font-size:13px;line-height:1;color:var(--text-3)}
-  #vResumen .rz-edtoggle.rz-abierto::after{content:'⌃'}
-  #vResumen .rz-edlista{margin-top:7px}
-  #vResumen .rz-edlista.hidden{display:none}
-  #vResumen .rz-edrow{display:flex;gap:8px;padding:4px 0;font-size:11.5px;color:var(--text-3)}
-  #vResumen .rz-edd{flex:none;min-width:52px}
-  #vResumen .rz-edp{color:var(--text-2);min-width:0}
   /* El lápiz mantiene su blanco táctil de 44×44 aunque la tarjeta sea más baja. */
-  #vResumen .rz-pen{top:0;right:0}
+  /* (el lápiz ya va en 0,0 en la regla base — el teléfono era la referencia) */
   /* Mismo motivo: menos de 16px y iOS hace zoom al enfocar. */
   #vResumen .rz-fsel,#vResumen .rz-fbt{font-size:16px;padding:5px 6px}
   /* Encabezado de semana en UNA línea de texto, sin píldora con caja.
@@ -2746,28 +2750,28 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vResumen .rz-cal2 .rz-wk-next .rz-day{background:var(--surface-2);border-style:solid}
   /* Fuera del teléfono: el aviso de meta (derrame) y el bloque de Inventario, que vive en
      su propia pestaña. */
-  /* La etiqueta ámbar "editado" del encabezado decía lo mismo que la línea de abajo, y en
-     ámbar. Queda solo "Volver al plan", que es una acción. */
-  #vResumen .rz-edtag{display:none}
-  #vResumen .rz-edwrap{display:block}
-  #vResumen .rz-leftnote{display:none}
+  /* (el aviso de meta se mudó al Plan: ya no hay nada que esconder acá) */
   /* El bloque de Inventario VUELVE al teléfono (se había escondido el 10-ago para calmar la
      pantalla). Sigue colapsado —tres tarjetas que se abren al tocar—, así que no pesa hasta
-     que se pide. Al desplegar, las cantidades van más grandes: es un dato que se lee de
-     lejos, en la cámara, no un renglón de tabla. */
-  #vResumen .rz-inv3{gap:9px}
+     que se pide. TIPOGRAFÍA IGUAL AL ESCRITORIO: el número iba en 16px y negrita "para leerse
+     de lejos, en la cámara", y lo que hacía era gritar más fuerte que todo lo demás de la
+     pantalla. La jerarquía la hacen los tonos de gris —nombre gris medio, número blanco hueso,
+     contraste en gris terciario—, igual que en las tablas del sistema. Del override queda solo
+     el respiro vertical, que es táctil y no tipográfico. */
+  #vResumen .rz-inv3{grid-template-columns:1fr;gap:9px}   /* en teléfono siguen apiladas */
   #vResumen .rz-ir{padding:7px 0}
-  #vResumen .rz-irn{font-size:13.5px}
-  #vResumen .rz-irv{font-size:16px;font-weight:600}
-  #vResumen .rz-irs{font-size:11.5px}
   /* Tarjetas 2×2 — fila 1: Por medir · Comprar·medir | fila 2: Producciones · Comprar·producir */
   #vResumen .rz-cards4{gap:10px;margin-top:20px;align-items:start}   /* sin estirar: nada de cajas medio vacías */
   #vResumen .rz-c4h{font-size:10.5px;letter-spacing:.02em;line-height:1.3}
-  /* El plazo ya lo dice la pantalla una vez: no hace falta repetirlo en cada tarjeta. */
-  #vResumen .rz-c4fecha{display:none}
+  /* La ventana de cobertura VA en el teléfono, en las cuatro tarjetas. Estaba oculta desde
+     cuando las tres decían lo mismo; ahora "Por medir" y "Comprar" cubren ventanas DISTINTAS
+     (el lunes al 50% contra el lunes completo), así que esconderla dejaba el número ambiguo. */
+  #vResumen .rz-c4fecha{font-size:10.5px;margin:-2px 0 8px;line-height:1.3}
   #vResumen .rz-c4-desk{display:none} #vResumen .rz-c4-mov{display:inline}
-  #vResumen .rz-c4-medir{order:1} #vResumen .rz-c4-cmedir{order:2}
-  #vResumen .rz-c4-prod{order:3}  #vResumen .rz-c4-cprod{order:4}
+  /* Por medir · Producciones registradas · las dos de Comprar. Lo que se mira todos los días
+     va primero; la lista de compra es de una vez por semana. */
+  #vResumen .rz-c4-medir{order:1} #vResumen .rz-c4-prod{order:2}
+  #vResumen .rz-c4-cmedir{order:3} #vResumen .rz-c4-cprod{order:4}
   /* En "Comprar · para producir" la cantidad va DEBAJO del nombre, no al lado. */
   #vResumen .rz-c4-cprod .rz-c4item{flex-direction:column;align-items:flex-start;gap:1px}
   #vResumen .rz-c4-cprod .rz-c4in{line-height:1.25}
@@ -2991,7 +2995,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 17 ago 2026 · b21';
+const BUILD = 'v 18 ago 2026 · b28';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -5221,7 +5225,12 @@ const NIV_INFO={
   472:{nom:'Pizza',       prem:473, rend:20,  cap:12, cajaU:12, presDiv:2, presLbl:'paq'},
   519:{nom:'Galletas',    prem:517, rend:160, cap:1,  cajaU:12, presDiv:1, presLbl:'uds'},
 };
-const NIV_CFG_DEF={ritmoVentana:6, colchon:3, colchonTemporada:4, horizonte:6};
+// medirLunesFrac — cuánto del LUNES SIGUIENTE entra en "Por medir". Parámetro, no número
+// enterrado: se sobreescribe desde plan_config con la clave `medir_lunes_frac`.
+// El porqué del 0,5: el lunes en la mañana las socias miden lo que falta para ESE día más toda la
+// producción de la semana, y del lunes siguiente miden solo la mitad — porque esa mañana vuelven
+// y miden la otra mitad. El ciclo se traslapa a propósito; la ventana tiene que traslaparse igual.
+const NIV_CFG_DEF={ritmoVentana:6, colchon:3, colchonTemporada:4, horizonte:6, medirLunesFrac:0.5};
 const _rzN=(n,d=0)=>(Number(n)||0).toLocaleString('es-CR',{minimumFractionDigits:d,maximumFractionDigits:d});
 // ── CAPACIDAD por Nº de personas (batches/día). Adelanto del futuro módulo RRHH. ──
 // El motor usa la tabla según cuánta gente hay esa semana (marca manual por semana ISO).
@@ -5286,22 +5295,56 @@ function _semillasVeto(ds){ return _esProductivo(_diaSig(ds)) ? '' : SEMILLAS_MS
 // overrides + auto-relleno—, NUNCA sobre la propuesta base del motor: ahí estaba el bug, el
 // picado se leía de un layout que no ve las ediciones y por eso sobrevivía a que Semillas se
 // fuera del día. El día del picado RINDE COMO 2 PERSONAS: la misma gente pica y hornea.
-function _aplicarPicado(cells){
-  cells=cells||[];
+// ESTA es la ÚNICA evaluación del picado. La etiqueta, la penalización de capacidad, la regla de
+// "solo galletas" y el chip salen todos de acá, en la misma pasada y sobre las mismas celdas: si
+// vivieran en dos lados podrían discrepar, y discreparon (b21: el motor penalizaba el viernes por
+// su cuenta y la penalización sobrevivía al picado que ya no existía).
+function _aplicarPicado(cells, personas){
+  cells=cells||[]; personas=personas||3;
   return cells.map(function(c,i){
     const prev=i>0?cells[i-1]:null;
     if(!prev || !prev.prods || !(prev.prods[452]>0)) return c;
     if(c.kind==='real' || c.kind==='feriado') return c;   // lo registrado en Odoo y los feriados no se tocan
     const nc=Object.assign({}, c); nc.picado=true; nc.prods=Object.assign({}, c.prods||{});
-    let recortado=false;
-    for(const k in nc.prods){ const pid=+k, tope=_capDe(pid,2);
-      if(nc.prods[pid]>tope){ nc.prods[pid]=tope; recortado=true; } }
-    if(nc.pid!=null && nc.prods[nc.pid]!=null) nc.batches=nc.prods[nc.pid];
+    const cortes=[];
+    if(personas<=2){
+      // SEMANA DE 2 PERSONAS + PICADO = SOLO GALLETAS. Pica la misma gente que hornearía: no
+      // queda nadie para pan. La consecuencia es cara a propósito y se deja ver — en una semana
+      // de 2, mover Semillas cuesta el día siguiente entero.
+      for(const k in nc.prods){ const pid=+k; if(pid===519) continue;
+        cortes.push({pid:pid, de:nc.prods[pid], a:0, motivo:'picado2p'}); delete nc.prods[pid]; }
+      nc.soloGalletas=true;
+    } else {
+      for(const k in nc.prods){ const pid=+k, tope=_capDe(pid,2);
+        if(nc.prods[pid]>tope){ cortes.push({pid:pid, de:nc.prods[pid], a:tope, motivo:'picado'}); nc.prods[pid]=tope; } }
+    }
+    if(cortes.length) nc.recortes=(nc.recortes||[]).concat(cortes);
+    if(nc.pid!=null) nc.batches=nc.prods[nc.pid]!=null?nc.prods[nc.pid]:undefined;
+    // EL CHIP SOLO SI LA RESTRICCIÓN MUERDE. Galletas rinde 1 batch con 2 y con 3 personas, así
+    // que un viernes de "Picado · 1 Galletas" NO lleva chip: anunciaría un castigo inexistente.
+    // Con 2 personas el chip va siempre — ahí la restricción es estructural, no una resta.
+    nc.picadoChip = (personas<=2) ? 'picado · solo galletas'
+                  : (cortes.length ? 'picado · rinde como 2 personas' : '');
     const ks=Object.keys(nc.prods);
     if(!ks.length){ nc.prod='Picado'; return nc; }        // día sin producción → el picado ES el día
-    nc.prod='Picado · '+(recortado ? ks.map(function(k){ return _rzBP(nc.prods[k], +k); }).join(' · ') : c.prod);
+    nc.prod='Picado · '+(cortes.length ? ks.map(function(k){ return _rzBP(nc.prods[k], +k); }).join(' · ') : c.prod);
     return nc;
   });
+}
+// Índice ds → estado del picado, escrito por los caminos que RENDERIZAN (no por las simulaciones).
+// Los vetos de edición e intercambio lo leen de acá en vez de re-derivarlo: una sola evaluación.
+let _rzPicIdx={};
+function _rzIndexPicado(cells, personas){
+  (cells||[]).forEach(function(c){ if(c && c.ds) _rzPicIdx[c.ds]={picado:!!c.picado, soloGalletas:!!c.soloGalletas, personas:personas}; });
+  return cells;
+}
+const PICADO_2P_MSG='En una semana de 2 personas, el día que se pica no puede producir pan: pica la misma gente que hornearía. Ese día solo entran Galletas.';
+// '' si ese producto puede ir ese día; el motivo si no. Lee el índice del último render.
+function _picado2pVeto(ds, pid){
+  const st=_rzPicIdx[ds];
+  if(!st || !st.picado || !(st.personas<=2)) return '';
+  if(pid==null || pid===519) return '';
+  return PICADO_2P_MSG;
 }
 
 function _isoWk(dt){
@@ -5318,20 +5361,28 @@ function _crDate(dt){ if(!dt) return ''; const d=new Date(String(dt).replace(' '
 // ── plan_config (Supabase; fila más reciente por clave manda). Fallback a defaults. ──
 async function nivConfig(){
   const cfg={ritmoVentana:NIV_CFG_DEF.ritmoVentana, colchonTemporada:NIV_CFG_DEF.colchonTemporada,
-             horizonte:NIV_CFG_DEF.horizonte, colchon:{}, ventanas:[], sembrado:false};
+             horizonte:NIV_CFG_DEF.horizonte, medirLunesFrac:NIV_CFG_DEF.medirLunesFrac,
+             colchon:{}, ventanas:[], sembrado:false};
   NIV_PROD.forEach(p=>cfg.colchon[p]=NIV_CFG_DEF.colchon);
-  try{
-    const c=sbClient(); if(!c) return cfg;
+  // SIN atrapa-errores: `plan_config` existe desde el 17-ago-2026 y está sembrada. Antes había un
+  // catch mudo acá porque la tabla no existía y el 404 era esperado — pero eso también se tragaba
+  // cualquier falla REAL (RLS mal puesta, sesión vencida, la tabla borrada) y el Planificador
+  // seguía con los defaults del código como si nada, sin que nadie se enterara. Ahora si falla,
+  // revienta hacia el caller, que ya pinta el error en pantalla.
+  {
+    const c=sbClient(); if(!c) return cfg;                       // sin sesión: defaults, eso no es una falla
     const {data,error}=await c.from('plan_config').select('clave,valor,creado_en').order('creado_en',{ascending:false});
-    if(error||!data||!data.length) return cfg;
+    if(error) throw new Error('No pude leer la configuración del plan (plan_config): '+(error.message||error));
+    if(!data||!data.length) return cfg;
     cfg.sembrado=true; const seen={};
     for(const r of data){ if(seen[r.clave])continue; seen[r.clave]=1; const v=r.valor;
       if(r.clave==='ritmo_ventana') cfg.ritmoVentana=+v||cfg.ritmoVentana;
       else if(r.clave==='colchon_temporada') cfg.colchonTemporada=+v||cfg.colchonTemporada;
       else if(r.clave==='colchon_semanas' && v && typeof v==='object'){ for(const k in v) cfg.colchon[+k]=+v[k]; }
       else if(r.clave==='ventanas_estacionales' && Array.isArray(v)) cfg.ventanas=v;
+      else if(r.clave==='medir_lunes_frac' && v!=null && +v>=0 && +v<=1) cfg.medirLunesFrac=+v;
     }
-  }catch(e){ /* tabla no sembrada aún → defaults */ }
+  }
   return cfg;
 }
 
@@ -5502,12 +5553,17 @@ function _weekLayout(stock, ritmo, colDe, H, personas, rampa){
   // ── VIERNES: día productivo para PAN (Blanco, Francés, Buns, Pizza) y Galletas —
   // TODO menos Semillas (su picado cae en sábado, que no se trabaja). La única regla:
   // producción y limpieza profunda NO caben el mismo día.
-  // (1) PICADO: ya NO se decide acá. Es derivado — sale de _aplicarPicado sobre las celdas
-  //     efectivas, que son las que saben en qué día quedó Semillas después de las ediciones.
-  //     Lo único que el motor necesita saber es que si esta semana lleva Semillas, el día que
-  //     la sigue RINDE COMO 2 PERSONAS. En el layout base Semillas va al jueves, así que ese
-  //     día es el viernes: por eso el techo del viernes se recorta acá.
-  const capVie=function(p){ const c=_capDe(p,personas); return semillas>0?Math.min(c,_capDe(p,2)):c; };
+  // (1) PICADO: el motor NO lo decide ni lo penaliza. Lo hace _aplicarPicado, sobre las celdas
+  //     efectivas, que son las únicas que saben en qué día quedó Semillas después de las
+  //     ediciones. En b21 el techo del viernes se recortaba TAMBIÉN acá, con `semillas>0` del
+  //     layout base — que no ve los overrides. Resultado medido: con el jueves editado a Francés,
+  //     el viernes seguía saliendo "6 Blanco" (techo de 2 personas) en una semana de 3, mientras
+  //     el chip de picado ya había desaparecido. Dos fuentes para una sola regla, y discreparon.
+  //     Una sola evaluación, y es la de las celdas.
+  //     Contrapartida asumida: la simulación interna de stock del motor ya no descuenta la
+  //     penalización. Sobrestima el día del picado en (cap3 − cap2) batches en las semanas con
+  //     Semillas. El colchón que se MUESTRA no se ve afectado: planColchonOv recalcula el stock
+  //     desde las celdas, que sí la traen aplicada.
   // (2) PRODUCCIÓN. El viernes es un 5º día de producción, no un día exclusivo de Galletas.
   //   · Viernes PRODUCTIVO (vieRampa): MISMA selección que lun–jue sobre el set del viernes —
   //     quiebre (cobertura < colchón) > deuda de rampa > jalar del horizonte (cobertura < H).
@@ -5519,7 +5575,9 @@ function _weekLayout(stock, ritmo, colDe, H, personas, rampa){
   //   `rampa.vie===false` fuerza limpieza (reporte de escenarios); ausente/true = productivo si la
   //   rampa está encendida.
   const vieRampa = rOn && rampa.vie!==false;
-  const vieCand = [451,453,503,472,519];   // pan + Galletas · nunca Semillas (452)
+  // 2 PERSONAS + la semana lleva Semillas → en el layout base el picado cae el viernes, y ese día
+  // solo entran Galletas. Es selección, no capacidad: por eso vive acá y no en _aplicarPicado.
+  const vieCand = (personas<=2 && semillas>0) ? [519] : [451,453,503,472,519];   // nunca Semillas (452)
   let prod=null;
   if(vieRampa){
     let peor=null, pc=1e9, mejorRank=-1, mejorDebe=0;
@@ -5529,13 +5587,13 @@ function _weekLayout(stock, ritmo, colDe, H, personas, rampa){
       const rank=u?2:(debe>0?1:0);                       // mismo orden que lun–jue
       const gana=(rank>mejorRank) || (rank===mejorRank && (rank===1 ? debe>mejorDebe : c<pc));
       if(gana){ mejorRank=rank; mejorDebe=debe; pc=c; peor=p; } }
-    if(peor!==null){ const cap=capVie(peor); stock[peor]+=cap*NIV_INFO[peor].rend; prod={p:peor, batches:cap}; asign[peor]=(asign[peor]||0)+1; }
+    if(peor!==null){ const cap=_capDe(peor,personas); stock[peor]+=cap*NIV_INFO[peor].rend; prod={p:peor, batches:cap}; asign[peor]=(asign[peor]||0)+1; }
   } else {
     let peor=null, pc=1e9;                               // motor de siempre: viernes solo ante quiebre
     for(const p of vieCand){ const r=ritmo[p]||0; if(r<=0)continue; const c=(stock[p]-r)/r;
       const th = personas<3 ? colDe(p) : NIV_DERRAME_MIN;
       if(c<th && c<pc){ pc=c; peor=p; } }
-    if(peor!==null){ const cap=capVie(peor); stock[peor]+=cap*NIV_INFO[peor].rend; prod={p:peor, batches:cap}; asign[peor]=(asign[peor]||0)+1; }
+    if(peor!==null){ const cap=_capDe(peor,personas); stock[peor]+=cap*NIV_INFO[peor].rend; prod={p:peor, batches:cap}; asign[peor]=(asign[peor]||0)+1; }
   }
   // (3) LIMPIEZA PROFUNDA: solo si el viernes NO quedó cargado (lo decide _celdasSemana/rzCeldas al
   //     armar la etiqueta: si no hay picado ni producción ni corridos → "Limpieza").
@@ -5543,6 +5601,10 @@ function _weekLayout(stock, ritmo, colDe, H, personas, rampa){
   return {otros, semillas, viernes:{prod}, personas, rampaOn:!!rOn};
 }
 function _semanaBatches(layout){
+  // Si la proyección ya calculó los batches EFECTIVOS de la semana (colocación + ediciones +
+  // picado), esos mandan: son los mismos que pinta el detalle del Plan. El camino de abajo es la
+  // propuesta cruda del motor, que es lo correcto cuando no hay celdas de por medio (nivLevel).
+  if(layout && layout.batches) return Object.assign({}, layout.batches);
   const b={}; (layout.otros||[]).forEach(d=>b[d.p]=(b[d.p]||0)+d.batches);
   if(layout.semillas) b[452]=(b[452]||0)+layout.semillas;
   const v=layout.viernes||{};
@@ -5678,14 +5740,19 @@ async function nivCompras(stock){
       // líneas obligaría a repartir el stock on-hand entre etapas con una regla arbitraria y
       // las dos líneas sumarían mal: la lista es de COMPRA, y se compra una vez.
       const otra=(grupo==='medir' ? (bolsas.direct[pid]||0) : (bolsas.prem[pid]||0));
-      const nota=otra>0.0001 ? ('incluye '+_cant(otra,uom)+' de '+(grupo==='medir'?'producción':'premezclas')) : '';
+      // "incluye X de producción" obligaba a deducir qué era el resto. Se dice completo: de dónde
+      // viene esa parte Y de dónde no. Vale para cualquier ingrediente que aparezca en las dos etapas.
+      const nota=otra>0.0001 ? (_cant(otra,uom)+' son de '+(grupo==='medir'?'producción, no de premezcla':'premezcla, no de producción')) : '';
       out.push({pid, nombre:nm, uom:uom, need:nq, have:have, falta:falta,
                 accion:_mpFuente(_mpTipo(nm)), nota:nota}); }
     return out; }
-  const fecha='comprar hoy · cubre hasta el lun '+nextMon.getDate();
+  // "comprar hoy" sobraba: el título de la tarjeta ya dice Comprar, y la línea rosa está para
+  // decir la VENTANA, que es el dato. El lunes entra COMPLETO acá — a diferencia de "Por medir",
+  // que lo cuenta al 50%. Son ventanas distintas y por eso cada una lo dice.
+  const fecha='cubre hasta el lun '+nextMon.getDate(), fecha2='ese día completo';
   return {
-    premezclas:{fecha:fecha, items:items('medir')},
-    produccion:{fecha:fecha, items:items('producir')}
+    premezclas:{fecha:fecha, fecha2:fecha2, items:items('medir')},
+    produccion:{fecha:fecha, fecha2:fecha2, items:items('producir')}
   };
 }
 // ÚLTIMAS producciones pasadas (chequeo de Keylor): plan del motor vs real Odoo.
@@ -5837,7 +5904,10 @@ async function _rzSetup(){
   _rzEdit=null; _rzSel=null; _rzAviso='';
   _rzOverrides=await nivOverrides();          // ediciones futuras guardadas en Supabase
   // ÚLTIMAS producciones: plan del motor (sin real, sin override) de la semana vs Odoo real.
-  const planW0={}; rzCeldas(_rzCtx.mon0, weeks[0], {}, _rzCtx.hoyStr, {}).forEach(function(cc){ if(cc.prods&&Object.keys(cc.prods).length) planW0[cc.ds]=cc.prods; });
+  // Con overrides: lo que se compara contra Odoo es el registro tal como quedó —plan del motor
+  // MÁS las correcciones de Andrea—, que es el desacuerdo que importa. Sin ellos la tarjeta
+  // seguía marcando "Odoo ≠ plan" contra una propuesta que ella ya había corregido.
+  const planW0={}; rzCeldas(_rzCtx.mon0, weeks[0], {}, _rzCtx.hoyStr, _rzOverrides).forEach(function(cc){ if(cc.prods&&Object.keys(cc.prods).length) planW0[cc.ds]=cc.prods; });
   _rzUltimas=nivUltimas(planW0, real.byDate, _rzCtx.hoyStr);
   await rzRecalcAlistar();                     // alistar + compras (usa _rzCtx)
 }
@@ -6503,8 +6573,13 @@ function _entAgrupar(crudo, anioSet){
   crudo.forEach(function(o){
     const r=_entParseLote(o.cmts, o.py, o.pj, anioSet, o.producto);
     const rec={orden:o.orden, ordenId:o.ordenId, producto:o.producto, fecha:o.fecha, uds:o.uds, dfUtc:o.dfUtc, r:r};
-    if(r.estado==='ok'){ const k=r.lote.key;
-      const L=lotes[k]=lotes[k]||{key:k, canon:r.lote.canon, producto:o.producto, prodYear:o.py, ddd:r.lote.ddd, ordenes:[]};
+    if(r.estado==='ok'){ const k=o.producto+'-'+r.lote.key;
+      // LA CLAVE LLEVA EL PRODUCTO. Antes era solo añoProd-ddd, así que dos productos hechos el
+      // MISMO día compartían entrada y la entrada guardaba UN solo `producto` — el primero que
+      // llegara. El otro desaparecía del selector de su producto. Medido el 18-ago sobre 3 meses:
+      // dos lotes reales invisibles, Galletas 163/12-26 (tapado por Pizza) y Buns 168/12-26
+      // (tapado por Semillas). El orden FIFO sigue saliendo de `key`, que no cambia.
+      const L=lotes[k]=lotes[k]||{key:r.lote.key, canon:r.lote.canon, producto:o.producto, prodYear:o.py, ddd:r.lote.ddd, ordenes:[]};
       L.ordenes.push(rec); }
     else buckets[r.estado].push(rec);
   });
@@ -7388,10 +7463,19 @@ function _despLotesDe(pid){
   Object.values(_despLotes.lotes).forEach(function(L){
     if(+L.producto!==+pid) return;
     const k=pid+'|'+L.canon;
-    if(_despSaldo && (_despSaldo[k]||0)<=0) return;    // sin saldo: no se ofrece
-    out.push({lote:L.canon});
+    // NUNCA se esconde un lote. Antes esta línea lo sacaba de la lista cuando el saldo daba ≤ 0,
+    // que es lo contrario de lo que hace el Reporte —"agotados al fondo, en gris, NUNCA ocultos:
+    // el congelador físico manda sobre el sistema"—. Dos pantallas con la regla al revés sobre el
+    // mismo dato, y el resultado fue que Andrea tuvo que escribir un lote a mano el 18-ago.
+    // Va a importar más todavía: hoy nada se descuenta porque falta la vista de saldos, así que
+    // en cuanto empiece a descontarse habría desaparecido medio selector.
+    out.push({lote:L.canon, saldo:(_despSaldo?(_despSaldo[k]!=null?_despSaldo[k]:null):null)});
   });
-  out.sort(function(a,z){ return String(a.lote).localeCompare(String(z.lote),'es'); });
+  out.sort(function(a,z){
+    const aa=(a.saldo!=null&&a.saldo<=0)?1:0, zz=(z.saldo!=null&&z.saldo<=0)?1:0;
+    if(aa!==zz) return aa-zz;                                       // agotados al fondo
+    return String(a.lote).localeCompare(String(z.lote),'es');
+  });
   return out;
 }
 
@@ -7463,7 +7547,8 @@ function _despSel(i,j,lt,disp,cls){
   let h='<select class="dp-lsel '+cls+'" onchange="despSetLote('+i+','+j+',this.value)">'
     +'<option value="">Elegir lote</option>';
   disp.forEach(function(d){
-    h+='<option value="'+esc(d.lote)+'"'+(lt.lote===d.lote?' selected':'')+'>'+esc(d.lote)+'</option>';
+    const ago=(d.saldo!=null&&d.saldo<=0)?' — agotado según sistema':'';
+    h+='<option value="'+esc(d.lote)+'"'+(lt.lote===d.lote?' selected':'')+'>'+esc(d.lote+ago)+'</option>';
   });
   if(lt.lote && !disp.some(function(d){return d.lote===lt.lote;}))
     h+='<option value="'+esc(lt.lote)+'" selected>'+esc(lt.lote)+'</option>';
@@ -7546,13 +7631,33 @@ function despQuitarLote(i,j){
 function despSetLote(i,j,v){ const f=_despFacAbierta(); if(!f) return;
   const e=_despEst(f,i);
   if(v==='__'){ const t=prompt('Lote (forma "154 / 12-26"):',e.lotes[j].lote||'');
-    if(t==null){ despRender(); return; } v=String(t).trim(); }
+    if(t==null){ despRender(); return; } v=String(t).trim();
+    const L=f.lineas[i], m=v?_loteConocido(L.producto_id, v):'';
+    if(m && !confirm(m+'\n\n¿Lo dejo igual? Si el lote no existe, esa salida no se resta de ningún lote real.')){ despRender(); return; } }
   e.lotes[j].lote=v;
   if(!e.partido) e.lotes[0].cant=e.cant;
   despRender(); }
 function despMasLote(i){ const f=_despFacAbierta(); if(!f) return;
   _despEst(f,i).lotes.push({lote:'',cant:null}); despRender(); }
 function _despFacAbierta(){ return (_despFac||[]).find(function(x){ return x.factura_id===_despAbierto; }); }
+
+// ¿Este lote escrito a mano existe de verdad? Un lote inventado no es un registro sin efecto:
+// las unidades salen del congelador contra una clave `producto|lote` que no le corresponde a
+// ninguna orden de Odoo, así que el lote REAL conserva su saldo completo para siempre y la
+// disponibilidad queda inflada. Pasó el 18-ago: se escribió "183 - 12/26" y el lote real era
+// "183 / 1-27". No se bloquea —el congelador físico manda sobre el sistema— pero se avisa, y el
+// aviso ofrece el lote parecido, que en ese caso era el correcto con otro vencimiento.
+function _loteConocido(pid, canon){
+  const ls=(_despLotes&&_despLotes.lotes)?Object.values(_despLotes.lotes).filter(function(L){ return +L.producto===+pid; }):[];
+  if(ls.some(function(L){ return L.canon===canon; })) return '';
+  if(!ls.length) return 'No hay lotes de este producto leídos de Odoo, así que no puedo verificarlo.';
+  // Mismo día juliano y distinto vencimiento = casi seguro el mismo lote, mal transcrito.
+  const ddd=(String(canon).match(/\d{1,3}/)||[])[0];
+  const casi=ddd?ls.filter(function(L){ return String(L.ddd)===String(+ddd); }).map(function(L){ return L.canon; }):[];
+  return casi.length
+    ? ('Ese lote no existe en Odoo. Con el día '+(+ddd)+' hay: '+casi.join(' · ')+'.')
+    : ('Ese lote no existe en Odoo para este producto. Los que hay: '+ls.map(function(L){return L.canon;}).join(' · ')+'.');
+}
 
 // ── CONFIRMAR · DOS CAMINOS ─────────────────────────────────────────────
 // PREPARAR corta antes de la salida; PREPARAR Y ENTREGAR escribe las dos cosas.
@@ -8555,16 +8660,24 @@ async function rzDiagCierre(body){
   }catch(e){ body.innerHTML='<div class="rz-err">No pude calcular la meta de cierre: '+esc(e&&e.message||e)+'</div>'; }
 }
 // ── Overrides guardados (Supabase plan_overrides; append-only, la fila más reciente por fecha manda) ──
+const OV_DIAS_ATRAS=120;   // ventana de lectura de plan_overrides hacia atrás (días corridos)
 async function nivOverrides(){
   const c=sbClient(); if(!c) return {};
   try{
-    const {data,error}=await c.from('plan_overrides').select('fecha,producto_id,batches,tipo,creado_en').order('creado_en',{ascending:false});
+    const {data,error}=await c.from('plan_overrides').select('fecha,producto_id,batches,tipo,personas,creado_en').order('creado_en',{ascending:false});
     if(error||!data) return {};
-    const hoyStr=_ymd(new Date()), seen={}, ov={};
+    // Se leen también los días PASADOS: son correcciones de REGISTRO (el plan decía 6 Francés y
+    // en planta se hizo limpieza). El tope era el lunes de ESTA semana, y eso las hacía
+    // desaparecer al pasar de semana — no se borraban, dejaban de leerse. Ahora es una ventana
+    // fija de OV_DIAS_ATRAS días: no se mueve sola, no hay que mantenerla, y da margen de sobra
+    // sobre lo que cualquier pantalla llega a mostrar (el Resumen ve 2 semanas; el Plan, del mes
+    // en curso en adelante).
+    const desde=new Date(); desde.setDate(desde.getDate()-OV_DIAS_ATRAS);
+    const desdeStr=_ymd(desde), seen={}, ov={};
     for(const r of data){ const f=r.fecha; if(!f||seen[f])continue; seen[f]=1;
-      if(f<hoyStr) continue;                    // el pasado lo dicta Odoo, no un override
+      if(f<desdeStr) continue;
       if(r.tipo==='anulacion') continue;        // la última fila es "volver al plan" → sin override
-      ov[f]={producto_id:r.producto_id, batches:r.batches, tipo:r.tipo}; }
+      ov[f]={producto_id:r.producto_id, batches:r.batches, tipo:r.tipo, personas:(r.personas!=null?+r.personas:null)}; }
     return ov;
   }catch(e){ return {}; }   // tabla no creada aún → sin overrides (degradación limpia, como plan_config)
 }
@@ -8590,7 +8703,7 @@ async function rzPersistPersonas(iso, n){
 function _rzRenivelar(){
   if(_rzCtx){ const lvl=nivLevel(_rzCtx.ritmo, _rzCtx.stock.finPlan||_rzCtx.stock.fin, _rzCtx.cfg); _rzCtx.weeks=lvl.weeks; _rzCtx.w0=lvl.w0; _rzRecalcAuto(); }
   if(_planInputs){ const sem=Math.max(0, Math.round((_mondayProd(new Date(2026,11,18))-_mondayProd(new Date()))/(7*86400000))+1);
-    _planProj=nivProyeccion(_planInputs.ritmo, _planInputs.fin, _planInputs.cfg, sem); }
+    _planProj=_planProyectar(_planInputs.ritmo, _planInputs.fin, _planInputs.cfg, sem); }
 }
 function _rzRepintar(){ if(_rzCtx && document.getElementById('rzBody')) rzRender(); if(_planProj.length && document.getElementById('planBody')) planRenderMeses(); }
 // Cambio MANUAL de personas: NO recalcula/guarda de una. Primero PREVISUALIZA y pide confirmar.
@@ -8625,6 +8738,13 @@ function _rzConfirmBar(iso){
 // ── Celdas de UNA semana con overrides + metadatos de interacción (Resumen editable) ──
 // ÚNICA función de colocación en celdas lun–vie (Resumen Y Plan): ds, editable, nav, swappable,
 // edited y prods={pid:batches} (para recalcular MP/premezclas). El Plan la reusa con sus overrides.
+// ¿Dos mapas de batches dicen lo mismo? (mismos productos, mismas cantidades redondeadas)
+function _mismosBatches(a, b){
+  a=a||{}; b=b||{}; const ks={};
+  Object.keys(a).forEach(function(k){ if(a[k]>0) ks[+k]=1; });
+  Object.keys(b).forEach(function(k){ if(b[k]>0) ks[+k]=1; });
+  return Object.keys(ks).every(function(k){ return Math.round(a[k]||0)===Math.round(b[k]||0); });
+}
 function rzCeldas(monday, layout, real, hoyStr, overrides){
   const days=_weekDays(monday);
   const otros=(layout.otros||[]).slice(), semB=layout.semillas||0, v=layout.viernes||{};
@@ -8643,25 +8763,52 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
     const ds=day.ds, realDay=(real&&real[ds])||null, past=ds<hoyStr, fut=ds>=hoyStr;
     const ov=overrides&&overrides[ds];
     const c={dow:day.dow, dnum:day.dnum, ds:ds, prods:{}};
-    if(realDay){ c.kind='real'; c.editable=false; c.nav=true;
-      c.prod=Object.keys(realDay).map(function(pp){return _rzBP(Math.round(realDay[pp]/NIV_INFO[+pp].rend), +pp);}).join(' + '); return c; }
+    // Lo que Odoo REGISTRÓ ese día, en batches. Es la verdad de lo que se produjo (regla madre) y
+    // acá se usa para dos cosas: pintar el día pasado sin corregir, y delatar el desacuerdo cuando
+    // la corrección de Andrea dice otra cosa.
+    const realB={}; if(realDay) for(const pp in realDay) realB[+pp]=Math.round(realDay[pp]/NIV_INFO[+pp].rend);
+    const odooTxt=realDay?Object.keys(realB).map(function(k){ return _rzBP(realB[k], +k); }).join(' + '):'';
+    // DÍA PASADO CORREGIDO A MANO. Va antes que el registro de Odoo porque es lo que Andrea afirma
+    // que pasó; Odoo no se toca ni se contradice en silencio: si discrepan, se dice en la celda.
+    if(ov && past){
+      c.kind=ov.producto_id==null||!(ov.batches>0)?'edit-empty':'edit';
+      c.editable=true; c.edited=true; c.swappable=false; c.nav=!!realDay; c.pasado=true;
+      if(c.kind==='edit'){ const tope=_capDe(ov.producto_id, pers), bt=Math.min(ov.batches, tope);
+        c.pid=ov.producto_id; c.batches=bt; c.prods[ov.producto_id]=bt; c.prod=_rzBP(bt, ov.producto_id); }
+      else { c.prod=i===4?'Limpieza':'—'; }
+      if(!_mismosBatches(c.prods, realB)) c.odoo=realDay?('Odoo: '+odooTxt):'Odoo: sin registro';
+      c.bt=''; return c;
+    }
+    // El día pasado que Odoo registró se pinta con lo real, y AHORA es editable: es la única forma
+    // de corregir el registro cuando la producción de planta no fue la del plan.
+    if(realDay){ c.kind='real'; c.editable=true; c.nav=true; c.pasado=true;
+      c.prod=odooTxt; return c; }
     if(i<4 && slot[i] && slot[i].feriado){ c.kind='feriado'; c.editable=false; c.prod='Feriado'; c.bt=slot[i].feriado; return c; }
     if(ov && fut){ c.editable=true; c.edited=true; c.swappable=true;
       if(ov.producto_id==null || !(ov.batches>0)){ c.kind='edit-empty';
         c.prod=(i===4?'Limpieza':'—'); c.bt=''; return c; }
-      // LA CAPACIDAD PISA EL OVERRIDE. Un día de 2 personas tiene un techo físico: antes esta
-      // rama devolvía ov.batches crudo y retornaba ANTES de mirar lo que el nivelador acababa de
-      // recalcular, así que un día editado se congelaba —mismo producto y mismos batches a 3 o a
-      // 2 personas— y ese número inflado se sumaba de vuelta al stock en _rzMetaEfectiva y en
-      // planColchonOv. El override NO se toca en la base: se recorta lo que el plan EJECUTA y
-      // SUMA. Si la semana vuelve a 3 personas, el número original revive solo.
-      const tope=_capDe(ov.producto_id, pers), bt=Math.min(ov.batches, tope);
-      if(bt<ov.batches) c.recorte={pid:ov.producto_id, de:ov.batches, a:bt};
+      // LA CAPACIDAD MANDA EN LOS DOS SENTIDOS. b21 solo recortaba (Math.min), así que un
+      // override guardado en una semana de 2 se quedaba clavado abajo cuando la semana volvía a
+      // 3: "6 Francés" en una semana de 3, cuyo techo son 10. Pero subir siempre sería peor —
+      // pisaría un 6 que Andrea puso a propósito. Lo que distingue los dos casos es `personas`,
+      // la dotación con la que se creó la fila:
+      //   · misma dotación que hoy      → su cifra manda tal cual (el techo físico igual aplica).
+      //   · otra dotación, y era EL TECHO de esa dotación → era "lo que cabía": se reajusta al
+      //     techo de hoy, para arriba o para abajo.
+      //   · otra dotación, y era otro número → fue deliberado: solo se recorta, nunca se sube.
+      //   · sin dato (filas anteriores a la columna) → se trata como deliberado: solo se recorta.
+      // El override NO se toca en la base: esto ajusta lo que el plan EJECUTA y SUMA.
+      const hoyCap=_capDe(ov.producto_id, pers);
+      const opers=(ov.personas!=null)?+ov.personas:null;
+      const eraTecho=(opers!=null && ov.batches===_capDe(ov.producto_id, opers));
+      const bt=(opers!==pers && eraTecho) ? hoyCap : Math.min(ov.batches, hoyCap);
+      if(bt!==ov.batches) c.recortes=[{pid:ov.producto_id, de:ov.batches, a:bt,
+                                       motivo:(bt>ov.batches?'suba':'dotacion')}];
       c.kind='edit'; c.pid=ov.producto_id; c.batches=bt; c.prods[ov.producto_id]=bt;
       c.prod=_rzBP(bt, ov.producto_id); c.bt=''; return c; }
     if(i<4){
       const e=slot[i];
-      if(e&&e.p){ c.kind=fut?'prop':(past?'pend':'prop'); c.editable=fut; c.swappable=fut; c.pid=e.p; c.batches=e.batches; c.prods[e.p]=e.batches; c.prod=_rzBP(e.batches, e.p); c.bt=''; c.today=ds===hoyStr; return c; }
+      if(e&&e.p){ c.kind=fut?'prop':(past?'pend':'prop'); c.editable=true; c.swappable=fut; if(past) c.pasado=true; c.pid=e.p; c.batches=e.batches; c.prods[e.p]=e.batches; c.prod=_rzBP(e.batches, e.p); c.bt=''; c.today=ds===hoyStr; return c; }
       c.kind='libre'; c.editable=fut; c.swappable=fut; c.prod='—'; c.bt=''; return c;
     }
     // VIERNES: picado (si Semillas jueves) + UN pan/galletas + corridos por feriado; la
@@ -8686,7 +8833,12 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
   });
 }
 // Suma prods de las celdas de producción de la semana (editables o auto-relleno).
-function _rzFutBatches(cells){ const b={}; cells.forEach(function(c){ if(!c.editable && !c.auto)return; const pr=c.prods||{}; for(const k in pr) b[+k]=(b[+k]||0)+pr[k]; }); return b; }
+// Los días PASADOS quedan afuera aunque ahora sean editables: su producción ya la cuenta
+// _rzHechoOAsumido. Antes bastaba con `editable` para separarlos —el pasado no lo era—; desde que
+// se corrige el registro hay que decirlo explícito o el día se suma dos veces a la meta.
+function _rzFutBatches(cells){ const hoy=(_rzCtx&&_rzCtx.hoyStr)||'';
+  const b={}; cells.forEach(function(c){ if(c.ds<hoy) return; if(!c.editable && !c.auto)return;
+    const pr=c.prods||{}; for(const k in pr) b[+k]=(b[+k]||0)+pr[k]; }); return b; }
 // Batches YA producidos esta semana según Odoo (real.byDate, días pasados) → en batches por producto.
 // Odoo manda sobre los días pasados: lo ya registrado cuenta contra la meta y NO se re-planifica.
 function _rzRealBatches(){ const b={}, bd=(_rzCtx&&_rzCtx.real&&_rzCtx.real.byDate)||{};
@@ -8723,8 +8875,14 @@ function _rzMetaEfectiva(offset){
 // creía que no se hicieron y metía días de más). La alerta avisa para que Keylor los registre;
 // cuando registre, manda lo real y el motor reajusta solo.
 // Usa _rzCells (base cruda) a propósito: _rzCellsBase llamaría a _creditRealIntoBase → recursión.
-function _rzAsumido(){ const b={};
-  _rzCells(0).forEach(function(c){ if(c.ds>=_rzCtx.hoyStr || c.kind!=='pend') return;
+// ASUMIDO = lo que se da por producido en un día pasado SIN registro en Odoo: el plan ('pend') o
+// la corrección de Andrea ('edit'). Si Odoo SÍ tiene registro ese día, no entra acá — lo cuenta
+// _rzRealBatches y Odoo es la verdad de lo que se produjo, incluso si la corrección dice otra cosa
+// (ese desacuerdo se MUESTRA en la celda, no se resuelve inventando un número).
+function _rzAsumido(){ const b={}, bd=(_rzCtx&&_rzCtx.real&&_rzCtx.real.byDate)||{};
+  _rzCells(0).forEach(function(c){ if(c.ds>=_rzCtx.hoyStr) return;
+    if(bd[c.ds] && Object.keys(bd[c.ds]).length) return;        // Odoo manda
+    if(c.kind!=='pend' && c.kind!=='edit') return;
     const pr=c.prods||{}; for(const k in pr) b[+k]=(b[+k]||0)+pr[k]; });
   return b; }
 // Real + asumido = lo que la semana ya dio por producido (contra la meta).
@@ -8755,8 +8913,8 @@ function _rzAutoFill(){
   // en la ventana consigue un DÍA concreto de destino (el próximo día productivo libre). También
   // se anota el ESTADO de cada día futuro (dayStates) para poder explicar la búsqueda del destino.
   const H=(_rzCtx.weeks&&_rzCtx.weeks.length)||2;
-  for(let o=0;o<H;o++){ const cells=_aplicarPicado(_rzCellsBase(o));
-    const persO=_personasDe(_isoWk(_rzMonday(o)));   // el techo del slot es el de SU semana
+  for(let o=0;o<H;o++){ const persO=_personasDe(_isoWk(_rzMonday(o)));   // el techo del slot es el de SU semana
+    const cells=_aplicarPicado(_rzCellsBase(o), persO);
     cells.forEach(function(cc,i){ if(cc.ds<_rzCtx.hoyStr) return;
       let libre=false, estado;
       if(i<4){ if(cc.kind==='libre'){ libre=true; estado='libre'; } else if(cc.kind==='feriado'){ estado='feriado (no se produce)'; } else if(cc.kind==='edit-empty'){ estado='vaciado por vos (respeta el "nada")'; } else { estado='ocupado ('+(cc.prod||'')+')'; } }
@@ -8785,6 +8943,7 @@ function _rzAutoFill(){
                                   .slice().sort(function(a,b){ return (a.dow===3?0:1)-(b.dow===3?0:1) || a.ord-b.ord; })
                            : slots;
       for(const s of cand){ if(falta<=0.0001) break; if(s.ord < o*10) continue; if(usados[s.ds]) continue;   // un producto por día (incl. viernes)
+        if(s.pic && s.pers<=2 && p!==519) continue;         // 2 personas + picado: ese día es solo de Galletas
         // CAPACIDAD MÁXIMA por día ("20 Francés/día" es imposible): la de SU semana —no la de 3
         // personas fija de antes, que volvía a inflar justo lo que el recorte acababa de corregir—
         // y si el día lleva picado, la de 2 personas.
@@ -8815,22 +8974,66 @@ function _rzOverlayAuto(cells, auto){ auto=auto||{};
 // Celdas de la semana del Resumen con el auto-relleno superpuesto (para render y para alistar).
 // El picado va AL FINAL, sobre las celdas ya efectivas (base + overrides + auto-relleno): es lo
 // último que se deriva porque depende de dónde quedó Semillas después de todo lo demás.
-function _rzCellsFull(offset){ return _aplicarPicado(_rzOverlayAuto(_rzCellsBase(offset), _rzAuto)); }
-// Aviso de RECORTE por dotación: qué días editados no cabían en la capacidad de la semana.
-// Se dice en pantalla — recortar en silencio sería mentirle al plan.
+function _rzCellsFull(offset){
+  const pers=_personasDe(_isoWk(_rzMonday(offset)));
+  return _rzIndexPicado(_aplicarPicado(_rzOverlayAuto(_rzCellsBase(offset), _rzAuto), pers), pers);
+}
+// Aviso de RECORTE: qué días no cabían y por qué. Dos motivos, dos frases — recortar en silencio
+// sería mentirle al plan, y decir "se recortó" sin decir por qué obliga a adivinar.
 function _rzRecorteAviso(cells, personas){
-  const rs=(cells||[]).filter(function(c){ return c.recorte; });
-  if(!rs.length) return '';
-  const det=rs.map(function(c){ return _fechaCorta(c.ds)+' '+_nomCorto(c.recorte.pid)+' '+_rzN(c.recorte.de)+' → '+_rzN(c.recorte.a); }).join(', ');
-  return '<div class="rz-recorte">'+personas+' persona'+(personas===1?'':'s')+': se '
-    +(rs.length===1?'recortó 1 día':('recortaron '+rs.length+' días'))+' — '+esc(det)+'</div>';
+  const todos=[]; (cells||[]).forEach(function(c){ (c.recortes||[]).forEach(function(r){ todos.push({ds:c.ds, r:r}); }); });
+  if(!todos.length) return '';
+  const lbl=function(x){ return _fechaCorta(x.ds)+' '+_nomCorto(x.r.pid)+' '+_rzN(x.r.de)+(x.r.a>0?(' → '+_rzN(x.r.a)):' fuera'); };
+  const sub=todos.filter(function(x){ return x.r.motivo==='suba'; });
+  const dot=todos.filter(function(x){ return x.r.motivo==='dotacion'; });
+  const p2p=todos.filter(function(x){ return x.r.motivo==='picado2p'; });
+  const fr=[];
+  if(dot.length) fr.push(personas+' persona'+(personas===1?'':'s')+': se '
+    +(dot.length===1?'recortó 1 día':('recortaron '+dot.length+' días'))+' — '+esc(dot.map(lbl).join(', ')));
+  if(sub.length) fr.push(personas+' persona'+(personas===1?'':'s')+': se '
+    +(sub.length===1?'subió 1 día':('subieron '+sub.length+' días'))+' al techo de hoy — '+esc(sub.map(lbl).join(', ')));
+  // El recorte por picado NO se avisa acá: el chip de la tarjeta ya lo dice y el número recortado
+  // está a la vista en la celda. Repetirlo era ruido. (El caso de 2 personas SÍ se avisa: ahí el
+  // producto SALE del día y eso no se ve en ninguna celda — no hay número que mirar.)
+  if(p2p.length) fr.push('2 personas + picado: ese día solo entran Galletas — sale '+esc(p2p.map(lbl).join(', ')));
+  if(!fr.length) return '';   // había recortes, pero ninguno de los que se avisan → NADA, ni la caja vacía
+  return '<div class="rz-recorte">'+fr.join('<br>')+'</div>';
 }
 function rzWeekBatchesFull(offset){ return _rzFutBatches(_rzCellsFull(offset)); }
 // Producción planeada por fecha (2 semanas, con ediciones + auto) → base de la lógica de compras.
 function _rzPerDate(){ const m={}; for(let o=0;o<2;o++){ _rzCellsFull(o).forEach(function(c){ const pr=c.prods||{}; if(!Object.keys(pr).length) return; const t=m[c.ds]=m[c.ds]||{}; for(const k in pr) t[+k]=(t[+k]||0)+pr[k]; }); } return m; }
 // (El calendario muestra la semana COMPLETA: días pasados = real de Odoo, hoy resaltado, futuro = plan.)
+// ── VENTANA DE "POR MEDIR": desde HOY hasta el LUNES SIGUIENTE inclusive, ese lunes al 50%. ──
+// No es la semana en curso (eso era lo que había, y se quedaba corto justo el lunes en la mañana,
+// que es cuando se mide). Las socias miden lo que falta para HOY más toda la producción hasta el
+// lunes que viene; de ese lunes miden la mitad, porque esa mañana vuelven y miden la otra mitad.
+// El traslape es deliberado — por eso el lunes entra fraccionado y no entero ni afuera.
+// Los batches quedan fraccionarios a propósito: nivAlistar redondea al final (Math.ceil sobre lo
+// que falta), así que partir acá y redondear allá no pierde media premezcla.
+function _rzMedirBatches(){
+  const frac=(_rzCtx && _rzCtx.cfg && _rzCtx.cfg.medirLunesFrac!=null) ? _rzCtx.cfg.medirLunesFrac : NIV_CFG_DEF.medirLunesFrac;
+  const nextMon=new Date(_rzCtx.mon0); nextMon.setDate(nextMon.getDate()+7);
+  const nextMonStr=_ymd(nextMon), perDate=_rzPerDate(), out={};
+  for(const ds in perDate){ if(ds<_rzCtx.hoyStr || ds>nextMonStr) continue;
+    const peso=(ds===nextMonStr)?frac:1, t=perDate[ds];
+    for(const k in t) out[+k]=(out[+k]||0)+t[k]*peso; }
+  return out;
+}
+// Etiqueta de la ventana — es definición del dato (hasta cuándo cubre), no instrucción de uso.
+function _rzMedirLbl(){
+  const frac=(_rzCtx && _rzCtx.cfg && _rzCtx.cfg.medirLunesFrac!=null) ? _rzCtx.cfg.medirLunesFrac : NIV_CFG_DEF.medirLunesFrac;
+  const nextMon=new Date(_rzCtx.mon0); nextMon.setDate(nextMon.getDate()+7);
+  return {l1:'cubre hasta el lun '+nextMon.getDate(), l2:'ese día al '+_rzN(frac*100)+'%'};
+}
+// Las dos líneas de la ventana, siempre en dos renglones: son dos datos distintos —hasta cuándo
+// cubre, y cómo cuenta ese último día— y corridos en una sola línea se leían como uno solo.
+function _rzVentanaHtml(l1, l2){
+  return '<div class="rz-c4fecha"><span>'+esc(l1)+'</span>'+(l2?('<span>'+esc(l2)+'</span>'):'')+'</div>';
+}
 async function rzRecalcAlistar(){ _rzRecalcAuto();
-  _rzAlistar=await nivAlistar([rzWeekBatchesFull(0), rzWeekBatchesFull(1)], _rzCtx.stock);
+  // UN solo mapa: el de la ventana. El segundo (semana 1) se calculaba y no lo leía nadie, y con
+  // la ventana nueva —que ya se mete en la semana siguiente— habría contado el traslape dos veces.
+  _rzAlistar=await nivAlistar([_rzMedirBatches()], _rzCtx.stock);
   _rzCompras=await nivCompras(_rzCtx.stock); }
 
 function rzRender(){
@@ -8864,7 +9067,9 @@ function rzVaSemanaCard(){
 function rzMedirCard(){
   const pm=(_rzAlistar[0]&&_rzAlistar[0].premez)||[];
   const txt=pm.length?pm.map(function(x){return x.n+' '+x.prod.replace(/^Pan /,'');}).join(' · '):'ya está todo ✓';
-  return '<div class="rz-card4 rz-c4-medir"><div class="rz-c4h">Por medir</div><div class="rz-c4line'+(pm.length?'':' rz-ok')+'">'+esc(txt)+'</div></div>';
+  return '<div class="rz-card4 rz-c4-medir"><div class="rz-c4h">Por medir</div>'
+    +(function(v){ return _rzVentanaHtml(v.l1, v.l2); })(_rzMedirLbl())
+    +'<div class="rz-c4line'+(pm.length?'':' rz-ok')+'">'+esc(txt)+'</div></div>';
 }
 // TARJETAS "Comprar": LISTA COMPLETA, siempre. Fecha objetivo en rosa apagado.
 // Sin "+N más": es la lista de compra real de Lorena y un ítem escondido es un ítem que no se
@@ -8885,7 +9090,7 @@ function rzComprasCards(){
       : '<div class="rz-c4line rz-ok"><span class="rz-c4-desk">alcanza — nada que comprar</span>'
         +'<span class="rz-c4-mov">ya está todo ✓</span></div>';
     return '<div class="rz-card4 '+extra+'"><div class="rz-c4h">'+titulo+'</div>'
-      +'<div class="rz-c4fecha">'+esc(data.fecha)+'</div>'+cuerpo+'</div>';
+      +_rzVentanaHtml(data.fecha, data.fecha2)+cuerpo+'</div>';
   }
   return card('Comprar · para medir premezclas', _rzCompras.premezclas, 'rz-c4-cmedir')
        + card('Comprar · para producir', _rzCompras.produccion, 'rz-c4-cprod');
@@ -8900,28 +9105,11 @@ function _rzChipPersonas(iso, personas){
 // qué gritar en cada cuadrito. Lo excepcional —lo que Andrea cambió a mano— se resume en una
 // línea gris al pie del calendario y se despliega en una lista chica: fecha y qué quedó.
 // Sin colores, sin badges, sin tabla. Si no hay días editados, la línea no existe.
-let _rzEdListaOpen=false;
-function _rzEditadosHtml(){
-  const eds=[];
-  // Cuenta SOLO los días VISIBLES: si la próxima semana está colapsada, sus ediciones no
-  // entran (decían "6 días editados" con 5 días en pantalla). Al desplegarla, entran las dos.
-  const semanas = _rzShowNext ? 2 : 1;
-  for(let o=0;o<semanas;o++) _rzCellsFull(o).forEach(function(c){ if(c.edited) eds.push(c); });
-  if(!eds.length) return '';
-  const filas=eds.map(function(c){
-    return '<div class="rz-edrow"><span class="rz-edd">'+c.dow+' '+c.dnum+'</span>'
-      +'<span class="rz-edp">'+esc(c.prod)+'</span></div>'; }).join('');
-  const n=eds.length;
-  return '<div class="rz-edwrap">'
-    +'<button class="rz-edtoggle'+(_rzEdListaOpen?' rz-abierto':'')+'" onclick="rzToggleEditados(this)">'
-      +n+' día'+(n===1?'':'s')+' editado'+(n===1?'':'s')+'</button>'
-    +'<div class="rz-edlista'+(_rzEdListaOpen?'':' hidden')+'" id="rzEdLista">'+filas+'</div></div>';
-}
-function rzToggleEditados(btn){
-  _rzEdListaOpen=!_rzEdListaOpen;
-  const l=document.getElementById('rzEdLista'); if(l) l.classList.toggle('hidden', !_rzEdListaOpen);
-  if(btn) btn.classList.toggle('rz-abierto', _rzEdListaOpen);
-}
+// SIN SEÑAL DE "EDITADO" EN LA TARJETA (17-ago-2026, decisión de Andrea). No hace falta: ella
+// sabe qué días tocó. La ÚNICA señal de que el plan fue modificado es el botón "Volver al plan",
+// que aparece solo cuando hay algo que revertir. Se fueron el punto rosa, la leyenda "N días
+// editados" con su chevron, la lista desplegable y el borde ámbar del día editado.
+// Consecuencia aceptada: el día vaciado a mano vuelve a verse igual que un día vacío del plan.
 function rzToggleNext(btn){
   _rzShowNext=!_rzShowNext;
   // Se repinta entero (y no solo la clase) para que "N días editados" vuelva a contar sobre
@@ -8944,6 +9132,9 @@ function _fechaCorta(ds){ const d=new Date(ds+'T00:00:00'); return _DOW[d.getDay
 function _fechaLarga(ds){ const d=new Date(ds+'T00:00:00'); return _DOW[d.getDay()]+' '+d.getDate()+' '+_MESAB[d.getMonth()]+' '+d.getFullYear(); }
 // Aviso de DERRAME con el DÍA concreto de destino (el motor ya lo colocó ahí). Agrupa por producto;
 // si se parte en varios días, muestra el rango. Fallback: lo que no cupo ni en el horizonte proyectado.
+// VIVE EN EL PLAN, no en el Resumen (17-ago-2026, decisión de Andrea). En el Resumen ella está
+// editando días concretos y ya sabe que anda apretada: ahí el aviso era ruido sobre algo que ya
+// sabe. En el Plan, donde se ve el panorama de meses, que la meta no cierre SÍ cambia decisiones.
 function _rzDerrameNota(){
   const der=_rzDerrame||[], parts=[];
   if(der.length){
@@ -8955,7 +9146,7 @@ function _rzDerrameNota(){
   if(_rzAutoLeft&&_rzAutoLeft.length){
     parts.push('quedan '+_rzAutoLeft.map(function(x){return _rzBP(x.batches,x.pid);}).join(' · ')+' sin agendar — no hay hueco hasta el cierre, la meta no se cumple');
   }
-  return parts.length?('<div class="rz-leftnote">Para cumplir la meta: '+parts.join(' · ')+'.</div>'):'';
+  return parts.length?('<div class="pl-metanota">Para cumplir la meta: '+parts.join(' · ')+'.</div>'):'';
 }
 const _SVG_WA='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-12.6 7.3L3 20.5l1.8-5.2A8.4 8.4 0 1 1 21 11.5z"/></svg>';
 const _SVG_ALERT='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>';
@@ -8980,19 +9171,25 @@ function _rzAlertaHtml(){
   return '<div class="rz-alert">'+_SVG_ALERT+'<span>'+txt+'</span></div>';
 }
 function rzStripHtml(){
-  const edited=_rzCellsFull(0).concat(_rzCellsFull(1)).some(c=>c.edited);
-  // Botón "Volver al plan" ARRIBA A LA DERECHA, junto a "editado" — SOLO si hay ediciones que revertir.
-  const right=edited?('<span class="rz-shr"><span class="rz-edtag" title="Editado por vos">'+_SVG_PENCIL+'editado</span>'
+  // "Volver al plan" descarta los overrides FUTUROS y NO toca las correcciones de días pasados:
+  // esas son registro de lo que ocurrió, no una preferencia de plan, y perderlas al reacomodar la
+  // semana sería destruir información. Por eso la condición cuenta solo lo futuro — con `c.edited`
+  // a secas el botón aparecía por una corrección del pasado y al tocarlo no hacía nada.
+  const edited=Object.keys(_rzOverrides||{}).some(function(ds){ return ds>=_rzCtx.hoyStr; });
+  const right=edited?('<span class="rz-shr">'
     +'<button class="rz-revert" onclick="rzVolverPlanStrip()">Volver al plan</button></span>'):'';
   const head='<div class="rz-sh"><span class="rz-st">Pendiente de fabricar</span>'
     +right+'</div>';
-  const leftnote=_rzDerrameNota();
   const cal='<div class="rz-cal2'+(_rzShowNext?' rz-shownext':'')+'">'+_rzWeekBlock(0)+_rzWeekBlock(1)+'</div>';
   const verbtn='<button class="rz-vernext'+(_rzShowNext?' rz-abierto':'')+'" onclick="rzToggleNext(this)">'
     +(_rzShowNext?'Ocultar próxima semana':'Ver próxima semana')+'</button>';
   // Motivo de un intercambio bloqueado (nunca falla en silencio) — se va al tocar otro día.
   const aviso=_rzAviso?('<div class="rz-aviso">'+esc(_rzAviso)+'</div>'):'';
-  return '<div class="rz-sec">'+head+_rzAlertaHtml()+aviso+cal+_rzEditadosHtml()+verbtn+leftnote+'</div>';
+  // Desplegado, el control dice "Ocultar" y va ARRIBA: al final del bloque obligaba a recorrer
+  // la semana entera para volver a cerrarla. Cerrado dice "Ver" y va abajo, que es donde invita
+  // a seguir leyendo. El botón es solo de teléfono (display:none en escritorio).
+  return '<div class="rz-sec">'+head+_rzAlertaHtml()+aviso
+    +(_rzShowNext?verbtn:'')+cal+(_rzShowNext?'':verbtn)+'</div>';
 }
 // ── 2 · PREMEZCLAS POR MEDIR (tira de una línea) ──
 function rzMedirHtml(){
@@ -9095,45 +9292,53 @@ async function rzVolverPlanStrip(){
 }
 // Estado del día en UNA palabra minúscula (tarjeta compacta de teléfono). "editado" gana sobre
 // el estado base: en escritorio se lee "Editado · editado", acá tiene que decirlo una sola vez.
+// "editado" ya NO es texto en ninguna de las dos pantallas: lo dice el punto rosa de la esquina.
+// Antes el mapa de estados traía 'Editado' Y además se concatenaba ' · editado' porque cell.edited
+// también era true — la tarjeta decía "Editado · editado". Se quitan los dos.
 const _RZ_CORTO={real:'hecho', pend:'sin registrar', prop:'propuesto', libre:'libre',
-                 feriado:'feriado', viernes:'libre', edit:'editado', 'edit-empty':'editado',
+                 feriado:'feriado', viernes:'libre', edit:'', 'edit-empty':'',
                  auto:'para la meta'};
 function _rzEstadoCorto(cell, sel){
   if(sel) return 'seleccionado';
-  if(cell.edited) return 'editado';
   if(cell.auto) return 'para la meta';
   return _RZ_CORTO[cell.kind]||'';
 }
 function rzCellHtml(cell){
   // 'pend' = día pasado con plan y sin registro en Odoo → se ASUME hecho según el plan
   // ("sin registrar aún" ≠ "Hecho ✓", que es lo confirmado por Odoo).
-  const RZ={real:['rz-done','Hecho ✓'], today:['rz-today','En curso'], pend:['rz-miss','Sin registrar aún'], prop:['rz-plan','Propuesto'], libre:['rz-clean','Libre'], feriado:['rz-fer','Feriado'], viernes:['rz-clean','—'], edit:['rz-plan','Editado'], 'edit-empty':['rz-clean','Editado'], auto:['rz-plan','Para cumplir la meta']};
+  const RZ={real:['rz-done','Hecho ✓'], today:['rz-today','En curso'], pend:['rz-miss','Sin registrar aún'], prop:['rz-plan','Propuesto'], libre:['rz-clean','Libre'], feriado:['rz-fer','Feriado'], viernes:['rz-clean','—'], edit:['rz-plan',''], 'edit-empty':['rz-clean',''], auto:['rz-plan','Para cumplir la meta']};
   const ds=cell.ds;
   if(_rzEdit===ds && cell.editable) return rzFormHtml(cell);
   const m=RZ[cell.kind]||RZ.libre;
+  // Fecha a la izquierda y lápiz a la derecha, en el mismo eje. (El .rz-dd sigue siendo flex por
+  // la alineación vertical, aunque ya no tenga que acomodar nada al lado de la fecha.)
   const dd='<div class="rz-dd">'+cell.dow+' '+cell.dnum+'</div>';
   const dp='<div class="rz-dp">'+esc(cell.prod)+'</div>';
   // El picado no es editable ni removible: es consecuencia de dónde quedó Semillas, no una marca.
-  const pic=cell.picado?'<div class="rz-picchip">picado · rinde como 2 personas</div>':'';
+  // El chip solo aparece si la restricción muerde — el texto lo decide _aplicarPicado.
+  const pic=cell.picadoChip?('<div class="rz-picchip">'+esc(cell.picadoChip)+'</div>'):'';
   const db=cell.bt?('<div class="rz-db">'+esc(cell.bt)+'</div>'):'';
+  // Desacuerdo con Odoo en un día corregido: se DICE, no se bloquea. Odoo sigue siendo la verdad
+  // de lo que se produjo; la corrección es lo que Andrea afirma. Ver los dos es la información.
+  const od=cell.odoo?('<div class="rz-dodoo">'+esc(cell.odoo)+'</div>'):'';
   const sel=_rzSel===ds;
-  const estado=(cell.auto&&cell.kind==='viernes'?'Para cumplir la meta':m[1])+(cell.edited?' · editado':'')
-    +(sel?' · seleccionado':'');
+  const estado=(cell.auto&&cell.kind==='viernes'?'Para cumplir la meta':m[1])+(sel?' · seleccionado':'');
   // En teléfono el estado va en UNA palabra minúscula. Se emiten los dos textos y el CSS
   // muestra el que corresponde al ancho: así no hay rama por viewport en JS (que se rompería
   // al rotar el teléfono) y el HTML es el mismo para las dos pantallas.
   const st='<div class="rz-ds">'+estado+'</div><div class="rz-dsm">'+_rzEstadoCorto(cell, sel)+'</div>';
-  const cls=m[0]+(cell.editable?' rz-ed':'')+(cell.edited?' rz-edited':'')+(cell.auto?' rz-autofill':'')
+  const cls=m[0]+(cell.editable?' rz-ed':'')+(cell.auto?' rz-autofill':'')
     +(cell.today?' rz-today':'')+(sel?' rz-sel':'');
   // El lápiz sigue EXACTAMENTE la misma regla que el día: solo se dibuja si cell.editable.
   // stopPropagation para que tocarlo no seleccione el día para intercambio.
   const pen=cell.editable?('<span class="rz-pen" title="Editar este día"'
     +' onclick="event.stopPropagation();rzOpenEdit(\''+ds+'\')">'+_SVG_PENCIL+'</span>'):'';
   // Toda celda responde al toque — las no editables para decir POR QUÉ no se pueden intercambiar.
-  const tip=cell.editable?(sel?'Tocá otro día para intercambiar, o este mismo para cancelar':'Tocá para seleccionar e intercambiar')
-                         :(cell.nav?'Ver esta producción en Odoo':'');
+  const tip=cell.pasado?(cell.nav?'Tocá para ver esta producción en Odoo · el lápiz corrige el registro':'El lápiz corrige el registro de este día')
+    :cell.editable?(sel?'Tocá otro día para intercambiar, o este mismo para cancelar':'Tocá para seleccionar e intercambiar')
+    :(cell.nav?'Ver esta producción en Odoo':'');
   return '<div class="rz-day '+cls+(cell.nav?' rz-nav':'')+'" data-ds="'+ds+'"'
-    +(tip?(' title="'+tip+'"'):'')+' onclick="rzTapDia(\''+ds+'\')">'+pen+dd+dp+pic+db+st+'</div>';
+    +(tip?(' title="'+tip+'"'):'')+' onclick="rzTapDia(\''+ds+'\')">'+pen+dd+dp+pic+od+db+st+'</div>';
 }
 function rzFormHtml(cell){
   const opts=NIV_PROD.map(p=>'<option value="'+p+'"'+(cell.pid===p?' selected':'')+'>'+esc(NIV_INFO[p].nom)+'</option>').join('');
@@ -9159,6 +9364,7 @@ async function rzSaveEdit(ds){
   // ofrecía Semillas para cualquier día y el veto solo cubría el swap, así que por edición se
   // podía dejar Semillas donde su picado caía en sábado.
   if(pid===452){ const m=_semillasVeto(ds); if(m){ _rzAviso=m; rzRender(); return; } }
+  { const m=_picado2pVeto(ds, pid); if(m){ _rzAviso=m; rzRender(); return; } }
   _rzOverrides[ds]={producto_id:val.producto_id, batches:val.batches, tipo:'edicion'};
   _rzEdit=null; _rzAviso=''; _rzRecalcAuto(); rzRender();     // pinta ya (con re-agendado del faltante)
   rzPersist([{fecha:ds, producto_id:val.producto_id, batches:val.batches, tipo:'edicion'}]);
@@ -9208,6 +9414,9 @@ function _rzSwapVeto(a, b){
   // trabaje (ahí cae el picado). Un solo portero, compartido con la edición y el auto-relleno.
   if(ca.pid===452){ const m=_semillasVeto(b.ds); if(m) return m; }
   if(cb.pid===452){ const m=_semillasVeto(a.ds); if(m) return m; }
+  // 2 personas + picado: ese día solo admite Galletas, venga por edición o por intercambio.
+  { const m=_picado2pVeto(b.ds, ca.pid); if(m) return m; }
+  { const m=_picado2pVeto(a.ds, cb.pid); if(m) return m; }
   return '';
 }
 // Un solo handler para TODO toque sobre un día — editable o no.
@@ -9240,8 +9449,12 @@ async function rzSwap(fromDs, toDs){
 async function rzPersist(filas){
   const c=sbClient(); if(!c){ alert('Sin conexión con la base — el cambio no se guardó. Reintentá.'); return; }
   let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
-  const payload=filas.map(r=>({fecha:r.fecha, producto_id:r.producto_id, batches:r.batches, tipo:r.tipo,
-    semana_iso:_isoWk(new Date(r.fecha+'T00:00:00')), usuario:email||null}));
+  // `personas` = la dotación VIGENTE al crear la fila. Sin ella no se puede distinguir "6 porque
+  // la semana era de 2" de "6 porque Andrea quiso 6", y esa diferencia decide si el override se
+  // ajusta o se respeta cuando cambia la dotación (ver rzCeldas).
+  const payload=filas.map(function(r){ const iso=_isoWk(new Date(r.fecha+'T00:00:00'));
+    return {fecha:r.fecha, producto_id:r.producto_id, batches:r.batches, tipo:r.tipo,
+            semana_iso:iso, personas:_personasDe(iso), usuario:email||null}; });
   try{ const {error}=await c.from('plan_overrides').insert(payload);
     if(error) alert('No se pudo guardar el cambio del plan: '+error.message); }
   catch(e){ alert('No se pudo guardar el cambio del plan: '+(e&&e.message||e)); }
@@ -9619,17 +9832,19 @@ async function cargarPlanMeses(){
     const hoy=new Date();
     _rzPersonas=await nivPersonas();        // marca de personas por semana (antes de proyectar)
     await cierreCargarMeta(cfg, ritmo);     // rampa hacia la meta de cierre (antes de proyectar)
+    if(_rzCtx) _rzRecalcAuto();             // refresca el derrame/faltante que pinta _rzDerrameNota
     _planStock=stk.fin;                     // stock de HOY, para el panel META vs HOY
     _planInputs={ritmo:ritmo, fin:stk.fin, cfg:cfg};   // para re-proyectar al cambiar personas sin volver a Odoo
     // Semanas hasta el cierre duro (lun 14-dic, viernes 18-dic incluido). nivProyeccion vuelve a cortar por seguridad.
     const semDic=Math.max(0, Math.round((_mondayProd(new Date(2026,11,18))-_mondayProd(hoy))/(7*86400000))+1);
     _rzOverrides=await nivOverrides();     // ediciones ANTES de proyectar (MISMA fuente que el Resumen)
-    const hoyStr0=_ymd(hoy), hayEd=Object.keys(_rzOverrides).some(function(d){ return d>=hoyStr0; });
+    // Lo REAL de Odoo se carga ANTES de proyectar: la proyección lo necesita para los días pasados
+    // de la semana en curso (antes se cargaba después y la primera pasada iba a ciegas).
+    _planReal=await nivRealRango(hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-01', _ymd(hoy));
     // Plan RECALCULADO (no pegado): si hay ediciones guardadas, la proyección de carga las honra y ya queda
     // NIVELADA hacia la meta; si no, la proyección cruda del motor. Así al recargar el plan ya está nivelado
     // desde las ediciones (el aviso de "reacomodar" no reaparece), sin guardar ningún plan aparte.
-    _planProj = hayEd ? planProyeccionOv(_rzOverrides) : nivProyeccion(ritmo, stk.fin, cfg, semDic);
-    _planReal=await nivRealRango(hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-01', _ymd(hoy));
+    _planProj = _planProyectar(ritmo, stk.fin, cfg, semDic);
     if(_rzCtx) _rzRecalcAuto();             // si el Resumen ya corrió, refresca el auto-relleno de la meta
     st.classList.add('hidden');
     planRenderMeses();
@@ -9785,6 +10000,7 @@ function planRenderMeses(){
   }
   document.getElementById('planBody').innerHTML=
     planPanelMeta()
+    +_rzDerrameNota()          // "no cierra la meta": pegado al panel de META vs HOY, que es de lo que habla
     +'<div id="planReacoWrap">'+planReacomodarAviso()+'</div>'
     +'<div class="pl-grid">'+cards+'</div><div id="planDetalle"></div>'
     +'<div class="pl-mas">'
@@ -9814,7 +10030,7 @@ function planVerDetalle(m, noScroll){
   wks.forEach(wk=>{
     const iso=_isoWk(wk.monday), pers=wk.personas||_personasDe(iso);
     // MISMAS celdas efectivas que el Resumen, picado incluido — una sola verdad.
-    const cells=_aplicarPicado(_rzOverlayAuto(rzCeldas(wk.monday, wk, _planReal, hoyStr, _rzOverrides), _rzAuto));
+    const cells=_rzIndexPicado(_aplicarPicado(_rzOverlayAuto(rzCeldas(wk.monday, wk, _planReal, hoyStr, _rzOverrides), _rzAuto), pers), pers);
     html+='<div class="pl-wk"><div class="pl-wr">'+_rangeLbl(wk.monday)+' '+_rzChipPersonas(iso, pers)
       +(pers===2 && wk.viernes && wk.viernes.prod?'<span class="pl-note2p">2 personas · viernes productivo</span>':'')+'</div>'
       +_rzRecorteAviso(cells, pers)+'<div class="pl-days">';
@@ -9824,7 +10040,7 @@ function planVerDetalle(m, noScroll){
       const tag=(c.kind==='pend')?'<div class="pl-dtag">sin registrar</div>':(c.edited?'<div class="pl-dtag pl-dtag-ed">editado</div>':(c.auto?'<div class="pl-dtag pl-dtag-auto">meta</div>':''));
       const cls='pl-d '+(PLK[c.kind]||'pl-d-clean')+(c.edited?' pl-d-ed':'')+(c.editable?' pl-d-editable':'');
       const click=c.editable?(' onclick="planOpenEdit(\''+c.ds+'\')"'):'';
-      const pic=c.picado?'<div class="rz-picchip">picado · rinde como 2 personas</div>':'';
+      const pic=c.picadoChip?('<div class="rz-picchip">'+esc(c.picadoChip)+'</div>'):'';
       html+='<div class="'+cls+'" data-ds="'+c.ds+'"'+click+'><div class="pl-dd">'+c.dow+' '+c.dnum+'</div><div class="pl-dp">'+esc(txt)+'</div>'+pic+tag+'</div>';
     });
     html+='</div>'+_rzConfirmBar(iso)+'</div>';
@@ -9851,6 +10067,7 @@ async function planSaveEdit(ds){
   const batches=(bt&&bt.value!=='')?Math.max(0,Math.round(+bt.value)):0;
   const val=(pid&&batches>0)?{producto_id:pid, batches:batches}:{producto_id:null, batches:0};   // sin producto o 0 batches = limpieza
   if(pid===452){ const m=_semillasVeto(ds); if(m){ _planAviso=m; planVerDetalle(_planEditMes, true); return; } }
+  { const m=_picado2pVeto(ds, pid); if(m){ _planAviso=m; planVerDetalle(_planEditMes, true); return; } }
   _rzOverrides[ds]={producto_id:val.producto_id, batches:val.batches, tipo:'edicion'};
   _planEdit=null; _planAviso='';
   if(_rzCtx) _rzRecalcAuto();                    // el Resumen comparte overrides → mantené su auto-relleno coherente
@@ -9880,10 +10097,11 @@ function planColchonOv(overrides){
     if(Rr){ rampaOn=rampaOn||_rampaEstado(stock, ritmo, Rr.meta, Rr.k).on; Rr.on=rampaOn; }
     const pre={}; NIV_PROD.forEach(p=>pre[p]=stock[p]);
     const L=_weekLayout(stock, ritmo, colDe, H, pers, Rr);           // decide la semana con el stock de inicio (muta stock: se descarta)
-    const cells=_aplicarPicado(rzCeldas(mon, L, {}, hoyStr, overrides));   // colocación honrando overrides + picado derivado
+    const cells=_aplicarPicado(rzCeldas(mon, L, _planReal||{}, hoyStr, overrides), pers);   // overrides + picado (NO indexa: es simulación)
     // (el recorte por dotación y el del picado ya vienen aplicados en las celdas: el colchón
     //  proyectado deja de contar producción que la gente de esa semana no puede hacer)
-    const prodB={}; cells.forEach(c=>{ const pr=c.prods||{}; for(const k in pr) prodB[+k]=(prodB[+k]||0)+pr[k]; });
+    // Los días pasados NO se suman al stock, por lo mismo que en planProyeccionOv: ya están en `fin`.
+    const prodB={}; cells.forEach(c=>{ if(c.ds<hoyStr) return; const pr=c.prods||{}; for(const k in pr) prodB[+k]=(prodB[+k]||0)+pr[k]; });
     NIV_PROD.forEach(p=>{ stock[p]=pre[p]+(prodB[p]||0)*NIV_INFO[p].rend-(ritmo[p]||0); });   // consumo = ritmo (fijo)
   }
   return escColchon(stock, R.M);
@@ -9891,13 +10109,15 @@ function planColchonOv(overrides){
 // Aviso discreto del impacto en el colchón de las ediciones futuras (solo si hay ediciones).
 function planColchonAviso(){
   if(!_planCierre || !_planInputs) return '';
-  const hoyStr=_ymd(new Date());
-  const futOv=Object.keys(_rzOverrides).filter(function(ds){ return ds>=hoyStr; });
-  if(!futOv.length) return '';
+  // Cuenta TODAS las ediciones, no solo las futuras: una corrección de un día pasado también
+  // mueve el colchón (la producción que no ocurrió no está), y la puerta vieja hacía que el aviso
+  // ni se calculara en ese caso.
+  const eds=Object.keys(_rzOverrides);
+  if(!eds.length) return '';
   const base=planColchonOv({}), ed=planColchonOv(_rzOverrides);
   if(!base || !ed) return '';
-  const nLimp=futOv.filter(function(ds){ const o=_rzOverrides[ds]; return !o.producto_id || !(o.batches>0); }).length;
-  const nProd=futOv.length-nLimp;
+  const nLimp=eds.filter(function(ds){ const o=_rzOverrides[ds]; return !o.producto_id || !(o.batches>0); }).length;
+  const nProd=eds.length-nLimp;
   const partes=[];
   if(nLimp) partes.push('<b>'+nLimp+'</b> '+(nLimp>1?'limpiezas':'limpieza'));
   if(nProd) partes.push('<b>'+nProd+'</b> '+(nProd>1?'cambios de producción':'cambio de producción'));
@@ -9915,6 +10135,12 @@ function planColchonAviso(){
 // honrando los overrides (ediciones de Andrea) y dejando que la rampa reacomode los días NO editados
 // hacia la meta. Devuelve los layouts por semana (misma forma que nivProyeccion) → reemplazan _planProj.
 // El re-nivelado es DETERMINISTA a partir de las ediciones (ya persistidas), no se guarda nada nuevo.
+// UNA sola puerta para elegir proyección. La condición cuenta CUALQUIER override, no solo los
+// futuros: con una corrección del pasado y nada más, la puerta vieja caía en la proyección cruda
+// y el panorama de meses ignoraba la corrección — que es justo el caso que la hace falta.
+function _planProyectar(ritmo, fin, cfg, nWeeks){
+  return Object.keys(_rzOverrides||{}).length ? planProyeccionOv(_rzOverrides) : nivProyeccion(ritmo, fin, cfg, nWeeks);
+}
 function planProyeccionOv(fixedOv){
   if(!_planInputs) return [];
   const cfg=_planInputs.cfg, ritmo=_planInputs.ritmo, fin=_planInputs.fin, hoyStr=_ymd(new Date());
@@ -9930,10 +10156,23 @@ function planProyeccionOv(fixedOv){
     if(R){ rampaOn=rampaOn||_rampaEstado(stock, ritmo, R.meta, R.k).on; R.on=rampaOn; }
     const pre={}; NIV_PROD.forEach(p=>pre[p]=stock[p]);
     const L=_weekLayout(stock, ritmo, colDe, H, pers, R);              // decide la semana (muta stock, se descarta)
-    out.push({monday:mon, otros:L.otros, semillas:L.semillas, viernes:L.viernes, personas:L.personas, rampa:L.rampaOn});
-    const cells=rzCeldas(mon, L, {}, hoyStr, fixedOv);                 // coloca honrando las ediciones fijas
-    const prodB={}; cells.forEach(c=>{ const pr=c.prods||{}; for(const k in pr) prodB[+k]=(prodB[+k]||0)+pr[k]; });
-    NIV_PROD.forEach(p=>{ stock[p]=pre[p]+(prodB[p]||0)*NIV_INFO[p].rend-(ritmo[p]||0); });   // stock = honra overrides → la rampa reacciona
+    // Celdas EFECTIVAS: colocación + lo REAL de Odoo en los días pasados + las ediciones + el
+    // picado. Es la misma verdad que pinta el detalle del Plan — antes esta función ya las
+    // calculaba para el stock, pero al `out` empujaba el layout CRUDO, así que las tarjetas de
+    // mes seguían mostrando la propuesta del motor y no lo que Andrea había corregido.
+    const cells=_aplicarPicado(rzCeldas(mon, L, _planReal||{}, hoyStr, fixedOv), pers);
+    // DOS sumas distintas, y la diferencia importa:
+    //  · mes  = TODOS los días. Es lo que la tarjeta del mes tiene que decir: lo ya producido más
+    //           lo que falta. Para los días pasados son lo real de Odoo o la corrección de Andrea.
+    //  · fut  = solo de HOY en adelante. Es lo único que puede SUMARSE al stock: `fin` es el
+    //           on-hand de Odoo de hoy y ya trae adentro lo que se produjo en los días pasados de
+    //           esta semana. Sumarlos otra vez inflaba el stock proyectado justo en la semana que
+    //           más se mira. De la semana 1 en adelante no hay días pasados y las dos coinciden.
+    const bMes={}, bFut={};
+    cells.forEach(function(c){ const pr=c.prods||{};
+      for(const k in pr){ bMes[+k]=(bMes[+k]||0)+pr[k]; if(c.ds>=hoyStr) bFut[+k]=(bFut[+k]||0)+pr[k]; } });
+    out.push({monday:mon, otros:L.otros, semillas:L.semillas, viernes:L.viernes, personas:L.personas, rampa:L.rampaOn, batches:bMes});
+    NIV_PROD.forEach(p=>{ stock[p]=pre[p]+(bFut[p]||0)*NIV_INFO[p].rend-(ritmo[p]||0); });   // stock = honra overrides → la rampa reacciona
   }
   return out;
 }
