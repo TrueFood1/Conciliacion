@@ -69,8 +69,45 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
   `display_type='product'` o las ventas salen infladas 3×.
 - **Facturado por canal**: usar `amount_total` (con IVA). El canal de venta
   está en el cliente (`res.partner.team_id`), NO en `account.move`.
-- **Producción y mermas**: filtrar por `date_finished` (calza con el pivot
-  nativo de Odoo), no `date_start`.
+- **`date_start` vs `date_finished` — no hay una ganadora, hay dos preguntas.**
+  Los dos campos son válidos; elegir mal mete errores silenciosos, así que el
+  criterio es qué se está preguntando:
+  - **`date_finished` = cuándo se TECLEÓ la orden.** Keylor la registra cuando
+    Daniel le pasa los reportes de papel — puede ser esa misma noche o el lunes
+    siguiente. Sirve para **cuadrar con el pivot nativo de Odoo**, que usa este
+    campo: es el que va cuando el número tiene que dar igual que el reporte
+    nativo. **Lo usan Producción y Mermas**, y solo por esa razón.
+  - **`date_start` = cuándo se HIZO el trabajo.** Las órdenes se abren y se
+    cierran el mismo día en la operación real; el desfase es retraso de
+    validación administrativa, no producción de otro día. Es el campo bueno para
+    todo lo que dependa de cuándo salió el pan del horno. **Lo usan el nivelador
+    (`nivSemana`), el costeo, los reportes del mes y ENTREGAS** (extractor de
+    lote y saldo por lote).
+  - ⚠️ **Comparar SIEMPRE en el mismo huso.** Odoo devuelve estos dos campos en
+    **UTC** y el corte del ancla se escribe en hora CR. Compararlos crudos da
+    resultados invertidos: el 19-ago-2026 esa confusión hizo dar por doble-contada
+    una tanda que estaba del lado correcto. `14-ago 16:00 CR = 14-ago 22:00 UTC`.
+  - **El caso que lo fijó (19-ago-2026), ya medido bien**: el conteo de Daniel del
+    viernes 14-ago 16:00 incluye Semillas `225/2-27` (168 u) y Galletas `226/2-27`
+    (158 u). Comparado en UTC contra el corte (22:00 UTC):
+
+    | Orden | Lote | `date_start` | `date_finished` |
+    |---|---|---|---|
+    | `WH/MO/01410` | Semillas 225 (168 u) | 13-ago 21:45 · **antes** | 14-ago 21:49 · **antes** |
+    | `WH/MO/01411` | Galletas 226 (160 u) | 14-ago 22:06 · **después** | 15-ago 00:10 · **después** |
+
+    O sea: la de Semillas **nunca estuvo doble** con ninguno de los dos campos, y
+    la de Galletas queda doble con **los dos** — 160 u que ya están dentro de la
+    foto y que el saldo vuelve a sumar. **Cambiar a `date_start` NO arregla este
+    caso**; lo que lo arregla es el próximo conteo, que reancla en cero.
+  - Entonces, **por qué `date_start` igual**: por los MOs `done` con
+    `date_finished` vacío o planeado a futuro (que el filtro por `date_finished`
+    excluía), y por la ventana juliana de abajo. No por el doble conteo.
+  - Y de yapa: la ventana juliana de `_entParseLote` (±10) se derivó midiendo
+    contra el juliano de `date_start` (93,9% exacto). Alimentarla con
+    `date_finished` hacía que un registro atrasado tirara el lote bueno fuera de
+    la ventana y la orden saliera `juliano_invalido` — el lote desaparecía de la
+    lista sin decir por qué.
 - **El lote de producto terminado vive SOLO en el chatter, en texto libre**, y se
   transcribe a mano del reporte de papel. No hay campo estructurado (`tracking`
   está en `none` en los seis terminados). Dos consecuencias medidas el 15-ago:
@@ -91,6 +128,19 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
   sábado y domingo 25-26 de julio. No buscar huecos en la secuencia; comparar el
   lote contra el juliano de la orden, que es lo que `_entParseLote` ya calcula en
   `coincideJul` (hoy con tolerancia ±3 y sin que nadie mire el resultado).
+- **El PDF de la factura NO se busca: se pide por su id.** Al validar una factura,
+  Odoo 17 con la localización de FE **genera el PDF y lo guarda** como
+  `ir.attachment` — no hay que renderizar ningún reporte. Pero ese adjunto tiene
+  `res_field = 'invoice_pdf_report_file'`, y **Odoo esconde de `search_read` todo
+  adjunto con `res_field` puesto**: buscarlo por `res_model='account.move'` +
+  `res_id` devuelve **cero filas**, y parece que el PDF no existe. Existe.
+  El camino correcto son dos lecturas, las dos ya dentro del candado (`read`):
+  1. `account.move.read([id], ['invoice_pdf_report_id'])` → da el id del adjunto.
+  2. `ir.attachment.read([att], ['name','mimetype','datas'])` → `datas` es el PDF
+     en base64 (medido el 19-ago: ~56 KB, cabecera `%PDF-1.4`).
+  Es hermano de "buscar productos por ID, nunca por nombre": **el buscador miente
+  por omisión y la lectura directa no.** Verificado sobre las 10 facturas del
+  17 al 19-ago: las 10 tienen su PDF, creado el día que se facturó.
 - **Despachos**: la fecha real es `scheduled_date`; `date_done` es cuando se
   validó en el sistema (llega 3–7 días tarde).
 - **Nombres traducidos** (es_CR / en_US): una consulta sin contexto de idioma
