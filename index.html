@@ -3043,7 +3043,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 20 ago 2026 · b28';
+const BUILD = 'v 24 ago 2026 · b29';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -7433,6 +7433,16 @@ let _despEntAbierto=0, _despDetErr='';
 // La distinción importa: mientras sea null NO se puede entregar, porque no sabemos
 // si la factura sigue viva. Misma regla que el detalle del diálogo.
 let _despAnul=null, _despAnulErr='';
+// `_despAnulFallo` separa DOS cosas que antes eran la misma: "todavía estoy leyendo"
+// de "ya me rendí". El botón se comporta al revés en cada una — apagado mientras se
+// intenta, encendido-con-marca después. Sin esta bandera, un fallo de red se ve igual
+// que una lectura en curso y Daniel se queda mirando un botón apagado para siempre.
+let _despAnulFallo=false;
+// Cuántos días hacia atrás se re-verifican las salidas que ya dieron 'vigente'.
+// Una factura no se anula un mes después: el caso real es el mismo día (Daniel
+// despacha 6:30, Andrea anula 10:00) o el siguiente. Siete días da margen de sobra
+// sin releer historia. Se cambia acá, no en la vista — por eso la vista no lo hornea.
+const DESP_REVERIF_DIAS = 7;
 
 // LA SEÑAL ES reversal_move_id, NO payment_state. Medido el 20-ago sobre las 497
 // facturas de venta de 2026: `reversal_move_id` no vacío caza 36; `payment_state =
@@ -7461,13 +7471,20 @@ async function despCargarAnuladas(ids){
   if(!pedir.length){ _despAnul=_despAnul||{}; return; }
   for(let intento=1; intento<=DESP_ANUL_REINTENTOS; intento++){
     const ok=await _despIntentarAnuladas(pedir, intento);
-    if(ok) return;
+    if(ok){ _despAnulFallo=false; return; }
     if(intento<DESP_ANUL_REINTENTOS){
       _despAnulErr='';                        // el fallo intermedio no se muestra
       despRender();
       await _esperar(DESP_ANUL_ESPERA_MS);
     }
   }
+  // Se agotaron los intentos. NO se bloquea el despacho por un problema de
+  // infraestructura: la salida se registra igual y queda MARCADA (ver despEntregar).
+  // Fallar cerrado empujaría a Daniel al Excel, y lo anotado ahí no baja nunca al
+  // saldo — un descuadre invisible y permanente. Una salida marcada, en cambio, se
+  // ve y se limpia sola cuando Odoo vuelve.
+  _despAnulFallo=true;
+  despRender();
 }
 async function _despIntentarAnuladas(pedir, intento){
   try{
@@ -7642,20 +7659,118 @@ async function despCargarEstado(){
     // NO se espera (`await`): la bandeja se pinta con Supabase, que es instantáneo, y
     // el estado de anulada llega después. Mientras tanto Entregar queda deshabilitado.
     const fids=prep.map(function(r){ return r.factura_id; }).filter(Boolean);
-    if(fids.length) despCargarAnuladas(fids).then(function(){ if(!_despAbierto) despRender(); });
-    else { _despAnul=_despAnul||{}; }
+    if(fids.length) despCargarAnuladas(fids).then(function(){
+      if(!_despAbierto) despRender();
+      despReverificar();            // en cuanto Odoo contesta, se limpia lo pendiente
+    });
+    else { _despAnul=_despAnul||{}; despReverificar(); }
   }catch(e){
     _despEstado=_despEstado||[];
     _despEstErr=(e&&e.message)||String(e);
   }
   if(!_despAbierto) despRender();     // sin pisar un pedido a medio llenar
 }
+// ── VERIFICACIÓN HACIA ATRÁS ────────────────────────────────────────────
+// Dos poblaciones, y las dos hacen falta:
+//   · las MARCADAS (`sin_verificar`) — se registraron sin poder mirar Odoo. Cuando Odoo
+//     vuelve, se resuelven y la marca se apaga sola. Nadie tiene que hacer nada.
+//   · las que dieron `vigente` — porque una factura puede anularse DESPUÉS de la salida.
+//     Daniel despacha a las 6:30 contra una factura viva y Andrea la anula a las 10:00.
+//     Sin esto, esa salida quedó 'vigente' y nadie la vuelve a mirar nunca.
+// Se corre sola al cargar Despachos, después de que la lectura de anuladas contestó —
+// si Odoo no contesta, no hay con qué verificar y no se hace nada.
+//
+// SOLO INSERTA cuando el resultado CAMBIA. Escribir 'vigente' encima de 'vigente' en
+// cada carga llenaría la tabla de ruido y volvería inútil el historial, que es la razón
+// por la que esto es append-only y no una columna.
+async function despReverificar(){
+  if(_despAnul===null) return;                 // no se pudo leer Odoo: nada que hacer
+  const c=sbClient(); if(!c) return;
+  try{
+    const corte=new Date(); corte.setDate(corte.getDate()-DESP_REVERIF_DIAS);
+    const desde=_despYmd(corte);
+    const [pend, vig] = await Promise.all([
+      c.from('ent_salida_sin_verificar').select('salida_id,estado,salida_en,factura_nombre').limit(200),
+      c.from('ent_salida_a_reverificar').select('salida_id,factura_id,salida_en')
+        .gte('salida_en', desde).limit(200)
+    ]);
+    if(pend.error) throw pend.error;
+    if(vig.error)  throw vig.error;
+
+    // De las marcadas hay que averiguar la factura: la vista no la trae cuando el
+    // estado es 'sin_verificar' (no se pudo mirar, así que no se guardó el id).
+    const marcadas=(pend.data||[]).filter(function(x){ return x.estado==='sin_verificar'; });
+    let facDeSalida={};
+    if(marcadas.length){
+      // SE PIDEN POR ID, no por ventana de fecha ni con un `limit` de corte.
+      // DESP_REVERIF_DIAS acota bien las 'vigente' —una factura no se anula un mes
+      // despues— pero NO sirve aca: `ent_salida_sin_verificar` no tiene corte por
+      // fecha, asi que una salida marcada sigue en la lista a los treinta dias.
+      // Filtrarla por siete la dejaria sin factura que mirar y no se limpiaria
+      // NUNCA — el mismo agujero que un `limit` arbitrario, con otra causa. Y sin
+      // conteos fisicos que reanclen, ese error ya no se limpia solo por ningun
+      // otro camino. Como ya sabemos QUE salidas son, se preguntan esas y punto:
+      // queda acotado por las <=200 de `pend` y no se puede caer ninguna.
+      const ids=marcadas.map(function(x){ return x.salida_id; });
+      const {data:est,error:eEst}=await c.from('v_ent_pedido_estado')
+        .select('pedido_id,factura_id,salida_id').in('salida_id', ids);
+      // El error NO se traga: si esta lectura falla, las marcadas se quedan
+      // marcadas y en silencio. Sube al catch, que al menos lo deja en consola.
+      if(eEst) throw eEst;
+      (est||[]).forEach(function(e){ if(e.salida_id) facDeSalida[e.salida_id]=e.factura_id; });
+    }
+    const objetivos=[];
+    marcadas.forEach(function(x){
+      const f=facDeSalida[x.salida_id];
+      if(f) objetivos.push({salida_id:x.salida_id, factura_id:f, previo:'sin_verificar'});
+    });
+    (vig.data||[]).forEach(function(x){
+      objetivos.push({salida_id:x.salida_id, factura_id:x.factura_id, previo:'vigente'});
+    });
+    if(!objetivos.length) return;
+
+    const facturas=[...new Set(objetivos.map(function(o){ return o.factura_id; }).filter(Boolean))];
+    const mv=await odooCall('account.move','search_read',[[['id','in',facturas]]],
+      {fields:['id','name','reversal_move_id'],limit:1000,context:{lang:'es_CR'}});
+    const rev={}, ncIds=[];
+    mv.forEach(function(m){ const r=m.reversal_move_id||[];
+      if(r.length){ rev[m.id]=r[0]; ncIds.push(r[0]); } });
+    const motivo={};
+    if(ncIds.length){
+      const ncs=await odooCall('account.move','search_read',[[['id','in',ncIds]]],
+        {fields:['id','ref'],limit:1000,context:{lang:'es_CR'}});
+      ncs.forEach(function(n){ motivo[n.id]=_despMotivoNC(n.ref); });
+    }
+    const {data:{user}}=await c.auth.getUser();
+    const quien=(user&&user.email)||'reverificacion';
+    const filas=[];
+    objetivos.forEach(function(o){
+      const anulada=!!rev[o.factura_id];
+      const nuevo=anulada?'anulada':'vigente';
+      if(nuevo===o.previo) return;             // sin cambio: no se escribe
+      filas.push({salida_id:o.salida_id, estado:nuevo, factura_id:o.factura_id,
+                  detalle: anulada ? ('NC: '+(motivo[rev[o.factura_id]]||'sin motivo')) : null,
+                  creado_por: quien});
+    });
+    if(filas.length){
+      const {error}=await c.from('ent_salida_verificacion').insert(filas);
+      if(error) throw error;
+      const gritan=filas.filter(function(f){ return f.estado==='anulada'; }).length;
+      if(gritan) console.warn('reverificación: '+gritan+' salida(s) contra factura anulada');
+    }
+  }catch(e){
+    console.warn('reverificación no pudo completarse:', (e&&e.message)||e);
+  }
+}
+
 // El estado de anulación de un pedido: null mientras no se sepa, {anulada:bool,...} después.
 // Un pedido SIN factura (traslado interno, salida manual) nunca puede estar anulado — no
 // hay documento que anular — así que se resuelve de una y no queda esperando a Odoo.
+// null = todavía leyendo · {sinVerificar:true} = se rindió, se entrega marcado ·
+// {anulada:bool} = se sabe. Un pedido SIN factura nunca puede estar anulado.
 function _despAnulDe(r){
   if(!r || !r.factura_id) return {anulada:false};
-  if(_despAnul===null) return null;
+  if(_despAnul===null) return _despAnulFallo ? {anulada:false, sinVerificar:true} : null;
   const a=_despAnul[r.factura_id];
   return a ? Object.assign({anulada:true}, a) : {anulada:false};
 }
@@ -7749,12 +7864,16 @@ function despRender(){
           +'<br>No se entrega. El producto ya está armado: avisale a Andrea.</div>';
       }else if(an===null){
         etiqueta='<div class="dp-prep-ver">Verificando en Odoo si la factura sigue vigente…</div>';
+      }else if(an.sinVerificar){
+        // Se entrega igual, pero Daniel tiene que saber qué está haciendo.
+        etiqueta='<div class="dp-prep-anul">No pude verificar la factura contra Odoo.'
+          +'<br>Se registra igual y queda marcada: Andrea la revisa después.</div>';
       }
       const btn = anulada
         ? '<button class="dp-entregar" disabled>Anulada</button>'
         : '<button class="dp-entregar"'+((ocupado||an===null)?' disabled':'')
           +' onclick="despAbrirEntrega('+r.pedido_id+')">'
-          +(ocupado?'Guardando…':(an===null?'Verificando…':'Entregar'))+'</button>';
+          +(ocupado?'Guardando…':(an===null?'Verificando…':(an.sinVerificar?'Entregar sin verificar':'Entregar')))+'</button>';
       return '<div class="dp-prep'+(vieja?' vieja':'')+(anulada?' anulada':'')+'">'
         +'<div class="dp-prep-i"><span class="dp-prep-cli">'+esc(r.cliente_nombre||'—')+'</span>'
         +'<span class="dp-prep-h">preparado '+esc(_despCuando(r.preparado_en))
@@ -8221,13 +8340,30 @@ async function despEntregar(pedidoId){
       : 'Todavía no pude verificar en Odoo si la factura sigue vigente. Probá en unos segundos.');
     despRender(); return;
   }
+  // `an.sinVerificar` NO frena: se registra y se marca. Es la decisión del 20-ago.
   _despEntregando=pedidoId; despRender();
   try{
     const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
     const {data:{user}}=await c.auth.getUser();
-    const {error}=await c.from('ent_salida').insert({
-      alisto_id:r.alisto_id, creado_por:(user&&user.email)||'desconocido'});
+    const quien=(user&&user.email)||'desconocido';
+    const {data:sal,error}=await c.from('ent_salida').insert({
+      alisto_id:r.alisto_id, creado_por:quien}).select('id').single();
     if(error) throw error;
+    // LA MARCA. Toda salida escribe su verificación, incluso la que verificó bien: así
+    // "sin fila" significa "salida vieja, anterior a esto" y no ensucia la alerta.
+    // Va DESPUÉS del insert de la salida y en su propio try: si falla la marca, la
+    // salida ya está registrada y el saldo ya bajó — perder la marca es molesto, perder
+    // la salida sería un descuadre. Se prioriza el dato duro.
+    try{
+      await c.from('ent_salida_verificacion').insert({
+        salida_id: sal.id,
+        estado: an.sinVerificar ? 'sin_verificar' : 'vigente',
+        factura_id: r.factura_id || null,
+        detalle: an.sinVerificar ? ('no se pudo leer Odoo: '+(_despAnulErr||'sin detalle')) : null,
+        creado_por: quien});
+    }catch(ev){
+      console.warn('salida registrada pero sin marca de verificación:', ev);
+    }
     _despEntAbierto=0;                 // salió bien: se cierra el diálogo
   }catch(e){
     alert('No se pudo marcar la salida: '+((e&&e.message)||e)
@@ -8783,7 +8919,25 @@ async function pdLeer(){
     if(mv==='venta' && !F[p.id]) l2.push(it);
     if(mv==='sin_clasificar') l3.push(it);
   });
-  return {l1:l1,l2:l2,l3:l3};
+  // ── SALIDAS SIN VERIFICAR (o contra factura anulada) ──────────────────
+  // Dos cosas distintas en una lista, ordenadas por gravedad:
+  //   anulada       → salió producto contra un documento muerto. NO se apaga sola.
+  //   sin_verificar → Odoo no contestó al despachar. SE APAGA SOLA cuando vuelva.
+  // Cumple las cinco reglas del lobby: solo existe si hay filas (1), trae la fecha de
+  // la salida (2), se apaga sola (3), el corte a 3 lo hace la pantalla (4), y el ámbar
+  // lo decide el estado y no la existencia (5).
+  let l4=[];
+  try{
+    const {data:sv}=await c.from('ent_salida_sin_verificar')
+      .select('salida_id,estado,salida_en,cliente_nombre,factura_nombre,detalle').limit(50);
+    l4=(sv||[]).map(function(x){
+      const dias=Math.floor((Date.now()-Date.parse(x.salida_en))/86400000);
+      return {id:x.salida_id, estado:x.estado, cliente:x.cliente_nombre||'—',
+              fecha:String(x.salida_en||'').slice(0,10), dias:dias,
+              factura:x.factura_nombre||'', detalle:x.detalle||''};
+    });
+  }catch(e){ l4=[]; }    // la vista puede no existir todavía: no rompe Pendientes
+  return {l1:l1,l2:l2,l3:l3,l4:l4};
 }
 function pdRender(){
   const body=document.getElementById('pdBody'); if(!body||!_pd) return;
@@ -8814,6 +8968,37 @@ function pdRender(){
   h+=secc('Salida sin clasificar',
     'Daniel registró la salida; falta que las socias digan qué fue. El pendiente es un estado con nombre, no un hueco.',
     _pd.l3, function(it){ return '<button class="btn btn-sm" onclick="pdClasifUI('+it.id+')">Clasificar</button>'; });
+
+  // Regla 1 del lobby: si no hay nada que hacer, la sección NO aparece. Nada de
+  // "todo al día" — eso es información, y la información vive adentro del módulo.
+  const l4=(_pd.l4||[]);
+  if(l4.length){
+    const anul=l4.filter(function(x){ return x.estado==='anulada'; });
+    const sinv=l4.filter(function(x){ return x.estado!=='anulada'; });
+    h+='<div class="card rp-z"><div class="card-title">Salidas sin verificar factura'
+      +' <span class="pd-cnt on">'+l4.length+'</span></div>';
+    if(anul.length){
+      h+='<div class="valid-box" style="border-color:rgba(226,75,74,.40);background:rgba(226,75,74,.08);margin-bottom:10px">'
+        +'<div style="font-weight:700;color:#E24B4A;font-size:12.5px">'+anul.length
+        +(anul.length===1?' salida contra una factura ANULADA':' salidas contra facturas ANULADAS')+'</div>'
+        +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.5">'
+        +'Salió producto contra un documento que ya no existe. Esto no se apaga solo.</div></div>';
+    }
+    h+='<table class="cl-tbl"><tr><th>Salida</th><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Hace</th><th></th></tr>';
+    l4.slice(0,3).forEach(function(it){
+      h+='<tr><td>#'+it.id+'</td><td>'+esc(it.cliente)+'</td>'
+        +'<td>'+esc(it.factura?('…'+String(it.factura).slice(-4)):'—')+'</td>'
+        +'<td>'+esc(it.fecha)+'</td><td>'+(it.dias===0?'hoy':(it.dias+' d'))+'</td>'
+        +'<td style="text-align:right">'+(it.estado==='anulada'
+            ? '<span style="color:#E24B4A;font-size:11.5px">anulada</span>'
+            : '<span style="color:#C99A4E;font-size:11.5px">sin verificar</span>')+'</td></tr>';
+    });
+    h+='</table>';
+    if(l4.length>3) h+='<div class="rp-nota" style="margin-top:6px">y '+(l4.length-3)+' más</div>';
+    if(sinv.length) h+='<div class="rp-nota" style="margin-top:6px">Las «sin verificar» se '
+      +'limpian solas la próxima vez que Despachos lea Odoo.</div>';
+    h+='</div>';
+  }
   body.innerHTML=h;
 }
 async function pdValidar(id){
