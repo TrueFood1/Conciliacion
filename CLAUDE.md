@@ -24,6 +24,22 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
   Validar sintaxis no alcanza — un `const` usado antes de declararse parsea
   perfecto y mata el bloque entero en el navegador (pasó el 11-ago con el bloque
   de vainilla, y salió publicado). Sintaxis OK ≠ la página carga.
+- **`esquema_check.py` dice menos de lo que parece.** Su ✓ significa *"el código
+  actual no depende de ningún objeto que falte"*, **no** *"el esquema está
+  completo"*. Dos puntos ciegos, los dos medidos:
+  1. **No ve lo que el código todavía no llama.** Saca los objetos de los
+     `from('tabla')` del `index.html`, así que una tabla recién pegada le es
+     invisible hasta que alguien la consulte. El 20-ago daba ✓ con 18 objetos
+     mientras `ent_devolucion` y `ent_salida_verificacion` ya existían y no
+     figuraban. Empieza a cubrirlas recién cuando el código las usa — que es su
+     momento útil, pero conviene no leer el ✓ como un inventario.
+  2. **No ve las llamadas por variable.** El regex busca `from('literal')`, así
+     que `c.from(t)` dentro de un helper se le escapa. Fue el caso de
+     `ent_pedido_motivo_vigente` y `ent_pedido_valida_vigente` el 19-ago: la
+     pantalla Pendientes estaba caída en producción y el chequeo daba ✓.
+  Para confirmar que un objeto existe de verdad: sondeo REST directo con la anon
+  key (devuelve `PGRST205` si falta). Para confirmar `security_invoker`, hace
+  falta SQL — la anon key no puede leer `pg_class.reloptions`.
 - **Credenciales nunca por el chat** ni impresas en output: van directo a
   `conexion_prod.env`; confirmar presencia con sí/no, sin mostrar la key.
 - Explicar en español simple; reportar con evidencia (números, no adjetivos).

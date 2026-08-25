@@ -831,7 +831,12 @@ tr.r-ing td{background:#eff6ff}
    OJO con el ámbar: #E9A23B / #C99A4E avisan, el lima identifica. Conviven cerca ahora,
    así que el lima NUNCA se usa de fondo lavado — los bloques de alerta conservan su
    lavado naranja, que es lo que los separa de un vistazo. */
-#vConteoLote,#vReporte,#vPendientes,#vDespachos{--mod:#E9FE60;--accent:#E9FE60;--blue:#E9FE60;--blue-l:rgba(233,254,96,.14)}
+/* Los cuatro valen --ent-line, que en oscuro ES el lima y en claro es el oliva.
+   Escrito a mano acá, el acento del módulo se saltaba el tema y la pestaña activa
+   quedaba subrayada en lima invisible sobre blanco. Y entra vEntBuscar, que faltaba
+   en esta lista desde que se creó: Buscar era la única vista de Entregas sin acento. */
+#vConteoLote,#vReporte,#vPendientes,#vDespachos,#vEntBuscar{
+  --mod:var(--ent-line);--accent:var(--ent-line);--blue:var(--ent-line);--blue-l:var(--ent-wash)}
 .faces .face.on{color:var(--text);border-bottom-color:var(--mod)}
 .m3nav .m3tab.on{background:transparent;color:var(--mod);border-bottom-color:var(--mod)}
 .home-mod-dot{width:9px;height:9px;border-radius:3px;display:inline-block}
@@ -966,6 +971,91 @@ tr.r-done td{background:rgba(192,208,72,.08)}
   --amber:#FF751F;--amber-l:rgba(255,117,31,.15);--orange:#FF751F;--orange-l:rgba(255,117,31,.15);
   --red:#FF6B6B;--red-l:rgba(255,107,107,.14);--purple:#C964CF;--purple-l:rgba(201,100,207,.15);
   --pink:#EF6782;--lime:#E9FE60;--accent:#C964CF;
+  /* ── TOKENS SEMÁNTICOS DE SUPERFICIE Y SEÑAL ──────────────────────────
+     Nacen el 24-ago para que ENTREGAS pueda ir en claro sin tocar el resto
+     de Truefie. Sus valores acá son EXACTAMENTE los hex que estaban escritos
+     a mano en las reglas del módulo, así que el tema oscuro no se mueve un
+     punto: esto es un renombre, no un rediseño. El modo claro vive abajo,
+     en `body.ent-claro`, y solo cambia estos números.
+     La regla que hace falta entender: en oscuro una superficie se ELEVA
+     aclarándose; en claro se eleva ACLARÁNDOSE TAMBIÉN, así que el fondo de
+     página es el tono y la tarjeta es el blanco. Por eso --sunken (hundido)
+     y --panel (elevado) no se invierten mecánicamente entre temas. */
+  --sunken:#0E0E11;        /* fondo hundido: campos, pies de tabla, detalle */
+  --panel:#141417;         /* panel elevado dentro de una tarjeta */
+  --field:#161619;         /* campo de texto y botón de hoja */
+  --dim-line:#4A4A4A;      /* borde de algo apagado a propósito (anulado) */
+  --dim-bg:#131315;        /* fondo de algo apagado a propósito */
+  --scrim:rgba(14,14,17,.94);   /* velo detrás de la hoja de cliente */
+  --scrim-2:rgba(0,0,0,.62);    /* velo detrás del diálogo de Entregar */
+  /* SEÑAL. El lima IDENTIFICA, el ámbar AVISA, el rojo FRENA (regla del
+     13-ago). En claro el lima puro deja de servir como línea y como texto
+     —no tiene contraste sobre blanco— así que se parte en dos tokens:
+     --ent-fill sigue siendo el lima de relleno, --ent-line pasa a oliva.
+     En oscuro los dos valen lo mismo y no cambia nada. */
+  --ent-fill:#E9FE60;      /* relleno del botón de acción */
+  --ent-fill-tx:#2C3A00;   /* texto sobre ese relleno */
+  --ent-line:#E9FE60;      /* línea, borde, texto de acento, enlace */
+  --ent-line-2:#3F4A16;    /* borde derivado, más callado */
+  --ent-wash:rgba(233,254,96,.08);   /* lavado de acento */
+  --warn:#E9A23B;          /* ámbar fuerte: esto necesita ojo */
+  --warn-2:#C99A4E;        /* ámbar callado: nota al pie */
+  --on-warn:#0E0E11;       /* texto sobre un ámbar relleno */
+  --good:#8FBF6A;          /* cuadra, salió bien */
+  --stop-line:#E24B4A;     /* borde de bloqueo */
+  --stop-tx:#E24B4A;       /* texto de bloqueo */
+  --busy:#A8A6A0;          /* "guardando…", sin color de estado */
+  --warn-wash:rgba(233,162,59,.10);--warn-edge:rgba(233,162,59,.35);--warn-tx:#E8D3AC;
+}
+
+/* ════════ ENTREGAS EN CLARO — decisión de Andrea, 24-ago-2026 ════════════
+   SOLO Entregas. El resto de Truefie se queda oscuro y es a propósito: es el
+   único módulo que se usa FUERA del escritorio, frente al congelador, con luz
+   de bodega dando en la pantalla. Ahí el tema oscuro se vuelve un espejo.
+   El ámbito es el módulo, no la pantalla: la clase la pone `_modShow` a
+   partir de ACCESO_VISTAS.entregas, así que si mañana Entregas gana una
+   vista, entra sola en claro y nadie tiene que acordarse de esta línea.
+   Va en `body` —y no en las cinco vistas— porque el ENCABEZADO vive fuera de
+   ellas: con los tokens en la vista, la miga de pan quedaba oscura sobre una
+   página clara. Todo lo que hay debajo es una redefinición de tokens; no se
+   toca ni una regla del sistema. */
+body.ent-claro{
+  --bg:#F7F6F2;--bg2:#FFFFFF;--bg3:#FFFFFF;      /* la página NO es blanco puro */
+  --surface:#FFFFFF;--surface-2:#F7F6F2;         /* la tarjeta se eleva siendo más clara */
+  --text:#1A1A17;--text-m:#6E6C68;--text-h:#8B897F;
+  /* El terciario NO es el #9A988F del sistema oscuro. Ese tono se leía bien
+     sobre negro y al invertir el fondo da 2.89:1 sobre blanco — por debajo del
+     mínimo, y justo en el escalón de las notas al pie, la hora de preparado y
+     los "hace N d". Es el texto más chico del módulo y el que peor aguanta el
+     reflejo del congelador. #8B897F sube a 3.51:1 sobre la tarjeta blanca y no
+     baja de 3.10:1 en el peor fondo del módulo (la tarjeta anulada, #F2F1EC),
+     sin achatar la jerarquía: sigue un escalón por debajo del secundario (5.24:1). */
+  --text-2:#6E6C68;--text-3:#8B897F;
+  --border:#E4E2DB;--border-m:#D6D4CC;--border-strong:#D6D4CC;
+  --sunken:#F7F6F2;        /* hundido = el tono de la página sobre el blanco */
+  --panel:#FFFFFF;
+  --field:#FFFFFF;
+  --dim-line:#C9C6BE;--dim-bg:#F2F1EC;
+  --scrim:rgba(247,246,242,.94);--scrim-2:rgba(26,26,23,.38);
+  /* El lima se queda SOLO donde es relleno. Como línea y como texto pasa a
+     oliva: #E9FE60 sobre blanco da ~1.1:1 y no se ve. */
+  --ent-fill:#E9FE60;--ent-fill-tx:#2E3300;
+  --ent-line:#8A9B00;--ent-line-2:#C4D14A;
+  --ent-wash:rgba(138,155,0,.09);
+  /* Ámbar y verde bajan de luminosidad para sobrevivir al blanco. El ámbar de
+     oscuro (#E9A23B) da 2.1:1 sobre #FFFFFF — ilegible como texto. Estos dos
+     pasan 4.5:1. El verde reusa el #4E7A00 que ya vive en `.tbl-clara .ok`,
+     que es el tono de "correcto" del sistema en claro; no se inventa uno. */
+  --warn:#9A6410;--warn-2:#8A5A00;--on-warn:#FFFFFF;
+  --good:#4E7A00;
+  --stop-line:#D14343;--stop-tx:#A32D2D;
+  --busy:#6E6C68;
+  --warn-wash:rgba(154,100,16,.08);--warn-edge:rgba(154,100,16,.35);--warn-tx:#7A4E08;
+  /* Los semánticos del sistema, que el chrome compartido usa por su nombre. */
+  --lime:#8A9B00;
+  --green:#4E7A00;--green-l:rgba(78,122,0,.12);--green-d:#4E7A00;
+  --amber:#9A6410;--amber-l:rgba(154,100,16,.12);--orange:#9A6410;--orange-l:rgba(154,100,16,.12);
+  --red:#A32D2D;--red-l:rgba(209,67,67,.10);
 }
 body{background:var(--bg);color:var(--text);letter-spacing:-0.005em}
 .main{max-width:1180px}
@@ -1154,7 +1244,7 @@ body,.main{background:var(--bg);color:var(--text)}
 .faces{border-bottom-color:var(--border)}
 .face{color:var(--text-2)}.face.on{color:var(--text);border-bottom-color:var(--accent)}.face.dis{color:var(--text-3)}
 /* tablas */
-th{background:none;color:#6E6C68;border-bottom-color:#26262C}
+th{background:none;color:var(--text-3);border-bottom-color:var(--border)}
 td{border:none}
 .tbl-clara{background:transparent}
 .tbl-clara th{background:transparent;color:var(--text-3);border-bottom-color:var(--border)}
@@ -1182,7 +1272,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .prop-badge.exacto{color:var(--green)}.prop-badge.sobra{color:var(--amber)}
 /* Dashboard — validación */
 .valid-box{background:var(--surface);border-color:var(--border-strong)}
-.valid-box th{border-bottom-color:#26262C}
+.valid-box th{border-bottom-color:var(--border)}
 .ok-tag{color:var(--green)}.bad-tag{color:var(--red)}
 /* Dashboard — tarjetas de producto (acento por producto se mantiene inline) */
 .ccard{background:var(--surface);border-color:var(--border-strong)}
@@ -2179,38 +2269,38 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* ── Reporte de despacho + Pendientes + tarjeta del lobby ── */
 .rp-z{margin-bottom:14px;padding:14px 16px}
 .rp-row{display:flex;gap:12px;flex-wrap:wrap}
-.rp-clisel{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#0E0E11;border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;font-size:14px;color:var(--text)}
+.rp-clisel{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--sunken);border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;font-size:14px;color:var(--text)}
 .rp-clisel button{background:none;border:none;color:var(--text-3);font-size:17px;cursor:pointer;padding:0 2px}
-.rp-clivacio{width:100%;text-align:left;background:#0E0E11;border:1px dashed var(--border-strong);border-radius:8px;padding:10px 11px;font:inherit;font-size:14px;color:var(--text-3);cursor:pointer}
+.rp-clivacio{width:100%;text-align:left;background:var(--sunken);border:1px dashed var(--border-strong);border-radius:8px;padding:10px 11px;font:inherit;font-size:14px;color:var(--text-3);cursor:pointer}
 .rp-tipo{display:flex;gap:8px}
-.rp-tipo button{flex:1;background:#0E0E11;border:1px solid var(--border-strong);border-radius:8px;color:var(--text-3);font:inherit;font-size:13.5px;padding:10px 8px;cursor:pointer}
-.rp-tipo button.on{border-color:#E9FE60;color:var(--text);background:rgba(233,254,96,.08)}
+.rp-tipo button{flex:1;background:var(--sunken);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-3);font:inherit;font-size:13.5px;padding:10px 8px;cursor:pointer}
+.rp-tipo button.on{border-color:var(--ent-line);color:var(--text);background:var(--ent-wash)}
 .rp-nota{font-size:11.5px;color:var(--text-3);margin-top:6px;line-height:1.5}
-.rp-nota.rp-falta{color:#C99A4E}
+.rp-nota.rp-falta{color:var(--warn-2)}
 .rp-prods{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.rp-prod{background:#0E0E11;border:1px solid var(--border-strong);border-radius:10px;color:var(--text-2);font:inherit;font-size:13.5px;padding:18px 6px;cursor:pointer}
+.rp-prod{background:var(--sunken);border:1px solid var(--border-strong);border-radius:10px;color:var(--text-2);font:inherit;font-size:13.5px;padding:18px 6px;cursor:pointer}
 .rp-prod.on{border-color:var(--pc);color:var(--text);box-shadow:inset 0 0 0 1px var(--pc)}
 .rp-conv{font-size:13px;color:var(--text);padding:9px 0;font-variant-numeric:tabular-nums}
 .rp-lote{display:flex;align-items:center;gap:8px;margin-top:6px}
-.rp-lotebtn{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:#0E0E11;border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:13px;padding:10px 11px;cursor:pointer}
-.rp-lote.on .rp-lotebtn{border-color:#E9FE60;color:var(--text)}
+.rp-lotebtn{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:var(--sunken);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:13px;padding:10px 11px;cursor:pointer}
+.rp-lote.on .rp-lotebtn{border-color:var(--ent-line);color:var(--text)}
 .rp-lote.ago .rp-lotebtn{opacity:.45}
 .rp-saldo{font-size:11px;color:var(--text-3);white-space:nowrap}
 .rp-lotein{width:76px}
-#rpSheet{position:fixed;inset:0;background:rgba(14,14,17,.94);z-index:60;display:flex;justify-content:center}
+#rpSheet{position:fixed;inset:0;background:var(--scrim);z-index:60;display:flex;justify-content:center}
 #rpSheet.hidden{display:none}
 .rp-sheet-in{width:100%;max-width:560px;padding:18px 16px;display:flex;flex-direction:column}
 .rp-sheet-top{display:flex;gap:10px;margin-bottom:12px}
-.rp-sheet-top input{flex:1;background:#161619;border:1px solid var(--border-strong);border-radius:9px;color:var(--text);font:inherit;font-size:16px;padding:11px 12px}
+.rp-sheet-top input{flex:1;background:var(--field);border:1px solid var(--border-strong);border-radius:9px;color:var(--text);font:inherit;font-size:16px;padding:11px 12px}
 .rp-lista{overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-bottom:24px}
-.rp-cli{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:#161619;border:1px solid var(--border);border-radius:9px;color:var(--text);font:inherit;font-size:14px;padding:12px;cursor:pointer}
+.rp-cli{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:var(--field);border:1px solid var(--border);border-radius:9px;color:var(--text);font:inherit;font-size:14px;padding:12px;cursor:pointer}
 .rp-clif{font-size:11px;color:var(--text-3);white-space:nowrap}
 .pd-cnt{display:inline-block;min-width:22px;text-align:center;font-size:11.5px;font-weight:600;color:var(--text-3);border:1px solid var(--border-strong);border-radius:999px;padding:1px 7px;margin-left:6px}
-.pd-cnt.on{color:#0E0E11;background:#C99A4E;border-color:#C99A4E}
+.pd-cnt.on{color:var(--on-warn);background:var(--warn-2);border-color:var(--warn-2)}
 .pd-exp td{padding:0}
-.pd-clasif{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#0E0E11;border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin:4px 0 10px;font-size:12px;color:var(--text-3)}
-.pd-clasif button{background:#161619;border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:12.5px;padding:8px 11px;cursor:pointer}
-.pd-clasif button:hover{color:var(--text);border-color:#E9FE60}
+.pd-clasif{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin:4px 0 10px;font-size:12px;color:var(--text-3)}
+.pd-clasif button{background:var(--field);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:12.5px;padding:8px 11px;cursor:pointer}
+.pd-clasif button:hover{color:var(--text);border-color:var(--ent-line)}
 #entCard{margin-top:12px;background:#141417;border:.5px solid #3F4A16;border-radius:12px;padding:13px 15px;cursor:pointer}
 #entCard .ec-t{font-size:12px;color:var(--text-2);font-weight:600}
 #entCard .ec-row{font-size:12px;color:var(--text-3);margin-top:5px}
@@ -2232,8 +2322,8 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    alto, el lote sin partir nunca, y el total del producto pegado al pie mientras se cuenta.
    La letra de los inputs NO baja de 16px: menos que eso reintroduce el zoom de iOS. */
 .cl-lista{display:flex;flex-direction:column;gap:6px}
-.cl-prod{border:.5px solid var(--border);border-radius:10px;background:#141417;overflow:hidden}
-.cl-prod.on{border-color:#E9FE60}
+.cl-prod{border:.5px solid var(--border);border-radius:10px;background:var(--panel);overflow:hidden}
+.cl-prod.on{border-color:var(--ent-line)}
 /* JERARQUÍA: el nombre del producto es una ETIQUETA — Andrea ya sabe qué está
    contando —, y lo que manda visualmente es el NÚMERO. Por eso el nombre va en
    secundario 500 y el total en el acento del módulo, no al mismo peso.
@@ -2248,10 +2338,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .cl-nom{font-weight:500;color:var(--text-2);white-space:nowrap}
 .cl-pres{color:var(--text-3);font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cl-tot{color:var(--text-3);font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
-.cl-tot.hay{color:#E9FE60;font-weight:600}
+.cl-tot.hay{color:var(--ent-line);font-weight:600}
 .cl-tot-u,.cl-pie .cl-tot-u{font-size:10.5px;color:var(--text-3);font-weight:400;margin-left:4px}
-.cl-cuadra{display:block;font-size:10.5px;color:#8FBF6A;margin-top:2px}
-.cl-nocuadra{display:block;font-size:11px;color:#E9A23B;font-weight:600;margin-top:2px}
+.cl-cuadra{display:block;font-size:10.5px;color:var(--good);margin-top:2px}
+.cl-nocuadra{display:block;font-size:11px;color:var(--warn);font-weight:600;margin-top:2px}
 .cl-cuerpo{padding:0 16px 12px}
 /* El LOTE no se parte nunca: es el identificador que se busca con la vista.
    Va en MONO y en secundario: es un código, no una cifra — el ojo lo usa para
@@ -2259,18 +2349,18 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    códigos del resto de Truefie. */
 .cl-tbl td.cl-lote{white-space:nowrap;color:var(--text-2);font-family:var(--mono);font-size:12px;letter-spacing:-.01em}
 .cl-pie{position:sticky;bottom:0;margin:10px -16px -12px;padding:10px 16px;
-  background:#0E0E11;border-top:1px solid var(--border);font-size:11.5px;color:var(--text-3)}
-.cl-pie strong{color:#E9FE60;font-size:13.5px;font-variant-numeric:tabular-nums;margin-left:3px}
+  background:var(--sunken);border-top:1px solid var(--border);font-size:11.5px;color:var(--text-3)}
+.cl-pie strong{color:var(--ent-line);font-size:13.5px;font-variant-numeric:tabular-nums;margin-left:3px}
 /* ── Conteo por lote ── */
 .cl-hrow{cursor:pointer}
 .cl-hrow:hover td{color:var(--text)}
-.cl-badge-a{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:#2C3A00;background:#E9FE60;border-radius:999px;padding:1px 7px;margin-left:5px;font-weight:600}
+.cl-badge-a{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ent-fill-tx);background:var(--ent-fill);border-radius:999px;padding:1px 7px;margin-left:5px;font-weight:600}
 .cl-badge-b{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);border:1px solid var(--border-strong);border-radius:999px;padding:1px 7px;margin-left:5px}
-.cl-det{background:#0E0E11;border:1px solid var(--border);border-radius:9px;padding:10px 12px}
+.cl-det{background:var(--sunken);border:1px solid var(--border);border-radius:9px;padding:10px 12px}
 .cl-detnota{font-size:11.5px;color:var(--text-3);margin-bottom:6px}
 .cl-detpie{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px}
-.cl-okmsg{font-size:11.5px;color:#8FBF6A}
-.cl-confirmar{border-color:#E9FE60;color:#E9FE60}
+.cl-okmsg{font-size:11.5px;color:var(--good)}
+.cl-confirmar{border-color:var(--ent-line);color:var(--ent-line)}
 @media(max-width:700px){
   /* Los totales viven en el detalle, no en la fila. OJO: hay que esconder la CELDA y
      el ENCABEZADO. Escondiendo solo la celda quedaba un "TOTALES" rotulando una columna
@@ -2303,11 +2393,11 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    limpios — con anchos elásticos la vista se leía como un formulario suelto. */
 .cl-tbl col.cl-cap{width:76px}
 .cl-tbl col.cl-fin{width:70px}
-.cl-in{width:68px;background:#0E0E11;border:1px solid var(--border-strong);border-radius:7px;color:var(--text);
+.cl-in{width:68px;background:var(--sunken);border:1px solid var(--border-strong);border-radius:7px;color:var(--text);
   font:inherit;font-size:16px;padding:6px 6px;text-align:center;font-variant-numeric:tabular-nums}
-.cl-in:focus{outline:none;border-color:#E9FE60}
+.cl-in:focus{outline:none;border-color:var(--ent-line)}
 .cl-resumen{margin-top:10px;font-size:11.5px;color:var(--text-3);line-height:1.7}
-.cl-resumen b{color:#E9FE60;font-weight:600;font-variant-numeric:tabular-nums}
+.cl-resumen b{color:var(--ent-line);font-weight:600;font-variant-numeric:tabular-nums}
 .cl-tag{font-size:10px;color:var(--text-3);border:1px solid var(--border);border-radius:999px;padding:1px 6px;margin-left:4px}
 .cl-add{margin-top:10px}
 /* Los dos campos en rejilla pareja y el botón EN SU PROPIA LÍNEA del flujo vertical.
@@ -2358,34 +2448,45 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* La tarjeta de un PREPARADO. No es un botón entero: el botón está adentro, a la
    derecha, porque tocar la tarjeta por accidente no puede marcar una salida. */
 .dp-prep{display:flex;align-items:center;justify-content:space-between;gap:10px;
-  border:1px solid var(--border);border-left:2px solid #E9FE60;border-radius:10px;
-  background:#141417;padding:9px 10px 9px 12px}
+  border:1px solid var(--border);border-left:2px solid var(--ent-line);border-radius:10px;
+  background:var(--panel);padding:9px 10px 9px 12px}
 .dp-prep-i{display:flex;flex-direction:column;gap:2px;min-width:0}
 .dp-prep-cli{font-size:13.5px;font-weight:500;color:var(--text);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dp-prep-h{font-size:11.5px;color:var(--text-3)}
 /* Anulada: gris y apagada, pero NO escondida. El producto ya está armado contra una
    factura que dejó de existir — es lo que Daniel más necesita ver, no lo que menos. */
-.dp-prep.anulada{border-left-color:#4A4A4A;background:#131315;opacity:.72}
+.dp-prep.anulada{border-left-color:var(--dim-line);background:var(--dim-bg);opacity:.72}
 .dp-prep.anulada .dp-prep-cli{color:var(--text-2)}
-.dp-prep-anul{font-size:11.5px;line-height:1.45;color:#C99A4E;margin-top:3px;
+.dp-prep-anul{font-size:11.5px;line-height:1.45;color:var(--warn-2);margin-top:3px;
   white-space:normal}
 .dp-prep-nc{font-family:var(--mono);color:var(--text-3)}
 .dp-prep-ver{font-size:11.5px;color:var(--text-3);margin-top:3px;white-space:normal}
 /* Ámbar solo lo que urge: preparado AYER o antes es lo que hay que sacar o
    devolver al congelador. Preparado hoy es normal y va en gris. */
-.dp-prep.vieja{border-left-color:#E9A23B}
-.dp-prep.vieja .dp-prep-h{color:#E9A23B}
-.dp-entregar{flex:none;height:34px;padding:0 14px;border-radius:9px;border:1px solid #3F4A16;
-  background:transparent;color:#E9FE60;font-family:var(--font);font-size:12.5px;
-  font-weight:600;cursor:pointer}
-.dp-entregar:hover{background:rgba(233,254,96,.08)}
-.dp-entregar:disabled{opacity:.5;cursor:default}
+.dp-prep.vieja{border-left-color:var(--warn)}
+.dp-prep.vieja .dp-prep-h{color:var(--warn)}
+/* RELLENO, no contorno. El contorno era un idioma del tema oscuro, donde el lima
+   sobre negro se lee solo. En claro ese mismo lima como TEXTO da 3.10:1 sobre
+   blanco —medido— y este es justo el control que Daniel toca a las 6:30 con la
+   pantalla reflejando. Relleno lima con texto #2E3300 da 11.83:1, y es lo que la
+   paleta ya define para la acción principal. Mismo tratamiento que `.de-ok`, que
+   es la misma acción un paso más adelante: un solo botón de entregar, no dos. */
+.dp-entregar{flex:none;height:34px;padding:0 14px;border-radius:9px;
+  border:1px solid var(--ent-fill);background:var(--ent-fill);color:var(--ent-fill-tx);
+  font-family:var(--font);font-size:12.5px;font-weight:600;cursor:pointer}
+.dp-entregar:hover{filter:brightness(.96)}
+/* Deshabilitado NO es el primario con menos opacidad. Al pasar el botón a relleno
+   lima, "Anulada" quedaba como un bloque lima apagado — que a un metro sigue
+   leyéndose como el botón que hay que tocar, y acá la regla es justo la contraria.
+   Pierde el relleno y se va a gris: deja de ser una acción y pasa a ser un estado. */
+.dp-entregar:disabled{background:transparent;border-color:var(--border-strong);
+  color:var(--text-3);opacity:1;cursor:default}
 /* El pie de entregados: una línea, no una lista. Lleva al historial. */
 /* ── Diálogo de Entregar ──────────────────────────────────────────────────
    Se abre sobre la bandeja. El cuerpo scrollea y el pie queda fijo: con seis
    productos el botón no se va de la pantalla, que es donde se pierde el gesto. */
-.de-fondo{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:90;
+.de-fondo{position:fixed;inset:0;background:var(--scrim-2);z-index:90;
   display:flex;align-items:flex-end;justify-content:center;padding:0}
 @media(min-width:700px){ .de-fondo{align-items:center;padding:24px} }
 .de-caja{background:var(--surface);border:1px solid var(--border);
@@ -2408,19 +2509,19 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .de-lote{display:flex;justify-content:space-between;gap:12px;margin-top:4px;padding-left:14px;
   font-family:var(--mono);font-size:12px;color:var(--text-3)}
 .de-lote-c{white-space:nowrap}
-.de-sinlote{color:#C99A4E}
+.de-sinlote{color:var(--warn-2)}
 .de-vacia{padding:22px 0;text-align:center;color:var(--text-3);font-size:13px}
 .de-mal{padding:14px;margin:10px 0;border-radius:8px;font-size:13px;line-height:1.5;
-  background:rgba(233,162,59,.10);border:1px solid rgba(233,162,59,.35);color:#E8D3AC}
+  background:var(--warn-wash);border:1px solid var(--warn-edge);color:var(--warn-tx)}
 .de-pie{border-top:1px solid var(--border);padding:12px 16px;display:flex;
   align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .de-hora{font-size:12px;color:var(--text-3)}
 .de-btns{display:flex;gap:8px;margin-left:auto}
 /* Mismo lima y mismo borde derivado que .dp-entregar — un solo tono, sin inventar
    intermedios. Acá va relleno porque es la acción primaria del diálogo. */
-.de-ok{background:#E9FE60;color:#12140A;border:1px solid #E9FE60;border-radius:9px;
+.de-ok{background:var(--ent-fill);color:var(--ent-fill-tx);border:1px solid var(--ent-fill);border-radius:9px;
   height:36px;padding:0 16px;font-family:var(--font);font-size:12.5px;font-weight:600;cursor:pointer}
-.de-ok:disabled{background:transparent;color:#E9FE60;border-color:#3F4A16;opacity:.45;cursor:default}
+.de-ok:disabled{background:transparent;color:var(--ent-line);border-color:var(--ent-line-2);opacity:.45;cursor:default}
 
 .dp-hoy{margin-top:16px;border-top:1px solid var(--border);padding-top:10px;max-width:620px}
 .dp-hoy button{background:none;border:none;padding:0;font:inherit;font-size:12px;
@@ -2428,9 +2529,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .dp-hoy button:hover{color:var(--text-2)}
 .dp-hoy b{font-family:var(--mono);font-weight:500;color:var(--text-2)}
 .dp-ped{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;cursor:pointer;
-  border:1px solid var(--border);border-radius:10px;background:#141417;padding:10px 12px;
+  border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:10px 12px;
   color:var(--text);font:inherit}
-.dp-ped.hoy{border-color:#3F4A16}
+.dp-ped.hoy{border-color:var(--ent-line-2)}
 .dp-ped.vieja{background:transparent}
 .dp-ped.vieja .dp-cli{font-weight:400;color:var(--text-2)}
 .dp-top,.dp-bot{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
@@ -2439,7 +2540,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .dp-n{font-size:11.5px;color:var(--text-3)}
 .dp-dia{font-size:9.5px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;
   padding:1px 7px;border-radius:999px;border:1px solid var(--border-strong);color:var(--text-3)}
-.dp-dia.hoy{color:#2C3A00;background:#E9FE60;border-color:#E9FE60}
+.dp-dia.hoy{color:var(--ent-fill-tx);background:var(--ent-fill);border-color:var(--ent-fill)}
 /* Lo anterior a la ventana no compite: encabezado propio, gris, y un punto menos
    de contraste. La regla es que nada desaparece, no que todo grite igual. */
 .dp-antes{margin-top:8px;border-top:1px solid var(--border);padding-top:9px;
@@ -2470,8 +2571,8 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   border-radius:10px;background:var(--surface);padding:10px 12px;
   display:flex;flex-direction:column;gap:8px;min-width:0}
 .dp-l.full{grid-column:1/-1}
-.dp-l.ok{border-left-color:#E9FE60}
-.dp-l.dif{border-left-color:#E9A23B}
+.dp-l.ok{border-left-color:var(--ent-line)}
+.dp-l.dif{border-left-color:var(--warn)}
 /* Compacta: producto arriba, cantidad debajo — apiladas, porque en 171px una
    fila con las dos deja al selector sin aire. Partida: vuelven a la misma fila,
    que ahí sí hay ancho. */
@@ -2487,10 +2588,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    sola al caso simple: un lote no es un reparto. */
 .dp-x{flex:none;width:34px;height:40px;border:none;background:none;cursor:pointer;
   color:var(--text-3);font-family:var(--font);font-size:17px;line-height:1;padding:0}
-.dp-x:hover{color:#E9A23B}
+.dp-x:hover{color:var(--warn)}
 /* "+ otro lote" dice lo que hace. "+ partir" describía la mecánica interna. */
 .dp-otro{align-self:flex-end;background:none;border:none;padding:2px 0;cursor:pointer;
-  font-family:var(--font);font-size:11.5px;color:#E9FE60}
+  font-family:var(--font);font-size:11.5px;color:var(--ent-line)}
 .dp-l-fin .dp-otro{align-self:auto}
 .dp-otro:hover{text-decoration:underline}
 /* La cantidad es un botón que PARECE texto hasta que se toca. Sin edición no
@@ -2501,7 +2602,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .dp-l-cant b{color:var(--text);font-weight:600;font-size:15px;font-variant-numeric:tabular-nums}
 .dp-lapiz{font-size:11px;color:var(--text-3)}
 .dp-l-cant:hover .dp-lapiz{color:var(--text-2)}
-.dp-fact{font-size:11px;color:#E9A23B;margin-top:-4px}
+.dp-fact{font-size:11px;color:var(--warn);margin-top:-4px}
 .dp-l-bot{display:flex;align-items:center;gap:8px}
 /* Selector e input: MISMO borde, MISMO fondo, MISMA altura. Es lo que los hace
    leerse como una fila y no como tres controles de orígenes distintos. */
@@ -2509,16 +2610,16 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   border-radius:9px;color:var(--text);font-family:var(--font);font-size:16px;
   height:40px;padding:0 11px;box-sizing:border-box;outline:none}
 .dp-lsel{flex:1;min-width:0;appearance:none;-webkit-appearance:none;cursor:pointer;
-  background-image:linear-gradient(45deg,transparent 50%,#6E6C68 50%),linear-gradient(135deg,#6E6C68 50%,transparent 50%);
+  background-image:linear-gradient(45deg,transparent 50%,var(--text-3) 50%),linear-gradient(135deg,var(--text-3) 50%,transparent 50%);
   background-position:calc(100% - 15px) 17px,calc(100% - 10px) 17px;
   background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:30px}
-.dp-lsel:focus,.dp-lq:focus,.dp-cant:focus{border-color:#E9FE60}
+.dp-lsel:focus,.dp-lq:focus,.dp-cant:focus{border-color:var(--ent-line)}
 .dp-lsel.p{flex:1}
 .dp-lq{width:74px;flex:none;text-align:center;font-variant-numeric:tabular-nums}
 .dp-cant{width:74px;text-align:center;font-variant-numeric:tabular-nums}
 .dp-suma{font-size:11.5px;color:var(--text-3);white-space:nowrap}
 .dp-ok{color:var(--text-3)}
-.dp-mal{color:#E9A23B;font-weight:600}
+.dp-mal{color:var(--warn);font-weight:600}
 .dp-pie{display:flex;flex-direction:column;gap:8px;margin-top:14px}
 /* PREPARAR es el primario y PREPARAR Y ENTREGAR el secundario. El riesgo no es
    simétrico: una hora de salida falsa no la ve nadie; un pendiente fantasma se
@@ -2545,17 +2646,17 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .bs-in{width:100%;background:var(--surface-2);border:1px solid var(--border-strong);
   border-radius:10px;color:var(--text);font-family:var(--font);font-size:16px;
   height:44px;padding:0 13px;box-sizing:border-box;outline:none}
-.bs-in:focus{border-color:#E9FE60}
+.bs-in:focus{border-color:var(--ent-line)}
 .bs-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .bs-chip{background:var(--surface-2);border:1px solid var(--border);border-radius:999px;
   color:var(--text-2);font-family:var(--font);font-size:12px;padding:5px 13px;cursor:pointer}
 .bs-chip:hover{border-color:var(--border-strong)}
-.bs-chip.on{background:#E9FE60;border-color:#E9FE60;color:#2C3A00;font-weight:600}
+.bs-chip.on{background:var(--ent-fill);border-color:var(--ent-fill);color:var(--ent-fill-tx);font-weight:600}
 .bs-lista{display:flex;flex-direction:column;gap:6px;margin-top:14px;max-width:620px}
-.bs-fila{width:100%;text-align:left;background:#141417;border:1px solid var(--border);
+.bs-fila{width:100%;text-align:left;background:var(--panel);border:1px solid var(--border);
   border-radius:10px;color:var(--text);font:inherit;font-family:var(--font);
   padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:3px}
-.bs-fila.on{border-color:#3F4A16;border-bottom-color:var(--border);border-radius:10px 10px 0 0}
+.bs-fila.on{border-color:var(--ent-line-2);border-bottom-color:var(--border);border-radius:10px 10px 0 0}
 .bs-f1,.bs-f2{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .bs-cli{font-size:13.5px;font-weight:500}
 .bs-fec{font-size:11px;color:var(--text-3);white-space:nowrap}
@@ -3043,7 +3144,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 20 ago 2026 · b28';
+const BUILD = 'v 24 ago 2026 · b30';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -3555,6 +3656,11 @@ function _modShow(id){
   // devuelve al lobby. No protege los datos — eso lo hará "Roles y accesos".
   const mod=accesoModDeVista(id);
   if(mod && !accesoPuede(mod)){ volverLobby(); return; }
+  // ENTREGAS VA EN CLARO (24-ago). El interruptor sale de ACCESO_VISTAS.entregas,
+  // que ya es la lista canónica del módulo: una vista nueva de Entregas entra en
+  // claro sola, sin que nadie tenga que acordarse de tocar el CSS. Va en `body`
+  // porque el encabezado vive fuera de las vistas — ver `body.ent-claro`.
+  document.body.classList.toggle('ent-claro', mod==='entregas');
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.toggle('hidden', v!==id); });
   document.getElementById('vLobby').classList.add('hidden');
   document.getElementById('appHeader').classList.remove('hidden');
@@ -3565,7 +3671,9 @@ function crumbSet(area,cur){
   const a=document.querySelector('.crumb-area'); if(a)a.textContent=area;
   const c=document.querySelector('.crumb-cur'); if(c)c.textContent=cur;
   // el punto del breadcrumb sigue el color del módulo (Finanzas azul · Operaciones rosa · Conciliación verde)
-  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Conciliación':'#84BD00','Entregas':'#E9FE60','Ventas':'#3FB6A8'};
+  // Entregas va en OLIVA, no en lima: su encabezado es claro y un punto de 7px en
+  // #E9FE60 sobre blanco no se ve. Mismo criterio que --ent-line.
+  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Conciliación':'#84BD00','Entregas':'#8A9B00','Ventas':'#3FB6A8'};
   const d=document.querySelector('.crumb-dot'); if(d)d.style.background=COL[area]||'#378ADD';
 }
 // Entradas desde el HOME (una por módulo).
@@ -3581,6 +3689,7 @@ function abrirConciliacion(){                                // módulo Concilia
   renderCobrosExtracto();   // la lista de cobros sale del extracto subido (no de la pila vieja de Odoo)
 }
 function volverLobby(){
+  document.body.classList.remove('ent-claro');   // el lobby es de todos: vuelve a oscuro
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.add('hidden'); });
   document.getElementById('appHeader').classList.add('hidden');
   document.getElementById('vLobby').classList.remove('hidden');
@@ -6892,7 +7001,7 @@ function _clRender(){
     const okey =_clExcl.filter(function(x){ return  x.ok; });
     if(rotas.length){
       h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-bottom:14px">'
-        +'<div style="font-weight:700;color:#E9A23B;font-size:12.5px">'+rotas.length
+        +'<div style="font-weight:700;color:var(--warn);font-size:12.5px">'+rotas.length
         +(rotas.length===1?' exclusión de producción no se pudo verificar':' exclusiones de producción no se pudieron verificar')+'</div>'
         +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.5">'
         +rotas.map(function(x){ return esc(x.etiqueta||('orden '+x.id))+': '+esc((x.fallas||[]).join(' · ')); }).join('<br>')
@@ -6907,7 +7016,7 @@ function _clRender(){
   }
   if(_clHuerfanos.length){
     h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-bottom:14px">'
-      +'<div style="font-weight:700;color:#E9A23B;font-size:12.5px">'+_clHuerfanos.length
+      +'<div style="font-weight:700;color:var(--warn);font-size:12.5px">'+_clHuerfanos.length
       +' lotes de un producto que no es de los seis</div>'
       +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px">'
       +esc(_clHuerfanos.map(function(L){return L.canon+' (id '+L.producto+')';}).join(' · '))
@@ -6969,7 +7078,7 @@ function _clRender(){
     .reduce(function(n,k){ return n+((b[k]||[]).length); },0);
   if(nb){
     h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-top:16px">'
-      +'<div style="font-weight:700;color:#E9A23B;font-size:12.5px">'+nb+' órdenes sin lote legible</div>'
+      +'<div style="font-weight:700;color:var(--warn);font-size:12.5px">'+nb+' órdenes sin lote legible</div>'
       +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.6">'
       +'El extractor no pudo sacar el lote del chatter de estas órdenes. No se asumen ni se esconden: '
       +'si hay producto de alguna en el congelador, agregá el lote a mano en el producto que corresponda.</div>'
@@ -7068,7 +7177,7 @@ function _clHistPintar(){
   if(_clHist===null){ el.innerHTML='<div class="cl-none">Cargando conteos guardados…</div>'; return; }
   if(_clHistErr){
     el.innerHTML='<div class="valid-box" style="border-color:rgba(224,90,90,.45);background:rgba(224,90,90,.08)">'
-      +'<div style="font-weight:700;color:#E05A5A;font-size:12.5px">No pude leer los conteos guardados</div>'
+      +'<div style="font-weight:700;color:var(--stop-tx);font-size:12.5px">No pude leer los conteos guardados</div>'
       +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px">'+esc(_clHistErr)+'</div></div>';
     return;
   }
@@ -7295,14 +7404,14 @@ async function guardarConteoLote(){
   if(_clGuardando) return;
   const msg=document.getElementById('clSaveMsg'), btn=document.getElementById('clSave');
   const lineas=_clLeer();
-  if(!lineas.length){ msg.style.color='#E9A23B'; msg.textContent='No hay nada anotado todavía.'; return; }
+  if(!lineas.length){ msg.style.color='var(--warn)'; msg.textContent='No hay nada anotado todavía.'; return; }
   const resp=(document.getElementById('clResp').value||'').trim();
-  if(!resp){ msg.style.color='#E9A23B'; msg.textContent='Falta quién contó.'; return; }
+  if(!resp){ msg.style.color='var(--warn)'; msg.textContent='Falta quién contó.'; return; }
   const c=sbClient();
-  if(!c){ msg.style.color='#FF8A8A'; msg.textContent='No hay sesión de Supabase.'; return; }
+  if(!c){ msg.style.color='var(--stop-tx)'; msg.textContent='No hay sesión de Supabase.'; return; }
   if(!confirm('Guardar el conteo con '+lineas.length+' lote'+(lineas.length===1?'':'s')+'?\n\nQueda como BORRADOR: no cambia ningún saldo hasta que lo confirmes como ancla.')) return;
   _clGuardando=true; btn.disabled=true;
-  msg.style.color='#A8A6A0'; msg.textContent='Guardando…';
+  msg.style.color='var(--busy)'; msg.textContent='Guardando…';
   try{
     const {data:{user}}=await c.auth.getUser();
     const email=(user&&user.email)||'desconocido';
@@ -7314,14 +7423,14 @@ async function guardarConteoLote(){
     const {error:e2}=await c.from('ent_conteo_linea')
       .insert(lineas.map(function(r){ return Object.assign({conteo_id:cab.id}, r); }));
     if(e2) throw e2;
-    msg.style.color='#8FBF6A';
+    msg.style.color='var(--good)';
     msg.innerHTML='Borrador guardado (#'+cab.id+', '+lineas.length+' lotes · corte '
       +esc(String(cab.corte||'').replace('T',' ').slice(0,16))+'). '
       +'<strong>Todavía no es el ancla</strong>: revisá los totales abajo y confirmalo.';
     btn.textContent='Guardar conteo';
     await _clCargarHist();          // el borrador nuevo aparece en el historial, listo para confirmar
   }catch(e){
-    msg.style.color='#FF8A8A';
+    msg.style.color='var(--stop-tx)';
     msg.textContent='No se pudo guardar: '+((e&&e.message)||e);
     btn.disabled=false; btn.textContent='Guardar conteo';
   }
@@ -7433,6 +7542,16 @@ let _despEntAbierto=0, _despDetErr='';
 // La distinción importa: mientras sea null NO se puede entregar, porque no sabemos
 // si la factura sigue viva. Misma regla que el detalle del diálogo.
 let _despAnul=null, _despAnulErr='';
+// `_despAnulFallo` separa DOS cosas que antes eran la misma: "todavía estoy leyendo"
+// de "ya me rendí". El botón se comporta al revés en cada una — apagado mientras se
+// intenta, encendido-con-marca después. Sin esta bandera, un fallo de red se ve igual
+// que una lectura en curso y Daniel se queda mirando un botón apagado para siempre.
+let _despAnulFallo=false;
+// Cuántos días hacia atrás se re-verifican las salidas que ya dieron 'vigente'.
+// Una factura no se anula un mes después: el caso real es el mismo día (Daniel
+// despacha 6:30, Andrea anula 10:00) o el siguiente. Siete días da margen de sobra
+// sin releer historia. Se cambia acá, no en la vista — por eso la vista no lo hornea.
+const DESP_REVERIF_DIAS = 7;
 
 // LA SEÑAL ES reversal_move_id, NO payment_state. Medido el 20-ago sobre las 497
 // facturas de venta de 2026: `reversal_move_id` no vacío caza 36; `payment_state =
@@ -7461,13 +7580,20 @@ async function despCargarAnuladas(ids){
   if(!pedir.length){ _despAnul=_despAnul||{}; return; }
   for(let intento=1; intento<=DESP_ANUL_REINTENTOS; intento++){
     const ok=await _despIntentarAnuladas(pedir, intento);
-    if(ok) return;
+    if(ok){ _despAnulFallo=false; return; }
     if(intento<DESP_ANUL_REINTENTOS){
       _despAnulErr='';                        // el fallo intermedio no se muestra
       despRender();
       await _esperar(DESP_ANUL_ESPERA_MS);
     }
   }
+  // Se agotaron los intentos. NO se bloquea el despacho por un problema de
+  // infraestructura: la salida se registra igual y queda MARCADA (ver despEntregar).
+  // Fallar cerrado empujaría a Daniel al Excel, y lo anotado ahí no baja nunca al
+  // saldo — un descuadre invisible y permanente. Una salida marcada, en cambio, se
+  // ve y se limpia sola cuando Odoo vuelve.
+  _despAnulFallo=true;
+  despRender();
 }
 async function _despIntentarAnuladas(pedir, intento){
   try{
@@ -7642,20 +7768,118 @@ async function despCargarEstado(){
     // NO se espera (`await`): la bandeja se pinta con Supabase, que es instantáneo, y
     // el estado de anulada llega después. Mientras tanto Entregar queda deshabilitado.
     const fids=prep.map(function(r){ return r.factura_id; }).filter(Boolean);
-    if(fids.length) despCargarAnuladas(fids).then(function(){ if(!_despAbierto) despRender(); });
-    else { _despAnul=_despAnul||{}; }
+    if(fids.length) despCargarAnuladas(fids).then(function(){
+      if(!_despAbierto) despRender();
+      despReverificar();            // en cuanto Odoo contesta, se limpia lo pendiente
+    });
+    else { _despAnul=_despAnul||{}; despReverificar(); }
   }catch(e){
     _despEstado=_despEstado||[];
     _despEstErr=(e&&e.message)||String(e);
   }
   if(!_despAbierto) despRender();     // sin pisar un pedido a medio llenar
 }
+// ── VERIFICACIÓN HACIA ATRÁS ────────────────────────────────────────────
+// Dos poblaciones, y las dos hacen falta:
+//   · las MARCADAS (`sin_verificar`) — se registraron sin poder mirar Odoo. Cuando Odoo
+//     vuelve, se resuelven y la marca se apaga sola. Nadie tiene que hacer nada.
+//   · las que dieron `vigente` — porque una factura puede anularse DESPUÉS de la salida.
+//     Daniel despacha a las 6:30 contra una factura viva y Andrea la anula a las 10:00.
+//     Sin esto, esa salida quedó 'vigente' y nadie la vuelve a mirar nunca.
+// Se corre sola al cargar Despachos, después de que la lectura de anuladas contestó —
+// si Odoo no contesta, no hay con qué verificar y no se hace nada.
+//
+// SOLO INSERTA cuando el resultado CAMBIA. Escribir 'vigente' encima de 'vigente' en
+// cada carga llenaría la tabla de ruido y volvería inútil el historial, que es la razón
+// por la que esto es append-only y no una columna.
+async function despReverificar(){
+  if(_despAnul===null) return;                 // no se pudo leer Odoo: nada que hacer
+  const c=sbClient(); if(!c) return;
+  try{
+    const corte=new Date(); corte.setDate(corte.getDate()-DESP_REVERIF_DIAS);
+    const desde=_despYmd(corte);
+    const [pend, vig] = await Promise.all([
+      c.from('ent_salida_sin_verificar').select('salida_id,estado,salida_en,factura_nombre').limit(200),
+      c.from('ent_salida_a_reverificar').select('salida_id,factura_id,salida_en')
+        .gte('salida_en', desde).limit(200)
+    ]);
+    if(pend.error) throw pend.error;
+    if(vig.error)  throw vig.error;
+
+    // De las marcadas hay que averiguar la factura: la vista no la trae cuando el
+    // estado es 'sin_verificar' (no se pudo mirar, así que no se guardó el id).
+    const marcadas=(pend.data||[]).filter(function(x){ return x.estado==='sin_verificar'; });
+    let facDeSalida={};
+    if(marcadas.length){
+      // SE PIDEN POR ID, no por ventana de fecha ni con un `limit` de corte.
+      // DESP_REVERIF_DIAS acota bien las 'vigente' —una factura no se anula un mes
+      // despues— pero NO sirve aca: `ent_salida_sin_verificar` no tiene corte por
+      // fecha, asi que una salida marcada sigue en la lista a los treinta dias.
+      // Filtrarla por siete la dejaria sin factura que mirar y no se limpiaria
+      // NUNCA — el mismo agujero que un `limit` arbitrario, con otra causa. Y sin
+      // conteos fisicos que reanclen, ese error ya no se limpia solo por ningun
+      // otro camino. Como ya sabemos QUE salidas son, se preguntan esas y punto:
+      // queda acotado por las <=200 de `pend` y no se puede caer ninguna.
+      const ids=marcadas.map(function(x){ return x.salida_id; });
+      const {data:est,error:eEst}=await c.from('v_ent_pedido_estado')
+        .select('pedido_id,factura_id,salida_id').in('salida_id', ids);
+      // El error NO se traga: si esta lectura falla, las marcadas se quedan
+      // marcadas y en silencio. Sube al catch, que al menos lo deja en consola.
+      if(eEst) throw eEst;
+      (est||[]).forEach(function(e){ if(e.salida_id) facDeSalida[e.salida_id]=e.factura_id; });
+    }
+    const objetivos=[];
+    marcadas.forEach(function(x){
+      const f=facDeSalida[x.salida_id];
+      if(f) objetivos.push({salida_id:x.salida_id, factura_id:f, previo:'sin_verificar'});
+    });
+    (vig.data||[]).forEach(function(x){
+      objetivos.push({salida_id:x.salida_id, factura_id:x.factura_id, previo:'vigente'});
+    });
+    if(!objetivos.length) return;
+
+    const facturas=[...new Set(objetivos.map(function(o){ return o.factura_id; }).filter(Boolean))];
+    const mv=await odooCall('account.move','search_read',[[['id','in',facturas]]],
+      {fields:['id','name','reversal_move_id'],limit:1000,context:{lang:'es_CR'}});
+    const rev={}, ncIds=[];
+    mv.forEach(function(m){ const r=m.reversal_move_id||[];
+      if(r.length){ rev[m.id]=r[0]; ncIds.push(r[0]); } });
+    const motivo={};
+    if(ncIds.length){
+      const ncs=await odooCall('account.move','search_read',[[['id','in',ncIds]]],
+        {fields:['id','ref'],limit:1000,context:{lang:'es_CR'}});
+      ncs.forEach(function(n){ motivo[n.id]=_despMotivoNC(n.ref); });
+    }
+    const {data:{user}}=await c.auth.getUser();
+    const quien=(user&&user.email)||'reverificacion';
+    const filas=[];
+    objetivos.forEach(function(o){
+      const anulada=!!rev[o.factura_id];
+      const nuevo=anulada?'anulada':'vigente';
+      if(nuevo===o.previo) return;             // sin cambio: no se escribe
+      filas.push({salida_id:o.salida_id, estado:nuevo, factura_id:o.factura_id,
+                  detalle: anulada ? ('NC: '+(motivo[rev[o.factura_id]]||'sin motivo')) : null,
+                  creado_por: quien});
+    });
+    if(filas.length){
+      const {error}=await c.from('ent_salida_verificacion').insert(filas);
+      if(error) throw error;
+      const gritan=filas.filter(function(f){ return f.estado==='anulada'; }).length;
+      if(gritan) console.warn('reverificación: '+gritan+' salida(s) contra factura anulada');
+    }
+  }catch(e){
+    console.warn('reverificación no pudo completarse:', (e&&e.message)||e);
+  }
+}
+
 // El estado de anulación de un pedido: null mientras no se sepa, {anulada:bool,...} después.
 // Un pedido SIN factura (traslado interno, salida manual) nunca puede estar anulado — no
 // hay documento que anular — así que se resuelve de una y no queda esperando a Odoo.
+// null = todavía leyendo · {sinVerificar:true} = se rindió, se entrega marcado ·
+// {anulada:bool} = se sabe. Un pedido SIN factura nunca puede estar anulado.
 function _despAnulDe(r){
   if(!r || !r.factura_id) return {anulada:false};
-  if(_despAnul===null) return null;
+  if(_despAnul===null) return _despAnulFallo ? {anulada:false, sinVerificar:true} : null;
   const a=_despAnul[r.factura_id];
   return a ? Object.assign({anulada:true}, a) : {anulada:false};
 }
@@ -7749,12 +7973,16 @@ function despRender(){
           +'<br>No se entrega. El producto ya está armado: avisale a Andrea.</div>';
       }else if(an===null){
         etiqueta='<div class="dp-prep-ver">Verificando en Odoo si la factura sigue vigente…</div>';
+      }else if(an.sinVerificar){
+        // Se entrega igual, pero Daniel tiene que saber qué está haciendo.
+        etiqueta='<div class="dp-prep-anul">No pude verificar la factura contra Odoo.'
+          +'<br>Se registra igual y queda marcada: Andrea la revisa después.</div>';
       }
       const btn = anulada
         ? '<button class="dp-entregar" disabled>Anulada</button>'
         : '<button class="dp-entregar"'+((ocupado||an===null)?' disabled':'')
           +' onclick="despAbrirEntrega('+r.pedido_id+')">'
-          +(ocupado?'Guardando…':(an===null?'Verificando…':'Entregar'))+'</button>';
+          +(ocupado?'Guardando…':(an===null?'Verificando…':(an.sinVerificar?'Entregar sin verificar':'Entregar')))+'</button>';
       return '<div class="dp-prep'+(vieja?' vieja':'')+(anulada?' anulada':'')+'">'
         +'<div class="dp-prep-i"><span class="dp-prep-cli">'+esc(r.cliente_nombre||'—')+'</span>'
         +'<span class="dp-prep-h">preparado '+esc(_despCuando(r.preparado_en))
@@ -8221,13 +8449,30 @@ async function despEntregar(pedidoId){
       : 'Todavía no pude verificar en Odoo si la factura sigue vigente. Probá en unos segundos.');
     despRender(); return;
   }
+  // `an.sinVerificar` NO frena: se registra y se marca. Es la decisión del 20-ago.
   _despEntregando=pedidoId; despRender();
   try{
     const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
     const {data:{user}}=await c.auth.getUser();
-    const {error}=await c.from('ent_salida').insert({
-      alisto_id:r.alisto_id, creado_por:(user&&user.email)||'desconocido'});
+    const quien=(user&&user.email)||'desconocido';
+    const {data:sal,error}=await c.from('ent_salida').insert({
+      alisto_id:r.alisto_id, creado_por:quien}).select('id').single();
     if(error) throw error;
+    // LA MARCA. Toda salida escribe su verificación, incluso la que verificó bien: así
+    // "sin fila" significa "salida vieja, anterior a esto" y no ensucia la alerta.
+    // Va DESPUÉS del insert de la salida y en su propio try: si falla la marca, la
+    // salida ya está registrada y el saldo ya bajó — perder la marca es molesto, perder
+    // la salida sería un descuadre. Se prioriza el dato duro.
+    try{
+      await c.from('ent_salida_verificacion').insert({
+        salida_id: sal.id,
+        estado: an.sinVerificar ? 'sin_verificar' : 'vigente',
+        factura_id: r.factura_id || null,
+        detalle: an.sinVerificar ? ('no se pudo leer Odoo: '+(_despAnulErr||'sin detalle')) : null,
+        creado_por: quien});
+    }catch(ev){
+      console.warn('salida registrada pero sin marca de verificación:', ev);
+    }
     _despEntAbierto=0;                 // salió bien: se cierra el diálogo
   }catch(e){
     alert('No se pudo marcar la salida: '+((e&&e.message)||e)
@@ -8667,13 +8912,13 @@ async function rpGuardar(){
   if(_rpGuardando) return;
   const msg=document.getElementById('rpSaveMsg'), btn=document.getElementById('rpSave');
   const pon=function(c,t){ msg.style.color=c; msg.textContent=t; };
-  if(!_rp.cliente){ pon('#E9A23B','Falta el cliente.'); return; }
-  if(!_rp.motivo){ pon('#E9A23B','Falta el tipo de salida: venta con factura, o sin factura.'); return; }
-  if(!_rp.lineas.length){ pon('#E9A23B','No hay ninguna línea cargada.'); return; }
+  if(!_rp.cliente){ pon('var(--warn)','Falta el cliente.'); return; }
+  if(!_rp.motivo){ pon('var(--warn)','Falta el tipo de salida: venta con factura, o sin factura.'); return; }
+  if(!_rp.lineas.length){ pon('var(--warn)','No hay ninguna línea cargada.'); return; }
   const resp=(document.getElementById('rpResp').value||'').trim();
-  if(!resp){ pon('#E9A23B','Falta quién despacha.'); return; }
-  const c=sbClient(); if(!c){ pon('#FF8A8A','No hay sesión de Supabase.'); return; }
-  _rpGuardando=true; btn.disabled=true; pon('#A8A6A0','Guardando…');
+  if(!resp){ pon('var(--warn)','Falta quién despacha.'); return; }
+  const c=sbClient(); if(!c){ pon('var(--stop-tx)','No hay sesión de Supabase.'); return; }
+  _rpGuardando=true; btn.disabled=true; pon('var(--busy)','Guardando…');
   let paso='pedido';
   try{
     const {data:{user}}=await c.auth.getUser();
@@ -8715,14 +8960,14 @@ async function rpGuardar(){
       nota:'Reporte de despacho: la fecha es la registrada, la hora NO es medida',
       creado_por:email});
     if(e6) throw e6;
-    pon('#8FBF6A','Despacho #'+ped.id+' guardado — '+_rp.lineas.length+' línea'
+    pon('var(--good)','Despacho #'+ped.id+' guardado — '+_rp.lineas.length+' línea'
       +(_rp.lineas.length===1?'':'s')+' de '+esc(_rp.cliente.nombre)
       +(_rp.motivo==='sin_clasificar'?' · quedó pendiente de clasificar':'')+'.');
     _rpReset(false);                       // conserva la fecha; cliente y tipo se eligen de nuevo
     rpRender(); rpCargarLotes();           // saldos frescos
     const m2=document.getElementById('rpSaveMsg'); if(m2&&msg.textContent) m2.textContent=msg.textContent;
   }catch(e){
-    pon('#FF8A8A','No se pudo guardar (falló en: '+paso+'): '+((e&&e.message)||e)
+    pon('var(--stop-tx)','No se pudo guardar (falló en: '+paso+'): '+((e&&e.message)||e)
       +(paso!=='pedido'?' — OJO: el despacho quedó a medias, va a salir en Pendientes.':''));
   }
   _rpGuardando=false; if(btn) btn.disabled=false;
@@ -8783,7 +9028,25 @@ async function pdLeer(){
     if(mv==='venta' && !F[p.id]) l2.push(it);
     if(mv==='sin_clasificar') l3.push(it);
   });
-  return {l1:l1,l2:l2,l3:l3};
+  // ── SALIDAS SIN VERIFICAR (o contra factura anulada) ──────────────────
+  // Dos cosas distintas en una lista, ordenadas por gravedad:
+  //   anulada       → salió producto contra un documento muerto. NO se apaga sola.
+  //   sin_verificar → Odoo no contestó al despachar. SE APAGA SOLA cuando vuelva.
+  // Cumple las cinco reglas del lobby: solo existe si hay filas (1), trae la fecha de
+  // la salida (2), se apaga sola (3), el corte a 3 lo hace la pantalla (4), y el ámbar
+  // lo decide el estado y no la existencia (5).
+  let l4=[];
+  try{
+    const {data:sv}=await c.from('ent_salida_sin_verificar')
+      .select('salida_id,estado,salida_en,cliente_nombre,factura_nombre,detalle').limit(50);
+    l4=(sv||[]).map(function(x){
+      const dias=Math.floor((Date.now()-Date.parse(x.salida_en))/86400000);
+      return {id:x.salida_id, estado:x.estado, cliente:x.cliente_nombre||'—',
+              fecha:String(x.salida_en||'').slice(0,10), dias:dias,
+              factura:x.factura_nombre||'', detalle:x.detalle||''};
+    });
+  }catch(e){ l4=[]; }    // la vista puede no existir todavía: no rompe Pendientes
+  return {l1:l1,l2:l2,l3:l3,l4:l4};
 }
 function pdRender(){
   const body=document.getElementById('pdBody'); if(!body||!_pd) return;
@@ -8814,6 +9077,37 @@ function pdRender(){
   h+=secc('Salida sin clasificar',
     'Daniel registró la salida; falta que las socias digan qué fue. El pendiente es un estado con nombre, no un hueco.',
     _pd.l3, function(it){ return '<button class="btn btn-sm" onclick="pdClasifUI('+it.id+')">Clasificar</button>'; });
+
+  // Regla 1 del lobby: si no hay nada que hacer, la sección NO aparece. Nada de
+  // "todo al día" — eso es información, y la información vive adentro del módulo.
+  const l4=(_pd.l4||[]);
+  if(l4.length){
+    const anul=l4.filter(function(x){ return x.estado==='anulada'; });
+    const sinv=l4.filter(function(x){ return x.estado!=='anulada'; });
+    h+='<div class="card rp-z"><div class="card-title">Salidas sin verificar factura'
+      +' <span class="pd-cnt on">'+l4.length+'</span></div>';
+    if(anul.length){
+      h+='<div class="valid-box" style="border-color:var(--stop-line);background:var(--stop-wash);margin-bottom:10px">'
+        +'<div style="font-weight:700;color:var(--stop-tx);font-size:12.5px">'+anul.length
+        +(anul.length===1?' salida contra una factura ANULADA':' salidas contra facturas ANULADAS')+'</div>'
+        +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.5">'
+        +'Salió producto contra un documento que ya no existe. Esto no se apaga solo.</div></div>';
+    }
+    h+='<table class="cl-tbl"><tr><th>Salida</th><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Hace</th><th></th></tr>';
+    l4.slice(0,3).forEach(function(it){
+      h+='<tr><td>#'+it.id+'</td><td>'+esc(it.cliente)+'</td>'
+        +'<td>'+esc(it.factura?('…'+String(it.factura).slice(-4)):'—')+'</td>'
+        +'<td>'+esc(it.fecha)+'</td><td>'+(it.dias===0?'hoy':(it.dias+' d'))+'</td>'
+        +'<td style="text-align:right">'+(it.estado==='anulada'
+            ? '<span style="color:var(--stop-tx);font-size:11.5px">anulada</span>'
+            : '<span style="color:var(--warn-2);font-size:11.5px">sin verificar</span>')+'</td></tr>';
+    });
+    h+='</table>';
+    if(l4.length>3) h+='<div class="rp-nota" style="margin-top:6px">y '+(l4.length-3)+' más</div>';
+    if(sinv.length) h+='<div class="rp-nota" style="margin-top:6px">Las «sin verificar» se '
+      +'limpian solas la próxima vez que Despachos lea Odoo.</div>';
+    h+='</div>';
+  }
   body.innerHTML=h;
 }
 async function pdValidar(id){
