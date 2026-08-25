@@ -1,9 +1,10 @@
 -- ════════════════════════════════════════════════════════════════════════
 -- MÓDULO PERSONAL · ESQUEMA SUPABASE   (PEGADO 2 de 3)
--- PROPUESTA 13-ago-2026. **NO PEGAR TODAVÍA** — esto es el STOP de diseño.
--- AMPLIADO 19-ago-2026 con vacaciones y aguinaldo. Sigue el MISMO STOP: no se
--- pega nada hasta que Andrea y Lorena revisen.
--- Va DESPUÉS de ACCESOS_ESQUEMA.sql, que es de donde salen los perfiles.
+-- PROPUESTA 13-ago-2026. AMPLIADO 19-ago-2026 con vacaciones y aguinaldo.
+-- ✅ APROBADO POR ANDREA 24-ago-2026 — se levanta el STOP de diseño.
+-- Va DESPUÉS de ACCESOS_ESQUEMA.sql, y no es una preferencia de orden: las 14
+-- políticas de la sección 10 llaman a acceso_es_socia() y acceso_perfil(), que
+-- se crean allá. Pegado al revés, esto se cae en la primera política.
 -- Va después de la pasada visual de Entregas y de Despachos: Daniel arranca
 -- el lunes y eso manda.
 --
@@ -651,6 +652,17 @@ create policy rrhh_aguinaldo_sel on rrhh_aguinaldo for select to authenticated
 drop policy if exists rrhh_aguinaldo_ins on rrhh_aguinaldo;
 create policy rrhh_aguinaldo_ins on rrhh_aguinaldo for insert to authenticated
   with check (acceso_es_socia());
+
+-- QUITARLE A `anon` LO QUE SUPABASE LE REGALA. Los privilegios por defecto de
+-- Supabase dan `select` a `anon` sobre todo lo que nace en `public`. Acá la RLS
+-- igual lo frena (ninguna política nombra a `anon`), así que esto es cinturón
+-- además de tirantes — pero el 24-ago-2026 una vista sin `security_invoker` en
+-- el pegado 1 dejó los correos del equipo legibles sin login, y la lección es
+-- que no conviene depender de una sola capa. Antes del login no hay nada acá
+-- que leer.
+revoke all on rrhh_param, rrhh_persona, rrhh_persona_baja, rrhh_salario,
+              rrhh_evento, rrhh_evento_aprob, rrhh_evento_anulado,
+              rrhh_quincena_aplicada, rrhh_aguinaldo from anon;
 
 grant select on rrhh_param, rrhh_persona, rrhh_persona_baja, rrhh_salario,
                 rrhh_evento, rrhh_evento_aprob, rrhh_evento_anulado,

@@ -1,7 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════════
 -- JUSTIFICANTES Y AGUINALDOS · SUPABASE STORAGE   (PEGADO 3 de 3)
--- PROPUESTA 13-ago-2026. **NO PEGAR TODAVÍA** — esto es el STOP de diseño.
--- AMPLIADO 19-ago-2026 con el bucket `aguinaldos`. Mismo STOP.
+-- PROPUESTA 13-ago-2026. AMPLIADO 19-ago-2026 con el bucket `aguinaldos`.
+-- ✅ APROBADO POR ANDREA 24-ago-2026 — se levanta el STOP de diseño.
 -- Va DESPUÉS de ACCESOS_ESQUEMA.sql y PERSONAL_ESQUEMA.sql.
 --
 -- SON DOS BUCKETS, NO UNO, y la razón no es de orden sino de permisos:
