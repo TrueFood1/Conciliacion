@@ -557,12 +557,43 @@ tr.r-ing td{background:#eff6ff}
 .face-mas{display:none}
 /* El "+" de Entregas no es solo de teléfono: el conteo tiene que estar a un
    toque también en escritorio. */
-.face-mas-ent{display:flex!important;align-items:center;justify-content:center;flex:none;
-  min-width:34px;padding:8px 10px;font-size:16px;line-height:1;color:var(--text-3)}
+.face-mas-ent{display:flex!important;align-items:center;justify-content:flex-end;flex:none;
+  /* !important por la misma razón que el display de arriba: `.face` se declara
+     DESPUÉS en el archivo, con la misma especificidad, y le gana el padding. */
+  min-width:34px;padding:8px 8px 8px 22px!important;font-size:16px;line-height:1;color:var(--text-3);
+  /* El padding izquierdo es el aire que separa al "+" de la última pestaña
+     cuando la barra está deslizada hasta el tope: sin él quedaban pegados
+     ("Entregas sin factura+"). */
+  /* PEGADO AL BORDE DERECHO, siempre visible. La barra se desliza cuando las
+     pestañas no caben (a 375px "Entregas sin factura" empuja al "+" fuera de la
+     pantalla), y el "+" dejó de ser un accesorio: guarda Historial, Pendientes y
+     Conteo. Un menú que hay que descubrir deslizando es un menú que no existe.
+     Lleva el fondo de la página para que las pestañas pasen POR DEBAJO. */
+  position:sticky;right:0;background:var(--bg)}
 #entMas{display:none;position:fixed;left:0;right:0;bottom:0;z-index:130;
   background:var(--surface);border-top:.5px solid var(--border-strong);
   border-radius:16px 16px 0 0;padding:10px 0 calc(14px + env(safe-area-inset-bottom))}
 #entMas:not(.hidden){display:block}
+/* Anclado bajo el "+" (iPad y escritorio). Las coordenadas las pone el JS del
+   rect del botón; acá va solo lo que deja de ser hoja al pie. */
+#entMas.anclado{right:auto;bottom:auto;border-radius:12px;
+  border:1px solid var(--border-strong);padding:8px 0;
+  box-shadow:0 10px 30px rgba(0,0,0,.28)}
+/* ⚠️ EL CONTENIDO DEL PANEL NUNCA ESTUVO ESTILADO. Las reglas de los renglones
+   existían solo como `#finMas ...` y ADEMÁS dentro de @media(max-width:700px),
+   así que el "+" de Entregas —que se muestra a todo ancho, a propósito— dibujaba
+   texto negro por defecto y el subtítulo en la misma línea que el título, en
+   teléfono también. Se veía poco porque el menú aparecía al pie, lejos de la
+   vista; anclarlo bajo el botón lo puso en la cara. Va fuera de todo @media
+   porque este panel existe a cualquier ancho. */
+#entMas .fm-h{font-size:11px;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--text-3);padding:10px 20px 6px}
+#entMas button{display:block;width:100%;text-align:left;background:none;border:none;
+  font-family:inherit;font-size:15px;color:var(--text);padding:13px 20px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent}
+#entMas button:hover{background:var(--surface-2)}
+#entMas button .sub{display:block;font-size:11.5px;color:var(--text-3);margin-top:2px;
+  line-height:1.45}
 #finMas{display:none}
 @media(max-width:700px){
   .face-desk{display:none}
@@ -831,7 +862,12 @@ tr.r-ing td{background:#eff6ff}
    OJO con el ámbar: #E9A23B / #C99A4E avisan, el lima identifica. Conviven cerca ahora,
    así que el lima NUNCA se usa de fondo lavado — los bloques de alerta conservan su
    lavado naranja, que es lo que los separa de un vistazo. */
-#vConteoLote,#vReporte,#vPendientes,#vDespachos{--mod:#E9FE60;--accent:#E9FE60;--blue:#E9FE60;--blue-l:rgba(233,254,96,.14)}
+/* Los cuatro valen --ent-line, que en oscuro ES el lima y en claro es el oliva.
+   Escrito a mano acá, el acento del módulo se saltaba el tema y la pestaña activa
+   quedaba subrayada en lima invisible sobre blanco. Y entra vEntBuscar, que faltaba
+   en esta lista desde que se creó: Buscar era la única vista de Entregas sin acento. */
+#vConteoLote,#vReporte,#vPendientes,#vDespachos,#vEntBuscar{
+  --mod:var(--ent-line);--accent:var(--ent-line);--blue:var(--ent-line);--blue-l:var(--ent-wash)}
 .faces .face.on{color:var(--text);border-bottom-color:var(--mod)}
 .m3nav .m3tab.on{background:transparent;color:var(--mod);border-bottom-color:var(--mod)}
 .home-mod-dot{width:9px;height:9px;border-radius:3px;display:inline-block}
@@ -966,6 +1002,96 @@ tr.r-done td{background:rgba(192,208,72,.08)}
   --amber:#FF751F;--amber-l:rgba(255,117,31,.15);--orange:#FF751F;--orange-l:rgba(255,117,31,.15);
   --red:#FF6B6B;--red-l:rgba(255,107,107,.14);--purple:#C964CF;--purple-l:rgba(201,100,207,.15);
   --pink:#EF6782;--lime:#E9FE60;--accent:#C964CF;
+  /* ── TOKENS SEMÁNTICOS DE SUPERFICIE Y SEÑAL ──────────────────────────
+     Nacen el 24-ago para que ENTREGAS pueda ir en claro sin tocar el resto
+     de Truefie. Sus valores acá son EXACTAMENTE los hex que estaban escritos
+     a mano en las reglas del módulo, así que el tema oscuro no se mueve un
+     punto: esto es un renombre, no un rediseño. El modo claro vive abajo,
+     en `body.ent-claro`, y solo cambia estos números.
+     La regla que hace falta entender: en oscuro una superficie se ELEVA
+     aclarándose; en claro se eleva ACLARÁNDOSE TAMBIÉN, así que el fondo de
+     página es el tono y la tarjeta es el blanco. Por eso --sunken (hundido)
+     y --panel (elevado) no se invierten mecánicamente entre temas. */
+  --sunken:#0E0E11;        /* fondo hundido: campos, pies de tabla, detalle */
+  --panel:#141417;         /* panel elevado dentro de una tarjeta */
+  --field:#161619;         /* campo de texto y botón de hoja */
+  --dim-line:#4A4A4A;      /* borde de algo apagado a propósito (anulado) */
+  --dim-bg:#131315;        /* fondo de algo apagado a propósito */
+  --scrim:rgba(14,14,17,.94);   /* velo detrás de la hoja de cliente */
+  --scrim-2:rgba(0,0,0,.62);    /* velo detrás del diálogo de Entregar */
+  /* SEÑAL. El lima IDENTIFICA, el ámbar AVISA, el rojo FRENA (regla del
+     13-ago). En claro el lima puro deja de servir como línea y como texto
+     —no tiene contraste sobre blanco— así que se parte en dos tokens:
+     --ent-fill sigue siendo el lima de relleno, --ent-line pasa a oliva.
+     En oscuro los dos valen lo mismo y no cambia nada. */
+  --ent-fill:#E9FE60;      /* relleno del botón de acción */
+  --ent-fill-tx:#2C3A00;   /* texto sobre ese relleno */
+  --ent-line:#E9FE60;      /* línea, borde, texto de acento, enlace */
+  --ent-line-2:#3F4A16;    /* borde derivado, más callado */
+  --ent-wash:rgba(233,254,96,.08);   /* lavado de acento */
+  --warn:#E9A23B;          /* ámbar fuerte: esto necesita ojo */
+  --warn-2:#C99A4E;        /* ámbar callado: nota al pie */
+  --on-warn:#0E0E11;       /* texto sobre un ámbar relleno */
+  --good:#8FBF6A;          /* cuadra, salió bien */
+  --stop-line:#E24B4A;     /* borde de bloqueo */
+  --stop-tx:#E24B4A;       /* texto de bloqueo */
+  --busy:#A8A6A0;          /* "guardando…", sin color de estado */
+  --warn-wash:rgba(233,162,59,.10);--warn-edge:rgba(233,162,59,.35);--warn-tx:#E8D3AC;
+}
+
+/* ════════ ENTREGAS EN CLARO — decisión de Andrea, 24-ago-2026 ════════════
+   SOLO Entregas. El resto de Truefie se queda oscuro y es a propósito: es el
+   único módulo que se usa FUERA del escritorio, frente al congelador, con luz
+   de bodega dando en la pantalla. Ahí el tema oscuro se vuelve un espejo.
+   El ámbito es el módulo, no la pantalla: la clase la pone `_modShow` a
+   partir de ACCESO_VISTAS.entregas, así que si mañana Entregas gana una
+   vista, entra sola en claro y nadie tiene que acordarse de esta línea.
+   Va en `body` —y no en las cinco vistas— porque el ENCABEZADO vive fuera de
+   ellas: con los tokens en la vista, la miga de pan quedaba oscura sobre una
+   página clara. Todo lo que hay debajo es una redefinición de tokens; no se
+   toca ni una regla del sistema. */
+body.ent-claro{
+  --bg:#F7F6F2;--bg2:#FFFFFF;--bg3:#FFFFFF;      /* la página NO es blanco puro */
+  --surface:#FFFFFF;--surface-2:#F7F6F2;         /* la tarjeta se eleva siendo más clara */
+  --text:#1A1A17;--text-m:#6E6C68;--text-h:#8B897F;
+  /* El terciario NO es el #9A988F del sistema oscuro. Ese tono se leía bien
+     sobre negro y al invertir el fondo da 2.89:1 sobre blanco — por debajo del
+     mínimo, y justo en el escalón de las notas al pie, la hora de preparado y
+     los "hace N d". Es el texto más chico del módulo y el que peor aguanta el
+     reflejo del congelador. #8B897F sube a 3.51:1 sobre la tarjeta blanca y no
+     baja de 3.10:1 en el peor fondo del módulo (la tarjeta anulada, #F2F1EC),
+     sin achatar la jerarquía: sigue un escalón por debajo del secundario (5.24:1). */
+  --text-2:#6E6C68;--text-3:#8B897F;
+  --border:#E4E2DB;--border-m:#D6D4CC;--border-strong:#D6D4CC;
+  --sunken:#F7F6F2;        /* hundido = el tono de la página sobre el blanco */
+  --panel:#FFFFFF;
+  --field:#FFFFFF;
+  --dim-line:#C9C6BE;--dim-bg:#F2F1EC;
+  --scrim:rgba(247,246,242,.94);--scrim-2:rgba(26,26,23,.38);
+  /* El lima se queda SOLO donde es relleno. Como línea y como texto pasa a
+     oliva: #E9FE60 sobre blanco da ~1.1:1 y no se ve. */
+  --ent-fill:#E9FE60;--ent-fill-tx:#2E3300;
+  --ent-line:#8A9B00;--ent-line-2:#C4D14A;
+  --ent-wash:rgba(138,155,0,.09);
+  /* Ámbar y verde bajan de luminosidad para sobrevivir al blanco. El ámbar de
+     oscuro (#E9A23B) da 2.1:1 sobre #FFFFFF — ilegible como texto. Estos dos
+     pasan 4.5:1. El verde reusa el #4E7A00 que ya vive en `.tbl-clara .ok`,
+     que es el tono de "correcto" del sistema en claro; no se inventa uno. */
+  --warn:#9A6410;--warn-2:#8A5A00;--on-warn:#FFFFFF;
+  --good:#4E7A00;
+  --stop-line:#D14343;--stop-tx:#A32D2D;
+  --busy:#6E6C68;
+  --warn-wash:rgba(154,100,16,.08);--warn-edge:rgba(154,100,16,.35);--warn-tx:#7A4E08;
+  /* Los semánticos del sistema, que el chrome compartido usa por su nombre.
+     --lime NO baja a oliva: es un token de RELLENO (el lima de marca, el del
+     logo y el de los botones amarillos), y como relleno se ve perfecto sobre
+     blanco — 11.8:1 con texto oscuro encima. El que baja a oliva es --ent-line,
+     que es el de LÍNEA y TEXTO. Confundir los dos fue el error: dejó el botón
+     Preparar en oliva, que es justo donde el lima sí funciona. */
+  --lime:#E9FE60;
+  --green:#4E7A00;--green-l:rgba(78,122,0,.12);--green-d:#4E7A00;
+  --amber:#9A6410;--amber-l:rgba(154,100,16,.12);--orange:#9A6410;--orange-l:rgba(154,100,16,.12);
+  --red:#A32D2D;--red-l:rgba(209,67,67,.10);
 }
 body{background:var(--bg);color:var(--text);letter-spacing:-0.005em}
 .main{max-width:1180px}
@@ -1080,7 +1206,10 @@ table td,table th{border-color:#F2F0EA}
 .hdr-right{margin-left:auto;margin-right:66px;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
 /* El aviso de producción también tenía su estilo en línea (le ganaba al @media). Solo queda
    `display` en línea, que es lo que el JS enciende y apaga. */
-.hdr-prod{font-size:11px;color:#B08585;letter-spacing:.01em}
+/* "producción · solo lectura" es INFORMACIÓN, no un estado de error. El #B08585
+   era un rojo apagado que sobre el encabezado claro se lee marrón y parece alerta.
+   Va al gris secundario, que es lo que corresponde a un dato de contexto. */
+.hdr-prod{font-size:11px;color:var(--text-2);letter-spacing:.01em}
 .conn-ind{margin-left:auto;display:flex;align-items:center;gap:7px;color:#5A5750;font-size:13px}
 .conn-ind .gdot{width:7px;height:7px;border-radius:50%;background:#4CAF6E}
 .logo-link{cursor:pointer}
@@ -1138,6 +1267,9 @@ body,.main{background:var(--bg);color:var(--text)}
 .btn-confirm{border-color:var(--green);color:var(--green);background:transparent}
 .btn-confirm:hover{background:var(--green-l)}
 .btn-amarillo,.btn-usar{background:var(--lime);color:#1A1A1A;border:none}
+/* El texto sobre el relleno lima, SOLO en Entregas: la regla de arriba es global y
+   el resto de Truefie no se toca. #2E3300 es el de la paleta clara. */
+body.ent-claro .btn-amarillo,body.ent-claro .btn-usar{color:var(--ent-fill-tx)}
 .btn-amarillo:hover,.btn-usar:hover{background:#dff04a}
 /* dropzone */
 .uz{border-color:var(--border-strong);background:var(--surface-2)}
@@ -1154,7 +1286,7 @@ body,.main{background:var(--bg);color:var(--text)}
 .faces{border-bottom-color:var(--border)}
 .face{color:var(--text-2)}.face.on{color:var(--text);border-bottom-color:var(--accent)}.face.dis{color:var(--text-3)}
 /* tablas */
-th{background:none;color:#6E6C68;border-bottom-color:#26262C}
+th{background:none;color:var(--text-3);border-bottom-color:var(--border)}
 td{border:none}
 .tbl-clara{background:transparent}
 .tbl-clara th{background:transparent;color:var(--text-3);border-bottom-color:var(--border)}
@@ -1182,7 +1314,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .prop-badge.exacto{color:var(--green)}.prop-badge.sobra{color:var(--amber)}
 /* Dashboard — validación */
 .valid-box{background:var(--surface);border-color:var(--border-strong)}
-.valid-box th{border-bottom-color:#26262C}
+.valid-box th{border-bottom-color:var(--border)}
 .ok-tag{color:var(--green)}.bad-tag{color:var(--red)}
 /* Dashboard — tarjetas de producto (acento por producto se mantiene inline) */
 .ccard{background:var(--surface);border-color:var(--border-strong)}
@@ -1331,8 +1463,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
      todos los saldos: tiene que estar a UN toque más, no escondido en un menú. -->
 <div id="entMas" class="hidden">
   <div class="fm-h">Entregas</div>
-  <button onclick="entMasIr('conteo')">Conteo por lote<span class="sub">La foto del congelador que ancla los saldos por lote</span></button>
-  <button onclick="entMasIr('reporte')">Salida sin factura<span class="sub">Reposición, regalía o consumo interno</span></button>
+  <button onclick="entMasIr('historial')">Historial<span class="sub">Toda la salida registrada: por cliente, lote o fecha</span></button>
+  <button onclick="entMasIr('pendientes')">Pendientes<span class="sub">Falta validar en Odoo, vincular factura o clasificar</span></button>
+  <button onclick="entMasIr('conteo')">Conteo<span class="sub">La foto del congelador que ancla los saldos por lote</span></button>
 </div>
 
 <!-- "+" de Finanzas en teléfono: las vistas de análisis. Solo móvil (CSS). -->
@@ -1531,12 +1664,12 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- MERMAS (módulo Operaciones) -->
 <div id="vReporte" class="hidden">
   <div class="faces faces-ent">
-    <button class="face" onclick="irADespachos()">Resumen</button>
-    <button class="face" onclick="irAPendientes()">Pendientes</button>
-    <button class="face" onclick="irAEntBuscar()">Buscar</button>
+    <button class="face" onclick="irADespachos()">Despachos</button>
+    <button class="face" onclick="irAEntLotes()">Inventario</button>
+    <button class="face on">Entregas sin factura</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
-  <div class="m3title" style="font-size:24px">Reporte de despacho</div>
+  <div class="m3title" style="font-size:24px">Entregas sin factura</div>
   <div class="m3sub" style="margin-top:2px">Cada salida con su lote.</div>
   <div id="rpStatus" class="status hidden" style="margin-top:14px"></div>
   <div id="rpBody" style="margin-top:14px"></div>
@@ -1545,24 +1678,44 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- ── DESPACHOS: el lector de facturas (Daniel, 6:30 am) ────────────────── -->
 <div id="vDespachos" class="hidden">
   <div class="faces faces-ent">
-    <button class="face on">Resumen</button>
-    <button class="face" onclick="irAPendientes()">Pendientes</button>
-    <button class="face" onclick="irAEntBuscar()">Buscar</button>
+    <button class="face on">Despachos</button>
+    <button class="face" onclick="irAEntLotes()">Inventario</button>
+    <button class="face" onclick="irAReporte()">Entregas sin factura</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
-    <div class="m3title" style="font-size:24px">Resumen</div>
+    <div class="m3title" style="font-size:24px">Despachos</div>
     <button class="btn btn-sm" onclick="despCargar(true)">Recargar</button>
   </div>
   <div id="despStatus" class="status hidden" style="margin-top:14px"></div>
   <div id="despBody" style="margin-top:14px"></div>
 </div>
 
+<!-- ── INVENTARIO: cuánto queda de cada lote. La llave del candado ────────
+     Truefie calculaba el saldo por lote desde b28 —es lo que alimenta el
+     selector de Daniel— pero no había dónde MIRARLO: el 25-ago hubo que
+     sacarlo con SQL a mano. Pesa más ahora que no se hacen conteos físicos y
+     que viene el bloqueo duro: sin esta pantalla, el candado no tiene llave. -->
+<div id="vEntLotes" class="hidden">
+  <div class="faces faces-ent">
+    <button class="face" onclick="irADespachos()">Despachos</button>
+    <button class="face on">Inventario</button>
+    <button class="face" onclick="irAReporte()">Entregas sin factura</button>
+    <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
+  </div>
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div class="m3title" style="font-size:24px">Inventario</div>
+    <button class="btn btn-sm" onclick="lotCargar(true)">Recargar</button>
+  </div>
+  <div id="elStatus" class="status hidden" style="margin-top:14px"></div>
+  <div id="elBody" style="margin-top:14px"></div>
+</div>
+
 <div id="vPendientes" class="hidden">
   <div class="faces faces-ent">
-    <button class="face" onclick="irADespachos()">Resumen</button>
-    <button class="face on">Pendientes</button>
-    <button class="face" onclick="irAEntBuscar()">Buscar</button>
+    <button class="face" onclick="irADespachos()">Despachos</button>
+    <button class="face" onclick="irAEntLotes()">Inventario</button>
+    <button class="face" onclick="irAReporte()">Entregas sin factura</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
@@ -1579,13 +1732,13 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- ── BUSCAR: el historial. UN campo, y al tocarlo se elige por qué se busca. ── -->
 <div id="vEntBuscar" class="hidden">
   <div class="faces faces-ent">
-    <button class="face" onclick="irADespachos()">Resumen</button>
-    <button class="face" onclick="irAPendientes()">Pendientes</button>
-    <button class="face on">Buscar</button>
+    <button class="face" onclick="irADespachos()">Despachos</button>
+    <button class="face" onclick="irAEntLotes()">Inventario</button>
+    <button class="face" onclick="irAReporte()">Entregas sin factura</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
-    <div class="m3title" style="font-size:24px">Buscar</div>
+    <div class="m3title" style="font-size:24px">Historial</div>
     <button class="btn btn-sm" onclick="bsCargar(true)">Recargar</button>
   </div>
   <div id="bsStatus" class="status hidden" style="margin-top:14px"></div>
@@ -1594,14 +1747,14 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <div id="vConteoLote" class="hidden">
   <div class="faces faces-ent">
-    <button class="face" onclick="irADespachos()">Resumen</button>
-    <button class="face" onclick="irAPendientes()">Pendientes</button>
-    <button class="face" onclick="irAEntBuscar()">Buscar</button>
+    <button class="face" onclick="irADespachos()">Despachos</button>
+    <button class="face" onclick="irAEntLotes()">Inventario</button>
+    <button class="face" onclick="irAReporte()">Entregas sin factura</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
-      <div class="m3title" style="font-size:24px">Conteo por lote</div>
+      <div class="m3title" style="font-size:24px">Conteo</div>
       <div class="m3sub" style="margin-top:2px">Ancla los saldos por lote.</div>
     </div>
     <button class="btn btn-sm" id="clRecargar" onclick="cargarConteoLote(true)">Recargar lotes</button>
@@ -2179,38 +2332,52 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* ── Reporte de despacho + Pendientes + tarjeta del lobby ── */
 .rp-z{margin-bottom:14px;padding:14px 16px}
 .rp-row{display:flex;gap:12px;flex-wrap:wrap}
-.rp-clisel{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#0E0E11;border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;font-size:14px;color:var(--text)}
+.rp-clisel{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--sunken);border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;font-size:14px;color:var(--text)}
 .rp-clisel button{background:none;border:none;color:var(--text-3);font-size:17px;cursor:pointer;padding:0 2px}
-.rp-clivacio{width:100%;text-align:left;background:#0E0E11;border:1px dashed var(--border-strong);border-radius:8px;padding:10px 11px;font:inherit;font-size:14px;color:var(--text-3);cursor:pointer}
+.rp-clivacio{width:100%;text-align:left;background:var(--sunken);border:1px dashed var(--border-strong);border-radius:8px;padding:10px 11px;font:inherit;font-size:14px;color:var(--text-3);cursor:pointer}
 .rp-tipo{display:flex;gap:8px}
-.rp-tipo button{flex:1;background:#0E0E11;border:1px solid var(--border-strong);border-radius:8px;color:var(--text-3);font:inherit;font-size:13.5px;padding:10px 8px;cursor:pointer}
-.rp-tipo button.on{border-color:#E9FE60;color:var(--text);background:rgba(233,254,96,.08)}
+/* Los cuatro motivos. Mismo tratamiento que .rp-tipo —es la misma clase de
+   elección— pero envuelven, porque "Consumo interno" no entra en un cuarto de
+   pantalla de teléfono. */
+.rp-mot{display:flex;gap:8px;flex-wrap:wrap}
+.rp-mot button{flex:1 1 auto;min-width:calc(50% - 4px);background:var(--sunken);
+  border:1px solid var(--border-strong);border-radius:8px;color:var(--text-3);
+  font:inherit;font-size:13.5px;padding:10px 8px;cursor:pointer}
+.rp-mot button.on{border-color:var(--ent-line);color:var(--text);background:var(--ent-wash)}
+/* 16px es piso de plataforma, no preferencia: Safari de iOS hace zoom al enfocar
+   un campo con letra menor y no vuelve. `.cl-in` lo pisa por especificidad. */
+.rp-dest{font-size:16px!important}
+.rp-tipo button{flex:1;background:var(--sunken);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-3);font:inherit;font-size:13.5px;padding:10px 8px;cursor:pointer}
+.rp-tipo button.on{border-color:var(--ent-line);color:var(--text);background:var(--ent-wash)}
 .rp-nota{font-size:11.5px;color:var(--text-3);margin-top:6px;line-height:1.5}
-.rp-nota.rp-falta{color:#C99A4E}
+.rp-nota.rp-falta{color:var(--warn-2)}
 .rp-prods{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.rp-prod{background:#0E0E11;border:1px solid var(--border-strong);border-radius:10px;color:var(--text-2);font:inherit;font-size:13.5px;padding:18px 6px;cursor:pointer}
+.rp-prod{background:var(--sunken);border:1px solid var(--border-strong);border-radius:10px;color:var(--text-2);font:inherit;font-size:13.5px;padding:18px 6px;cursor:pointer}
 .rp-prod.on{border-color:var(--pc);color:var(--text);box-shadow:inset 0 0 0 1px var(--pc)}
 .rp-conv{font-size:13px;color:var(--text);padding:9px 0;font-variant-numeric:tabular-nums}
 .rp-lote{display:flex;align-items:center;gap:8px;margin-top:6px}
-.rp-lotebtn{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:#0E0E11;border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:13px;padding:10px 11px;cursor:pointer}
-.rp-lote.on .rp-lotebtn{border-color:#E9FE60;color:var(--text)}
+.rp-lotebtn{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:var(--sunken);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:13px;padding:10px 11px;cursor:pointer}
+.rp-lote.on .rp-lotebtn{border-color:var(--ent-line);color:var(--text)}
 .rp-lote.ago .rp-lotebtn{opacity:.45}
 .rp-saldo{font-size:11px;color:var(--text-3);white-space:nowrap}
 .rp-lotein{width:76px}
-#rpSheet{position:fixed;inset:0;background:rgba(14,14,17,.94);z-index:60;display:flex;justify-content:center}
+#rpSheet{position:fixed;inset:0;background:var(--scrim);z-index:60;display:flex;justify-content:center}
 #rpSheet.hidden{display:none}
 .rp-sheet-in{width:100%;max-width:560px;padding:18px 16px;display:flex;flex-direction:column}
 .rp-sheet-top{display:flex;gap:10px;margin-bottom:12px}
-.rp-sheet-top input{flex:1;background:#161619;border:1px solid var(--border-strong);border-radius:9px;color:var(--text);font:inherit;font-size:16px;padding:11px 12px}
+.rp-sheet-top input{flex:1;background:var(--field);border:1px solid var(--border-strong);border-radius:9px;color:var(--text);font:inherit;font-size:16px;padding:11px 12px}
 .rp-lista{overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-bottom:24px}
-.rp-cli{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:#161619;border:1px solid var(--border);border-radius:9px;color:var(--text);font:inherit;font-size:14px;padding:12px;cursor:pointer}
+.rp-cli{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:var(--field);border:1px solid var(--border);border-radius:9px;color:var(--text);font:inherit;font-size:14px;padding:12px;cursor:pointer}
 .rp-clif{font-size:11px;color:var(--text-3);white-space:nowrap}
 .pd-cnt{display:inline-block;min-width:22px;text-align:center;font-size:11.5px;font-weight:600;color:var(--text-3);border:1px solid var(--border-strong);border-radius:999px;padding:1px 7px;margin-left:6px}
-.pd-cnt.on{color:#0E0E11;background:#C99A4E;border-color:#C99A4E}
+/* CONTADOR, NO ALERTA. Iba en ámbar heredado del tema oscuro, que sobre blanco se
+   lee marrón y promete un problema que no existe: un "10" es cuántos hay, no que
+   algo esté mal. Va al relleno lima, el mismo patrón del chip activo del buscador. */
+.pd-cnt.on{color:var(--ent-fill-tx);background:var(--ent-fill);border-color:var(--ent-fill)}
 .pd-exp td{padding:0}
-.pd-clasif{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#0E0E11;border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin:4px 0 10px;font-size:12px;color:var(--text-3)}
-.pd-clasif button{background:#161619;border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:12.5px;padding:8px 11px;cursor:pointer}
-.pd-clasif button:hover{color:var(--text);border-color:#E9FE60}
+.pd-clasif{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin:4px 0 10px;font-size:12px;color:var(--text-3)}
+.pd-clasif button{background:var(--field);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:12.5px;padding:8px 11px;cursor:pointer}
+.pd-clasif button:hover{color:var(--text);border-color:var(--ent-line)}
 #entCard{margin-top:12px;background:#141417;border:.5px solid #3F4A16;border-radius:12px;padding:13px 15px;cursor:pointer}
 #entCard .ec-t{font-size:12px;color:var(--text-2);font-weight:600}
 #entCard .ec-row{font-size:12px;color:var(--text-3);margin-top:5px}
@@ -2232,8 +2399,8 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    alto, el lote sin partir nunca, y el total del producto pegado al pie mientras se cuenta.
    La letra de los inputs NO baja de 16px: menos que eso reintroduce el zoom de iOS. */
 .cl-lista{display:flex;flex-direction:column;gap:6px}
-.cl-prod{border:.5px solid var(--border);border-radius:10px;background:#141417;overflow:hidden}
-.cl-prod.on{border-color:#E9FE60}
+.cl-prod{border:.5px solid var(--border);border-radius:10px;background:var(--panel);overflow:hidden}
+.cl-prod.on{border-color:var(--ent-line)}
 /* JERARQUÍA: el nombre del producto es una ETIQUETA — Andrea ya sabe qué está
    contando —, y lo que manda visualmente es el NÚMERO. Por eso el nombre va en
    secundario 500 y el total en el acento del módulo, no al mismo peso.
@@ -2248,10 +2415,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .cl-nom{font-weight:500;color:var(--text-2);white-space:nowrap}
 .cl-pres{color:var(--text-3);font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cl-tot{color:var(--text-3);font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
-.cl-tot.hay{color:#E9FE60;font-weight:600}
+.cl-tot.hay{color:var(--ent-line);font-weight:600}
 .cl-tot-u,.cl-pie .cl-tot-u{font-size:10.5px;color:var(--text-3);font-weight:400;margin-left:4px}
-.cl-cuadra{display:block;font-size:10.5px;color:#8FBF6A;margin-top:2px}
-.cl-nocuadra{display:block;font-size:11px;color:#E9A23B;font-weight:600;margin-top:2px}
+.cl-cuadra{display:block;font-size:10.5px;color:var(--good);margin-top:2px}
+.cl-nocuadra{display:block;font-size:11px;color:var(--warn);font-weight:600;margin-top:2px}
 .cl-cuerpo{padding:0 16px 12px}
 /* El LOTE no se parte nunca: es el identificador que se busca con la vista.
    Va en MONO y en secundario: es un código, no una cifra — el ojo lo usa para
@@ -2259,18 +2426,18 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    códigos del resto de Truefie. */
 .cl-tbl td.cl-lote{white-space:nowrap;color:var(--text-2);font-family:var(--mono);font-size:12px;letter-spacing:-.01em}
 .cl-pie{position:sticky;bottom:0;margin:10px -16px -12px;padding:10px 16px;
-  background:#0E0E11;border-top:1px solid var(--border);font-size:11.5px;color:var(--text-3)}
-.cl-pie strong{color:#E9FE60;font-size:13.5px;font-variant-numeric:tabular-nums;margin-left:3px}
+  background:var(--sunken);border-top:1px solid var(--border);font-size:11.5px;color:var(--text-3)}
+.cl-pie strong{color:var(--ent-line);font-size:13.5px;font-variant-numeric:tabular-nums;margin-left:3px}
 /* ── Conteo por lote ── */
 .cl-hrow{cursor:pointer}
 .cl-hrow:hover td{color:var(--text)}
-.cl-badge-a{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:#2C3A00;background:#E9FE60;border-radius:999px;padding:1px 7px;margin-left:5px;font-weight:600}
+.cl-badge-a{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ent-fill-tx);background:var(--ent-fill);border-radius:999px;padding:1px 7px;margin-left:5px;font-weight:600}
 .cl-badge-b{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);border:1px solid var(--border-strong);border-radius:999px;padding:1px 7px;margin-left:5px}
-.cl-det{background:#0E0E11;border:1px solid var(--border);border-radius:9px;padding:10px 12px}
+.cl-det{background:var(--sunken);border:1px solid var(--border);border-radius:9px;padding:10px 12px}
 .cl-detnota{font-size:11.5px;color:var(--text-3);margin-bottom:6px}
 .cl-detpie{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px}
-.cl-okmsg{font-size:11.5px;color:#8FBF6A}
-.cl-confirmar{border-color:#E9FE60;color:#E9FE60}
+.cl-okmsg{font-size:11.5px;color:var(--good)}
+.cl-confirmar{border-color:var(--ent-line);color:var(--ent-line)}
 @media(max-width:700px){
   /* Los totales viven en el detalle, no en la fila. OJO: hay que esconder la CELDA y
      el ENCABEZADO. Escondiendo solo la celda quedaba un "TOTALES" rotulando una columna
@@ -2303,11 +2470,11 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    limpios — con anchos elásticos la vista se leía como un formulario suelto. */
 .cl-tbl col.cl-cap{width:76px}
 .cl-tbl col.cl-fin{width:70px}
-.cl-in{width:68px;background:#0E0E11;border:1px solid var(--border-strong);border-radius:7px;color:var(--text);
+.cl-in{width:68px;background:var(--sunken);border:1px solid var(--border-strong);border-radius:7px;color:var(--text);
   font:inherit;font-size:16px;padding:6px 6px;text-align:center;font-variant-numeric:tabular-nums}
-.cl-in:focus{outline:none;border-color:#E9FE60}
+.cl-in:focus{outline:none;border-color:var(--ent-line)}
 .cl-resumen{margin-top:10px;font-size:11.5px;color:var(--text-3);line-height:1.7}
-.cl-resumen b{color:#E9FE60;font-weight:600;font-variant-numeric:tabular-nums}
+.cl-resumen b{color:var(--ent-line);font-weight:600;font-variant-numeric:tabular-nums}
 .cl-tag{font-size:10px;color:var(--text-3);border:1px solid var(--border);border-radius:999px;padding:1px 6px;margin-left:4px}
 .cl-add{margin-top:10px}
 /* Los dos campos en rejilla pareja y el botón EN SU PROPIA LÍNEA del flujo vertical.
@@ -2358,40 +2525,135 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* La tarjeta de un PREPARADO. No es un botón entero: el botón está adentro, a la
    derecha, porque tocar la tarjeta por accidente no puede marcar una salida. */
 .dp-prep{display:flex;align-items:center;justify-content:space-between;gap:10px;
-  border:1px solid var(--border);border-left:2px solid #E9FE60;border-radius:10px;
-  background:#141417;padding:9px 10px 9px 12px}
+  border:1px solid var(--border);border-left:2px solid var(--ent-line);border-radius:10px;
+  background:var(--panel);padding:9px 10px 9px 12px}
 .dp-prep-i{display:flex;flex-direction:column;gap:2px;min-width:0}
 .dp-prep-cli{font-size:13.5px;font-weight:500;color:var(--text);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dp-prep-h{font-size:11.5px;color:var(--text-3)}
+/* Anulada: gris y apagada, pero NO escondida. El producto ya está armado contra una
+   factura que dejó de existir — es lo que Daniel más necesita ver, no lo que menos. */
+.dp-prep.anulada{border-left-color:var(--dim-line);background:var(--dim-bg);opacity:.72}
+.dp-prep.anulada .dp-prep-cli{color:var(--text-2)}
+.dp-prep-anul{font-size:11.5px;line-height:1.45;color:var(--warn-2);margin-top:3px;
+  white-space:normal}
+.dp-prep-nc{font-family:var(--mono);color:var(--text-3)}
+.dp-prep-ver{font-size:11.5px;color:var(--text-3);margin-top:3px;white-space:normal}
 /* Ámbar solo lo que urge: preparado AYER o antes es lo que hay que sacar o
    devolver al congelador. Preparado hoy es normal y va en gris. */
-.dp-prep.vieja{border-left-color:#E9A23B}
-.dp-prep.vieja .dp-prep-h{color:#E9A23B}
-.dp-entregar{flex:none;height:34px;padding:0 14px;border-radius:9px;border:1px solid #3F4A16;
-  background:transparent;color:#E9FE60;font-family:var(--font);font-size:12.5px;
-  font-weight:600;cursor:pointer}
-.dp-entregar:hover{background:rgba(233,254,96,.08)}
-.dp-entregar:disabled{opacity:.5;cursor:default}
+.dp-prep.vieja{border-left-color:var(--warn)}
+.dp-prep.vieja .dp-prep-h{color:var(--warn)}
+/* RELLENO, no contorno. El contorno era un idioma del tema oscuro, donde el lima
+   sobre negro se lee solo. En claro ese mismo lima como TEXTO da 3.10:1 sobre
+   blanco —medido— y este es justo el control que Daniel toca a las 6:30 con la
+   pantalla reflejando. Relleno lima con texto #2E3300 da 11.83:1, y es lo que la
+   paleta ya define para la acción principal. Mismo tratamiento que `.de-ok`, que
+   es la misma acción un paso más adelante: un solo botón de entregar, no dos. */
+.dp-entregar{flex:none;height:34px;padding:0 14px;border-radius:9px;
+  border:1px solid var(--ent-fill);background:var(--ent-fill);color:var(--ent-fill-tx);
+  font-family:var(--font);font-size:12.5px;font-weight:600;cursor:pointer}
+.dp-entregar:hover{filter:brightness(.96)}
+/* Deshabilitado NO es el primario con menos opacidad. Al pasar el botón a relleno
+   lima, "Anulada" quedaba como un bloque lima apagado — que a un metro sigue
+   leyéndose como el botón que hay que tocar, y acá la regla es justo la contraria.
+   Pierde el relleno y se va a gris: deja de ser una acción y pasa a ser un estado. */
+.dp-entregar:disabled{background:transparent;border-color:var(--border-strong);
+  color:var(--text-3);opacity:1;cursor:default}
 /* El pie de entregados: una línea, no una lista. Lleva al historial. */
+/* ── Diálogo de Entregar ──────────────────────────────────────────────────
+   Se abre sobre la bandeja. El cuerpo scrollea y el pie queda fijo: con seis
+   productos el botón no se va de la pantalla, que es donde se pierde el gesto. */
+.de-fondo{position:fixed;inset:0;background:var(--scrim-2);z-index:90;
+  display:flex;align-items:flex-end;justify-content:center;padding:0}
+@media(min-width:700px){ .de-fondo{align-items:center;padding:24px} }
+.de-caja{background:var(--surface);border:1px solid var(--border);
+  border-radius:14px 14px 0 0;width:100%;max-width:520px;max-height:88vh;
+  display:flex;flex-direction:column;overflow:hidden}
+@media(min-width:700px){ .de-caja{border-radius:14px} }
+.de-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+  padding:16px 16px 12px;border-bottom:1px solid var(--border)}
+.de-cli{font-size:16px;color:var(--text);font-weight:500;line-height:1.25}
+.de-sub{font-size:12px;color:var(--text-3);margin-top:3px}
+.de-x{background:none;border:none;color:var(--text-3);font-size:18px;line-height:1;
+  padding:4px 6px;cursor:pointer;flex:0 0 auto}
+.de-x:hover{color:var(--text-2)}
+.de-cuerpo{overflow-y:auto;padding:6px 16px 10px;-webkit-overflow-scrolling:touch}
+.de-lin{padding:11px 0;border-bottom:1px solid var(--border)}
+.de-lin:last-child{border-bottom:none}
+.de-prod{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.de-prod>span:first-child{color:var(--text);font-size:14px}
+.de-cant{font-family:var(--mono);font-size:13px;color:var(--text);white-space:nowrap}
+.de-lote{display:flex;justify-content:space-between;gap:12px;margin-top:4px;padding-left:14px;
+  font-family:var(--mono);font-size:12px;color:var(--text-3)}
+.de-lote-c{white-space:nowrap}
+.de-sinlote{color:var(--warn-2)}
+.de-vacia{padding:22px 0;text-align:center;color:var(--text-3);font-size:13px}
+.de-mal{padding:14px;margin:10px 0;border-radius:8px;font-size:13px;line-height:1.5;
+  background:var(--warn-wash);border:1px solid var(--warn-edge);color:var(--warn-tx)}
+.de-pie{border-top:1px solid var(--border);padding:12px 16px;display:flex;
+  align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+/* Secundario, no terciario (25-ago). Este renglón dejó de ser una nota al pie el
+   día que pasó a decir "la hora no se registra": eso cambia cómo se LEE el
+   registro, que por el estándar del sistema se queda y se lee. Medido sobre el
+   blanco del diálogo: terciario 3,51:1 · secundario 5,24:1. */
+.de-hora{font-size:12px;color:var(--text-2)}
+/* ── Fecha de salida (b32) ───────────────────────────────────────────────
+   Va en el pie del diálogo y en el pie del pedido, con el mismo campo en los dos.
+   Todo por tokens del módulo: el claro los redefine y esto no se entera.
+   ⚠️ 16px es PISO DE PLATAFORMA, no preferencia: Safari de iOS hace zoom al
+   enfocar un campo con letra menor y NO vuelve. Ya hay una regla global igual,
+   pero vive dentro de @media(max-width:700px); acá va explícita para que el piso
+   valga a cualquier ancho, y con !important porque una regla por clase le gana a
+   un selector de elemento. Misma razón que la del 12-ago. */
+.de-fecha,.dp-fecha{display:flex;align-items:center;gap:7px}
+/* La etiqueta va en --text-2, no en el terciario: rotula un control que se toca,
+   no es una nota al pie. Medido en claro sobre el blanco del diálogo — terciario
+   3,51:1 y secundario 5,24:1, que es el que pasa AA a 12px. */
+.de-fecha-l,.dp-fecha-l{font-size:12px;color:var(--text-2);white-space:nowrap}
+.de-fecha-in{font-family:var(--font);font-size:16px !important;color:var(--text);
+  background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+  height:36px;padding:0 9px;outline:none;box-sizing:border-box;max-width:100%}
+.de-fecha-in:focus{border-color:var(--ent-line)}
+.de-fecha-in:disabled{opacity:.5;cursor:default}
+.dp-fecha{margin-right:auto}
+.de-btns{display:flex;gap:8px;margin-left:auto}
+/* Mismo lima y mismo borde derivado que .dp-entregar — un solo tono, sin inventar
+   intermedios. Acá va relleno porque es la acción primaria del diálogo. */
+.de-ok{background:var(--ent-fill);color:var(--ent-fill-tx);border:1px solid var(--ent-fill);border-radius:9px;
+  height:36px;padding:0 16px;font-family:var(--font);font-size:12.5px;font-weight:600;cursor:pointer}
+.de-ok:disabled{background:transparent;color:var(--ent-line);border-color:var(--ent-line-2);opacity:.45;cursor:default}
+
 .dp-hoy{margin-top:16px;border-top:1px solid var(--border);padding-top:10px;max-width:620px}
 .dp-hoy button{background:none;border:none;padding:0;font:inherit;font-size:12px;
   color:var(--text-3);cursor:pointer;font-family:var(--font)}
 .dp-hoy button:hover{color:var(--text-2)}
 .dp-hoy b{font-family:var(--mono);font-weight:500;color:var(--text-2)}
 .dp-ped{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;cursor:pointer;
-  border:1px solid var(--border);border-radius:10px;background:#141417;padding:10px 12px;
+  border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:10px 12px;
   color:var(--text);font:inherit}
-.dp-ped.hoy{border-color:#3F4A16}
+.dp-ped.hoy{border-color:var(--ent-line-2)}
 .dp-ped.vieja{background:transparent}
 .dp-ped.vieja .dp-cli{font-weight:400;color:var(--text-2)}
 .dp-top,.dp-bot{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .dp-cli{font-size:13.5px;font-weight:500}
 .dp-fac{font-family:var(--mono);font-size:10.5px;color:var(--text-3)}
+/* ── El control del PDF ───────────────────────────────────────────────────
+   Es un <span role=button> y no un <button> a propósito: tres de los cuatro
+   lugares donde vive SON un <button> entero, y anidar botones es HTML inválido.
+   Discreto: no compite con la acción de la tarjeta (abrir el pedido, entregar).
+   Los estados van en el mismo control, no en un cartel aparte — "PDF…" mientras
+   lee y "PDF ✕" si falló, con el motivo en el title. Nunca en silencio. */
+.pdf-b{display:inline-flex;align-items:center;margin-left:8px;padding:1px 7px;
+  border:1px solid var(--border-strong);border-radius:999px;
+  font-family:var(--font);font-size:10px;letter-spacing:.03em;color:var(--text-2);
+  cursor:pointer;white-space:nowrap;vertical-align:middle;-webkit-tap-highlight-color:transparent}
+.pdf-b:hover{color:var(--text);border-color:var(--ent-line)}
+.pdf-b.cargando{color:var(--text-3);border-style:dashed;cursor:progress}
+.pdf-b.mal{color:var(--warn);border-color:var(--warn-edge)}
 .dp-n{font-size:11.5px;color:var(--text-3)}
 .dp-dia{font-size:9.5px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;
   padding:1px 7px;border-radius:999px;border:1px solid var(--border-strong);color:var(--text-3)}
-.dp-dia.hoy{color:#2C3A00;background:#E9FE60;border-color:#E9FE60}
+.dp-dia.hoy{color:var(--ent-fill-tx);background:var(--ent-fill);border-color:var(--ent-fill)}
 /* Lo anterior a la ventana no compite: encabezado propio, gris, y un punto menos
    de contraste. La regla es que nada desaparece, no que todo grite igual. */
 .dp-antes{margin-top:8px;border-top:1px solid var(--border);padding-top:9px;
@@ -2422,8 +2684,8 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   border-radius:10px;background:var(--surface);padding:10px 12px;
   display:flex;flex-direction:column;gap:8px;min-width:0}
 .dp-l.full{grid-column:1/-1}
-.dp-l.ok{border-left-color:#E9FE60}
-.dp-l.dif{border-left-color:#E9A23B}
+.dp-l.ok{border-left-color:var(--ent-line)}
+.dp-l.dif{border-left-color:var(--warn)}
 /* Compacta: producto arriba, cantidad debajo — apiladas, porque en 171px una
    fila con las dos deja al selector sin aire. Partida: vuelven a la misma fila,
    que ahí sí hay ancho. */
@@ -2439,10 +2701,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    sola al caso simple: un lote no es un reparto. */
 .dp-x{flex:none;width:34px;height:40px;border:none;background:none;cursor:pointer;
   color:var(--text-3);font-family:var(--font);font-size:17px;line-height:1;padding:0}
-.dp-x:hover{color:#E9A23B}
+.dp-x:hover{color:var(--warn)}
 /* "+ otro lote" dice lo que hace. "+ partir" describía la mecánica interna. */
 .dp-otro{align-self:flex-end;background:none;border:none;padding:2px 0;cursor:pointer;
-  font-family:var(--font);font-size:11.5px;color:#E9FE60}
+  font-family:var(--font);font-size:11.5px;color:var(--ent-line)}
 .dp-l-fin .dp-otro{align-self:auto}
 .dp-otro:hover{text-decoration:underline}
 /* La cantidad es un botón que PARECE texto hasta que se toca. Sin edición no
@@ -2453,7 +2715,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .dp-l-cant b{color:var(--text);font-weight:600;font-size:15px;font-variant-numeric:tabular-nums}
 .dp-lapiz{font-size:11px;color:var(--text-3)}
 .dp-l-cant:hover .dp-lapiz{color:var(--text-2)}
-.dp-fact{font-size:11px;color:#E9A23B;margin-top:-4px}
+.dp-fact{font-size:11px;color:var(--warn);margin-top:-4px}
 .dp-l-bot{display:flex;align-items:center;gap:8px}
 /* Selector e input: MISMO borde, MISMO fondo, MISMA altura. Es lo que los hace
    leerse como una fila y no como tres controles de orígenes distintos. */
@@ -2461,16 +2723,16 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   border-radius:9px;color:var(--text);font-family:var(--font);font-size:16px;
   height:40px;padding:0 11px;box-sizing:border-box;outline:none}
 .dp-lsel{flex:1;min-width:0;appearance:none;-webkit-appearance:none;cursor:pointer;
-  background-image:linear-gradient(45deg,transparent 50%,#6E6C68 50%),linear-gradient(135deg,#6E6C68 50%,transparent 50%);
+  background-image:linear-gradient(45deg,transparent 50%,var(--text-3) 50%),linear-gradient(135deg,var(--text-3) 50%,transparent 50%);
   background-position:calc(100% - 15px) 17px,calc(100% - 10px) 17px;
   background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:30px}
-.dp-lsel:focus,.dp-lq:focus,.dp-cant:focus{border-color:#E9FE60}
+.dp-lsel:focus,.dp-lq:focus,.dp-cant:focus{border-color:var(--ent-line)}
 .dp-lsel.p{flex:1}
 .dp-lq{width:74px;flex:none;text-align:center;font-variant-numeric:tabular-nums}
 .dp-cant{width:74px;text-align:center;font-variant-numeric:tabular-nums}
 .dp-suma{font-size:11.5px;color:var(--text-3);white-space:nowrap}
 .dp-ok{color:var(--text-3)}
-.dp-mal{color:#E9A23B;font-weight:600}
+.dp-mal{color:var(--warn);font-weight:600}
 .dp-pie{display:flex;flex-direction:column;gap:8px;margin-top:14px}
 /* PREPARAR es el primario y PREPARAR Y ENTREGAR el secundario. El riesgo no es
    simétrico: una hora de salida falsa no la ve nadie; un pendiente fantasma se
@@ -2497,17 +2759,45 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .bs-in{width:100%;background:var(--surface-2);border:1px solid var(--border-strong);
   border-radius:10px;color:var(--text);font-family:var(--font);font-size:16px;
   height:44px;padding:0 13px;box-sizing:border-box;outline:none}
-.bs-in:focus{border-color:#E9FE60}
+.bs-in:focus{border-color:var(--ent-line)}
 .bs-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .bs-chip{background:var(--surface-2);border:1px solid var(--border);border-radius:999px;
   color:var(--text-2);font-family:var(--font);font-size:12px;padding:5px 13px;cursor:pointer}
 .bs-chip:hover{border-color:var(--border-strong)}
-.bs-chip.on{background:#E9FE60;border-color:#E9FE60;color:#2C3A00;font-weight:600}
+.bs-chip.on{background:var(--ent-fill);border-color:var(--ent-fill);color:var(--ent-fill-tx);font-weight:600}
+/* Banner del filtro por día de registro. No es una alerta —no pasa nada malo— así
+   que va en gris con el borde de siempre, no en ámbar. Solo dice qué se está
+   mirando y cómo salir. */
+/* ── Inventario · saldo por lote ─────────────────────────────────────────
+   Misma escala que el resto del módulo: producto a 13px/600, lote en mono como
+   en el diálogo de Entregar, y la cantidad alineada a la derecha. Las cajas son
+   el número que se lee (se cuentan cajas frente al congelador) y las unidades
+   van al lado, chicas: el saldo VIVE en unidades y no siempre divide exacto. */
+.el-prod{max-width:620px;margin-top:18px}
+.el-prod-h{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  padding-bottom:7px;border-bottom:1px solid var(--border);
+  font-size:13px;font-weight:600;color:var(--text)}
+.el-prod-n{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text-2);white-space:nowrap}
+.el-lote{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  padding:10px 0;border-bottom:1px solid var(--border)}
+.el-lote:last-child{border-bottom:none}
+.el-lote-n{font-family:var(--mono);font-size:12.5px;color:var(--text-2)}
+.el-lote-c{font-family:var(--mono);font-size:13px;color:var(--text);white-space:nowrap}
+.el-lote-u{color:var(--text-3);font-size:11.5px;margin-left:7px}
+/* En cero: se ve, no grita. Es lo contrario del selector, donde se manda al fondo. */
+.el-lote.cero .el-lote-n,.el-lote.cero .el-lote-c{color:var(--text-3)}
+/* Negativo: anomalía, y las anomalías se ven. Ámbar, que es el que avisa. */
+.el-lote.neg .el-lote-c{color:var(--warn)}
+.bs-reg{display:flex;align-items:center;gap:10px;margin-top:12px;max-width:620px;
+  border:1px solid var(--border);border-radius:9px;padding:8px 11px;
+  font-size:12px;color:var(--text-2)}
+.bs-reg button{background:none;border:none;padding:0;margin-left:auto;cursor:pointer;
+  font-family:var(--font);font-size:12px;color:var(--ent-line)}
 .bs-lista{display:flex;flex-direction:column;gap:6px;margin-top:14px;max-width:620px}
-.bs-fila{width:100%;text-align:left;background:#141417;border:1px solid var(--border);
+.bs-fila{width:100%;text-align:left;background:var(--panel);border:1px solid var(--border);
   border-radius:10px;color:var(--text);font:inherit;font-family:var(--font);
   padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:3px}
-.bs-fila.on{border-color:#3F4A16;border-bottom-color:var(--border);border-radius:10px 10px 0 0}
+.bs-fila.on{border-color:var(--ent-line-2);border-bottom-color:var(--border);border-radius:10px 10px 0 0}
 .bs-f1,.bs-f2{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .bs-cli{font-size:13.5px;font-weight:500}
 .bs-fec{font-size:11px;color:var(--text-3);white-space:nowrap}
@@ -2995,7 +3285,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 17 ago 2026 · b27';
+const BUILD = 'v 25 ago 2026 · b32';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -3434,7 +3724,7 @@ const ACCESO_VISTAS = {
   finanzas:     ['vFacturado','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vResults'],
   conciliacion: ['vUpload'],
   operaciones:  ['vProduccion','vMermas','vInventario','vPlan','vResumen','vConteo'],
-  entregas:     ['vConteoLote','vReporte','vPendientes','vDespachos','vEntBuscar'],
+  entregas:     ['vConteoLote','vReporte','vPendientes','vDespachos','vEntBuscar','vEntLotes'],
 };
 let _accesoMods=null;   // se llena al entrar; null = todavía no se sabe → no se restringe
 function accesoPuede(mod){ return !_accesoMods || _accesoMods==='todo' || _accesoMods.indexOf(mod)>=0; }
@@ -3507,6 +3797,11 @@ function _modShow(id){
   // devuelve al lobby. No protege los datos — eso lo hará "Roles y accesos".
   const mod=accesoModDeVista(id);
   if(mod && !accesoPuede(mod)){ volverLobby(); return; }
+  // ENTREGAS VA EN CLARO (24-ago). El interruptor sale de ACCESO_VISTAS.entregas,
+  // que ya es la lista canónica del módulo: una vista nueva de Entregas entra en
+  // claro sola, sin que nadie tenga que acordarse de tocar el CSS. Va en `body`
+  // porque el encabezado vive fuera de las vistas — ver `body.ent-claro`.
+  document.body.classList.toggle('ent-claro', mod==='entregas');
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.toggle('hidden', v!==id); });
   document.getElementById('vLobby').classList.add('hidden');
   document.getElementById('appHeader').classList.remove('hidden');
@@ -3517,7 +3812,9 @@ function crumbSet(area,cur){
   const a=document.querySelector('.crumb-area'); if(a)a.textContent=area;
   const c=document.querySelector('.crumb-cur'); if(c)c.textContent=cur;
   // el punto del breadcrumb sigue el color del módulo (Finanzas azul · Operaciones rosa · Conciliación verde)
-  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Conciliación':'#84BD00','Entregas':'#E9FE60','Ventas':'#3FB6A8'};
+  // Entregas va en OLIVA, no en lima: su encabezado es claro y un punto de 7px en
+  // #E9FE60 sobre blanco no se ve. Mismo criterio que --ent-line.
+  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Conciliación':'#84BD00','Entregas':'#8A9B00','Ventas':'#3FB6A8'};
   const d=document.querySelector('.crumb-dot'); if(d)d.style.background=COL[area]||'#378ADD';
 }
 // Entradas desde el HOME (una por módulo).
@@ -3533,6 +3830,7 @@ function abrirConciliacion(){                                // módulo Concilia
   renderCobrosExtracto();   // la lista de cobros sale del extracto subido (no de la pila vieja de Odoo)
 }
 function volverLobby(){
+  document.body.classList.remove('ent-claro');   // el lobby es de todos: vuelve a oscuro
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.add('hidden'); });
   document.getElementById('appHeader').classList.add('hidden');
   document.getElementById('vLobby').classList.remove('hidden');
@@ -6429,9 +6727,17 @@ async function rzDiagEscenarios(body){
 //   mrp.production → message_ids → mail.message (message_type='comment') → body.
 // Formato de 4 campos:  DDD [C] / M AA
 //   · DDD = día juliano de PRODUCCIÓN (2-3 díg)
-//   · C   = código de producto (OPCIONAL): Blanco 2·Semillas 4·Francés 1·Buns 3·Pizza 5
+//   · C   = código de producto (OPCIONAL): Blanco 2·Semillas 4·Francés 1·Buns 3·Pizza 5·Galletas 6
 //   · M/AA = fecha de VENCIMIENTO (producción + ~6 meses) → AA LLEGA A 27 (confirmado 17-jul).
-// El año de PRODUCCIÓN se ancla en date_finished de la orden (dato duro), NO en AA.
+// El año de PRODUCCIÓN se ancla en date_start de la orden (dato duro), NO en AA.
+//
+// ⚠️ EL CÓDIGO ES PARTE DE LA IDENTIDAD DEL LOTE, y la forma canónica NO lo lleva.
+// Dos productos hechos el mismo día juliano y con el mismo vencimiento se ven IDÉNTICOS en
+// pantalla: "168 / 12-26" es un lote de Buns Y otro de Pizza, distintos, confirmados en físico
+// contra el sticker el 19-ago. La aritmética NO se mezcla —tanto rpCalcSaldos como
+// ent_salido_del_congelador_desde_ancla llevan el saldo por (producto, lote), y la clave de
+// _entAgrupar lleva el producto desde b28—, pero el HUMANO no los puede distinguir leyendo la
+// pantalla. Pendiente: mostrar el código junto al lote donde Daniel elige.
 // Separadores inconsistentes (/ - espacio y mezclas), prefijo "Lote:" opcional.
 // Regla de oro: 0-lote / ambiguo / año-inválido van EXPLÍCITOS, nunca se asumen.
 // SOLO LECTURA de Odoo (candado intacto). Nada escribe acá.
@@ -6485,6 +6791,89 @@ function _entLimpiarChatter(html){
 // Día juliano (1..366) de 'YYYY-MM-DD' o Date.
 function _julian(d){ const dt=(d instanceof Date)?d:new Date(String(d).slice(0,10)+'T00:00:00');
   const ini=new Date(dt.getFullYear(),0,0); return Math.floor((dt-ini)/86400000); }
+// ── UN LOTE TECLEADO A MANO SE GUARDA SIEMPRE EN FORMA CANÓNICA ─────────
+// Daniel escribe `183-12/26` y la herramienta usa `183 / 12-26`. Son el MISMO lote en dos
+// formatos: medido el 19-ago sobre los 3.304 lotes de su hoja, el 97,4% usa DDD-M/AA o DDD-MM/AA.
+// _entParseLote ya entiende los dos —sus separadores son [/.-]— pero solo se ejecutaba sobre el
+// chatter de Odoo, nunca sobre lo que se escribe en Supabase, así que lo tecleado entraba crudo.
+//
+// POR QUÉ IMPORTA: el saldo se lleva por la clave `producto|lote` COMO TEXTO, en las tres puntas
+// (ent_conteo_linea y ent_salido_del_congelador_desde_ancla usan la cadena cruda; la producción
+// usa la canónica que sale de acá). Dos escrituras del mismo lote son dos claves distintas, y la
+// salida nunca se resta de la producción. En silencio. Pasó el 18-ago con `183 - 12/26`: quedó un
+// bucket propio en -84 mientras el `183 / 1-27` real conservaba sus 48 u intactas.
+//
+// Va anclado con ^...$ —a diferencia del regex del chatter, que busca dentro de texto libre—
+// porque acá la entrada es UN valor tecleado: si no es un lote entero, no es un lote.
+// Devuelve null cuando no puede leerlo; el que llama decide qué hacer, nunca se inventa nada.
+function _entCanon(txt){
+  const t=String(txt==null?'':txt).trim();
+  if(!t) return null;
+  const m=/^(?:lote\s*:?\s*)?(\d{1,3})\s*([1-9])?\s*[\/.\-]\s*(\d{1,2})\s*[\/.\-\s]\s*(\d{2})(?!\d)\s*$/i.exec(t);
+  if(!m) return null;
+  const ddd=+m[1], mesV=+m[3], anioV=m[4];
+  if(ddd<1||ddd>366) return null;          // día juliano fuera de rango
+  if(mesV<1||mesV>12) return null;         // mes inválido
+  return ddd+' / '+mesV+'-'+anioV;         // el código de producto NO va en la clave (igual que canon)
+}
+
+// ── ÓRDENES QUE NO SUMAN AL SALDO (hermano de COSTOS_LINEAS_EXCLUIDAS) ──
+// EL PATRÓN, que es estructural y no un caso suelto: el corte del conteo es contra el
+// PRODUCTO FÍSICO, no contra el registro en Odoo. Keylor registra la orden cuando la
+// producción TERMINA, así que una tanda que Daniel ya contó puede quedar registrada
+// minutos u horas DESPUÉS del corte. El saldo la suma como producción nueva cuando ya
+// está dentro de la foto, y el lote queda inflado — en silencio, porque los números
+// cierran solos y nada avisa.
+//
+// Va a volver a pasar cada vez que se cuente cerca de una hora de cierre de producción.
+// Por eso esto es un mecanismo con lista, no un número metido en el motor.
+//
+// La clave es el ID de la orden y el valor lleva la HUELLA COMPLETA, para que
+// verificarExclusionesMO() pueda confirmar contra Odoo que la orden sigue siendo la que
+// se excluyó. Si algo no calza, NO se excluye y se marca rota: preferimos un lote
+// inflado y visible a una resta silenciosa contra la orden equivocada.
+const ENT_MO_EXCLUIDAS = {
+  // Conteo de Daniel del viernes 14-ago-2026, corte 16:00 CR. Esta orden se registró a
+  // las 16:06 —seis minutos después— pero el pan ya estaba hecho y contado: el conteo
+  // trae 226 / 2-27 con 13 cajas + 2 potes = 158 u. Sumar las 160 de la orden lo deja
+  // en 316 cuando el número bueno es 156.
+  // Andrea decidió NO repetir el conteo físico (20-ago), así que el inflado no se limpia
+  // solo al reanclar: hay que corregirlo en el cálculo.
+  1411: {orden:'WH/MO/01411', producto_id:519, lote:'226 / 2-27', uds:160,
+         date_start:'2026-08-14 22:06:40',
+         etiqueta:'Galletas 226 / 2-27 · 160 u',
+         razon:'Registrada 6 min DESPUÉS del corte del conteo del 14-ago (16:00 CR), pero '
+              +'el producto ya estaba terminado y contado en el físico. Sumarla lo cuenta '
+              +'dos veces: el saldo daba 316 y el correcto es 156.'},
+};
+// Verifica cada exclusión contra Odoo. Misma disciplina que verificarExclusiones() de
+// costos: si la huella no calza, la exclusión NO se aplica y se reporta.
+async function verificarExclusionesMO(){
+  const ids=Object.keys(ENT_MO_EXCLUIDAS).map(Number);
+  if(!ids.length) return [];
+  const mos=await odooCall('mrp.production','search_read',[[['id','in',ids]]],
+    {fields:['id','name','product_id','qty_produced','product_uom_id','date_start','state']});
+  const byId={}; mos.forEach(function(m){ byId[m.id]=m; });
+  const out=[];
+  for(const id of ids){
+    const d=ENT_MO_EXCLUIDAS[id], m=byId[id], fallas=[];
+    if(!m) fallas.push('la orden ya no existe en Odoo');
+    else{
+      const fac=await uomFactor(m.product_uom_id&&m.product_uom_id[0]);
+      const uds=(m.qty_produced||0)/(fac||1);
+      if(m.name!==d.orden) fallas.push('nombre: Odoo dice '+m.name+', la lista dice '+d.orden);
+      if((m.product_id&&m.product_id[0])!==d.producto_id)
+        fallas.push('producto: Odoo dice '+(m.product_id&&m.product_id[0])+', la lista dice '+d.producto_id);
+      if(Math.abs(uds-d.uds)>0.5) fallas.push('uds: Odoo dice '+uds+', la lista dice '+d.uds);
+      if(String(m.date_start||'')!==d.date_start)
+        fallas.push('date_start: Odoo dice '+m.date_start+', la lista dice '+d.date_start);
+      if(m.state!=='done') fallas.push('la orden ya no está done ('+m.state+')');
+    }
+    out.push(Object.assign({id:id}, d, {ok:!fallas.length, fallas:fallas}));
+  }
+  return out;
+}
+
 // Parsea el chatter → candidatos válidos + estado. prodYear/prodJulian anclan la PRODUCCIÓN.
 // anioSet: sin pasar nada usa la ventana de vencimiento (motor). Un Set fuerza una regla fija (diag).
 function _entParseLote(chatterTxt, prodYear, prodJulian, anioSet, productoId){
@@ -6537,10 +6926,39 @@ function _entParseLote(chatterTxt, prodYear, prodJulian, anioSet, productoId){
 }
 
 // ── Lectura CRUDA de Odoo: órdenes done desde `desdeYmd` + su chatter (comentarios). Solo lectura.
+//
+// FILTRA Y FECHA POR date_start, NO date_finished — la regla del proyecto, la misma que ya usan
+// nivSemana, el costeo y los reportes del mes. `date_finished` es cuándo Keylor TECLEÓ la orden en
+// Odoo, no cuándo se hizo el pan: las órdenes se abren y se cierran el mismo día en la operación
+// real, y el desfase es retraso de validación administrativa.
+//
+// ⚠️ LO QUE ESTE CAMBIO **NO** ARREGLA — corregido el 19-ago después de medirlo bien. La primera
+// versión de este comentario decía que salvaba ~328 u de doble conteo. Estaba mal: comparaba
+// timestamps UTC de Odoo contra un corte escrito en hora CR. Comparado en el mismo huso
+// (14-ago 16:00 CR = 14-ago 22:00 UTC):
+//     WH/MO/01410  Semillas 225/2-27 (168 u)  date_start 13-ago 21:45 UTC · ANTES del corte
+//                                             date_finished 14-ago 21:49 UTC · ANTES también
+//     WH/MO/01411  Galletas 226/2-27 (160 u)  date_start 14-ago 22:06 UTC · DESPUÉS
+//                                             date_finished 15-ago 00:10 UTC · DESPUÉS también
+// O sea: la de Semillas nunca estuvo doble, y la de Galletas queda doble con LOS DOS campos —
+// 160 u que ya están dentro de la foto de Daniel y que el saldo vuelve a sumar. Eso no lo arregla
+// el campo: lo arregla el próximo conteo, que reancla en cero. El saldo de Galletas 226/2-27 va a
+// dar 316 en vez de 156 hasta entonces, y queda a la vista a propósito.
+//
+// AL COMPARAR CONTRA EL CORTE, MISMO HUSO SIEMPRE. rpCalcSaldos ya lo hace bien (parsea el UTC
+// crudo de Odoo con 'Z' y el corte con su offset, y compara instantes); el error estuvo en el
+// análisis a mano, no en el código.
+//
+// ENTONCES POR QUÉ date_start IGUAL: por los MOs `done` con date_finished vacío o planeado a
+// futuro, que el filtro por date_finished excluía — el mismo bug que ya se había arreglado en
+// nivSemana. Y porque arregla el parseo del lote: la ventana juliana de ±10 de _entParseLote se derivó
+// midiendo contra el juliano de date_start (93,9% exacto), pero se le venía alimentando el de
+// date_finished. Cuando el registro se atrasa varios días, el lote bueno caía fuera de la ventana
+// y la orden salía como `juliano_invalido`.
 async function entLeerCrudo(desdeYmd){
   const mos=await odooCall('mrp.production','search_read',
-    [[['state','=','done'],['product_id','in',ENT_PROD],['date_finished','>=',desdeYmd]]],
-    {fields:['id','name','product_id','qty_produced','product_uom_id','date_finished'],limit:5000,order:'date_finished desc'});
+    [[['state','=','done'],['product_id','in',ENT_PROD],['date_start','>=',desdeYmd]]],
+    {fields:['id','name','product_id','qty_produced','product_uom_id','date_start'],limit:5000,order:'date_start desc'});
   const ids=mos.map(o=>o.id);
   // el lote está en comentarios (message_type='comment') ligados a la orden por res_id
   const msgs = ids.length ? await odooCall('mail.message','search_read',
@@ -6549,12 +6967,13 @@ async function entLeerCrudo(desdeYmd){
   const chatBy={}; msgs.forEach(function(mm){ const r=mm.res_id&&(mm.res_id[0]||mm.res_id);
     (chatBy[r]=chatBy[r]||[]).push(mm.body||''); });
   const out=[];
-  for(const o of mos){ const pf=_crDate(o.date_finished);
+  for(const o of mos){ const pf=_crDate(o.date_start);
     // uds INDIVIDUALES de la orden (qty ÷ factor UoM) y el timestamp UTC crudo: los usa el
     // saldo por lote del Reporte (fabricado DESPUÉS del corte del ancla, comparado en UTC).
+    // El campo se llama prodUtc y no dfUtc porque ya NO es date_finished: es cuándo se produjo.
     const fac=await uomFactor(o.product_uom_id&&o.product_uom_id[0]);
     out.push({orden:o.name, ordenId:o.id, producto:o.product_id[0], fecha:pf,
-            uds:(o.qty_produced||0)/(fac||1), dfUtc:o.date_finished,
+            uds:(o.qty_produced||0)/(fac||1), prodUtc:o.date_start,
             py:+pf.slice(0,4), pj:_julian(pf), cmts:(chatBy[o.id]||[]).join(' \n '),
             capMsgs:msgs.length>=20000, capMos:mos.length>=5000}); }
   return out;
@@ -6572,9 +6991,14 @@ function _entAgrupar(crudo, anioSet){
   const lotes={}, buckets={sin_lote:[], ambiguo:[], anio_invalido:[], juliano_invalido:[], codigo_ajeno:[]};
   crudo.forEach(function(o){
     const r=_entParseLote(o.cmts, o.py, o.pj, anioSet, o.producto);
-    const rec={orden:o.orden, ordenId:o.ordenId, producto:o.producto, fecha:o.fecha, uds:o.uds, dfUtc:o.dfUtc, r:r};
-    if(r.estado==='ok'){ const k=r.lote.key;
-      const L=lotes[k]=lotes[k]||{key:k, canon:r.lote.canon, producto:o.producto, prodYear:o.py, ddd:r.lote.ddd, ordenes:[]};
+    const rec={orden:o.orden, ordenId:o.ordenId, producto:o.producto, fecha:o.fecha, uds:o.uds, prodUtc:o.prodUtc, r:r};
+    if(r.estado==='ok'){ const k=o.producto+'-'+r.lote.key;
+      // LA CLAVE LLEVA EL PRODUCTO. Antes era solo añoProd-ddd, así que dos productos hechos el
+      // MISMO día compartían entrada y la entrada guardaba UN solo `producto` — el primero que
+      // llegara. El otro desaparecía del selector de su producto. Medido el 18-ago sobre 3 meses:
+      // dos lotes reales invisibles, Galletas 163/12-26 (tapado por Pizza) y Buns 168/12-26
+      // (tapado por Semillas). El orden FIFO sigue saliendo de `key`, que no cambia.
+      const L=lotes[k]=lotes[k]||{key:r.lote.key, canon:r.lote.canon, producto:o.producto, prodYear:o.py, ddd:r.lote.ddd, ordenes:[]};
       L.ordenes.push(rec); }
     else buckets[r.estado].push(rec);
   });
@@ -6589,6 +7013,17 @@ function _entAgrupar(crudo, anioSet){
 // Odoo sigue SOLO LECTURA — acá solo se escribe en Supabase.
 // ════════════════════════════════════════════════════════════════════════
 let _clLotes=null, _clExtra={}, _clGuardando=false, _clHuerfanos=[];
+// Exclusiones de ENT_MO_EXCLUIDAS verificadas contra Odoo. Se muestran ACÁ, en el panel
+// de lotes, porque es la pantalla donde se mira de qué está hecho el saldo. Una exclusión
+// rota no se aplica —el motor la ignora— pero tiene que verse, o el lote queda inflado
+// otra vez y en silencio, que es justo lo que la lista vino a evitar.
+let _clExcl=null;
+async function clCargarExclusiones(){
+  try{ _clExcl=await verificarExclusionesMO(); }
+  catch(e){ _clExcl=[{ok:false, etiqueta:'(no se pudo verificar)',
+                       fallas:['no pude leer Odoo: '+((e&&e.message)||e)]}]; }
+  _clRender();
+}
 // ⚠️ EL ESTADO DEL CONTEO VIVE ACÁ, NO EN EL DOM. Clave 'producto|lote', valor
 // {c:'cajas', s:'sueltas'} tal como se escribieron (texto, para no perder la
 // diferencia entre "" y "0").
@@ -6615,6 +7050,44 @@ function _clSet(pid,lote,campo,v){
 }
 // Nombre legible de un producto por id (los buckets traen el id pelado).
 function _clNom(pid){ const I=NIV_INFO[+pid]; return I?I.nom:('producto '+pid); }
+// ── EL AVISO DE ÓRDENES SIN LOTE LEGIBLE, COMPARTIDO ────────────────────
+// Vivía dentro del render de Conteo. Ahora lo usan DOS pantallas —Conteo e
+// Inventario— y tiene que decir lo mismo en las dos: son el mismo hecho, y dos
+// redacciones de la misma regla es una que se va a desincronizar.
+//
+// LLEVA LAS UNIDADES (25-ago). Sin ellas el aviso dice "hay una orden rara"; con
+// ellas dice "hay 168 unidades de Pan Blanco sueltas", que es lo que hace que
+// alguien levante el teléfono y llame a Keylor. El dato ya venía en el registro
+// (`rec.uds` de _entAgrupar) y se estaba tirando.
+function _entBucketsHTML(buckets){
+  const b=buckets||{};
+  const KS=['sin_lote','ambiguo','anio_invalido','juliano_invalido','codigo_ajeno'];
+  const nb=KS.reduce(function(n,k){ return n+((b[k]||[]).length); },0);
+  if(!nb) return '';
+  const uds=KS.reduce(function(n,k){
+    return n+(b[k]||[]).reduce(function(m,r){ return m+(+r.uds||0); },0); },0);
+  let h='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-top:16px">'
+    +'<div style="font-weight:700;color:var(--warn);font-size:12.5px">'+nb+' orden'+(nb===1?'':'es')
+    +' sin lote legible'+(uds?(' · '+_rzN(uds)+' u'):'')+'</div>'
+    +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.6">'
+    +'El extractor no pudo sacar el lote del chatter de estas órdenes. No se asumen ni se esconden: '
+    +'si hay producto de alguna en el congelador, agregá el lote a mano en el producto que corresponda.</div>'
+    +'<table class="cl-tbl" style="margin-top:8px"><tr><th>Orden</th><th>Producto</th><th>Fecha</th>'
+    +'<th class="n">Uds</th><th>Caso</th></tr>';
+  KS.forEach(function(k){
+    const lbl={sin_lote:'sin lote en el chatter',
+               ambiguo:'ambiguo (más de un candidato)',
+               anio_invalido:'año fuera del rango de vida útil',
+               juliano_invalido:'lote incompleto: el día no calza con la producción',
+               codigo_ajeno:'el código del lote no es el de este producto'}[k];
+    (b[k]||[]).slice(0,40).forEach(function(r){
+      h+='<tr><td class="cl-lote">'+esc(r.orden||'')+'</td><td>'+esc(_clNom(r.producto))+'</td>'
+        +'<td class="cl-nw">'+esc(r.fecha||'')+'</td>'
+        +'<td class="n">'+_rzN(+r.uds||0)+'</td><td class="muted">'+lbl+'</td></tr>';
+    });
+  });
+  return h+'</table></div>';
+}
 // Aviso de pantalla. NUNCA se deja el cuerpo mudo: si algo falla, se dice y se sigue.
 function _clAviso(tipo, html){
   const st=document.getElementById('clStatus'); if(!st) return;
@@ -6635,7 +7108,7 @@ function abrirEntregas(){
   return (_accesoMods==='todo') ? irAPendientes() : irADespachos();
 }
 function irAConteoLote(){
-  _modShow('vConteoLote'); crumbSet('Entregas','Conteo por lote');
+  _modShow('vConteoLote'); crumbSet('Entregas','Conteo');
   cargarConteoLote(false);
 }
 
@@ -6654,6 +7127,9 @@ async function cargarConteoLote(force){
   body.style.display='none';
   try{
     _clLotes=await entLotesActivos(3);
+    // Va sin await y no bloquea el panel: es una comprobación de fondo, no un insumo
+    // para pintar los lotes. Cuando conteste, _clRender() se vuelve a llamar sola.
+    clCargarExclusiones();
   }catch(e){
     _clLotes={lotes:{},buckets:{sin_lote:[],ambiguo:[],anio_invalido:[]}, _err:(e&&e.message)||String(e)};
   }
@@ -6697,9 +7173,29 @@ function _clRender(){
   } else {
     const st=document.getElementById('clStatus'); if(st) st.classList.add('hidden');
   }
+  // Las exclusiones: las rotas en ámbar (no se aplicaron, el lote está inflado), las
+  // buenas en una línea gris que dice qué se está descontando y por qué.
+  if(_clExcl && _clExcl.length){
+    const rotas=_clExcl.filter(function(x){ return !x.ok; });
+    const okey =_clExcl.filter(function(x){ return  x.ok; });
+    if(rotas.length){
+      h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-bottom:14px">'
+        +'<div style="font-weight:700;color:var(--warn);font-size:12.5px">'+rotas.length
+        +(rotas.length===1?' exclusión de producción no se pudo verificar':' exclusiones de producción no se pudieron verificar')+'</div>'
+        +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.5">'
+        +rotas.map(function(x){ return esc(x.etiqueta||('orden '+x.id))+': '+esc((x.fallas||[]).join(' · ')); }).join('<br>')
+        +'<br>No se aplicaron: el saldo de esos lotes está inflado.</div></div>';
+    }
+    if(okey.length){
+      h+='<div style="font-size:11.5px;color:var(--text-3);margin-bottom:14px;line-height:1.5">'
+        +okey.length+(okey.length===1?' orden no suma al saldo: ':' órdenes no suman al saldo: ')
+        +okey.map(function(x){ return esc(x.etiqueta||x.orden); }).join(' · ')
+        +' — ya contadas en el conteo físico.</div>';
+    }
+  }
   if(_clHuerfanos.length){
     h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-bottom:14px">'
-      +'<div style="font-weight:700;color:#E9A23B;font-size:12.5px">'+_clHuerfanos.length
+      +'<div style="font-weight:700;color:var(--warn);font-size:12.5px">'+_clHuerfanos.length
       +' lotes de un producto que no es de los seis</div>'
       +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px">'
       +esc(_clHuerfanos.map(function(L){return L.canon+' (id '+L.producto+')';}).join(' · '))
@@ -6756,29 +7252,7 @@ function _clRender(){
   h+='</div>';
 
   // Los casos que el extractor NO pudo resolver van a la vista, nunca escondidos (regla de la ESPEC).
-  const b=_clLotes.buckets||{};
-  const nb=['sin_lote','ambiguo','anio_invalido','juliano_invalido','codigo_ajeno']
-    .reduce(function(n,k){ return n+((b[k]||[]).length); },0);
-  if(nb){
-    h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-top:16px">'
-      +'<div style="font-weight:700;color:#E9A23B;font-size:12.5px">'+nb+' órdenes sin lote legible</div>'
-      +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.6">'
-      +'El extractor no pudo sacar el lote del chatter de estas órdenes. No se asumen ni se esconden: '
-      +'si hay producto de alguna en el congelador, agregá el lote a mano en el producto que corresponda.</div>'
-      +'<table class="cl-tbl" style="margin-top:8px"><tr><th>Orden</th><th>Producto</th><th>Fecha</th><th>Caso</th></tr>';
-    ['sin_lote','ambiguo','anio_invalido','juliano_invalido','codigo_ajeno'].forEach(function(k){
-      const lbl={sin_lote:'sin lote en el chatter',
-                 ambiguo:'ambiguo (más de un candidato)',
-                 anio_invalido:'año fuera del rango de vida útil',
-                 juliano_invalido:'lote incompleto: el día no calza con la producción',
-                 codigo_ajeno:'el código del lote no es el de este producto'}[k];
-      (b[k]||[]).slice(0,40).forEach(function(r){
-        h+='<tr><td class="cl-lote">'+esc(r.orden||'')+'</td><td>'+esc(_clNom(r.producto))+'</td>'
-          +'<td class="cl-nw">'+esc(r.fecha||'')+'</td><td class="muted">'+lbl+'</td></tr>';
-      });
-    });
-    h+='</table></div>';
-  }
+  h+=_entBucketsHTML(_clLotes.buckets);
 
   // GUARDAR — todo sale de la escala del sistema, nada propio de esta vista:
   //   título   → .card-title (13px/600, igual que toda tarjeta de Truefie)
@@ -6860,7 +7334,7 @@ function _clHistPintar(){
   if(_clHist===null){ el.innerHTML='<div class="cl-none">Cargando conteos guardados…</div>'; return; }
   if(_clHistErr){
     el.innerHTML='<div class="valid-box" style="border-color:rgba(224,90,90,.45);background:rgba(224,90,90,.08)">'
-      +'<div style="font-weight:700;color:#E05A5A;font-size:12.5px">No pude leer los conteos guardados</div>'
+      +'<div style="font-weight:700;color:var(--stop-tx);font-size:12.5px">No pude leer los conteos guardados</div>'
       +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px">'+esc(_clHistErr)+'</div></div>';
     return;
   }
@@ -7070,7 +7544,13 @@ function _clLeer(){
 function _clAgregar(pid){
   const v=prompt('Lote de '+((NIV_INFO[pid]&&NIV_INFO[pid].nom)||pid)+' que no está en la lista\n(forma "154 / 12-26"):');
   if(!v) return;
-  const canon=String(v).trim(); if(!canon) return;
+  // Se guarda la forma canónica, no lo tecleado: la clave del saldo es la cadena. Si no se puede
+  // leer se acepta igual (el congelador físico manda) pero se avisa de lo que eso cuesta.
+  const crudo=String(v).trim(); if(!crudo) return;
+  const cn=_entCanon(crudo);
+  if(!cn && !confirm('No pude leer "'+crudo+'" como lote; la forma es "154 / 12-26". Lo guardo tal cual, '
+                    +'pero así no cruza con ningún lote de Odoo.\n\n¿Lo dejo igual?')) return;
+  const canon=cn||crudo;
   _clExtra[pid]=_clExtra[pid]||[];
   if(_clExtra[pid].indexOf(canon)<0) _clExtra[pid].push(canon);
   _clProdAbierto=pid;
@@ -7081,14 +7561,14 @@ async function guardarConteoLote(){
   if(_clGuardando) return;
   const msg=document.getElementById('clSaveMsg'), btn=document.getElementById('clSave');
   const lineas=_clLeer();
-  if(!lineas.length){ msg.style.color='#E9A23B'; msg.textContent='No hay nada anotado todavía.'; return; }
+  if(!lineas.length){ msg.style.color='var(--warn)'; msg.textContent='No hay nada anotado todavía.'; return; }
   const resp=(document.getElementById('clResp').value||'').trim();
-  if(!resp){ msg.style.color='#E9A23B'; msg.textContent='Falta quién contó.'; return; }
+  if(!resp){ msg.style.color='var(--warn)'; msg.textContent='Falta quién contó.'; return; }
   const c=sbClient();
-  if(!c){ msg.style.color='#FF8A8A'; msg.textContent='No hay sesión de Supabase.'; return; }
+  if(!c){ msg.style.color='var(--stop-tx)'; msg.textContent='No hay sesión de Supabase.'; return; }
   if(!confirm('Guardar el conteo con '+lineas.length+' lote'+(lineas.length===1?'':'s')+'?\n\nQueda como BORRADOR: no cambia ningún saldo hasta que lo confirmes como ancla.')) return;
   _clGuardando=true; btn.disabled=true;
-  msg.style.color='#A8A6A0'; msg.textContent='Guardando…';
+  msg.style.color='var(--busy)'; msg.textContent='Guardando…';
   try{
     const {data:{user}}=await c.auth.getUser();
     const email=(user&&user.email)||'desconocido';
@@ -7100,14 +7580,14 @@ async function guardarConteoLote(){
     const {error:e2}=await c.from('ent_conteo_linea')
       .insert(lineas.map(function(r){ return Object.assign({conteo_id:cab.id}, r); }));
     if(e2) throw e2;
-    msg.style.color='#8FBF6A';
+    msg.style.color='var(--good)';
     msg.innerHTML='Borrador guardado (#'+cab.id+', '+lineas.length+' lotes · corte '
       +esc(String(cab.corte||'').replace('T',' ').slice(0,16))+'). '
       +'<strong>Todavía no es el ancla</strong>: revisá los totales abajo y confirmalo.';
     btn.textContent='Guardar conteo';
     await _clCargarHist();          // el borrador nuevo aparece en el historial, listo para confirmar
   }catch(e){
-    msg.style.color='#FF8A8A';
+    msg.style.color='var(--stop-tx)';
     msg.textContent='No se pudo guardar: '+((e&&e.message)||e);
     btn.disabled=false; btn.textContent='Guardar conteo';
   }
@@ -7125,16 +7605,33 @@ const RP_COLOR={451:'#378ADD',452:'#84BD00',453:'#D4537E',503:'#7F77DD',472:'#FF
 let _rp=null, _rpLotes=null, _rpSaldo=null, _rpClientes=null, _rpGuardando=false;
 
 function irAReporte(){
-  _modShow('vReporte'); crumbSet('Entregas','Reporte');
+  _modShow('vReporte'); crumbSet('Entregas','Entregas sin factura');
   if(!_rp) _rpReset(true);
   rpRender();
   if(!_rpLotes) rpCargarLotes();
 }
+// `tipo` es lo que se elige en pantalla ('venta' | 'sin'); `motivo` es lo que va a
+// la base. Con venta son lo mismo; sin factura, `tipo` abre la lista y `motivo`
+// queda vacío hasta que se elija uno — porque sin motivo no se puede guardar.
 function _rpReset(todo){
   const fecha=(_rp&&!todo)?_rp.fecha:_ymd(new Date());
-  _rp={fecha:fecha, cliente:null, motivo:null, lineas:[],
+  _rp={fecha:fecha, cliente:null, tipo:null, motivo:null, destinatario:'', lineas:[],
        cur:{pid:null, cant:'', pres:'cj', lotes:{}}};
 }
+// ── LOS MOTIVOS DE UNA SALIDA SIN FACTURA ───────────────────────────────
+// Lista cerrada, sin texto libre: el motivo es EL DATO —dentro de seis meses lo
+// que va a importar es cuánto producto se regaló, no quién lo recibió— y un campo
+// libre no se puede sumar. Los cuatro valores son los del check de `ent_pedido`.
+const RP_MOTIVOS=[{k:'regalia',n:'Regalía'},{k:'reposicion',n:'Reposición'},
+                  {k:'consumo_interno',n:'Consumo interno'},{k:'degustacion',n:'Degustación'}];
+function rpSetTipo(t){
+  _rp.tipo=t;
+  // Venta y motivo son lo mismo cuando hay factura. Sin factura hay que elegir.
+  _rp.motivo=(t==='venta')?'venta':null;
+  if(t==='venta') _rp.destinatario='';     // el destinatario no aplica a una venta
+  rpRender();
+}
+function rpSetMotivo(k){ _rp.motivo=k; rpRender(); }
 
 async function rpCargarLotes(){
   try{ _rpLotes=await entLotesActivos(3); }
@@ -7153,8 +7650,14 @@ async function rpCalcSaldos(g){
   const {data:lin}=await c.from('ent_conteo_linea').select('producto_id,lote,uds').eq('conteo_id',A.id);
   (lin||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote; s[k]=(s[k]||0)+(+r.uds||0); });
   const corteMs=Date.parse(A.corte);
+  // ⚠️ LA EXCLUSIÓN VA ACÁ Y SOLO ACÁ. En el SALDO, no en la lista de lotes: la orden
+  // excluida sigue existiendo y su lote tiene que seguir apareciendo en el selector con
+  // su saldo bueno. Si se filtrara en entLeerCrudo o en _entAgrupar, un lote cuya única
+  // orden esté excluida DESAPARECERÍA de la pantalla — y con el bloqueo duro de Despachos
+  // eso significa no poder despachar producto que sí está en el congelador.
   Object.values((g&&g.lotes)||{}).forEach(function(L){ (L.ordenes||[]).forEach(function(rec){
-    if(rec.dfUtc && Date.parse(rec.dfUtc.replace(' ','T')+'Z')>corteMs){
+    if(ENT_MO_EXCLUIDAS[rec.ordenId]) return;      // ya contada en el físico del ancla
+    if(rec.prodUtc && Date.parse(rec.prodUtc.replace(' ','T')+'Z')>corteMs){
       const k=(+L.producto)+'|'+L.canon; s[k]=(s[k]||0)+(rec.uds||0); } }); });
   // El nombre dice lo que resta: lo que SALIÓ DEL CONGELADOR, que es lo que se
   // descuenta al PREPARAR — no al entregar. El ancla cuenta lo que está adentro,
@@ -7206,6 +7709,101 @@ let _despFac=null, _despUom=null, _despErr='', _despAbierto=null, _despLotes=nul
 // en frío del proxy de Odoo. Es a propósito — lo que hay que hacer AHORA MISMO
 // (sacar lo que ya está armado) no puede depender de que despierte un servidor.
 let _despEstado=null, _despEstErr='', _despEntregando=0;
+// El diálogo de Entregar: qué pedido está abierto y el error de la lectura de detalle.
+// `_despEntFecha` y `_despPedFecha` son la fecha de salida elegida en cada camino
+// (el diálogo y el atajo "Preparar y entregar"). VACÍO = no se tocó = hoy con hora
+// real, o sea el comportamiento de siempre. Solo se activan si alguien las toca.
+let _despEntAbierto=0, _despDetErr='', _despEntFecha='', _despPedFecha='';
+// Qué acción está esperando confirmación en el pedido abierto:
+// 0 = ninguna · 'preparar' · 'entregar'. Reemplaza al confirm() nativo.
+let _despPrepAbierto=0;
+// ── FACTURAS ANULADAS POR NOTA DE CRÉDITO ───────────────────────────────
+// `null` = todavía no se leyó de Odoo. `{}` = leído y ninguna anulada.
+// La distinción importa: mientras sea null NO se puede entregar, porque no sabemos
+// si la factura sigue viva. Misma regla que el detalle del diálogo.
+let _despAnul=null, _despAnulErr='';
+// `_despAnulFallo` separa DOS cosas que antes eran la misma: "todavía estoy leyendo"
+// de "ya me rendí". El botón se comporta al revés en cada una — apagado mientras se
+// intenta, encendido-con-marca después. Sin esta bandera, un fallo de red se ve igual
+// que una lectura en curso y Daniel se queda mirando un botón apagado para siempre.
+let _despAnulFallo=false;
+// Cuántos días hacia atrás se re-verifican las salidas que ya dieron 'vigente'.
+// Una factura no se anula un mes después: el caso real es el mismo día (Daniel
+// despacha 6:30, Andrea anula 10:00) o el siguiente. Siete días da margen de sobra
+// sin releer historia. Se cambia acá, no en la vista — por eso la vista no lo hornea.
+const DESP_REVERIF_DIAS = 7;
+
+// LA SEÑAL ES reversal_move_id, NO payment_state. Medido el 20-ago sobre las 497
+// facturas de venta de 2026: `reversal_move_id` no vacío caza 36; `payment_state =
+// 'reversed'` caza 35 y se le escapa la 00003181, que está reversada con una NC
+// posted por el monto completo. Confiar en payment_state deja pasar el 3%.
+// `state` no sirve para nada acá: vale 'posted' en las reversadas igual que en las vivas.
+//
+// El motivo vive en el `ref` de la NOTA DE CRÉDITO, no en la factura (el de la factura
+// viene vacío): 'Reversal of: 00100001010000003487, error en producto'. Se toma lo que
+// sigue a la PRIMERA coma — el consecutivo no lleva comas, así que el corte es seguro.
+// Solo lectura de Odoo.
+function _despMotivoNC(ref){
+  const t=String(ref==null?'':ref); const i=t.indexOf(',');
+  return i>=0 ? t.slice(i+1).trim() : '';
+}
+// REINTENTA ANTES DE RENDIRSE. La mayoría de los fallos acá no son Odoo caído: son el
+// arranque en frío del proxy, que tarda ~40 s la primera vez del día. Un solo intento
+// convierte una demora normal en "no se pudo verificar", y eso ahora tiene consecuencia
+// (la salida queda marcada). Se reintenta una vez, esperando, antes de darla por perdida.
+const DESP_ANUL_REINTENTOS = 2;      // intentos totales, no reintentos extra
+const DESP_ANUL_ESPERA_MS  = 6000;
+function _esperar(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+
+async function despCargarAnuladas(ids){
+  const pedir=[...new Set((ids||[]).filter(Boolean))];
+  if(!pedir.length){ _despAnul=_despAnul||{}; return; }
+  for(let intento=1; intento<=DESP_ANUL_REINTENTOS; intento++){
+    const ok=await _despIntentarAnuladas(pedir, intento);
+    if(ok){ _despAnulFallo=false; return; }
+    if(intento<DESP_ANUL_REINTENTOS){
+      _despAnulErr='';                        // el fallo intermedio no se muestra
+      despRender();
+      await _esperar(DESP_ANUL_ESPERA_MS);
+    }
+  }
+  // Se agotaron los intentos. NO se bloquea el despacho por un problema de
+  // infraestructura: la salida se registra igual y queda MARCADA (ver despEntregar).
+  // Fallar cerrado empujaría a Daniel al Excel, y lo anotado ahí no baja nunca al
+  // saldo — un descuadre invisible y permanente. Una salida marcada, en cambio, se
+  // ve y se limpia sola cuando Odoo vuelve.
+  _despAnulFallo=true;
+  despRender();
+}
+async function _despIntentarAnuladas(pedir, intento){
+  try{
+    // Se leen TODAS y se filtra en el navegador: `reversal_move_id` es un one2many y
+    // un dominio ['!=',false] sobre one2many no es de fiar en todas las versiones.
+    const mv=await odooCall('account.move','search_read',[[['id','in',pedir]]],
+      {fields:['id','name','reversal_move_id'],limit:1000,context:{lang:'es_CR'}});
+    const anul={}, ncIds=[];
+    mv.forEach(function(m){
+      const rev=m.reversal_move_id||[];
+      if(rev.length){ anul[m.id]={motivo:'', nc:rev[0]}; ncIds.push(rev[0]); }
+    });
+    if(ncIds.length){
+      const ncs=await odooCall('account.move','search_read',[[['id','in',ncIds]]],
+        {fields:['id','name','ref'],limit:1000,context:{lang:'es_CR'}});
+      const byNc={}; ncs.forEach(function(n){ byNc[n.id]=n; });
+      Object.keys(anul).forEach(function(fid){
+        const n=byNc[anul[fid].nc];
+        if(n){ anul[fid].motivo=_despMotivoNC(n.ref); anul[fid].nc_nombre=n.name; }
+      });
+    }
+    _despAnul=Object.assign(_despAnul||{}, anul); _despAnulErr='';
+    return true;
+  }catch(e){
+    _despAnulErr=(e&&e.message)||String(e);
+    // Se queda en null: no sabemos si están anuladas. Si este era el último intento,
+    // el que llama decide qué hacer con eso — hoy, deshabilitar Entregar.
+    return false;
+  }
+}
 
 // ⚠️ EN HORA LOCAL, NO UTC. Antes esto era toISOString().slice(0,10), que en
 // Costa Rica (UTC−6) devuelve el día SIGUIENTE a partir de las 18:00. Nunca se
@@ -7226,6 +7824,58 @@ function _despCuando(ts){
   const ymd=_despDiaDe(ts); if(!ymd) return '';
   const h=_despHora(ts);
   return ymd===_despHoy() ? h : (_despDia(ymd)+' '+h);
+}
+
+// ── FECHA DE SALIDA EDITABLE (b32) ──────────────────────────────────────
+// El problema que resuelve: hasta b31 la fecha de una salida era CUÁNDO SE MARCÓ,
+// no cuándo salió el producto. La 3489 (Automercado) salió el 24-ago y se registró
+// el 25 a las 10:49: el AB-RE-04 decía 25. La ESPEC (Pieza 2) pedía desde el
+// principio "Fecha: 'hoy' puesta, un toque para cambiar"; se había construido la
+// mitad.
+//
+// NO HIZO FALTA ESQUEMA. `ent_salida` nació con las dos columnas y con el motivo
+// escrito: `salida_en` es la hora REAL y `creado_en` es cuándo se registró
+// ("Hoy la pantalla usa now() para las dos; el día que haga falta corregir una
+// hora, la columna ya está"). Y las dos ya llegan a la pantalla: ent_salida_vigente
+// expone creado_en como `registrado_en` y v_ent_pedido_estado como
+// `salida_registrada_en`. Esto es solo la mitad de arriba.
+//
+// ⚠️ NO TOCA NINGÚN SALDO, y es a propósito: el saldo por lote se descuenta al
+// PREPARAR, no al salir — ent_salido_del_congelador_desde_ancla filtra por
+// `av.preparado_en > corte`, el instante del ALISTO. `salida_en` no entra en
+// ningún término de rpCalcSaldos. La fecha editable es documental (AB-RE-04 y
+// Buscar), no contable.
+const DESP_FECHA_DIAS = 7;          // ventana hacia atrás, contando hoy. Sin futuro.
+// La nota va en la fila: dentro de un año, quien lea esa salida tiene que poder
+// distinguir una hora medida de una puesta a mano, sin preguntarle a nadie.
+const DESP_NOTA_RETRO = 'Fecha de salida corregida a mano: la fecha es la real, la hora NO es medida';
+function _despFechaMin(){ const d=new Date(); d.setDate(d.getDate()-(DESP_FECHA_DIAS-1));
+  return _despYmd(d); }
+function _despFechaOK(ymd){ return !!ymd && ymd>=_despFechaMin() && ymd<=_despHoy(); }
+// Lo que se le agrega al insert de ent_salida. VACÍO cuando la fecha es hoy: ahí
+// gana el `default now()` de la base, que es una hora MEDIDA de verdad. Solo una
+// fecha pasada escribe `salida_en`, y a mediodía — la misma convención que ya usa
+// el Reporte de Despacho, y por la misma razón: un now() con fecha vieja pondría
+// una hora con pinta de medida.
+// Tira error en vez de caer a hoy en silencio: una salida guardada con la fecha
+// equivocada no la ve nadie después.
+function _despSalidaPayload(ymd){
+  if(!ymd || ymd===_despHoy()) return {};
+  if(!_despFechaOK(ymd)) throw new Error('la fecha de salida ('+ymd+') está fuera de la '
+    +'ventana de '+DESP_FECHA_DIAS+' días — no se guardó nada');
+  return {salida_en:ymd+'T12:00:00-06:00', nota:DESP_NOTA_RETRO};
+}
+// LA HORA SE MUESTRA SOLO SI ESTÁ MEDIDA (decisión de Andrea, 25-ago). Una salida
+// retroactiva lleva mediodía puesto a mano, así que enseñar "ayer 12:00" sería
+// mostrar un dato que nadie midió. Retroactiva = el día en que SALIÓ no es el día
+// en que se REGISTRÓ, que es exactamente para lo que existen las dos columnas.
+// Sin `reg` (filas viejas, o un select que no lo pidió) se comporta como antes.
+// Ojo: esto NO reemplaza a _despCuando, que sigue sirviendo a `preparado_en` —
+// esa hora siempre es un now() real y no hay que esconderla.
+function _despCuandoSalida(ts, reg){
+  const ymd=_despDiaDe(ts); if(!ymd) return '';
+  const r=_despDiaDe(reg);
+  return (r && r!==ymd) ? _despDia(ymd) : _despCuando(ts);
 }
 
 function _despAviso(cls,html){
@@ -7271,9 +7921,16 @@ async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
   const mv=await odooCall('account.move','search_read',
     [[['move_type','=','out_invoice'],['state','=','posted'],
       ['invoice_date','>=',desdeTodo],['invoice_date','<=',hasta]]],
-    {fields:['id','name','invoice_date','partner_id'],limit:500,
+    {fields:['id','name','invoice_date','partner_id','reversal_move_id'],limit:500,
      order:'invoice_date desc, id desc',context:{lang:'es_CR'}});
   if(!mv.length) return [];
+  // Las anuladas por nota de crédito NO van a "Por preparar": preparar contra una
+  // factura que dejó de existir es sacar producto del congelador contra un documento
+  // muerto. Caso del 20-ago: la 3487 anulada al lado de la 3488 buena, mismo cliente,
+  // montos casi iguales, y nada en pantalla que las distinguiera.
+  // El motivo se resuelve aparte (despCargarAnuladas): acá alcanza con saber cuáles son.
+  const anuladas={};
+  mv.forEach(function(m){ if((m.reversal_move_id||[]).length) anuladas[m.id]=1; });
   const ids=mv.map(function(m){return m.id;});
   const ls=await odooCall('account.move.line','search_read',
     [[['move_id','in',ids],['display_type','=','product'],['product_id','in',ENT_PROD]]],
@@ -7290,6 +7947,7 @@ async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
   const out=[];
   mv.forEach(function(m){
     if(ya[m.id]) return;
+    if(anuladas[m.id]) return;                 // anulada por NC y sin alisto: no se lista
     const lin=por[m.id]; if(!lin) return;      // factura sin terminado: no es despacho
     out.push({
       factura_id:m.id, factura:m.name, fecha:m.invoice_date,
@@ -7319,15 +7977,154 @@ async function despCargarEstado(){
   try{
     const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
     const {data,error}=await c.from('v_ent_pedido_estado')
-      .select('pedido_id,cliente_nombre,factura_nombre,alisto_id,estado,preparado_en,salida_en,n_lineas')
+      .select('pedido_id,cliente_nombre,factura_id,factura_nombre,alisto_id,estado,preparado_en,salida_en,'
+             +'salida_registrada_en,n_lineas')
       .order('preparado_en',{ascending:false}).limit(200);
     if(error) throw error;
     _despEstado=data||[]; _despEstErr='';
+    // EL DETALLE SE TRAE ACÁ, DE UNA, PARA TODOS LOS PREPARADOS JUNTOS. No al abrir el
+    // diálogo: son 1 a 5 pedidos en un día normal, tres lecturas más no se notan al
+    // cargar la pantalla, y a cambio el diálogo abre instantáneo. Al revés —leer al
+    // abrir— pondría una espera justo en el gesto que tiene que ser rápido.
+    // Se guarda su error aparte: que falle el detalle NO puede dejar la bandeja sin
+    // pintar, pero sí tiene que impedir confirmar una salida a ciegas.
+    const prep=_despEstado.filter(function(r){ return r.estado==='preparado'; });
+    _despDetErr='';
+    if(prep.length){
+      try{ await _entColgarDetalle(c, prep); }
+      catch(e2){ _despDetErr=(e2&&e2.message)||String(e2); }
+    }
+    // ¿Alguna de las PREPARADAS quedó anulada en Odoo? Es el caso peligroso: producto
+    // ya armado contra una factura que dejó de existir. Va aparte de la lectura de
+    // "Por preparar" porque un pedido preparado puede tener una factura FUERA del rango
+    // de fechas de la bandeja, y porque estas tarjetas salen de Supabase, no de Odoo.
+    // NO se espera (`await`): la bandeja se pinta con Supabase, que es instantáneo, y
+    // el estado de anulada llega después. Mientras tanto Entregar queda deshabilitado.
+    const fids=prep.map(function(r){ return r.factura_id; }).filter(Boolean);
+    if(fids.length) despCargarAnuladas(fids).then(function(){
+      if(!_despAbierto) despRender();
+      despReverificar();            // en cuanto Odoo contesta, se limpia lo pendiente
+    });
+    else { _despAnul=_despAnul||{}; despReverificar(); }
   }catch(e){
     _despEstado=_despEstado||[];
     _despEstErr=(e&&e.message)||String(e);
   }
   if(!_despAbierto) despRender();     // sin pisar un pedido a medio llenar
+}
+// ── VERIFICACIÓN HACIA ATRÁS ────────────────────────────────────────────
+// Dos poblaciones, y las dos hacen falta:
+//   · las MARCADAS (`sin_verificar`) — se registraron sin poder mirar Odoo. Cuando Odoo
+//     vuelve, se resuelven y la marca se apaga sola. Nadie tiene que hacer nada.
+//   · las que dieron `vigente` — porque una factura puede anularse DESPUÉS de la salida.
+//     Daniel despacha a las 6:30 contra una factura viva y Andrea la anula a las 10:00.
+//     Sin esto, esa salida quedó 'vigente' y nadie la vuelve a mirar nunca.
+// Se corre sola al cargar Despachos, después de que la lectura de anuladas contestó —
+// si Odoo no contesta, no hay con qué verificar y no se hace nada.
+//
+// SOLO INSERTA cuando el resultado CAMBIA. Escribir 'vigente' encima de 'vigente' en
+// cada carga llenaría la tabla de ruido y volvería inútil el historial, que es la razón
+// por la que esto es append-only y no una columna.
+async function despReverificar(){
+  if(_despAnul===null) return;                 // no se pudo leer Odoo: nada que hacer
+  const c=sbClient(); if(!c) return;
+  try{
+    const corte=new Date(); corte.setDate(corte.getDate()-DESP_REVERIF_DIAS);
+    const desde=_despYmd(corte);
+    const [pend, vig] = await Promise.all([
+      c.from('ent_salida_sin_verificar').select('salida_id,estado,salida_en,factura_nombre').limit(200),
+      c.from('ent_salida_a_reverificar').select('salida_id,factura_id,salida_en')
+        .gte('salida_en', desde).limit(200)
+    ]);
+    if(pend.error) throw pend.error;
+    if(vig.error)  throw vig.error;
+
+    // De las marcadas hay que averiguar la factura: la vista no la trae cuando el
+    // estado es 'sin_verificar' (no se pudo mirar, así que no se guardó el id).
+    const marcadas=(pend.data||[]).filter(function(x){ return x.estado==='sin_verificar'; });
+    let facDeSalida={};
+    if(marcadas.length){
+      // SE PIDEN POR ID, no por ventana de fecha ni con un `limit` de corte.
+      // DESP_REVERIF_DIAS acota bien las 'vigente' —una factura no se anula un mes
+      // despues— pero NO sirve aca: `ent_salida_sin_verificar` no tiene corte por
+      // fecha, asi que una salida marcada sigue en la lista a los treinta dias.
+      // Filtrarla por siete la dejaria sin factura que mirar y no se limpiaria
+      // NUNCA — el mismo agujero que un `limit` arbitrario, con otra causa. Y sin
+      // conteos fisicos que reanclen, ese error ya no se limpia solo por ningun
+      // otro camino. Como ya sabemos QUE salidas son, se preguntan esas y punto:
+      // queda acotado por las <=200 de `pend` y no se puede caer ninguna.
+      const ids=marcadas.map(function(x){ return x.salida_id; });
+      const {data:est,error:eEst}=await c.from('v_ent_pedido_estado')
+        .select('pedido_id,factura_id,salida_id').in('salida_id', ids);
+      // El error NO se traga: si esta lectura falla, las marcadas se quedan
+      // marcadas y en silencio. Sube al catch, que al menos lo deja en consola.
+      if(eEst) throw eEst;
+      (est||[]).forEach(function(e){ if(e.salida_id) facDeSalida[e.salida_id]=e.factura_id; });
+    }
+    const objetivos=[];
+    marcadas.forEach(function(x){
+      const f=facDeSalida[x.salida_id];
+      if(f) objetivos.push({salida_id:x.salida_id, factura_id:f, previo:'sin_verificar'});
+    });
+    (vig.data||[]).forEach(function(x){
+      objetivos.push({salida_id:x.salida_id, factura_id:x.factura_id, previo:'vigente'});
+    });
+    if(!objetivos.length) return;
+
+    const facturas=[...new Set(objetivos.map(function(o){ return o.factura_id; }).filter(Boolean))];
+    const mv=await odooCall('account.move','search_read',[[['id','in',facturas]]],
+      {fields:['id','name','reversal_move_id'],limit:1000,context:{lang:'es_CR'}});
+    const rev={}, ncIds=[];
+    mv.forEach(function(m){ const r=m.reversal_move_id||[];
+      if(r.length){ rev[m.id]=r[0]; ncIds.push(r[0]); } });
+    const motivo={};
+    if(ncIds.length){
+      const ncs=await odooCall('account.move','search_read',[[['id','in',ncIds]]],
+        {fields:['id','ref'],limit:1000,context:{lang:'es_CR'}});
+      ncs.forEach(function(n){ motivo[n.id]=_despMotivoNC(n.ref); });
+    }
+    const {data:{user}}=await c.auth.getUser();
+    const quien=(user&&user.email)||'reverificacion';
+    const filas=[];
+    objetivos.forEach(function(o){
+      const anulada=!!rev[o.factura_id];
+      const nuevo=anulada?'anulada':'vigente';
+      if(nuevo===o.previo) return;             // sin cambio: no se escribe
+      filas.push({salida_id:o.salida_id, estado:nuevo, factura_id:o.factura_id,
+                  detalle: anulada ? ('NC: '+(motivo[rev[o.factura_id]]||'sin motivo')) : null,
+                  creado_por: quien});
+    });
+    if(filas.length){
+      const {error}=await c.from('ent_salida_verificacion').insert(filas);
+      if(error) throw error;
+      const gritan=filas.filter(function(f){ return f.estado==='anulada'; }).length;
+      if(gritan) console.warn('reverificación: '+gritan+' salida(s) contra factura anulada');
+    }
+  }catch(e){
+    console.warn('reverificación no pudo completarse:', (e&&e.message)||e);
+  }
+}
+
+// El estado de anulación de un pedido: null mientras no se sepa, {anulada:bool,...} después.
+// Un pedido SIN factura (traslado interno, salida manual) nunca puede estar anulado — no
+// hay documento que anular — así que se resuelve de una y no queda esperando a Odoo.
+// null = todavía leyendo · {sinVerificar:true} = se rindió, se entrega marcado ·
+// {anulada:bool} = se sabe. Un pedido SIN factura nunca puede estar anulado.
+function _despAnulDe(r){
+  if(!r || !r.factura_id) return {anulada:false};
+  if(_despAnul===null) return _despAnulFallo ? {anulada:false, sinVerificar:true} : null;
+  const a=_despAnul[r.factura_id];
+  return a ? Object.assign({anulada:true}, a) : {anulada:false};
+}
+// Cuántos lotes distintos toca un pedido. Se cuenta por (producto, lote), no por lote
+// suelto: el mismo día juliano puede ser dos lotes de dos productos (ver _entCanon).
+function _despResumen(r){
+  const ls=r&&r.lineas; if(!ls||!ls.length) return '';
+  const lotes={}; let n=0;
+  ls.forEach(function(l){ (l.lotes||[]).forEach(function(x){
+    const k=l.producto_id+'|'+x.lote; if(!lotes[k]){ lotes[k]=1; n++; } }); });
+  return ls.length+(ls.length===1?' producto':' productos')
+       + (n?(' · '+n+(n===1?' lote':' lotes')):'');
 }
 
 // ── LA BANDEJA · DOS SECCIONES VIVAS ────────────────────────────────────
@@ -7341,7 +8138,14 @@ function despRender(){
   const hoy=_despHoy();
   const est=_despEstado||[];
   const prep=est.filter(function(r){ return r.estado==='preparado'; });
-  const entHoy=est.filter(function(r){ return r.estado==='entregado' && _despDiaDe(r.salida_en)===hoy; });
+  // CUENTA POR EL DÍA DEL REGISTRO, NO POR EL DE LA SALIDA (decisión de Andrea, 25-ago).
+  // Con fecha editable las dos dejaron de ser la misma: una salida marcada hoy con
+  // fecha de ayer contaba por el día de salida y DESAPARECÍA de la bandeja en el acto,
+  // sin dejar acuse de que se registró. Lo que hiciste hoy se ve hoy; el AB-RE-04
+  // sigue llevando la fecha real, que es lo que esa fecha existe para arreglar.
+  // Con fallback a salida_en para las filas viejas, que no tienen registro propio.
+  const entHoy=est.filter(function(r){ return r.estado==='entregado'
+    && _despDiaDe(r.salida_registrada_en||r.salida_en)===hoy; });
   const fs=_despFac||[];
   const enVentana=fs.filter(function(f){ return f.enVentana; });
   const viejas  =fs.filter(function(f){ return !f.enVentana; });
@@ -7352,7 +8156,8 @@ function despRender(){
       +'<span class="dp-dia'+(f.fecha===hoy?' hoy':'')+'">'+esc(_despDia(f.fecha))+'</span></span>'
       +'<span class="dp-bot"><span class="dp-n">'+f.lineas.length
       +(f.lineas.length===1?' producto':' productos')+'</span>'
-      +'<span class="dp-fac">'+esc(f.factura.slice(-10))+'</span></span></button>';
+      +'<span class="dp-fac">'+esc(f.factura.slice(-10))+'</span>'
+      +entPdfBtn(f.factura_id, f.factura, f.cliente)+'</span></button>';
   };
 
   let h='<div class="dp-lista">';
@@ -7366,17 +8171,13 @@ function despRender(){
     h+='<div class="dp-vacia">'+(_despErr?'No se pudieron leer las facturas de Odoo.':'Nada por preparar.')+'</div>';
   }else{
     h+=enVentana.map(function(f){ return tarjeta(f,false); }).join('');
-    // Lo anterior a la ventana no compite: encabezado propio y un punto menos de
-    // contraste. La regla es que nada desaparece, no que todo grite igual.
-    if(viejas.length){
-      h+='<div class="dp-antes"><div class="dp-antes-h"><span>Anteriores sin despachar</span>'
-        +'<span class="dp-antes-n">'+viejas.length+'</span></div>'
-        +viejas.map(function(f){ return tarjeta(f,true); }).join('')+'</div>';
-    }
   }
 
-  // 2 · PREPARADO
-  h+='<div class="dp-secc"><span>Preparado</span><span class="dp-secc-n">'
+  // 2 · POR ENTREGAR
+  // El nombre pasó de estado a trabajo: "Preparado" describe algo que YA pasó,
+  // "Por entregar" nombra lo que falta hacer — igual que "Por preparar". Leídas
+  // en orden, las tres secciones cuentan el día.
+  h+='<div class="dp-secc"><span>Por entregar</span><span class="dp-secc-n">'
     +(_despEstado===null?'·':prep.length)+'</span></div>';
   if(_despEstErr){
     h+='<div class="dp-vacia dp-mal">No pude leer el estado de los pedidos: '+esc(_despEstErr)
@@ -7385,26 +8186,71 @@ function despRender(){
   }else if(_despEstado===null){
     h+='<div class="dp-vacia">Leyendo…</div>';
   }else if(!prep.length){
-    h+='<div class="dp-vacia">Nada esperando salir.</div>';
+    h+='<div class="dp-vacia">Nada por entregar.</div>';
   }else{
     h+=prep.map(function(r){
       // Ámbar solo lo que urge: preparado ayer o antes hay que sacarlo o
       // devolverlo al congelador. Preparado hoy es lo normal y va en gris.
       const vieja=_despDiaDe(r.preparado_en)<hoy, ocupado=(_despEntregando===r.pedido_id);
-      return '<div class="dp-prep'+(vieja?' vieja':'')+'">'
+      // El resumen no pide ningún gesto ni ninguna lectura extra: los datos ya vinieron
+      // con la bandeja. Da contexto de lo que hay armado sin abrir nada.
+      const res=_despResumen(r);
+      const an=_despAnulDe(r);              // null = todavía verificando
+      const anulada=!!(an&&an.anulada);
+      // TRES ESTADOS, y el del medio importa tanto como los otros dos:
+      //   verificando → no se sabe si la factura vive. Botón apagado y se dice por qué.
+      //   anulada     → gris, etiquetada, con el motivo. NO se puede entregar, y NO se
+      //                 esconde: el producto ya está armado y Daniel tiene que enterarse.
+      //   normal      → como siempre.
+      let etiqueta='';
+      if(anulada){
+        etiqueta='<div class="dp-prep-anul">Factura anulada'
+          +(an.motivo?(' · '+esc(an.motivo)):'')
+          +(an.nc_nombre?(' <span class="dp-prep-nc">NC '+esc(String(an.nc_nombre).slice(-6))+'</span>'):'')
+          +'<br>No se entrega. El producto ya está armado: avisale a Andrea.</div>';
+      }else if(an===null){
+        etiqueta='<div class="dp-prep-ver">Verificando en Odoo si la factura sigue vigente…</div>';
+      }else if(an.sinVerificar){
+        // Se entrega igual, pero Daniel tiene que saber qué está haciendo.
+        etiqueta='<div class="dp-prep-anul">No pude verificar la factura contra Odoo.'
+          +'<br>Se registra igual y queda marcada: Andrea la revisa después.</div>';
+      }
+      const btn = anulada
+        ? '<button class="dp-entregar" disabled>Anulada</button>'
+        : '<button class="dp-entregar"'+((ocupado||an===null)?' disabled':'')
+          +' onclick="despAbrirEntrega('+r.pedido_id+')">'
+          +(ocupado?'Guardando…':(an===null?'Verificando…':(an.sinVerificar?'Entregar sin verificar':'Entregar')))+'</button>';
+      return '<div class="dp-prep'+(vieja?' vieja':'')+(anulada?' anulada':'')+'">'
         +'<div class="dp-prep-i"><span class="dp-prep-cli">'+esc(r.cliente_nombre||'—')+'</span>'
-        +'<span class="dp-prep-h">preparado '+esc(_despCuando(r.preparado_en))+'</span></div>'
-        +'<button class="dp-entregar"'+(ocupado?' disabled':'')
-        +' onclick="despEntregar('+r.pedido_id+')">'+(ocupado?'Guardando…':'Entregar')+'</button></div>';
+        +'<span class="dp-prep-h">preparado '+esc(_despCuando(r.preparado_en))
+        +(res?(' · '+esc(res)):'')+'</span>'+etiqueta+'</div>'
+        +entPdfBtn(r.factura_id, r.factura_nombre, r.cliente_nombre)+btn+'</div>';
     }).join('');
   }
   h+='</div>';
 
-  // 3 · ENTREGADOS: una línea, no una lista. Si no hay, no se dice nada.
+  // 3 · ANTERIORES SIN DESPACHAR — al FONDO, no en medio.
+  // Estaba metido dentro de "Por preparar", así que lo atrasado se leía antes que
+  // el trabajo del día. Arriba lo de hoy; lo que quedó colgando, abajo. No
+  // desaparece —nada desaparece— pero deja de competir: encabezado propio y un
+  // punto menos de contraste.
+  if(_despFac!==null && viejas.length){
+    h+='<div class="dp-antes"><div class="dp-antes-h"><span>Anteriores sin despachar</span>'
+      +'<span class="dp-antes-n">'+viejas.length+'</span></div>'
+      +viejas.map(function(f){ return tarjeta(f,true); }).join('')+'</div>';
+  }
+
+  // 4 · ENTREGADOS: una línea, no una lista. Si no hay, no se dice nada.
   if(entHoy.length){
-    h+='<div class="dp-hoy"><button onclick="irAEntBuscar(\'hoy\')">Entregados hoy · <b>'
+    // El nombre dice lo que cuenta. "Entregados hoy" mentía en cuanto una salida
+    // pudo llevar fecha de ayer, y el destino tiene que traer EXACTAMENTE lo mismo
+    // que el contador: por eso el preset filtra por registro, no por fecha.
+    h+='<div class="dp-hoy"><button onclick="irAEntBuscar(\'reg-hoy\')">Registrados hoy · <b>'
       +entHoy.length+'</b></button></div>';
   }
+  // El diálogo va al final del mismo innerHTML: no hay que montar nada aparte y se
+  // repinta con la lista, así que no puede quedar mostrando un pedido que ya salió.
+  h+=despRenderDialogoEntrega();
   body.innerHTML=h;
 }
 function _despDia(ymd){
@@ -7426,8 +8272,21 @@ function _despDia(ymd){
 // sea cuatro números para una sola cosa, y dejaba pasar un "5 de 2" — más
 // repartido que el total. Ahora la línea normal tiene UN control: el selector.
 // Cinco toques y confirmar es el 90% de las veces.
-function despAbrir(fid){ _despAbierto=fid; _despEdit={}; despRender(); window.scrollTo(0,0); }
-function despCerrar(){ _despAbierto=null; _despEdit={}; despRender(); }
+function despAbrir(fid){ _despAbierto=fid; _despEdit={}; _despPedFecha=''; _despPrepAbierto=0; despRender(); window.scrollTo(0,0); }
+function despCerrar(){ _despAbierto=null; _despEdit={}; _despPedFecha=''; _despPrepAbierto=0; despRender(); }
+// El gemelo de despSetFecha para el atajo. Redibuja SOLO el pie: un despRender()
+// acá rehace los selectores de lote y perdería el lote a medio elegir.
+function despSetPedFecha(v){
+  if(_despGuardando) return;
+  if(v && !_despFechaOK(v)){ despPieRender(); return; }
+  _despPedFecha=(v===_despHoy()?'':String(v||''));
+  despPieRender();
+}
+function despPieRender(){
+  const el=document.getElementById('despPie'); if(!el) return;
+  const f=_despFacAbierta(); if(!f) return;
+  el.innerHTML=_despPieHTML(f);
+}
 
 function _despKey(fid,i){ return fid+':'+i; }
 // Estado de una línea. `partido` y `editando` son las dos excepciones: mientras
@@ -7458,10 +8317,19 @@ function _despLotesDe(pid){
   Object.values(_despLotes.lotes).forEach(function(L){
     if(+L.producto!==+pid) return;
     const k=pid+'|'+L.canon;
-    if(_despSaldo && (_despSaldo[k]||0)<=0) return;    // sin saldo: no se ofrece
-    out.push({lote:L.canon});
+    // NUNCA se esconde un lote. Antes esta línea lo sacaba de la lista cuando el saldo daba ≤ 0,
+    // que es lo contrario de lo que hace el Reporte —"agotados al fondo, en gris, NUNCA ocultos:
+    // el congelador físico manda sobre el sistema"—. Dos pantallas con la regla al revés sobre el
+    // mismo dato, y el resultado fue que Andrea tuvo que escribir un lote a mano el 18-ago.
+    // Va a importar más todavía: hoy nada se descuenta porque falta la vista de saldos, así que
+    // en cuanto empiece a descontarse habría desaparecido medio selector.
+    out.push({lote:L.canon, saldo:(_despSaldo?(_despSaldo[k]!=null?_despSaldo[k]:null):null)});
   });
-  out.sort(function(a,z){ return String(a.lote).localeCompare(String(z.lote),'es'); });
+  out.sort(function(a,z){
+    const aa=(a.saldo!=null&&a.saldo<=0)?1:0, zz=(z.saldo!=null&&z.saldo<=0)?1:0;
+    if(aa!==zz) return aa-zz;                                       // agotados al fondo
+    return String(a.lote).localeCompare(String(z.lote),'es');
+  });
   return out;
 }
 
@@ -7472,7 +8340,8 @@ function despRenderPedido(body){
   // repetirlo dos veces en la misma esquina no orienta, confunde.
   let h='<button class="btn btn-sm" onclick="despCerrar()">← Volver</button>'
     +'<div class="dp-cab"><div class="dp-cab-cli">'+esc(f.cliente)+'</div>'
-    +'<div class="dp-cab-sub">'+esc(f.factura.slice(-10))+' · '+esc(_despDia(f.fecha))+' · '
+    +'<div class="dp-cab-sub">'+esc(f.factura.slice(-10))
+    +entPdfBtn(f.factura_id, f.factura, f.cliente)+' · '+esc(_despDia(f.fecha))+' · '
     +f.lineas.length+(f.lineas.length===1?' producto':' productos')+'</div></div>';
   h+='<div class="dp-lin">';
   f.lineas.forEach(function(L,i){
@@ -7513,16 +8382,29 @@ function despRenderPedido(body){
     h+='</div>';
   });
   h+='</div>';
-  const pend=_despPendientes(f);
-  h+='<div class="dp-pie">'
-    +'<div class="cl-none" id="dpPend">'+(pend?esc(pend):'')+'</div>'
-    +'<div class="dp-btns">'
-    +'<button class="btn btn-amarillo" id="despOk"'+(pend?' disabled':'')
-    +' onclick="despConfirmar(false)">Preparar</button>'
-    +'<button class="btn" id="despOk2"'+(pend?' disabled':'')
-    +' onclick="despConfirmar(true)">Preparar y entregar</button>'
-    +'</div></div>';
+  h+='<div class="dp-pie" id="despPie">'+_despPieHTML(f)+'</div>';
+  // Al final del mismo innerHTML, igual que el de Entregar: se repinta con la
+  // pantalla y no puede quedar abierto sobre un pedido que ya se guardó.
+  h+=despRenderDialogoPreparar();
   body.innerHTML=h;
+}
+// El pie, aparte, porque ahora se redibuja solo cuando cambia la fecha.
+// LA FECHA ES DEL ATAJO, NO DE "Preparar". Preparar no marca ninguna salida, así
+// que ahí una fecha de salida no significa nada; por eso el campo se rotula
+// "Sale" y vive al lado del botón que sí la registra.
+function _despPieHTML(f){
+  const pend=_despPendientes(f);
+  return '<div class="cl-none" id="dpPend">'+(pend?esc(pend):'')+'</div>'
+    +'<div class="dp-btns">'
+    +'<label class="dp-fecha"><span class="dp-fecha-l">Día de entrega</span>'
+    +'<input type="date" class="de-fecha-in" value="'+esc(_despPedFecha||_despHoy())+'" '
+    +'min="'+esc(_despFechaMin())+'" max="'+esc(_despHoy())+'"'+(_despGuardando?' disabled':'')
+    +' onchange="despSetPedFecha(this.value)"></label>'
+    +'<button class="btn btn-amarillo" id="despOk"'+(pend?' disabled':'')
+    +' onclick="despPedirConfirmar(false)">Preparar</button>'
+    +'<button class="btn" id="despOk2"'+(pend?' disabled':'')
+    +' onclick="despPedirConfirmar(true)">Preparar y entregar</button>'
+    +'</div>';
 }
 
 // El selector, con el MISMO tratamiento que los inputs del resto de Truefie:
@@ -7533,7 +8415,8 @@ function _despSel(i,j,lt,disp,cls){
   let h='<select class="dp-lsel '+cls+'" onchange="despSetLote('+i+','+j+',this.value)">'
     +'<option value="">Elegir lote</option>';
   disp.forEach(function(d){
-    h+='<option value="'+esc(d.lote)+'"'+(lt.lote===d.lote?' selected':'')+'>'+esc(d.lote)+'</option>';
+    const ago=(d.saldo!=null&&d.saldo<=0)?' — agotado según sistema':'';
+    h+='<option value="'+esc(d.lote)+'"'+(lt.lote===d.lote?' selected':'')+'>'+esc(d.lote+ago)+'</option>';
   });
   if(lt.lote && !disp.some(function(d){return d.lote===lt.lote;}))
     h+='<option value="'+esc(lt.lote)+'" selected>'+esc(lt.lote)+'</option>';
@@ -7616,13 +8499,59 @@ function despQuitarLote(i,j){
 function despSetLote(i,j,v){ const f=_despFacAbierta(); if(!f) return;
   const e=_despEst(f,i);
   if(v==='__'){ const t=prompt('Lote (forma "154 / 12-26"):',e.lotes[j].lote||'');
-    if(t==null){ despRender(); return; } v=String(t).trim(); }
+    if(t==null){ despRender(); return; } v=String(t).trim();
+    if(v){ const L=f.lineas[i], r=_loteConocido(L.producto_id, v);
+      // Se guarda SIEMPRE la forma canónica, nunca lo tecleado: la clave del saldo es texto.
+      v=r.canon;
+      // 'formato' no interrumpe — es el mismo lote, y la corrección se ve en el campo. Interrumpir
+      // por esto a las 6:30 es lo que entrena a saltarse el aviso que sí importa.
+      if((r.nivel==='desconocido'||r.nivel==='ilegible')
+         && !confirm(r.msg+'\n\n¿Lo dejo igual? Si el lote no existe, esa salida no se resta de ningún lote real.')){
+        despRender(); return; } } }
   e.lotes[j].lote=v;
   if(!e.partido) e.lotes[0].cant=e.cant;
   despRender(); }
 function despMasLote(i){ const f=_despFacAbierta(); if(!f) return;
   _despEst(f,i).lotes.push({lote:'',cant:null}); despRender(); }
 function _despFacAbierta(){ return (_despFac||[]).find(function(x){ return x.factura_id===_despAbierto; }); }
+
+// ¿Este lote escrito a mano existe de verdad? Un lote inventado no es un registro sin efecto:
+// las unidades salen del congelador contra una clave `producto|lote` que no le corresponde a
+// ninguna orden de Odoo, así que el lote REAL conserva su saldo completo para siempre y la
+// disponibilidad queda inflada. Pasó el 18-ago: se escribió "183 - 12/26" y el lote real era
+// "183 / 1-27". No se bloquea —el congelador físico manda sobre el sistema— pero se avisa, y el
+// aviso ofrece el lote parecido, que en ese caso era el correcto con otro vencimiento.
+// ⚠️ RECIBE LO TECLEADO, NO UNA FORMA CANÓNICA. Antes comparaba la cadena cruda contra L.canon,
+// así que un lote que existía escrito en el formato de Daniel caía en la rama de "no existe". El
+// 18-ago la pantalla le dijo a Andrea "Ese lote no existe en Odoo para este producto" sobre un
+// lote que SÍ existía — el aviso era correcto en la forma y falso en el fondo, y por eso siguió
+// de largo. Un aviso que se equivoca así es peor que no tenerlo: entrena a ignorarlo.
+//
+// Devuelve {nivel, msg, canon}. `canon` es lo que hay que GUARDAR (nunca lo tecleado).
+//   ok           → el lote existe y ya venía bien escrito.
+//   formato      → existe, escrito distinto. NO es una anomalía: se guarda canónico y no se
+//                  interrumpe. La corrección se ve sola, en el valor del campo.
+//   desconocido  → no hay ningún lote así en Odoo. Sí es anomalía: se avisa (no se bloquea).
+//   ilegible     → no tiene forma de lote. Se guarda igual, pero no va a cruzar con nada.
+function _loteConocido(pid, txt){
+  const ls=(_despLotes&&_despLotes.lotes)?Object.values(_despLotes.lotes).filter(function(L){ return +L.producto===+pid; }):[];
+  const v=String(txt==null?'':txt).trim(), canon=_entCanon(v);
+  if(!canon) return {nivel:'ilegible', canon:v,
+    msg:'No pude leer "'+v+'" como lote; la forma es "154 / 12-26". Lo guardo tal cual, pero así '
+       +'no cruza con ningún lote de Odoo: esa salida no se resta de ningún saldo.'};
+  if(ls.some(function(L){ return L.canon===canon; }))
+    return canon===v ? {nivel:'ok', canon:canon, msg:''}
+                     : {nivel:'formato', canon:canon,
+                        msg:'Ese lote existe; en el sistema se escribe "'+canon+'".'};
+  if(!ls.length) return {nivel:'desconocido', canon:canon,
+    msg:'No hay lotes de este producto leídos de Odoo, así que no puedo verificarlo.'};
+  // Mismo día juliano y distinto vencimiento = casi seguro el mismo lote, mal transcrito.
+  const ddd=(canon.match(/^\d{1,3}/)||[])[0];
+  const casi=ddd?ls.filter(function(L){ return String(L.ddd)===String(+ddd); }).map(function(L){ return L.canon; }):[];
+  return {nivel:'desconocido', canon:canon, msg: casi.length
+    ? ('Ese lote no existe en Odoo. Con el día '+(+ddd)+' hay: '+casi.join(' · ')+'.')
+    : ('Ese lote no existe en Odoo para este producto. Los que hay: '+ls.map(function(L){return L.canon;}).join(' · ')+'.')};
+}
 
 // ── CONFIRMAR · DOS CAMINOS ─────────────────────────────────────────────
 // PREPARAR corta antes de la salida; PREPARAR Y ENTREGAR escribe las dos cosas.
@@ -7640,11 +8569,10 @@ async function despConfirmar(entregar){
   const f=_despFacAbierta(); if(!f) return;
   const pend=_despPendientes(f); if(pend){ alert(pend); return; }
   const btn=document.getElementById('despOk'), btn2=document.getElementById('despOk2');
-  const dif=f.lineas.filter(function(L,i){ return Math.abs(_despEst(f,i).cant-L.cant_uom)>1e-9; }).length;
-  if(!confirm((entregar
-      ? '¿Preparar y marcar la salida de '+f.cliente+'?\n\nQueda registrado que salió a las '+_despHora(new Date())+'.'
-      : '¿Preparar el pedido de '+f.cliente+'?\n\nQueda esperando salir; la salida se marca después.')
-    +(dif?('\n\n'+dif+(dif===1?' línea sale':' líneas salen')+' con cantidad distinta a la facturada.'):''))) return;
+  // SIN confirm() NATIVO (b32). Lo que este confirm decía —cliente, fecha real,
+  // líneas con cantidad distinta a la facturada— se ve ahora en el diálogo, junto
+  // al detalle de qué sale. Acá solo se lee la fecha ya elegida.
+  const fSal=(entregar?_despPedFecha:'');
   _despGuardando=true;
   if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
   if(btn2){ btn2.disabled=true; }
@@ -7653,7 +8581,10 @@ async function despConfirmar(entregar){
     const {data:{user}}=await c.auth.getUser();
     const quien=(user&&user.email)||'desconocido';
     const {data:ped,error:e1}=await c.from('ent_pedido').insert({
-      fecha_despacho:_despHoy(), origen:'factura', factura_id:f.factura_id,
+      // Si la salida se está cargando con fecha de atrás, el pedido es de ese día
+      // también. fecha_ab_re_04 igual prefiere salida_en; esto es para que la fila
+      // no se contradiga sola cuando alguien la mire cruda.
+      fecha_despacho:(fSal||_despHoy()), origen:'factura', factura_id:f.factura_id,
       factura_nombre:f.factura, cliente_id:f.cliente_id, cliente_nombre:f.cliente,
       motivo:'venta', creado_por:quien}).select('id').single();
     if(e1) throw e1;
@@ -7680,16 +8611,20 @@ async function despConfirmar(entregar){
     // La segunda etapa, solo si se pidió. `salida_en` queda en el now() de la
     // base: la hora real de salida es ESTA, no la de preparación.
     if(entregar){
-      const {error:e6}=await c.from('ent_salida').insert({alisto_id:ali.id, creado_por:quien});
+      const {error:e6}=await c.from('ent_salida').insert(
+        Object.assign({alisto_id:ali.id, creado_por:quien}, _despSalidaPayload(fSal)));
       if(e6) throw new Error('el pedido quedó PREPARADO pero no pude marcar la salida: '
         +((e6&&e6.message)||e6)+' — marcala con el botón Entregar.');
     }
     _despFac=(_despFac||[]).filter(function(x){ return x.factura_id!==f.factura_id; });
-    _despAbierto=null; _despEdit={};
+    _despAbierto=null; _despEdit={}; _despPedFecha=''; _despPrepAbierto=0;   // nada se hereda al pedido siguiente
     despRender();
     despCargarEstado();    // pasa a "Preparado" (o a "Entregados hoy")
     despCargarLotes();     // el saldo por lote cambió
   }catch(e){
+    // El diálogo SE CIERRA si falló: el error va por alert y la pantalla del
+    // pedido queda visible para corregir. Dejarlo abierto taparía lo que hay que tocar.
+    _despPrepAbierto=0;
     alert('No se pudo guardar: '+((e&&e.message)||e)
       +'\n\nSi la factura sigue en "Por preparar", probá de nuevo.');
     despCargarEstado();
@@ -7704,29 +8639,343 @@ async function despConfirmar(entregar){
 // Sin abrir el pedido: a las 7:30 lo único que pasa es que el camión se fue.
 // PIDE CONFIRMACIÓN (decisión de Andrea): un toque accidental no puede marcar
 // una salida, porque una hora de salida falsa no la ve nadie después.
+// ── EL DIÁLOGO DE ENTREGAR ──────────────────────────────────────────────
+// El problema que resuelve: la tarjeta mostraba cliente y hora, y el botón confirmaba
+// la salida sin que se viera QUÉ se estaba entregando. Andrea confirmaba a ciegas.
+//
+// POR QUÉ UN DIÁLOGO Y NO UNA TARJETA EXPANDIBLE: expandir es opcional, y a las 6:30 un
+// paso opcional no se hace. Acá el detalle está EN EL CAMINO, no al lado — no se puede
+// confirmar sin haberlo visto. Y mirar sin comprometerse sigue siendo posible: se abre
+// y se cancela, que es gratis.
+//
+// Cantidades en UNIDAD DE VENTA (cant_uom + uom_nombre), no en unidades individuales:
+// Daniel cuenta cajas frente al congelador. "96 u" no le dice nada; "4 Caja (Frances)" sí.
+function despAbrirEntrega(pedidoId){
+  if(_despEntregando) return;
+  const r=(_despEstado||[]).find(function(x){ return x.pedido_id===pedidoId; });
+  if(!r || r.estado!=='preparado') return;
+  const an=_despAnulDe(r);
+  if(an===null || an.anulada) return;      // sin verificar o anulada: no se abre
+  _despEntAbierto=pedidoId; _despEntFecha=''; despRender();   // cada apertura arranca en hoy
+}
+function despCerrarEntrega(){ if(_despEntregando) return; _despEntAbierto=0; _despEntFecha=''; despRender(); }
+// La ventana la impone el input (min/max), pero un valor fuera de rango tecleado a
+// mano no se guarda: se ignora y el campo vuelve a lo que había. Nunca se acepta a
+// medias.
+function despSetFecha(v){
+  if(_despEntregando) return;
+  if(v && !_despFechaOK(v)){ despRender(); return; }
+  _despEntFecha=(v===_despHoy()?'':String(v||''));
+  despRender();
+}
+
+function despRenderDialogoEntrega(){
+  if(!_despEntAbierto) return '';
+  const r=(_despEstado||[]).find(function(x){ return x.pedido_id===_despEntAbierto; });
+  if(!r) return '';
+  const ocupado=(_despEntregando===r.pedido_id);
+  // BLOQUEA SI EL DETALLE NO CARGÓ. Acá sí corresponde bloquear: no es proponer un lote
+  // —donde la regla es proponer y nunca bloquear—, es registrar una salida sin saber de qué.
+  const lineas=r.lineas||null;
+  const listo=!!(lineas && lineas.length) && !_despDetErr;
+
+  let cuerpo='';
+  if(_despDetErr){
+    cuerpo='<div class="de-mal">No pude leer el detalle de este pedido: '+esc(_despDetErr)
+      +'<br>No se puede confirmar la salida sin verlo. Recargá la pantalla.</div>';
+  }else if(lineas===null){
+    cuerpo='<div class="de-vacia">Leyendo el detalle…</div>';
+  }else if(!lineas.length){
+    cuerpo='<div class="de-mal">Este pedido no tiene líneas guardadas. '
+      +'No se puede confirmar una salida sin saber qué sale.</div>';
+  }else{
+    cuerpo=lineas.map(function(l){
+      const un=l.uom_nombre||'';
+      const cant=(l.cant_uom!=null&&un)?(_rzN(l.cant_uom)+' '+un):(_rzN(l.cant_uds)+' u');
+      // El lote va DEBAJO del producto, indentado, y no en la misma línea: una línea con
+      // dos lotes es lo normal, no la excepción, y en teléfono el segundo se corta.
+      const lotes=(l.lotes||[]).length
+        ? l.lotes.map(function(x){
+            return '<div class="de-lote"><span>'+esc(x.lote)+'</span>'
+                 +'<span class="de-lote-c">'+esc(_despCantLote(x.cant_uds,l))+'</span></div>'; }).join('')
+        : '<div class="de-lote de-sinlote"><span>sin lote</span></div>';
+      return '<div class="de-lin"><div class="de-prod"><span>'+esc(_bsProd(l.producto_id))+'</span>'
+        +'<span class="de-cant">'+esc(cant)+'</span></div>'+lotes+'</div>';
+    }).join('');
+  }
+
+  return _despDialogoHTML({
+    cliente: r.cliente_nombre, cuerpo: cuerpo, listo: listo, ocupado: ocupado,
+    sub: (r.factura_nombre?('…'+String(r.factura_nombre).slice(-4)):'sin factura')
+         +' · preparado '+_despHora(r.preparado_en),
+    extraCab: entPdfBtn(r.factura_id, r.factura_nombre, r.cliente_nombre),
+    fecha: _despEntFecha, setFecha: 'despSetFecha', cerrar: 'despCerrarEntrega()',
+    ok: 'despEntregar('+r.pedido_id+')', okTxt: 'Confirmar salida'});
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// EL PDF DE LA FACTURA (b32) — un solo componente, cuatro lugares.
+//
+// QUÉ SACA DEL CIRCUITO: hoy Andrea baja el PDF de Odoo y se lo manda a Daniel
+// por WhatsApp, uno por uno, seis veces los lunes.
+//
+// ⚠️ EL ADJUNTO NO SE BUSCA: SE PIDE POR SU ID. Odoo esconde de `search_read`
+// todo adjunto con `res_field` puesto, y el PDF de la FE lo tiene
+// (`invoice_pdf_report_file`): buscarlo por res_model+res_id devuelve CERO filas
+// y parece que no existe. Existe. Son dos lecturas, las dos ya dentro del
+// candado — no se abre ni un permiso:
+//   1. account.move.read([id],['invoice_pdf_report_id'])  → id del adjunto
+//   2. ir.attachment.read([att],['datas'])                → el PDF en base64
+// Hermano de "buscar productos por ID, nunca por nombre": el buscador miente por
+// omisión y la lectura directa no.
+//
+// UN COMPONENTE Y NO CUATRO. Va en Por preparar, Por entregar, Anteriores sin
+// despachar e Historial, más la cabecera del pedido y el diálogo de Entregar.
+// Cuatro implementaciones serían cuatro comportamientos que se desincronizan.
+// Se dibuja como <span role="button"> y no como <button> porque tres de esos
+// cuatro lugares SON un <button> entero (la tarjeta se toca para abrir el
+// pedido) y un botón dentro de otro es HTML inválido: el navegador lo saca del
+// contenedor y la tarjeta deja de funcionar.
+// ════════════════════════════════════════════════════════════════════════
+const _pdfEstado={};      // factura_id → 'cargando' | 'listo' | mensaje de error
+let _pdfPing=false;
+// PRECALENTADO. El proxy de lectura duerme y despierta en ~40 s. El riesgo real
+// no son los 40 s: es que parezca que no pasó nada y se toque tres veces. Un GET
+// sin await al entrar a Despachos lo despierta mientras Daniel mira la bandeja.
+function entPdfPrecalentar(){
+  if(_pdfPing) return; _pdfPing=true;
+  // Contra el proxy de PRODUCCIÓN, que es el que duerme en Render. Su GET
+  // contesta 'proxy-lectura OK' sin tocar Odoo: despierta el dyno y nada más.
+  try{ fetch(PROXY_LECTURA_URL, {method:'GET'}).catch(function(){}); }catch(e){}
+}
+// El nombre que ve el humano. El de Odoo es `FE-506170826...` de 54 caracteres,
+// que en WhatsApp se corta y no dice de quién es.
+function _pdfNombre(consecutivo, cliente){
+  const n=String(consecutivo||'').replace(/\D/g,'').slice(-4) || 'factura';
+  // Se le sacan los caracteres que rompen un nombre de archivo, y el punto final:
+  // "Automercado S.A." + ".pdf" daba "...S.A..pdf".
+  const c=String(cliente||'').replace(/[\/\\:*?"<>|]/g,' ').replace(/\s+/g,' ')
+    .trim().slice(0,40).replace(/[.\s]+$/,'');
+  return (c?(n+' '+c):n)+'.pdf';
+}
+// El control. Sin factura vinculada NO se dibuja — un botón que no puede
+// funcionar es peor que ninguno (regla del renglón sin control muerto).
+function entPdfBtn(facturaId, consecutivo, cliente, cls){
+  if(!facturaId) return '';
+  const st=_pdfEstado[facturaId];
+  const txt=(st==='cargando')?'PDF…':(st&&st!=='listo'?'PDF ✕':'PDF');
+  const arg="entPdfAbrir("+(+facturaId)+",'"+String(consecutivo||'').replace(/'/g,"\\'")+"','"
+    +String(cliente||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')+"')";
+  return '<span class="pdf-b'+(cls?(' '+cls):'')+(st==='cargando'?' cargando':'')
+    +(st&&st!=='listo'&&st!=='cargando'?' mal':'')+'" role="button" tabindex="0"'
+    +(st?(' title="'+esc(st==='cargando'?'Leyendo de Odoo…':st)+'"'):'')
+    +' onclick="event.stopPropagation();'+arg+'"'
+    +' onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();event.stopPropagation();'+arg+'}"'
+    +'>'+txt+'</span>';
+}
+function _pdfRepintar(){
+  // Repinta la vista que esté abierta, sin saber cuál es: cada render es idempotente.
+  try{ if(_despAbierto!=null||_despEstado!==null) despRender(); }catch(e){}
+  try{ if(_bs) bsFiltrar(); }catch(e){}
+}
+async function entPdfAbrir(facturaId, consecutivo, cliente){
+  if(_pdfEstado[facturaId]==='cargando') return;
+  _pdfEstado[facturaId]='cargando'; _pdfRepintar();
+  try{
+    // 1 · el id del adjunto. Nunca search_read: con res_field puesto no aparece.
+    const mv=await odooCall('account.move','read',[[+facturaId]],{fields:['invoice_pdf_report_id','name']});
+    const att=mv&&mv[0]&&mv[0].invoice_pdf_report_id;
+    const attId=att&&(att[0]||att);
+    if(!attId) throw new Error('esta factura todavía no tiene PDF generado en Odoo');
+    // 2 · el contenido
+    const a=await odooCall('ir.attachment','read',[[+attId]],{fields:['datas','mimetype','name']});
+    const b64=a&&a[0]&&a[0].datas;
+    if(!b64) throw new Error('el adjunto vino vacío');
+    const bin=atob(b64), buf=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) buf[i]=bin.charCodeAt(i);
+    const nombre=_pdfNombre(consecutivo||(mv[0]&&mv[0].name), cliente);
+    const blob=new Blob([buf], {type:(a[0].mimetype||'application/pdf')});
+    _pdfEstado[facturaId]='listo'; _pdfRepintar();
+    // DOS GESTOS EN EL TELÉFONO: compartir directo a WhatsApp. Donde no hay
+    // navigator.share (escritorio, y iOS si el archivo no es compartible) cae a
+    // pestaña nueva, que es el camino de siempre.
+    const file=(typeof File!=='undefined') ? new File([blob], nombre, {type:'application/pdf'}) : null;
+    if(file && navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file], title:nombre}); return; }
+      catch(e){ if(e && e.name==='AbortError') return; }   // lo canceló el humano: no es un error
+    }
+    const url=URL.createObjectURL(blob);
+    const w=window.open(url,'_blank');
+    if(!w){ const a2=document.createElement('a'); a2.href=url; a2.download=nombre;
+            document.body.appendChild(a2); a2.click(); a2.remove(); }
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+  }catch(e){
+    // NUNCA EN SILENCIO: el estado queda en el botón y el detalle en el título.
+    _pdfEstado[facturaId]=(e&&e.message)||String(e);
+    _pdfRepintar();
+    alert('No pude traer el PDF de la factura: '+((e&&e.message)||e));
+  }
+}
+
+// ── EL ARMAZÓN DEL DIÁLOGO, COMPARTIDO (b32) ────────────────────────────
+// Lo estrenó Entregar en b28 y ahora lo usan LOS DOS caminos: Entregar (desde la
+// tarjeta) y Preparar / Preparar y entregar (desde el pedido abierto). Ese
+// segundo camino seguía con `confirm()` nativo, o sea confirmando a ciegas —
+// exactamente el problema que este componente existe para resolver, en la
+// pantalla de al lado. Y desde b32 confirmaba además una FECHA a ciegas.
+//
+// Un solo armazón y no dos parecidos: mismo relleno lima (`--ent-fill`, que es el
+// token de RELLENO y no el de línea), mismo Cancelar sin relleno para que no
+// compita, misma ✕, mismo campo de fecha. Dos redacciones del mismo diálogo es
+// una que se va a desincronizar.
+//
+// Lo único que cambia entre los dos es el TEXTO DE LA ACCIÓN: "Confirmar salida"
+// no es lo mismo que "Preparar", y el botón tiene que decir lo que va a pasar.
+function _despDialogoHTML(d){
+  const dis=(d.ocupado||!d.listo)?' disabled':'';
+  return '<div class="de-fondo" onclick="if(event.target===this)'+d.cerrar+'">'
+    +'<div class="de-caja" role="dialog" aria-modal="true">'
+    +'<div class="de-cab"><div><div class="de-cli">'+esc(d.cliente||'—')+'</div>'
+    +'<div class="de-sub">'+esc(d.sub||'')+(d.extraCab||'')+'</div></div>'
+    +'<button class="de-x" onclick="'+d.cerrar+'" aria-label="Cerrar">✕</button></div>'
+    +'<div class="de-cuerpo">'+d.cuerpo+'</div>'
+    // LA FECHA VA ACÁ, pegada al detalle de qué sale y al botón que lo confirma
+    // (decisión de Andrea): es parte de lo que se está afirmando, no un ajuste
+    // aparte. En la tarjeta cerrada no va — ahí el gesto es sacar el pedido.
+    +'<div class="de-pie">'
+    +(d.setFecha
+      ? ('<label class="de-fecha"><span class="de-fecha-l">Día de entrega</span>'
+        +'<input type="date" class="de-fecha-in" value="'+esc(d.fecha||_despHoy())+'" '
+        +'min="'+esc(_despFechaMin())+'" max="'+esc(_despHoy())+'"'+(d.ocupado?' disabled':'')
+        +' onchange="'+d.setFecha+'(this.value)"></label>'
+        // Cuando la fecha es hoy la hora es la del reloj y se dice. Cuando es de
+        // atrás NO se inventa una: se dice que no se registra, que es la verdad.
+        +'<div class="de-hora">'+(d.fecha
+            ? 'la hora no se registra'
+            : ('a las '+esc(_despHora(new Date()))))+'</div>')
+      : '')
+    +'<div class="de-btns"><button class="btn btn-sm" onclick="'+d.cerrar+'"'
+    +(d.ocupado?' disabled':'')+'>Cancelar</button>'
+    +'<button class="de-ok"'+dis+' onclick="'+d.ok+'">'
+    +esc(d.ocupado?'Guardando…':d.okTxt)+'</button>'
+    +'</div></div></div></div>';
+}
+// ── EL DIÁLOGO DE PREPARAR / PREPARAR Y ENTREGAR (b32) ──────────────────
+// Reemplaza el confirm() nativo. Mismo componente que Entregar: lo que se está
+// por guardar se VE —producto, cantidad en unidad de venta, lotes debajo— antes
+// de que exista una fila en Supabase.
+// La fecha solo aparece cuando se va a marcar la salida: en "Preparar" no hay
+// salida que fechar, y un campo que no significa nada es peor que ninguno.
+function despRenderDialogoPreparar(){
+  if(!_despPrepAbierto) return '';
+  const f=_despFacAbierta(); if(!f) return '';
+  const entregar=(_despPrepAbierto==='entregar');
+  const pend=_despPendientes(f);
+  let dif=0;
+  let cuerpo=f.lineas.map(function(L,i){
+    const e=_despEst(f,i), cant=(+e.cant||0), un=L.uom_nombre||'';
+    if(Math.abs(cant-L.cant_uom)>1e-9) dif++;
+    const pres=(L.uom_factor===1?'u':'cj');
+    const lotes=(e.lotes||[]).filter(function(x){ return x.lote; });
+    const filas=lotes.length
+      ? lotes.map(function(x){
+          // Sin partir, la cantidad del único lote ES el total de la línea.
+          const c=(lotes.length===1 && (x.cant==null||x.cant==='')) ? cant : (+x.cant||0);
+          return '<div class="de-lote"><span>'+esc(x.lote)+'</span>'
+               +'<span class="de-lote-c">'+_rzN(c)+' '+pres+'</span></div>'; }).join('')
+      : '<div class="de-lote de-sinlote"><span>sin lote</span></div>';
+    return '<div class="de-lin"><div class="de-prod"><span>'+esc(_bsProd(L.producto_id))+'</span>'
+      +'<span class="de-cant">'+_rzN(cant)+(un?(' '+esc(un)):'')+'</span></div>'+filas+'</div>';
+  }).join('');
+  // Lo que ANTES iba escondido al final del confirm(). Acá está donde se mira.
+  if(dif) cuerpo+='<div class="de-mal">'+dif+(dif===1?' línea sale':' líneas salen')
+    +' con cantidad distinta a la facturada.</div>';
+  if(pend) cuerpo+='<div class="de-mal">'+esc(pend)+'</div>';
+  return _despDialogoHTML({
+    cliente: f.cliente, cuerpo: cuerpo, listo: !pend, ocupado: _despGuardando,
+    sub: (f.factura?('…'+String(f.factura).slice(-4)):'sin factura')
+         +' · '+(entregar?'sale del congelador ahora':'queda esperando el camión'),
+    fecha: _despPedFecha, setFecha: (entregar?'despSetPedFecha':''),
+    cerrar: 'despCerrarPrep()',
+    ok: 'despConfirmar('+(entregar?'true':'false')+')',
+    okTxt: (entregar?'Preparar y entregar':'Preparar')});
+}
+function despPedirConfirmar(entregar){
+  if(_despGuardando) return;
+  const f=_despFacAbierta(); if(!f) return;
+  _despPrepAbierto=(entregar?'entregar':'preparar');
+  if(!entregar) _despPedFecha='';        // sin salida no hay fecha que arrastrar
+  despRender();
+}
+function despCerrarPrep(){ if(_despGuardando) return; _despPrepAbierto=0; despRender(); }
+
+// La cantidad del lote se muestra en la MISMA unidad que la línea, no en unidades
+// individuales: si la línea dice "7 Caja (Pizza)", los lotes tienen que decir 3 cj y 4 cj.
+// El factor viene congelado en la línea del pedido; sin él se cae a unidades y se dice.
+function _despCantLote(uds, l){
+  const f=l&&l.uom_factor;
+  if(f&&+f>0){ const n=(+uds)*(+f); if(Math.abs(n-Math.round(n))<1e-9) return _rzN(Math.round(n))+' '+(l.presentacion==='cj'?'cj':'u'); }
+  return _rzN(uds)+' u';
+}
+
 async function despEntregar(pedidoId){
   if(_despEntregando) return;
   const r=(_despEstado||[]).find(function(x){ return x.pedido_id===pedidoId; });
   if(!r || r.estado!=='preparado') return;
-  if(!confirm('¿Marcar la salida de '+(r.cliente_nombre||'este pedido')+'?'
-    +'\n\nSe registra que salió a las '+_despHora(new Date())+'.')) return;
+  if(!r.lineas || !r.lineas.length || _despDetErr) return;   // nunca a ciegas
+  // El candado también acá, no solo en el botón: entre que se abrió el diálogo y que se
+  // confirma pueden pasar minutos, y en ese rato la lectura de anuladas puede contestar.
+  const an=_despAnulDe(r);
+  if(an===null || an.anulada){
+    _despEntAbierto=0; _despEntFecha='';
+    alert(an&&an.anulada
+      ? ('Esa factura quedó anulada en Odoo'+(an.motivo?(': '+an.motivo):'')
+         +'.\n\nNo se registra la salida. El producto ya está armado: avisale a Andrea.')
+      : 'Todavía no pude verificar en Odoo si la factura sigue vigente. Probá en unos segundos.');
+    despRender(); return;
+  }
+  // `an.sinVerificar` NO frena: se registra y se marca. Es la decisión del 20-ago.
   _despEntregando=pedidoId; despRender();
   try{
     const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
     const {data:{user}}=await c.auth.getUser();
-    const {error}=await c.from('ent_salida').insert({
-      alisto_id:r.alisto_id, creado_por:(user&&user.email)||'desconocido'});
+    const quien=(user&&user.email)||'desconocido';
+    // Sin fecha tocada el payload va vacío y gana el `default now()` de la base:
+    // Daniel a las 6:30 no ve ningún cambio. Con fecha de atrás va salida_en a
+    // mediodía y la nota que dice que la hora no está medida.
+    const {data:sal,error}=await c.from('ent_salida').insert(
+      Object.assign({alisto_id:r.alisto_id, creado_por:quien},
+                    _despSalidaPayload(_despEntFecha))).select('id').single();
     if(error) throw error;
+    // LA MARCA. Toda salida escribe su verificación, incluso la que verificó bien: así
+    // "sin fila" significa "salida vieja, anterior a esto" y no ensucia la alerta.
+    // Va DESPUÉS del insert de la salida y en su propio try: si falla la marca, la
+    // salida ya está registrada y el saldo ya bajó — perder la marca es molesto, perder
+    // la salida sería un descuadre. Se prioriza el dato duro.
+    try{
+      await c.from('ent_salida_verificacion').insert({
+        salida_id: sal.id,
+        estado: an.sinVerificar ? 'sin_verificar' : 'vigente',
+        factura_id: r.factura_id || null,
+        detalle: an.sinVerificar ? ('no se pudo leer Odoo: '+(_despAnulErr||'sin detalle')) : null,
+        creado_por: quien});
+    }catch(ev){
+      console.warn('salida registrada pero sin marca de verificación:', ev);
+    }
+    _despEntAbierto=0; _despEntFecha='';   // salió bien: se cierra el diálogo
   }catch(e){
     alert('No se pudo marcar la salida: '+((e&&e.message)||e)
       +'\n\nEl pedido sigue en Preparado: probá de nuevo.');
+    // El diálogo SE QUEDA ABIERTO si falló: cerrarlo dejaría a Daniel sin saber
+    // sobre cuál pedido reintentar.
   }
   _despEntregando=0;
   await despCargarEstado();   // la verdad la dice la vista, no el navegador
 }
 
 function irADespachos(){
-  _modShow('vDespachos'); crumbSet('Entregas','Resumen');
+  _modShow('vDespachos'); crumbSet('Entregas','Despachos');
+  entPdfPrecalentar();      // el proxy despierta mientras Daniel mira la bandeja
   despCargar(false);
 }
 
@@ -7741,17 +8990,156 @@ function irADespachos(){
 // detalle del AB-RE-04 se arma SOLO al abrir una fila — la pregunta normal es
 // "¿cuándo y a quién?", y el papel es la excepción.
 // ════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════
+// INVENTARIO · SALDO POR LOTE (b32) — la pantalla que faltaba.
+//
+// NO REIMPLEMENTA LA ARITMÉTICA. Llama a las MISMAS dos funciones que alimentan
+// el selector de Daniel: entLotesActivos() y rpCalcSaldos(). Si esta pantalla
+// calculara por su cuenta y el número difiriera del que Daniel ve al elegir
+// lote, la pantalla mentiría — y mentiría justo donde se va a mirar para
+// resolver una duda.
+//
+// ⚠️ ITERA LA UNIÓN DE LAS DOS FUENTES, NO SOLO LOS LOTES ACTIVOS. Medido el
+// 25-ago contra el ancla: 5 lotes con producto real —Semillas 126/11-26 (12 u),
+// Francés 182/12-26 (8 u), Pizza 120/10-26 (8 u), 82/9-26 (4 u) y 107/10-26
+// (2 u), 34 unidades en total— quedan FUERA de entLotesActivos(3), porque su
+// orden de producción es más vieja que la ventana de 3 meses. En el selector no
+// aparecer está bien; acá sería esconder producto que está en el congelador, que
+// es lo contrario de para lo que existe esta pantalla.
+//
+// Y AL REVÉS: un lote fabricado DESPUÉS del ancla y que todavía no salió está en
+// los activos y no en el ancla. Por eso son las dos fuentes y no una.
+// ════════════════════════════════════════════════════════════════════════
+let _lot=null, _lotSaldo=null, _lotErr='', _lotCargando=false;
+
+function irAEntLotes(){
+  _modShow('vEntLotes'); crumbSet('Entregas','Inventario');
+  lotCargar(false);
+}
+async function lotCargar(force){
+  const st=document.getElementById('elStatus');
+  if(_lot && !force){ lotRender(); return; }
+  if(_lotCargando) return;
+  _lotCargando=true; _lotErr='';
+  if(st){ st.className='status s-info'; st.classList.remove('hidden');
+          st.innerHTML='<span class="spin"></span>Leyendo lotes de Odoo y saldos de Supabase…'; }
+  try{
+    _lot=await entLotesActivos(3);
+    _lotSaldo=await rpCalcSaldos(_lot);      // null = no hay ancla confirmada
+  }catch(e){ _lotErr=(e&&e.message)||String(e); _lot=null; _lotSaldo=null; }
+  _lotCargando=false;
+  if(st) st.classList.add('hidden');
+  lotRender();
+}
+// FIFO DE VERDAD, no por juliano pelado. El juliano se repite cada año, así que
+// ordenar por él solo mezclaría `350 / 12-26` con `010 / 6-27`. El vencimiento
+// (M-AA) sale del mismo string y es monótono con la producción —vence 6 meses
+// después—, así que (AA, M, DDD) da el orden real de entrada al congelador.
+function _lotOrden(lote){
+  const m=/^(\d{1,3})\s*\/\s*(\d{1,2})-(\d{2})$/.exec(String(lote||''));
+  if(!m) return [9999,99,999];
+  return [+m[3], +m[2], +m[1]];
+}
+function _lotCmp(a,z){ const A=_lotOrden(a), Z=_lotOrden(z);
+  return (A[0]-Z[0]) || (A[1]-Z[1]) || (A[2]-Z[2]); }
+// uds → "7 cj" / "20 cj + 4 u" / "—". El factor sale de INV_TERM, la misma
+// tabla de caja física que usa el resto del sistema (se lee ACÁ ADENTRO y no en
+// un const de arriba: INV_TERM se declara al final del bloque).
+function _lotCajas(uds, pid){
+  const t=(typeof INV_TERM!=='undefined') ? INV_TERM.find(function(x){ return x.id===pid; }) : null;
+  const f=t&&t.factor;
+  if(uds===0) return '—';                       // el guión es CERO, y solo cero
+  // Un negativo NO se dibuja en cajas —no existe media caja negativa— pero tampoco
+  // puede caer en el guión: "—" se lee como "nada" y esto es "bajo cero", que es
+  // una anomalía que hay que ver. Va en unidades, que es como se entiende.
+  if(!f || uds<0 || uds<f) return _rzN(uds)+' u';
+  const cj=Math.floor(uds/f), r=Math.round((uds-cj*f)*1000)/1000;
+  return _rzN(cj)+' cj'+(r?(' + '+_rzN(r)+' u'):'');
+}
+function _lotNom(pid){ const t=(typeof INV_TERM!=='undefined')
+  ? INV_TERM.find(function(x){ return x.id===pid; }) : null; return (t&&t.label)||('#'+pid); }
+
+function lotRender(){
+  const body=document.getElementById('elBody'); if(!body) return;
+  if(_lotErr){ body.innerHTML='<div class="dp-vacia dp-mal">No pude leer los lotes: '+esc(_lotErr)+'</div>'; return; }
+  if(!_lot){ body.innerHTML='<div class="dp-vacia">Leyendo…</div>'; return; }
+  // SIN ANCLA NO HAY SALDO, y no se dibuja una lista de lotes sin número: un
+  // lote en blanco se lee como cero, que es peor que no mostrar nada.
+  if(_lotSaldo===null){
+    body.innerHTML='<div class="dp-vacia dp-mal">No hay ningún conteo confirmado como ancla, '
+      +'así que no hay saldo por lote que mostrar. Confirmá un conteo desde Conteo.</div>';
+    return;
+  }
+  // LA UNIÓN: las claves del saldo (todo lo que tiene o tuvo producto) más los
+  // lotes activos (lo fabricado después del ancla).
+  const claves={};
+  Object.keys(_lotSaldo).forEach(function(k){ claves[k]=1; });
+  Object.values(_lot.lotes||{}).forEach(function(L){ claves[(+L.producto)+'|'+L.canon]=1; });
+  const porProd={};
+  Object.keys(claves).forEach(function(k){
+    const i=k.indexOf('|'), pid=+k.slice(0,i), lote=k.slice(i+1);
+    (porProd[pid]=porProd[pid]||[]).push({lote:lote, uds:(+_lotSaldo[k]||0)});
+  });
+  const ids=(typeof INV_TERM!=='undefined') ? INV_TERM.map(function(t){ return t.id; })
+                                            : Object.keys(porProd).map(Number);
+  let h='';
+  ids.forEach(function(pid){
+    const ls=(porProd[pid]||[]).sort(function(a,z){ return _lotCmp(a.lote,z.lote); });
+    if(!ls.length) return;
+    const tot=ls.reduce(function(n,x){ return n+x.uds; },0);
+    h+='<div class="el-prod"><div class="el-prod-h"><span>'+esc(_lotNom(pid))+'</span>'
+      +'<span class="el-prod-n">'+esc(_lotCajas(tot,pid))+' · '+_rzN(tot)+' u</span></div>';
+    ls.forEach(function(x){
+      // Los CEROS se quedan en su lugar FIFO, en gris. El selector los manda al
+      // fondo porque ahí se ELIGE; acá se LEE, y mover una fila cambia el orden
+      // de entrada al congelador, que es la información.
+      const cero=(x.uds===0), neg=(x.uds<0);
+      const cj=_lotCajas(x.uds,pid), u=_rzN(x.uds)+' u';
+      // El renglón queda listo para abrir el detalle por (producto, lote) más
+      // adelante: lleva las dos claves. NO lleva chevron ni onclick — un control
+      // que no hace nada es peor que no tenerlo.
+      h+='<div class="el-lote'+(cero?' cero':'')+(neg?' neg':'')+'"'
+        +' data-producto="'+pid+'" data-lote="'+esc(x.lote)+'">'
+        +'<span class="el-lote-n">'+esc(x.lote)+'</span>'
+        +'<span class="el-lote-c">'+esc(cj)
+        // Las unidades al lado SOLO si dicen algo distinto: "4 u   4 u" es ruido.
+        +(cj!==u?('<span class="el-lote-u">'+esc(u)+'</span>'):'')+'</span></div>';
+    });
+    h+='</div>';
+  });
+  if(!h) h='<div class="dp-vacia">No hay ningún lote con saldo.</div>';
+  // Las órdenes que el extractor no pudo leer van ACÁ TAMBIÉN, no solo en Conteo:
+  // ese producto está en el congelador y no suma a ningún lote de arriba, así que
+  // la lista de arriba está incompleta y hay que decirlo donde se la mira.
+  h+=_entBucketsHTML(_lot.buckets);
+  body.innerHTML=h;
+}
+
 const BS_CAMPOS=[{k:'cliente',n:'Cliente'},{k:'lote',n:'Lote'},
                  {k:'producto',n:'Producto'},{k:'fecha',n:'Fecha'}];
 const BS_TOPE=60;                    // filas dibujadas; el resto se DICE, no se esconde
 let _bs=null, _bsErr='', _bsCampo='cliente', _bsQ='', _bsAbierto=0, _bsCargando=false;
+// Filtro por día de REGISTRO. No es un campo de búsqueda —no lleva chip— porque no
+// es una pregunta que alguien se haga escribiendo: es el destino del contador
+// "Registrados hoy", y tiene que traer exactamente lo mismo que ese contador
+// cuenta. Se ve en un banner y se quita de un toque.
+let _bsReg='';
 
 function irAEntBuscar(preset){
-  _modShow('vEntBuscar'); crumbSet('Entregas','Buscar');
-  // "Entregados hoy" del Resumen entra acá con la fecha ya puesta.
-  if(preset==='hoy'){ _bsCampo='fecha'; _bsQ=_despHoy(); _bsAbierto=0; }
+  _modShow('vEntBuscar'); crumbSet('Entregas','Historial');
+  // "Registrados hoy" de la bandeja entra acá con el filtro puesto.
+  if(preset==='reg-hoy'){ _bsReg=_despHoy(); _bsCampo='cliente'; _bsQ=''; _bsAbierto=0; }
+  // El preset viejo, por si algo quedó apuntando: filtra por fecha de salida.
+  else if(preset==='hoy'){ _bsReg=''; _bsCampo='fecha'; _bsQ=_despHoy(); _bsAbierto=0; }
   bsCargar(false);
 }
+function bsLimpiarReg(){ _bsReg=''; _bsAbierto=0; bsRender(); }
+// _despDia() devuelve 'hoy' / 'ayer' / 'vie 15', y los tres NO llevan el mismo
+// artículo delante: "el ayer" está mal, "el vie 15" está bien. Cualquier frase que
+// meta _despDia() dentro de un texto corrido pasa por acá — si no, el bug vuelve
+// en la próxima frase que alguien escriba.
+function _despDiaFrase(ymd){ const d=_despDia(ymd);
+  return (d==='hoy'||d==='ayer') ? d : ('el '+d); }
 
 async function bsCargar(force){
   const st=document.getElementById('bsStatus');
@@ -7776,16 +9164,20 @@ async function bsCargar(force){
 // Cuatro consultas y el armado en el navegador. Se filtra ACÁ y no en Supabase
 // porque el volumen es chico (cientos de filas) y así escribir en el campo
 // responde sin ida y vuelta por cada tecla.
-async function bsLeer(){
-  const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
-  const {data:peds,error:e1}=await c.from('v_ent_pedido_estado')
-    .select('pedido_id,fecha_despacho,factura_nombre,cliente_nombre,origen,motivo,'
-           +'alisto_id,responsable,preparado_en,salida_en,estado,fecha_ab_re_04')
-    .order('fecha_ab_re_04',{ascending:false}).limit(300);
-  if(e1) throw e1;
-  const P=peds||[]; if(!P.length) return [];
-  const alis=P.map(function(p){ return p.alisto_id; });
-  const pids=P.map(function(p){ return p.pedido_id; });
+// ── EL DETALLE DE UN PEDIDO: qué productos, cuántos y de qué lote ───────
+// UNA sola definición, usada por Buscar (el historial) y por el diálogo de Entregar.
+// Estaba escrita dentro de bsLeer; se saca acá porque la segunda copia habría sido
+// la que se desincroniza — el mismo argumento por el que ent_alisto_vigente existe.
+//
+// Recibe filas que traigan `pedido_id` y `alisto_id` (o sea, lo que devuelve
+// v_ent_pedido_estado) y les cuelga `.lineas`. Muta las filas y también las devuelve.
+// Tres lecturas a Supabase, ninguna a Odoo: el diálogo tiene que abrir al instante y
+// no puede depender de que despierte el proxy.
+async function _entColgarDetalle(c, P){
+  P=P||[]; if(!P.length) return P;
+  const alis=P.map(function(p){ return p.alisto_id; }).filter(Boolean);
+  const pids=P.map(function(p){ return p.pedido_id; }).filter(Boolean);
+  if(!alis.length) return P;
 
   const {data:lins,error:e2}=await c.from('ent_alisto_linea')
     .select('id,alisto_id,producto_id,cant_uds,cant_uom').in('alisto_id',alis);
@@ -7824,6 +9216,16 @@ async function bsLeer(){
   return P;
 }
 
+async function bsLeer(){
+  const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
+  const {data:peds,error:e1}=await c.from('v_ent_pedido_estado')
+    .select('pedido_id,fecha_despacho,factura_id,factura_nombre,cliente_nombre,origen,motivo,'
+           +'alisto_id,responsable,preparado_en,salida_en,salida_registrada_en,estado,fecha_ab_re_04')
+    .order('fecha_ab_re_04',{ascending:false}).limit(300);
+  if(e1) throw e1;
+  return await _entColgarDetalle(c, peds||[]);
+}
+
 // Sin tildes y en minúscula: "Automercado" tiene que encontrarse escribiendo
 // "automercado", y "Buñuelo" escribiendo "bunuelo".
 function _bsNorm(s){ return String(s==null?'':s).toLowerCase()
@@ -7844,6 +9246,10 @@ function bsRender(){
       return '<button class="bs-chip'+(cp.k===_bsCampo?' on':'')+'" '
         +'onclick="bsSetCampo(\''+cp.k+'\')">'+cp.n+'</button>'; }).join('')
     +'</div></div>'
+    // Un filtro que no se ve es un filtro que miente sobre cuántas filas hay.
+    // "hoy" y "ayer" no llevan "el" delante; "vie 15" sí.
+    +(_bsReg?('<div class="bs-reg">Registrados '+esc(_despDiaFrase(_bsReg))
+      +'<button onclick="bsLimpiarReg()">ver todo</button></div>'):'')
     +'<div id="bsLista" class="bs-lista"></div>';
   body.innerHTML=h;
   bsFiltrar();
@@ -7865,8 +9271,12 @@ function bsFiltrar(){
   if(_bs===null){ cont.innerHTML='<div class="dp-vacia">Leyendo…</div>'; return; }
   const q=_bsNorm(_bsQ).trim();
   let rs=_bs;
+  // El filtro por registro se aplica ANTES y se combina con el que se escriba:
+  // "registrados hoy" + "Automercado" tiene que poder pedirse.
+  if(_bsReg) rs=rs.filter(function(p){ return p.estado==='entregado'
+    && _despDiaDe(p.salida_registrada_en||p.salida_en)===_bsReg; });
   if(q){
-    rs=_bs.filter(function(p){
+    rs=rs.filter(function(p){
       if(_bsCampo==='cliente')  return _bsNorm(p.cliente_nombre).indexOf(q)>=0;
       if(_bsCampo==='fecha')    return _despDiaDe(p.fecha_ab_re_04)===_bsQ;
       if(_bsCampo==='lote')     return (p.lineas||[]).some(function(l){
@@ -7884,14 +9294,15 @@ function bsFiltrar(){
   let h=vis.map(function(p){
     const ab=(_bsAbierto===p.pedido_id), n=(p.lineas||[]).length;
     const cuando = p.estado==='entregado'
-      ? _despCuando(p.salida_en)
+      ? _despCuandoSalida(p.salida_en, p.salida_registrada_en)
       : _despCuando(p.preparado_en);
     return '<button class="bs-fila'+(ab?' on':'')+'" onclick="bsAbrir('+p.pedido_id+')">'
       +'<span class="bs-f1"><span class="bs-cli">'+esc(p.cliente_nombre||'—')+'</span>'
       +'<span class="bs-fec">'+esc(cuando)+'</span></span>'
       +'<span class="bs-f2"><span class="bs-sub">'+n+(n===1?' producto':' productos')
       +(p.estado==='preparado'?' · preparado, sin salir':'')+'</span>'
-      +'<span class="bs-fac">'+esc((p.factura_nombre||'').slice(-10))+'</span></span></button>'
+      +'<span class="bs-fac">'+esc((p.factura_nombre||'').slice(-10))+'</span>'
+      +entPdfBtn(p.factura_id, p.factura_nombre, p.cliente_nombre)+'</span></button>'
       +(ab?bsDetalle(p):'');
   }).join('');
   // Tope explícito: lo que no se dibuja se DICE. Un corte callado se lee como
@@ -7933,7 +9344,8 @@ function bsDetalle(p){
   });
   h+='</tbody></table><div class="bs-meta">'
     +'Preparó '+esc(p.responsable||'—')+' · preparado '+esc(_despCuando(p.preparado_en))
-    +(p.salida_en ? ' · salió '+esc(_despCuando(p.salida_en)) : ' · sin salida registrada')
+    +(p.salida_en ? ' · salió '+esc(_despCuandoSalida(p.salida_en, p.salida_registrada_en))
+                  : ' · sin salida registrada')
     +(p.factura_nombre?' · factura '+esc(p.factura_nombre):'')
     +(p.motivo&&p.motivo!=='venta'?' · '+esc(p.motivo.replace(/_/g,' ')):'')
     +'</div></div>';
@@ -7986,19 +9398,48 @@ function rpRender(){
   h+='<div class="card rp-z"><div class="rp-row">'
     +'<div class="field" style="min-width:150px"><label>Fecha</label>'
     +'<input type="date" class="cl-in" style="width:100%" value="'+esc(R.fecha)+'" onchange="_rp.fecha=this.value"></div>'
-    +'<div class="field" style="flex:1;min-width:200px"><label>Cliente</label>'
-    +(R.cliente
-      ? '<div class="rp-clisel"><span>'+esc(R.cliente.nombre)+'</span><button onclick="_rp.cliente=null;rpRender()" title="Cambiar">×</button></div>'
-      : '<button class="rp-clivacio" onclick="rpAbrirClientes()">Elegir de la lista…</button>')
-    +'</div></div>'
+    // EL CLIENTE SOLO OCUPA EL LUGAR PRINCIPAL EN UNA VENTA. Sin factura, quien
+    // recibe casi nunca está en Odoo —el caso que abrió esto fue un pan regalado
+    // a una persona que no es cliente— y exigir la lista era lo que hacía
+    // IMPOSIBLE registrar la salida, con el lote contando producto que ya no está.
+    +(R.tipo!=='sin'
+      ? ('<div class="field" style="flex:1;min-width:200px"><label>Cliente</label>'
+        +(R.cliente
+          ? '<div class="rp-clisel"><span>'+esc(R.cliente.nombre)+'</span><button onclick="_rp.cliente=null;rpRender()" title="Cambiar">×</button></div>'
+          : '<button class="rp-clivacio" onclick="rpAbrirClientes()">Elegir de la lista…</button>')
+        +'</div>')
+      : '')
+    +'</div>'
     +'<div class="field" style="margin-top:10px"><label>Tipo de salida</label>'
     +'<div class="rp-tipo">'
-    +'<button class="'+(R.motivo==='venta'?'on':'')+'" onclick="_rp.motivo=\'venta\';rpRender()">Venta con factura</button>'
-    +'<button class="'+(R.motivo==='sin_clasificar'?'on':'')+'" onclick="_rp.motivo=\'sin_clasificar\';rpRender()">Sin factura</button>'
+    +'<button class="'+(R.tipo==='venta'?'on':'')+'" onclick="rpSetTipo(\'venta\')">Venta con factura</button>'
+    +'<button class="'+(R.tipo==='sin'?'on':'')+'" onclick="rpSetTipo(\'sin\')">Sin factura</button>'
     +'</div>'
-    +(R.motivo==='sin_clasificar'?'<div class="rp-nota">Queda pendiente de clasificar — las socias dicen después si fue reposición, regalía o consumo interno.</div>':'')
-    +(R.motivo===null?'<div class="rp-nota rp-falta">Elegí una de las dos: sin tipo no se puede guardar.</div>':'')
-    +'</div></div>';
+    +(R.tipo===null?'<div class="rp-nota rp-falta">Elegí una de las dos: sin tipo no se puede guardar.</div>':'')
+    +'</div>'
+    // ── SIN FACTURA: motivo (obligatorio) y destinatario (opcional) ──────
+    +(R.tipo==='sin'
+      ? ('<div class="field" style="margin-top:10px"><label>Motivo</label>'
+        +'<div class="rp-mot">'
+        +RP_MOTIVOS.map(function(m){
+            return '<button class="'+(R.motivo===m.k?'on':'')+'" onclick="rpSetMotivo(\''+m.k+'\')">'
+                 +esc(m.n)+'</button>'; }).join('')
+        +'</div>'
+        +(R.motivo===null?'<div class="rp-nota rp-falta">Sin motivo no se puede guardar.</div>':'')
+        +'</div>'
+        +'<div class="rp-row" style="margin-top:10px">'
+        +'<div class="field" style="flex:1;min-width:200px"><label>Destinatario</label>'
+        +'<input type="text" class="cl-in rp-dest" style="width:100%" maxlength="120" '
+        +'placeholder="Quién recibió, o el destino" value="'+esc(R.destinatario||'')+'" '
+        +'oninput="_rp.destinatario=this.value"></div>'
+        // El cliente sigue disponible, pero como opción y no como puerta.
+        +'<div class="field" style="min-width:200px"><label>Cliente de Odoo (opcional)</label>'
+        +(R.cliente
+          ? '<div class="rp-clisel"><span>'+esc(R.cliente.nombre)+'</span><button onclick="_rp.cliente=null;rpRender()" title="Quitar">×</button></div>'
+          : '<button class="rp-clivacio" onclick="rpAbrirClientes()">Elegir de la lista…</button>')
+        +'</div></div>')
+      : '')
+    +'</div>';
 
   // ZONA 2 · la línea que se está armando
   h+='<div class="card rp-z"><div class="field"><label>Producto</label><div class="rp-prods">';
@@ -8093,8 +9534,13 @@ function rpLoteManual(){
   const pid=_rp.cur.pid; if(!pid) return;
   const v=prompt('Lote de '+((NIV_INFO[pid]&&NIV_INFO[pid].nom)||pid)+' que no está en la lista\n(forma "154 / 12-26"):');
   if(!v||!String(v).trim()) return;
+  // Igual que en el conteo y en Despachos: se guarda canónico, nunca lo tecleado.
+  const crudo=String(v).trim(), cn=_entCanon(crudo);
+  if(!cn && !confirm('No pude leer "'+crudo+'" como lote; la forma es "154 / 12-26". Lo guardo tal cual, '
+                    +'pero así no cruza con ningún lote de Odoo.\n\n¿Lo dejo igual?')) return;
+  const canon=cn||crudo;
   _rp._extra=_rp._extra||{}; _rp._extra[pid]=_rp._extra[pid]||[];
-  if(_rp._extra[pid].indexOf(String(v).trim())<0) _rp._extra[pid].push(String(v).trim());
+  if(_rp._extra[pid].indexOf(canon)<0) _rp._extra[pid].push(canon);
   rpRender();
 }
 function rpValidarLotes(){
@@ -8134,20 +9580,25 @@ async function rpGuardar(){
   if(_rpGuardando) return;
   const msg=document.getElementById('rpSaveMsg'), btn=document.getElementById('rpSave');
   const pon=function(c,t){ msg.style.color=c; msg.textContent=t; };
-  if(!_rp.cliente){ pon('#E9A23B','Falta el cliente.'); return; }
-  if(!_rp.motivo){ pon('#E9A23B','Falta el tipo de salida: venta con factura, o sin factura.'); return; }
-  if(!_rp.lineas.length){ pon('#E9A23B','No hay ninguna línea cargada.'); return; }
+  if(!_rp.tipo){ pon('var(--warn)','Falta el tipo de salida: venta con factura, o sin factura.'); return; }
+  // El cliente es obligatorio SOLO en la venta. Es la app la que sabe el tipo de
+  // salida, así que la regla vive acá y no en la columna (que ya acepta nulo).
+  if(_rp.tipo==='venta' && !_rp.cliente){ pon('var(--warn)','Falta el cliente.'); return; }
+  if(!_rp.motivo){ pon('var(--warn)','Falta el motivo de la salida.'); return; }
+  if(!_rp.lineas.length){ pon('var(--warn)','No hay ninguna línea cargada.'); return; }
   const resp=(document.getElementById('rpResp').value||'').trim();
-  if(!resp){ pon('#E9A23B','Falta quién despacha.'); return; }
-  const c=sbClient(); if(!c){ pon('#FF8A8A','No hay sesión de Supabase.'); return; }
-  _rpGuardando=true; btn.disabled=true; pon('#A8A6A0','Guardando…');
+  if(!resp){ pon('var(--warn)','Falta quién despacha.'); return; }
+  const c=sbClient(); if(!c){ pon('var(--stop-tx)','No hay sesión de Supabase.'); return; }
+  _rpGuardando=true; btn.disabled=true; pon('var(--busy)','Guardando…');
   let paso='pedido';
   try{
     const {data:{user}}=await c.auth.getUser();
     const email=(user&&user.email)||'desconocido';
     const {data:ped,error:e1}=await c.from('ent_pedido').insert({
       fecha_despacho:_rp.fecha, origen:'manual',
-      cliente_id:_rp.cliente.id, cliente_nombre:_rp.cliente.nombre,
+      cliente_id:(_rp.cliente?_rp.cliente.id:null),
+      cliente_nombre:(_rp.cliente?_rp.cliente.nombre:null),
+      destinatario:((_rp.destinatario||'').trim()||null),
       motivo:_rp.motivo, creado_por:email }).select('id').single();
     if(e1) throw e1;
     paso='líneas del pedido';
@@ -8182,14 +9633,15 @@ async function rpGuardar(){
       nota:'Reporte de despacho: la fecha es la registrada, la hora NO es medida',
       creado_por:email});
     if(e6) throw e6;
-    pon('#8FBF6A','Despacho #'+ped.id+' guardado — '+_rp.lineas.length+' línea'
-      +(_rp.lineas.length===1?'':'s')+' de '+esc(_rp.cliente.nombre)
-      +(_rp.motivo==='sin_clasificar'?' · quedó pendiente de clasificar':'')+'.');
+    pon('var(--good)','Despacho #'+ped.id+' guardado — '+_rp.lineas.length+' línea'
+      +(_rp.lineas.length===1?'':'s')+(_rp.cliente?(' de '+esc(_rp.cliente.nombre))
+        :((_rp.destinatario||'').trim()?(' a '+esc(_rp.destinatario.trim())):''))
+      +(_rp.tipo==='sin'?(' · '+esc((RP_MOTIVOS.find(function(m){return m.k===_rp.motivo;})||{}).n||_rp.motivo)):'')+'.');
     _rpReset(false);                       // conserva la fecha; cliente y tipo se eligen de nuevo
     rpRender(); rpCargarLotes();           // saldos frescos
     const m2=document.getElementById('rpSaveMsg'); if(m2&&msg.textContent) m2.textContent=msg.textContent;
   }catch(e){
-    pon('#FF8A8A','No se pudo guardar (falló en: '+paso+'): '+((e&&e.message)||e)
+    pon('var(--stop-tx)','No se pudo guardar (falló en: '+paso+'): '+((e&&e.message)||e)
       +(paso!=='pedido'?' — OJO: el despacho quedó a medias, va a salir en Pendientes.':''));
   }
   _rpGuardando=false; if(btn) btn.disabled=false;
@@ -8250,7 +9702,25 @@ async function pdLeer(){
     if(mv==='venta' && !F[p.id]) l2.push(it);
     if(mv==='sin_clasificar') l3.push(it);
   });
-  return {l1:l1,l2:l2,l3:l3};
+  // ── SALIDAS SIN VERIFICAR (o contra factura anulada) ──────────────────
+  // Dos cosas distintas en una lista, ordenadas por gravedad:
+  //   anulada       → salió producto contra un documento muerto. NO se apaga sola.
+  //   sin_verificar → Odoo no contestó al despachar. SE APAGA SOLA cuando vuelva.
+  // Cumple las cinco reglas del lobby: solo existe si hay filas (1), trae la fecha de
+  // la salida (2), se apaga sola (3), el corte a 3 lo hace la pantalla (4), y el ámbar
+  // lo decide el estado y no la existencia (5).
+  let l4=[];
+  try{
+    const {data:sv}=await c.from('ent_salida_sin_verificar')
+      .select('salida_id,estado,salida_en,cliente_nombre,factura_nombre,detalle').limit(50);
+    l4=(sv||[]).map(function(x){
+      const dias=Math.floor((Date.now()-Date.parse(x.salida_en))/86400000);
+      return {id:x.salida_id, estado:x.estado, cliente:x.cliente_nombre||'—',
+              fecha:String(x.salida_en||'').slice(0,10), dias:dias,
+              factura:x.factura_nombre||'', detalle:x.detalle||''};
+    });
+  }catch(e){ l4=[]; }    // la vista puede no existir todavía: no rompe Pendientes
+  return {l1:l1,l2:l2,l3:l3,l4:l4};
 }
 function pdRender(){
   const body=document.getElementById('pdBody'); if(!body||!_pd) return;
@@ -8281,6 +9751,37 @@ function pdRender(){
   h+=secc('Salida sin clasificar',
     'Daniel registró la salida; falta que las socias digan qué fue. El pendiente es un estado con nombre, no un hueco.',
     _pd.l3, function(it){ return '<button class="btn btn-sm" onclick="pdClasifUI('+it.id+')">Clasificar</button>'; });
+
+  // Regla 1 del lobby: si no hay nada que hacer, la sección NO aparece. Nada de
+  // "todo al día" — eso es información, y la información vive adentro del módulo.
+  const l4=(_pd.l4||[]);
+  if(l4.length){
+    const anul=l4.filter(function(x){ return x.estado==='anulada'; });
+    const sinv=l4.filter(function(x){ return x.estado!=='anulada'; });
+    h+='<div class="card rp-z"><div class="card-title">Salidas sin verificar factura'
+      +' <span class="pd-cnt on">'+l4.length+'</span></div>';
+    if(anul.length){
+      h+='<div class="valid-box" style="border-color:var(--stop-line);background:var(--stop-wash);margin-bottom:10px">'
+        +'<div style="font-weight:700;color:var(--stop-tx);font-size:12.5px">'+anul.length
+        +(anul.length===1?' salida contra una factura ANULADA':' salidas contra facturas ANULADAS')+'</div>'
+        +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.5">'
+        +'Salió producto contra un documento que ya no existe. Esto no se apaga solo.</div></div>';
+    }
+    h+='<table class="cl-tbl"><tr><th>Salida</th><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Hace</th><th></th></tr>';
+    l4.slice(0,3).forEach(function(it){
+      h+='<tr><td>#'+it.id+'</td><td>'+esc(it.cliente)+'</td>'
+        +'<td>'+esc(it.factura?('…'+String(it.factura).slice(-4)):'—')+'</td>'
+        +'<td>'+esc(it.fecha)+'</td><td>'+(it.dias===0?'hoy':(it.dias+' d'))+'</td>'
+        +'<td style="text-align:right">'+(it.estado==='anulada'
+            ? '<span style="color:var(--stop-tx);font-size:11.5px">anulada</span>'
+            : '<span style="color:var(--warn-2);font-size:11.5px">sin verificar</span>')+'</td></tr>';
+    });
+    h+='</table>';
+    if(l4.length>3) h+='<div class="rp-nota" style="margin-top:6px">y '+(l4.length-3)+' más</div>';
+    if(sinv.length) h+='<div class="rp-nota" style="margin-top:6px">Las «sin verificar» se '
+      +'limpian solas la próxima vez que Despachos lea Odoo.</div>';
+    h+='</div>';
+  }
   body.innerHTML=h;
 }
 async function pdValidar(id){
@@ -8401,7 +9902,7 @@ async function rzDiagLotes(body){
     body.innerHTML='<div class="rz-wrap" style="font-size:13px;color:var(--text-2);line-height:1.6">'
       +'<style>.rz-wrap{--ent:#E9FE60}</style>'
       +'<h3 style="color:var(--text);font-size:15px;margin:0 0 4px">Extractor de lote v2 — cobertura (validación Etapa 1)</h3>'
-      +'<div style="color:var(--text-3);margin-bottom:16px;max-width:900px">Órdenes <b style="color:var(--text-2)">done</b> de los 6 productos desde <b style="color:var(--text-2)">2025-01-01</b>. El lote se lee del chatter (comentario de Keylor) con la regla v2. El año de PRODUCCIÓN se ancla en <code>date_finished</code>; <b style="color:var(--text-2)">M/AA es la fecha de vencimiento</b> (producción + ~6 meses). Solo lectura de Odoo.'+(capado?' <b style="color:#C99A4E">⚠ lectura tope: hay más datos de los leídos, la cobertura es aproximada.</b>':'')+'</div>'
+      +'<div style="color:var(--text-3);margin-bottom:16px;max-width:900px">Órdenes <b style="color:var(--text-2)">done</b> de los 6 productos desde <b style="color:var(--text-2)">2025-01-01</b>. El lote se lee del chatter (comentario de Keylor) con la regla v2. El año de PRODUCCIÓN se ancla en <code>date_start</code>; <b style="color:var(--text-2)">M/AA es la fecha de vencimiento</b> (producción + ~6 meses). Solo lectura de Odoo.'+(capado?' <b style="color:#C99A4E">⚠ lectura tope: hay más datos de los leídos, la cobertura es aproximada.</b>':'')+'</div>'
 
       // las dos reglas, lado a lado
       +'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:20px">'
@@ -12539,12 +14040,40 @@ function resVer(v){
 // Las pestañas de análisis (Rentabilidad · Precios) y las dos caras de análisis de
 // Resultados viven acá. Nada se elimina: se ordena por frecuencia de uso.
 const esMovil = () => window.matchMedia && matchMedia('(max-width:700px)').matches;
+// ── EL "+" SE ABRE DONDE ESTÁ EL "+" ────────────────────────────────────
+// En teléfono la hoja al pie es lo correcto: el pulgar llega ahí y la pantalla
+// es chica. En iPad y escritorio era el pendiente de b28 al revés — el menú
+// aparecía pegado al fondo, a media pantalla de distancia del botón que lo
+// abrió, y no se leía como suyo.
+// La posición se calcula del rect REAL del botón y no con CSS solo: la barra de
+// pestañas no es un contenedor posicionado, y anclar con `position:absolute`
+// obligaría a tocar su layout — que es lógica visual ya probada en cinco vistas.
+// Se ancla por la DERECHA del botón (el "+" es el último de la barra) para que
+// el panel no se salga por el borde.
+const ENT_MAS_ANCLA = 700;      // el mismo corte que usa el resto del sistema
 function entMasToggle(ev){ if(ev) ev.stopPropagation();
-  const p=document.getElementById('entMas'); if(p) p.classList.toggle('hidden'); }
-function entMasCerrar(){ const p=document.getElementById('entMas'); if(p) p.classList.add('hidden'); }
+  const p=document.getElementById('entMas'); if(!p) return;
+  const abriendo=p.classList.contains('hidden');
+  p.classList.toggle('hidden');
+  if(!abriendo) return;
+  p.classList.remove('anclado'); p.style.left=p.style.top=p.style.width='';
+  const btn=ev&&ev.currentTarget;
+  if(!btn||!btn.getBoundingClientRect||window.innerWidth<ENT_MAS_ANCLA) return;
+  const r=btn.getBoundingClientRect(), an=Math.min(320, window.innerWidth-24);
+  p.classList.add('anclado');
+  p.style.width=an+'px';
+  p.style.left=Math.round(Math.max(12, Math.min(r.right-an, window.innerWidth-an-12)))+'px';
+  p.style.top=Math.round(r.bottom+6)+'px';
+}
+function entMasCerrar(){ const p=document.getElementById('entMas');
+  if(p){ p.classList.add('hidden'); p.classList.remove('anclado');
+         p.style.left=p.style.top=p.style.width=''; } }
 function entMasIr(k){ entMasCerrar();
-  if(k==='conteo')  return irAConteoLote();
-  if(k==='reporte') return irAReporte(); }
+  if(k==='conteo')     return irAConteoLote();
+  if(k==='historial')  return irAEntBuscar();
+  if(k==='pendientes') return irAPendientes();
+  if(k==='lotes')      return irAEntLotes();
+  if(k==='reporte')    return irAReporte(); }
 function finMasToggle(ev){ if(ev) ev.stopPropagation();
   const p=document.getElementById('finMas'); if(p) p.classList.toggle('hidden'); }
 function finMasCerrar(){ const p=document.getElementById('finMas'); if(p) p.classList.add('hidden'); }

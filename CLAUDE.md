@@ -24,6 +24,22 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
   Validar sintaxis no alcanza — un `const` usado antes de declararse parsea
   perfecto y mata el bloque entero en el navegador (pasó el 11-ago con el bloque
   de vainilla, y salió publicado). Sintaxis OK ≠ la página carga.
+- **`esquema_check.py` dice menos de lo que parece.** Su ✓ significa *"el código
+  actual no depende de ningún objeto que falte"*, **no** *"el esquema está
+  completo"*. Dos puntos ciegos, los dos medidos:
+  1. **No ve lo que el código todavía no llama.** Saca los objetos de los
+     `from('tabla')` del `index.html`, así que una tabla recién pegada le es
+     invisible hasta que alguien la consulte. El 20-ago daba ✓ con 18 objetos
+     mientras `ent_devolucion` y `ent_salida_verificacion` ya existían y no
+     figuraban. Empieza a cubrirlas recién cuando el código las usa — que es su
+     momento útil, pero conviene no leer el ✓ como un inventario.
+  2. **No ve las llamadas por variable.** El regex busca `from('literal')`, así
+     que `c.from(t)` dentro de un helper se le escapa. Fue el caso de
+     `ent_pedido_motivo_vigente` y `ent_pedido_valida_vigente` el 19-ago: la
+     pantalla Pendientes estaba caída en producción y el chequeo daba ✓.
+  Para confirmar que un objeto existe de verdad: sondeo REST directo con la anon
+  key (devuelve `PGRST205` si falta). Para confirmar `security_invoker`, hace
+  falta SQL — la anon key no puede leer `pg_class.reloptions`.
 - **Credenciales nunca por el chat** ni impresas en output: van directo a
   `conexion_prod.env`; confirmar presencia con sí/no, sin mostrar la key.
 - Explicar en español simple; reportar con evidencia (números, no adjetivos).
@@ -69,16 +85,78 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
   `display_type='product'` o las ventas salen infladas 3×.
 - **Facturado por canal**: usar `amount_total` (con IVA). El canal de venta
   está en el cliente (`res.partner.team_id`), NO en `account.move`.
-- **Producción y mermas**: filtrar por `date_finished` (calza con el pivot
-  nativo de Odoo), no `date_start`.
+- **`date_start` vs `date_finished` — no hay una ganadora, hay dos preguntas.**
+  Los dos campos son válidos; elegir mal mete errores silenciosos, así que el
+  criterio es qué se está preguntando:
+  - **`date_finished` = cuándo se TECLEÓ la orden.** Keylor la registra cuando
+    Daniel le pasa los reportes de papel — puede ser esa misma noche o el lunes
+    siguiente. Sirve para **cuadrar con el pivot nativo de Odoo**, que usa este
+    campo: es el que va cuando el número tiene que dar igual que el reporte
+    nativo. **Lo usan Producción y Mermas**, y solo por esa razón.
+  - **`date_start` = cuándo se HIZO el trabajo.** Las órdenes se abren y se
+    cierran el mismo día en la operación real; el desfase es retraso de
+    validación administrativa, no producción de otro día. Es el campo bueno para
+    todo lo que dependa de cuándo salió el pan del horno. **Lo usan el nivelador
+    (`nivSemana`), el costeo, los reportes del mes y ENTREGAS** (extractor de
+    lote y saldo por lote).
+  - ⚠️ **Comparar SIEMPRE en el mismo huso.** Odoo devuelve estos dos campos en
+    **UTC** y el corte del ancla se escribe en hora CR. Compararlos crudos da
+    resultados invertidos: el 19-ago-2026 esa confusión hizo dar por doble-contada
+    una tanda que estaba del lado correcto. `14-ago 16:00 CR = 14-ago 22:00 UTC`.
+  - **El caso que lo fijó (19-ago-2026), ya medido bien**: el conteo de Daniel del
+    viernes 14-ago 16:00 incluye Semillas `225/2-27` (168 u) y Galletas `226/2-27`
+    (158 u). Comparado en UTC contra el corte (22:00 UTC):
+
+    | Orden | Lote | `date_start` | `date_finished` |
+    |---|---|---|---|
+    | `WH/MO/01410` | Semillas 225 (168 u) | 13-ago 21:45 · **antes** | 14-ago 21:49 · **antes** |
+    | `WH/MO/01411` | Galletas 226 (160 u) | 14-ago 22:06 · **después** | 15-ago 00:10 · **después** |
+
+    O sea: la de Semillas **nunca estuvo doble** con ninguno de los dos campos, y
+    la de Galletas queda doble con **los dos** — 160 u que ya están dentro de la
+    foto y que el saldo vuelve a sumar. **Cambiar a `date_start` NO arregla este
+    caso.**
+- ⚠️ **EL CORTE DEL CONTEO ES CONTRA EL PRODUCTO FÍSICO, NO CONTRA EL REGISTRO EN
+  ODOO.** Es la regla que generaliza el caso de arriba, y va a volver a pasar.
+  Keylor registra la orden cuando la producción **termina**, así que una tanda que
+  Daniel ya contó puede quedar registrada minutos u horas **después** del corte.
+  El saldo la suma como producción nueva cuando ya está dentro de la foto: el lote
+  queda inflado, **en silencio**, porque los números cierran solos y nada avisa.
+  Pasa cada vez que se cuente cerca de una hora de cierre de producción — el
+  14-ago el conteo cerró a las 16:00 y la orden entró a las 16:06.
+  **No se arregla mirando el campo de fecha: los dos campos caen del mismo lado.**
+  Se arregla con `ENT_MO_EXCLUIDAS` (`index.html`), la lista de órdenes que NO
+  suman al saldo, hermana de `COSTOS_LINEAS_EXCLUIDAS`: id de la orden, razón
+  escrita y huella completa (nombre, producto, lote, uds, `date_start`) que
+  `verificarExclusionesMO()` confirma contra Odoo. Si la huella no calza, la
+  exclusión **no se aplica** — mejor un lote inflado y visible que una resta
+  silenciosa contra la orden equivocada.
+  ⚠️ **La exclusión se aplica SOLO en la suma del saldo (`rpCalcSaldos`), nunca en
+  `entLeerCrudo` ni en `_entAgrupar`.** Medido el 20-ago: `WH/MO/01411` es la
+  **única** orden del lote `226 / 2-27`, así que filtrarla antes lo haría
+  desaparecer del selector — y con el bloqueo duro de Despachos eso es no poder
+  despachar producto que sí está en el congelador.
+  - Entonces, **por qué `date_start` igual**: por los MOs `done` con
+    `date_finished` vacío o planeado a futuro (que el filtro por `date_finished`
+    excluía), y por la ventana juliana de abajo. No por el doble conteo.
+  - Y de yapa: la ventana juliana de `_entParseLote` (±10) se derivó midiendo
+    contra el juliano de `date_start` (93,9% exacto). Alimentarla con
+    `date_finished` hacía que un registro atrasado tirara el lote bueno fuera de
+    la ventana y la orden saliera `juliano_invalido` — el lote desaparecía de la
+    lista sin decir por qué.
 - **El lote de producto terminado vive SOLO en el chatter, en texto libre**, y se
   transcribe a mano del reporte de papel. No hay campo estructurado (`tracking`
   está en `none` en los seis terminados). Dos consecuencias medidas el 15-ago:
   1. **Una corrección en el papel puede no llegar al sistema.** Caso real: el
-     reporte del 11-ago-2026 tiene el lote tachado y corregido de 222 a 223; el
-     chatter de `WH/MO/01408` quedó con el 222. El congelador dice 223 y Odoo
-     dice 222 — la misma tanda con dos números. Se identificó cruzando fecha de
-     inicio y mermas (3 unidades en `SP/00355` sobre 01408, ninguna en 01409).
+     reporte del 11-ago-2026 tenía el lote tachado y corregido de 222 a 223, y el
+     chatter de `WH/MO/01408` había quedado con el 222 — la misma tanda con dos
+     números. Se identificó cruzando fecha de inicio y mermas (3 unidades en
+     `SP/00355` sobre 01408, ninguna en 01409).
+     **CERRADO el 20-ago-2026**: el chatter hoy dice `223/02 27`, se corrigió
+     editando el mensaje (no agregando otro, ver el punto 2). Verificado corriendo
+     `_entParseLote` real bajo `jsc`: parsea a `223 / 2-27`, `coincideJul = true`,
+     y el lote aparece en la lista de activos. El caso se deja escrito porque la
+     **trampa** sigue viva aunque esta instancia se haya cerrado.
   2. **Corregirlo agregando un comentario EMPEORA las cosas.** `_entParseLote`
      junta todos los lotes válidos del chatter y, si encuentra más de uno, marca
      la orden `ambiguo` — y el lote **desaparece** de la lista del conteo. Para
@@ -91,8 +169,44 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
   sábado y domingo 25-26 de julio. No buscar huecos en la secuencia; comparar el
   lote contra el juliano de la orden, que es lo que `_entParseLote` ya calcula en
   `coincideJul` (hoy con tolerancia ±3 y sin que nadie mire el resultado).
+- **El PDF de la factura NO se busca: se pide por su id.** Al validar una factura,
+  Odoo 17 con la localización de FE **genera el PDF y lo guarda** como
+  `ir.attachment` — no hay que renderizar ningún reporte. Pero ese adjunto tiene
+  `res_field = 'invoice_pdf_report_file'`, y **Odoo esconde de `search_read` todo
+  adjunto con `res_field` puesto**: buscarlo por `res_model='account.move'` +
+  `res_id` devuelve **cero filas**, y parece que el PDF no existe. Existe.
+  El camino correcto son dos lecturas, las dos ya dentro del candado (`read`):
+  1. `account.move.read([id], ['invoice_pdf_report_id'])` → da el id del adjunto.
+  2. `ir.attachment.read([att], ['name','mimetype','datas'])` → `datas` es el PDF
+     en base64 (medido el 19-ago: ~56 KB, cabecera `%PDF-1.4`).
+  Es hermano de "buscar productos por ID, nunca por nombre": **el buscador miente
+  por omisión y la lectura directa no.** Verificado sobre las 10 facturas del
+  17 al 19-ago: las 10 tienen su PDF, creado el día que se facturó.
+- **El Excel de Daniel NO es salida de emergencia válida** (regla de Andrea,
+  20-ago-2026). Lo que se anota ahí **no baja nunca al saldo por lote**: el saldo
+  se arma con el ancla, la producción de Odoo y lo registrado en Truefie, y el
+  Excel no es ninguna de las tres. Y como el error no se ve en ningún número, solo
+  se limpiaría con un conteo físico que reancle — que puede no venir en meses.
+  Consecuencia de diseño: **cuando algo falla, la emergencia se resuelve DENTRO de
+  Truefie, con rastro**, nunca empujando a Daniel al papel. Por eso Despachos
+  cambió de fallar cerrado a **registrar y marcar** cuando no puede verificar la
+  factura contra Odoo: una salida marcada es un problema que se ve y se limpia
+  sola; una salida en el Excel es un descuadre invisible y permanente.
 - **Despachos**: la fecha real es `scheduled_date`; `date_done` es cuando se
   validó en el sistema (llega 3–7 días tarde).
+- **Una salida SIN FACTURA es producto regalado o consumido, NUNCA vendido**
+  (regla de Andrea, 25-ago-2026). Regalía, reposición, consumo interno y
+  degustación salen del congelador igual que una venta y bajan el saldo del lote
+  igual, pero **no son ingreso**. Cuando se cablee el costeo, esas salidas van a
+  un **renglón aparte** y jamás a ventas — sumarlas inflaría la venta y taparía
+  justo el número que hoy no existe: cuánto producto se regala.
+  - Por eso el **motivo es el dato y el destinatario es contexto**. El nombre de
+    quien recibió sirve para auditar una salida suelta; lo que va a importar
+    dentro de seis meses es cuánto se fue por cada motivo.
+  - Y por eso el destinatario es **texto libre y no una FK a `res.partner`**: casi
+    nunca es cliente de Odoo (el caso que abrió esto fue un pan regalado a una
+    persona que no está en el sistema), y forzar la lista de Odoo es lo que hacía
+    IMPOSIBLE registrar la salida — con el lote contando producto que ya no está.
 - **Nombres traducidos** (es_CR / en_US): una consulta sin contexto de idioma
   devuelve el nombre en inglés. Trampa mayor: **517 ("Premezcla Galletas") y
   519 ("Cookie Dough") COMPARTEN el nombre en inglés "Prueba Galletas"**.

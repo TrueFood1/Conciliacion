@@ -1,6 +1,14 @@
 -- ════════════════════════════════════════════════════════════════════════
 -- ACCESOS POR PERFIL · ESQUEMA SUPABASE   (PEGADO 1 de 3)
--- PROPUESTA 13-ago-2026. **NO PEGAR TODAVÍA** — esto es el STOP de diseño.
+-- PROPUESTA 13-ago-2026.
+-- ✅ APROBADO POR ANDREA 24-ago-2026 — se levanta el STOP de diseño.
+-- Es el PRIMERO de los tres: acá se crean acceso_es_socia() y acceso_perfil(),
+-- de las que dependen todas las políticas del pegado 2.
+--
+-- ⚠️ LA SEMILLA DEL FINAL NO ESTÁ COMENTADA — se ejecuta apenas le des Run, y
+-- tiene `on conflict do nothing`, así que NO falla si quedan los CAMBIAR-.
+-- Reemplazá los tres correos ANTES de ejecutar o vas a insertar tres correos
+-- falsos sin que nada te avise.
 --
 -- QUÉ RESUELVE
 -- Hoy la lista de accesos vive en index.html (`ACCESO_USUARIOS`) y los nombres
@@ -48,7 +56,16 @@ create index if not exists acceso_usuario_email_idx
 
 -- La fila VIGENTE de un correo: la más reciente. Una sola definición de
 -- "vigente" para todo el sistema, así ninguna vista la reinventa distinto.
-create or replace view v_acceso_usuario as
+--
+-- ⚠️ `security_invoker` NO ES OPCIONAL ACÁ, y falta costó una fuga real. Esta
+-- vista nació sin la opción y el 24-ago-2026, con el esquema recién pegado, la
+-- anon key —que va publicada dentro de index.html en GitHub Pages— devolvía las
+-- 5 filas completas: nombre, perfil y correo, tres de ellos personales. La
+-- tabla estaba bien cerrada por RLS; la vista la esquivaba, porque sin esta
+-- opción corre con los permisos de su dueño y la RLS del que llama no se
+-- aplica. Puerta con llave, ventana abierta al lado.
+-- Regla que sale de esto: TODA vista de este módulo lleva security_invoker.
+create or replace view v_acceso_usuario with (security_invoker = true) as
 select distinct on (lower(email))
        id, lower(email) as email, nombre, perfil, activo, creado_en
   from acceso_usuario
@@ -81,6 +98,14 @@ drop policy if exists acceso_usuario_sel on acceso_usuario;
 create policy acceso_usuario_sel on acceso_usuario
   for select to authenticated
   using (lower(email) = lower(coalesce(auth.jwt() ->> 'email','')) or acceso_es_socia());
+
+-- OJO CON LOS GRANTS: Supabase le da `select` a `anon` y a `authenticated`
+-- sobre todo lo que nace en `public`, por privilegios por defecto. O sea que
+-- los `grant` de abajo no restringen nada — repiten algo ya dado. Lo que sí
+-- hace falta es QUITARLE a `anon` lo que no debería tener: antes del login no
+-- hay nada acá que leer. Sin este revoke, cualquiera con la anon key (pública,
+-- va dentro de index.html) consulta la tabla por REST.
+revoke all on acceso_usuario, v_acceso_usuario from anon;
 
 grant select on acceso_usuario to authenticated;
 grant select on v_acceso_usuario to authenticated;

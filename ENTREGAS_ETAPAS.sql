@@ -293,6 +293,19 @@ select 'entregas_etapas',
 -- usada como aproximación, NO una medición de cuándo salió el camión. (Regla de
 -- la bitácora, 9-ago: medido vs objetivo, no confundirlos. Confundirlos costó
 -- una sesión.)
+-- ⚠️ EXCLUSIÓN DEL 18-AGO — leer antes de tocar esta consulta.
+-- Cuando se escribió este backfill, la bitácora del 16-ago decía que "hoy probablemente hay CERO
+-- alistos: la factura …3476 se abrió pero nunca se confirmó". Esa premisa dejó de ser cierta el
+-- 18-ago: Andrea confirmó el 3476 en producción (varias veces, porque `ent_salida` no existía y
+-- el botón fallaba). Sin este filtro, el backfill le pondría a ese alisto una salida inventada
+-- —la hora de PREPARACIÓN— y se perdería la posibilidad de registrar la salida real.
+--
+-- Regla del 9-ago, medido vs objetivo: una hora calculada no se guarda como si fuera medida.
+--
+-- Por eso el backfill NO toca los alistos creados el 18-ago-2026 en adelante: esos son del
+-- modelo de dos etapas y su salida se marca desde la pantalla, con la hora real.
+-- La fecha va DURA a propósito, no `current_date`: si alguien re-pega el archivo dentro de un
+-- mes, el corte tiene que seguir siendo el mismo día, no el día del re-pegado.
 insert into ent_salida (alisto_id, salida_en, nota, creado_por)
 select a.id,
        a.creado_en,
@@ -300,7 +313,14 @@ select a.id,
        'migracion:ENTREGAS_ETAPAS.sql'
   from ent_alisto a
  where a.creado_en <= (select corte from ent_migracion where clave = 'entregas_etapas')
+   and a.creado_en <  timestamptz '2026-08-18 00:00:00-06'
    and not exists (select 1 from ent_salida s where s.alisto_id = a.id);
+
+-- COMPROBACIÓN del backfill: tiene que devolver 0 filas. Si devuelve alguna, es un alisto del
+-- 18-ago o posterior al que el backfill le puso salida — habría que borrarla antes de seguir.
+--   select s.* from ent_salida s join ent_alisto a on a.id = s.alisto_id
+--    where s.creado_por = 'migracion:ENTREGAS_ETAPAS.sql'
+--      and a.creado_en >= timestamptz '2026-08-18 00:00:00-06';
 
 
 -- ── 9 · EL AB-RE-04, ACTUALIZADO ────────────────────────────────────────
