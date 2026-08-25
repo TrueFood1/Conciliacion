@@ -194,6 +194,19 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
   sola; una salida en el Excel es un descuadre invisible y permanente.
 - **Despachos**: la fecha real es `scheduled_date`; `date_done` es cuando se
   validó en el sistema (llega 3–7 días tarde).
+- **Una salida SIN FACTURA es producto regalado o consumido, NUNCA vendido**
+  (regla de Andrea, 25-ago-2026). Regalía, reposición, consumo interno y
+  degustación salen del congelador igual que una venta y bajan el saldo del lote
+  igual, pero **no son ingreso**. Cuando se cablee el costeo, esas salidas van a
+  un **renglón aparte** y jamás a ventas — sumarlas inflaría la venta y taparía
+  justo el número que hoy no existe: cuánto producto se regala.
+  - Por eso el **motivo es el dato y el destinatario es contexto**. El nombre de
+    quien recibió sirve para auditar una salida suelta; lo que va a importar
+    dentro de seis meses es cuánto se fue por cada motivo.
+  - Y por eso el destinatario es **texto libre y no una FK a `res.partner`**: casi
+    nunca es cliente de Odoo (el caso que abrió esto fue un pan regalado a una
+    persona que no está en el sistema), y forzar la lista de Odoo es lo que hacía
+    IMPOSIBLE registrar la salida — con el lote contando producto que ya no está.
 - **Nombres traducidos** (es_CR / en_US): una consulta sin contexto de idioma
   devuelve el nombre en inglés. Trampa mayor: **517 ("Premezcla Galletas") y
   519 ("Cookie Dough") COMPARTEN el nombre en inglés "Prueba Galletas"**.

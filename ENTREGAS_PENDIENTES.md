@@ -59,7 +59,73 @@ que el lote de Pizza del mismo día, y en pantalla no se distinguen.
 
 ---
 
-## 3 · Trazabilidad: lo frágil que el módulo convierte en estructura
+## 3 · ABIERTO · `WH/MO/01420` salió del horno sin número de lote
+
+**Qué pasa.** Pan Blanco, 168 unidades, `date_start` 24-ago-2026 16:30 CR, `done`.
+El chatter, escrito el 25-ago 08:34, dice literal:
+
+```
+WH/MO/01412 WH/MO/01419 ?/02 27
+```
+
+Keylor puso **`?`** donde va el día juliano. El extractor la manda a `sin_lote`
+—correcto, no se inventa un lote— y el efecto es que **168 unidades que están en
+el congelador no suman a ningún saldo**. No es un error de la herramienta: el
+dato no existe en el origen.
+
+**Por qué importa más de lo que parece.** Es la forma 1 de la fragilidad del
+pendiente 5: si alguien mira el saldo de Blanco y lo ve corto, el faltante puede
+estar acá, sin número, y nada lo dice. Un lote invisible no se distingue de un
+sobregiro.
+
+**Estado (25-ago-2026).** Keylor ya sabe y va a corregirlo a **236**, que es el
+juliano que corresponde: 24-ago-2026 = día 236. Cuadra con `date_start`.
+
+**Ojo al corregir:** hay que **editar** ese mensaje, no agregar otro. Dos lotes
+válidos en el chatter marcan la orden `ambiguo` y el lote **desaparece** de la
+lista — la trampa del `223` del 11-ago, ya documentada en `CLAUDE.md`.
+
+---
+
+## 4 · CERRADO (25-ago-2026) · Los saldos por lote después de la salida ...3489
+
+**Qué se preguntó.** Si la salida del 24-ago (Automercado, registrada el 25 a las
+10:49) había dejado algún lote en negativo. `main` está en b27, que no tiene
+bloqueo duro, así que un sobregiro habría pasado en silencio.
+
+**Resultado: cero negativos.** Saldos verificados con la lógica de
+`rpCalcSaldos` — ancla del 14-ago + producción posterior por `date_start` −
+salidas registradas:
+
+| Producto · lote | Antes | Salió | Después |
+|---|---|---|---|
+| Buns `191 / 1-27` | 576 | 96 | 480 |
+| Pizza `190 / 1-27` | 144 | 60 | 84 |
+| Galletas `226 / 2-27` | 156 | 12 | 144 |
+| Galletas `205 / 1-27` | 71 | 60 | 11 |
+| Semillas `209 / 1-27` | 127 | 48 | 79 |
+| Francés `203 / 1-27` | 360 | 288 | 72 |
+| Blanco `208 / 1-27` | 126 | 84 | 42 |
+
+**Tres cosas quedaron probadas, y vale tenerlas escritas:**
+
+1. **`ENT_MO_EXCLUIDAS` funciona en producción.** Galletas `226 / 2-27` arrancó en
+   **156, no en 316**: la exclusión de `WH/MO/01411` (las 160 u registradas 6 min
+   después del corte del conteo) se aplicó. Huella verificada contra Odoo el
+   25-ago — nombre, producto 519, 160 u, `date_start 2026-08-14 22:06:40`, `done`.
+2. **La salida quedó registrada UNA vez** (`n_alistos: 1 · n_salidas: 1`) y con la
+   verificación de factura en verde (`sin_verificar: null`). Sin nota de crédito
+   en Odoo.
+3. **Un negativo que NO es un sobregiro.** De los 34 lotes del ancla, el único en
+   negativo es Blanco `230 / 2-27` en **−2**, y es artefacto del método: contar
+   solo ancla − salidas **no suma la producción posterior al ancla**. Con
+   `WH/MO/01414` (126 u, 18-ago) el saldo real es **124**. Cuadra exacto:
+   −2 + 126 = 124. La herramienta no tiene este problema — `rpCalcSaldos` sí suma
+   la producción; lo tiene una consulta que mire solo Supabase.
+
+---
+
+## 5 · Trazabilidad: lo frágil que el módulo convierte en estructura
 
 Vale dejarlo escrito porque es el argumento del módulo entero: hoy el lote es
 texto libre en un comentario, y lo que sale del congelador no queda ligado a

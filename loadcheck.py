@@ -26,7 +26,11 @@ var fetch=function(){return {then:function(){return this;},catch:function(){retu
 open(SP+'/_load.js','w',encoding='utf-8').write(stub+body)
 r=subprocess.run([JSC,SP+'/_load.js'],capture_output=True,text=True)
 out=(r.stdout+r.stderr).strip()
-tdz=[l for l in out.splitlines() if 'before initialization' in l or 'ReferenceError' in l]
+# También los SyntaxError de EJECUCIÓN (los de parseo no llegan acá): una
+# redeclaración `let` mata el bloque entero igual que un TDZ, y sin esta línea
+# el chequeo imprimía ✓ con el script muerto — pasó el 25-ago con `_el`.
+tdz=[l for l in out.splitlines()
+     if 'before initialization' in l or 'ReferenceError' in l or 'SyntaxError' in l]
 if tdz:
     print('✗ ERROR DE CARGA:'); [print('   '+l) for l in tdz[:6]]; sys.exit(1)
 print('✓ el script corre de arriba a abajo sin errores de carga')
