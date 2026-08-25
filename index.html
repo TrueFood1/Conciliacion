@@ -1051,8 +1051,13 @@ body.ent-claro{
   --stop-line:#D14343;--stop-tx:#A32D2D;
   --busy:#6E6C68;
   --warn-wash:rgba(154,100,16,.08);--warn-edge:rgba(154,100,16,.35);--warn-tx:#7A4E08;
-  /* Los semánticos del sistema, que el chrome compartido usa por su nombre. */
-  --lime:#8A9B00;
+  /* Los semánticos del sistema, que el chrome compartido usa por su nombre.
+     --lime NO baja a oliva: es un token de RELLENO (el lima de marca, el del
+     logo y el de los botones amarillos), y como relleno se ve perfecto sobre
+     blanco — 11.8:1 con texto oscuro encima. El que baja a oliva es --ent-line,
+     que es el de LÍNEA y TEXTO. Confundir los dos fue el error: dejó el botón
+     Preparar en oliva, que es justo donde el lima sí funciona. */
+  --lime:#E9FE60;
   --green:#4E7A00;--green-l:rgba(78,122,0,.12);--green-d:#4E7A00;
   --amber:#9A6410;--amber-l:rgba(154,100,16,.12);--orange:#9A6410;--orange-l:rgba(154,100,16,.12);
   --red:#A32D2D;--red-l:rgba(209,67,67,.10);
@@ -1170,7 +1175,10 @@ table td,table th{border-color:#F2F0EA}
 .hdr-right{margin-left:auto;margin-right:66px;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
 /* El aviso de producción también tenía su estilo en línea (le ganaba al @media). Solo queda
    `display` en línea, que es lo que el JS enciende y apaga. */
-.hdr-prod{font-size:11px;color:#B08585;letter-spacing:.01em}
+/* "producción · solo lectura" es INFORMACIÓN, no un estado de error. El #B08585
+   era un rojo apagado que sobre el encabezado claro se lee marrón y parece alerta.
+   Va al gris secundario, que es lo que corresponde a un dato de contexto. */
+.hdr-prod{font-size:11px;color:var(--text-2);letter-spacing:.01em}
 .conn-ind{margin-left:auto;display:flex;align-items:center;gap:7px;color:#5A5750;font-size:13px}
 .conn-ind .gdot{width:7px;height:7px;border-radius:50%;background:#4CAF6E}
 .logo-link{cursor:pointer}
@@ -1228,6 +1236,9 @@ body,.main{background:var(--bg);color:var(--text)}
 .btn-confirm{border-color:var(--green);color:var(--green);background:transparent}
 .btn-confirm:hover{background:var(--green-l)}
 .btn-amarillo,.btn-usar{background:var(--lime);color:#1A1A1A;border:none}
+/* El texto sobre el relleno lima, SOLO en Entregas: la regla de arriba es global y
+   el resto de Truefie no se toca. #2E3300 es el de la paleta clara. */
+body.ent-claro .btn-amarillo,body.ent-claro .btn-usar{color:var(--ent-fill-tx)}
 .btn-amarillo:hover,.btn-usar:hover{background:#dff04a}
 /* dropzone */
 .uz{border-color:var(--border-strong);background:var(--surface-2)}
@@ -2296,7 +2307,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .rp-cli{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:var(--field);border:1px solid var(--border);border-radius:9px;color:var(--text);font:inherit;font-size:14px;padding:12px;cursor:pointer}
 .rp-clif{font-size:11px;color:var(--text-3);white-space:nowrap}
 .pd-cnt{display:inline-block;min-width:22px;text-align:center;font-size:11.5px;font-weight:600;color:var(--text-3);border:1px solid var(--border-strong);border-radius:999px;padding:1px 7px;margin-left:6px}
-.pd-cnt.on{color:var(--on-warn);background:var(--warn-2);border-color:var(--warn-2)}
+/* CONTADOR, NO ALERTA. Iba en ámbar heredado del tema oscuro, que sobre blanco se
+   lee marrón y promete un problema que no existe: un "10" es cuántos hay, no que
+   algo esté mal. Va al relleno lima, el mismo patrón del chip activo del buscador. */
+.pd-cnt.on{color:var(--ent-fill-tx);background:var(--ent-fill);border-color:var(--ent-fill)}
 .pd-exp td{padding:0}
 .pd-clasif{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin:4px 0 10px;font-size:12px;color:var(--text-3)}
 .pd-clasif button{background:var(--field);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:12.5px;padding:8px 11px;cursor:pointer}
@@ -3144,7 +3158,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 24 ago 2026 · b30';
+const BUILD = 'v 24 ago 2026 · b31';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
