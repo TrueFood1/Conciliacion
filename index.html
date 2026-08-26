@@ -2713,6 +2713,15 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .pdf-b.cargando{color:var(--text-3);border-style:dashed;cursor:progress}
 .pdf-b.mal{color:var(--warn);border-color:var(--warn-edge)}
 .dp-n{font-size:11.5px;color:var(--text-3)}
+/* Sin despacho pendiente: mismo tratamiento callado que "Anteriores sin despachar"
+   —un punto menos de contraste, encabezado propio— porque tampoco es trabajo del
+   día. Lo que NO se calla es el motivo: es todo lo que Andrea necesita para
+   decidir en dos segundos si el filtro acertó. */
+.dp-nodesp .dp-nd{padding:10px 0;border-bottom:1px solid var(--border)}
+.dp-nodesp .dp-nd:last-child{border-bottom:none}
+.dp-nd-t{font-size:13.5px;color:var(--text-2);line-height:1.35}
+.dp-nd-f{font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:2px}
+.dp-nd-m{font-size:11.5px;color:var(--text-3);margin:3px 0 8px;line-height:1.45}
 .dp-dia{font-size:9.5px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;
   padding:1px 7px;border-radius:999px;border:1px solid var(--border-strong);color:var(--text-3)}
 .dp-dia.hoy{color:var(--ent-fill-tx);background:var(--ent-fill);border-color:var(--ent-fill)}
@@ -3372,7 +3381,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 26 ago 2026 · b38';
+const BUILD = 'v 26 ago 2026 · b39';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -7861,6 +7870,9 @@ try{
   const _dd=new URLSearchParams(location.search).get('despdesde');
   if(_dd && /^\d{4}-\d{2}-\d{2}$/.test(_dd)) DESP_DESDE=_dd;
 }catch(e){}
+// Las facturas apartadas por no llevar despacho, y las que Andrea mandó igual a
+// "Por preparar" (de la sesión: se confirma y se despacha en el momento).
+let _despSinDesp=[], _despForzar={};
 let _despFac=null, _despUom=null, _despErr='', _despAbierto=null, _despLotes=null,
     _despSaldo=null, _despEdit={}, _despGuardando=false;
 // El estado de los pedidos YA preparados. Sale de v_ent_pedido_estado, o sea
@@ -8074,6 +8086,109 @@ async function despCargar(force){
   despRender();
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// FACTURAS QUE NO LLEVAN DESPACHO (26-ago). El caso que lo abrió: la ...3498
+// (Inversiones Amigas Greibaro) apareció en "Por preparar" el 25-ago. Es la
+// RE-EMISIÓN de la ...3403 del 8-jul, que se anuló por un error en la cédula
+// jurídica estando ya pagada — NC, se movió el pago, se re-emitió. El producto
+// había salido en JULIO con el traslado WH/OUT/02233. Si alguien la prepara, el
+// lote se descuenta DOS VECES contra una venta que ya salió.
+//
+// ⚠️ `qty_delivered` NO SIRVE PARA ESTO, medido: filtra 456 de 493 facturas de
+// 2026. Es un estado ACTUAL sin ancla de tiempo — contesta "¿está entregado
+// hoy?" cuando la pregunta es "¿ya estaba entregado cuando se emitió esta
+// factura?". Y en vivo sería una carrera: validar un traslado en Odoo antes de
+// que Daniel despache escondería un pedido real.
+//
+// LA SEÑAL BUENA ES EL TRASLADO CON SU FECHA: el traslado de SALIDA del pedido de
+// venta validado ANTES de la factura. Un hecho fechado, no un estado que se mueve.
+// Medido sobre las 493 facturas con terminado de 2026:
+//     traslado antes de la factura (filtra) →   2   (−120 y −48 días)
+//     mismo día                             →  94
+//     +1 día                                → 124
+//     +2 o más días                         → 246
+//     sin traslado de salida validado       →  27
+// Las 2 son re-emisiones administrativas confirmadas (3498 y 3323, las dos con el
+// mismo triplete original-anulada / NC / re-emitida). CERO ventas reales
+// perdidas, y el hueco es limpio: nada legítimo cae en negativo.
+//
+// EL MARGEN DE 2 DÍAS (decisión de Andrea) no cambia nada hoy —los dos casos
+// están a 48 y 120 días— y saca del medio el límite del día: una factura emitida
+// a la mañana siguiente de un traslado validado a las 23:00 no se filtra sola.
+//
+// SOLO TRASLADOS DE SALIDA, y esto NO es opcional: un pedido con devolución trae
+// un WH/IN con fecha propia que ensuciaría la cuenta. Medido: 3 pedidos de 2026
+// tienen entrega parcial y en los tres lo parcial viene de una devolución, no de
+// un despacho partido. Ninguno se filtra.
+//
+// SEGUNDA RED: la factura sin NINGÚN pedido de venta. Cubre lo que la primera no
+// puede mirar — la ...020000000001 del 12-ene, re-emisión hecha a mano, cuyo
+// `invoice_origin` apunta a la factura original y no a un pedido. Por eso el
+// vínculo se lee por `sale_line_ids` (relación por ID) y nunca por ese texto.
+//
+// Devuelve {id_factura: 'motivo'} SOLO de las que no llevan despacho.
+// Si Odoo falla en cualquiera de los tres pasos devuelve {}: sin señal se muestra
+// TODO, que es el modo de falla correcto — de más nunca esconde una entrega.
+// ════════════════════════════════════════════════════════════════════════
+const DESP_MARGEN_DIAS = 2;
+async function despYaEntregado(mv, porLinea){
+  const fuera={};
+  try{
+    const M={}; mv.forEach(function(m){ M[m.id]=m; });
+    // a · las líneas de pedido de venta de cada factura
+    const solPorFac={}, sol=[];
+    Object.keys(porLinea).forEach(function(mid){
+      const acc=[];
+      porLinea[mid].forEach(function(l){ (l.sale_line_ids||[]).forEach(function(x){
+        acc.push(x); if(sol.indexOf(x)<0) sol.push(x); }); });
+      solPorFac[mid]=acc;
+      // SEGUNDA RED, acá mismo: sin una sola línea de pedido de venta.
+      if(!acc.length && M[mid]) fuera[mid]='sin pedido de venta en Odoo';
+    });
+    if(!sol.length) return fuera;
+    // b · el pedido de cada línea
+    const sl=await odooCall('sale.order.line','search_read',[[['id','in',sol]]],
+      {fields:['id','order_id'],limit:5000,context:{lang:'es_CR'}});
+    const ord={}; sl.forEach(function(r){ ord[r.id]=r.order_id&&r.order_id[0]; });
+    const soIds=[]; sl.forEach(function(r){ const o=r.order_id&&r.order_id[0];
+      if(o && soIds.indexOf(o)<0) soIds.push(o); });
+    if(!soIds.length) return fuera;
+    // c · los traslados de cada pedido
+    const so=await odooCall('sale.order','search_read',[[['id','in',soIds]]],
+      {fields:['id','picking_ids'],limit:2000,context:{lang:'es_CR'}});
+    const pkIds=[]; so.forEach(function(r){ (r.picking_ids||[]).forEach(function(p){
+      if(pkIds.indexOf(p)<0) pkIds.push(p); }); });
+    if(!pkIds.length) return fuera;
+    const pk=await odooCall('stock.picking','search_read',
+      [[['id','in',pkIds],['state','=','done'],['picking_type_code','=','outgoing']]],
+      {fields:['id','date_done'],limit:2000,context:{lang:'es_CR'}});
+    const fechaPk={}; pk.forEach(function(p){ fechaPk[p.id]=String(p.date_done||'').slice(0,10); });
+    const pkDeSo={}; so.forEach(function(r){ pkDeSo[r.id]=(r.picking_ids||[]); });
+    // d · el veredicto, factura por factura
+    Object.keys(solPorFac).forEach(function(mid){
+      const m=M[mid]; if(!m || fuera[mid]) return;
+      let mejor=null;
+      solPorFac[mid].forEach(function(lid){
+        const o=ord[lid]; if(!o) return;
+        (pkDeSo[o]||[]).forEach(function(pid){
+          const f=fechaPk[pid];
+          if(f && (mejor===null || f<mejor)) mejor=f;
+        });
+      });
+      if(!mejor) return;                       // sin traslado validado: se muestra
+      const dias=Math.round((Date.parse(m.invoice_date+'T00:00:00Z')
+                            -Date.parse(mejor+'T00:00:00Z'))/86400000);
+      if(dias>=DESP_MARGEN_DIAS)
+        fuera[mid]='ya entregado el '+mejor+' según Odoo, '+dias+' días antes de esta factura';
+    });
+  }catch(e){
+    try{ console.error('[Truefie] no pude verificar entregas previas:',
+      (e&&e.message)||e,'— se muestran TODAS las facturas.'); }catch(_){}
+    return {};                                 // sin señal: no se esconde nada
+  }
+  return fuera;
+}
+
 // Facturas posted del período con al menos una línea de los 6 terminados, menos
 // las que ya tienen despacho confirmado.
 async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
@@ -8093,9 +8208,11 @@ async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
   const ids=mv.map(function(m){return m.id;});
   const ls=await odooCall('account.move.line','search_read',
     [[['move_id','in',ids],['display_type','=','product'],['product_id','in',ENT_PROD]]],
-    {fields:['move_id','product_id','product_uom_id','quantity'],limit:5000,context:{lang:'es_CR'}});
+    {fields:['move_id','product_id','product_uom_id','quantity','sale_line_ids'],limit:5000,context:{lang:'es_CR'}});
   const por={};
   ls.forEach(function(l){ (por[l.move_id[0]]=por[l.move_id[0]]||[]).push(l); });
+  // ── ¿ESTA FACTURA TIENE ALGO QUE DESPACHAR? ───────────────────────────
+  const sinDesp = await despYaEntregado(mv, por);
   // ya despachadas (Supabase). Si falla, se muestran todas: mejor de más que de menos.
   let ya={};
   try{
@@ -8104,10 +8221,20 @@ async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
            (data||[]).forEach(function(r){ ya[r.factura_id]=1; }); }
   }catch(e){}
   const out=[];
+  _despSinDesp=[];
   mv.forEach(function(m){
     if(ya[m.id]) return;
     if(anuladas[m.id]) return;                 // anulada por NC y sin alisto: no se lista
     const lin=por[m.id]; if(!lin) return;      // factura sin terminado: no es despacho
+    // NO DESAPARECE: se aparta a su propia lista, con el motivo escrito, y con un
+    // botón para mandarla igual a "Por preparar". Filtrar no puede ser una puerta
+    // de una sola dirección. `_despForzar` es de la sesión: se confirma y se
+    // despacha en el momento, no es una marca que haya que persistir.
+    if(sinDesp[m.id] && !_despForzar[m.id]){
+      _despSinDesp.push({factura_id:m.id, factura:m.name, fecha:m.invoice_date,
+        cliente:(m.partner_id&&m.partner_id[1])||'—', motivo:sinDesp[m.id]});
+      return;
+    }
     out.push({
       factura_id:m.id, factura:m.name, fecha:m.invoice_date,
       cliente:(m.partner_id&&m.partner_id[1])||'—', cliente_id:(m.partner_id&&m.partner_id[0])||0,
@@ -8399,7 +8526,29 @@ function despRender(){
       +viejas.map(function(f){ return tarjeta(f,true); }).join('')+'</div>';
   }
 
-  // 4 · ENTREGADOS: una línea, no una lista. Si no hay, no se dice nada.
+  // 4 · SIN DESPACHO PENDIENTE — apartadas, NO desaparecidas.
+  // Una factura acá no es un error del sistema: es una re-emisión administrativa,
+  // que no toca inventario porque el producto ya salió con la original. Pero el
+  // juicio es de Andrea, no del filtro: cada fila dice POR QUÉ se apartó y trae el
+  // botón para mandarla igual a "Por preparar". Una puerta de una sola dirección
+  // sería peor que no filtrar — escondería una entrega real sin dejar rastro.
+  if(_despSinDesp.length){
+    h+='<div class="dp-antes dp-nodesp"><div class="dp-antes-h">'
+      +'<span>Facturas sin despacho pendiente</span>'
+      +'<span class="dp-antes-n">'+_despSinDesp.length+'</span></div>'
+      +_despSinDesp.map(function(f){
+        // Cliente arriba solo; la factura y la fecha abajo en su propio renglón. En
+        // una línea, una razón social larga empujaba el "…3498 · ayer" al renglón
+        // siguiente y quedaba colgando — medido a 375px.
+        return '<div class="dp-nd"><div class="dp-nd-t">'+esc(f.cliente)+'</div>'
+          +'<div class="dp-nd-f">…'+esc(String(f.factura).slice(-4))+' · '+esc(_despDia(f.fecha))+'</div>'
+          +'<div class="dp-nd-m">'+esc(f.motivo)+'</div>'
+          +'<button class="btn btn-sm" onclick="despForzar('+f.factura_id+')">Despachar igual</button>'
+          +'</div>'; }).join('')
+      +'</div>';
+  }
+
+  // 5 · ENTREGADOS: una línea, no una lista. Si no hay, no se dice nada.
   if(entHoy.length){
     // El nombre dice lo que cuenta. "Entregados hoy" mentía en cuanto una salida
     // pudo llevar fecha de ayer, y el destino tiene que traer EXACTAMENTE lo mismo
@@ -8411,6 +8560,12 @@ function despRender(){
   // repinta con la lista, así que no puede quedar mostrando un pedido que ya salió.
   h+=despRenderDialogoEntrega();
   body.innerHTML=h;
+}
+// "Despachar igual": Andrea revisó y dice que sí lleva despacho. Vuelve a leer de
+// Odoo para que la factura entre por el camino normal, con sus líneas y su UoM.
+function despForzar(facId){
+  _despForzar[facId]=1;
+  despCargar(true);
 }
 function _despDia(ymd){
   const hoy=new Date(), ayer=new Date(); ayer.setDate(ayer.getDate()-1);
