@@ -766,7 +766,11 @@ tr.r-ing td{background:#eff6ff}
 /* zona central: consulta centrada verticalmente */
 .home-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;gap:0}
 /* zona inferior: módulos anclados abajo */
-.home-bottom{width:100%;max-width:620px;display:flex;flex-direction:column;align-items:stretch}
+/* 746px = seis tarjetas de ~116px + cinco huecos de 10px. Era 620 (cinco tarjetas);
+   con Personal el bloque se ensancha lo justo para que la fila siga siendo UNA y las
+   tarjetas conserven su tamaño. Ensanchar el bloque en vez de apretar las columnas es
+   lo que mantiene "Conciliación" en un renglón. */
+.home-bottom{width:100%;max-width:746px;display:flex;flex-direction:column;align-items:stretch}
 .home-hi{font-size:26px;font-weight:500;color:#F5F4F0;letter-spacing:-.4px;text-align:center}
 .home-q{font-size:20px;font-weight:400;color:#9A988F;margin:10px 0 0}
 .home-search{display:flex;align-items:center;width:100%;max-width:480px;background:#18181C;border:.5px solid #34343C;border-radius:999px;padding:5px 6px 5px 20px;gap:10px;margin-top:2.5rem}
@@ -784,7 +788,7 @@ tr.r-ing td{background:#eff6ff}
 .home-soon .home-search{margin-top:0}
 .home-sep{border-top:.5px solid #26262C;width:100%;margin:0}
 .home-modlabel{font-size:12px;font-weight:500;color:#6E6C68;letter-spacing:.5px;width:100%;margin:1.5rem 0 .9rem;text-align:left}
-.home-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;width:100%;max-width:760px}
+.home-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;width:100%;max-width:760px}
 /* El sello de versión iba con estilo en línea; vive acá para que el @media pueda darle
    el respiro del safe-area en teléfono (el estilo en línea le ganaba a la hoja). */
 .home-build{text-align:center;color:#6E6C68;font-size:11px;letter-spacing:.03em;padding:16px 0 6px}
@@ -825,13 +829,20 @@ tr.r-ing td{background:#eff6ff}
      preferencia de diseño sino una restricción de la plataforma. */
   input,select,textarea{font-size:16px !important}
   .home-grid{grid-template-columns:1fr 1fr;gap:9px}
-  /* En teléfono Conciliación no se muestra, así que quedan CUATRO módulos: 2×2 exacto,
-     sin huecos ni tarjeta estirada. Arriba lo que se usa a diario (Operaciones y
-     Entregas), abajo lo que se consulta (Finanzas) y lo que todavía no existe (Ventas). */
+  /* CUATRO módulos en teléfono: 2×2 exacto, sin huecos ni tarjeta estirada. Arriba lo
+     que se usa a diario (Operaciones y Entregas), abajo lo de la persona (Personal) y
+     lo que se consulta (Finanzas).
+     CON PERSONAL SERÍAN CINCO, y cinco en dos columnas deja una tarjeta huérfana en la
+     tercera fila — justo lo que este bloque vino a arreglar. La que sale del teléfono es
+     VENTAS: es la única inerte, no se puede abrir, y en la pantalla más chica una tarjeta
+     que no hace nada es decoración. Sigue en escritorio, donde no le quita el lugar a
+     nadie. Para devolverla al teléfono: borrar la línea `.home-mod-ven{display:none}` de
+     abajo y darle `order:5` — y asumir la huérfana. */
   .home-mod-ops{order:1}  .home-mod-ent{order:2}
-  .home-mod-fin{order:3}  .home-mod-ven{order:4}
+  .home-mod-per{order:3}  .home-mod-fin{order:4}
   .home-mod{padding:14px;min-height:86px;display:flex;flex-direction:column;box-sizing:border-box}
   .home-mod-conc{display:none}
+  .home-mod-ven{display:none}
   /* Por id: la regla base de .home-mod.inert va más abajo en la hoja y le ganaba por orden. */
   #vLobby .home-mod.inert{opacity:.38}
   .home-mod .home-mod-state{margin-top:auto}
@@ -879,6 +890,19 @@ tr.r-ing td{background:#eff6ff}
    claro es del TEMA: el día que Entregas vuelva a oscuro, el acento sigue bien. */
 body[data-mod="entregas"] .main{
   --mod:var(--ent-line);--accent:var(--ent-line);--blue:var(--ent-line);--blue-l:var(--ent-wash)}
+/* PERSONAL = NARANJA #FF671D (Pantone 165 C), del VisualDNA de True Food — el
+   secundario de "Francés". Decidido por Andrea el 26-ago-2026.
+   ⚠️ EL NARANJA NO SE USA DE FONDO LAVADO, por la misma razón que el lima: el ámbar
+   (#E9A23B) es el que AVISA, y un bloque lavado en naranja a 15% es indistinguible de
+   una alerta de un vistazo. Por eso `--blue-l` acá NO es el naranja al 15% como en los
+   otros módulos, sino el panel neutro: el aviso de carga queda en superficie oscura con
+   el texto en el color del módulo. El naranja identifica (punto, subrayado, el número
+   grande); nunca rellena. Si algún día alguien "unifica" esta línea con las de arriba,
+   Personal empieza a verse en alerta permanente.
+   Y ojo con Automatización, que en CLAUDE.md tiene #FF751F: es prácticamente el mismo
+   naranja. Todavía no existe como módulo; cuando exista, uno de los dos se mueve. */
+body[data-mod="personal"] .main{
+  --mod:#FF671D;--accent:#FF671D;--blue:#FF671D;--blue-l:var(--panel)}
 .faces .face.on{color:var(--text);border-bottom-color:var(--mod)}
 .m3nav .m3tab.on{background:transparent;color:var(--mod);border-bottom-color:var(--mod)}
 .home-mod-dot{width:9px;height:9px;border-radius:3px;display:inline-block}
@@ -900,6 +924,30 @@ body[data-mod="entregas"] .main{
 .home-wrap.solo .home-mod-dot{width:11px;height:11px}
 .home-wrap.solo .home-mod-name{font-size:19px;margin-top:15px}
 .home-wrap.solo .home-mod-state{font-size:13px;margin-top:9px}
+/* ── LOBBY DE DOS MÓDULOS (hoy: Daniel, con Entregas y Personal) ──
+   Hermano de `.solo`, y nace el mismo día que Personal: hasta hoy Daniel veía UN
+   módulo y el lobby era portada. Con dos vuelve a ser índice, así que el separador y
+   el rótulo se QUEDAN —rotular una lista de dos sí informa—; lo único que hace falta
+   es que las dos tarjetas no queden arrinconadas a la izquierda de una fila de seis.
+   Va solo en escritorio: en teléfono la cuadrícula ya es de dos columnas y dos
+   tarjetas la llenan exacto, así que ahí no hay nada que corregir y tocarlo solo
+   rompería el tamaño de tarjeta que la media query ya fijó. */
+@media(min-width:701px){
+  .home-wrap.duo .home-center{flex:0 0 auto;margin:auto 0 0}
+  .home-wrap.duo .home-bottom{margin:26px auto auto;max-width:480px}
+  .home-wrap.duo .home-grid{grid-template-columns:1fr 1fr;max-width:480px}
+}
+/* ── PERSONAL · MIS VACACIONES ──
+   Un número y su detalle. El número grande va en blanco hueso, no en el naranja del
+   módulo: el sistema pinta los números en blanco hueso y el color de módulo lo lleva
+   el punto de las migas de pan. Un acento por vista, y ese es. */
+.vac-hero{text-align:center;padding:30px 0 4px}
+.vac-num{font-size:64px;font-weight:600;letter-spacing:-.03em;line-height:1;color:var(--text);font-variant-numeric:tabular-nums}
+.vac-lbl{font-size:13px;color:var(--text-2);margin-top:10px}
+.vac-det{font-size:13px;color:var(--text-3);margin-top:20px;text-align:center}
+.vac-ped{font-size:13px;color:var(--text-2);margin-top:10px;text-align:center}
+.vac-n{color:var(--text);font-variant-numeric:tabular-nums}
+.vac-sub{font-size:12px;color:var(--text-2);margin-top:4px}
 /* ── M3 — Asistente de conciliación (presentación; lógica intacta) ── */
 .m3card{background:var(--bg);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:1rem;overflow:hidden}
 .m3head{padding:1rem 1.25rem .75rem}
@@ -1445,6 +1493,14 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
         <span class="home-mod-dot" style="background:#E9FE60"></span>
         <div class="home-mod-name" style="color:#F5F4F0">Entregas</div>
         <div class="home-mod-state" style="color:#E9FE60">Abrir →</div>
+      </div>
+      <!-- PERSONAL. Es módulo, no tarjeta: ACCESOS_ESQUEMA.sql ya declara que el perfil
+           `equipo` ve "Entregas · Personal · Producción". El borde #5E2610 es el naranja
+           del módulo oscurecido, derivado igual que los otros cuatro. -->
+      <div class="home-mod home-mod-per" style="border-color:#5E2610" onclick="abrirPersonal()">
+        <span class="home-mod-dot" style="background:#FF671D"></span>
+        <div class="home-mod-name" style="color:#F5F4F0">Personal</div>
+        <div class="home-mod-state" style="color:#FF9C63">Abrir →</div>
       </div>
       <div class="home-mod inert home-mod-ven">
         <span class="home-mod-dot" style="background:#3FB6A8"></span>
@@ -3322,6 +3378,26 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   </div>
 </div>
 
+<!-- ── PERSONAL · MIS VACACIONES ────────────────────────────────────────────
+     Primera pantalla del módulo Personal y primera de Truefie pensada para el
+     EQUIPO, no para las socias. El diseño está escrito en el bloque "PANTALLA
+     MIS VACACIONES" de la sección 8 de PERSONAL_ESQUEMA.sql; acá se implementa
+     eso y nada más. Sin barra de pestañas: el módulo tiene una sola pantalla y
+     una pestaña sola no informa nada (mismo criterio que el rótulo del lobby). -->
+<div id="vVacaciones" class="hidden">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <div class="m3title" style="font-size:24px">Mis vacaciones</div>
+      <!-- Definición del dato, no explicación de uso: sin esto el número se lee como
+           "las de este año", y el saldo NO reinicia en enero. Ver la sección 8. -->
+      <div class="m3sub" style="margin-top:2px">Desde tu ingreso · no reinicia en enero.</div>
+    </div>
+    <button class="btn btn-sm" onclick="vacCargar(true)">Recargar</button>
+  </div>
+  <div id="vacStatus" class="status hidden" style="margin-top:14px"></div>
+  <div id="vacBody" style="margin-top:14px"></div>
+</div>
+
 <!-- ── NINGUNA PANTALLA MUDA (26-ago) ──────────────────────────────────────
      b32 publicó Inventario con la pantalla ENTERA en el documento y sin
      registrar en la lista de navegación: `hidden` nunca se le quitaba, así que
@@ -3372,7 +3448,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 26 ago 2026 · b36';
+const BUILD = 'v 26 ago 2026 · b40';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -3805,13 +3881,19 @@ const ACCESO_USUARIOS = {
   // Daniel: cubierto por el default (solo Entregas). No se nombra por ser
   // gmail personal en repo público. Nombrar cuando tenga correo @truefoodcr.com.
 };
-const ACCESO_DEFAULT = ['entregas'];
+// PERSONAL entra al default (26-ago). El default es lo que ve quien NO está nombrado
+// acá arriba, o sea hoy Daniel, Daniela y Ney: es SU módulo — sus vacaciones, y mañana
+// sus permisos y su banco de horas. Es la primera vez que el default crece, y no
+// contradice la regla de "ver de menos, no de más": lo que se abre es lo propio de cada
+// quien, filtrado por RLS del lado del servidor, no datos de la empresa.
+const ACCESO_DEFAULT = ['entregas','personal'];
 // Qué vistas son de cada módulo. Las que no estén acá se consideran de acceso libre.
 const ACCESO_VISTAS = {
   finanzas:     ['vFacturado','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vResults'],
   conciliacion: ['vUpload'],
   operaciones:  ['vProduccion','vMermas','vInventario','vPlan','vResumen','vConteo'],
   entregas:     ['vConteoLote','vReporte','vPendientes','vDespachos','vEntBuscar','vEntLotes'],
+  personal:     ['vVacaciones'],
 };
 let _accesoMods=null;   // se llena al entrar; null = todavía no se sabe → no se restringe
 function accesoPuede(mod){ return !_accesoMods || _accesoMods==='todo' || _accesoMods.indexOf(mod)>=0; }
@@ -3829,7 +3911,7 @@ async function accesoCargar(){
 // El lobby no dibuja lo que no le toca (los inertes "Pronto" tampoco).
 function accesoPintarLobby(){
   const map={finanzas:'home-mod-fin', conciliacion:'home-mod-conc', operaciones:'home-mod-ops',
-             entregas:'home-mod-ent', ventas:'home-mod-ven'};
+             entregas:'home-mod-ent', personal:'home-mod-per', ventas:'home-mod-ven'};
   for(const mod in map){
     const el=document.querySelector('#vLobby .'+map[mod]);
     if(el) el.style.display = accesoPuede(mod) ? '' : 'none';
@@ -3843,11 +3925,15 @@ function accesoPintarLobby(){
   if(hs) hs.style.display = (_accesoMods==='todo') ? '' : 'none';
   // UN SOLO módulo visible → el lobby deja de ser cuadrícula y pasa a ser portada:
   // saludo y tarjeta juntos y centrados, sin separador ni rótulo "TUS MÓDULOS"
-  // (rotular una lista de uno es ruido). Es el caso de Daniel.
+  // (rotular una lista de uno es ruido).
+  // DOS → `.duo`: sigue siendo índice (el rótulo se queda) pero el par se centra en
+  // vez de quedar arrinconado en una fila de seis. Es el caso de Daniel desde que
+  // entró Personal; `solo` queda para el día que alguien vuelva a tener uno.
   const wrap=document.querySelector('#vLobby .home-wrap');
   if(wrap){
     const vis=Object.keys(map).filter(function(m){ return accesoPuede(m); }).length;
     wrap.classList.toggle('solo', vis===1);
+    wrap.classList.toggle('duo',  vis===2);
   }
 }
 async function setSaludo(){
@@ -3944,7 +4030,7 @@ function crumbSet(area,cur){
   // el punto del breadcrumb sigue el color del módulo (Finanzas azul · Operaciones rosa · Conciliación verde)
   // Entregas va en OLIVA, no en lima: su encabezado es claro y un punto de 7px en
   // #E9FE60 sobre blanco no se ve. Mismo criterio que --ent-line.
-  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Conciliación':'#84BD00','Entregas':'#8A9B00','Ventas':'#3FB6A8'};
+  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Conciliación':'#84BD00','Entregas':'#8A9B00','Ventas':'#3FB6A8','Personal':'#FF671D'};
   const d=document.querySelector('.crumb-dot'); if(d)d.style.background=COL[area]||'#378ADD';
 }
 // Entradas desde el HOME (una por módulo).
@@ -3959,6 +4045,7 @@ function abrirConciliacion(){                                // módulo Concilia
   _modShow('vUpload'); crumbSet('Conciliación','Cobros');
   renderCobrosExtracto();   // la lista de cobros sale del extracto subido (no de la pila vieja de Odoo)
 }
+function abrirPersonal(){ irAVacaciones(); }                 // módulo Personal → su única pantalla
 function volverLobby(){
   document.body.classList.remove('ent-claro');   // el lobby es de todos: vuelve a oscuro
   document.body.removeAttribute('data-mod');     // …y sin módulo activo: el lobby no lleva acento de nadie
@@ -3968,6 +4055,130 @@ function volverLobby(){
   document.getElementById('vLobby').classList.remove('hidden');
   accesoPintarLobby();
   entCardCargar();   // los contadores pueden haber cambiado mientras se trabajaba
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// PERSONAL · MIS VACACIONES
+// ════════════════════════════════════════════════════════════════════════
+// Implementa el bloque "PANTALLA MIS VACACIONES" de la sección 8 de
+// PERSONAL_ESQUEMA.sql. Tres decisiones que vienen de ahí y no se tocan acá:
+//
+// 1. NO FILTRA POR PERSONA, a propósito. Las dos vistas son `security_invoker` y
+//    su RLS ya recorta del lado del SERVIDOR: corrida por Daniela devuelve UNA
+//    fila —la de ella—; corrida por una socia devuelve las tres. Filtrar acá
+//    sería poner una segunda llave en el único lugar donde no protege nada (el
+//    navegador), y encima escondería filas que la socia sí tiene que ver. Por eso
+//    el render decide por lo que LLEGA, no por el perfil: una fila → número
+//    grande; varias → una línea por persona.
+//
+// 2. NO MUESTRA PLATA. Ninguna de las dos consultas toca `rrhh_salario`, que
+//    sigue siendo solo-socias. Días y nada más — una superficie sensible menos.
+//
+// 3. LO PEDIDO Y SIN APROBAR NO BAJA EL SALDO, y por eso se dice. Quien pidió
+//    tres días el lunes entra el martes, ve el saldo igualito y concluye que la
+//    solicitud se perdió. La línea de pendientes existe para que no lo concluya.
+//    Va en gris, NO en ámbar: es estado del dato, no algo que urja.
+let _vacDatos=null;
+
+function irAVacaciones(){
+  _modShow('vVacaciones'); crumbSet('Personal','Mis vacaciones');
+  vacCargar(false);
+}
+// Aviso de pantalla. Sin tipo, se apaga. NUNCA se deja el cuerpo mudo.
+function _vacAviso(tipo, html){
+  const st=document.getElementById('vacStatus'); if(!st) return;
+  if(!tipo){ st.classList.add('hidden'); st.innerHTML=''; return; }
+  st.className='status '+tipo; st.classList.remove('hidden'); st.innerHTML=html;
+}
+// Días en es-CR: coma decimal y sin decimales de relleno — 7 se ve "7", 7,5 se ve
+// "7,5". El saldo puede tener decimales el día que `vacacion_dias_por_mes` no sea
+// entero, así que redondear a entero acá mentiría sobre el saldo real.
+function _vacDias(n){ return (Number(n)||0).toLocaleString('es-CR',{minimumFractionDigits:0,maximumFractionDigits:1}); }
+// Singular solo con exactamente 1. En español el cero va en plural ("0 días"), así
+// que no alcanza con `n < 2`. Con un día de saldo la pantalla dice "1 día disponible ·
+// 1 ganado", no "1 días disponibles · 1 ganados".
+function _vacUno(n){ return Math.abs(Number(n)||0)===1; }
+function _vacPedidos(n){
+  return _vacDias(n)+(_vacUno(n)?' día pedido':' días pedidos')+', esperando aprobación';
+}
+
+async function vacCargar(force){
+  const body=document.getElementById('vacBody'); if(!body) return;
+  if(_vacDatos && !force){ _vacRender(); return; }
+  _vacAviso('s-info','<span class="spin"></span>Leyendo tu saldo de vacaciones…');
+  body.innerHTML='';
+  try{
+    const c=sbClient(); if(!c) throw new Error('no hay conexión a Supabase');
+    const [rs,rp]=await Promise.all([
+      c.from('v_rrhh_vacacion_saldo').select('persona_id,nombre,dias_ganados,dias_tomados,dias_disponibles'),
+      c.from('v_rrhh_solicitud').select('persona_id,dias').eq('tipo','vacaciones')
+    ]);
+    if(rs.error) throw rs.error;
+    // Las solicitudes son ACCESORIAS: si esa consulta falla, el saldo se muestra
+    // igual. Lo que no se hace es callarlo — un saldo sin la línea de pendientes se
+    // lee como "no pediste nada", que es justo el malentendido que vino a evitar.
+    _vacDatos={saldo:(rs.data||[]), pedidos:(rp.error?null:(rp.data||[]))};
+    _vacRender();
+  }catch(e){
+    _vacAviso('s-err','No pude leer tu saldo: '+esc((e&&e.message)||e));
+  }
+}
+
+function _vacRender(){
+  const body=document.getElementById('vacBody'); if(!body||!_vacDatos) return;
+  const filas=_vacDatos.saldo, ped=_vacDatos.pedidos;
+
+  // CERO FILAS NO ES CERO DÍAS. Es el fallo silencioso del módulo: si el correo con
+  // el que se entró no coincide con el de `rrhh_persona`, `rrhh_mi_persona()`
+  // devuelve null, la RLS no deja pasar ninguna fila y la pantalla queda en blanco
+  // sin un solo error. Dicho, se arregla en un minuto; mudo, no se arregla nunca.
+  if(!filas.length){
+    _vacAviso('s-warn','Tu cuenta no está enlazada a una persona en Personal, así que no hay saldo que mostrar. Lo enlaza Andrea.');
+    body.innerHTML=''; return;
+  }
+  _vacAviso('');
+
+  const porPersona={};
+  if(ped) ped.forEach(function(r){
+    porPersona[r.persona_id]=(porPersona[r.persona_id]||0)+(Number(r.dias)||0);
+  });
+  const avisoPed = (ped===null)
+    ? '<div class="vac-ped">No pude leer las solicitudes pendientes — el saldo de arriba no las descuenta.</div>' : '';
+
+  // UNA FILA: la persona mirando lo suyo. Un número y de dónde sale.
+  if(filas.length===1){
+    const f=filas[0], p=porPersona[f.persona_id]||0;
+    body.innerHTML=
+      '<div class="vac-hero">'
+      +   '<div class="vac-num">'+_vacDias(f.dias_disponibles)+'</div>'
+      +   '<div class="vac-lbl">'+(_vacUno(f.dias_disponibles)?'día disponible':'días disponibles')+'</div>'
+      + '</div>'
+      + '<div class="vac-det">'
+      +   _vacDias(f.dias_ganados)+(_vacUno(f.dias_ganados)?' ganado':' ganados')+' · '
+      +   _vacDias(f.dias_tomados)+(_vacUno(f.dias_tomados)?' tomado':' tomados')
+      + '</div>'
+      + (p>0 ? '<div class="vac-ped">'+_vacPedidos(p)+'</div>' : '')
+      + avisoPed;
+    return;
+  }
+
+  // VARIAS FILAS: una socia mirando al equipo. Mismo dato, forma de lista.
+  let h='<table><thead><tr><th>Persona</th>'
+       +'<th style="text-align:right">Disponibles</th>'
+       +'<th style="text-align:right">Ganados</th>'
+       +'<th style="text-align:right">Tomados</th></tr></thead><tbody>';
+  filas.slice().sort(function(a,b){
+    return String(a.nombre||'').localeCompare(String(b.nombre||''),'es');
+  }).forEach(function(f){
+    const p=porPersona[f.persona_id]||0;
+    h+='<tr><td>'+esc(f.nombre||'—')
+      +(p>0?'<div class="vac-sub">'+_vacPedidos(p)+'</div>':'')
+      +'</td>'
+      +'<td class="vac-n" style="text-align:right">'+_vacDias(f.dias_disponibles)+'</td>'
+      +'<td style="text-align:right">'+_vacDias(f.dias_ganados)+'</td>'
+      +'<td style="text-align:right">'+_vacDias(f.dias_tomados)+'</td></tr>';
+  });
+  body.innerHTML=h+'</tbody></table>'+avisoPed;
 }
 
 function setProgress(pct,msg){
