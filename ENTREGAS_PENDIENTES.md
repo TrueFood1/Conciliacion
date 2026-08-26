@@ -163,7 +163,7 @@ Blanco/Semillas, 24 en Francés/Buns, 12 en Pizza—, así que la fila afirma al
 falso sobre lo que salió del congelador.
 
 **Lo encontró Andrea el 26-ago-2026** probando en iPhone el diálogo de "Preparar
-y entregar" con la factura 3496 (Cafe Pikaluca): la línea decía *"2 Paquete de
+y entregar" con la **factura 3496**: la línea decía *"2 Paquete de
 4"* y la conversión de al lado *"2 cj"*.
 
 ### Lo que YA se arregló (26-ago, b34) y lo que NO
