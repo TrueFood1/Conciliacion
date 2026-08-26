@@ -3372,7 +3372,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 26 ago 2026 · b36';
+const BUILD = 'v 26 ago 2026 · b37';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -8763,6 +8763,30 @@ async function despConfirmar(entregar){
       factura_nombre:f.factura, cliente_id:f.cliente_id, cliente_nombre:f.cliente,
       motivo:'venta', creado_por:quien}).select('id').single();
     if(e1) throw e1;
+    // ── EL VÍNCULO A LA FACTURA, EN SU PROPIA TABLA (26-ago) ──────────────
+    // Faltaba desde que existe el lector de facturas. `ent_pedido.factura_id` se
+    // escribía arriba, pero ENTREGAS_SALIDAS.sql §2 la declara OBSOLETA: el
+    // vínculo vive SOLO en `ent_pedido_factura`, y el único código que escribía
+    // ahí era el botón manual "Vincular" de Pendientes. Resultado: TODO despacho
+    // hecho desde una factura caía en "Salida de venta, sin factura vinculada"
+    // aunque el sistema supiera perfectamente cuál era su factura — la creó a
+    // partir de ella. La lista se llenaba sola y el "arreglo" era que un humano
+    // volviera a elegir a mano lo que ya estaba escrito.
+    //
+    // NO ABORTA SI FALLA, a propósito. Va en su propio try por la misma razón que
+    // la marca de `_despAnulFallo`: si esto falla, el pedido ya existe y el saldo
+    // del lote ya va a bajar — tirar acá dejaría un pedido huérfano sin líneas ni
+    // alisto, que es peor que un vínculo faltante. Y el vínculo faltante tiene su
+    // propia red desde siempre: aparece en Pendientes con su botón.
+    try{
+      const {error:eV}=await c.from('ent_pedido_factura').insert({
+        pedido_id:ped.id, factura_id:f.factura_id, factura_nombre:f.factura,
+        anulado:false, creado_por:quien});
+      if(eV) throw eV;
+    }catch(eV){
+      try{ console.error('[Truefie] el pedido '+ped.id+' quedó sin vínculo a la factura '
+        +f.factura+': '+((eV&&eV.message)||eV)+' — se puede vincular desde Pendientes.'); }catch(_){}
+    }
     const lineasPed=f.lineas.map(function(L){
       return {pedido_id:ped.id, producto_id:L.producto_id, cant_uds:L.cant_uds,
               // ⚠️ `presentacion` GUARDA MAL las líneas en paquete, y se deja así A PROPÓSITO
