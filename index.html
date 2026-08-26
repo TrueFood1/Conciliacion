@@ -863,10 +863,21 @@ tr.r-ing td{background:#eff6ff}
    así que el lima NUNCA se usa de fondo lavado — los bloques de alerta conservan su
    lavado naranja, que es lo que los separa de un vistazo. */
 /* Los cuatro valen --ent-line, que en oscuro ES el lima y en claro es el oliva.
-   Escrito a mano acá, el acento del módulo se saltaba el tema y la pestaña activa
-   quedaba subrayada en lima invisible sobre blanco. Y entra vEntBuscar, que faltaba
-   en esta lista desde que se creó: Buscar era la única vista de Entregas sin acento. */
-#vConteoLote,#vReporte,#vPendientes,#vDespachos,#vEntBuscar{
+   Escrito a mano, el acento del módulo se saltaba el tema y la pestaña activa
+   quedaba subrayada en lima invisible sobre blanco.
+
+   ⚠️ YA NO SE ESCRIBE LA LISTA (26-ago). Era una lista de ids a mano, y una lista
+   a mano se olvida: primero faltó vEntBuscar ("la única vista de Entregas sin
+   acento"), después vEntLotes — medido, el aviso de carga de Inventario salía en
+   MAGENTA (#C964CF, el acento por defecto) en vez del oliva del módulo. Es el
+   mismo agujero que dejó Inventario en blanco, dos veces en el mismo archivo.
+   Ahora cuelga de `body[data-mod]`, que lo pone _modShow() a partir de
+   ACCESO_VISTAS: una vista nueva de Entregas nace con su acento puesto.
+   Va sobre `.main` y no sobre `body` a propósito — el encabezado vive FUERA de
+   .main y pinta su punto por JS (crumbSet), no por estos tokens.
+   Y cuelga de data-mod y no de .ent-claro porque el acento es del MÓDULO y el
+   claro es del TEMA: el día que Entregas vuelva a oscuro, el acento sigue bien. */
+body[data-mod="entregas"] .main{
   --mod:var(--ent-line);--accent:var(--ent-line);--blue:var(--ent-line);--blue-l:var(--ent-wash)}
 .faces .face.on{color:var(--text);border-bottom-color:var(--mod)}
 .m3nav .m3tab.on{background:transparent;color:var(--mod);border-bottom-color:var(--mod)}
@@ -3255,6 +3266,26 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   </div>
 </div>
 
+<!-- ── NINGUNA PANTALLA MUDA (26-ago) ──────────────────────────────────────
+     b32 publicó Inventario con la pantalla ENTERA en el documento y sin
+     registrar en la lista de navegación: `hidden` nunca se le quitaba, así que
+     el cuerpo salía en blanco —sin título, sin aviso de carga y sin error— en
+     TODO dispositivo. Un fondo vacío no se puede diagnosticar desde el teléfono
+     frente al congelador: se lee igual que "se cayó todo".
+     Esta es la red. Si al pedir una vista NINGUNA queda visible, se dice cuál
+     falló y se ofrece la salida. Ver _modShow(). -->
+<div id="vFallo" class="hidden">
+  <div class="card" style="max-width:520px;padding:18px">
+    <div style="font-size:15px;font-weight:600;color:var(--warn)">No pude abrir esta pantalla</div>
+    <div style="font-size:13px;color:var(--text-2);margin-top:8px;line-height:1.5">
+      No es tu teléfono ni la conexión: es un fallo del sistema, y ya quedó anotado.
+      Podés seguir usando el resto de Truefie.
+    </div>
+    <div style="font-size:11px;color:var(--text-3);margin-top:10px">Pantalla: <span id="vFalloId">?</span></div>
+    <div style="margin-top:14px"><button class="btn btn-sm" onclick="volverLobby()">Volver al inicio</button></div>
+  </div>
+</div>
+
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -3285,7 +3316,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 25 ago 2026 · b32';
+const BUILD = 'v 26 ago 2026 · b33';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -3771,6 +3802,19 @@ async function setSaludo(){
 }
 async function authLogout(){ try{ await sbClient().auth.signOut(); }catch(e){} location.reload(); }
 window.addEventListener('DOMContentLoaded', authInit);
+// ── AUDITORÍA DE PANTALLAS (26-ago) ──────────────────────────────────────
+// Al arrancar, compara las vistas DECLARADAS contra los <div> que existen de
+// verdad. Es el gemelo del aviso de _modFallo: aquel avisa cuando alguien ya
+// tocó el botón; este avisa en la consola apenas se abre la app, que es donde
+// se mira cuando algo se construyó ayer y todavía no se probó. Barato y mudo
+// mientras todo esté bien.
+window.addEventListener('DOMContentLoaded', function(){
+  try{
+    const faltan=_MOD_VIEWS.filter(function(v){ return !document.getElementById(v); });
+    if(faltan.length) console.error('[Truefie] vistas declaradas SIN <div>:', faltan.join(', '));
+    else console.log('[Truefie] '+_MOD_VIEWS.length+' pantallas declaradas, todas presentes.');
+  }catch(e){}
+});
 
 // Entrar a producción en SOLO LECTURA: apunta la sesión a prod y conecta vía proxy de lectura.
 // No usa usuario/clave del formulario (la cuenta read-only vive en render).
@@ -3790,8 +3834,20 @@ function aplicarModoProduccion(){
     else { t.classList.remove('dis'); t.disabled=false; t.removeAttribute('title'); }
   });
 }
-// Vistas de módulo (Contabilidad + Conciliación + Operaciones). Muestra UNA, oculta el resto.
-const _MOD_VIEWS=['vUpload','vFacturado','vProduccion','vMermas','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vInventario','vPlan','vResumen','vConteo','vConteoLote','vReporte','vPendientes','vDespachos','vEntBuscar','vResults'];
+// Vistas de módulo (Finanzas + Conciliación + Operaciones + Entregas). Muestra UNA,
+// oculta el resto.
+//
+// ⚠️ LA LISTA SE DERIVA, NO SE ESCRIBE A MANO (26-ago). Escrita a mano se olvidó
+// `vEntLotes` en b32 y la pantalla de Inventario NUNCA se mostró —en ningún
+// dispositivo—: el bucle de abajo escondía todas las vistas y a la pedida no le
+// quitaba `hidden`, porque no estaba en la lista. Encabezado sí, cuerpo vacío.
+// ACCESO_VISTAS ya es la lista canónica —una vista nueva hay que declararla ahí
+// igual, para el guardia de acceso y para el modo claro de Entregas—, así que
+// derivarla de ahí registra sola cualquier pantalla nueva. Medido el 26-ago: la
+// lista escrita a mano tenía exactamente las mismas 20 vistas, ni una de más,
+// más la que faltaba.
+const _MOD_VIEWS=Object.keys(ACCESO_VISTAS).reduce(function(a,m){
+  ACCESO_VISTAS[m].forEach(function(v){ if(a.indexOf(v)<0) a.push(v); }); return a; },[]);
 function _modShow(id){
   // Guardia COSMÉTICO (ver ACCESO_USUARIOS): navegar directo a una vista ajena
   // devuelve al lobby. No protege los datos — eso lo hará "Roles y accesos".
@@ -3802,11 +3858,29 @@ function _modShow(id){
   // claro sola, sin que nadie tenga que acordarse de tocar el CSS. Va en `body`
   // porque el encabezado vive fuera de las vistas — ver `body.ent-claro`.
   document.body.classList.toggle('ent-claro', mod==='entregas');
+  // El MÓDULO activo, en el body. De acá cuelga el acento de color (ver el CSS de
+  // `body[data-mod="entregas"]`), derivado de ACCESO_VISTAS igual que todo lo demás.
+  document.body.setAttribute('data-mod', mod||'');
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.toggle('hidden', v!==id); });
   document.getElementById('vLobby').classList.add('hidden');
   document.getElementById('appHeader').classList.remove('hidden');
+  // NINGUNA PANTALLA MUDA. Con la lista derivada esto no debería dispararse
+  // nunca; existe para que el día que se dispare se VEA. Un fondo vacío con el
+  // encabezado puesto es indistinguible de "se cayó todo", y desde el teléfono
+  // no hay forma de averiguar cuál de las dos cosas es.
+  const _v=document.getElementById(id);
+  _modFallo((_v && !_v.classList.contains('hidden')) ? '' : id);
   finMasCerrar();   // el "+" es de Finanzas: no sobrevive a un cambio de vista
   aplicarModoProduccion();
+}
+// id vacío = todo bien, se esconde. id con valor = esa vista no se pudo mostrar.
+function _modFallo(id){
+  const f=document.getElementById('vFallo'); if(!f) return;
+  if(!id){ f.classList.add('hidden'); return; }
+  const n=document.getElementById('vFalloId'); if(n) n.textContent=id;
+  f.classList.remove('hidden');
+  try{ console.error('[Truefie] vista no mostrable:', id,
+       '— ¿está declarada en ACCESO_VISTAS y existe su <div>?'); }catch(e){}
 }
 function crumbSet(area,cur){
   const a=document.querySelector('.crumb-area'); if(a)a.textContent=area;
@@ -3831,7 +3905,9 @@ function abrirConciliacion(){                                // módulo Concilia
 }
 function volverLobby(){
   document.body.classList.remove('ent-claro');   // el lobby es de todos: vuelve a oscuro
+  document.body.removeAttribute('data-mod');     // …y sin módulo activo: el lobby no lleva acento de nadie
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.add('hidden'); });
+  _modFallo('');   // el aviso de pantalla rota no sobrevive a volver al inicio
   document.getElementById('appHeader').classList.add('hidden');
   document.getElementById('vLobby').classList.remove('hidden');
   accesoPintarLobby();
