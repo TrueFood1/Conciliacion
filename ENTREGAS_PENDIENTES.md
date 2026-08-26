@@ -235,3 +235,64 @@ Referencia de Odoo (26-ago): desde el 15-ago hay **15 facturas** con líneas en
 paquete — 3478, 3479, 3482, 3483, 3485, 3487, 3488, 3491, 3492, 3494, 3496,
 3497, 3500, 3501, 3502. Cuántas de ellas llegaron a `ent_pedido_linea` depende de
 cuáles se registraron por el módulo; el SELECT de arriba da la lista real.
+
+---
+
+## 7 · ABIERTO · Anular un despacho desde la pantalla, con motivo obligatorio
+
+**El caso que lo abrió.** El 26-ago-2026 apareció el primero: el **despacho 11**
+(Mentha y limón, 19-ago, factura ...3484) registraba una salida que **nunca
+ocurrió**. Entró en el cargue retroactivo del 19-ago desde la hoja de Daniel —
+la hoja tenía el bloque anotado y la factura existía en Odoo, así que el cargue lo
+dio por salido. Pero el pan no salió ese día: la entrega no se hizo, por eso se
+anuló la 3484 (NC id 40822) y su traslado `WH/OUT/02319` quedó `cancel`. El
+producto salió el **26-ago con la ...3499**. El lote quedó descontado **dos
+veces** y el saldo, 6 u por debajo del congelador físico en dos lotes.
+
+**El problema de fondo: no hay forma de corregirlo desde la pantalla.** Hizo falta
+SQL a mano (`CORRECCION_DESP11.sql`). Y va a volver a pasar: en 2026 hubo **37
+reversiones administrativas** contra 6 devoluciones reales. Cada vez que una
+entrega se cae después de registrada, hoy hace falta una sesión con SQL.
+
+### Lo que el esquema YA resuelve (no hay que inventar nada)
+
+`ent_anulacion` existe desde el 19-ago y está pensada exactamente para esto:
+anular es **insertar** `(entidad, entidad_id, motivo, creado_por)`, con
+`entidad in ('alisto','salida')`. `ent_alisto_vigente` y `ent_salida_vigente` ya
+la respetan. Falta **solo la pantalla**.
+
+⚠️ **Y hay que anular el ALISTO, no solo la salida.** El saldo se descuenta al
+PREPARAR: `ent_salido_del_congelador_desde_ancla` suma desde `ent_alisto_lote`
+pasando por `ent_alisto_vigente`. Anular solo la salida devuelve el pedido a
+"Preparado" y deja el saldo igual de mal. Son dos gestos distintos y la pantalla
+tiene que distinguirlos:
+
+- **"No salió, pero sigue preparado"** → anular la salida. El pedido vuelve a la
+  bandeja. El saldo NO cambia (el producto sigue fuera del congelador).
+- **"Esto nunca pasó"** → anular el alisto (y su salida). El saldo VUELVE.
+
+### Lo que hay que construir
+
+1. Un control en el detalle del despacho, con **motivo obligatorio y de texto
+   libre** — acá el motivo no se puede cerrar en una lista: "la hoja lo tenía
+   anotado pero el pan no salió" no entra en ninguna categoría previsible.
+2. Que diga **cuánto vuelve al saldo, por lote, ANTES de confirmar**. Es la única
+   forma de que quien anula vea lo que está moviendo.
+3. Que quede **visible que fue anulado y por qué** en el historial. Anular no es
+   esconder: la fila se queda, con su motivo.
+
+### Un cabo suelto que deja la anulación
+
+Un pedido de venta cuyo alisto queda anulado **sigue apareciendo en "Salida de
+venta, sin factura vinculada"**, porque esa lista solo mira `motivo = 'venta'` y
+la ausencia de vínculo — no mira si el alisto sigue vigente. El despacho 11 va a
+quedar ahí sin nada que hacer. Hay que decidir si esa lista excluye los pedidos
+sin alisto vigente (ojo: un pedido que todavía NO se preparó también está sin
+alisto, y ése sí tiene que aparecer — no es la misma cosa).
+
+### Ya arreglado de paso (26-ago, b38)
+
+`pdLeer` leía `ent_alisto.anulado`, la columna que `ENTREGAS_ETAPAS.sql` §2
+declara MUERTA: no tiene grant de UPDATE, así que nadie puede ponerla en true
+nunca. Con la tabla cruda, un despacho anulado seguía saliendo en Pendientes para
+siempre. Pasó a `ent_alisto_vigente`, que es la que refleja `ent_anulacion`.
