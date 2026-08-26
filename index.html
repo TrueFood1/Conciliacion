@@ -3330,7 +3330,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 26 ago 2026 · b34';
+const BUILD = 'v 26 ago 2026 · b35';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -8513,9 +8513,18 @@ function _despPieHTML(f){
     +'<input type="date" class="de-fecha-in" value="'+esc(_despPedFecha||_despHoy())+'" '
     +'min="'+esc(_despFechaMin())+'" max="'+esc(_despHoy())+'"'+(_despGuardando?' disabled':'')
     +' onchange="despSetPedFecha(this.value)"></label>'
-    +'<button class="btn btn-amarillo" id="despOk"'+(pend?' disabled':'')
+    // JERARQUÍA INVERTIDA (26-ago, decisión de Andrea). El relleno lima estaba en
+    // "Preparar", que es el caso RARO: el flujo normal es sacar del congelador y
+    // despachar en el mismo momento. El peso visual estaba en lo que menos se usa.
+    // Se invierte el RELLENO, no el orden: "Preparar y entregar" sigue abajo, donde
+    // el pulgar de Daniel ya lo busca, y ahora además es lo que la vista encuentra
+    // primero. Cambiar las dos cosas a la vez rompería la memoria muscular sin
+    // necesidad — el relleno solo ya manda la jerarquía.
+    // El lima entra por `btn-amarillo`, que es --ent-fill + --ent-fill-tx: token de
+    // RELLENO con su texto pareado, como manda b31. No se dibuja un borde lima.
+    +'<button class="btn" id="despOk"'+(pend?' disabled':'')
     +' onclick="despPedirConfirmar(false)">Preparar</button>'
-    +'<button class="btn" id="despOk2"'+(pend?' disabled':'')
+    +'<button class="btn btn-amarillo" id="despOk2"'+(pend?' disabled':'')
     +' onclick="despPedirConfirmar(true)">Preparar y entregar</button>'
     +'</div>';
 }
@@ -8682,13 +8691,20 @@ async function despConfirmar(entregar){
   const f=_despFacAbierta(); if(!f) return;
   const pend=_despPendientes(f); if(pend){ alert(pend); return; }
   const btn=document.getElementById('despOk'), btn2=document.getElementById('despOk2');
+  // "Guardando…" va en el botón QUE SE APRETÓ. Antes iba siempre en `despOk`, así
+  // que apretar "Preparar y entregar" ponía el aviso en "Preparar" — raro desde
+  // siempre, y desde que se invirtió la jerarquía (26-ago) además lo pone en el
+  // secundario mientras el primario se queda mudo.
+  const btnAcc = entregar ? btn2 : btn;
+  const txtAcc = entregar ? 'Preparar y entregar' : 'Preparar';
   // SIN confirm() NATIVO (b32). Lo que este confirm decía —cliente, fecha real,
   // líneas con cantidad distinta a la facturada— se ve ahora en el diálogo, junto
   // al detalle de qué sale. Acá solo se lee la fecha ya elegida.
   const fSal=(entregar?_despPedFecha:'');
   _despGuardando=true;
-  if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
-  if(btn2){ btn2.disabled=true; }
+  if(btn) btn.disabled=true;
+  if(btn2) btn2.disabled=true;
+  if(btnAcc) btnAcc.textContent='Guardando…';
   try{
     const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
     const {data:{user}}=await c.auth.getUser();
@@ -8748,8 +8764,9 @@ async function despConfirmar(entregar){
     despCargarEstado();
   }finally{
     _despGuardando=false;
-    if(btn){ btn.disabled=false; btn.textContent='Preparar'; }
-    if(btn2){ btn2.disabled=false; }
+    if(btn) btn.disabled=false;
+    if(btn2) btn2.disabled=false;
+    if(btnAcc) btnAcc.textContent=txtAcc;
   }
 }
 
