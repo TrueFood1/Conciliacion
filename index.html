@@ -2367,11 +2367,53 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .rp-prod.on{border-color:var(--pc);color:var(--text);box-shadow:inset 0 0 0 1px var(--pc)}
 .rp-conv{font-size:13px;color:var(--text);padding:9px 0;font-variant-numeric:tabular-nums}
 .rp-lote{display:flex;align-items:center;gap:8px;margin-top:6px}
-.rp-lotebtn{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:var(--sunken);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:13px;padding:10px 11px;cursor:pointer}
+.rp-lotebtn{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;background:var(--sunken);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:13px;padding:9px 11px;cursor:pointer}
 .rp-lote.on .rp-lotebtn{border-color:var(--ent-line);color:var(--text)}
 .rp-lote.ago .rp-lotebtn{opacity:.45}
-.rp-saldo{font-size:11px;color:var(--text-3);white-space:nowrap}
-.rp-lotein{width:76px}
+/* ⚠️ EL LOTE NO SE PARTE (26-ago). El nombre iba como nodo de texto suelto dentro
+   de un flex, así que al elegir el lote —que agrega el input de 76px al lado— el
+   botón se quedaba sin ancho y "208 / 1-27" se rompía en TRES renglones, cortado
+   por los espacios de alrededor de la barra. Medido a 375px. El saldo ya llevaba
+   nowrap y se quedaba con su espacio primero; el que cedía era el dato principal.
+   Ahora el nombre también es un span con nowrap y el que se achica es el saldo. */
+.rp-lote-n{white-space:nowrap;font-variant-numeric:tabular-nums}
+.rp-saldo{font-size:11px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rp-lotein{width:76px;flex:none}
+.rp-ceros{background:none;border:none;padding:6px 0 0;font:inherit;font-size:11.5px;
+  color:var(--text-3);text-decoration:underline;cursor:pointer}
+
+/* ── ENTREGAS SIN FACTURA · rediseño del formulario (26-ago) ─────────────
+   JERARQUÍA POR ESPACIO Y ETIQUETAS CHICAS, NO POR BORDES. Antes eran tres
+   .card apiladas y adentro de cada una más cajas con borde —el producto, la
+   presentación, cada lote—: tarjetas dentro de tarjetas, y el ojo no sabía qué
+   agrupaba a qué. Ahora el borde queda SOLO donde hay algo que tocar, y lo que
+   separa las tres partes del formulario es el aire más una etiqueta chica. */
+.rp-sec{margin-top:24px}
+.rp-sec:first-child{margin-top:2px}
+.rp-sec-t{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--text-3);margin-bottom:10px}
+/* El campo condicional cuelga de la decisión que lo abre. Sin caja: lo que dice
+   que depende es que aparece debajo y solo cuando corresponde. */
+.rp-cond{margin-top:16px}
+/* Los seis productos como CHIPS con su punto de color de empaque (RP_COLOR, el
+   mismo mapa que ya usaba esta pantalla). Antes eran seis botones de 18px de alto
+   en una grilla: ocupaban media pantalla de teléfono para elegir una de seis
+   cosas, y el color solo aparecía DESPUÉS de elegir. */
+.rp-chips{display:flex;flex-wrap:wrap;gap:7px}
+.rp-chip{display:inline-flex;align-items:center;gap:7px;background:var(--sunken);
+  border:1px solid var(--border-strong);border-radius:999px;color:var(--text-2);
+  font:inherit;font-size:13.5px;padding:9px 14px;cursor:pointer;white-space:nowrap}
+.rp-chip .rp-pt{width:8px;height:8px;border-radius:999px;background:var(--pc);flex:none}
+.rp-chip.on{border-color:var(--ent-line);background:var(--ent-wash);color:var(--text);font-weight:600}
+/* UN TOPE DE ANCHO. Sin las tarjetas, en escritorio el formulario se estiraba a
+   1132px y "Venta con factura" quedaba de medio metro. 620px es el mismo número
+   que ya usa .dp-pie, el pie del pedido — no se inventa una medida nueva. En
+   teléfono no cambia nada: 375 < 620. */
+#rpBody{max-width:620px}
+/* La fecha al pie, chiquita: casi siempre es hoy y casi nunca se toca. */
+.rp-pie{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:18px}
+.rp-pie-l{font-size:11.5px;color:var(--text-3);white-space:nowrap}
+.rp-guardar{height:46px;font-size:14px;width:100%;margin-top:14px}
 #rpSheet{position:fixed;inset:0;background:var(--scrim);z-index:60;display:flex;justify-content:center}
 #rpSheet.hidden{display:none}
 .rp-sheet-in{width:100%;max-width:560px;padding:18px 16px;display:flex;flex-direction:column}
@@ -3330,7 +3372,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 26 ago 2026 · b35';
+const BUILD = 'v 26 ago 2026 · b36';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -7354,8 +7396,9 @@ function _clRender(){
   // se ve en la lista de abajo. Regla de sistema: estado sí, instrucciones no.
   h+='<div class="card" style="margin-top:16px"><div class="card-title">Guardar el conteo</div>'
     +'<div class="cl-form">'
-    +'<div class="field"><label>Quién contó</label>'
-    +'<input id="clResp" placeholder="tu nombre" autocomplete="off"></div>'
+    // SIN "quién contó" (26-ago): sale de la sesión, igual que en Entregas sin
+    // factura y que en Despachos. Era el segundo lugar del módulo que pedía a
+    // mano un dato que el sistema ya tiene.
     +'<div class="field"><label>Nota (opcional)</label>'
     +'<input id="clNota" placeholder="lo que valga la pena recordar"></div>'
     +'</div>'
@@ -7652,8 +7695,6 @@ async function guardarConteoLote(){
   const msg=document.getElementById('clSaveMsg'), btn=document.getElementById('clSave');
   const lineas=_clLeer();
   if(!lineas.length){ msg.style.color='var(--warn)'; msg.textContent='No hay nada anotado todavía.'; return; }
-  const resp=(document.getElementById('clResp').value||'').trim();
-  if(!resp){ msg.style.color='var(--warn)'; msg.textContent='Falta quién contó.'; return; }
   const c=sbClient();
   if(!c){ msg.style.color='var(--stop-tx)'; msg.textContent='No hay sesión de Supabase.'; return; }
   if(!confirm('Guardar el conteo con '+lineas.length+' lote'+(lineas.length===1?'':'s')+'?\n\nQueda como BORRADOR: no cambia ningún saldo hasta que lo confirmes como ancla.')) return;
@@ -7663,7 +7704,7 @@ async function guardarConteoLote(){
     const {data:{user}}=await c.auth.getUser();
     const email=(user&&user.email)||'desconocido';
     const {data:cab,error:e1}=await c.from('ent_conteo').insert({
-      fecha:_ymd(new Date()), responsable:resp,
+      fecha:_ymd(new Date()), responsable:email,
       nota:(document.getElementById('clNota').value||'').trim()||null, creado_por:email
     }).select('id,corte').single();
     if(e1) throw e1;
@@ -7705,8 +7746,13 @@ function irAReporte(){
 // queda vacío hasta que se elija uno — porque sin motivo no se puede guardar.
 function _rpReset(todo){
   const fecha=(_rp&&!todo)?_rp.fecha:_ymd(new Date());
+  // pres:'uds' = la UNIDAD CHICA del producto, no la caja (26-ago). 'uds' no
+  // significa "unidades sueltas" sino "la presentación menuda de ESE producto":
+  // rpUdsDe la resuelve con NIV_INFO.presDiv, que vale 1 en Blanco/Semillas/
+  // Cookie Dough y 4/4/2 en Francés/Buns/Pizza. Una regalía casi nunca es una
+  // caja entera, y el default es lo que se acepta sin mirar.
   _rp={fecha:fecha, cliente:null, tipo:null, motivo:null, destinatario:'', lineas:[],
-       cur:{pid:null, cant:'', pres:'cj', lotes:{}}};
+       verCeros:false, cur:{pid:null, cant:'', pres:'uds', lotes:{}}};
 }
 // ── LOS MOTIVOS DE UNA SALIDA SIN FACTURA ───────────────────────────────
 // Lista cerrada, sin texto libre: el motivo es EL DATO —dentro de seis meses lo
@@ -9530,96 +9576,123 @@ function rpFiltrarClientes(){
 function rpElegirCliente(id,nombre){ _rp.cliente={id:id,nombre:nombre}; rpCerrarClientes(); rpRender(); }
 
 // ── Render de la pantalla completa ──────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════
+// EL FORMULARIO, REDISEÑADO (26-ago). Tres cambios de fondo, todos aprobados:
+//
+// 1 · EL ORDEN SIGUE LA DECISIÓN, NO EL FORMULARIO. Primero "¿qué tipo de
+//     salida es?" y RECIÉN DESPUÉS "¿a quién?", porque la respuesta cambia según
+//     el tipo: con factura es un Cliente de Odoo; sin factura es un Motivo (que
+//     es EL dato) más un texto libre. Antes el Cliente estaba arriba y siempre
+//     visible, incluso cuando no aplicaba — se preguntaba antes de saber si la
+//     pregunta correspondía.
+// 2 · EL DEFAULT ES LA UNIDAD CHICA, no la caja. Una regalía casi nunca es una
+//     caja entera. Y "unidad chica" depende del producto: Blanco, Semillas y
+//     Cookie Dough van en unidades; Francés, Buns y Pizza en paquetes de 4, 4 y
+//     2. Eso ya vivía en NIV_INFO (presDiv/presLbl), no se inventa acá.
+// 3 · SIN CAJAS DENTRO DE CAJAS. Ver el CSS de .rp-sec.
+// ════════════════════════════════════════════════════════════════════════
+// El rótulo de la unidad chica, por producto. "Paquetes de 4" y no "Paquetes":
+// el número es la mitad del dato, y es justo la que se olvida.
+function _rpPresLbl(pid){
+  const I=NIV_INFO[pid]||{};
+  return (I.presLbl==='paq') ? ('Paquetes de '+(I.presDiv||1)) : 'Unidades';
+}
+// El rótulo CORTO, para la tabla de lo cargado. Mismo criterio que
+// DESP_UOM_CORTA en Despachos: una línea en paquetes no se llama "u".
+function _rpPresCorta(pid,pres){
+  if(pres==='cj') return 'cj';
+  return ((NIV_INFO[pid]||{}).presLbl==='paq') ? 'paq' : 'u';
+}
 function rpRender(){
   const body=document.getElementById('rpBody'); if(!body) return;
   const R=_rp, cur=R.cur;
   let h='';
-  // ZONA 1 · cabecera del despacho
-  h+='<div class="card rp-z"><div class="rp-row">'
-    +'<div class="field" style="min-width:150px"><label>Fecha</label>'
-    +'<input type="date" class="cl-in" style="width:100%" value="'+esc(R.fecha)+'" onchange="_rp.fecha=this.value"></div>'
-    // EL CLIENTE SOLO OCUPA EL LUGAR PRINCIPAL EN UNA VENTA. Sin factura, quien
-    // recibe casi nunca está en Odoo —el caso que abrió esto fue un pan regalado
-    // a una persona que no es cliente— y exigir la lista era lo que hacía
-    // IMPOSIBLE registrar la salida, con el lote contando producto que ya no está.
-    +(R.tipo!=='sin'
-      ? ('<div class="field" style="flex:1;min-width:200px"><label>Cliente</label>'
-        +(R.cliente
-          ? '<div class="rp-clisel"><span>'+esc(R.cliente.nombre)+'</span><button onclick="_rp.cliente=null;rpRender()" title="Cambiar">×</button></div>'
-          : '<button class="rp-clivacio" onclick="rpAbrirClientes()">Elegir de la lista…</button>')
-        +'</div>')
-      : '')
-    +'</div>'
-    +'<div class="field" style="margin-top:10px"><label>Tipo de salida</label>'
+
+  // ── 1 · LA DECISIÓN ────────────────────────────────────────────────────
+  h+='<div class="rp-sec"><div class="rp-sec-t">Tipo de salida</div>'
     +'<div class="rp-tipo">'
     +'<button class="'+(R.tipo==='venta'?'on':'')+'" onclick="rpSetTipo(\'venta\')">Venta con factura</button>'
     +'<button class="'+(R.tipo==='sin'?'on':'')+'" onclick="rpSetTipo(\'sin\')">Sin factura</button>'
     +'</div>'
-    +(R.tipo===null?'<div class="rp-nota rp-falta">Elegí una de las dos: sin tipo no se puede guardar.</div>':'')
-    +'</div>'
-    // ── SIN FACTURA: motivo (obligatorio) y destinatario (opcional) ──────
-    +(R.tipo==='sin'
-      ? ('<div class="field" style="margin-top:10px"><label>Motivo</label>'
-        +'<div class="rp-mot">'
-        +RP_MOTIVOS.map(function(m){
-            return '<button class="'+(R.motivo===m.k?'on':'')+'" onclick="rpSetMotivo(\''+m.k+'\')">'
-                 +esc(m.n)+'</button>'; }).join('')
-        +'</div>'
-        +(R.motivo===null?'<div class="rp-nota rp-falta">Sin motivo no se puede guardar.</div>':'')
-        +'</div>'
-        +'<div class="rp-row" style="margin-top:10px">'
-        +'<div class="field" style="flex:1;min-width:200px"><label>Destinatario</label>'
-        +'<input type="text" class="cl-in rp-dest" style="width:100%" maxlength="120" '
-        +'placeholder="Quién recibió, o el destino" value="'+esc(R.destinatario||'')+'" '
-        +'oninput="_rp.destinatario=this.value"></div>'
-        // El cliente sigue disponible, pero como opción y no como puerta.
-        +'<div class="field" style="min-width:200px"><label>Cliente de Odoo (opcional)</label>'
-        +(R.cliente
-          ? '<div class="rp-clisel"><span>'+esc(R.cliente.nombre)+'</span><button onclick="_rp.cliente=null;rpRender()" title="Quitar">×</button></div>'
-          : '<button class="rp-clivacio" onclick="rpAbrirClientes()">Elegir de la lista…</button>')
-        +'</div></div>')
-      : '')
-    +'</div>';
+    +(R.tipo===null?'<div class="rp-nota">Elegí una de las dos para seguir.</div>':'');
 
-  // ZONA 2 · la línea que se está armando
-  h+='<div class="card rp-z"><div class="field"><label>Producto</label><div class="rp-prods">';
-  ENT_PROD.forEach(function(pid){ const I=NIV_INFO[pid]||{nom:pid};
-    h+='<button class="rp-prod'+(cur.pid===pid?' on':'')+'" style="--pc:'+RP_COLOR[pid]+'" '
-      +'onclick="rpElegirProd('+pid+')">'+esc(I.nom.replace(/^Pan /,''))+'</button>'; });
-  h+='</div></div>';
-  if(cur.pid){
-    const I=NIV_INFO[cur.pid], uds=rpUdsDe(cur.pid, cur.pres, +cur.cant||0);
-    h+='<div class="rp-row" style="margin-top:8px">'
-      +'<div class="field"><label>Cantidad</label>'
-      +'<input type="number" min="0" step="1" inputmode="numeric" class="cl-in" style="width:96px" value="'+esc(cur.cant)+'" oninput="_rp.cur.cant=this.value;rpRender()"></div>'
-      +'<div class="field"><label>Presentación</label><div class="rp-tipo">'
-      +'<button class="'+(cur.pres==='cj'?'on':'')+'" onclick="_rp.cur.pres=\'cj\';rpRender()">Cajas</button>'
-      +'<button class="'+(cur.pres==='uds'?'on':'')+'" onclick="_rp.cur.pres=\'uds\';rpRender()">'+esc(I.presLbl==='paq'?'Paquetes':'Unidades')+'</button>'
-      +'</div></div>'
-      +'<div class="field"><label>&nbsp;</label><div class="rp-conv">'+(uds?('= '+_rzN(uds)+' unidades'):'&nbsp;')+'</div></div>'
+  // ── A QUIÉN · condicional, debajo, y distinto según el tipo ────────────
+  if(R.tipo==='venta'){
+    h+='<div class="rp-cond"><div class="rp-sec-t">Cliente</div>'
+      +(R.cliente
+        ? '<div class="rp-clisel"><span>'+esc(R.cliente.nombre)+'</span><button onclick="_rp.cliente=null;rpRender()" title="Cambiar">×</button></div>'
+        : '<button class="rp-clivacio" onclick="rpAbrirClientes()">Elegir de la lista…</button>')
       +'</div>';
-    h+=rpLotesHtml();
+  } else if(R.tipo==='sin'){
+    h+='<div class="rp-cond"><div class="rp-sec-t">Motivo</div>'
+      +'<div class="rp-mot">'
+      +RP_MOTIVOS.map(function(m){
+          return '<button class="'+(R.motivo===m.k?'on':'')+'" onclick="rpSetMotivo(\''+m.k+'\')">'
+               +esc(m.n)+'</button>'; }).join('')
+      +'</div>'
+      +(R.motivo===null?'<div class="rp-nota rp-falta">Sin motivo no se puede guardar.</div>':'')
+      +'</div>'
+      +'<div class="rp-cond"><div class="rp-sec-t">Para quién <span style="text-transform:none;letter-spacing:0;font-weight:400">· opcional</span></div>'
+      +'<input type="text" class="cl-in rp-dest" style="width:100%" maxlength="120" '
+      +'placeholder="Quién recibió, o el destino" value="'+esc(R.destinatario||'')+'" '
+      +'oninput="_rp.destinatario=this.value">'
+      // El cliente de Odoo sigue disponible sin factura —una reposición va a un
+      // cliente real— pero como opción y no como puerta. Se abre solo si se pide.
+      +(R.cliente
+        ? '<div class="rp-lote" style="margin-top:8px"><div class="rp-clisel" style="flex:1"><span>'+esc(R.cliente.nombre)+'</span>'
+          +'<button onclick="_rp.cliente=null;rpRender()" title="Quitar">×</button></div></div>'
+        : '<button class="rp-ceros" onclick="rpAbrirClientes()">vincular un cliente de Odoo</button>')
+      +'</div>';
   }
-  h+='<div style="margin-top:12px"><button class="btn" onclick="rpAgregarLinea()">Agregar al despacho</button>'
-    +'<span id="rpLineaMsg" class="rp-nota" style="margin-left:10px"></span></div></div>';
+  h+='</div>';
 
-  // ZONA 3 · lo cargado + guardar
-  h+='<div class="card rp-z"><div class="card-title">En este despacho</div>';
+  // ── 2 · QUÉ SALE ───────────────────────────────────────────────────────
+  h+='<div class="rp-sec"><div class="rp-sec-t">Qué sale</div><div class="rp-chips">';
+  ENT_PROD.forEach(function(pid){ const I=NIV_INFO[pid]||{nom:pid};
+    h+='<button class="rp-chip'+(cur.pid===pid?' on':'')+'" style="--pc:'+RP_COLOR[pid]+'" '
+      +'onclick="rpElegirProd('+pid+')"><span class="rp-pt"></span>'
+      +esc(I.nom.replace(/^Pan (de )?/,''))+'</button>'; });
+  h+='</div>';
+
+  if(cur.pid){
+    const uds=rpUdsDe(cur.pid, cur.pres, +cur.cant||0);
+    h+='<div class="rp-cond"><div class="rp-row" style="align-items:flex-end">'
+      +'<div class="field"><label>Cantidad</label>'
+      +'<input type="number" min="0" step="1" inputmode="numeric" class="cl-in rp-dest" style="width:92px" '
+      +'value="'+esc(cur.cant)+'" oninput="_rp.cur.cant=this.value;rpRender()"></div>'
+      +'<div class="field" style="flex:1;min-width:180px"><label>Presentación</label><div class="rp-tipo">'
+      // LA UNIDAD CHICA VA PRIMERA Y ES EL DEFAULT. Cajas queda de segunda.
+      +'<button class="'+(cur.pres==='uds'?'on':'')+'" onclick="_rp.cur.pres=\'uds\';rpRender()">'+esc(_rpPresLbl(cur.pid))+'</button>'
+      +'<button class="'+(cur.pres==='cj'?'on':'')+'" onclick="_rp.cur.pres=\'cj\';rpRender()">Cajas</button>'
+      +'</div></div>'
+      +'</div>'
+      +(uds?('<div class="rp-conv">= '+_rzN(uds)+' unidad'+(uds===1?'':'es')+'</div>'):'')
+      +rpLotesHtml()
+      +'<div style="margin-top:14px"><button class="btn" onclick="rpAgregarLinea()">Agregar al despacho</button>'
+      +'<span id="rpLineaMsg" class="rp-nota" style="margin-left:10px"></span></div>'
+      +'</div>';
+  }
+  h+='</div>';
+
+  // ── 3 · LO CARGADO, LA FECHA Y EL BOTÓN ────────────────────────────────
+  h+='<div class="rp-sec"><div class="rp-sec-t">En este despacho</div>';
   if(!R.lineas.length) h+='<div class="cl-none">Todavía no hay líneas.</div>';
   else{
     h+='<table class="cl-tbl"><tr><th>Producto</th><th>Cantidad</th><th>Lotes</th><th></th></tr>';
     R.lineas.forEach(function(l,i){ const I=NIV_INFO[l.producto_id]||{nom:l.producto_id};
       const lots=l.lotes.map(function(x){ return esc(x.lote)+(l.lotes.length>1?(' ('+_rzN(x.cant_uds)+' u)'):''); }).join(' · ');
-      h+='<tr><td>'+esc(I.nom)+'</td><td>'+_rzN(l.cant_present)+' '+(l.presentacion==='cj'?'cj':'u')
+      h+='<tr><td>'+esc(I.nom)+'</td><td>'+_rzN(l.cant_present)+' '+esc(_rpPresCorta(l.producto_id,l.presentacion))
         +' <span class="muted">= '+_rzN(l.cant_uds)+' u</span></td>'
         +'<td style="font-size:11.5px;color:var(--text-2)">'+lots+'</td>'
         +'<td style="text-align:right"><button class="btn btn-sm" onclick="rpEditarLinea('+i+')">✎</button></td></tr>'; });
     h+='</table>';
   }
-  h+='<div class="rp-row" style="margin-top:12px;align-items:flex-end">'
-    +'<div class="field" style="min-width:180px"><label>Quién despacha</label>'
-    +'<input id="rpResp" class="cl-in" style="width:100%" placeholder="tu nombre" autocomplete="off"></div>'
-    +'<button class="btn" id="rpSave" onclick="rpGuardar()">Guardar despacho</button></div>'
+  // La fecha al pie y chiquita: casi siempre es hoy. Y NO se pregunta quién
+  // despacha — eso sale de la sesión, igual que en Despachos.
+  h+='<div class="rp-pie"><span class="rp-pie-l">Día de la salida</span>'
+    +'<input type="date" class="de-fecha-in" value="'+esc(R.fecha)+'" onchange="_rp.fecha=this.value">'
+    +'</div>'
+    +'<button class="btn btn-amarillo rp-guardar" id="rpSave" onclick="rpGuardar()">Guardar despacho</button>'
     +'<div id="rpSaveMsg" style="margin-top:10px;font-size:12.5px"></div></div>';
   body.innerHTML=h;
 }
@@ -9627,12 +9700,23 @@ function rpUdsDe(pid,pres,n){ const I=NIV_INFO[pid]||{cajaU:1,presDiv:1};
   return pres==='cj' ? n*I.cajaU : n*I.presDiv; }
 function rpElegirProd(pid){ _rp.cur.pid=pid; _rp.cur.lotes={}; rpRender(); }
 
-// Lotes del producto elegido, FIFO (el más viejo primero). Agotados según sistema:
-// en gris, al fondo, NUNCA ocultos — el congelador físico manda sobre el sistema.
+// Lotes del producto elegido, FIFO (el más viejo primero).
+//
+// ⚠️ CAMBIO DE CRITERIO (26-ago, aprobado por Andrea). Antes se listaban TODOS y
+// los agotados iban en gris al fondo, con el argumento de que "el congelador
+// físico manda sobre el sistema". Medido en uso: los que están en cero son la
+// MAYORÍA, así que la lista quedaba llena de renglones que no se pueden elegir y
+// el lote bueno había que buscarlo. Ahora los de saldo cero NO se dibujan.
+// El argumento viejo NO se tira, se mueve: los ceros siguen a un toque de
+// distancia ("ver los N en cero") y "Agregar un lote que no está" sigue ahí para
+// el caso real de producto en el congelador que el sistema no conoce. Esconder
+// no es negar: el contador dice cuántos hay.
+// Sin ancla confirmada no hay saldo de nada (todos null) y entonces se listan
+// todos — filtrar por un saldo que no existe sería esconder a ciegas.
 function rpLotesHtml(){
   const cur=_rp.cur, pid=cur.pid;
-  let h='<div class="field" style="margin-top:8px"><label>Lote'
-    +(Object.keys(cur.lotes).length>1?' — partido entre varios':'')+'</label>';
+  let h='<div class="rp-cond"><div class="rp-sec-t">Lote'
+    +(Object.keys(cur.lotes).length>1?' — partido entre varios':'')+'</div>';
   if(!_rpLotes){ return h+'<div class="cl-none">Leyendo lotes de Odoo…</div></div>'; }
   const ls=Object.values(_rpLotes.lotes||{}).filter(function(L){ return +L.producto===pid; })
     .map(function(L){ const k=pid+'|'+L.canon;
@@ -9644,20 +9728,29 @@ function rpLotesHtml(){
     if(aa!==zz) return aa-zz;                                  // agotados al fondo
     return String(a.key).localeCompare(String(z.key),'es');    // FIFO: clave = añoProd-ddd
   });
+  // Un lote en cero YA ELEGIDO no se esconde: esconderlo borraría de la vista
+  // una cantidad que sigue contando en la línea.
+  const enCero=ls.filter(function(L){ return L.saldo!=null && L.saldo<=0 && cur.lotes[L.canon]==null; });
+  const vis=_rp.verCeros ? ls : ls.filter(function(L){ return enCero.indexOf(L)<0; });
   if(!ls.length) h+='<div class="cl-none">Sin lotes de este producto en la ventana. Agregalo a mano.</div>';
-  ls.forEach(function(L){
+  else if(!vis.length) h+='<div class="cl-none">Ningún lote de este producto tiene saldo.</div>';
+  vis.forEach(function(L){
     const sel=cur.lotes[L.canon]!=null, ago=(L.saldo!=null&&L.saldo<=0);
     h+='<div class="rp-lote'+(sel?' on':'')+(ago?' ago':'')+'">'
       +'<button class="rp-lotebtn" onclick="rpToggleLote(\''+esc(L.canon).replace(/'/g,'&#39;')+'\')">'
-      +esc(L.canon)
-      +(L.saldo!=null?('<span class="rp-saldo">'+(ago?'agotado según sistema':('quedan '+_rzN(L.saldo)))+'</span>'):'')
-      +(L.extra?'<span class="cl-tag">agregado</span>':'')
+      // El nombre del lote, en su propio span y con nowrap: es el dato principal
+      // y no puede ser el que ceda el ancho. Ver el CSS de .rp-lote-n.
+      +'<span class="rp-lote-n">'+esc(L.canon)+'</span>'
+      +(L.saldo!=null?('<span class="rp-saldo">'+(ago?'agotado':('quedan '+_rzN(L.saldo)))+'</span>')
+                     :(L.extra?'<span class="rp-saldo">agregado</span>':''))
       +'</button>'
-      +(sel?('<input type="number" min="0" step="1" inputmode="numeric" class="cl-in rp-lotein" value="'+esc(cur.lotes[L.canon])+'" '
+      +(sel?('<input type="number" min="0" step="1" inputmode="numeric" class="cl-in rp-lotein rp-dest" value="'+esc(cur.lotes[L.canon])+'" '
         +'oninput="_rp.cur.lotes[\''+esc(L.canon).replace(/'/g,'&#39;')+'\']=this.value;rpValidarLotes()">'):'')
       +'</div>';
   });
-  h+='<button class="btn btn-sm cl-add" onclick="rpLoteManual()">Agregar un lote que no está</button>'
+  if(enCero.length) h+='<button class="rp-ceros" onclick="_rp.verCeros=!_rp.verCeros;rpRender()">'
+    +(_rp.verCeros?'ocultar los ':'ver los ')+enCero.length+' en cero</button>';
+  h+='<div><button class="btn btn-sm cl-add" onclick="rpLoteManual()">Agregar un lote que no está</button></div>'
     +'<div id="rpLoteMsg" class="rp-nota"></div></div>';
   return h;
 }
@@ -9726,8 +9819,6 @@ async function rpGuardar(){
   if(_rp.tipo==='venta' && !_rp.cliente){ pon('var(--warn)','Falta el cliente.'); return; }
   if(!_rp.motivo){ pon('var(--warn)','Falta el motivo de la salida.'); return; }
   if(!_rp.lineas.length){ pon('var(--warn)','No hay ninguna línea cargada.'); return; }
-  const resp=(document.getElementById('rpResp').value||'').trim();
-  if(!resp){ pon('var(--warn)','Falta quién despacha.'); return; }
   const c=sbClient(); if(!c){ pon('var(--stop-tx)','No hay sesión de Supabase.'); return; }
   _rpGuardando=true; btn.disabled=true; pon('var(--busy)','Guardando…');
   let paso='pedido';
@@ -9747,8 +9838,13 @@ async function rpGuardar(){
               presentacion:l.presentacion, cant_present:l.cant_present}; }));
     if(e2) throw e2;
     paso='alisto';
+    // QUIÉN DESPACHA SALE DE LA SESIÓN (26-ago). Antes había un campo "tu nombre"
+    // que había que escribir a mano en cada despacho: tiempo perdido y un dato
+    // duplicado, porque el sistema ya sabe quién está adentro. Es lo que hace
+    // despConfirmar() desde siempre, y por eso el detalle de un despacho de
+    // Despachos dice "Preparó andrea@truefoodcr.com" sin haber preguntado nada.
     const {data:al,error:e3}=await c.from('ent_alisto').insert({
-      pedido_id:ped.id, responsable:resp, creado_por:email }).select('id').single();
+      pedido_id:ped.id, responsable:email, creado_por:email }).select('id').single();
     if(e3) throw e3;
     paso='líneas del alisto';
     for(const l of _rp.lineas){
