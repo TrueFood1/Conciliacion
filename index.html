@@ -3372,7 +3372,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 26 ago 2026 · b37';
+const BUILD = 'v 26 ago 2026 · b38';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -9945,13 +9945,20 @@ async function pdLeer(){
     q('ent_pedido_motivo_vigente','pedido_id,motivo,clasificado_en'),
     q('ent_pedido_factura_vigente','pedido_id,factura_id,factura_nombre,anulado'),
     q('ent_pedido_valida_vigente','pedido_id,anulado,validado_en'),
-    q('ent_alisto','pedido_id,anulado,creado_en') ]);
+    // ⚠️ LA VISTA VIGENTE, NO LA TABLA (26-ago). Leía `ent_alisto.anulado`, que es
+    // la columna que ENTREGAS_ETAPAS.sql §2 declara MUERTA: no tiene grant de
+    // UPDATE, así que nadie puede ponerla en true nunca. Anular de verdad es
+    // insertar en `ent_anulacion`, y eso solo lo refleja `ent_alisto_vigente`.
+    // Con la tabla cruda, un despacho anulado seguía saliendo en Pendientes para
+    // siempre — se descubrió anulando el despacho 11 (la salida de Mentha del
+    // 19-ago que nunca ocurrió, ver CORRECCION_DESP11.sql).
+    q('ent_alisto_vigente','pedido_id,preparado_en') ]);
   for(const r of [mot,fac,val,als]){ if(r.error) throw r.error; }
   const M={},F={},V={},A={};
   (mot.data||[]).forEach(function(r){ M[r.pedido_id]=r; });
   (fac.data||[]).forEach(function(r){ if(!r.anulado) F[r.pedido_id]=r; });
   (val.data||[]).forEach(function(r){ if(!r.anulado) V[r.pedido_id]=r; });
-  (als.data||[]).forEach(function(r){ if(!r.anulado) A[r.pedido_id]=1; });
+  (als.data||[]).forEach(function(r){ A[r.pedido_id]=1; });   // la vista ya filtró lo anulado
   const l1=[],l2=[],l3=[];
   (peds||[]).forEach(function(p){
     const mv=(M[p.id]&&M[p.id].motivo)||p.motivo;
