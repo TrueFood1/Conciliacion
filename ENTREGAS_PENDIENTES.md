@@ -290,9 +290,70 @@ quedar ahí sin nada que hacer. Hay que decidir si esa lista excluye los pedidos
 sin alisto vigente (ojo: un pedido que todavía NO se preparó también está sin
 alisto, y ése sí tiene que aparecer — no es la misma cosa).
 
+⚠️ **Y OJO CON UNA COSA ANTES DE CONSTRUIRLO**: hoy anular es un camino de una
+sola dirección — ver §8. El primer caso real de anulación (este mismo despacho
+11) resultó ser un error de diagnóstico que hubo que revertir al día siguiente
+re-registrando el alisto a mano. Un botón de anular sin deshacer es una trampa;
+§8 va antes que §7, o al menos junto.
+
 ### Ya arreglado de paso (26-ago, b38)
 
 `pdLeer` leía `ent_alisto.anulado`, la columna que `ENTREGAS_ETAPAS.sql` §2
 declara MUERTA: no tiene grant de UPDATE, así que nadie puede ponerla en true
 nunca. Con la tabla cruda, un despacho anulado seguía saliendo en Pendientes para
 siempre. Pasó a `ent_alisto_vigente`, que es la que refleja `ent_anulacion`.
+
+---
+
+## 8 · ABIERTO · `ent_anulacion` es de una sola dirección — no se puede revertir
+
+Descubierto el 26-ago-2026 al tener que deshacer una anulación mal hecha (ver §7
+y `CORRECCION_DESP11_REVERTIR.sql`).
+
+**El problema.** `ent_anulacion` no tiene columna para anularse a sí misma, y las
+dos vistas la leen con `not exists`:
+
+```sql
+where a.anulado = false
+  and not exists (select 1 from ent_anulacion x
+                   where x.entidad = 'alisto' and x.entidad_id = a.id)
+```
+
+Cualquier fila de anulación es **final**: una fila posterior no la deshace.
+Anular es fácil y desanular es imposible sin tocar el esquema.
+
+**Por qué importa ahora.** El pendiente §7 es construir la anulación desde la
+pantalla. Si se construye sobre este esquema, se le está dando a alguien un botón
+que **no tiene vuelta atrás** — y el primer caso real de anulación (el despacho
+11) resultó ser un error de diagnóstico que hubo que revertir al día siguiente.
+Un botón de anular sin deshacer es una trampa.
+
+**Lo que habría que cambiar.** Agregar a `ent_anulacion` una columna que apunte a
+la fila que la revierte (o un `anulado boolean`, el mismo patrón de
+`ent_pedido_factura`), y pasar las dos vistas de `not exists` a **"gana la fila
+más reciente"**, que es el criterio que el resto del módulo ya usa para el ancla,
+el motivo y el vínculo a la factura. ⚠️ Toca `ent_alisto_vigente` y
+`ent_salida_vigente`, de las que cuelgan los saldos, `v_ent_pedido_estado` y
+Pendientes: no es un cambio para hacer con urgencia, y hay que probarlo antes.
+
+**Mientras tanto**, revertir se hace **re-registrando** el alisto (append-only,
+sin DDL): las filas de anulación se quedan como evidencia y se inserta el alisto
+de nuevo con su misma fecha, líneas y lotes. Es lo que hace
+`CORRECCION_DESP11_REVERTIR.sql` y funciona, pero deja el pedido con dos alistos.
+
+---
+
+## 9 · ABIERTO · "Despachar igual" no se persiste
+
+El filtro de "Facturas sin despacho pendiente" (b39) aparta las facturas que ya
+tienen su entrega hecha en Odoo, y deja el botón **"Despachar igual"** para
+cuando el filtro se equivoque. Ese botón hoy es **de la sesión**: se guarda en
+`_despForzar`, una variable en memoria. Si se recarga la pantalla antes de
+despachar, la factura vuelve a la lista apartada.
+
+Alcanza para el uso previsto —se confirma y se despacha en el momento— pero no
+para el caso de "la aparto ahora y la despacho mañana". Persistirlo pide una
+tabla (`ent_factura_forzada`, append-only con su motivo, como todo lo demás) y
+decidir si la decisión es para siempre o solo para esa factura y esa fecha.
+
+Aprobado como está por Andrea el 26-ago; anotado para cuando moleste.
