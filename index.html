@@ -1109,24 +1109,45 @@ tr.r-done td{background:rgba(192,208,72,.08)}
    ellas: con los tokens en la vista, la miga de pan quedaba oscura sobre una
    página clara. Todo lo que hay debajo es una redefinición de tokens; no se
    toca ni una regla del sistema. */
+/* ── GRIS FRÍO, NO BEIGE (26-ago) ────────────────────────────────────────
+   El #F7F6F2 tiraba a amarillento y daba aire a papel viejo. Pasa a #F7F8FA: un
+   blanco con una gota de AZUL en vez de una de amarillo. Las tarjetas siguen en
+   blanco puro, así que la jerarquía —tarjeta que se eleva sobre la página— no
+   cambia; lo único que cambia es la temperatura.
+   ⚠️ SE MUEVE LA FAMILIA ENTERA, no solo el fondo. Los bordes y el hundido eran
+   beige de la misma familia (#E4E2DB, #D6D4CC, #C9C6BE, #F2F1EC): dejarlos
+   cálidos contra un fondo frío los habría vuelto visiblemente amarillos, que es
+   peor que el beige parejo de antes. Los reemplazos conservan la LUMINANCIA de
+   cada uno y solo giran el tono, así que ningún contraste medido empeora.
+   Los TEXTOS no se tocan: sus tres tonos están medidos y calibrados, y a esta
+   saturación un gris cálido sobre fondo frío es indistinguible.
+   CONTRASTE MEDIDO en el navegador, antes → después (el fondo nuevo es un pelo
+   MÁS claro: luminancia 0,9210 → 0,9381, así que todo sube un poco):
+       principal  sobre el fondo    16,13 → 16,41
+       SECUNDARIO sobre el fondo     4,85 →  4,93   (AA pide 4,5)
+       terciario  sobre el fondo     3,25 →  3,30   (AA grande pide 3,0)
+       terciario  sobre la anulada   3,10 →  3,16
+   Sobre la tarjeta blanca no cambia nada (5,24 y 3,51): el blanco es el mismo.
+   El secundario sobre el fondo era el que venía justo —4,85 contra un mínimo de
+   4,5— y queda un poco mejor, no peor. */
 body.ent-claro{
-  --bg:#F7F6F2;--bg2:#FFFFFF;--bg3:#FFFFFF;      /* la página NO es blanco puro */
-  --surface:#FFFFFF;--surface-2:#F7F6F2;         /* la tarjeta se eleva siendo más clara */
+  --bg:#F7F8FA;--bg2:#FFFFFF;--bg3:#FFFFFF;      /* la página NO es blanco puro */
+  --surface:#FFFFFF;--surface-2:#F7F8FA;         /* la tarjeta se eleva siendo más clara */
   --text:#1A1A17;--text-m:#6E6C68;--text-h:#8B897F;
   /* El terciario NO es el #9A988F del sistema oscuro. Ese tono se leía bien
      sobre negro y al invertir el fondo da 2.89:1 sobre blanco — por debajo del
      mínimo, y justo en el escalón de las notas al pie, la hora de preparado y
      los "hace N d". Es el texto más chico del módulo y el que peor aguanta el
      reflejo del congelador. #8B897F sube a 3.51:1 sobre la tarjeta blanca y no
-     baja de 3.10:1 en el peor fondo del módulo (la tarjeta anulada, #F2F1EC),
+     baja de 3.10:1 en el peor fondo del módulo (la tarjeta anulada, #F1F3F6),
      sin achatar la jerarquía: sigue un escalón por debajo del secundario (5.24:1). */
   --text-2:#6E6C68;--text-3:#8B897F;
-  --border:#E4E2DB;--border-m:#D6D4CC;--border-strong:#D6D4CC;
-  --sunken:#F7F6F2;        /* hundido = el tono de la página sobre el blanco */
+  --border:#E3E5EA;--border-m:#D5D8DE;--border-strong:#D5D8DE;
+  --sunken:#F7F8FA;        /* hundido = el tono de la página sobre el blanco */
   --panel:#FFFFFF;
   --field:#FFFFFF;
-  --dim-line:#C9C6BE;--dim-bg:#F2F1EC;
-  --scrim:rgba(247,246,242,.94);--scrim-2:rgba(26,26,23,.38);
+  --dim-line:#C7CBD2;--dim-bg:#F1F3F6;
+  --scrim:rgba(247,248,250,.94);--scrim-2:rgba(26,26,23,.38);
   /* El lima se queda SOLO donde es relleno. Como línea y como texto pasa a
      oliva: #E9FE60 sobre blanco da ~1.1:1 y no se ve. */
   --ent-fill:#E9FE60;--ent-fill-tx:#2E3300;
@@ -1508,7 +1529,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
         <div class="home-mod-state" style="color:#6E6C68">Pronto</div>
       </div>
     </div>
-    <div id="entCard" class="hidden" onclick="irAPendientes()"></div>
+    <!-- La alerta de Entregas se fue del lobby (26-ago): cada módulo muestra sus
+         alertas al ENTRAR, y repetirlas afuera duplica. Verificado antes de
+         sacarla que nada vivía solo acá — los tres contadores y las filas salían
+         de pdLeer(), la misma función que alimenta Pendientes. -->
     </div><!-- /home-bottom -->
     <div class="home-build" id="homeBuild"></div>
   </div>
@@ -1531,7 +1555,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <div id="entMas" class="hidden">
   <div class="fm-h">Entregas</div>
   <button onclick="entMasIr('historial')">Historial<span class="sub">Toda la salida registrada: por cliente, lote o fecha</span></button>
-  <button onclick="entMasIr('pendientes')">Pendientes<span class="sub">Falta validar en Odoo, vincular factura o clasificar</span></button>
+  <button onclick="entMasIr('pendientes')">Pendientes<span class="sub">Lo que hay que arreglar</span></button>
   <button onclick="entMasIr('conteo')">Conteo<span class="sub">La foto del congelador que ancla los saldos por lote</span></button>
 </div>
 
@@ -1731,7 +1755,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- MERMAS (módulo Operaciones) -->
 <div id="vReporte" class="hidden">
   <div class="faces faces-ent">
-    <button class="face" onclick="irADespachos()">Despachos</button>
+    <button class="face" onclick="irADespachos()">Entregas</button>
     <button class="face" onclick="irAEntLotes()">Inventario</button>
     <button class="face on">Entregas sin factura</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
@@ -1745,13 +1769,13 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- ── DESPACHOS: el lector de facturas (Daniel, 6:30 am) ────────────────── -->
 <div id="vDespachos" class="hidden">
   <div class="faces faces-ent">
-    <button class="face on">Despachos</button>
+    <button class="face on">Entregas</button>
     <button class="face" onclick="irAEntLotes()">Inventario</button>
     <button class="face" onclick="irAReporte()">Entregas sin factura</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
-    <div class="m3title" style="font-size:24px">Despachos</div>
+    <div class="m3title" style="font-size:24px">Entregas</div>
     <button class="btn btn-sm" onclick="despCargar(true)">Recargar</button>
   </div>
   <div id="despStatus" class="status hidden" style="margin-top:14px"></div>
@@ -1765,7 +1789,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
      que viene el bloqueo duro: sin esta pantalla, el candado no tiene llave. -->
 <div id="vEntLotes" class="hidden">
   <div class="faces faces-ent">
-    <button class="face" onclick="irADespachos()">Despachos</button>
+    <button class="face" onclick="irADespachos()">Entregas</button>
     <button class="face on">Inventario</button>
     <button class="face" onclick="irAReporte()">Entregas sin factura</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
@@ -1780,7 +1804,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <div id="vPendientes" class="hidden">
   <div class="faces faces-ent">
-    <button class="face" onclick="irADespachos()">Despachos</button>
+    <button class="face" onclick="irADespachos()">Entregas</button>
     <button class="face" onclick="irAEntLotes()">Inventario</button>
     <button class="face" onclick="irAReporte()">Entregas sin factura</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
@@ -1788,7 +1812,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
       <div class="m3title" style="font-size:24px">Pendientes</div>
-      <div class="m3sub" style="margin-top:2px">Falta validar en Odoo, vincular factura o clasificar.</div>
+      <div class="m3sub" style="margin-top:2px">Lo que hay que arreglar.</div>
     </div>
     <button class="btn btn-sm" onclick="pdCargar(true)">Recargar</button>
   </div>
@@ -1799,7 +1823,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- ── BUSCAR: el historial. UN campo, y al tocarlo se elige por qué se busca. ── -->
 <div id="vEntBuscar" class="hidden">
   <div class="faces faces-ent">
-    <button class="face" onclick="irADespachos()">Despachos</button>
+    <button class="face" onclick="irADespachos()">Entregas</button>
     <button class="face" onclick="irAEntLotes()">Inventario</button>
     <button class="face" onclick="irAReporte()">Entregas sin factura</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
@@ -1814,7 +1838,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <div id="vConteoLote" class="hidden">
   <div class="faces faces-ent">
-    <button class="face" onclick="irADespachos()">Despachos</button>
+    <button class="face" onclick="irADespachos()">Entregas</button>
     <button class="face" onclick="irAEntLotes()">Inventario</button>
     <button class="face" onclick="irAReporte()">Entregas sin factura</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
@@ -2470,12 +2494,37 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .rp-pie{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:18px}
 .rp-pie-l{font-size:11.5px;color:var(--text-3);white-space:nowrap}
 .rp-guardar{height:46px;font-size:14px;width:100%;margin-top:14px}
-#rpSheet{position:fixed;inset:0;background:var(--scrim);z-index:60;display:flex;justify-content:center}
+/* ── EL SELECTOR DE CLIENTE (arreglado el 26-ago) ────────────────────────
+   Estaba INSERVIBLE en iPhone por dos causas distintas:
+
+   1 · POR DEBAJO DEL ENCABEZADO. En teléfono `#appHeader` es sticky con
+       z-index:110 (para no meterse bajo la barra de estado al hacer scroll), y
+       esta capa estaba en 60. O sea que el encabezado se dibujaba ENCIMA: se
+       veía medio renglón del buscador y el botón "Cerrar" cortado al medio.
+       Sube a 140: arriba del encabezado (110) y del panel "+" (130), abajo de
+       los paneles laterales (200+).
+
+   2 · LA LISTA NO SE PODÍA DESPLAZAR, que es lo que lo hacía inservible. En una
+       columna flex, un hijo con `overflow-y:auto` NO desborda si no se le pone
+       `min-height:0`: el `min-height:auto` que trae por defecto lo deja CRECER
+       con su contenido, así que el scroll nunca se activa y lo que sobra se
+       recorta contra el contenedor fijo — inalcanzable. Con decenas de clientes
+       ordenados por cantidad de despachos, los de abajo no se podían elegir de
+       ninguna forma. `flex:1;min-height:0` es el arreglo.
+
+   Y el buscador queda FIJO mientras la lista se desplaza (`flex:none`): en una
+   lista larga es lo único que la salva, y si se va con el scroll no sirve.
+   `overscroll-behavior:contain` evita que el tirón se lo coma la página de
+   atrás, y el safe-area de abajo saca el último cliente de la barra de gestos. */
+#rpSheet{position:fixed;inset:0;background:var(--scrim);z-index:140;display:flex;justify-content:center;
+  padding-top:env(safe-area-inset-top)}
 #rpSheet.hidden{display:none}
-.rp-sheet-in{width:100%;max-width:560px;padding:18px 16px;display:flex;flex-direction:column}
-.rp-sheet-top{display:flex;gap:10px;margin-bottom:12px}
+.rp-sheet-in{width:100%;max-width:560px;padding:18px 16px;display:flex;flex-direction:column;min-height:0}
+.rp-sheet-top{display:flex;gap:10px;margin-bottom:12px;flex:none}
 .rp-sheet-top input{flex:1;background:var(--field);border:1px solid var(--border-strong);border-radius:9px;color:var(--text);font:inherit;font-size:16px;padding:11px 12px}
-.rp-lista{overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-bottom:24px}
+.rp-lista{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;display:flex;flex-direction:column;gap:6px;
+  padding-bottom:calc(24px + env(safe-area-inset-bottom))}
 .rp-cli{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:var(--field);border:1px solid var(--border);border-radius:9px;color:var(--text);font:inherit;font-size:14px;padding:12px;cursor:pointer}
 .rp-clif{font-size:11px;color:var(--text-3);white-space:nowrap}
 .pd-cnt{display:inline-block;min-width:22px;text-align:center;font-size:11.5px;font-weight:600;color:var(--text-3);border:1px solid var(--border-strong);border-radius:999px;padding:1px 7px;margin-left:6px}
@@ -2483,16 +2532,34 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    lee marrón y promete un problema que no existe: un "10" es cuántos hay, no que
    algo esté mal. Va al relleno lima, el mismo patrón del chip activo del buscador. */
 .pd-cnt.on{color:var(--ent-fill-tx);background:var(--ent-fill);border-color:var(--ent-fill)}
+/* ── Pendientes · la fila (26-ago) ───────────────────────────────────────
+   Era una tabla de 4 columnas. A 375px la columna del botón se quedaba con ~70px
+   y "Ya validé en Odoo" se partía en CUATRO renglones — eso era lo que hacía cada
+   fila tan alta, no el contenido. Ahora es una fila flex: el dato a la izquierda,
+   la acción a la derecha, y el botón con nowrap para que no vuelva a partirse. */
+.pd-fila{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:10px 0;border-bottom:1px solid var(--border)}
+.pd-fila:last-of-type{border-bottom:none}
+.pd-fila-c{min-width:0;flex:1}
+.pd-quien{font-size:13.5px;color:var(--text);line-height:1.35}
+.pd-para{color:var(--text-3);font-weight:400}
+.pd-meta{font-size:11px;color:var(--text-3);margin-top:2px;font-variant-numeric:tabular-nums}
+.pd-fila-nb{border-bottom:none;padding-bottom:0}
+/* Los dos botones de decisión, en su propio renglón y a ancho completo. Al lado
+   del texto se partían; y son la acción de la fila, no un adorno al margen. */
+.pd-decs{display:flex;gap:8px;flex-wrap:wrap;padding:0 0 12px;
+  border-bottom:1px solid var(--border)}
+.pd-decs:last-child{border-bottom:none;padding-bottom:2px}
+.pd-decs .btn{white-space:nowrap}
+.pd-motivo{font-size:11.5px;color:var(--text-3);line-height:1.45;padding:5px 0 9px}
+.pd-acc{flex:none;white-space:nowrap}
+.pd-est{flex:none;white-space:nowrap;font-size:11.5px}
+.pd-est-mal{color:var(--stop-tx)}
+.pd-est-ojo{color:var(--warn-2)}
 .pd-exp td{padding:0}
 .pd-clasif{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin:4px 0 10px;font-size:12px;color:var(--text-3)}
 .pd-clasif button{background:var(--field);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:12.5px;padding:8px 11px;cursor:pointer}
 .pd-clasif button:hover{color:var(--text);border-color:var(--ent-line)}
-#entCard{margin-top:12px;background:#141417;border:.5px solid #3F4A16;border-radius:12px;padding:13px 15px;cursor:pointer}
-#entCard .ec-t{font-size:12px;color:var(--text-2);font-weight:600}
-#entCard .ec-row{font-size:12px;color:var(--text-3);margin-top:5px}
-#entCard .ec-c{display:inline-block;min-width:18px;text-align:center;font-size:11px;font-weight:600;color:var(--text-3);border:1px solid var(--border-strong);border-radius:999px;padding:0 6px}
-#entCard .ec-c.on{color:#0E0E11;background:#C99A4E;border-color:#C99A4E}
-#entCard .ec-rec{font-size:11.5px;color:var(--text-3);margin-top:7px;line-height:1.6}
 @media(max-width:700px){
   .rp-prods{grid-template-columns:repeat(2,1fr)}
   .rp-prod{padding:16px 6px;font-size:14px}
@@ -2618,6 +2685,18 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* En escritorio la bandeja NO se estira a 1180px: una tarjeta de un metro de ancho
    con dos datos adentro se lee peor, no mejor. Misma medida que las líneas del
    pedido, para que las dos pantallas se sientan del mismo módulo. */
+/* ── Sub-pestañas de Despachos (26-ago) ──────────────────────────────────
+   Reemplazan a los dos encabezados de sección apilados. El contador activo va al
+   relleno lima, el mismo patrón de .pd-cnt.on y del chip del buscador: un número
+   es cuántos hay, no una alerta. */
+.dp-tabs{display:flex;gap:20px;border-bottom:1px solid var(--border);margin-bottom:12px;max-width:620px}
+.dp-tab{background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;
+  padding:0 0 9px;font:inherit;font-size:14px;color:var(--text-3);cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px;-webkit-tap-highlight-color:transparent}
+.dp-tab.on{color:var(--text);font-weight:600;border-bottom-color:var(--mod)}
+.dp-tab-n{font-family:var(--mono);font-size:11px;color:var(--text-3);
+  border:1px solid var(--border-strong);border-radius:999px;padding:0 6px;line-height:16px}
+.dp-tab.on .dp-tab-n{color:var(--ent-fill-tx);background:var(--ent-fill);border-color:var(--ent-fill)}
 .dp-lista{display:flex;flex-direction:column;gap:6px;max-width:620px}
 .dp-sep{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
   color:var(--text-3);padding-top:6px}
@@ -2672,7 +2751,12 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* ── Diálogo de Entregar ──────────────────────────────────────────────────
    Se abre sobre la bandeja. El cuerpo scrollea y el pie queda fijo: con seis
    productos el botón no se va de la pantalla, que es donde se pierde el gesto. */
-.de-fondo{position:fixed;inset:0;background:var(--scrim-2);z-index:90;
+/* z-index 140 y no 90 por lo mismo que #rpSheet: en teléfono el encabezado es
+   sticky en 110 y se dibujaba ENCIMA del diálogo. Acá no se notaba —la caja va
+   anclada abajo y nunca llegaba a tocarlo— pero el velo no tapaba el encabezado
+   y sus botones seguían tocables con un diálogo abierto, que es justo lo que un
+   modal existe para impedir. */
+.de-fondo{position:fixed;inset:0;background:var(--scrim-2);z-index:140;
   display:flex;align-items:flex-end;justify-content:center;padding:0}
 @media(min-width:700px){ .de-fondo{align-items:center;padding:24px} }
 .de-caja{background:var(--surface);border:1px solid var(--border);
@@ -3457,7 +3541,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 26 ago 2026 · b40';
+const BUILD = 'v 26 ago 2026 · b47';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -3835,7 +3919,6 @@ async function authEntrar(){
     document.getElementById('vAuth').classList.add('hidden');   // conectado → recién ahora dejamos ver el lobby
     setSaludo();                                                // saluda a quien está autenticado (no un nombre fijo)
     await accesoCargar();                                       // qué módulos dibuja el lobby (cosmético)
-    entCardCargar();                                            // pendientes de Entregas, sin bloquear el lobby
   }else if(msg){
     msg.style.color='#FF8A8A'; msg.textContent='No pude conectar a producción. Reintentá.';
     document.getElementById('btnSalir').classList.add('hidden');
@@ -3925,8 +4008,6 @@ function accesoPintarLobby(){
     const el=document.querySelector('#vLobby .'+map[mod]);
     if(el) el.style.display = accesoPuede(mod) ? '' : 'none';
   }
-  const ec=document.getElementById('entCard');
-  if(ec && !accesoPuede('finanzas')) ec.classList.add('hidden');   // la tarjeta de pendientes es de las socias
   // El buscador conversacional es la puerta del dashboard de las socias. A quien no
   // tiene acceso a todo no le sirve, y es superficie de más en una pantalla que
   // debería tener UNA sola cosa que hacer.
@@ -4033,9 +4114,15 @@ function _modFallo(id){
   try{ console.error('[Truefie] vista no mostrable:', id,
        '— ¿está declarada en ACCESO_VISTAS y existe su <div>?'); }catch(e){}
 }
+// SIN "Entregas · Entregas" (26-ago). Cuando la pantalla se llama igual que su
+// módulo, repetirlo no agrega nada y encima se lee como un error. Se muestra uno
+// solo: el nombre, y punto. La regla es general, no un caso especial de Entregas.
 function crumbSet(area,cur){
   const a=document.querySelector('.crumb-area'); if(a)a.textContent=area;
-  const c=document.querySelector('.crumb-cur'); if(c)c.textContent=cur;
+  const igual=(String(cur||'').trim().toLowerCase()===String(area||'').trim().toLowerCase());
+  const c=document.querySelector('.crumb-cur'); if(c){ c.textContent=igual?'':cur;
+    c.style.display=igual?'none':''; }
+  const sp=document.querySelector('.crumb-sep'); if(sp) sp.style.display=igual?'none':'';
   // el punto del breadcrumb sigue el color del módulo (Finanzas azul · Operaciones rosa · Conciliación verde)
   // Entregas va en OLIVA, no en lima: su encabezado es claro y un punto de 7px en
   // #E9FE60 sobre blanco no se ve. Mismo criterio que --ent-line.
@@ -4063,7 +4150,6 @@ function volverLobby(){
   document.getElementById('appHeader').classList.add('hidden');
   document.getElementById('vLobby').classList.remove('hidden');
   accesoPintarLobby();
-  entCardCargar();   // los contadores pueden haber cambiado mientras se trabajaba
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -7424,7 +7510,13 @@ function _entBucketsHTML(buckets){
     +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.6">'
     +'El extractor no pudo sacar el lote del chatter de estas órdenes. No se asumen ni se esconden: '
     +'si hay producto de alguna en el congelador, agregá el lote a mano en el producto que corresponda.</div>'
-    +'<table class="cl-tbl" style="margin-top:8px"><tr><th>Orden</th><th>Producto</th><th>Fecha</th>'
+    // ⚠️ LA TABLA VA EN UN CONTENEDOR QUE SE DESPLAZA (26-ago). Son cinco
+    // columnas: a 375px pedía 322px de ancho mínimo dentro de un recuadro de
+    // 309 y se salía 28px por la derecha, encima del borde. Con overflow-x se
+    // desplaza sola y no rompe nada. Va acá, en el componente, así que también
+    // lo arregla en Inventario y en Conteo, donde vive el mismo bucket.
+    +'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:8px">'
+    +'<table class="cl-tbl" style="margin-top:0;min-width:100%"><tr><th>Orden</th><th>Producto</th><th>Fecha</th>'
     +'<th class="n">Uds</th><th>Caso</th></tr>';
   KS.forEach(function(k){
     const lbl={sin_lote:'sin lote en el chatter',
@@ -7438,7 +7530,7 @@ function _entBucketsHTML(buckets){
         +'<td class="n">'+_rzN(+r.uds||0)+'</td><td class="muted">'+lbl+'</td></tr>';
     });
   });
-  return h+'</table></div>';
+  return h+'</table></div></div>';
 }
 // Aviso de pantalla. NUNCA se deja el cuerpo mudo: si algo falla, se dice y se sigue.
 function _clAviso(tipo, html){
@@ -8084,6 +8176,9 @@ try{
 // Las facturas apartadas por no llevar despacho, y las que Andrea mandó igual a
 // "Por preparar" (de la sesión: se confirma y se despacha en el momento).
 let _despSinDesp=[], _despForzar={};
+// Sub-pestaña abierta en Despachos: 'preparar' | 'entregar'. Arranca en preparar,
+// que es el trabajo de la mañana.
+let _despTab='preparar';
 let _despFac=null, _despUom=null, _despErr='', _despAbierto=null, _despLotes=null,
     _despSaldo=null, _despEdit={}, _despGuardando=false;
 // El estado de los pedidos YA preparados. Sale de v_ent_pedido_estado, o sea
@@ -8295,6 +8390,9 @@ async function despCargar(force){
   // los lotes van aparte y NO bloquean la bandeja: si fallan, se escribe el lote a mano
   despCargarLotes();
   despRender();
+  // Pendientes muestra las apartadas y sus datos salen de acá: si es la pantalla
+  // abierta, hay que repintarla o la sección se queda en "Leyendo…" para siempre.
+  try{ if(_pd) pdRender(); }catch(e){}
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -8431,20 +8529,40 @@ async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
     if(c){ const {data}=await c.from('v_ent_factura_despachada').select('factura_id');
            (data||[]).forEach(function(r){ ya[r.factura_id]=1; }); }
   }catch(e){}
+  // ── LO QUE UN HUMANO YA DECIDIÓ sobre las apartadas ───────────────────
+  // 'revisado'  → la miró y está bien apartada: sale de las DOS listas.
+  // 'despachar' → el filtro se equivocó: va a la bandeja como cualquier otra.
+  // Gana la fila más reciente (lo resuelve la vista). Si Supabase falla queda
+  // vacío y las apartadas se muestran todas — de más, nunca de menos.
+  let dec={};
+  try{
+    const c=sbClient();
+    if(c){ const {data}=await c.from('ent_factura_decision_vigente').select('factura_id,decision');
+           (data||[]).forEach(function(r){ dec[r.factura_id]=r.decision; }); }
+  }catch(e){}
   const out=[];
   _despSinDesp=[];
   mv.forEach(function(m){
     if(ya[m.id]) return;
     if(anuladas[m.id]) return;                 // anulada por NC y sin alisto: no se lista
     const lin=por[m.id]; if(!lin) return;      // factura sin terminado: no es despacho
-    // NO DESAPARECE: se aparta a su propia lista, con el motivo escrito, y con un
-    // botón para mandarla igual a "Por preparar". Filtrar no puede ser una puerta
-    // de una sola dirección. `_despForzar` es de la sesión: se confirma y se
-    // despacha en el momento, no es una marca que haya que persistir.
-    if(sinDesp[m.id] && !_despForzar[m.id]){
-      _despSinDesp.push({factura_id:m.id, factura:m.name, fecha:m.invoice_date,
-        cliente:(m.partner_id&&m.partner_id[1])||'—', motivo:sinDesp[m.id]});
-      return;
+    // NO DESAPARECE: se aparta a su propia lista, con el motivo escrito y con
+    // DOS botones —"Revisado" y "Despachar igual"—, los dos guardados en
+    // `ent_factura_decision`. Filtrar no puede ser una puerta de una sola
+    // dirección, y una decisión que se pierde al recargar tampoco es una decisión.
+    if(sinDesp[m.id]){
+      // `_despForzar` es el acuse INMEDIATO del toque —vale hasta que la
+      // relectura traiga la decisión ya guardada— y `dec` es lo que quedó
+      // escrito. Los dos dicen lo mismo; el primero llega antes.
+      const d = _despForzar[m.id] ? 'despachar' : dec[m.id];
+      if(d==='revisado') return;                 // decidida: fuera de las dos listas
+      if(d!=='despachar'){                       // sin decidir: a la lista de apartadas
+        const dias=Math.floor((Date.now()-Date.parse(m.invoice_date+'T12:00:00Z'))/86400000);
+        _despSinDesp.push({factura_id:m.id, factura:m.name, fecha:m.invoice_date,
+          cliente:(m.partner_id&&m.partner_id[1])||'—', motivo:sinDesp[m.id], dias:dias});
+        return;
+      }
+      // 'despachar': sigue de largo y entra a "Por preparar" como cualquier otra.
     }
     out.push({
       factura_id:m.id, factura:m.name, fecha:m.invoice_date,
@@ -8657,109 +8775,88 @@ function despRender(){
       +entPdfBtn(f.factura_id, f.factura, f.cliente)+'</span></button>';
   };
 
-  let h='<div class="dp-lista">';
+  // ── SUB-PESTAÑAS (26-ago) ─────────────────────────────────────────────
+  // Eran dos secciones apiladas con su encabezado. Pasan a pestañas con su
+  // conteo: son ETAPAS de la misma cosa, no categorías — "Por preparar" es lo
+  // que nadie tocó todavía, "Por entregar" es lo que ya está armado y falta
+  // marcarle la salida. Puestas una al lado de la otra, el orden se lee solo.
+  const stab=function(k,txt,n){
+    return '<button class="dp-tab'+(_despTab===k?' on':'')+'" onclick="despSetTab(\''+k+'\')">'
+      +esc(txt)+'<span class="dp-tab-n">'+n+'</span></button>';
+  };
+  let h='<div class="dp-tabs">'
+    +stab('preparar','Por preparar',(_despFac===null?'·':fs.length))
+    +stab('entregar','Por entregar',(_despEstado===null?'·':prep.length))
+    +'</div><div class="dp-lista">';
 
-  // 1 · POR PREPARAR
-  h+='<div class="dp-secc"><span>Por preparar</span><span class="dp-secc-n">'
-    +(_despFac===null?'·':fs.length)+'</span></div>';
-  if(_despFac===null){
-    h+='<div class="dp-vacia">Leyendo facturas de Odoo…</div>';
-  }else if(!fs.length){
-    h+='<div class="dp-vacia">'+(_despErr?'No se pudieron leer las facturas de Odoo.':'Nada por preparar.')+'</div>';
+  if(_despTab==='preparar'){
+    // ⚠️ "ANTERIORES SIN DESPACHAR" DEJA DE SER UNA SECCIÓN APARTE (26-ago).
+    // Eran las MISMAS de "Por preparar", solo que viejas: separarlas obligaba a
+    // mirar dos listas para saber qué falta despachar. Van adentro, marcadas con
+    // su etiqueta de fecha —la que ya existía: `HOY` en lima, `MIÉ 19` en gris—
+    // y ordenadas de la MÁS VIEJA a la más nueva, para que lo atrasado quede
+    // arriba, que es donde se mira primero.
+    const orden=fs.slice().sort(function(a,z){
+      return String(a.fecha).localeCompare(String(z.fecha)) || (a.factura_id-z.factura_id); });
+    if(_despFac===null){
+      h+='<div class="dp-vacia">Leyendo facturas de Odoo…</div>';
+    }else if(!orden.length){
+      h+='<div class="dp-vacia">'+(_despErr?'No se pudieron leer las facturas de Odoo.':'Nada por preparar.')+'</div>';
+    }else{
+      h+=orden.map(function(f){ return tarjeta(f,!f.enVentana); }).join('');
+    }
   }else{
-    h+=enVentana.map(function(f){ return tarjeta(f,false); }).join('');
-  }
-
-  // 2 · POR ENTREGAR
-  // El nombre pasó de estado a trabajo: "Preparado" describe algo que YA pasó,
-  // "Por entregar" nombra lo que falta hacer — igual que "Por preparar". Leídas
-  // en orden, las tres secciones cuentan el día.
-  h+='<div class="dp-secc"><span>Por entregar</span><span class="dp-secc-n">'
-    +(_despEstado===null?'·':prep.length)+'</span></div>';
-  if(_despEstErr){
-    h+='<div class="dp-vacia dp-mal">No pude leer el estado de los pedidos: '+esc(_despEstErr)
-      +(/pedido_estado|ent_salida|schema cache/i.test(_despEstErr)
-        ? ' — falta pegar ENTREGAS_ETAPAS.sql en Supabase.' : '')+'</div>';
-  }else if(_despEstado===null){
-    h+='<div class="dp-vacia">Leyendo…</div>';
-  }else if(!prep.length){
-    h+='<div class="dp-vacia">Nada por entregar.</div>';
-  }else{
-    h+=prep.map(function(r){
-      // Ámbar solo lo que urge: preparado ayer o antes hay que sacarlo o
-      // devolverlo al congelador. Preparado hoy es lo normal y va en gris.
-      const vieja=_despDiaDe(r.preparado_en)<hoy, ocupado=(_despEntregando===r.pedido_id);
-      // El resumen no pide ningún gesto ni ninguna lectura extra: los datos ya vinieron
-      // con la bandeja. Da contexto de lo que hay armado sin abrir nada.
-      const res=_despResumen(r);
-      const an=_despAnulDe(r);              // null = todavía verificando
-      const anulada=!!(an&&an.anulada);
-      // TRES ESTADOS, y el del medio importa tanto como los otros dos:
-      //   verificando → no se sabe si la factura vive. Botón apagado y se dice por qué.
-      //   anulada     → gris, etiquetada, con el motivo. NO se puede entregar, y NO se
-      //                 esconde: el producto ya está armado y Daniel tiene que enterarse.
-      //   normal      → como siempre.
-      let etiqueta='';
-      if(anulada){
-        etiqueta='<div class="dp-prep-anul">Factura anulada'
-          +(an.motivo?(' · '+esc(an.motivo)):'')
-          +(an.nc_nombre?(' <span class="dp-prep-nc">NC '+esc(String(an.nc_nombre).slice(-6))+'</span>'):'')
-          +'<br>No se entrega. El producto ya está armado: avisale a Andrea.</div>';
-      }else if(an===null){
-        etiqueta='<div class="dp-prep-ver">Verificando en Odoo si la factura sigue vigente…</div>';
-      }else if(an.sinVerificar){
-        // Se entrega igual, pero Daniel tiene que saber qué está haciendo.
-        etiqueta='<div class="dp-prep-anul">No pude verificar la factura contra Odoo.'
-          +'<br>Se registra igual y queda marcada: Andrea la revisa después.</div>';
-      }
-      const btn = anulada
-        ? '<button class="dp-entregar" disabled>Anulada</button>'
-        : '<button class="dp-entregar"'+((ocupado||an===null)?' disabled':'')
-          +' onclick="despAbrirEntrega('+r.pedido_id+')">'
-          +(ocupado?'Guardando…':(an===null?'Verificando…':(an.sinVerificar?'Entregar sin verificar':'Entregar')))+'</button>';
-      return '<div class="dp-prep'+(vieja?' vieja':'')+(anulada?' anulada':'')+'">'
-        +'<div class="dp-prep-i"><span class="dp-prep-cli">'+esc(r.cliente_nombre||'—')+'</span>'
-        +'<span class="dp-prep-h">preparado '+esc(_despCuando(r.preparado_en))
-        +(res?(' · '+esc(res)):'')+'</span>'+etiqueta+'</div>'
-        +entPdfBtn(r.factura_id, r.factura_nombre, r.cliente_nombre)+btn+'</div>';
-    }).join('');
+    if(_despEstErr){
+      h+='<div class="dp-vacia dp-mal">No pude leer el estado de los pedidos: '+esc(_despEstErr)
+        +(/pedido_estado|ent_salida|schema cache/i.test(_despEstErr)
+          ? ' — falta pegar ENTREGAS_ETAPAS.sql en Supabase.' : '')+'</div>';
+    }else if(_despEstado===null){
+      h+='<div class="dp-vacia">Leyendo…</div>';
+    }else if(!prep.length){
+      h+='<div class="dp-vacia">Nada por entregar.</div>';
+    }else{
+      h+=prep.map(function(r){
+        // Ámbar solo lo que urge: preparado ayer o antes hay que sacarlo o
+        // devolverlo al congelador. Preparado hoy es lo normal y va en gris.
+        const vieja=_despDiaDe(r.preparado_en)<hoy, ocupado=(_despEntregando===r.pedido_id);
+        const res=_despResumen(r);
+        const an=_despAnulDe(r);              // null = todavía verificando
+        const anulada=!!(an&&an.anulada);
+        let etiqueta='';
+        if(anulada){
+          etiqueta='<div class="dp-prep-anul">Factura anulada'
+            +(an.motivo?(' · '+esc(an.motivo)):'')
+            +(an.nc_nombre?(' <span class="dp-prep-nc">NC '+esc(String(an.nc_nombre).slice(-6))+'</span>'):'')
+            +'<br>No se entrega. El producto ya está armado: avisale a Andrea.</div>';
+        }else if(an===null){
+          etiqueta='<div class="dp-prep-ver">Verificando en Odoo si la factura sigue vigente…</div>';
+        }else if(an.sinVerificar){
+          etiqueta='<div class="dp-prep-anul">No pude verificar la factura contra Odoo.'
+            +'<br>Se registra igual y queda marcada: Andrea la revisa después.</div>';
+        }
+        const btn = anulada
+          ? '<button class="dp-entregar" disabled>Anulada</button>'
+          : '<button class="dp-entregar"'+((ocupado||an===null)?' disabled':'')
+            +' onclick="despAbrirEntrega('+r.pedido_id+')">'
+            +(ocupado?'Guardando…':(an===null?'Verificando…':(an.sinVerificar?'Entregar sin verificar':'Entregar')))+'</button>';
+        return '<div class="dp-prep'+(vieja?' vieja':'')+(anulada?' anulada':'')+'">'
+          +'<div class="dp-prep-i"><span class="dp-prep-cli">'+esc(r.cliente_nombre||'—')+'</span>'
+          +'<span class="dp-prep-h">preparado '+esc(_despCuando(r.preparado_en))
+          +(res?(' · '+esc(res)):'')+'</span>'+etiqueta+'</div>'
+          +entPdfBtn(r.factura_id, r.factura_nombre, r.cliente_nombre)+btn+'</div>';
+      }).join('');
+    }
   }
   h+='</div>';
 
-  // 3 · ANTERIORES SIN DESPACHAR — al FONDO, no en medio.
-  // Estaba metido dentro de "Por preparar", así que lo atrasado se leía antes que
-  // el trabajo del día. Arriba lo de hoy; lo que quedó colgando, abajo. No
-  // desaparece —nada desaparece— pero deja de competir: encabezado propio y un
-  // punto menos de contraste.
-  if(_despFac!==null && viejas.length){
-    h+='<div class="dp-antes"><div class="dp-antes-h"><span>Anteriores sin despachar</span>'
-      +'<span class="dp-antes-n">'+viejas.length+'</span></div>'
-      +viejas.map(function(f){ return tarjeta(f,true); }).join('')+'</div>';
-  }
+  // Las "Facturas sin despacho pendiente" ya NO viven acá (26-ago): se mudaron a
+  // Pendientes. Despachos es la pantalla de TRABAJO —lo que hay que sacar del
+  // congelador— y algo que no hay que despachar no es trabajo, es ruido al lado
+  // de lo que sí. En Pendientes están junto a "sin validar en Odoo" y "sin
+  // factura vinculada", que es la pantalla de cosas por revisar. No se eliminó
+  // nada: el motivo por fila y el botón "Despachar igual" siguen enteros.
 
-  // 4 · SIN DESPACHO PENDIENTE — apartadas, NO desaparecidas.
-  // Una factura acá no es un error del sistema: es una re-emisión administrativa,
-  // que no toca inventario porque el producto ya salió con la original. Pero el
-  // juicio es de Andrea, no del filtro: cada fila dice POR QUÉ se apartó y trae el
-  // botón para mandarla igual a "Por preparar". Una puerta de una sola dirección
-  // sería peor que no filtrar — escondería una entrega real sin dejar rastro.
-  if(_despSinDesp.length){
-    h+='<div class="dp-antes dp-nodesp"><div class="dp-antes-h">'
-      +'<span>Facturas sin despacho pendiente</span>'
-      +'<span class="dp-antes-n">'+_despSinDesp.length+'</span></div>'
-      +_despSinDesp.map(function(f){
-        // Cliente arriba solo; la factura y la fecha abajo en su propio renglón. En
-        // una línea, una razón social larga empujaba el "…3498 · ayer" al renglón
-        // siguiente y quedaba colgando — medido a 375px.
-        return '<div class="dp-nd"><div class="dp-nd-t">'+esc(f.cliente)+'</div>'
-          +'<div class="dp-nd-f">…'+esc(String(f.factura).slice(-4))+' · '+esc(_despDia(f.fecha))+'</div>'
-          +'<div class="dp-nd-m">'+esc(f.motivo)+'</div>'
-          +'<button class="btn btn-sm" onclick="despForzar('+f.factura_id+')">Despachar igual</button>'
-          +'</div>'; }).join('')
-      +'</div>';
-  }
-
-  // 5 · ENTREGADOS: una línea, no una lista. Si no hay, no se dice nada.
+  // ENTREGADOS: una línea, no una lista. Si no hay, no se dice nada.
   if(entHoy.length){
     // El nombre dice lo que cuenta. "Entregados hoy" mentía en cuanto una salida
     // pudo llevar fecha de ayer, y el destino tiene que traer EXACTAMENTE lo mismo
@@ -8772,12 +8869,7 @@ function despRender(){
   h+=despRenderDialogoEntrega();
   body.innerHTML=h;
 }
-// "Despachar igual": Andrea revisó y dice que sí lleva despacho. Vuelve a leer de
-// Odoo para que la factura entre por el camino normal, con sus líneas y su UoM.
-function despForzar(facId){
-  _despForzar[facId]=1;
-  despCargar(true);
-}
+function despSetTab(t){ _despTab=t; despRender(); window.scrollTo(0,0); }
 function _despDia(ymd){
   const hoy=new Date(), ayer=new Date(); ayer.setDate(ayer.getDate()-1);
   if(ymd===_despYmd(hoy))  return 'hoy';
@@ -9349,8 +9441,41 @@ function _pdfRepintar(){
   try{ if(_despAbierto!=null||_despEstado!==null) despRender(); }catch(e){}
   try{ if(_bs) bsFiltrar(); }catch(e){}
 }
-async function entPdfAbrir(facturaId, consecutivo, cliente){
+// ── VER LA FACTURA, NO COMPARTIRLA A CIEGAS (26-ago) ────────────────────
+// Antes, en el teléfono, un toque disparaba `navigator.share()` DIRECTO: se abría
+// la hoja de compartir de iOS y no había forma de mirar el PDF antes de mandarlo.
+// Andrea quiere VER primero y decidir después. Ahora un toque ABRE el PDF, y
+// compartir queda como acción secundaria: el visor de iOS ya trae su botón
+// nativo, así que no hace falta agregar ninguno.
+// SIGUEN SIENDO DOS GESTOS, la meta de b32 — solo que el segundo lo pone el
+// sistema operativo en vez de la app. Esto NO es un menú de opciones: un toque,
+// una cosa.
+//
+// ⚠️ LA PESTAÑA SE ABRE **ANTES** DEL PRIMER await, Y ES A PROPÓSITO. Safari de
+// iOS solo deja abrir una pestaña dentro del gesto del usuario; un window.open
+// después de esperar a Odoo llega tarde y lo bloquea. Como leer la factura puede
+// tardar ~40 s con el proxy dormido, la pestaña se abre YA y mientras tanto dice
+// qué está pasando: una pestaña en blanco 40 s se lee como que se rompió.
+function entPdfAbrir(facturaId, consecutivo, cliente){
   if(_pdfEstado[facturaId]==='cargando') return;
+  let w=null;
+  try{ w=window.open('', '_blank'); }catch(e){}
+  if(w){ try{
+    // El charset va explícito: la pestaña nace de about:blank y heredar la
+    // codificación del padre no está garantizado. Sin esto, "día" y los puntos
+    // suspensivos salen rotos — visto al mirar la pantalla de espera.
+    w.document.write('<!doctype html><meta charset="utf-8">'
+      +'<meta name="viewport" content="width=device-width,initial-scale=1">'
+      +'<title>Factura '+esc(String(consecutivo||'').replace(/\D/g,'').slice(-4))+'</title>'
+      +'<body style="margin:0;padding:32px 24px;font:16px/1.5 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#1a1a17;background:#f7f6f2">'
+      +'<div id="m">Buscando la factura en Odoo…</div>'
+      +'<div style="margin-top:10px;font-size:13px;color:#6b6b63">La primera del día puede tardar unos 40 segundos.</div>'
+      +'</body>');
+    w.document.close();
+  }catch(e){} }
+  return _entPdfTraer(facturaId, consecutivo, cliente, w);
+}
+async function _entPdfTraer(facturaId, consecutivo, cliente, w){
   _pdfEstado[facturaId]='cargando'; _pdfRepintar();
   try{
     // 1 · el id del adjunto. Nunca search_read: con res_field puesto no aparece.
@@ -9367,24 +9492,33 @@ async function entPdfAbrir(facturaId, consecutivo, cliente){
     const nombre=_pdfNombre(consecutivo||(mv[0]&&mv[0].name), cliente);
     const blob=new Blob([buf], {type:(a[0].mimetype||'application/pdf')});
     _pdfEstado[facturaId]='listo'; _pdfRepintar();
-    // DOS GESTOS EN EL TELÉFONO: compartir directo a WhatsApp. Donde no hay
-    // navigator.share (escritorio, y iOS si el archivo no es compartible) cae a
-    // pestaña nueva, que es el camino de siempre.
-    const file=(typeof File!=='undefined') ? new File([blob], nombre, {type:'application/pdf'}) : null;
-    if(file && navigator.canShare && navigator.canShare({files:[file]})){
-      try{ await navigator.share({files:[file], title:nombre}); return; }
-      catch(e){ if(e && e.name==='AbortError') return; }   // lo canceló el humano: no es un error
-    }
     const url=URL.createObjectURL(blob);
-    const w=window.open(url,'_blank');
-    if(!w){ const a2=document.createElement('a'); a2.href=url; a2.download=nombre;
-            document.body.appendChild(a2); a2.click(); a2.remove(); }
+    if(w && !w.closed){
+      // La pestaña ya está abierta desde el toque: solo se la manda al PDF.
+      // NO se revoca la URL — el visor la sigue usando mientras la pestaña viva.
+      // Es un PDF suelto en memoria; el costo es despreciable al lado de romperle
+      // el visor a alguien que todavía lo está mirando.
+      w.location.href=url;
+      return;
+    }
+    // Sin pestaña (bloqueada, o escritorio con el bloqueador puesto): descarga.
+    const a2=document.createElement('a'); a2.href=url; a2.download=nombre;
+    document.body.appendChild(a2); a2.click(); a2.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
   }catch(e){
-    // NUNCA EN SILENCIO: el estado queda en el botón y el detalle en el título.
-    _pdfEstado[facturaId]=(e&&e.message)||String(e);
-    _pdfRepintar();
-    alert('No pude traer el PDF de la factura: '+((e&&e.message)||e));
+    // NUNCA EN SILENCIO. Si la pestaña se abrió, el error va ADENTRO —que es
+    // donde está mirando quien tocó— y no en un alert de la pestaña de atrás.
+    const msg=(e&&e.message)||String(e);
+    _pdfEstado[facturaId]=msg; _pdfRepintar();
+    if(w && !w.closed){
+      try{
+        const el=w.document.getElementById('m');
+        if(el){ el.textContent='No pude traer el PDF: '+msg; el.style.color='#8a3b12'; }
+        else w.document.body.textContent='No pude traer el PDF: '+msg;
+        return;
+      }catch(_){}
+    }
+    alert('No pude traer el PDF de la factura: '+msg);
   }
 }
 
@@ -9550,7 +9684,7 @@ async function despEntregar(pedidoId){
 }
 
 function irADespachos(){
-  _modShow('vDespachos'); crumbSet('Entregas','Despachos');
+  _modShow('vDespachos'); crumbSet('Entregas','Entregas');   // la miga muestra uno solo
   entPdfPrecalentar();      // el proxy despierta mientras Daniel mira la bandeja
   despCargar(false);
 }
@@ -10279,10 +10413,78 @@ async function rpGuardar(){
 //   3 salida sin clasificar. Cada cierre es un INSERT.
 // ════════════════════════════════════════════════════════════════════════
 let _pd=null, _pdErr='', _pdFacs={};
+// Cuántos días sin decidir hacen que una factura apartada se pliegue. 30 fue la
+// decisión de Andrea: pasado un mes ya no es una decisión pendiente, es historia.
+const PD_DIAS_ANTIGUA=30;
+// ── FACTURA ATRASADA: 3 DÍAS HÁBILES (26-ago) ───────────────────────────
+// MEDIDO, no estimado: sobre 174 facturas con terminado de jun-ago 2026, la
+// distancia entre la fecha de la factura y la fecha PLANEADA de su traslado de
+// salida es 0 días en el 94,8% y +1 en el 3,4% — el 100% cae dentro de +1. El
+// negocio despacha el mismo día.
+// ⚠️ POR QUÉ HÁBILES Y NO CALENDARIO. Se factura sábado y domingo (2 de 56 en
+// agosto). Con días calendario, una factura del viernes o del sábado dispararía
+// la alerta el LUNES A LA MAÑANA, antes de que Daniel despache: un falso
+// positivo por semana. Una alerta que se equivoca todos los lunes deja de
+// leerse, y entonces no sirve para el día que sí pasa algo.
+const PD_DIAS_ATRASO=3;
+// Días hábiles entre dos fechas (excluye sábado y domingo). Sin feriados: no hay
+// tabla de feriados en el sistema y meterla sería inventar una fuente.
+function _pdHabiles(desdeYmd, hastaMs){
+  // Las dos puntas al MEDIODÍA: comparar con la hora real hacía que una factura
+  // de hoy a las 18:00 contara 1 día hábil en vez de 0.
+  const d=new Date(desdeYmd+'T12:00:00');
+  const fin=new Date(hastaMs); fin.setHours(12,0,0,0);
+  let n=0;
+  while(d<fin){ d.setDate(d.getDate()+1);
+    const w=d.getDay(); if(w!==0 && w!==6) n++; }
+  return n;
+}
+let _pdVerAntiguas=false;   // ¿está desplegado el "ver las N antiguas"?
+let _pdDecidiendo=0;        // factura_id que se está guardando ahora mismo
+
+// ── LA DECISIÓN SOBRE UNA FACTURA APARTADA (26-ago) ─────────────────────
+// Dos botones, una tabla: `ent_factura_decision`, append-only, gana la fila más
+// reciente. Guarda quién y cuándo, y CONGELA el motivo del filtro en la fila —
+// dentro de seis meses el filtro puede haber cambiado y esa fila tiene que
+// seguir explicando qué se estaba mirando.
+//   'revisado'  → la miré, está bien apartada. Sale de las dos listas.
+//   'despachar' → el filtro se equivocó. Va a "Por preparar".
+// ⚠️ "Revisado" y NO "Validado": en esta misma pantalla "Ya validé" significa
+// validar la entrega en Odoo. Dos palabras distintas para dos cosas distintas.
+async function pdDecidir(facturaId, facturaNombre, decision){
+  if(_pdDecidiendo) return;
+  const f=(_despSinDesp||[]).find(function(x){ return x.factura_id===facturaId; });
+  const c=sbClient(); if(!c){ alert('No hay sesión de Supabase.'); return; }
+  _pdDecidiendo=facturaId; pdRender();
+  try{
+    const {data:{user}}=await c.auth.getUser();
+    const {error}=await c.from('ent_factura_decision').insert({
+      factura_id:facturaId, factura_nombre:facturaNombre, decision:decision,
+      motivo_filtro:(f&&f.motivo)||null,
+      creado_por:(user&&user.email)||'desconocido'});
+    if(error) throw error;
+    // ACUSE INMEDIATO. La fila sale de la lista YA, sin esperar a que Odoo
+    // conteste: lo que se acaba de decidir tiene que verse decidido. La relectura
+    // de Odoo va detrás y reconcilia —es la que mete la factura en "Por preparar"
+    // cuando la decisión fue 'despachar'.
+    if(decision==='despachar') _despForzar[facturaId]=1;
+    _despSinDesp=(_despSinDesp||[]).filter(function(x){ return x.factura_id!==facturaId; });
+    _pdDecidiendo=0; pdRender();
+    despCargar(true);
+  }catch(e){
+    _pdDecidiendo=0; pdRender();
+    alert('No se pudo guardar la decisión: '+((e&&e.message)||e));
+  }
+}
 
 async function irAPendientes(){
   _modShow('vPendientes'); crumbSet('Entregas','Pendientes');
   pdCargar(false);
+  // "Facturas sin despacho pendiente" sale de Odoo, no de Supabase. Se dispara
+  // SIN await: las tres listas de Supabase se dibujan al instante y esta aparece
+  // cuando Odoo conteste (~40 s si el proxy está dormido). Si ya se leyó, no
+  // cuesta nada: despCargar sale por el camino corto.
+  try{ despCargar(false); }catch(e){}
 }
 async function pdCargar(force){
   const st=document.getElementById('pdStatus'), body=document.getElementById('pdBody');
@@ -10301,7 +10503,7 @@ async function pdCargar(force){
 async function pdLeer(){
   const c=sbClient(); if(!c) throw new Error('sin sesión de Supabase');
   const {data:peds,error:e1}=await c.from('ent_pedido')
-    .select('id,fecha_despacho,cliente_id,cliente_nombre,motivo,creado_en')
+    .select('id,fecha_despacho,cliente_id,cliente_nombre,motivo,origen,destinatario,creado_en')
     .order('creado_en',{ascending:false}).limit(300);
   if(e1) throw e1;
   const ids=(peds||[]).map(function(p){return p.id;});
@@ -10330,8 +10532,21 @@ async function pdLeer(){
     const mv=(M[p.id]&&M[p.id].motivo)||p.motivo;
     const dias=Math.floor((Date.now()-Date.parse(p.creado_en))/86400000);
     const it={id:p.id, fecha:p.fecha_despacho, cliente:p.cliente_nombre,
-              cliente_id:p.cliente_id, motivo:mv, dias:dias};
-    if(A[p.id] && !V[p.id]) l1.push(it);
+              cliente_id:p.cliente_id, motivo:mv, dias:dias,
+              origen:p.origen, destinatario:p.destinatario};
+    // ⚠️ SOLO LO QUE TIENE ALGO QUE VALIDAR EN ODOO (26-ago). Una salida sin
+    // factura —regalía, consumo interno, degustación, reposición— NO genera
+    // ningún documento en Odoo: Truefie es solo lectura y no crea traslados. No
+    // hay nada que validar, así que se quedaba en esta lista PARA SIEMPRE, que es
+    // la forma más común de matar una vista de control. Los despachos 28 a 31
+    // llevaban días ahí sin que nadie pudiera cerrarlos.
+    // Vuelven a entrar solas el día que se abra el caso 2 del candado (crear el
+    // traslado en Odoo): ahí sí van a tener un documento que validar.
+    // El discriminador es tener FACTURA: `origen='factura'` cubre las que nacieron
+    // de una, y `F[p.id]` las que se vincularon después. Se miran las dos para no
+    // depender de que el backfill de vínculos esté corrido.
+    const tieneQueValidarse = (p.origen==='factura') || !!F[p.id];
+    if(A[p.id] && !V[p.id] && tieneQueValidarse) l1.push(it);
     if(mv==='venta' && !F[p.id]) l2.push(it);
     if(mv==='sin_clasificar') l3.push(it);
   });
@@ -10355,35 +10570,179 @@ async function pdLeer(){
   }catch(e){ l4=[]; }    // la vista puede no existir todavía: no rompe Pendientes
   return {l1:l1,l2:l2,l3:l3,l4:l4};
 }
+// ── CÓMO SE NOMBRA UNA FILA QUE NO TIENE CLIENTE ────────────────────────
+// Una salida sin factura NO tiene cliente: tiene MOTIVO y, a veces, destinatario.
+// Antes se dibujaba `esc(it.cliente)` a secas y esas filas salían con la celda en
+// blanco — un hueco que no dice nada y que encima se lee como "falta un dato".
+// Regla: si un dato no aplica, se muestra el que SÍ aplica, nunca el hueco.
+const PD_MOTIVO_N={regalia:'Regalía', reposicion:'Reposición',
+                   consumo_interno:'Consumo interno', degustacion:'Degustación',
+                   venta:'Venta', sin_clasificar:'Sin clasificar'};
+function _pdQuien(it){
+  if(it.cliente) return esc(it.cliente);
+  const m=PD_MOTIVO_N[it.motivo]||it.motivo||'Salida sin clasificar';
+  const d=(it.destinatario||'').trim();
+  return esc(m)+(d?(' <span class="pd-para">para '+esc(d)+'</span>'):'');
+}
+// FECHA RELATIVA, y la exacta SOLO si no es de esta semana. "Fecha" y "Hace" eran
+// dos columnas diciendo casi lo mismo; lo que se pregunta mirando esta lista es
+// hace cuánto que está colgando, no el día calendario. Pasada la semana el número
+// deja de ubicar solo y ahí sí entra la fecha.
+const PD_MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function _pdCuando(fecha, dias){
+  const rel = dias<=0 ? 'hoy' : (dias===1 ? 'ayer' : ('hace '+dias+' d'));
+  if(dias<=7) return rel;
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fecha||''));
+  return rel + (m ? (' · '+(+m[3])+' '+PD_MES[(+m[2])-1]) : '');
+}
 function pdRender(){
   const body=document.getElementById('pdBody'); if(!body||!_pd) return;
+  // UNA FILA, NO UNA TABLA DE CUATRO COLUMNAS. A 375px la tabla obligaba al botón
+  // a partirse en cuatro renglones y era eso lo que hacía cada fila tan alta.
+  // Arriba: quién (o el motivo) y la acción, que es lo que se viene a hacer.
+  // Abajo, callado: el número de despacho y hace cuánto.
+  // ── UNA LISTA VACÍA NO SE DIBUJA (26-ago) ─────────────────────────────
+  // Dos tarjetas diciendo "Nada pendiente" ocupaban media pantalla de teléfono
+  // para informar que no hay nada que hacer. Es la regla 1 del lobby, aplicada
+  // acá: si no hay nada, la sección no aparece. Y si no aparece NINGUNA, un solo
+  // renglón lo dice — no cinco tarjetas vacías.
   const secc=function(titulo,expl,ls,accion){
+    if(!ls.length) return '';
     let h='<div class="card rp-z"><div class="card-title">'+titulo
       +' <span class="pd-cnt'+(ls.length?' on':'')+'">'+ls.length+'</span></div>'
       +'<div class="rp-nota" style="margin:-4px 0 8px">'+expl+'</div>';
-    if(!ls.length) h+='<div class="cl-none">Nada pendiente.</div>';
-    else{
-      h+='<table class="cl-tbl"><tr><th>Despacho</th><th>Cliente</th><th>Fecha</th><th>Hace</th><th></th></tr>';
-      ls.forEach(function(it){
-        h+='<tr><td>#'+it.id+'</td><td>'+esc(it.cliente)+'</td><td>'+esc(it.fecha)+'</td>'
-          +'<td>'+(it.dias===0?'hoy':(it.dias+' d'))+'</td>'
-          +'<td style="text-align:right">'+accion(it)+'</td></tr>'
-          +'<tr class="pd-exp"><td colspan="5"><div id="pdx'+it.id+'"></div></td></tr>';
-      });
-      h+='</table>';
-    }
+    ls.forEach(function(it){
+      h+='<div class="pd-fila"><div class="pd-fila-c">'
+        +'<div class="pd-quien">'+_pdQuien(it)+'</div>'
+        +'<div class="pd-meta">#'+it.id+' · '+esc(_pdCuando(it.fecha,it.dias))+'</div>'
+        +'</div>'+accion(it)+'</div>'
+        +'<div id="pdx'+it.id+'"></div>';
+    });
     return h+'</div>';
   };
+  // ══ EL ORDEN ES LA PANTALLA (26-ago) ═════════════════════════════════
+  // Pendientes muestra lo que está MAL y hay que arreglar. No estados, no
+  // información: cosas rotas. Y el orden es por GRAVEDAD, no por de dónde salen
+  // los datos. Los DOS PRIMEROS tienen producto o un cliente del otro lado; los
+  // tres de abajo son papeles.
+  //   1 · sin lote legible   → producto físico que el sistema no puede contar.
+  //                            Rompe el saldo, de donde cuelga todo lo demás.
+  //   2 · sin despachar 3+ d → hay un cliente esperando. Lo único con alguien afuera.
+  //   3 · sin clasificar     → salió producto y no se sabe qué fue.
+  //   4 · sin validar        → Truefie y Odoo no dicen lo mismo. Contable.
+  //   5 · sin despacho pend. → revisión, ya resuelta con sus botones.
+  // DESCARTADO A PROPÓSITO: avisar de lotes por agotarse. Un saldo bajo no es un
+  // problema, es información — Andrea ya sabe cuánto producir. No va acá.
   let h='';
-  h+=secc('Entregado en Truefie, sin validar en Odoo',
-    'Andrea valida la entrega en Odoo a mano (fase 1) y la marca acá. Si esta lista se cierra sola durante semanas, ésa es la evidencia para la escritura automática.',
-    _pd.l1, function(it){ return '<button class="btn btn-sm" onclick="pdValidar('+it.id+')">Ya validé en Odoo</button>'; });
-  h+=secc('Salida de venta, sin factura vinculada',
-    'Solo salidas de tipo venta: una regalía sin factura no es un pendiente, es lo correcto.',
-    _pd.l2, function(it){ return '<button class="btn btn-sm" onclick="pdVincular('+it.id+','+it.cliente_id+')">Vincular factura</button>'; });
+
+  // ── 1 · ÓRDENES SIN LOTE LEGIBLE ─────────────────────────────────────
+  // Reusa el bucket que ya existe (_entBucketsHTML), el mismo que se ve en
+  // Inventario y en Conteo. Es producto en el congelador que no suma a ningún
+  // lote: mientras esté así, el saldo de ese producto está incompleto.
+  const _bk=(_despLotes&&_despLotes.buckets)||null;
+  const _bkH=_bk?_entBucketsHTML(_bk):'';
+  if(_bkH) h+='<div class="card rp-z"><div class="card-title">Producción sin lote legible</div>'
+    +_bkH.replace('margin-top:16px','margin-top:2px')+'</div>';
+
+  // ── 2 · FACTURAS SIN DESPACHAR HACE 3+ DÍAS HÁBILES ──────────────────
+  // Salen de la MISMA lista que alimenta "Por preparar": no es una consulta
+  // nueva, es la misma bandeja mirada por antigüedad. Si Odoo no contestó
+  // todavía, la sección no aparece — no se inventa una alerta sin datos.
+  const atrasadas=(_despFac||[]).map(function(f){
+      return {f:f, h:_pdHabiles(f.fecha, Date.now())}; })
+    .filter(function(x){ return x.h>=PD_DIAS_ATRASO; })
+    .sort(function(a,z){ return z.h-a.h; });
+  if(atrasadas.length){
+    h+='<div class="card rp-z"><div class="card-title">Facturas sin despachar'
+      +' <span class="pd-cnt on">'+atrasadas.length+'</span></div>'
+      +'<div class="rp-nota" style="margin:-4px 0 8px">Hace '+PD_DIAS_ATRASO
+      +' días hábiles o más que están en «Por preparar». Hay un cliente esperando.</div>';
+    atrasadas.forEach(function(x){
+      h+='<div class="pd-fila"><div class="pd-fila-c">'
+        +'<div class="pd-quien">'+esc(x.f.cliente)+'</div>'
+        +'<div class="pd-meta">…'+esc(String(x.f.factura).slice(-4))+' · hace '+x.h+' días hábiles</div>'
+        +'</div><button class="btn btn-sm pd-acc" onclick="irADespachos();despAbrir('+x.f.factura_id+')">Ver</button>'
+        +'</div>';
+    });
+    h+='</div>';
+  }
+
   h+=secc('Salida sin clasificar',
     'Daniel registró la salida; falta que las socias digan qué fue. El pendiente es un estado con nombre, no un hueco.',
-    _pd.l3, function(it){ return '<button class="btn btn-sm" onclick="pdClasifUI('+it.id+')">Clasificar</button>'; });
+    _pd.l3, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdClasifUI('+it.id+')">Clasificar</button>'; });
+  h+=secc('Entregado en Truefie, sin validar en Odoo',
+    'Andrea valida la entrega en Odoo a mano (fase 1) y la marca acá. Si esta lista se cierra sola durante semanas, ésa es la evidencia para la escritura automática.',
+    _pd.l1, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdValidar('+it.id+')">Ya validé</button>'; });
+  h+=secc('Salida de venta, sin factura vinculada',
+    'Solo salidas de tipo venta: una regalía sin factura no es un pendiente, es lo correcto.',
+    _pd.l2, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdVincular('+it.id+','+it.cliente_id+')">Vincular</button>'; });
+
+  // ── FACTURAS SIN DESPACHO PENDIENTE · mudada desde Despachos (26-ago) ──
+  // Despachos es la pantalla de TRABAJO; algo que no hay que despachar es ruido
+  // ahí. Acá está entre las otras cosas por revisar, que es lo que es.
+  // NO desaparece nada: el motivo por fila y el botón "Despachar igual" siguen
+  // enteros — el filtro puede equivocarse y una puerta de una sola dirección
+  // escondería una entrega real sin dejar rastro.
+  // Los datos vienen de Odoo por Despachos, no de Supabase: por eso esta sección
+  // puede estar "leyendo" mientras las otras tres ya se dibujaron.
+  // Vacía NO se dibuja — salvo que esté leyendo o que Odoo haya fallado, que son
+  // dos cosas que SÍ hay que decir.
+  if(_despFac===null || _despErr || _despSinDesp.length){
+  h+='<div class="card rp-z"><div class="card-title">Facturas sin despacho pendiente'
+    +' <span class="pd-cnt'+(_despSinDesp.length?' on':'')+'">'
+    +(_despFac===null?'·':_despSinDesp.length)+'</span></div>'
+    +'<div class="rp-nota" style="margin:-4px 0 8px">Su entrega ya está hecha según Odoo, '
+    +'o no tienen pedido de venta. No se despachan: prepararlas descontaría el lote dos veces.</div>';
+  if(_despFac===null) h+='<div class="cl-none">Leyendo facturas de Odoo…</div>';
+  // Si Odoo falló NO se dice "nada pendiente": no lo sabemos, y una falsa
+  // tranquilidad acá es peor que un aviso feo.
+  else if(_despErr) h+='<div class="cl-none dp-mal">No pude leer las facturas de Odoo, '
+    +'así que esta lista puede estar incompleta: '+esc(_despErr)+'</div>';
+  else{
+    // ── RED POR TIEMPO (26-ago) ─────────────────────────────────────────
+    // Con ~41 reversiones administrativas al año, esta lista solo crece. Lo que
+    // NADIE tocó en 30 días se pliega: no desaparece —está a un toque— pero deja
+    // de competir con lo de esta semana. El corte es la fecha de la factura, que
+    // es lo único que se tiene: una factura de hace tres meses que sigue sin
+    // decidir ya no es una decisión pendiente, es historia.
+    const nuevas=_despSinDesp.filter(function(f){ return (f.dias||0)<PD_DIAS_ANTIGUA; });
+    const antiguas=_despSinDesp.filter(function(f){ return (f.dias||0)>=PD_DIAS_ANTIGUA; });
+    const fila=function(f){
+      // El motivo va en SU renglón, a ancho completo y debajo de la fila. Metido
+      // dentro de la fila se lo comían los botones: "ya entregado el 2026-07-08
+      // según Odoo, 48 días antes de esta factura" caía en tres líneas
+      // espachurradas contra el borde — medido a 375px. Y el motivo es justo lo
+      // que hay que leer para decidir si el filtro acertó.
+      const arg=f.factura_id+",'"+String(f.factura||'').replace(/'/g,"\\'")+"'";
+      const ocupada=(_pdDecidiendo===f.factura_id);
+      return '<div class="pd-fila pd-fila-nb"><div class="pd-fila-c">'
+        +'<div class="pd-quien">'+esc(f.cliente)+'</div>'
+        +'<div class="pd-meta">…'+esc(String(f.factura).slice(-4))+' · '+esc(_despDia(f.fecha))+'</div>'
+        +'</div></div>'
+        +'<div class="pd-motivo">'+esc(f.motivo)+'</div>'
+        // DOS BOTONES, y el orden dice cuál es el normal: "Revisado" es lo que
+        // pasa casi siempre —el filtro acertó— y va primero. "Despachar igual"
+        // es la excepción y va sin relleno, a la derecha.
+        // ⚠️ "Revisado" y NO "Validado": en esta MISMA pantalla "Ya validé"
+        // significa validar la entrega en Odoo, que es otra cosa.
+        +'<div class="pd-decs">'
+        +'<button class="btn btn-sm"'+(ocupada?' disabled':'')
+        +' onclick="pdDecidir('+arg+",'revisado')\">"+(ocupada?'Guardando…':'Revisado')+'</button>'
+        +'<button class="btn btn-sm"'+(ocupada?' disabled':'')
+        +' onclick="pdDecidir('+arg+",'despachar')\">Despachar igual</button>"
+        +'</div>';
+    };
+    nuevas.forEach(function(f){ h+=fila(f); });
+    if(antiguas.length){
+      h+='<button class="rp-ceros" onclick="_pdVerAntiguas=!_pdVerAntiguas;pdRender()">'
+        +(_pdVerAntiguas?'ocultar las ':'ver las ')+antiguas.length
+        +(antiguas.length===1?' antigua':' antiguas')+' (más de '+PD_DIAS_ANTIGUA+' días)</button>';
+      if(_pdVerAntiguas) antiguas.forEach(function(f){ h+=fila(f); });
+    }
+    if(!nuevas.length && !antiguas.length) h+='<div class="cl-none">Nada pendiente.</div>';
+  }
+  h+='</div>';
+  }
 
   // Regla 1 del lobby: si no hay nada que hacer, la sección NO aparece. Nada de
   // "todo al día" — eso es información, y la información vive adentro del módulo.
@@ -10400,21 +10759,26 @@ function pdRender(){
         +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.5">'
         +'Salió producto contra un documento que ya no existe. Esto no se apaga solo.</div></div>';
     }
-    h+='<table class="cl-tbl"><tr><th>Salida</th><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Hace</th><th></th></tr>';
+    // La misma fila que las de arriba: en la misma pantalla no puede haber dos
+    // formas de listar lo mismo. Acá el lugar de la acción lo ocupa el estado.
     l4.slice(0,3).forEach(function(it){
-      h+='<tr><td>#'+it.id+'</td><td>'+esc(it.cliente)+'</td>'
-        +'<td>'+esc(it.factura?('…'+String(it.factura).slice(-4)):'—')+'</td>'
-        +'<td>'+esc(it.fecha)+'</td><td>'+(it.dias===0?'hoy':(it.dias+' d'))+'</td>'
-        +'<td style="text-align:right">'+(it.estado==='anulada'
-            ? '<span style="color:var(--stop-tx);font-size:11.5px">anulada</span>'
-            : '<span style="color:var(--warn-2);font-size:11.5px">sin verificar</span>')+'</td></tr>';
+      h+='<div class="pd-fila"><div class="pd-fila-c">'
+        +'<div class="pd-quien">'+_pdQuien(it)
+        +(it.factura?(' <span class="pd-para">…'+esc(String(it.factura).slice(-4))+'</span>'):'')+'</div>'
+        +'<div class="pd-meta">#'+it.id+' · '+esc(_pdCuando(it.fecha,it.dias))+'</div>'
+        +'</div>'
+        +(it.estado==='anulada'
+          ? '<span class="pd-est pd-est-mal">anulada</span>'
+          : '<span class="pd-est pd-est-ojo">sin verificar</span>')
+        +'</div>';
     });
-    h+='</table>';
     if(l4.length>3) h+='<div class="rp-nota" style="margin-top:6px">y '+(l4.length-3)+' más</div>';
     if(sinv.length) h+='<div class="rp-nota" style="margin-top:6px">Las «sin verificar» se '
       +'limpian solas la próxima vez que Despachos lea Odoo.</div>';
     h+='</div>';
   }
+  // Todo vacío: UN renglón, no cinco tarjetas. Estado, no explicación.
+  if(!h) h='<div class="card rp-z"><div class="cl-none">Nada pendiente.</div></div>';
   body.innerHTML=h;
 }
 async function pdValidar(id){
@@ -10461,7 +10825,7 @@ async function pdInsert(tabla,fila,texto){
     fila.creado_por=(user&&user.email)||'desconocido';
     const {error}=await c.from(tabla).insert(fila);
     if(error) throw error;
-    await pdCargar(true); entCardCargar();
+    await pdCargar(true);
   }catch(e){ alert('No se pudo '+texto+': '+((e&&e.message)||e)); }
 }
 
@@ -10469,30 +10833,6 @@ async function pdInsert(tabla,fila,texto){
 // Va en el lobby común (hoy no hay roles); cuando exista la tabla de permisos,
 // Daniel no la verá y las socias sí. Nada grita: tono gris, ámbar SOLO en los
 // contadores que exigen acción, y las 3 más recientes con cliente y fecha.
-async function entCardCargar(){
-  const el=document.getElementById('entCard'); if(!el) return;
-  // La tarjeta es la bandeja de las socias. El filtro vivía SOLO en accesoPintarLobby(),
-  // que corre ANTES que esta función: la escondía, y un segundo después el
-  // classList.remove('hidden') de abajo la volvía a mostrar. Por eso seguía saliendo en
-  // la sesión de Daniel. El filtro tiene que estar acá, que es donde se decide mostrarla,
-  // y antes del pdLeer(): a quien no le toca, ni siquiera se le hace la consulta.
-  if(!accesoPuede('finanzas')){ el.classList.add('hidden'); return; }
-  try{
-    const d=await pdLeer();
-    const tot=d.l1.length+d.l2.length+d.l3.length;
-    const cnt=function(n,lbl){ return '<span class="ec-c'+(n?' on':'')+'">'+n+'</span> '+lbl; };
-    let h='<div class="ec-t">Entregas pendientes de facturar o registrar</div>'
-      +'<div class="ec-row">'+cnt(d.l1.length,'sin validar')+' · '+cnt(d.l2.length,'sin factura')+' · '+cnt(d.l3.length,'sin clasificar')+'</div>';
-    if(tot){
-      const rec=d.l1.concat(d.l2,d.l3).sort(function(a,z){ return a.dias-z.dias; }).slice(0,3);
-      const seen={}, rec2=rec.filter(function(x){ if(seen[x.id])return false; seen[x.id]=1; return true; });
-      h+='<div class="ec-rec">'+rec2.map(function(x){
-        return esc(x.cliente)+' · '+esc(x.fecha); }).join('<br>')+'</div>';
-    } else h+='<div class="ec-rec" style="color:#7E8C5A">Todo al día.</div>';
-    el.innerHTML=h; el.classList.remove('hidden');
-  }catch(e){ el.classList.add('hidden'); }   // tablas sin crear o sin sesión: la tarjeta no aparece
-}
-
 // ── VALIDACIÓN (index.html?diag=lotes): cobertura del extractor con las DOS reglas. Solo lectura.
 async function rzDiagLotes(body){
   body.innerHTML='<div class="rz-load">Leyendo órdenes y chatter de Odoo (solo lectura)…</div>';
