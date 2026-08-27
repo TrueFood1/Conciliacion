@@ -1529,7 +1529,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
         <div class="home-mod-state" style="color:#6E6C68">Pronto</div>
       </div>
     </div>
-    <div id="entCard" class="hidden" onclick="irAPendientes()"></div>
+    <!-- La alerta de Entregas se fue del lobby (26-ago): cada módulo muestra sus
+         alertas al ENTRAR, y repetirlas afuera duplica. Verificado antes de
+         sacarla que nada vivía solo acá — los tres contadores y las filas salían
+         de pdLeer(), la misma función que alimenta Pendientes. -->
     </div><!-- /home-bottom -->
     <div class="home-build" id="homeBuild"></div>
   </div>
@@ -1552,7 +1555,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <div id="entMas" class="hidden">
   <div class="fm-h">Entregas</div>
   <button onclick="entMasIr('historial')">Historial<span class="sub">Toda la salida registrada: por cliente, lote o fecha</span></button>
-  <button onclick="entMasIr('pendientes')">Pendientes<span class="sub">Falta validar en Odoo, vincular factura o clasificar</span></button>
+  <button onclick="entMasIr('pendientes')">Pendientes<span class="sub">Lo que hay que arreglar</span></button>
   <button onclick="entMasIr('conteo')">Conteo<span class="sub">La foto del congelador que ancla los saldos por lote</span></button>
 </div>
 
@@ -1809,7 +1812,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
       <div class="m3title" style="font-size:24px">Pendientes</div>
-      <div class="m3sub" style="margin-top:2px">Falta validar en Odoo, vincular factura o clasificar.</div>
+      <div class="m3sub" style="margin-top:2px">Lo que hay que arreglar.</div>
     </div>
     <button class="btn btn-sm" onclick="pdCargar(true)">Recargar</button>
   </div>
@@ -2557,12 +2560,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .pd-clasif{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin:4px 0 10px;font-size:12px;color:var(--text-3)}
 .pd-clasif button{background:var(--field);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:12.5px;padding:8px 11px;cursor:pointer}
 .pd-clasif button:hover{color:var(--text);border-color:var(--ent-line)}
-#entCard{margin-top:12px;background:#141417;border:.5px solid #3F4A16;border-radius:12px;padding:13px 15px;cursor:pointer}
-#entCard .ec-t{font-size:12px;color:var(--text-2);font-weight:600}
-#entCard .ec-row{font-size:12px;color:var(--text-3);margin-top:5px}
-#entCard .ec-c{display:inline-block;min-width:18px;text-align:center;font-size:11px;font-weight:600;color:var(--text-3);border:1px solid var(--border-strong);border-radius:999px;padding:0 6px}
-#entCard .ec-c.on{color:#0E0E11;background:#C99A4E;border-color:#C99A4E}
-#entCard .ec-rec{font-size:11.5px;color:var(--text-3);margin-top:7px;line-height:1.6}
 @media(max-width:700px){
   .rp-prods{grid-template-columns:repeat(2,1fr)}
   .rp-prod{padding:16px 6px;font-size:14px}
@@ -3544,7 +3541,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 26 ago 2026 · b46';
+const BUILD = 'v 26 ago 2026 · b47';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -3922,7 +3919,6 @@ async function authEntrar(){
     document.getElementById('vAuth').classList.add('hidden');   // conectado → recién ahora dejamos ver el lobby
     setSaludo();                                                // saluda a quien está autenticado (no un nombre fijo)
     await accesoCargar();                                       // qué módulos dibuja el lobby (cosmético)
-    entCardCargar();                                            // pendientes de Entregas, sin bloquear el lobby
   }else if(msg){
     msg.style.color='#FF8A8A'; msg.textContent='No pude conectar a producción. Reintentá.';
     document.getElementById('btnSalir').classList.add('hidden');
@@ -4012,8 +4008,6 @@ function accesoPintarLobby(){
     const el=document.querySelector('#vLobby .'+map[mod]);
     if(el) el.style.display = accesoPuede(mod) ? '' : 'none';
   }
-  const ec=document.getElementById('entCard');
-  if(ec && !accesoPuede('finanzas')) ec.classList.add('hidden');   // la tarjeta de pendientes es de las socias
   // El buscador conversacional es la puerta del dashboard de las socias. A quien no
   // tiene acceso a todo no le sirve, y es superficie de más en una pantalla que
   // debería tener UNA sola cosa que hacer.
@@ -4156,7 +4150,6 @@ function volverLobby(){
   document.getElementById('appHeader').classList.add('hidden');
   document.getElementById('vLobby').classList.remove('hidden');
   accesoPintarLobby();
-  entCardCargar();   // los contadores pueden haber cambiado mientras se trabajaba
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -7517,7 +7510,13 @@ function _entBucketsHTML(buckets){
     +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.6">'
     +'El extractor no pudo sacar el lote del chatter de estas órdenes. No se asumen ni se esconden: '
     +'si hay producto de alguna en el congelador, agregá el lote a mano en el producto que corresponda.</div>'
-    +'<table class="cl-tbl" style="margin-top:8px"><tr><th>Orden</th><th>Producto</th><th>Fecha</th>'
+    // ⚠️ LA TABLA VA EN UN CONTENEDOR QUE SE DESPLAZA (26-ago). Son cinco
+    // columnas: a 375px pedía 322px de ancho mínimo dentro de un recuadro de
+    // 309 y se salía 28px por la derecha, encima del borde. Con overflow-x se
+    // desplaza sola y no rompe nada. Va acá, en el componente, así que también
+    // lo arregla en Inventario y en Conteo, donde vive el mismo bucket.
+    +'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:8px">'
+    +'<table class="cl-tbl" style="margin-top:0;min-width:100%"><tr><th>Orden</th><th>Producto</th><th>Fecha</th>'
     +'<th class="n">Uds</th><th>Caso</th></tr>';
   KS.forEach(function(k){
     const lbl={sin_lote:'sin lote en el chatter',
@@ -7531,7 +7530,7 @@ function _entBucketsHTML(buckets){
         +'<td class="n">'+_rzN(+r.uds||0)+'</td><td class="muted">'+lbl+'</td></tr>';
     });
   });
-  return h+'</table></div>';
+  return h+'</table></div></div>';
 }
 // Aviso de pantalla. NUNCA se deja el cuerpo mudo: si algo falla, se dice y se sigue.
 function _clAviso(tipo, html){
@@ -10417,6 +10416,29 @@ let _pd=null, _pdErr='', _pdFacs={};
 // Cuántos días sin decidir hacen que una factura apartada se pliegue. 30 fue la
 // decisión de Andrea: pasado un mes ya no es una decisión pendiente, es historia.
 const PD_DIAS_ANTIGUA=30;
+// ── FACTURA ATRASADA: 3 DÍAS HÁBILES (26-ago) ───────────────────────────
+// MEDIDO, no estimado: sobre 174 facturas con terminado de jun-ago 2026, la
+// distancia entre la fecha de la factura y la fecha PLANEADA de su traslado de
+// salida es 0 días en el 94,8% y +1 en el 3,4% — el 100% cae dentro de +1. El
+// negocio despacha el mismo día.
+// ⚠️ POR QUÉ HÁBILES Y NO CALENDARIO. Se factura sábado y domingo (2 de 56 en
+// agosto). Con días calendario, una factura del viernes o del sábado dispararía
+// la alerta el LUNES A LA MAÑANA, antes de que Daniel despache: un falso
+// positivo por semana. Una alerta que se equivoca todos los lunes deja de
+// leerse, y entonces no sirve para el día que sí pasa algo.
+const PD_DIAS_ATRASO=3;
+// Días hábiles entre dos fechas (excluye sábado y domingo). Sin feriados: no hay
+// tabla de feriados en el sistema y meterla sería inventar una fuente.
+function _pdHabiles(desdeYmd, hastaMs){
+  // Las dos puntas al MEDIODÍA: comparar con la hora real hacía que una factura
+  // de hoy a las 18:00 contara 1 día hábil en vez de 0.
+  const d=new Date(desdeYmd+'T12:00:00');
+  const fin=new Date(hastaMs); fin.setHours(12,0,0,0);
+  let n=0;
+  while(d<fin){ d.setDate(d.getDate()+1);
+    const w=d.getDay(); if(w!==0 && w!==6) n++; }
+  return n;
+}
 let _pdVerAntiguas=false;   // ¿está desplegado el "ver las N antiguas"?
 let _pdDecidiendo=0;        // factura_id que se está guardando ahora mismo
 
@@ -10598,16 +10620,62 @@ function pdRender(){
     });
     return h+'</div>';
   };
+  // ══ EL ORDEN ES LA PANTALLA (26-ago) ═════════════════════════════════
+  // Pendientes muestra lo que está MAL y hay que arreglar. No estados, no
+  // información: cosas rotas. Y el orden es por GRAVEDAD, no por de dónde salen
+  // los datos. Los DOS PRIMEROS tienen producto o un cliente del otro lado; los
+  // tres de abajo son papeles.
+  //   1 · sin lote legible   → producto físico que el sistema no puede contar.
+  //                            Rompe el saldo, de donde cuelga todo lo demás.
+  //   2 · sin despachar 3+ d → hay un cliente esperando. Lo único con alguien afuera.
+  //   3 · sin clasificar     → salió producto y no se sabe qué fue.
+  //   4 · sin validar        → Truefie y Odoo no dicen lo mismo. Contable.
+  //   5 · sin despacho pend. → revisión, ya resuelta con sus botones.
+  // DESCARTADO A PROPÓSITO: avisar de lotes por agotarse. Un saldo bajo no es un
+  // problema, es información — Andrea ya sabe cuánto producir. No va acá.
   let h='';
+
+  // ── 1 · ÓRDENES SIN LOTE LEGIBLE ─────────────────────────────────────
+  // Reusa el bucket que ya existe (_entBucketsHTML), el mismo que se ve en
+  // Inventario y en Conteo. Es producto en el congelador que no suma a ningún
+  // lote: mientras esté así, el saldo de ese producto está incompleto.
+  const _bk=(_despLotes&&_despLotes.buckets)||null;
+  const _bkH=_bk?_entBucketsHTML(_bk):'';
+  if(_bkH) h+='<div class="card rp-z"><div class="card-title">Producción sin lote legible</div>'
+    +_bkH.replace('margin-top:16px','margin-top:2px')+'</div>';
+
+  // ── 2 · FACTURAS SIN DESPACHAR HACE 3+ DÍAS HÁBILES ──────────────────
+  // Salen de la MISMA lista que alimenta "Por preparar": no es una consulta
+  // nueva, es la misma bandeja mirada por antigüedad. Si Odoo no contestó
+  // todavía, la sección no aparece — no se inventa una alerta sin datos.
+  const atrasadas=(_despFac||[]).map(function(f){
+      return {f:f, h:_pdHabiles(f.fecha, Date.now())}; })
+    .filter(function(x){ return x.h>=PD_DIAS_ATRASO; })
+    .sort(function(a,z){ return z.h-a.h; });
+  if(atrasadas.length){
+    h+='<div class="card rp-z"><div class="card-title">Facturas sin despachar'
+      +' <span class="pd-cnt on">'+atrasadas.length+'</span></div>'
+      +'<div class="rp-nota" style="margin:-4px 0 8px">Hace '+PD_DIAS_ATRASO
+      +' días hábiles o más que están en «Por preparar». Hay un cliente esperando.</div>';
+    atrasadas.forEach(function(x){
+      h+='<div class="pd-fila"><div class="pd-fila-c">'
+        +'<div class="pd-quien">'+esc(x.f.cliente)+'</div>'
+        +'<div class="pd-meta">…'+esc(String(x.f.factura).slice(-4))+' · hace '+x.h+' días hábiles</div>'
+        +'</div><button class="btn btn-sm pd-acc" onclick="irADespachos();despAbrir('+x.f.factura_id+')">Ver</button>'
+        +'</div>';
+    });
+    h+='</div>';
+  }
+
+  h+=secc('Salida sin clasificar',
+    'Daniel registró la salida; falta que las socias digan qué fue. El pendiente es un estado con nombre, no un hueco.',
+    _pd.l3, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdClasifUI('+it.id+')">Clasificar</button>'; });
   h+=secc('Entregado en Truefie, sin validar en Odoo',
     'Andrea valida la entrega en Odoo a mano (fase 1) y la marca acá. Si esta lista se cierra sola durante semanas, ésa es la evidencia para la escritura automática.',
     _pd.l1, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdValidar('+it.id+')">Ya validé</button>'; });
   h+=secc('Salida de venta, sin factura vinculada',
     'Solo salidas de tipo venta: una regalía sin factura no es un pendiente, es lo correcto.',
     _pd.l2, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdVincular('+it.id+','+it.cliente_id+')">Vincular</button>'; });
-  h+=secc('Salida sin clasificar',
-    'Daniel registró la salida; falta que las socias digan qué fue. El pendiente es un estado con nombre, no un hueco.',
-    _pd.l3, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdClasifUI('+it.id+')">Clasificar</button>'; });
 
   // ── FACTURAS SIN DESPACHO PENDIENTE · mudada desde Despachos (26-ago) ──
   // Despachos es la pantalla de TRABAJO; algo que no hay que despachar es ruido
@@ -10757,7 +10825,7 @@ async function pdInsert(tabla,fila,texto){
     fila.creado_por=(user&&user.email)||'desconocido';
     const {error}=await c.from(tabla).insert(fila);
     if(error) throw error;
-    await pdCargar(true); entCardCargar();
+    await pdCargar(true);
   }catch(e){ alert('No se pudo '+texto+': '+((e&&e.message)||e)); }
 }
 
@@ -10765,30 +10833,6 @@ async function pdInsert(tabla,fila,texto){
 // Va en el lobby común (hoy no hay roles); cuando exista la tabla de permisos,
 // Daniel no la verá y las socias sí. Nada grita: tono gris, ámbar SOLO en los
 // contadores que exigen acción, y las 3 más recientes con cliente y fecha.
-async function entCardCargar(){
-  const el=document.getElementById('entCard'); if(!el) return;
-  // La tarjeta es la bandeja de las socias. El filtro vivía SOLO en accesoPintarLobby(),
-  // que corre ANTES que esta función: la escondía, y un segundo después el
-  // classList.remove('hidden') de abajo la volvía a mostrar. Por eso seguía saliendo en
-  // la sesión de Daniel. El filtro tiene que estar acá, que es donde se decide mostrarla,
-  // y antes del pdLeer(): a quien no le toca, ni siquiera se le hace la consulta.
-  if(!accesoPuede('finanzas')){ el.classList.add('hidden'); return; }
-  try{
-    const d=await pdLeer();
-    const tot=d.l1.length+d.l2.length+d.l3.length;
-    const cnt=function(n,lbl){ return '<span class="ec-c'+(n?' on':'')+'">'+n+'</span> '+lbl; };
-    let h='<div class="ec-t">Entregas pendientes de facturar o registrar</div>'
-      +'<div class="ec-row">'+cnt(d.l1.length,'sin validar')+' · '+cnt(d.l2.length,'sin factura')+' · '+cnt(d.l3.length,'sin clasificar')+'</div>';
-    if(tot){
-      const rec=d.l1.concat(d.l2,d.l3).sort(function(a,z){ return a.dias-z.dias; }).slice(0,3);
-      const seen={}, rec2=rec.filter(function(x){ if(seen[x.id])return false; seen[x.id]=1; return true; });
-      h+='<div class="ec-rec">'+rec2.map(function(x){
-        return esc(x.cliente)+' · '+esc(x.fecha); }).join('<br>')+'</div>';
-    } else h+='<div class="ec-rec" style="color:#7E8C5A">Todo al día.</div>';
-    el.innerHTML=h; el.classList.remove('hidden');
-  }catch(e){ el.classList.add('hidden'); }   // tablas sin crear o sin sesión: la tarjeta no aparece
-}
-
 // ── VALIDACIÓN (index.html?diag=lotes): cobertura del extractor con las DOS reglas. Solo lectura.
 async function rzDiagLotes(body){
   body.innerHTML='<div class="rz-load">Leyendo órdenes y chatter de Odoo (solo lectura)…</div>';
@@ -15764,11 +15808,9 @@ function exportPendientes(){
 // Sello de versión visible en el pie del lobby (única fuente: const BUILD)
 try{ document.getElementById('homeBuild').textContent = BUILD; }catch(e){}
 </script>
-<!-- ── MARCA DE PRUEBA ─────────────────────────────────────────────────────
-     beta.html: copia de `dev` servida al lado de la app real para probarla desde
-     el iPhone SIN publicar. index.html NO se toca. -->
+<!-- ── MARCA DE PRUEBA · beta.html, copia de dev para el iPhone. index.html NO se toca. -->
 <div style="position:fixed;left:8px;bottom:8px;z-index:9999;background:#E9A23B;color:#241a00;
   font:600 10px/1 -apple-system,system-ui,sans-serif;letter-spacing:.08em;
-  padding:5px 8px;border-radius:999px;pointer-events:none;opacity:.92">PRUEBA · b46</div>
+  padding:5px 8px;border-radius:999px;pointer-events:none;opacity:.92">PRUEBA · b47</div>
 </body>
 </html>
