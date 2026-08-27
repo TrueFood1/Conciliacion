@@ -2483,6 +2483,22 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    lee marrón y promete un problema que no existe: un "10" es cuántos hay, no que
    algo esté mal. Va al relleno lima, el mismo patrón del chip activo del buscador. */
 .pd-cnt.on{color:var(--ent-fill-tx);background:var(--ent-fill);border-color:var(--ent-fill)}
+/* ── Pendientes · la fila (26-ago) ───────────────────────────────────────
+   Era una tabla de 4 columnas. A 375px la columna del botón se quedaba con ~70px
+   y "Ya validé en Odoo" se partía en CUATRO renglones — eso era lo que hacía cada
+   fila tan alta, no el contenido. Ahora es una fila flex: el dato a la izquierda,
+   la acción a la derecha, y el botón con nowrap para que no vuelva a partirse. */
+.pd-fila{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:10px 0;border-bottom:1px solid var(--border)}
+.pd-fila:last-of-type{border-bottom:none}
+.pd-fila-c{min-width:0;flex:1}
+.pd-quien{font-size:13.5px;color:var(--text);line-height:1.35}
+.pd-para{color:var(--text-3);font-weight:400}
+.pd-meta{font-size:11px;color:var(--text-3);margin-top:2px;font-variant-numeric:tabular-nums}
+.pd-acc{flex:none;white-space:nowrap}
+.pd-est{flex:none;white-space:nowrap;font-size:11.5px}
+.pd-est-mal{color:var(--stop-tx)}
+.pd-est-ojo{color:var(--warn-2)}
 .pd-exp td{padding:0}
 .pd-clasif{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin:4px 0 10px;font-size:12px;color:var(--text-3)}
 .pd-clasif button{background:var(--field);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:12.5px;padding:8px 11px;cursor:pointer}
@@ -3457,7 +3473,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 26 ago 2026 · b40';
+const BUILD = 'v 26 ago 2026 · b41';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -10301,7 +10317,7 @@ async function pdCargar(force){
 async function pdLeer(){
   const c=sbClient(); if(!c) throw new Error('sin sesión de Supabase');
   const {data:peds,error:e1}=await c.from('ent_pedido')
-    .select('id,fecha_despacho,cliente_id,cliente_nombre,motivo,creado_en')
+    .select('id,fecha_despacho,cliente_id,cliente_nombre,motivo,origen,destinatario,creado_en')
     .order('creado_en',{ascending:false}).limit(300);
   if(e1) throw e1;
   const ids=(peds||[]).map(function(p){return p.id;});
@@ -10330,8 +10346,21 @@ async function pdLeer(){
     const mv=(M[p.id]&&M[p.id].motivo)||p.motivo;
     const dias=Math.floor((Date.now()-Date.parse(p.creado_en))/86400000);
     const it={id:p.id, fecha:p.fecha_despacho, cliente:p.cliente_nombre,
-              cliente_id:p.cliente_id, motivo:mv, dias:dias};
-    if(A[p.id] && !V[p.id]) l1.push(it);
+              cliente_id:p.cliente_id, motivo:mv, dias:dias,
+              origen:p.origen, destinatario:p.destinatario};
+    // ⚠️ SOLO LO QUE TIENE ALGO QUE VALIDAR EN ODOO (26-ago). Una salida sin
+    // factura —regalía, consumo interno, degustación, reposición— NO genera
+    // ningún documento en Odoo: Truefie es solo lectura y no crea traslados. No
+    // hay nada que validar, así que se quedaba en esta lista PARA SIEMPRE, que es
+    // la forma más común de matar una vista de control. Los despachos 28 a 31
+    // llevaban días ahí sin que nadie pudiera cerrarlos.
+    // Vuelven a entrar solas el día que se abra el caso 2 del candado (crear el
+    // traslado en Odoo): ahí sí van a tener un documento que validar.
+    // El discriminador es tener FACTURA: `origen='factura'` cubre las que nacieron
+    // de una, y `F[p.id]` las que se vincularon después. Se miran las dos para no
+    // depender de que el backfill de vínculos esté corrido.
+    const tieneQueValidarse = (p.origen==='factura') || !!F[p.id];
+    if(A[p.id] && !V[p.id] && tieneQueValidarse) l1.push(it);
     if(mv==='venta' && !F[p.id]) l2.push(it);
     if(mv==='sin_clasificar') l3.push(it);
   });
@@ -10355,35 +10384,61 @@ async function pdLeer(){
   }catch(e){ l4=[]; }    // la vista puede no existir todavía: no rompe Pendientes
   return {l1:l1,l2:l2,l3:l3,l4:l4};
 }
+// ── CÓMO SE NOMBRA UNA FILA QUE NO TIENE CLIENTE ────────────────────────
+// Una salida sin factura NO tiene cliente: tiene MOTIVO y, a veces, destinatario.
+// Antes se dibujaba `esc(it.cliente)` a secas y esas filas salían con la celda en
+// blanco — un hueco que no dice nada y que encima se lee como "falta un dato".
+// Regla: si un dato no aplica, se muestra el que SÍ aplica, nunca el hueco.
+const PD_MOTIVO_N={regalia:'Regalía', reposicion:'Reposición',
+                   consumo_interno:'Consumo interno', degustacion:'Degustación',
+                   venta:'Venta', sin_clasificar:'Sin clasificar'};
+function _pdQuien(it){
+  if(it.cliente) return esc(it.cliente);
+  const m=PD_MOTIVO_N[it.motivo]||it.motivo||'Salida sin clasificar';
+  const d=(it.destinatario||'').trim();
+  return esc(m)+(d?(' <span class="pd-para">para '+esc(d)+'</span>'):'');
+}
+// FECHA RELATIVA, y la exacta SOLO si no es de esta semana. "Fecha" y "Hace" eran
+// dos columnas diciendo casi lo mismo; lo que se pregunta mirando esta lista es
+// hace cuánto que está colgando, no el día calendario. Pasada la semana el número
+// deja de ubicar solo y ahí sí entra la fecha.
+const PD_MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function _pdCuando(fecha, dias){
+  const rel = dias<=0 ? 'hoy' : (dias===1 ? 'ayer' : ('hace '+dias+' d'));
+  if(dias<=7) return rel;
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fecha||''));
+  return rel + (m ? (' · '+(+m[3])+' '+PD_MES[(+m[2])-1]) : '');
+}
 function pdRender(){
   const body=document.getElementById('pdBody'); if(!body||!_pd) return;
+  // UNA FILA, NO UNA TABLA DE CUATRO COLUMNAS. A 375px la tabla obligaba al botón
+  // a partirse en cuatro renglones y era eso lo que hacía cada fila tan alta.
+  // Arriba: quién (o el motivo) y la acción, que es lo que se viene a hacer.
+  // Abajo, callado: el número de despacho y hace cuánto.
   const secc=function(titulo,expl,ls,accion){
     let h='<div class="card rp-z"><div class="card-title">'+titulo
       +' <span class="pd-cnt'+(ls.length?' on':'')+'">'+ls.length+'</span></div>'
       +'<div class="rp-nota" style="margin:-4px 0 8px">'+expl+'</div>';
     if(!ls.length) h+='<div class="cl-none">Nada pendiente.</div>';
-    else{
-      h+='<table class="cl-tbl"><tr><th>Despacho</th><th>Cliente</th><th>Fecha</th><th>Hace</th><th></th></tr>';
-      ls.forEach(function(it){
-        h+='<tr><td>#'+it.id+'</td><td>'+esc(it.cliente)+'</td><td>'+esc(it.fecha)+'</td>'
-          +'<td>'+(it.dias===0?'hoy':(it.dias+' d'))+'</td>'
-          +'<td style="text-align:right">'+accion(it)+'</td></tr>'
-          +'<tr class="pd-exp"><td colspan="5"><div id="pdx'+it.id+'"></div></td></tr>';
-      });
-      h+='</table>';
-    }
+    else ls.forEach(function(it){
+      h+='<div class="pd-fila"><div class="pd-fila-c">'
+        +'<div class="pd-quien">'+_pdQuien(it)+'</div>'
+        +'<div class="pd-meta">#'+it.id+' · '+esc(_pdCuando(it.fecha,it.dias))+'</div>'
+        +'</div>'+accion(it)+'</div>'
+        +'<div id="pdx'+it.id+'"></div>';
+    });
     return h+'</div>';
   };
   let h='';
   h+=secc('Entregado en Truefie, sin validar en Odoo',
     'Andrea valida la entrega en Odoo a mano (fase 1) y la marca acá. Si esta lista se cierra sola durante semanas, ésa es la evidencia para la escritura automática.',
-    _pd.l1, function(it){ return '<button class="btn btn-sm" onclick="pdValidar('+it.id+')">Ya validé en Odoo</button>'; });
+    _pd.l1, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdValidar('+it.id+')">Ya validé</button>'; });
   h+=secc('Salida de venta, sin factura vinculada',
     'Solo salidas de tipo venta: una regalía sin factura no es un pendiente, es lo correcto.',
-    _pd.l2, function(it){ return '<button class="btn btn-sm" onclick="pdVincular('+it.id+','+it.cliente_id+')">Vincular factura</button>'; });
+    _pd.l2, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdVincular('+it.id+','+it.cliente_id+')">Vincular</button>'; });
   h+=secc('Salida sin clasificar',
     'Daniel registró la salida; falta que las socias digan qué fue. El pendiente es un estado con nombre, no un hueco.',
-    _pd.l3, function(it){ return '<button class="btn btn-sm" onclick="pdClasifUI('+it.id+')">Clasificar</button>'; });
+    _pd.l3, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdClasifUI('+it.id+')">Clasificar</button>'; });
 
   // Regla 1 del lobby: si no hay nada que hacer, la sección NO aparece. Nada de
   // "todo al día" — eso es información, y la información vive adentro del módulo.
@@ -10400,16 +10455,19 @@ function pdRender(){
         +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.5">'
         +'Salió producto contra un documento que ya no existe. Esto no se apaga solo.</div></div>';
     }
-    h+='<table class="cl-tbl"><tr><th>Salida</th><th>Cliente</th><th>Factura</th><th>Fecha</th><th>Hace</th><th></th></tr>';
+    // La misma fila que las de arriba: en la misma pantalla no puede haber dos
+    // formas de listar lo mismo. Acá el lugar de la acción lo ocupa el estado.
     l4.slice(0,3).forEach(function(it){
-      h+='<tr><td>#'+it.id+'</td><td>'+esc(it.cliente)+'</td>'
-        +'<td>'+esc(it.factura?('…'+String(it.factura).slice(-4)):'—')+'</td>'
-        +'<td>'+esc(it.fecha)+'</td><td>'+(it.dias===0?'hoy':(it.dias+' d'))+'</td>'
-        +'<td style="text-align:right">'+(it.estado==='anulada'
-            ? '<span style="color:var(--stop-tx);font-size:11.5px">anulada</span>'
-            : '<span style="color:var(--warn-2);font-size:11.5px">sin verificar</span>')+'</td></tr>';
+      h+='<div class="pd-fila"><div class="pd-fila-c">'
+        +'<div class="pd-quien">'+_pdQuien(it)
+        +(it.factura?(' <span class="pd-para">…'+esc(String(it.factura).slice(-4))+'</span>'):'')+'</div>'
+        +'<div class="pd-meta">#'+it.id+' · '+esc(_pdCuando(it.fecha,it.dias))+'</div>'
+        +'</div>'
+        +(it.estado==='anulada'
+          ? '<span class="pd-est pd-est-mal">anulada</span>'
+          : '<span class="pd-est pd-est-ojo">sin verificar</span>')
+        +'</div>';
     });
-    h+='</table>';
     if(l4.length>3) h+='<div class="rp-nota" style="margin-top:6px">y '+(l4.length-3)+' más</div>';
     if(sinv.length) h+='<div class="rp-nota" style="margin-top:6px">Las «sin verificar» se '
       +'limpian solas la próxima vez que Despachos lea Odoo.</div>';
