@@ -388,7 +388,7 @@ O sea que **cambiar la factura ya es posible a nivel de datos**: se INSERTA una
 fila con la factura nueva y esa pasa a ser la vigente. No hace falta anular la
 anterior ni tocar el esquema. (Es justo lo contrario de `ent_anulacion` — ver §8.)
 
-### ⚠️ La mala, y es la mitad peligrosa
+### La mitad peligrosa — RESUELTA el 26-ago con `VISTA_FACTURA_DESPACHADA.sql`
 
 **`v_ent_factura_despachada` NO lee el vínculo vigente. Lee
 `ent_pedido.factura_id`**, la columna que `ENTREGAS_SALIDAS.sql` §2 declara
@@ -408,11 +408,23 @@ preparar"**. Va a quedar ahí, con pinta de pendiente legítima, y el primero qu
 la prepare descuenta los lotes por segunda vez — exactamente lo que este pendiente
 existe para evitar.
 
-🔴 **Y esto ya es un riesgo HOY, sin construir nada**: en cuanto se emita la
-factura nueva de Mentha, va a aparecer en "Por preparar". El filtro de b39
-tampoco la agarra (su traslado `WH/OUT/02319` está `cancel`, así que no hay
-entrega validada anterior a la factura). Hasta que esto se construya, **el único
-freno es avisarle a Daniel**.
+✅ **YA ARREGLADO** (`VISTA_FACTURA_DESPACHADA.sql`, 26-ago). La vista pasó a
+leer `ent_pedido_factura_vigente`, así que cambiar el vínculo SÍ saca la factura
+nueva de la bandeja. De paso se le quitó la condición `p.origen = 'factura'`: con
+el vínculo en su propia tabla, lo que despacha una factura es TENER vínculo
+vigente y alisto vigente, no cómo nació el pedido — un despacho cargado a mano y
+vinculado después también tiene que sacarla.
+
+⚠️ **El orden importaba**: la vista se cambió DESPUÉS de `VINCULOS_BACKFILL.sql`.
+Al revés, las 23 facturas ya despachadas habrían vuelto a "Por preparar" con el
+producto fuera del congelador. El bloque lleva un candado que lo impide.
+
+⚠️ **Lo que queda abierto de esto**: el índice único `ent_pedido_factura_unico`
+—la red que impide dos pedidos para la misma factura— vive sobre
+`ent_pedido(factura_id)`, la columna vieja. `ent_pedido_factura` NO tiene índice
+único (el esquema lo dice: "se valida en la app"). Cuando se construya el cambio
+de factura, esa red hay que rehacerla del lado nuevo o el control queda en la app
+sola.
 
 ### Cómo debería funcionar
 
@@ -423,11 +435,8 @@ freno es avisarle a Daniel**.
 3. **Que diga en letras que NO registra una entrega nueva** y que los lotes no se
    vuelven a descontar. Es la duda que va a tener quien lo use, y es lo que hace
    que el gesto sea seguro.
-4. **`v_ent_factura_despachada` tiene que pasar a `ent_pedido_factura_vigente`.**
-   Sin esto, el punto 1 es una trampa. ⚠️ Toca la vista que alimenta "Por
-   preparar": hay que medir antes cuántas facturas entran y salen de la bandeja
-   con el cambio, contra los 23 vínculos recién escritos por
-   `VINCULOS_BACKFILL.sql`.
+4. ~~`v_ent_factura_despachada` tiene que pasar a `ent_pedido_factura_vigente`.~~
+   **Hecho el 26-ago.** Era el piso: sin esto el punto 1 era una trampa.
 5. **El historial tiene que mostrar la cadena**: a qué factura apuntaba antes, a
    cuál apunta ahora, cuándo y por qué. El append-only ya guarda todo; falta
    mostrarlo.
