@@ -343,7 +343,7 @@ de nuevo con su misma fecha, líneas y lotes. Es lo que hace
 
 ---
 
-## 9 · ABIERTO · "Despachar igual" no se persiste
+## 9 · EN CURSO (26-ago) · "Despachar igual" no se persiste — y falta "Revisado"
 
 El filtro de "Facturas sin despacho pendiente" (b39) aparta las facturas que ya
 tienen su entrega hecha en Odoo, y deja el botón **"Despachar igual"** para
@@ -356,7 +356,26 @@ para el caso de "la aparto ahora y la despacho mañana". Persistirlo pide una
 tabla (`ent_factura_forzada`, append-only con su motivo, como todo lo demás) y
 decidir si la decisión es para siempre o solo para esa factura y esa fecha.
 
-Aprobado como está por Andrea el 26-ago; anotado para cuando moleste.
+**Molestó el mismo día.** Andrea lo probó desde el iPhone: la lista **solo
+crece**, porque el único botón es "Despachar igual" —que hace lo contrario de
+marcarla como vista— y encima se pierde al recargar. Con ~41 reversiones
+administrativas al año, en un año son 41 filas que nadie puede sacar.
+
+**Lo aprobado el 26-ago**, pendiente de construir:
+1. Botón **"Revisado"**: la marca como vista y sale de la lista. ⚠️ "Revisado" y
+   NO "Validado": en este módulo validar ya significa *validar la entrega en
+   Odoo* —el botón "Ya validé" de la misma pantalla— y dos palabras iguales para
+   dos cosas distintas en la misma vista es exactamente lo que no puede pasar.
+2. **"Despachar igual" se persiste** en la misma tabla: las dos decisiones son de
+   la misma naturaleza —un humano miró una factura apartada y dijo qué hacer— y
+   merecen el mismo registro, con quién y cuándo.
+3. **Red por tiempo**: lo que nadie tocó en 30 días se pliega bajo un
+   "ver N antiguas". No desaparece, pero la lista deja de crecer sin fin.
+
+**El esquema ya está escrito**: `ENTREGAS_DECISION_FACTURA.sql` crea
+`ent_factura_decision` (append-only, gana la fila más reciente, con el motivo del
+filtro congelado en la fila) y su vista vigente. **Falta pegarlo**, y recién
+después se construye la pantalla.
 
 ---
 
