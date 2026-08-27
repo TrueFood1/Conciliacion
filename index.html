@@ -3059,6 +3059,13 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .bs-fec{font-size:11px;color:var(--text-3);white-space:nowrap}
 .bs-sub{font-size:11.5px;color:var(--text-3)}
 .bs-fac{font-family:var(--mono);font-size:10.5px;color:var(--text-3)}
+/* "sin factura" NO es un consecutivo: sale de la mono y del gris de dato, y pasa
+   a texto normal en el tono de nota. Con la mono se leía como si fuera un número
+   ilegible, que es justo la confusión que este arreglo viene a sacar. */
+.bs-fac.bs-sinfac{font-family:var(--font);font-size:11px;font-style:italic}
+/* El destinatario de una salida sin cliente. Va pegado al motivo y un escalón
+   más callado: "Regalía" es el qué, el nombre es el a quién. */
+.bs-para{color:var(--text-3);font-weight:400}
 /* El detalle: el AB-RE-04 tal cual, en filas de tabla. Misma densidad que el
    resto del módulo — encabezado 11px terciario y una línea debajo. */
 .bs-det{max-width:620px;border:1px solid var(--border);border-top:none;
@@ -3581,7 +3588,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 27 ago 2026 · b49';
+const BUILD = 'v 27 ago 2026 · b50';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -8925,7 +8932,7 @@ function despRender(){
             +' onclick="despAbrirEntrega('+r.pedido_id+')">'
             +(ocupado?'Guardando…':(an===null?'Verificando…':(an.sinVerificar?'Entregar sin verificar':'Entregar')))+'</button>';
         return '<div class="dp-prep'+(vieja?' vieja':'')+(anulada?' anulada':'')+'">'
-          +'<div class="dp-top"><span class="dp-cli">'+esc(r.cliente_nombre||'—')+'</span></div>'
+          +'<div class="dp-top"><span class="dp-cli">'+esc(_entQuien(r).nombre)+'</span></div>'
           +'<div class="dp-sub">preparado '+esc(_despCuando(r.preparado_en))
           +(res?(' · '+esc(res)):'')
           +(r.factura_nombre?(' · factura '+esc(_despFacCorta(r.factura_nombre))):'')+'</div>'
@@ -9465,7 +9472,7 @@ function despRenderDialogoEntrega(){
   }
 
   return _despDialogoHTML({
-    cliente: r.cliente_nombre, cuerpo: cuerpo, listo: listo, ocupado: ocupado,
+    cliente: _entQuien(r).nombre, cuerpo: cuerpo, listo: listo, ocupado: ocupado,
     sub: (r.factura_nombre?('…'+String(r.factura_nombre).slice(-4)):'sin factura')
          +' · preparado '+_despHora(r.preparado_en),
     extraCab: entPdfBtn(r.factura_id, r.factura_nombre, r.cliente_nombre),
@@ -9694,7 +9701,7 @@ function despRenderDialogoPreparar(){
     +' con cantidad distinta a la facturada.</div>';
   if(pend) cuerpo+='<div class="de-mal">'+esc(pend)+'</div>';
   return _despDialogoHTML({
-    cliente: f.cliente, cuerpo: cuerpo, listo: !pend, ocupado: _despGuardando,
+    cliente: _entQuien(f).nombre, cuerpo: cuerpo, listo: !pend, ocupado: _despGuardando,
     sub: (f.factura?('…'+String(f.factura).slice(-4)):'sin factura')
          +' · '+(entregar?'sale del congelador ahora':'queda esperando el camión'),
     fecha: _despPedFecha, setFecha: (entregar?'despSetPedFecha':''),
@@ -9980,6 +9987,40 @@ async function bsCargar(force){
 // v_ent_pedido_estado) y les cuelga `.lineas`. Muta las filas y también las devuelve.
 // Tres lecturas a Supabase, ninguna a Odoo: el diálogo tiene que abrir al instante y
 // no puede depender de que despierte el proxy.
+// ── CÓMO SE NOMBRA UNA SALIDA QUE NO TIENE CLIENTE ─────────────────────
+// UNA sola definición para todo el módulo, hermana de _entColgarDetalle y de
+// _entBucketsHTML: la regla vivía escrita SOLO adentro de Pendientes (b41) y el
+// Historial nunca la recibió. Andrea lo vio el 27-ago filtrando por el lote 208:
+// los despachos 28, 30 y 31 —las regalías del 26-ago— salían con el nombre en
+// "—", sin factura y sin PDF. Tres tarjetas que no decían absolutamente nada.
+//
+// LA CAUSA: `rpGuardar` inserta `cliente_nombre: null` cuando la salida no es
+// una venta (una regalía no tiene cliente, tiene DESTINATARIO), y cada pantalla
+// resolvía ese null por su cuenta con `||'—'`.
+//
+// LA REGLA: si un dato no aplica, se muestra el que SÍ aplica, nunca el hueco.
+// Un guión se lee como "falta un dato" cuando en realidad el dato correcto es
+// otro. Devuelve las dos partes por separado para que cada pantalla las arme
+// con su propia tipografía en vez de recibir HTML cocinado.
+const ENT_MOTIVO_N={regalia:'Regalía', reposicion:'Reposición',
+                    consumo_interno:'Consumo interno', degustacion:'Degustación',
+                    venta:'Venta', sin_clasificar:'Sin clasificar'};
+function _entQuien(o){
+  o=o||{};
+  const cli=(o.cliente_nombre||o.cliente||'').trim();
+  if(cli) return {nombre:cli, para:''};
+  const m=ENT_MOTIVO_N[o.motivo]||o.motivo||'Salida sin clasificar';
+  return {nombre:m, para:(o.destinatario||'').trim()};
+}
+// Y el rótulo de dónde iría el número de factura. Una salida sin factura no
+// tiene un número que esconder: tiene un motivo. Decir "sin factura" ahí es
+// información —explica por qué no hay PDF— y el hueco no lo era.
+function _entFacRotulo(o){
+  o=o||{};
+  if(o.factura_nombre) return _despFacCorta(o.factura_nombre);
+  return 'sin factura';
+}
+
 async function _entColgarDetalle(c, P){
   P=P||[]; if(!P.length) return P;
   const alis=P.map(function(p){ return p.alisto_id; }).filter(Boolean);
@@ -10030,7 +10071,21 @@ async function bsLeer(){
            +'alisto_id,responsable,preparado_en,salida_en,salida_registrada_en,estado,fecha_ab_re_04')
     .order('fecha_ab_re_04',{ascending:false}).limit(300);
   if(e1) throw e1;
-  return await _entColgarDetalle(c, peds||[]);
+  const P=peds||[];
+  // EL DESTINATARIO, de `ent_pedido`. `v_ent_pedido_estado` no lo expone y sin él
+  // una regalía se muestra como "Regalía" a secas, sin decir a quién — que es la
+  // mitad del dato. Se lee acá y no en la vista a propósito: cambiar la vista
+  // obliga a pegar SQL y a publicar juntas dos cosas que no dependen una de otra.
+  // Si falla, la pantalla sigue: se pierde el "para X", no la fila.
+  try{
+    const ids=P.map(function(x){ return x.pedido_id; }).filter(Boolean);
+    if(ids.length){
+      const {data:dst}=await c.from('ent_pedido').select('id,destinatario').in('id',ids);
+      const D={}; (dst||[]).forEach(function(x){ D[x.id]=x.destinatario; });
+      P.forEach(function(x){ x.destinatario=D[x.pedido_id]||''; });
+    }
+  }catch(e){}
+  return await _entColgarDetalle(c, P);
 }
 
 // Sin tildes y en minúscula: "Automercado" tiene que encontrarse escribiendo
@@ -10084,7 +10139,13 @@ function bsFiltrar(){
     && _despDiaDe(p.salida_registrada_en||p.salida_en)===_bsReg; });
   if(q){
     rs=rs.filter(function(p){
-      if(_bsCampo==='cliente')  return _bsNorm(p.cliente_nombre).indexOf(q)>=0;
+      // BUSCA POR LO QUE LA FILA MUESTRA, no por la columna. Estas filas dicen
+      // "Regalía para Escuela de Santa Ana" y filtrando solo por `cliente_nombre`
+      // —que en una salida sin cliente es null— no se encontraban escribiendo ni
+      // "Escuela" ni "Regalía". Un buscador que no encuentra lo que la pantalla
+      // muestra es el mismo hueco del guión, un paso más adelante.
+      if(_bsCampo==='cliente'){ const w=_entQuien(p);
+        return _bsNorm(w.nombre+' '+w.para).indexOf(q)>=0; }
       if(_bsCampo==='fecha')    return _despDiaDe(p.fecha_ab_re_04)===_bsQ;
       if(_bsCampo==='lote')     return (p.lineas||[]).some(function(l){
         return (l.lotes||[]).some(function(x){ return _bsNorm(x.lote).indexOf(q)>=0; }); });
@@ -10103,12 +10164,15 @@ function bsFiltrar(){
     const cuando = p.estado==='entregado'
       ? _despCuandoSalida(p.salida_en, p.salida_registrada_en)
       : _despCuando(p.preparado_en);
+    const q=_entQuien(p);
     return '<button class="bs-fila'+(ab?' on':'')+'" onclick="bsAbrir('+p.pedido_id+')">'
-      +'<span class="bs-f1"><span class="bs-cli">'+esc(p.cliente_nombre||'—')+'</span>'
+      +'<span class="bs-f1"><span class="bs-cli">'+esc(q.nombre)
+      +(q.para?('<span class="bs-para"> para '+esc(q.para)+'</span>'):'')+'</span>'
       +'<span class="bs-fec">'+esc(cuando)+'</span></span>'
       +'<span class="bs-f2"><span class="bs-sub">'+n+(n===1?' producto':' productos')
       +(p.estado==='preparado'?' · preparado, sin salir':'')+'</span>'
-      +'<span class="bs-fac">'+esc(_despFacCorta(p.factura_nombre))+'</span>'
+      +'<span class="bs-fac'+(p.factura_nombre?'':' bs-sinfac')+'">'
+      +esc(_entFacRotulo(p))+'</span>'
       +entPdfBtn(p.factura_id, p.factura_nombre, p.cliente_nombre)+'</span></button>'
       +(ab?bsDetalle(p):'');
   }).join('');
@@ -10153,8 +10217,8 @@ function bsDetalle(p){
     +'Preparó '+esc(p.responsable||'—')+' · preparado '+esc(_despCuando(p.preparado_en))
     +(p.salida_en ? ' · salió '+esc(_despCuandoSalida(p.salida_en, p.salida_registrada_en))
                   : ' · sin salida registrada')
-    +(p.factura_nombre?' · factura '+esc(_despFacCorta(p.factura_nombre)):'')
-    +(p.motivo&&p.motivo!=='venta'?' · '+esc(p.motivo.replace(/_/g,' ')):'')
+    +' · '+esc(p.factura_nombre?('factura '+_despFacCorta(p.factura_nombre)):'sin factura')
+    +(p.motivo&&p.motivo!=='venta'?' · '+esc((ENT_MOTIVO_N[p.motivo]||p.motivo).toLowerCase()):'')
     +'</div></div>';
   return h;
 }
@@ -10660,7 +10724,7 @@ async function pdLeer(){
       .select('salida_id,estado,salida_en,cliente_nombre,factura_nombre,detalle').limit(50);
     l4=(sv||[]).map(function(x){
       const dias=Math.floor((Date.now()-Date.parse(x.salida_en))/86400000);
-      return {id:x.salida_id, estado:x.estado, cliente:x.cliente_nombre||'—',
+      return {id:x.salida_id, estado:x.estado, cliente:_entQuien(x).nombre,
               fecha:String(x.salida_en||'').slice(0,10), dias:dias,
               factura:x.factura_nombre||'', detalle:x.detalle||''};
     });
@@ -10672,14 +10736,12 @@ async function pdLeer(){
 // Antes se dibujaba `esc(it.cliente)` a secas y esas filas salían con la celda en
 // blanco — un hueco que no dice nada y que encima se lee como "falta un dato".
 // Regla: si un dato no aplica, se muestra el que SÍ aplica, nunca el hueco.
-const PD_MOTIVO_N={regalia:'Regalía', reposicion:'Reposición',
-                   consumo_interno:'Consumo interno', degustacion:'Degustación',
-                   venta:'Venta', sin_clasificar:'Sin clasificar'};
+// Pendientes fue la primera pantalla que tuvo esta regla (b41) y ahora la TOMA
+// PRESTADA en vez de tener la suya: era la copia que se desincronizó — el
+// Historial nació sin ella. Se conserva exactamente la misma salida visual.
 function _pdQuien(it){
-  if(it.cliente) return esc(it.cliente);
-  const m=PD_MOTIVO_N[it.motivo]||it.motivo||'Salida sin clasificar';
-  const d=(it.destinatario||'').trim();
-  return esc(m)+(d?(' <span class="pd-para">para '+esc(d)+'</span>'):'');
+  const q=_entQuien(it);
+  return esc(q.nombre)+(q.para?(' <span class="pd-para">para '+esc(q.para)+'</span>'):'');
 }
 // FECHA RELATIVA, y la exacta SOLO si no es de esta semana. "Fecha" y "Hace" eran
 // dos columnas diciendo casi lo mismo; lo que se pregunta mirando esta lista es
