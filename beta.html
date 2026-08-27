@@ -2491,12 +2491,37 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .rp-pie{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:18px}
 .rp-pie-l{font-size:11.5px;color:var(--text-3);white-space:nowrap}
 .rp-guardar{height:46px;font-size:14px;width:100%;margin-top:14px}
-#rpSheet{position:fixed;inset:0;background:var(--scrim);z-index:60;display:flex;justify-content:center}
+/* ── EL SELECTOR DE CLIENTE (arreglado el 26-ago) ────────────────────────
+   Estaba INSERVIBLE en iPhone por dos causas distintas:
+
+   1 · POR DEBAJO DEL ENCABEZADO. En teléfono `#appHeader` es sticky con
+       z-index:110 (para no meterse bajo la barra de estado al hacer scroll), y
+       esta capa estaba en 60. O sea que el encabezado se dibujaba ENCIMA: se
+       veía medio renglón del buscador y el botón "Cerrar" cortado al medio.
+       Sube a 140: arriba del encabezado (110) y del panel "+" (130), abajo de
+       los paneles laterales (200+).
+
+   2 · LA LISTA NO SE PODÍA DESPLAZAR, que es lo que lo hacía inservible. En una
+       columna flex, un hijo con `overflow-y:auto` NO desborda si no se le pone
+       `min-height:0`: el `min-height:auto` que trae por defecto lo deja CRECER
+       con su contenido, así que el scroll nunca se activa y lo que sobra se
+       recorta contra el contenedor fijo — inalcanzable. Con decenas de clientes
+       ordenados por cantidad de despachos, los de abajo no se podían elegir de
+       ninguna forma. `flex:1;min-height:0` es el arreglo.
+
+   Y el buscador queda FIJO mientras la lista se desplaza (`flex:none`): en una
+   lista larga es lo único que la salva, y si se va con el scroll no sirve.
+   `overscroll-behavior:contain` evita que el tirón se lo coma la página de
+   atrás, y el safe-area de abajo saca el último cliente de la barra de gestos. */
+#rpSheet{position:fixed;inset:0;background:var(--scrim);z-index:140;display:flex;justify-content:center;
+  padding-top:env(safe-area-inset-top)}
 #rpSheet.hidden{display:none}
-.rp-sheet-in{width:100%;max-width:560px;padding:18px 16px;display:flex;flex-direction:column}
-.rp-sheet-top{display:flex;gap:10px;margin-bottom:12px}
+.rp-sheet-in{width:100%;max-width:560px;padding:18px 16px;display:flex;flex-direction:column;min-height:0}
+.rp-sheet-top{display:flex;gap:10px;margin-bottom:12px;flex:none}
 .rp-sheet-top input{flex:1;background:var(--field);border:1px solid var(--border-strong);border-radius:9px;color:var(--text);font:inherit;font-size:16px;padding:11px 12px}
-.rp-lista{overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-bottom:24px}
+.rp-lista{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;display:flex;flex-direction:column;gap:6px;
+  padding-bottom:calc(24px + env(safe-area-inset-bottom))}
 .rp-cli{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:var(--field);border:1px solid var(--border);border-radius:9px;color:var(--text);font:inherit;font-size:14px;padding:12px;cursor:pointer}
 .rp-clif{font-size:11px;color:var(--text-3);white-space:nowrap}
 .pd-cnt{display:inline-block;min-width:22px;text-align:center;font-size:11.5px;font-weight:600;color:var(--text-3);border:1px solid var(--border-strong);border-radius:999px;padding:1px 7px;margin-left:6px}
@@ -2729,7 +2754,12 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* ── Diálogo de Entregar ──────────────────────────────────────────────────
    Se abre sobre la bandeja. El cuerpo scrollea y el pie queda fijo: con seis
    productos el botón no se va de la pantalla, que es donde se pierde el gesto. */
-.de-fondo{position:fixed;inset:0;background:var(--scrim-2);z-index:90;
+/* z-index 140 y no 90 por lo mismo que #rpSheet: en teléfono el encabezado es
+   sticky en 110 y se dibujaba ENCIMA del diálogo. Acá no se notaba —la caja va
+   anclada abajo y nunca llegaba a tocarlo— pero el velo no tapaba el encabezado
+   y sus botones seguían tocables con un diálogo abierto, que es justo lo que un
+   modal existe para impedir. */
+.de-fondo{position:fixed;inset:0;background:var(--scrim-2);z-index:140;
   display:flex;align-items:flex-end;justify-content:center;padding:0}
 @media(min-width:700px){ .de-fondo{align-items:center;padding:24px} }
 .de-caja{background:var(--surface);border:1px solid var(--border);
@@ -3514,7 +3544,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 26 ago 2026 · b45';
+const BUILD = 'v 26 ago 2026 · b46';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -15736,10 +15766,9 @@ try{ document.getElementById('homeBuild').textContent = BUILD; }catch(e){}
 </script>
 <!-- ── MARCA DE PRUEBA ─────────────────────────────────────────────────────
      beta.html: copia de `dev` servida al lado de la app real para probarla desde
-     el iPhone SIN publicar. index.html NO se toca. La marca es un div de posición
-     fija con pointer-events:none: no interfiere con nada de lo que se prueba. -->
+     el iPhone SIN publicar. index.html NO se toca. -->
 <div style="position:fixed;left:8px;bottom:8px;z-index:9999;background:#E9A23B;color:#241a00;
   font:600 10px/1 -apple-system,system-ui,sans-serif;letter-spacing:.08em;
-  padding:5px 8px;border-radius:999px;pointer-events:none;opacity:.92">PRUEBA · b45</div>
+  padding:5px 8px;border-radius:999px;pointer-events:none;opacity:.92">PRUEBA · b46</div>
 </body>
 </html>
