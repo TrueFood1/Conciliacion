@@ -29,6 +29,23 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
   duplicada. La corrección dejó 12 unidades fantasma en el saldo hasta que se
   revirtió. **Antes de concluir que una salida no ocurrió, hay que mirar el
   Excel** — y si no se puede mirar, decirlo y no concluir.
+  ⚠️ **CORTE DEL 27-AGO-2026: el Excel deja de existir hacia adelante.** Andrea
+  le dijo a Daniel que no lo use más. Truefie pasa a ser la **fuente primaria de
+  lotes**, no la hoja. Daniel, sobre el cambio: *"me parece mucho mejor... dos
+  clicks y ya uno marca lo que va a entregar y listo"*, contra leer y apuntar
+  lotes a mano.
+  - **Antes del 27-ago la regla vale entera.** Toda auditoría de lo viejo —que es
+    donde caen las correcciones— sigue teniendo dos registros independientes, y
+    ante contradicción manda el Excel.
+  - **Del 27-ago en adelante NO HAY hoja contra la cual contrastar.** Eso no
+    relaja la regla: la endurece. El Excel era un **segundo testigo** del
+    movimiento físico, y era lo único que salvó al despacho 11. Sin él, lo que se
+    registra en Truefie tiene que estar bien **la primera vez**, porque un error
+    ya no se caza cruzando dos fuentes: se caza con un conteo físico que reancle,
+    que puede no venir en meses.
+  - Consecuencia de diseño, más fuerte que antes: **la emergencia se resuelve
+    DENTRO de Truefie, con rastro** (registrar y marcar), y nunca empujando a
+    Daniel al papel. Ahora el papel ya no está.
 - **Cambios visuales no tocan lógica probada**: conservar ids/handlers,
   revalidar sintaxis al final. Al cambiar ids de contenedores, buscar TODOS los
   `getElementById` que los referencian.
@@ -46,6 +63,21 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
      mientras `ent_devolucion` y `ent_salida_verificacion` ya existían y no
      figuraban. Empieza a cubrirlas recién cuando el código las usa — que es su
      momento útil, pero conviene no leer el ✓ como un inventario.
+     ⚠️ **Y el punto ciego tiene una segunda cara, peor, demostrada el 27-ago:
+     tampoco avisa cuando un esquema pegado no lo lee NADIE.** Las tablas de
+     devoluciones se pegaron el 20-ago con su vista `ent_devuelto_desde_ancla`
+     —la CUARTA PUNTA del saldo, `ancla + producción − salidas + devoluciones`—
+     y `rpCalcSaldos()` nunca la llamó. **Siete días con la función a medias y
+     el chequeo en ✓ los siete**, porque un objeto que nadie consulta no puede
+     faltarle a nadie. No se descubrió por una alerta sino por buscar a mano al
+     preparar la primera devolución real. Medido en el momento de arreglarlo:
+     26 objetos → **27**, y "dependencias nuevas respecto de main: 1", en cuanto
+     el código escribió el `from('ent_devuelto_desde_ancla')`. El ✓ mide
+     **cobertura de lo que el código pide**, no que el código pida todo lo que
+     debería.
+     **Cómo se caza**: al pegar un esquema, anotar en el pendiente qué código
+     va a leerlo, y no darlo por cerrado hasta que `esquema_check` **suba de
+     número**. Si el contador no se mueve, el esquema está muerto.
   2. **No ve las llamadas por variable.** El regex busca `from('literal')`, así
      que `c.from(t)` dentro de un helper se le escapa. Fue el caso de
      `ent_pedido_motivo_vigente` y `ent_pedido_valida_vigente` el 19-ago: la
