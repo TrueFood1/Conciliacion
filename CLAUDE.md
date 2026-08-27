@@ -16,6 +16,19 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
 - **Validar contra la fuente**: todo número nuevo se cruza contra el pivot
   nativo de Odoo o el Excel de Andrea antes de darse por bueno. La dirección de
   una conversión de UoM (× o ÷ factor) se verifica con un dato real conocido.
+- **La factura dice qué se COBRÓ; el Excel de Daniel dice qué SALIÓ del
+  congelador. Cuando se contradicen, manda el Excel.** Son dos hechos distintos y
+  Odoo solo conoce el primero: los seis terminados están con `tracking = none`, y
+  una factura se anula por razones administrativas que no tienen nada que ver con
+  el inventario (en 2026: 37 reversiones administrativas contra 6 devoluciones
+  reales). El 26-ago-2026 se concluyó que el despacho 11 —Mentha y limón,
+  19-ago— "nunca ocurrió" porque su factura ...3484 estaba anulada y su traslado
+  `WH/OUT/02319` en `cancel`, y se escribió un SQL que lo anuló. Era falso: el
+  Excel tenía el bloque `19 ago 26 · Mentha y limón · Blanco 6 Uds 202-1/27 ·
+  Semillas 6 Uds 209-1/27`, calzando exacto. Habían salido DOS entregas, no una
+  duplicada. La corrección dejó 12 unidades fantasma en el saldo hasta que se
+  revirtió. **Antes de concluir que una salida no ocurrió, hay que mirar el
+  Excel** — y si no se puede mirar, decirlo y no concluir.
 - **Cambios visuales no tocan lógica probada**: conservar ids/handlers,
   revalidar sintaxis al final. Al cambiar ids de contenedores, buscar TODOS los
   `getElementById` que los referencian.

@@ -235,3 +235,207 @@ Referencia de Odoo (26-ago): desde el 15-ago hay **15 facturas** con líneas en
 paquete — 3478, 3479, 3482, 3483, 3485, 3487, 3488, 3491, 3492, 3494, 3496,
 3497, 3500, 3501, 3502. Cuántas de ellas llegaron a `ent_pedido_linea` depende de
 cuáles se registraron por el módulo; el SELECT de arriba da la lista real.
+
+---
+
+## 7 · ABIERTO · Anular un despacho desde la pantalla, con motivo obligatorio
+
+**El caso que lo abrió.** El 26-ago-2026 apareció el primero: el **despacho 11**
+(Mentha y limón, 19-ago, factura ...3484) registraba una salida que **nunca
+ocurrió**. Entró en el cargue retroactivo del 19-ago desde la hoja de Daniel —
+la hoja tenía el bloque anotado y la factura existía en Odoo, así que el cargue lo
+dio por salido. Pero el pan no salió ese día: la entrega no se hizo, por eso se
+anuló la 3484 (NC id 40822) y su traslado `WH/OUT/02319` quedó `cancel`. El
+producto salió el **26-ago con la ...3499**. El lote quedó descontado **dos
+veces** y el saldo, 6 u por debajo del congelador físico en dos lotes.
+
+**El problema de fondo: no hay forma de corregirlo desde la pantalla.** Hizo falta
+SQL a mano (`CORRECCION_DESP11.sql`). Y va a volver a pasar: en 2026 hubo **37
+reversiones administrativas** contra 6 devoluciones reales. Cada vez que una
+entrega se cae después de registrada, hoy hace falta una sesión con SQL.
+
+### Lo que el esquema YA resuelve (no hay que inventar nada)
+
+`ent_anulacion` existe desde el 19-ago y está pensada exactamente para esto:
+anular es **insertar** `(entidad, entidad_id, motivo, creado_por)`, con
+`entidad in ('alisto','salida')`. `ent_alisto_vigente` y `ent_salida_vigente` ya
+la respetan. Falta **solo la pantalla**.
+
+⚠️ **Y hay que anular el ALISTO, no solo la salida.** El saldo se descuenta al
+PREPARAR: `ent_salido_del_congelador_desde_ancla` suma desde `ent_alisto_lote`
+pasando por `ent_alisto_vigente`. Anular solo la salida devuelve el pedido a
+"Preparado" y deja el saldo igual de mal. Son dos gestos distintos y la pantalla
+tiene que distinguirlos:
+
+- **"No salió, pero sigue preparado"** → anular la salida. El pedido vuelve a la
+  bandeja. El saldo NO cambia (el producto sigue fuera del congelador).
+- **"Esto nunca pasó"** → anular el alisto (y su salida). El saldo VUELVE.
+
+### Lo que hay que construir
+
+1. Un control en el detalle del despacho, con **motivo obligatorio y de texto
+   libre** — acá el motivo no se puede cerrar en una lista: "la hoja lo tenía
+   anotado pero el pan no salió" no entra en ninguna categoría previsible.
+2. Que diga **cuánto vuelve al saldo, por lote, ANTES de confirmar**. Es la única
+   forma de que quien anula vea lo que está moviendo.
+3. Que quede **visible que fue anulado y por qué** en el historial. Anular no es
+   esconder: la fila se queda, con su motivo.
+
+### Un cabo suelto que deja la anulación
+
+Un pedido de venta cuyo alisto queda anulado **sigue apareciendo en "Salida de
+venta, sin factura vinculada"**, porque esa lista solo mira `motivo = 'venta'` y
+la ausencia de vínculo — no mira si el alisto sigue vigente. El despacho 11 va a
+quedar ahí sin nada que hacer. Hay que decidir si esa lista excluye los pedidos
+sin alisto vigente (ojo: un pedido que todavía NO se preparó también está sin
+alisto, y ése sí tiene que aparecer — no es la misma cosa).
+
+⚠️ **Y OJO CON UNA COSA ANTES DE CONSTRUIRLO**: hoy anular es un camino de una
+sola dirección — ver §8. El primer caso real de anulación (este mismo despacho
+11) resultó ser un error de diagnóstico que hubo que revertir al día siguiente
+re-registrando el alisto a mano. Un botón de anular sin deshacer es una trampa;
+§8 va antes que §7, o al menos junto.
+
+### Ya arreglado de paso (26-ago, b38)
+
+`pdLeer` leía `ent_alisto.anulado`, la columna que `ENTREGAS_ETAPAS.sql` §2
+declara MUERTA: no tiene grant de UPDATE, así que nadie puede ponerla en true
+nunca. Con la tabla cruda, un despacho anulado seguía saliendo en Pendientes para
+siempre. Pasó a `ent_alisto_vigente`, que es la que refleja `ent_anulacion`.
+
+---
+
+## 8 · ABIERTO · `ent_anulacion` es de una sola dirección — no se puede revertir
+
+Descubierto el 26-ago-2026 al tener que deshacer una anulación mal hecha (ver §7
+y `CORRECCION_DESP11_REVERTIR.sql`).
+
+**El problema.** `ent_anulacion` no tiene columna para anularse a sí misma, y las
+dos vistas la leen con `not exists`:
+
+```sql
+where a.anulado = false
+  and not exists (select 1 from ent_anulacion x
+                   where x.entidad = 'alisto' and x.entidad_id = a.id)
+```
+
+Cualquier fila de anulación es **final**: una fila posterior no la deshace.
+Anular es fácil y desanular es imposible sin tocar el esquema.
+
+**Por qué importa ahora.** El pendiente §7 es construir la anulación desde la
+pantalla. Si se construye sobre este esquema, se le está dando a alguien un botón
+que **no tiene vuelta atrás** — y el primer caso real de anulación (el despacho
+11) resultó ser un error de diagnóstico que hubo que revertir al día siguiente.
+Un botón de anular sin deshacer es una trampa.
+
+**Lo que habría que cambiar.** Agregar a `ent_anulacion` una columna que apunte a
+la fila que la revierte (o un `anulado boolean`, el mismo patrón de
+`ent_pedido_factura`), y pasar las dos vistas de `not exists` a **"gana la fila
+más reciente"**, que es el criterio que el resto del módulo ya usa para el ancla,
+el motivo y el vínculo a la factura. ⚠️ Toca `ent_alisto_vigente` y
+`ent_salida_vigente`, de las que cuelgan los saldos, `v_ent_pedido_estado` y
+Pendientes: no es un cambio para hacer con urgencia, y hay que probarlo antes.
+
+**Mientras tanto**, revertir se hace **re-registrando** el alisto (append-only,
+sin DDL): las filas de anulación se quedan como evidencia y se inserta el alisto
+de nuevo con su misma fecha, líneas y lotes. Es lo que hace
+`CORRECCION_DESP11_REVERTIR.sql` y funciona, pero deja el pedido con dos alistos.
+
+---
+
+## 9 · ABIERTO · "Despachar igual" no se persiste
+
+El filtro de "Facturas sin despacho pendiente" (b39) aparta las facturas que ya
+tienen su entrega hecha en Odoo, y deja el botón **"Despachar igual"** para
+cuando el filtro se equivoque. Ese botón hoy es **de la sesión**: se guarda en
+`_despForzar`, una variable en memoria. Si se recarga la pantalla antes de
+despachar, la factura vuelve a la lista apartada.
+
+Alcanza para el uso previsto —se confirma y se despacha en el momento— pero no
+para el caso de "la aparto ahora y la despacho mañana". Persistirlo pide una
+tabla (`ent_factura_forzada`, append-only con su motivo, como todo lo demás) y
+decidir si la decisión es para siempre o solo para esa factura y esa fecha.
+
+Aprobado como está por Andrea el 26-ago; anotado para cuando moleste.
+
+---
+
+## 10 · ABIERTO · No se puede CAMBIAR la factura de un despacho ya vinculado
+
+**El caso vivo (26-ago-2026).** Mentha y limón se quedó con el producto de la
+entrega del 19-ago (despacho 11), cuya factura ...3484 se anuló. Andrea va a
+emitir una **factura nueva** por esas 12 unidades. Hay que apuntar el despacho 11
+a la factura nueva — y **sin registrar una entrega nueva**, porque el movimiento
+físico ya está registrado con sus lotes (`202 / 1-27` y `209 / 1-27`). Registrar
+otro descontaría esos lotes dos veces.
+
+Hoy no hay forma. El botón "Vincular factura" de Pendientes solo aparece para los
+despachos que **no tienen ninguna**: es para llenar un hueco, no para reemplazar.
+
+Con **37 reversiones administrativas al año**, esto vuelve.
+
+### La buena noticia: el dato ya sabe hacerlo
+
+`ent_pedido_factura_vigente` es **"gana la fila más reciente"**, no `not exists`:
+
+```sql
+select distinct on (pedido_id) pedido_id, factura_id, factura_nombre, anulado, ...
+  from ent_pedido_factura
+ order by pedido_id, creado_en desc;
+```
+
+O sea que **cambiar la factura ya es posible a nivel de datos**: se INSERTA una
+fila con la factura nueva y esa pasa a ser la vigente. No hace falta anular la
+anterior ni tocar el esquema. (Es justo lo contrario de `ent_anulacion` — ver §8.)
+
+### ⚠️ La mala, y es la mitad peligrosa
+
+**`v_ent_factura_despachada` NO lee el vínculo vigente. Lee
+`ent_pedido.factura_id`**, la columna que `ENTREGAS_SALIDAS.sql` §2 declara
+OBSOLETA y que no tiene grant de UPDATE:
+
+```sql
+create or replace view v_ent_factura_despachada ... as
+  select p.factura_id, p.id as pedido_id, ...
+    from ent_pedido p
+    join ent_alisto_vigente av on av.pedido_id = p.id
+   where p.origen = 'factura' and p.factura_id is not null;
+```
+
+Esa vista es la que saca de "Por preparar" las facturas ya despachadas.
+Consecuencia: **cambiar el vínculo NO va a sacar la factura nueva de "Por
+preparar"**. Va a quedar ahí, con pinta de pendiente legítima, y el primero que
+la prepare descuenta los lotes por segunda vez — exactamente lo que este pendiente
+existe para evitar.
+
+🔴 **Y esto ya es un riesgo HOY, sin construir nada**: en cuanto se emita la
+factura nueva de Mentha, va a aparecer en "Por preparar". El filtro de b39
+tampoco la agarra (su traslado `WH/OUT/02319` está `cancel`, así que no hay
+entrega validada anterior a la factura). Hasta que esto se construya, **el único
+freno es avisarle a Daniel**.
+
+### Cómo debería funcionar
+
+1. **En el detalle del despacho**, no en Pendientes: un control "Cambiar la
+   factura" disponible **también cuando ya tiene una**, mostrando cuál tiene hoy.
+2. **Motivo obligatorio, texto libre.** "La 3484 se anuló y se re-emitió como
+   ...35xx" no entra en ninguna lista cerrada.
+3. **Que diga en letras que NO registra una entrega nueva** y que los lotes no se
+   vuelven a descontar. Es la duda que va a tener quien lo use, y es lo que hace
+   que el gesto sea seguro.
+4. **`v_ent_factura_despachada` tiene que pasar a `ent_pedido_factura_vigente`.**
+   Sin esto, el punto 1 es una trampa. ⚠️ Toca la vista que alimenta "Por
+   preparar": hay que medir antes cuántas facturas entran y salen de la bandeja
+   con el cambio, contra los 23 vínculos recién escritos por
+   `VINCULOS_BACKFILL.sql`.
+5. **El historial tiene que mostrar la cadena**: a qué factura apuntaba antes, a
+   cuál apunta ahora, cuándo y por qué. El append-only ya guarda todo; falta
+   mostrarlo.
+
+### Relación con los otros pendientes
+
+- **§8** (anular es de una sola dirección) es el problema espejo: ahí falta poder
+  deshacer, acá falta poder reemplazar. Los dos salen del mismo caso real.
+- **§6**: `presentacion` es otra columna que se sigue escribiendo mal. Junto con
+  `ent_pedido.factura_id`, son dos columnas declaradas obsoletas de las que
+  todavía cuelga algo. Vale una pasada que las cierre a las dos.

@@ -766,7 +766,11 @@ tr.r-ing td{background:#eff6ff}
 /* zona central: consulta centrada verticalmente */
 .home-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;gap:0}
 /* zona inferior: módulos anclados abajo */
-.home-bottom{width:100%;max-width:620px;display:flex;flex-direction:column;align-items:stretch}
+/* 746px = seis tarjetas de ~116px + cinco huecos de 10px. Era 620 (cinco tarjetas);
+   con Personal el bloque se ensancha lo justo para que la fila siga siendo UNA y las
+   tarjetas conserven su tamaño. Ensanchar el bloque en vez de apretar las columnas es
+   lo que mantiene "Conciliación" en un renglón. */
+.home-bottom{width:100%;max-width:746px;display:flex;flex-direction:column;align-items:stretch}
 .home-hi{font-size:26px;font-weight:500;color:#F5F4F0;letter-spacing:-.4px;text-align:center}
 .home-q{font-size:20px;font-weight:400;color:#9A988F;margin:10px 0 0}
 .home-search{display:flex;align-items:center;width:100%;max-width:480px;background:#18181C;border:.5px solid #34343C;border-radius:999px;padding:5px 6px 5px 20px;gap:10px;margin-top:2.5rem}
@@ -784,7 +788,7 @@ tr.r-ing td{background:#eff6ff}
 .home-soon .home-search{margin-top:0}
 .home-sep{border-top:.5px solid #26262C;width:100%;margin:0}
 .home-modlabel{font-size:12px;font-weight:500;color:#6E6C68;letter-spacing:.5px;width:100%;margin:1.5rem 0 .9rem;text-align:left}
-.home-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;width:100%;max-width:760px}
+.home-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;width:100%;max-width:760px}
 /* El sello de versión iba con estilo en línea; vive acá para que el @media pueda darle
    el respiro del safe-area en teléfono (el estilo en línea le ganaba a la hoja). */
 .home-build{text-align:center;color:#6E6C68;font-size:11px;letter-spacing:.03em;padding:16px 0 6px}
@@ -825,13 +829,20 @@ tr.r-ing td{background:#eff6ff}
      preferencia de diseño sino una restricción de la plataforma. */
   input,select,textarea{font-size:16px !important}
   .home-grid{grid-template-columns:1fr 1fr;gap:9px}
-  /* En teléfono Conciliación no se muestra, así que quedan CUATRO módulos: 2×2 exacto,
-     sin huecos ni tarjeta estirada. Arriba lo que se usa a diario (Operaciones y
-     Entregas), abajo lo que se consulta (Finanzas) y lo que todavía no existe (Ventas). */
+  /* CUATRO módulos en teléfono: 2×2 exacto, sin huecos ni tarjeta estirada. Arriba lo
+     que se usa a diario (Operaciones y Entregas), abajo lo de la persona (Personal) y
+     lo que se consulta (Finanzas).
+     CON PERSONAL SERÍAN CINCO, y cinco en dos columnas deja una tarjeta huérfana en la
+     tercera fila — justo lo que este bloque vino a arreglar. La que sale del teléfono es
+     VENTAS: es la única inerte, no se puede abrir, y en la pantalla más chica una tarjeta
+     que no hace nada es decoración. Sigue en escritorio, donde no le quita el lugar a
+     nadie. Para devolverla al teléfono: borrar la línea `.home-mod-ven{display:none}` de
+     abajo y darle `order:5` — y asumir la huérfana. */
   .home-mod-ops{order:1}  .home-mod-ent{order:2}
-  .home-mod-fin{order:3}  .home-mod-ven{order:4}
+  .home-mod-per{order:3}  .home-mod-fin{order:4}
   .home-mod{padding:14px;min-height:86px;display:flex;flex-direction:column;box-sizing:border-box}
   .home-mod-conc{display:none}
+  .home-mod-ven{display:none}
   /* Por id: la regla base de .home-mod.inert va más abajo en la hoja y le ganaba por orden. */
   #vLobby .home-mod.inert{opacity:.38}
   .home-mod .home-mod-state{margin-top:auto}
@@ -879,6 +890,19 @@ tr.r-ing td{background:#eff6ff}
    claro es del TEMA: el día que Entregas vuelva a oscuro, el acento sigue bien. */
 body[data-mod="entregas"] .main{
   --mod:var(--ent-line);--accent:var(--ent-line);--blue:var(--ent-line);--blue-l:var(--ent-wash)}
+/* PERSONAL = NARANJA #FF671D (Pantone 165 C), del VisualDNA de True Food — el
+   secundario de "Francés". Decidido por Andrea el 26-ago-2026.
+   ⚠️ EL NARANJA NO SE USA DE FONDO LAVADO, por la misma razón que el lima: el ámbar
+   (#E9A23B) es el que AVISA, y un bloque lavado en naranja a 15% es indistinguible de
+   una alerta de un vistazo. Por eso `--blue-l` acá NO es el naranja al 15% como en los
+   otros módulos, sino el panel neutro: el aviso de carga queda en superficie oscura con
+   el texto en el color del módulo. El naranja identifica (punto, subrayado, el número
+   grande); nunca rellena. Si algún día alguien "unifica" esta línea con las de arriba,
+   Personal empieza a verse en alerta permanente.
+   Y ojo con Automatización, que en CLAUDE.md tiene #FF751F: es prácticamente el mismo
+   naranja. Todavía no existe como módulo; cuando exista, uno de los dos se mueve. */
+body[data-mod="personal"] .main{
+  --mod:#FF671D;--accent:#FF671D;--blue:#FF671D;--blue-l:var(--panel)}
 .faces .face.on{color:var(--text);border-bottom-color:var(--mod)}
 .m3nav .m3tab.on{background:transparent;color:var(--mod);border-bottom-color:var(--mod)}
 .home-mod-dot{width:9px;height:9px;border-radius:3px;display:inline-block}
@@ -900,6 +924,30 @@ body[data-mod="entregas"] .main{
 .home-wrap.solo .home-mod-dot{width:11px;height:11px}
 .home-wrap.solo .home-mod-name{font-size:19px;margin-top:15px}
 .home-wrap.solo .home-mod-state{font-size:13px;margin-top:9px}
+/* ── LOBBY DE DOS MÓDULOS (hoy: Daniel, con Entregas y Personal) ──
+   Hermano de `.solo`, y nace el mismo día que Personal: hasta hoy Daniel veía UN
+   módulo y el lobby era portada. Con dos vuelve a ser índice, así que el separador y
+   el rótulo se QUEDAN —rotular una lista de dos sí informa—; lo único que hace falta
+   es que las dos tarjetas no queden arrinconadas a la izquierda de una fila de seis.
+   Va solo en escritorio: en teléfono la cuadrícula ya es de dos columnas y dos
+   tarjetas la llenan exacto, así que ahí no hay nada que corregir y tocarlo solo
+   rompería el tamaño de tarjeta que la media query ya fijó. */
+@media(min-width:701px){
+  .home-wrap.duo .home-center{flex:0 0 auto;margin:auto 0 0}
+  .home-wrap.duo .home-bottom{margin:26px auto auto;max-width:480px}
+  .home-wrap.duo .home-grid{grid-template-columns:1fr 1fr;max-width:480px}
+}
+/* ── PERSONAL · MIS VACACIONES ──
+   Un número y su detalle. El número grande va en blanco hueso, no en el naranja del
+   módulo: el sistema pinta los números en blanco hueso y el color de módulo lo lleva
+   el punto de las migas de pan. Un acento por vista, y ese es. */
+.vac-hero{text-align:center;padding:30px 0 4px}
+.vac-num{font-size:64px;font-weight:600;letter-spacing:-.03em;line-height:1;color:var(--text);font-variant-numeric:tabular-nums}
+.vac-lbl{font-size:13px;color:var(--text-2);margin-top:10px}
+.vac-det{font-size:13px;color:var(--text-3);margin-top:20px;text-align:center}
+.vac-ped{font-size:13px;color:var(--text-2);margin-top:10px;text-align:center}
+.vac-n{color:var(--text);font-variant-numeric:tabular-nums}
+.vac-sub{font-size:12px;color:var(--text-2);margin-top:4px}
 /* ── M3 — Asistente de conciliación (presentación; lógica intacta) ── */
 .m3card{background:var(--bg);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:1rem;overflow:hidden}
 .m3head{padding:1rem 1.25rem .75rem}
@@ -1445,6 +1493,14 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
         <span class="home-mod-dot" style="background:#E9FE60"></span>
         <div class="home-mod-name" style="color:#F5F4F0">Entregas</div>
         <div class="home-mod-state" style="color:#E9FE60">Abrir →</div>
+      </div>
+      <!-- PERSONAL. Es módulo, no tarjeta: ACCESOS_ESQUEMA.sql ya declara que el perfil
+           `equipo` ve "Entregas · Personal · Producción". El borde #5E2610 es el naranja
+           del módulo oscurecido, derivado igual que los otros cuatro. -->
+      <div class="home-mod home-mod-per" style="border-color:#5E2610" onclick="abrirPersonal()">
+        <span class="home-mod-dot" style="background:#FF671D"></span>
+        <div class="home-mod-name" style="color:#F5F4F0">Personal</div>
+        <div class="home-mod-state" style="color:#FF9C63">Abrir →</div>
       </div>
       <div class="home-mod inert home-mod-ven">
         <span class="home-mod-dot" style="background:#3FB6A8"></span>
@@ -2367,11 +2423,53 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .rp-prod.on{border-color:var(--pc);color:var(--text);box-shadow:inset 0 0 0 1px var(--pc)}
 .rp-conv{font-size:13px;color:var(--text);padding:9px 0;font-variant-numeric:tabular-nums}
 .rp-lote{display:flex;align-items:center;gap:8px;margin-top:6px}
-.rp-lotebtn{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:var(--sunken);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:13px;padding:10px 11px;cursor:pointer}
+.rp-lotebtn{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;background:var(--sunken);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:13px;padding:9px 11px;cursor:pointer}
 .rp-lote.on .rp-lotebtn{border-color:var(--ent-line);color:var(--text)}
 .rp-lote.ago .rp-lotebtn{opacity:.45}
-.rp-saldo{font-size:11px;color:var(--text-3);white-space:nowrap}
-.rp-lotein{width:76px}
+/* ⚠️ EL LOTE NO SE PARTE (26-ago). El nombre iba como nodo de texto suelto dentro
+   de un flex, así que al elegir el lote —que agrega el input de 76px al lado— el
+   botón se quedaba sin ancho y "208 / 1-27" se rompía en TRES renglones, cortado
+   por los espacios de alrededor de la barra. Medido a 375px. El saldo ya llevaba
+   nowrap y se quedaba con su espacio primero; el que cedía era el dato principal.
+   Ahora el nombre también es un span con nowrap y el que se achica es el saldo. */
+.rp-lote-n{white-space:nowrap;font-variant-numeric:tabular-nums}
+.rp-saldo{font-size:11px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rp-lotein{width:76px;flex:none}
+.rp-ceros{background:none;border:none;padding:6px 0 0;font:inherit;font-size:11.5px;
+  color:var(--text-3);text-decoration:underline;cursor:pointer}
+
+/* ── ENTREGAS SIN FACTURA · rediseño del formulario (26-ago) ─────────────
+   JERARQUÍA POR ESPACIO Y ETIQUETAS CHICAS, NO POR BORDES. Antes eran tres
+   .card apiladas y adentro de cada una más cajas con borde —el producto, la
+   presentación, cada lote—: tarjetas dentro de tarjetas, y el ojo no sabía qué
+   agrupaba a qué. Ahora el borde queda SOLO donde hay algo que tocar, y lo que
+   separa las tres partes del formulario es el aire más una etiqueta chica. */
+.rp-sec{margin-top:24px}
+.rp-sec:first-child{margin-top:2px}
+.rp-sec-t{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--text-3);margin-bottom:10px}
+/* El campo condicional cuelga de la decisión que lo abre. Sin caja: lo que dice
+   que depende es que aparece debajo y solo cuando corresponde. */
+.rp-cond{margin-top:16px}
+/* Los seis productos como CHIPS con su punto de color de empaque (RP_COLOR, el
+   mismo mapa que ya usaba esta pantalla). Antes eran seis botones de 18px de alto
+   en una grilla: ocupaban media pantalla de teléfono para elegir una de seis
+   cosas, y el color solo aparecía DESPUÉS de elegir. */
+.rp-chips{display:flex;flex-wrap:wrap;gap:7px}
+.rp-chip{display:inline-flex;align-items:center;gap:7px;background:var(--sunken);
+  border:1px solid var(--border-strong);border-radius:999px;color:var(--text-2);
+  font:inherit;font-size:13.5px;padding:9px 14px;cursor:pointer;white-space:nowrap}
+.rp-chip .rp-pt{width:8px;height:8px;border-radius:999px;background:var(--pc);flex:none}
+.rp-chip.on{border-color:var(--ent-line);background:var(--ent-wash);color:var(--text);font-weight:600}
+/* UN TOPE DE ANCHO. Sin las tarjetas, en escritorio el formulario se estiraba a
+   1132px y "Venta con factura" quedaba de medio metro. 620px es el mismo número
+   que ya usa .dp-pie, el pie del pedido — no se inventa una medida nueva. En
+   teléfono no cambia nada: 375 < 620. */
+#rpBody{max-width:620px}
+/* La fecha al pie, chiquita: casi siempre es hoy y casi nunca se toca. */
+.rp-pie{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:18px}
+.rp-pie-l{font-size:11.5px;color:var(--text-3);white-space:nowrap}
+.rp-guardar{height:46px;font-size:14px;width:100%;margin-top:14px}
 #rpSheet{position:fixed;inset:0;background:var(--scrim);z-index:60;display:flex;justify-content:center}
 #rpSheet.hidden{display:none}
 .rp-sheet-in{width:100%;max-width:560px;padding:18px 16px;display:flex;flex-direction:column}
@@ -2671,6 +2769,15 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .pdf-b.cargando{color:var(--text-3);border-style:dashed;cursor:progress}
 .pdf-b.mal{color:var(--warn);border-color:var(--warn-edge)}
 .dp-n{font-size:11.5px;color:var(--text-3)}
+/* Sin despacho pendiente: mismo tratamiento callado que "Anteriores sin despachar"
+   —un punto menos de contraste, encabezado propio— porque tampoco es trabajo del
+   día. Lo que NO se calla es el motivo: es todo lo que Andrea necesita para
+   decidir en dos segundos si el filtro acertó. */
+.dp-nodesp .dp-nd{padding:10px 0;border-bottom:1px solid var(--border)}
+.dp-nodesp .dp-nd:last-child{border-bottom:none}
+.dp-nd-t{font-size:13.5px;color:var(--text-2);line-height:1.35}
+.dp-nd-f{font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:2px}
+.dp-nd-m{font-size:11.5px;color:var(--text-3);margin:3px 0 8px;line-height:1.45}
 .dp-dia{font-size:9.5px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;
   padding:1px 7px;border-radius:999px;border:1px solid var(--border-strong);color:var(--text-3)}
 .dp-dia.hoy{color:var(--ent-fill-tx);background:var(--ent-fill);border-color:var(--ent-fill)}
@@ -3280,6 +3387,26 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   </div>
 </div>
 
+<!-- ── PERSONAL · MIS VACACIONES ────────────────────────────────────────────
+     Primera pantalla del módulo Personal y primera de Truefie pensada para el
+     EQUIPO, no para las socias. El diseño está escrito en el bloque "PANTALLA
+     MIS VACACIONES" de la sección 8 de PERSONAL_ESQUEMA.sql; acá se implementa
+     eso y nada más. Sin barra de pestañas: el módulo tiene una sola pantalla y
+     una pestaña sola no informa nada (mismo criterio que el rótulo del lobby). -->
+<div id="vVacaciones" class="hidden">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <div class="m3title" style="font-size:24px">Mis vacaciones</div>
+      <!-- Definición del dato, no explicación de uso: sin esto el número se lee como
+           "las de este año", y el saldo NO reinicia en enero. Ver la sección 8. -->
+      <div class="m3sub" style="margin-top:2px">Desde tu ingreso · no reinicia en enero.</div>
+    </div>
+    <button class="btn btn-sm" onclick="vacCargar(true)">Recargar</button>
+  </div>
+  <div id="vacStatus" class="status hidden" style="margin-top:14px"></div>
+  <div id="vacBody" style="margin-top:14px"></div>
+</div>
+
 <!-- ── NINGUNA PANTALLA MUDA (26-ago) ──────────────────────────────────────
      b32 publicó Inventario con la pantalla ENTERA en el documento y sin
      registrar en la lista de navegación: `hidden` nunca se le quitaba, así que
@@ -3330,7 +3457,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 26 ago 2026 · b34';
+const BUILD = 'v 26 ago 2026 · b40';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -3763,13 +3890,19 @@ const ACCESO_USUARIOS = {
   // Daniel: cubierto por el default (solo Entregas). No se nombra por ser
   // gmail personal en repo público. Nombrar cuando tenga correo @truefoodcr.com.
 };
-const ACCESO_DEFAULT = ['entregas'];
+// PERSONAL entra al default (26-ago). El default es lo que ve quien NO está nombrado
+// acá arriba, o sea hoy Daniel, Daniela y Ney: es SU módulo — sus vacaciones, y mañana
+// sus permisos y su banco de horas. Es la primera vez que el default crece, y no
+// contradice la regla de "ver de menos, no de más": lo que se abre es lo propio de cada
+// quien, filtrado por RLS del lado del servidor, no datos de la empresa.
+const ACCESO_DEFAULT = ['entregas','personal'];
 // Qué vistas son de cada módulo. Las que no estén acá se consideran de acceso libre.
 const ACCESO_VISTAS = {
   finanzas:     ['vFacturado','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vResults'],
   conciliacion: ['vUpload'],
   operaciones:  ['vProduccion','vMermas','vInventario','vPlan','vResumen','vConteo'],
   entregas:     ['vConteoLote','vReporte','vPendientes','vDespachos','vEntBuscar','vEntLotes'],
+  personal:     ['vVacaciones'],
 };
 let _accesoMods=null;   // se llena al entrar; null = todavía no se sabe → no se restringe
 function accesoPuede(mod){ return !_accesoMods || _accesoMods==='todo' || _accesoMods.indexOf(mod)>=0; }
@@ -3787,7 +3920,7 @@ async function accesoCargar(){
 // El lobby no dibuja lo que no le toca (los inertes "Pronto" tampoco).
 function accesoPintarLobby(){
   const map={finanzas:'home-mod-fin', conciliacion:'home-mod-conc', operaciones:'home-mod-ops',
-             entregas:'home-mod-ent', ventas:'home-mod-ven'};
+             entregas:'home-mod-ent', personal:'home-mod-per', ventas:'home-mod-ven'};
   for(const mod in map){
     const el=document.querySelector('#vLobby .'+map[mod]);
     if(el) el.style.display = accesoPuede(mod) ? '' : 'none';
@@ -3801,11 +3934,15 @@ function accesoPintarLobby(){
   if(hs) hs.style.display = (_accesoMods==='todo') ? '' : 'none';
   // UN SOLO módulo visible → el lobby deja de ser cuadrícula y pasa a ser portada:
   // saludo y tarjeta juntos y centrados, sin separador ni rótulo "TUS MÓDULOS"
-  // (rotular una lista de uno es ruido). Es el caso de Daniel.
+  // (rotular una lista de uno es ruido).
+  // DOS → `.duo`: sigue siendo índice (el rótulo se queda) pero el par se centra en
+  // vez de quedar arrinconado en una fila de seis. Es el caso de Daniel desde que
+  // entró Personal; `solo` queda para el día que alguien vuelva a tener uno.
   const wrap=document.querySelector('#vLobby .home-wrap');
   if(wrap){
     const vis=Object.keys(map).filter(function(m){ return accesoPuede(m); }).length;
     wrap.classList.toggle('solo', vis===1);
+    wrap.classList.toggle('duo',  vis===2);
   }
 }
 async function setSaludo(){
@@ -3902,7 +4039,7 @@ function crumbSet(area,cur){
   // el punto del breadcrumb sigue el color del módulo (Finanzas azul · Operaciones rosa · Conciliación verde)
   // Entregas va en OLIVA, no en lima: su encabezado es claro y un punto de 7px en
   // #E9FE60 sobre blanco no se ve. Mismo criterio que --ent-line.
-  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Conciliación':'#84BD00','Entregas':'#8A9B00','Ventas':'#3FB6A8'};
+  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Conciliación':'#84BD00','Entregas':'#8A9B00','Ventas':'#3FB6A8','Personal':'#FF671D'};
   const d=document.querySelector('.crumb-dot'); if(d)d.style.background=COL[area]||'#378ADD';
 }
 // Entradas desde el HOME (una por módulo).
@@ -3917,6 +4054,7 @@ function abrirConciliacion(){                                // módulo Concilia
   _modShow('vUpload'); crumbSet('Conciliación','Cobros');
   renderCobrosExtracto();   // la lista de cobros sale del extracto subido (no de la pila vieja de Odoo)
 }
+function abrirPersonal(){ irAVacaciones(); }                 // módulo Personal → su única pantalla
 function volverLobby(){
   document.body.classList.remove('ent-claro');   // el lobby es de todos: vuelve a oscuro
   document.body.removeAttribute('data-mod');     // …y sin módulo activo: el lobby no lleva acento de nadie
@@ -3926,6 +4064,130 @@ function volverLobby(){
   document.getElementById('vLobby').classList.remove('hidden');
   accesoPintarLobby();
   entCardCargar();   // los contadores pueden haber cambiado mientras se trabajaba
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// PERSONAL · MIS VACACIONES
+// ════════════════════════════════════════════════════════════════════════
+// Implementa el bloque "PANTALLA MIS VACACIONES" de la sección 8 de
+// PERSONAL_ESQUEMA.sql. Tres decisiones que vienen de ahí y no se tocan acá:
+//
+// 1. NO FILTRA POR PERSONA, a propósito. Las dos vistas son `security_invoker` y
+//    su RLS ya recorta del lado del SERVIDOR: corrida por Daniela devuelve UNA
+//    fila —la de ella—; corrida por una socia devuelve las tres. Filtrar acá
+//    sería poner una segunda llave en el único lugar donde no protege nada (el
+//    navegador), y encima escondería filas que la socia sí tiene que ver. Por eso
+//    el render decide por lo que LLEGA, no por el perfil: una fila → número
+//    grande; varias → una línea por persona.
+//
+// 2. NO MUESTRA PLATA. Ninguna de las dos consultas toca `rrhh_salario`, que
+//    sigue siendo solo-socias. Días y nada más — una superficie sensible menos.
+//
+// 3. LO PEDIDO Y SIN APROBAR NO BAJA EL SALDO, y por eso se dice. Quien pidió
+//    tres días el lunes entra el martes, ve el saldo igualito y concluye que la
+//    solicitud se perdió. La línea de pendientes existe para que no lo concluya.
+//    Va en gris, NO en ámbar: es estado del dato, no algo que urja.
+let _vacDatos=null;
+
+function irAVacaciones(){
+  _modShow('vVacaciones'); crumbSet('Personal','Mis vacaciones');
+  vacCargar(false);
+}
+// Aviso de pantalla. Sin tipo, se apaga. NUNCA se deja el cuerpo mudo.
+function _vacAviso(tipo, html){
+  const st=document.getElementById('vacStatus'); if(!st) return;
+  if(!tipo){ st.classList.add('hidden'); st.innerHTML=''; return; }
+  st.className='status '+tipo; st.classList.remove('hidden'); st.innerHTML=html;
+}
+// Días en es-CR: coma decimal y sin decimales de relleno — 7 se ve "7", 7,5 se ve
+// "7,5". El saldo puede tener decimales el día que `vacacion_dias_por_mes` no sea
+// entero, así que redondear a entero acá mentiría sobre el saldo real.
+function _vacDias(n){ return (Number(n)||0).toLocaleString('es-CR',{minimumFractionDigits:0,maximumFractionDigits:1}); }
+// Singular solo con exactamente 1. En español el cero va en plural ("0 días"), así
+// que no alcanza con `n < 2`. Con un día de saldo la pantalla dice "1 día disponible ·
+// 1 ganado", no "1 días disponibles · 1 ganados".
+function _vacUno(n){ return Math.abs(Number(n)||0)===1; }
+function _vacPedidos(n){
+  return _vacDias(n)+(_vacUno(n)?' día pedido':' días pedidos')+', esperando aprobación';
+}
+
+async function vacCargar(force){
+  const body=document.getElementById('vacBody'); if(!body) return;
+  if(_vacDatos && !force){ _vacRender(); return; }
+  _vacAviso('s-info','<span class="spin"></span>Leyendo tu saldo de vacaciones…');
+  body.innerHTML='';
+  try{
+    const c=sbClient(); if(!c) throw new Error('no hay conexión a Supabase');
+    const [rs,rp]=await Promise.all([
+      c.from('v_rrhh_vacacion_saldo').select('persona_id,nombre,dias_ganados,dias_tomados,dias_disponibles'),
+      c.from('v_rrhh_solicitud').select('persona_id,dias').eq('tipo','vacaciones')
+    ]);
+    if(rs.error) throw rs.error;
+    // Las solicitudes son ACCESORIAS: si esa consulta falla, el saldo se muestra
+    // igual. Lo que no se hace es callarlo — un saldo sin la línea de pendientes se
+    // lee como "no pediste nada", que es justo el malentendido que vino a evitar.
+    _vacDatos={saldo:(rs.data||[]), pedidos:(rp.error?null:(rp.data||[]))};
+    _vacRender();
+  }catch(e){
+    _vacAviso('s-err','No pude leer tu saldo: '+esc((e&&e.message)||e));
+  }
+}
+
+function _vacRender(){
+  const body=document.getElementById('vacBody'); if(!body||!_vacDatos) return;
+  const filas=_vacDatos.saldo, ped=_vacDatos.pedidos;
+
+  // CERO FILAS NO ES CERO DÍAS. Es el fallo silencioso del módulo: si el correo con
+  // el que se entró no coincide con el de `rrhh_persona`, `rrhh_mi_persona()`
+  // devuelve null, la RLS no deja pasar ninguna fila y la pantalla queda en blanco
+  // sin un solo error. Dicho, se arregla en un minuto; mudo, no se arregla nunca.
+  if(!filas.length){
+    _vacAviso('s-warn','Tu cuenta no está enlazada a una persona en Personal, así que no hay saldo que mostrar. Lo enlaza Andrea.');
+    body.innerHTML=''; return;
+  }
+  _vacAviso('');
+
+  const porPersona={};
+  if(ped) ped.forEach(function(r){
+    porPersona[r.persona_id]=(porPersona[r.persona_id]||0)+(Number(r.dias)||0);
+  });
+  const avisoPed = (ped===null)
+    ? '<div class="vac-ped">No pude leer las solicitudes pendientes — el saldo de arriba no las descuenta.</div>' : '';
+
+  // UNA FILA: la persona mirando lo suyo. Un número y de dónde sale.
+  if(filas.length===1){
+    const f=filas[0], p=porPersona[f.persona_id]||0;
+    body.innerHTML=
+      '<div class="vac-hero">'
+      +   '<div class="vac-num">'+_vacDias(f.dias_disponibles)+'</div>'
+      +   '<div class="vac-lbl">'+(_vacUno(f.dias_disponibles)?'día disponible':'días disponibles')+'</div>'
+      + '</div>'
+      + '<div class="vac-det">'
+      +   _vacDias(f.dias_ganados)+(_vacUno(f.dias_ganados)?' ganado':' ganados')+' · '
+      +   _vacDias(f.dias_tomados)+(_vacUno(f.dias_tomados)?' tomado':' tomados')
+      + '</div>'
+      + (p>0 ? '<div class="vac-ped">'+_vacPedidos(p)+'</div>' : '')
+      + avisoPed;
+    return;
+  }
+
+  // VARIAS FILAS: una socia mirando al equipo. Mismo dato, forma de lista.
+  let h='<table><thead><tr><th>Persona</th>'
+       +'<th style="text-align:right">Disponibles</th>'
+       +'<th style="text-align:right">Ganados</th>'
+       +'<th style="text-align:right">Tomados</th></tr></thead><tbody>';
+  filas.slice().sort(function(a,b){
+    return String(a.nombre||'').localeCompare(String(b.nombre||''),'es');
+  }).forEach(function(f){
+    const p=porPersona[f.persona_id]||0;
+    h+='<tr><td>'+esc(f.nombre||'—')
+      +(p>0?'<div class="vac-sub">'+_vacPedidos(p)+'</div>':'')
+      +'</td>'
+      +'<td class="vac-n" style="text-align:right">'+_vacDias(f.dias_disponibles)+'</td>'
+      +'<td style="text-align:right">'+_vacDias(f.dias_ganados)+'</td>'
+      +'<td style="text-align:right">'+_vacDias(f.dias_tomados)+'</td></tr>';
+  });
+  body.innerHTML=h+'</tbody></table>'+avisoPed;
 }
 
 function setProgress(pct,msg){
@@ -7354,8 +7616,9 @@ function _clRender(){
   // se ve en la lista de abajo. Regla de sistema: estado sí, instrucciones no.
   h+='<div class="card" style="margin-top:16px"><div class="card-title">Guardar el conteo</div>'
     +'<div class="cl-form">'
-    +'<div class="field"><label>Quién contó</label>'
-    +'<input id="clResp" placeholder="tu nombre" autocomplete="off"></div>'
+    // SIN "quién contó" (26-ago): sale de la sesión, igual que en Entregas sin
+    // factura y que en Despachos. Era el segundo lugar del módulo que pedía a
+    // mano un dato que el sistema ya tiene.
     +'<div class="field"><label>Nota (opcional)</label>'
     +'<input id="clNota" placeholder="lo que valga la pena recordar"></div>'
     +'</div>'
@@ -7652,8 +7915,6 @@ async function guardarConteoLote(){
   const msg=document.getElementById('clSaveMsg'), btn=document.getElementById('clSave');
   const lineas=_clLeer();
   if(!lineas.length){ msg.style.color='var(--warn)'; msg.textContent='No hay nada anotado todavía.'; return; }
-  const resp=(document.getElementById('clResp').value||'').trim();
-  if(!resp){ msg.style.color='var(--warn)'; msg.textContent='Falta quién contó.'; return; }
   const c=sbClient();
   if(!c){ msg.style.color='var(--stop-tx)'; msg.textContent='No hay sesión de Supabase.'; return; }
   if(!confirm('Guardar el conteo con '+lineas.length+' lote'+(lineas.length===1?'':'s')+'?\n\nQueda como BORRADOR: no cambia ningún saldo hasta que lo confirmes como ancla.')) return;
@@ -7663,7 +7924,7 @@ async function guardarConteoLote(){
     const {data:{user}}=await c.auth.getUser();
     const email=(user&&user.email)||'desconocido';
     const {data:cab,error:e1}=await c.from('ent_conteo').insert({
-      fecha:_ymd(new Date()), responsable:resp,
+      fecha:_ymd(new Date()), responsable:email,
       nota:(document.getElementById('clNota').value||'').trim()||null, creado_por:email
     }).select('id,corte').single();
     if(e1) throw e1;
@@ -7705,8 +7966,13 @@ function irAReporte(){
 // queda vacío hasta que se elija uno — porque sin motivo no se puede guardar.
 function _rpReset(todo){
   const fecha=(_rp&&!todo)?_rp.fecha:_ymd(new Date());
+  // pres:'uds' = la UNIDAD CHICA del producto, no la caja (26-ago). 'uds' no
+  // significa "unidades sueltas" sino "la presentación menuda de ESE producto":
+  // rpUdsDe la resuelve con NIV_INFO.presDiv, que vale 1 en Blanco/Semillas/
+  // Cookie Dough y 4/4/2 en Francés/Buns/Pizza. Una regalía casi nunca es una
+  // caja entera, y el default es lo que se acepta sin mirar.
   _rp={fecha:fecha, cliente:null, tipo:null, motivo:null, destinatario:'', lineas:[],
-       cur:{pid:null, cant:'', pres:'cj', lotes:{}}};
+       verCeros:false, cur:{pid:null, cant:'', pres:'uds', lotes:{}}};
 }
 // ── LOS MOTIVOS DE UNA SALIDA SIN FACTURA ───────────────────────────────
 // Lista cerrada, sin texto libre: el motivo es EL DATO —dentro de seis meses lo
@@ -7815,6 +8081,9 @@ try{
   const _dd=new URLSearchParams(location.search).get('despdesde');
   if(_dd && /^\d{4}-\d{2}-\d{2}$/.test(_dd)) DESP_DESDE=_dd;
 }catch(e){}
+// Las facturas apartadas por no llevar despacho, y las que Andrea mandó igual a
+// "Por preparar" (de la sesión: se confirma y se despacha en el momento).
+let _despSinDesp=[], _despForzar={};
 let _despFac=null, _despUom=null, _despErr='', _despAbierto=null, _despLotes=null,
     _despSaldo=null, _despEdit={}, _despGuardando=false;
 // El estado de los pedidos YA preparados. Sale de v_ent_pedido_estado, o sea
@@ -8028,6 +8297,109 @@ async function despCargar(force){
   despRender();
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// FACTURAS QUE NO LLEVAN DESPACHO (26-ago). El caso que lo abrió: la ...3498
+// apareció en "Por preparar" el 25-ago (pedido de venta S02260). Es la
+// RE-EMISIÓN de la ...3403 del 8-jul, que se anuló por un error en la cédula
+// jurídica estando ya pagada — NC, se movió el pago, se re-emitió. El producto
+// había salido en JULIO con el traslado WH/OUT/02233. Si alguien la prepara, el
+// lote se descuenta DOS VECES contra una venta que ya salió.
+//
+// ⚠️ `qty_delivered` NO SIRVE PARA ESTO, medido: filtra 456 de 493 facturas de
+// 2026. Es un estado ACTUAL sin ancla de tiempo — contesta "¿está entregado
+// hoy?" cuando la pregunta es "¿ya estaba entregado cuando se emitió esta
+// factura?". Y en vivo sería una carrera: validar un traslado en Odoo antes de
+// que Daniel despache escondería un pedido real.
+//
+// LA SEÑAL BUENA ES EL TRASLADO CON SU FECHA: el traslado de SALIDA del pedido de
+// venta validado ANTES de la factura. Un hecho fechado, no un estado que se mueve.
+// Medido sobre las 493 facturas con terminado de 2026:
+//     traslado antes de la factura (filtra) →   2   (−120 y −48 días)
+//     mismo día                             →  94
+//     +1 día                                → 124
+//     +2 o más días                         → 246
+//     sin traslado de salida validado       →  27
+// Las 2 son re-emisiones administrativas confirmadas (3498 y 3323, las dos con el
+// mismo triplete original-anulada / NC / re-emitida). CERO ventas reales
+// perdidas, y el hueco es limpio: nada legítimo cae en negativo.
+//
+// EL MARGEN DE 2 DÍAS (decisión de Andrea) no cambia nada hoy —los dos casos
+// están a 48 y 120 días— y saca del medio el límite del día: una factura emitida
+// a la mañana siguiente de un traslado validado a las 23:00 no se filtra sola.
+//
+// SOLO TRASLADOS DE SALIDA, y esto NO es opcional: un pedido con devolución trae
+// un WH/IN con fecha propia que ensuciaría la cuenta. Medido: 3 pedidos de 2026
+// tienen entrega parcial y en los tres lo parcial viene de una devolución, no de
+// un despacho partido. Ninguno se filtra.
+//
+// SEGUNDA RED: la factura sin NINGÚN pedido de venta. Cubre lo que la primera no
+// puede mirar — la ...020000000001 del 12-ene, re-emisión hecha a mano, cuyo
+// `invoice_origin` apunta a la factura original y no a un pedido. Por eso el
+// vínculo se lee por `sale_line_ids` (relación por ID) y nunca por ese texto.
+//
+// Devuelve {id_factura: 'motivo'} SOLO de las que no llevan despacho.
+// Si Odoo falla en cualquiera de los tres pasos devuelve {}: sin señal se muestra
+// TODO, que es el modo de falla correcto — de más nunca esconde una entrega.
+// ════════════════════════════════════════════════════════════════════════
+const DESP_MARGEN_DIAS = 2;
+async function despYaEntregado(mv, porLinea){
+  const fuera={};
+  try{
+    const M={}; mv.forEach(function(m){ M[m.id]=m; });
+    // a · las líneas de pedido de venta de cada factura
+    const solPorFac={}, sol=[];
+    Object.keys(porLinea).forEach(function(mid){
+      const acc=[];
+      porLinea[mid].forEach(function(l){ (l.sale_line_ids||[]).forEach(function(x){
+        acc.push(x); if(sol.indexOf(x)<0) sol.push(x); }); });
+      solPorFac[mid]=acc;
+      // SEGUNDA RED, acá mismo: sin una sola línea de pedido de venta.
+      if(!acc.length && M[mid]) fuera[mid]='sin pedido de venta en Odoo';
+    });
+    if(!sol.length) return fuera;
+    // b · el pedido de cada línea
+    const sl=await odooCall('sale.order.line','search_read',[[['id','in',sol]]],
+      {fields:['id','order_id'],limit:5000,context:{lang:'es_CR'}});
+    const ord={}; sl.forEach(function(r){ ord[r.id]=r.order_id&&r.order_id[0]; });
+    const soIds=[]; sl.forEach(function(r){ const o=r.order_id&&r.order_id[0];
+      if(o && soIds.indexOf(o)<0) soIds.push(o); });
+    if(!soIds.length) return fuera;
+    // c · los traslados de cada pedido
+    const so=await odooCall('sale.order','search_read',[[['id','in',soIds]]],
+      {fields:['id','picking_ids'],limit:2000,context:{lang:'es_CR'}});
+    const pkIds=[]; so.forEach(function(r){ (r.picking_ids||[]).forEach(function(p){
+      if(pkIds.indexOf(p)<0) pkIds.push(p); }); });
+    if(!pkIds.length) return fuera;
+    const pk=await odooCall('stock.picking','search_read',
+      [[['id','in',pkIds],['state','=','done'],['picking_type_code','=','outgoing']]],
+      {fields:['id','date_done'],limit:2000,context:{lang:'es_CR'}});
+    const fechaPk={}; pk.forEach(function(p){ fechaPk[p.id]=String(p.date_done||'').slice(0,10); });
+    const pkDeSo={}; so.forEach(function(r){ pkDeSo[r.id]=(r.picking_ids||[]); });
+    // d · el veredicto, factura por factura
+    Object.keys(solPorFac).forEach(function(mid){
+      const m=M[mid]; if(!m || fuera[mid]) return;
+      let mejor=null;
+      solPorFac[mid].forEach(function(lid){
+        const o=ord[lid]; if(!o) return;
+        (pkDeSo[o]||[]).forEach(function(pid){
+          const f=fechaPk[pid];
+          if(f && (mejor===null || f<mejor)) mejor=f;
+        });
+      });
+      if(!mejor) return;                       // sin traslado validado: se muestra
+      const dias=Math.round((Date.parse(m.invoice_date+'T00:00:00Z')
+                            -Date.parse(mejor+'T00:00:00Z'))/86400000);
+      if(dias>=DESP_MARGEN_DIAS)
+        fuera[mid]='ya entregado el '+mejor+' según Odoo, '+dias+' días antes de esta factura';
+    });
+  }catch(e){
+    try{ console.error('[Truefie] no pude verificar entregas previas:',
+      (e&&e.message)||e,'— se muestran TODAS las facturas.'); }catch(_){}
+    return {};                                 // sin señal: no se esconde nada
+  }
+  return fuera;
+}
+
 // Facturas posted del período con al menos una línea de los 6 terminados, menos
 // las que ya tienen despacho confirmado.
 async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
@@ -8047,9 +8419,11 @@ async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
   const ids=mv.map(function(m){return m.id;});
   const ls=await odooCall('account.move.line','search_read',
     [[['move_id','in',ids],['display_type','=','product'],['product_id','in',ENT_PROD]]],
-    {fields:['move_id','product_id','product_uom_id','quantity'],limit:5000,context:{lang:'es_CR'}});
+    {fields:['move_id','product_id','product_uom_id','quantity','sale_line_ids'],limit:5000,context:{lang:'es_CR'}});
   const por={};
   ls.forEach(function(l){ (por[l.move_id[0]]=por[l.move_id[0]]||[]).push(l); });
+  // ── ¿ESTA FACTURA TIENE ALGO QUE DESPACHAR? ───────────────────────────
+  const sinDesp = await despYaEntregado(mv, por);
   // ya despachadas (Supabase). Si falla, se muestran todas: mejor de más que de menos.
   let ya={};
   try{
@@ -8058,10 +8432,20 @@ async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
            (data||[]).forEach(function(r){ ya[r.factura_id]=1; }); }
   }catch(e){}
   const out=[];
+  _despSinDesp=[];
   mv.forEach(function(m){
     if(ya[m.id]) return;
     if(anuladas[m.id]) return;                 // anulada por NC y sin alisto: no se lista
     const lin=por[m.id]; if(!lin) return;      // factura sin terminado: no es despacho
+    // NO DESAPARECE: se aparta a su propia lista, con el motivo escrito, y con un
+    // botón para mandarla igual a "Por preparar". Filtrar no puede ser una puerta
+    // de una sola dirección. `_despForzar` es de la sesión: se confirma y se
+    // despacha en el momento, no es una marca que haya que persistir.
+    if(sinDesp[m.id] && !_despForzar[m.id]){
+      _despSinDesp.push({factura_id:m.id, factura:m.name, fecha:m.invoice_date,
+        cliente:(m.partner_id&&m.partner_id[1])||'—', motivo:sinDesp[m.id]});
+      return;
+    }
     out.push({
       factura_id:m.id, factura:m.name, fecha:m.invoice_date,
       cliente:(m.partner_id&&m.partner_id[1])||'—', cliente_id:(m.partner_id&&m.partner_id[0])||0,
@@ -8353,7 +8737,29 @@ function despRender(){
       +viejas.map(function(f){ return tarjeta(f,true); }).join('')+'</div>';
   }
 
-  // 4 · ENTREGADOS: una línea, no una lista. Si no hay, no se dice nada.
+  // 4 · SIN DESPACHO PENDIENTE — apartadas, NO desaparecidas.
+  // Una factura acá no es un error del sistema: es una re-emisión administrativa,
+  // que no toca inventario porque el producto ya salió con la original. Pero el
+  // juicio es de Andrea, no del filtro: cada fila dice POR QUÉ se apartó y trae el
+  // botón para mandarla igual a "Por preparar". Una puerta de una sola dirección
+  // sería peor que no filtrar — escondería una entrega real sin dejar rastro.
+  if(_despSinDesp.length){
+    h+='<div class="dp-antes dp-nodesp"><div class="dp-antes-h">'
+      +'<span>Facturas sin despacho pendiente</span>'
+      +'<span class="dp-antes-n">'+_despSinDesp.length+'</span></div>'
+      +_despSinDesp.map(function(f){
+        // Cliente arriba solo; la factura y la fecha abajo en su propio renglón. En
+        // una línea, una razón social larga empujaba el "…3498 · ayer" al renglón
+        // siguiente y quedaba colgando — medido a 375px.
+        return '<div class="dp-nd"><div class="dp-nd-t">'+esc(f.cliente)+'</div>'
+          +'<div class="dp-nd-f">…'+esc(String(f.factura).slice(-4))+' · '+esc(_despDia(f.fecha))+'</div>'
+          +'<div class="dp-nd-m">'+esc(f.motivo)+'</div>'
+          +'<button class="btn btn-sm" onclick="despForzar('+f.factura_id+')">Despachar igual</button>'
+          +'</div>'; }).join('')
+      +'</div>';
+  }
+
+  // 5 · ENTREGADOS: una línea, no una lista. Si no hay, no se dice nada.
   if(entHoy.length){
     // El nombre dice lo que cuenta. "Entregados hoy" mentía en cuanto una salida
     // pudo llevar fecha de ayer, y el destino tiene que traer EXACTAMENTE lo mismo
@@ -8365,6 +8771,12 @@ function despRender(){
   // repinta con la lista, así que no puede quedar mostrando un pedido que ya salió.
   h+=despRenderDialogoEntrega();
   body.innerHTML=h;
+}
+// "Despachar igual": Andrea revisó y dice que sí lleva despacho. Vuelve a leer de
+// Odoo para que la factura entre por el camino normal, con sus líneas y su UoM.
+function despForzar(facId){
+  _despForzar[facId]=1;
+  despCargar(true);
 }
 function _despDia(ymd){
   const hoy=new Date(), ayer=new Date(); ayer.setDate(ayer.getDate()-1);
@@ -8513,9 +8925,18 @@ function _despPieHTML(f){
     +'<input type="date" class="de-fecha-in" value="'+esc(_despPedFecha||_despHoy())+'" '
     +'min="'+esc(_despFechaMin())+'" max="'+esc(_despHoy())+'"'+(_despGuardando?' disabled':'')
     +' onchange="despSetPedFecha(this.value)"></label>'
-    +'<button class="btn btn-amarillo" id="despOk"'+(pend?' disabled':'')
+    // JERARQUÍA INVERTIDA (26-ago, decisión de Andrea). El relleno lima estaba en
+    // "Preparar", que es el caso RARO: el flujo normal es sacar del congelador y
+    // despachar en el mismo momento. El peso visual estaba en lo que menos se usa.
+    // Se invierte el RELLENO, no el orden: "Preparar y entregar" sigue abajo, donde
+    // el pulgar de Daniel ya lo busca, y ahora además es lo que la vista encuentra
+    // primero. Cambiar las dos cosas a la vez rompería la memoria muscular sin
+    // necesidad — el relleno solo ya manda la jerarquía.
+    // El lima entra por `btn-amarillo`, que es --ent-fill + --ent-fill-tx: token de
+    // RELLENO con su texto pareado, como manda b31. No se dibuja un borde lima.
+    +'<button class="btn" id="despOk"'+(pend?' disabled':'')
     +' onclick="despPedirConfirmar(false)">Preparar</button>'
-    +'<button class="btn" id="despOk2"'+(pend?' disabled':'')
+    +'<button class="btn btn-amarillo" id="despOk2"'+(pend?' disabled':'')
     +' onclick="despPedirConfirmar(true)">Preparar y entregar</button>'
     +'</div>';
 }
@@ -8682,13 +9103,20 @@ async function despConfirmar(entregar){
   const f=_despFacAbierta(); if(!f) return;
   const pend=_despPendientes(f); if(pend){ alert(pend); return; }
   const btn=document.getElementById('despOk'), btn2=document.getElementById('despOk2');
+  // "Guardando…" va en el botón QUE SE APRETÓ. Antes iba siempre en `despOk`, así
+  // que apretar "Preparar y entregar" ponía el aviso en "Preparar" — raro desde
+  // siempre, y desde que se invirtió la jerarquía (26-ago) además lo pone en el
+  // secundario mientras el primario se queda mudo.
+  const btnAcc = entregar ? btn2 : btn;
+  const txtAcc = entregar ? 'Preparar y entregar' : 'Preparar';
   // SIN confirm() NATIVO (b32). Lo que este confirm decía —cliente, fecha real,
   // líneas con cantidad distinta a la facturada— se ve ahora en el diálogo, junto
   // al detalle de qué sale. Acá solo se lee la fecha ya elegida.
   const fSal=(entregar?_despPedFecha:'');
   _despGuardando=true;
-  if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
-  if(btn2){ btn2.disabled=true; }
+  if(btn) btn.disabled=true;
+  if(btn2) btn2.disabled=true;
+  if(btnAcc) btnAcc.textContent='Guardando…';
   try{
     const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
     const {data:{user}}=await c.auth.getUser();
@@ -8701,6 +9129,30 @@ async function despConfirmar(entregar){
       factura_nombre:f.factura, cliente_id:f.cliente_id, cliente_nombre:f.cliente,
       motivo:'venta', creado_por:quien}).select('id').single();
     if(e1) throw e1;
+    // ── EL VÍNCULO A LA FACTURA, EN SU PROPIA TABLA (26-ago) ──────────────
+    // Faltaba desde que existe el lector de facturas. `ent_pedido.factura_id` se
+    // escribía arriba, pero ENTREGAS_SALIDAS.sql §2 la declara OBSOLETA: el
+    // vínculo vive SOLO en `ent_pedido_factura`, y el único código que escribía
+    // ahí era el botón manual "Vincular" de Pendientes. Resultado: TODO despacho
+    // hecho desde una factura caía en "Salida de venta, sin factura vinculada"
+    // aunque el sistema supiera perfectamente cuál era su factura — la creó a
+    // partir de ella. La lista se llenaba sola y el "arreglo" era que un humano
+    // volviera a elegir a mano lo que ya estaba escrito.
+    //
+    // NO ABORTA SI FALLA, a propósito. Va en su propio try por la misma razón que
+    // la marca de `_despAnulFallo`: si esto falla, el pedido ya existe y el saldo
+    // del lote ya va a bajar — tirar acá dejaría un pedido huérfano sin líneas ni
+    // alisto, que es peor que un vínculo faltante. Y el vínculo faltante tiene su
+    // propia red desde siempre: aparece en Pendientes con su botón.
+    try{
+      const {error:eV}=await c.from('ent_pedido_factura').insert({
+        pedido_id:ped.id, factura_id:f.factura_id, factura_nombre:f.factura,
+        anulado:false, creado_por:quien});
+      if(eV) throw eV;
+    }catch(eV){
+      try{ console.error('[Truefie] el pedido '+ped.id+' quedó sin vínculo a la factura '
+        +f.factura+': '+((eV&&eV.message)||eV)+' — se puede vincular desde Pendientes.'); }catch(_){}
+    }
     const lineasPed=f.lineas.map(function(L){
       return {pedido_id:ped.id, producto_id:L.producto_id, cant_uds:L.cant_uds,
               // ⚠️ `presentacion` GUARDA MAL las líneas en paquete, y se deja así A PROPÓSITO
@@ -8748,8 +9200,9 @@ async function despConfirmar(entregar){
     despCargarEstado();
   }finally{
     _despGuardando=false;
-    if(btn){ btn.disabled=false; btn.textContent='Preparar'; }
-    if(btn2){ btn2.disabled=false; }
+    if(btn) btn.disabled=false;
+    if(btn2) btn2.disabled=false;
+    if(btnAcc) btnAcc.textContent=txtAcc;
   }
 }
 
@@ -9513,96 +9966,123 @@ function rpFiltrarClientes(){
 function rpElegirCliente(id,nombre){ _rp.cliente={id:id,nombre:nombre}; rpCerrarClientes(); rpRender(); }
 
 // ── Render de la pantalla completa ──────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════
+// EL FORMULARIO, REDISEÑADO (26-ago). Tres cambios de fondo, todos aprobados:
+//
+// 1 · EL ORDEN SIGUE LA DECISIÓN, NO EL FORMULARIO. Primero "¿qué tipo de
+//     salida es?" y RECIÉN DESPUÉS "¿a quién?", porque la respuesta cambia según
+//     el tipo: con factura es un Cliente de Odoo; sin factura es un Motivo (que
+//     es EL dato) más un texto libre. Antes el Cliente estaba arriba y siempre
+//     visible, incluso cuando no aplicaba — se preguntaba antes de saber si la
+//     pregunta correspondía.
+// 2 · EL DEFAULT ES LA UNIDAD CHICA, no la caja. Una regalía casi nunca es una
+//     caja entera. Y "unidad chica" depende del producto: Blanco, Semillas y
+//     Cookie Dough van en unidades; Francés, Buns y Pizza en paquetes de 4, 4 y
+//     2. Eso ya vivía en NIV_INFO (presDiv/presLbl), no se inventa acá.
+// 3 · SIN CAJAS DENTRO DE CAJAS. Ver el CSS de .rp-sec.
+// ════════════════════════════════════════════════════════════════════════
+// El rótulo de la unidad chica, por producto. "Paquetes de 4" y no "Paquetes":
+// el número es la mitad del dato, y es justo la que se olvida.
+function _rpPresLbl(pid){
+  const I=NIV_INFO[pid]||{};
+  return (I.presLbl==='paq') ? ('Paquetes de '+(I.presDiv||1)) : 'Unidades';
+}
+// El rótulo CORTO, para la tabla de lo cargado. Mismo criterio que
+// DESP_UOM_CORTA en Despachos: una línea en paquetes no se llama "u".
+function _rpPresCorta(pid,pres){
+  if(pres==='cj') return 'cj';
+  return ((NIV_INFO[pid]||{}).presLbl==='paq') ? 'paq' : 'u';
+}
 function rpRender(){
   const body=document.getElementById('rpBody'); if(!body) return;
   const R=_rp, cur=R.cur;
   let h='';
-  // ZONA 1 · cabecera del despacho
-  h+='<div class="card rp-z"><div class="rp-row">'
-    +'<div class="field" style="min-width:150px"><label>Fecha</label>'
-    +'<input type="date" class="cl-in" style="width:100%" value="'+esc(R.fecha)+'" onchange="_rp.fecha=this.value"></div>'
-    // EL CLIENTE SOLO OCUPA EL LUGAR PRINCIPAL EN UNA VENTA. Sin factura, quien
-    // recibe casi nunca está en Odoo —el caso que abrió esto fue un pan regalado
-    // a una persona que no es cliente— y exigir la lista era lo que hacía
-    // IMPOSIBLE registrar la salida, con el lote contando producto que ya no está.
-    +(R.tipo!=='sin'
-      ? ('<div class="field" style="flex:1;min-width:200px"><label>Cliente</label>'
-        +(R.cliente
-          ? '<div class="rp-clisel"><span>'+esc(R.cliente.nombre)+'</span><button onclick="_rp.cliente=null;rpRender()" title="Cambiar">×</button></div>'
-          : '<button class="rp-clivacio" onclick="rpAbrirClientes()">Elegir de la lista…</button>')
-        +'</div>')
-      : '')
-    +'</div>'
-    +'<div class="field" style="margin-top:10px"><label>Tipo de salida</label>'
+
+  // ── 1 · LA DECISIÓN ────────────────────────────────────────────────────
+  h+='<div class="rp-sec"><div class="rp-sec-t">Tipo de salida</div>'
     +'<div class="rp-tipo">'
     +'<button class="'+(R.tipo==='venta'?'on':'')+'" onclick="rpSetTipo(\'venta\')">Venta con factura</button>'
     +'<button class="'+(R.tipo==='sin'?'on':'')+'" onclick="rpSetTipo(\'sin\')">Sin factura</button>'
     +'</div>'
-    +(R.tipo===null?'<div class="rp-nota rp-falta">Elegí una de las dos: sin tipo no se puede guardar.</div>':'')
-    +'</div>'
-    // ── SIN FACTURA: motivo (obligatorio) y destinatario (opcional) ──────
-    +(R.tipo==='sin'
-      ? ('<div class="field" style="margin-top:10px"><label>Motivo</label>'
-        +'<div class="rp-mot">'
-        +RP_MOTIVOS.map(function(m){
-            return '<button class="'+(R.motivo===m.k?'on':'')+'" onclick="rpSetMotivo(\''+m.k+'\')">'
-                 +esc(m.n)+'</button>'; }).join('')
-        +'</div>'
-        +(R.motivo===null?'<div class="rp-nota rp-falta">Sin motivo no se puede guardar.</div>':'')
-        +'</div>'
-        +'<div class="rp-row" style="margin-top:10px">'
-        +'<div class="field" style="flex:1;min-width:200px"><label>Destinatario</label>'
-        +'<input type="text" class="cl-in rp-dest" style="width:100%" maxlength="120" '
-        +'placeholder="Quién recibió, o el destino" value="'+esc(R.destinatario||'')+'" '
-        +'oninput="_rp.destinatario=this.value"></div>'
-        // El cliente sigue disponible, pero como opción y no como puerta.
-        +'<div class="field" style="min-width:200px"><label>Cliente de Odoo (opcional)</label>'
-        +(R.cliente
-          ? '<div class="rp-clisel"><span>'+esc(R.cliente.nombre)+'</span><button onclick="_rp.cliente=null;rpRender()" title="Quitar">×</button></div>'
-          : '<button class="rp-clivacio" onclick="rpAbrirClientes()">Elegir de la lista…</button>')
-        +'</div></div>')
-      : '')
-    +'</div>';
+    +(R.tipo===null?'<div class="rp-nota">Elegí una de las dos para seguir.</div>':'');
 
-  // ZONA 2 · la línea que se está armando
-  h+='<div class="card rp-z"><div class="field"><label>Producto</label><div class="rp-prods">';
-  ENT_PROD.forEach(function(pid){ const I=NIV_INFO[pid]||{nom:pid};
-    h+='<button class="rp-prod'+(cur.pid===pid?' on':'')+'" style="--pc:'+RP_COLOR[pid]+'" '
-      +'onclick="rpElegirProd('+pid+')">'+esc(I.nom.replace(/^Pan /,''))+'</button>'; });
-  h+='</div></div>';
-  if(cur.pid){
-    const I=NIV_INFO[cur.pid], uds=rpUdsDe(cur.pid, cur.pres, +cur.cant||0);
-    h+='<div class="rp-row" style="margin-top:8px">'
-      +'<div class="field"><label>Cantidad</label>'
-      +'<input type="number" min="0" step="1" inputmode="numeric" class="cl-in" style="width:96px" value="'+esc(cur.cant)+'" oninput="_rp.cur.cant=this.value;rpRender()"></div>'
-      +'<div class="field"><label>Presentación</label><div class="rp-tipo">'
-      +'<button class="'+(cur.pres==='cj'?'on':'')+'" onclick="_rp.cur.pres=\'cj\';rpRender()">Cajas</button>'
-      +'<button class="'+(cur.pres==='uds'?'on':'')+'" onclick="_rp.cur.pres=\'uds\';rpRender()">'+esc(I.presLbl==='paq'?'Paquetes':'Unidades')+'</button>'
-      +'</div></div>'
-      +'<div class="field"><label>&nbsp;</label><div class="rp-conv">'+(uds?('= '+_rzN(uds)+' unidades'):'&nbsp;')+'</div></div>'
+  // ── A QUIÉN · condicional, debajo, y distinto según el tipo ────────────
+  if(R.tipo==='venta'){
+    h+='<div class="rp-cond"><div class="rp-sec-t">Cliente</div>'
+      +(R.cliente
+        ? '<div class="rp-clisel"><span>'+esc(R.cliente.nombre)+'</span><button onclick="_rp.cliente=null;rpRender()" title="Cambiar">×</button></div>'
+        : '<button class="rp-clivacio" onclick="rpAbrirClientes()">Elegir de la lista…</button>')
       +'</div>';
-    h+=rpLotesHtml();
+  } else if(R.tipo==='sin'){
+    h+='<div class="rp-cond"><div class="rp-sec-t">Motivo</div>'
+      +'<div class="rp-mot">'
+      +RP_MOTIVOS.map(function(m){
+          return '<button class="'+(R.motivo===m.k?'on':'')+'" onclick="rpSetMotivo(\''+m.k+'\')">'
+               +esc(m.n)+'</button>'; }).join('')
+      +'</div>'
+      +(R.motivo===null?'<div class="rp-nota rp-falta">Sin motivo no se puede guardar.</div>':'')
+      +'</div>'
+      +'<div class="rp-cond"><div class="rp-sec-t">Para quién <span style="text-transform:none;letter-spacing:0;font-weight:400">· opcional</span></div>'
+      +'<input type="text" class="cl-in rp-dest" style="width:100%" maxlength="120" '
+      +'placeholder="Quién recibió, o el destino" value="'+esc(R.destinatario||'')+'" '
+      +'oninput="_rp.destinatario=this.value">'
+      // El cliente de Odoo sigue disponible sin factura —una reposición va a un
+      // cliente real— pero como opción y no como puerta. Se abre solo si se pide.
+      +(R.cliente
+        ? '<div class="rp-lote" style="margin-top:8px"><div class="rp-clisel" style="flex:1"><span>'+esc(R.cliente.nombre)+'</span>'
+          +'<button onclick="_rp.cliente=null;rpRender()" title="Quitar">×</button></div></div>'
+        : '<button class="rp-ceros" onclick="rpAbrirClientes()">vincular un cliente de Odoo</button>')
+      +'</div>';
   }
-  h+='<div style="margin-top:12px"><button class="btn" onclick="rpAgregarLinea()">Agregar al despacho</button>'
-    +'<span id="rpLineaMsg" class="rp-nota" style="margin-left:10px"></span></div></div>';
+  h+='</div>';
 
-  // ZONA 3 · lo cargado + guardar
-  h+='<div class="card rp-z"><div class="card-title">En este despacho</div>';
+  // ── 2 · QUÉ SALE ───────────────────────────────────────────────────────
+  h+='<div class="rp-sec"><div class="rp-sec-t">Qué sale</div><div class="rp-chips">';
+  ENT_PROD.forEach(function(pid){ const I=NIV_INFO[pid]||{nom:pid};
+    h+='<button class="rp-chip'+(cur.pid===pid?' on':'')+'" style="--pc:'+RP_COLOR[pid]+'" '
+      +'onclick="rpElegirProd('+pid+')"><span class="rp-pt"></span>'
+      +esc(I.nom.replace(/^Pan (de )?/,''))+'</button>'; });
+  h+='</div>';
+
+  if(cur.pid){
+    const uds=rpUdsDe(cur.pid, cur.pres, +cur.cant||0);
+    h+='<div class="rp-cond"><div class="rp-row" style="align-items:flex-end">'
+      +'<div class="field"><label>Cantidad</label>'
+      +'<input type="number" min="0" step="1" inputmode="numeric" class="cl-in rp-dest" style="width:92px" '
+      +'value="'+esc(cur.cant)+'" oninput="_rp.cur.cant=this.value;rpRender()"></div>'
+      +'<div class="field" style="flex:1;min-width:180px"><label>Presentación</label><div class="rp-tipo">'
+      // LA UNIDAD CHICA VA PRIMERA Y ES EL DEFAULT. Cajas queda de segunda.
+      +'<button class="'+(cur.pres==='uds'?'on':'')+'" onclick="_rp.cur.pres=\'uds\';rpRender()">'+esc(_rpPresLbl(cur.pid))+'</button>'
+      +'<button class="'+(cur.pres==='cj'?'on':'')+'" onclick="_rp.cur.pres=\'cj\';rpRender()">Cajas</button>'
+      +'</div></div>'
+      +'</div>'
+      +(uds?('<div class="rp-conv">= '+_rzN(uds)+' unidad'+(uds===1?'':'es')+'</div>'):'')
+      +rpLotesHtml()
+      +'<div style="margin-top:14px"><button class="btn" onclick="rpAgregarLinea()">Agregar al despacho</button>'
+      +'<span id="rpLineaMsg" class="rp-nota" style="margin-left:10px"></span></div>'
+      +'</div>';
+  }
+  h+='</div>';
+
+  // ── 3 · LO CARGADO, LA FECHA Y EL BOTÓN ────────────────────────────────
+  h+='<div class="rp-sec"><div class="rp-sec-t">En este despacho</div>';
   if(!R.lineas.length) h+='<div class="cl-none">Todavía no hay líneas.</div>';
   else{
     h+='<table class="cl-tbl"><tr><th>Producto</th><th>Cantidad</th><th>Lotes</th><th></th></tr>';
     R.lineas.forEach(function(l,i){ const I=NIV_INFO[l.producto_id]||{nom:l.producto_id};
       const lots=l.lotes.map(function(x){ return esc(x.lote)+(l.lotes.length>1?(' ('+_rzN(x.cant_uds)+' u)'):''); }).join(' · ');
-      h+='<tr><td>'+esc(I.nom)+'</td><td>'+_rzN(l.cant_present)+' '+(l.presentacion==='cj'?'cj':'u')
+      h+='<tr><td>'+esc(I.nom)+'</td><td>'+_rzN(l.cant_present)+' '+esc(_rpPresCorta(l.producto_id,l.presentacion))
         +' <span class="muted">= '+_rzN(l.cant_uds)+' u</span></td>'
         +'<td style="font-size:11.5px;color:var(--text-2)">'+lots+'</td>'
         +'<td style="text-align:right"><button class="btn btn-sm" onclick="rpEditarLinea('+i+')">✎</button></td></tr>'; });
     h+='</table>';
   }
-  h+='<div class="rp-row" style="margin-top:12px;align-items:flex-end">'
-    +'<div class="field" style="min-width:180px"><label>Quién despacha</label>'
-    +'<input id="rpResp" class="cl-in" style="width:100%" placeholder="tu nombre" autocomplete="off"></div>'
-    +'<button class="btn" id="rpSave" onclick="rpGuardar()">Guardar despacho</button></div>'
+  // La fecha al pie y chiquita: casi siempre es hoy. Y NO se pregunta quién
+  // despacha — eso sale de la sesión, igual que en Despachos.
+  h+='<div class="rp-pie"><span class="rp-pie-l">Día de la salida</span>'
+    +'<input type="date" class="de-fecha-in" value="'+esc(R.fecha)+'" onchange="_rp.fecha=this.value">'
+    +'</div>'
+    +'<button class="btn btn-amarillo rp-guardar" id="rpSave" onclick="rpGuardar()">Guardar despacho</button>'
     +'<div id="rpSaveMsg" style="margin-top:10px;font-size:12.5px"></div></div>';
   body.innerHTML=h;
 }
@@ -9610,12 +10090,23 @@ function rpUdsDe(pid,pres,n){ const I=NIV_INFO[pid]||{cajaU:1,presDiv:1};
   return pres==='cj' ? n*I.cajaU : n*I.presDiv; }
 function rpElegirProd(pid){ _rp.cur.pid=pid; _rp.cur.lotes={}; rpRender(); }
 
-// Lotes del producto elegido, FIFO (el más viejo primero). Agotados según sistema:
-// en gris, al fondo, NUNCA ocultos — el congelador físico manda sobre el sistema.
+// Lotes del producto elegido, FIFO (el más viejo primero).
+//
+// ⚠️ CAMBIO DE CRITERIO (26-ago, aprobado por Andrea). Antes se listaban TODOS y
+// los agotados iban en gris al fondo, con el argumento de que "el congelador
+// físico manda sobre el sistema". Medido en uso: los que están en cero son la
+// MAYORÍA, así que la lista quedaba llena de renglones que no se pueden elegir y
+// el lote bueno había que buscarlo. Ahora los de saldo cero NO se dibujan.
+// El argumento viejo NO se tira, se mueve: los ceros siguen a un toque de
+// distancia ("ver los N en cero") y "Agregar un lote que no está" sigue ahí para
+// el caso real de producto en el congelador que el sistema no conoce. Esconder
+// no es negar: el contador dice cuántos hay.
+// Sin ancla confirmada no hay saldo de nada (todos null) y entonces se listan
+// todos — filtrar por un saldo que no existe sería esconder a ciegas.
 function rpLotesHtml(){
   const cur=_rp.cur, pid=cur.pid;
-  let h='<div class="field" style="margin-top:8px"><label>Lote'
-    +(Object.keys(cur.lotes).length>1?' — partido entre varios':'')+'</label>';
+  let h='<div class="rp-cond"><div class="rp-sec-t">Lote'
+    +(Object.keys(cur.lotes).length>1?' — partido entre varios':'')+'</div>';
   if(!_rpLotes){ return h+'<div class="cl-none">Leyendo lotes de Odoo…</div></div>'; }
   const ls=Object.values(_rpLotes.lotes||{}).filter(function(L){ return +L.producto===pid; })
     .map(function(L){ const k=pid+'|'+L.canon;
@@ -9627,20 +10118,29 @@ function rpLotesHtml(){
     if(aa!==zz) return aa-zz;                                  // agotados al fondo
     return String(a.key).localeCompare(String(z.key),'es');    // FIFO: clave = añoProd-ddd
   });
+  // Un lote en cero YA ELEGIDO no se esconde: esconderlo borraría de la vista
+  // una cantidad que sigue contando en la línea.
+  const enCero=ls.filter(function(L){ return L.saldo!=null && L.saldo<=0 && cur.lotes[L.canon]==null; });
+  const vis=_rp.verCeros ? ls : ls.filter(function(L){ return enCero.indexOf(L)<0; });
   if(!ls.length) h+='<div class="cl-none">Sin lotes de este producto en la ventana. Agregalo a mano.</div>';
-  ls.forEach(function(L){
+  else if(!vis.length) h+='<div class="cl-none">Ningún lote de este producto tiene saldo.</div>';
+  vis.forEach(function(L){
     const sel=cur.lotes[L.canon]!=null, ago=(L.saldo!=null&&L.saldo<=0);
     h+='<div class="rp-lote'+(sel?' on':'')+(ago?' ago':'')+'">'
       +'<button class="rp-lotebtn" onclick="rpToggleLote(\''+esc(L.canon).replace(/'/g,'&#39;')+'\')">'
-      +esc(L.canon)
-      +(L.saldo!=null?('<span class="rp-saldo">'+(ago?'agotado según sistema':('quedan '+_rzN(L.saldo)))+'</span>'):'')
-      +(L.extra?'<span class="cl-tag">agregado</span>':'')
+      // El nombre del lote, en su propio span y con nowrap: es el dato principal
+      // y no puede ser el que ceda el ancho. Ver el CSS de .rp-lote-n.
+      +'<span class="rp-lote-n">'+esc(L.canon)+'</span>'
+      +(L.saldo!=null?('<span class="rp-saldo">'+(ago?'agotado':('quedan '+_rzN(L.saldo)))+'</span>')
+                     :(L.extra?'<span class="rp-saldo">agregado</span>':''))
       +'</button>'
-      +(sel?('<input type="number" min="0" step="1" inputmode="numeric" class="cl-in rp-lotein" value="'+esc(cur.lotes[L.canon])+'" '
+      +(sel?('<input type="number" min="0" step="1" inputmode="numeric" class="cl-in rp-lotein rp-dest" value="'+esc(cur.lotes[L.canon])+'" '
         +'oninput="_rp.cur.lotes[\''+esc(L.canon).replace(/'/g,'&#39;')+'\']=this.value;rpValidarLotes()">'):'')
       +'</div>';
   });
-  h+='<button class="btn btn-sm cl-add" onclick="rpLoteManual()">Agregar un lote que no está</button>'
+  if(enCero.length) h+='<button class="rp-ceros" onclick="_rp.verCeros=!_rp.verCeros;rpRender()">'
+    +(_rp.verCeros?'ocultar los ':'ver los ')+enCero.length+' en cero</button>';
+  h+='<div><button class="btn btn-sm cl-add" onclick="rpLoteManual()">Agregar un lote que no está</button></div>'
     +'<div id="rpLoteMsg" class="rp-nota"></div></div>';
   return h;
 }
@@ -9709,8 +10209,6 @@ async function rpGuardar(){
   if(_rp.tipo==='venta' && !_rp.cliente){ pon('var(--warn)','Falta el cliente.'); return; }
   if(!_rp.motivo){ pon('var(--warn)','Falta el motivo de la salida.'); return; }
   if(!_rp.lineas.length){ pon('var(--warn)','No hay ninguna línea cargada.'); return; }
-  const resp=(document.getElementById('rpResp').value||'').trim();
-  if(!resp){ pon('var(--warn)','Falta quién despacha.'); return; }
   const c=sbClient(); if(!c){ pon('var(--stop-tx)','No hay sesión de Supabase.'); return; }
   _rpGuardando=true; btn.disabled=true; pon('var(--busy)','Guardando…');
   let paso='pedido';
@@ -9730,8 +10228,13 @@ async function rpGuardar(){
               presentacion:l.presentacion, cant_present:l.cant_present}; }));
     if(e2) throw e2;
     paso='alisto';
+    // QUIÉN DESPACHA SALE DE LA SESIÓN (26-ago). Antes había un campo "tu nombre"
+    // que había que escribir a mano en cada despacho: tiempo perdido y un dato
+    // duplicado, porque el sistema ya sabe quién está adentro. Es lo que hace
+    // despConfirmar() desde siempre, y por eso el detalle de un despacho de
+    // Despachos dice "Preparó andrea@truefoodcr.com" sin haber preguntado nada.
     const {data:al,error:e3}=await c.from('ent_alisto').insert({
-      pedido_id:ped.id, responsable:resp, creado_por:email }).select('id').single();
+      pedido_id:ped.id, responsable:email, creado_por:email }).select('id').single();
     if(e3) throw e3;
     paso='líneas del alisto';
     for(const l of _rp.lineas){
@@ -9808,13 +10311,20 @@ async function pdLeer(){
     q('ent_pedido_motivo_vigente','pedido_id,motivo,clasificado_en'),
     q('ent_pedido_factura_vigente','pedido_id,factura_id,factura_nombre,anulado'),
     q('ent_pedido_valida_vigente','pedido_id,anulado,validado_en'),
-    q('ent_alisto','pedido_id,anulado,creado_en') ]);
+    // ⚠️ LA VISTA VIGENTE, NO LA TABLA (26-ago). Leía `ent_alisto.anulado`, que es
+    // la columna que ENTREGAS_ETAPAS.sql §2 declara MUERTA: no tiene grant de
+    // UPDATE, así que nadie puede ponerla en true nunca. Anular de verdad es
+    // insertar en `ent_anulacion`, y eso solo lo refleja `ent_alisto_vigente`.
+    // Con la tabla cruda, un despacho anulado seguía saliendo en Pendientes para
+    // siempre — se descubrió anulando el despacho 11 (la salida de Mentha del
+    // 19-ago que nunca ocurrió, ver CORRECCION_DESP11.sql).
+    q('ent_alisto_vigente','pedido_id,preparado_en') ]);
   for(const r of [mot,fac,val,als]){ if(r.error) throw r.error; }
   const M={},F={},V={},A={};
   (mot.data||[]).forEach(function(r){ M[r.pedido_id]=r; });
   (fac.data||[]).forEach(function(r){ if(!r.anulado) F[r.pedido_id]=r; });
   (val.data||[]).forEach(function(r){ if(!r.anulado) V[r.pedido_id]=r; });
-  (als.data||[]).forEach(function(r){ if(!r.anulado) A[r.pedido_id]=1; });
+  (als.data||[]).forEach(function(r){ A[r.pedido_id]=1; });   // la vista ya filtró lo anulado
   const l1=[],l2=[],l3=[];
   (peds||[]).forEach(function(p){
     const mv=(M[p.id]&&M[p.id].motivo)||p.motivo;
