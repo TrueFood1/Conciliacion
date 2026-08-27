@@ -379,9 +379,37 @@ después se construye la pantalla.
 
 ---
 
-## 10 · ABIERTO · No se puede CAMBIAR la factura de un despacho ya vinculado
+## 10 · APARCADO (27-ago) · No se puede CAMBIAR la factura de un despacho ya vinculado
 
-**El caso vivo (26-ago-2026).** Mentha y limón se quedó con el producto de la
+> ⚠️ **APARCADO EL 27-AGO — sigue siendo pendiente válido, pero YA NO HAY CASO
+> REAL ESPERANDO.** Mentha contestó, y el enredo se deshizo por otro camino: la
+> entrega del 19-ago (despacho 11) **la recibieron y se la quedan**, y la factura
+> ...3499 del 26-ago —emitida con otra intención— es la que van a pagar por ella.
+> No hay nada que re-emitir ni que re-apuntar. Lo que vuelve es el despacho 20
+> (ver §11). **Con 41 reversiones administrativas al año esto va a volver**, así
+> que el diagnóstico de abajo se conserva entero, incluido el diseño de la
+> pantalla y la decisión sobre el índice único. NO SE CONSTRUYÓ NADA.
+>
+> Del diagnóstico del 27-ago quedaron tres cosas anotadas que no estaban acá:
+> 1. **Son DOS índices viejos, no uno**: `ent_pedido_factura_uidx`
+>    (`ENTREGAS_ESQUEMA.sql:73`) y `ent_pedido_factura_unico`
+>    (`ENTREGAS_DESPACHOS.sql:69`), los dos sobre `ent_pedido(factura_id)`.
+> 2. **`ent_pedido_factura_vigente` no tiene desempate.** Ordena por `creado_en
+>    desc` a secas, y `creado_en` usa `default now()`, que en Postgres es la hora
+>    de la TRANSACCIÓN: dos filas insertadas juntas empatan y gana cualquiera.
+>    Falta `, id desc`.
+> 3. **El `coalesce` de `v_ent_pedido_estado` puede resucitar la factura vieja.**
+>    El join pide `fv.anulado = false`; si la fila vigente de un pedido tuviera
+>    `anulado = true`, el join no trae nada y el `coalesce` cae en
+>    `ent_pedido.factura_id`, la columna obsoleta. Hoy nadie escribe `anulado =
+>    true` desde la app; §10 es justo el pendiente que lo vuelve alcanzable.
+>
+> Y una consecuencia que la pantalla va a tener que decir en letras: **cambiar la
+> factura A por la B devuelve la A a "Por preparar"** (pierde su vínculo vigente,
+> y desde el 26-ago `v_ent_factura_despachada` lee el vínculo). Es correcto, pero
+> se lee como un pendiente que apareció solo.
+
+**El caso vivo (26-ago-2026) — RESUELTO POR OTRO CAMINO, ver el recuadro.** Mentha y limón se quedó con el producto de la
 entrega del 19-ago (despacho 11), cuya factura ...3484 se anuló. Andrea va a
 emitir una **factura nueva** por esas 12 unidades. Hay que apuntar el despacho 11
 a la factura nueva — y **sin registrar una entrega nueva**, porque el movimiento
@@ -467,3 +495,149 @@ sola.
 - **§6**: `presentacion` es otra columna que se sigue escribiendo mal. Junto con
   `ent_pedido.factura_id`, son dos columnas declaradas obsoletas de las que
   todavía cuelga algo. Vale una pasada que las cierre a las dos.
+
+---
+
+## 11 · CERRADO (27-ago, b48) · La CUARTA PUNTA está en el esquema y no en el código
+
+> ✅ **ARREGLADO EN b48.** `rpCalcSaldos()` ya suma `ent_devuelto_desde_ancla`.
+> Se publica ANTES del viernes 28-ago, para que el saldo lea las cuatro puntas el
+> mismo día en que el pan vuelve al congelador. Se conserva el diagnóstico entero
+> porque la LECCIÓN no es el bug, es cómo estuvo siete días invisible.
+>
+> **Medido al arreglarlo**: `esquema_check` pasó de 26 a **27 objetos** y marcó
+> "dependencias nuevas respecto de main: 1" en cuanto el código escribió el
+> `from('ent_devuelto_desde_ancla')`. Antes de eso daba ✓ con la función a medias.
+> La regla que salió de acá está en `CLAUDE.md`: **al pegar un esquema, si el
+> contador de `esquema_check` no sube, el esquema está muerto.**
+>
+> **Verificado que una sola aritmética alimenta las tres pantallas**: `rpCalcSaldos`
+> es la única implementación, y la llaman el selector de lotes de Despachos
+> (`_despSaldo`), Inventario M7 (`_lotSaldo`) y el Reporte (`_rpSaldo`). Las tres
+> heredan el arreglo — comprobado, no asumido.
+
+**Qué pasa.** `ENTREGAS_DEVOLUCIONES.sql` (20-ago) crea `ent_devolucion`,
+`ent_devolucion_linea` y la vista `ent_devuelto_desde_ancla`, y la describe en su
+propio comentario como *"la cuarta punta del saldo: disponible = ancla +
+produccion - salidas + devoluciones"*. Las tablas existen en Supabase (sondeadas
+el 27-ago: responden `200`, no `PGRST205`).
+
+**Pero `index.html` no las nombra ni una vez.** `rpCalcSaldos()` hace exactamente
+tres cosas:
+
+```
+  ancla   ← ent_conteo_linea del conteo anclado
++ producción ← chatter de Odoo (entLotesActivos), en el navegador
+− salidas ← ent_salido_del_congelador_desde_ancla
+```
+
+y ahí termina. Falta la cuarta lectura. Son ~3 líneas, simétricas a las de
+salidas:
+
+```js
+const {data:dev}=await c.from('ent_devuelto_desde_ancla').select('lote,producto_id,uds');
+(dev||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote; s[k]=(s[k]||0)+(+r.uds||0); });
+```
+
+**Por qué no es cosmético.** Es el escenario que el propio archivo de
+devoluciones advirtió y que ahora se cumple: *"con el bloqueo duro de Despachos
+eso deja de ser cosmetico: un saldo subestimado ahora IMPIDE despachar producto
+que si esta"*. Con las 12 unidades de Mentha de vuelta en el congelador y el
+saldo sin sumarlas, Daniel no va a poder despacharlas — y el pan está ahí.
+
+**Orden elegido** (decisión de Andrea, 27-ago): la lectura se agrega, se prueba
+**y se publica ANTES** de que se pegue el bloque del viernes. Con el bloqueo duro
+vivo, un saldo por debajo no es un número feo: es pan en el congelador que Truefie
+no deja despachar.
+
+**Una asimetría que quedó escrita en el código.** Las otras lecturas de
+`rpCalcSaldos` se tragan el error en silencio. Ésta no: si falla, se escribe en la
+consola. Es por la DIRECCIÓN del daño — si falla la de salidas el saldo queda
+ALTO (se ofrece de más, y eso se ve al despachar); si falla la de devoluciones
+queda BAJO y el bloqueo duro impide despachar producto real, sin decir por qué.
+Un saldo que bloquea en silencio es indepurable.
+
+---
+
+## 12 · ABIERTO · La pantalla de DEVOLUCIONES (Entrega 2)
+
+**Estado**: el primer caso real (Mentha, 28-ago) se resuelve **a mano con SQL**
+(`PEGADO_28AGO_DEVOLUCION_MENTHA.sql`, gitignored). Esto es la especificación
+para que el segundo no requiera SQL.
+
+### Qué la hace distinta de todo lo demás del módulo
+
+Todo lo que existe hoy en Entregas **resta** del congelador. Esta es la única
+pantalla que **suma**. Eso cambia dos cosas: no hay bloqueo por saldo (nunca vas
+a "no tener suficiente" para recibir algo), y el error grave no es quedarse
+corto sino **contar de más** — que es exactamente lo que casi pasa acá.
+
+### Desde dónde se registra
+
+**Desde el despacho, en el Historial.** El caso real llega como *"lo del 26-ago
+vuelve"*, no como *"entraron 6 unidades de Blanco"*. Abrís el despacho y el pie
+gana un control **"Registrar devolución"**.
+
+Entrar por el despacho resuelve solo el problema difícil: **las líneas y los
+lotes vienen ya cargados del alisto vigente**, con sus cantidades y sus unidades.
+Nadie escribe un lote a mano, y por lo tanto nadie escribe el lote de otro
+despacho. Es la red de diseño contra el error del 26-ago.
+
+⚠️ **La red importa más que la comodidad.** Semillas `209 / 1-27` está en el
+despacho 11 (6 u, se quedó el cliente) y en el 20 (6 u, vuelve). Una pantalla que
+pidiera "producto + lote + cantidad" en campos libres deja pasar "12" sin
+pestañear. Una que parte del despacho, no.
+
+Hace falta **también** una entrada suelta —`ent_devolucion` es suelta a
+propósito: *"una devolucion llega por telefono o en el camion de vuelta"*— pero
+va **segunda**, y con el lote elegido de una lista, nunca escrito.
+
+### El gesto
+
+1. Se abre con **todas las líneas del despacho marcadas y en su cantidad total**:
+   el caso normal es que vuelva todo (es lo que pasó acá). Devolver parcial es
+   desmarcar o bajar el número, no llenar un formulario en blanco.
+2. **Cantidad por lote, no por línea.** La unidad es la del alisto, y la línea
+   avisa si se pide más de lo que salió en ese lote de ese despacho — *avisa*,
+   no bloquea: puede volver producto de una entrega anterior en el mismo camión.
+3. **Fecha del movimiento, editable, con el mismo control que la salida**
+   (`de-fecha`, `min`/`max`, 16 px). El día por defecto es hoy. **Y el texto tiene
+   que decir que se registra cuando el producto LLEGA, no cuando avisan que va a
+   volver** — es la lección del 26-ago escrita en la pantalla.
+4. **Motivo obligatorio**, texto libre. "El cliente no lo recibió, Lusof lo
+   devolvió a la planta" no entra en ninguna lista cerrada.
+5. **La pregunta que decide todo, explícita: ¿vuelve al congelador?** Sí → se
+   registra. No → **no se registra nada** y la pantalla lo dice: lo que se bota no
+   se registra (decisión de Andrea, `ENTREGAS_DEVOLUCIONES.sql` §alcance). No hay
+   ruta de desecho y no se construye una.
+6. Antes de confirmar, en letras: **"esto SUMA al congelador"**, con el saldo del
+   lote antes y después. Es la simetría de "no registra una entrega nueva" del
+   diálogo de Entregar, y es lo que hace el gesto seguro.
+
+### Qué se muestra después
+
+- **En el Historial, colgando del despacho**: *"devuelto el 28-ago · 6 u Blanco
+  208 / 1-27 · 6 u Semillas 209 / 1-27"*. El despacho **no cambia de estado** —
+  salió, y eso sigue siendo cierto. La devolución es un hecho que se le agrega.
+- **En Inventario (M7)**: cuando un lote tiene devoluciones, poder ver de dónde
+  salió ese saldo. Sin esto, un lote que sube sin producción se lee como un error.
+- **En Pendientes**: nada. Una devolución registrada no es un problema.
+
+### Lo que YA está y no hay que construir
+
+- Esquema completo, con RLS select+insert y sin update/delete
+  (`ENTREGAS_DEVOLUCIONES.sql`).
+- Anulación: `ent_anulacion` ya acepta `entidad = 'devolucion'`, y
+  `ent_devolucion_vigente` ya la respeta. Corregir es anular e insertar.
+- El check del lote canónico en la propia columna (`^\d{1,3} / \d{1,2}-\d{2}$`),
+  que es la red contra el `"183 - 12/26"` del 18-ago.
+- La unidad independiente de cómo salió (se vendió 1 caja, devuelven 1 unidad):
+  la línea guarda su `uom_id` y su `uom_factor` congelados.
+
+### Lo que hay que construir, en orden
+
+1. **§11 primero** — la cuarta punta en `rpCalcSaldos()`. Sin eso la pantalla
+   registra algo que no se ve, que es peor que no tenerla.
+2. El diálogo desde el Historial, reusando `_despDialogoHTML`.
+3. El renglón de devoluciones en el detalle del Historial.
+4. La entrada suelta (sin despacho), después y con lote de lista.

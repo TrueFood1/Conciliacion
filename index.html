@@ -2842,16 +2842,41 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* ── El control del PDF ───────────────────────────────────────────────────
    Es un <span role=button> y no un <button> a propósito: tres de los cuatro
    lugares donde vive SON un <button> entero, y anidar botones es HTML inválido.
-   Discreto: no compite con la acción de la tarjeta (abrir el pedido, entregar).
    Los estados van en el mismo control, no en un cartel aparte — "PDF…" mientras
-   lee y "PDF ✕" si falló, con el motivo en el title. Nunca en silencio. */
-.pdf-b{display:inline-flex;align-items:center;margin-left:8px;padding:1px 7px;
-  border:1px solid var(--border-strong);border-radius:999px;
-  font-family:var(--font);font-size:10px;letter-spacing:.03em;color:var(--text-2);
+   lee y "PDF ✕" si falló, con el motivo en el title. Nunca en silencio.
+
+   ── DEJA DE SER DISCRETO (b48) ──
+   Nació callado a propósito: "no compite con la acción de la tarjeta". Eso era
+   correcto en el escritorio y falso frente al congelador. Daniel, textual: "el
+   botón del PDF es muy pequeño chiquillo... no lo veo, no lo veo, no lo veo".
+   No es un control secundario: la factura impresa va en CADA entrega, así que
+   es parte del trabajo, no un accesorio. Pasa a relleno lima.
+
+   LA REGLA DE b31, APLICADA COMPLETA: el lima es token de RELLENO, no de línea.
+   Así que el relleno va con --ent-fill y el borde con --ent-line, que en claro
+   NO es lima sino oliva. Poner el borde lima habría sido el error de b31 otra vez.
+
+   Medido (tema claro, que es el de Entregas):
+     · texto #2E3300 sobre lima ......... 11,83:1  (antes 5,24:1, gris sobre blanco)
+     · borde oliva contra la tarjeta ....  3,10:1  (mínimo 3:1 para el contorno de
+       un control; el borde gris de antes daba 1,43:1 y no llegaba)
+   El relleno lima contra el blanco es 1,12:1 y eso NO es un descuido: el lima
+   trabaja como resaltador —marca la zona— y lo que se busca a un metro es la
+   palabra PDF, que es la que se fue a 11,83:1. La silueta la sostiene el borde.
+   En oscuro el lima da 16,18:1 contra la superficie y el borde ni hace falta.
+
+   CARGANDO Y ERROR PIERDEN EL RELLENO, por la regla que ya existe en este
+   archivo para los botones apagados: un estado no es una acción con menos tinta.
+   Dejan de ser lima y se van a gris o a ámbar. */
+.pdf-b{display:inline-flex;align-items:center;margin-left:8px;padding:2px 8px;
+  background:var(--ent-fill);border:1px solid var(--ent-line);border-radius:999px;
+  font-family:var(--font);font-size:10px;font-weight:600;letter-spacing:.03em;
+  color:var(--ent-fill-tx);
   cursor:pointer;white-space:nowrap;vertical-align:middle;-webkit-tap-highlight-color:transparent}
-.pdf-b:hover{color:var(--text);border-color:var(--ent-line)}
-.pdf-b.cargando{color:var(--text-3);border-style:dashed;cursor:progress}
-.pdf-b.mal{color:var(--warn);border-color:var(--warn-edge)}
+.pdf-b:hover{background:#dff04a}
+.pdf-b.cargando{background:transparent;color:var(--text-3);
+  border-color:var(--border-strong);border-style:dashed;cursor:progress}
+.pdf-b.mal{background:transparent;color:var(--warn);border-color:var(--warn-edge)}
 .dp-n{font-size:11.5px;color:var(--text-3)}
 /* Sin despacho pendiente: mismo tratamiento callado que "Anteriores sin despachar"
    —un punto menos de contraste, encabezado propio— porque tampoco es trabajo del
@@ -3541,7 +3566,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 26 ago 2026 · b47';
+const BUILD = 'v 27 ago 2026 · b48';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -8114,6 +8139,31 @@ async function rpCalcSaldos(g){
   // el alias viejo sigue vivo en Supabase un build por si algo quedó apuntando.)
   const {data:ent}=await c.from('ent_salido_del_congelador_desde_ancla').select('lote,producto_id,uds');
   (ent||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote; s[k]=(s[k]||0)-(+r.uds||0); });
+  // ── LA CUARTA PUNTA (b48) — lo que VOLVIÓ al congelador ────────────────
+  // `disponible = ancla + producción − salidas + devoluciones`. Las tres
+  // primeras estaban acá desde siempre; la cuarta vivía SOLO en el esquema.
+  // ent_devolucion y ent_devuelto_desde_ancla existen desde el 20-ago y ninguna
+  // línea de este archivo las nombraba: se registraba una devolución y el saldo
+  // en pantalla no se movía. Se descubrió el 27-ago preparando la primera
+  // devolución real (Mentha, 12 u que vuelven el 28-ago).
+  //
+  // ⚠️ NO ES COSMÉTICO, y el archivo del esquema lo había advertido: "con el
+  // bloqueo duro de Despachos un saldo subestimado ahora IMPIDE despachar
+  // producto que sí está". Sin esta suma, el pan devuelto está en el congelador
+  // y Daniel no lo puede sacar.
+  //
+  // La vista ya filtra por `recibido_en > corte`, igual que las salidas por
+  // `preparado_en`: una devolución anterior al conteo ya está en el físico del
+  // ancla y sumarla la contaría dos veces.
+  const {data:dev,error:eDev}=await c.from('ent_devuelto_desde_ancla').select('lote,producto_id,uds');
+  // Las otras lecturas se tragan el error en silencio; ésta NO, y es por la
+  // dirección del daño: si falla la de salidas el saldo queda ALTO (se ofrece
+  // de más), si falla ésta queda BAJO y el bloqueo duro impide despachar
+  // producto real. Un saldo que bloquea sin decir por qué es indepurable.
+  if(eDev){ try{ console.error('[Truefie] no pude leer las devoluciones ('
+    +((eDev&&eDev.message)||eDev)+'): el saldo por lote queda por DEBAJO de lo real '
+    +'y Despachos puede bloquear producto que sí está.'); }catch(_){} }
+  (dev||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote; s[k]=(s[k]||0)+(+r.uds||0); });
   return s;
 }
 
