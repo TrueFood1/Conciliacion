@@ -1109,24 +1109,45 @@ tr.r-done td{background:rgba(192,208,72,.08)}
    ellas: con los tokens en la vista, la miga de pan quedaba oscura sobre una
    página clara. Todo lo que hay debajo es una redefinición de tokens; no se
    toca ni una regla del sistema. */
+/* ── GRIS FRÍO, NO BEIGE (26-ago) ────────────────────────────────────────
+   El #F7F6F2 tiraba a amarillento y daba aire a papel viejo. Pasa a #F7F8FA: un
+   blanco con una gota de AZUL en vez de una de amarillo. Las tarjetas siguen en
+   blanco puro, así que la jerarquía —tarjeta que se eleva sobre la página— no
+   cambia; lo único que cambia es la temperatura.
+   ⚠️ SE MUEVE LA FAMILIA ENTERA, no solo el fondo. Los bordes y el hundido eran
+   beige de la misma familia (#E4E2DB, #D6D4CC, #C9C6BE, #F2F1EC): dejarlos
+   cálidos contra un fondo frío los habría vuelto visiblemente amarillos, que es
+   peor que el beige parejo de antes. Los reemplazos conservan la LUMINANCIA de
+   cada uno y solo giran el tono, así que ningún contraste medido empeora.
+   Los TEXTOS no se tocan: sus tres tonos están medidos y calibrados, y a esta
+   saturación un gris cálido sobre fondo frío es indistinguible.
+   CONTRASTE MEDIDO en el navegador, antes → después (el fondo nuevo es un pelo
+   MÁS claro: luminancia 0,9210 → 0,9381, así que todo sube un poco):
+       principal  sobre el fondo    16,13 → 16,41
+       SECUNDARIO sobre el fondo     4,85 →  4,93   (AA pide 4,5)
+       terciario  sobre el fondo     3,25 →  3,30   (AA grande pide 3,0)
+       terciario  sobre la anulada   3,10 →  3,16
+   Sobre la tarjeta blanca no cambia nada (5,24 y 3,51): el blanco es el mismo.
+   El secundario sobre el fondo era el que venía justo —4,85 contra un mínimo de
+   4,5— y queda un poco mejor, no peor. */
 body.ent-claro{
-  --bg:#F7F6F2;--bg2:#FFFFFF;--bg3:#FFFFFF;      /* la página NO es blanco puro */
-  --surface:#FFFFFF;--surface-2:#F7F6F2;         /* la tarjeta se eleva siendo más clara */
+  --bg:#F7F8FA;--bg2:#FFFFFF;--bg3:#FFFFFF;      /* la página NO es blanco puro */
+  --surface:#FFFFFF;--surface-2:#F7F8FA;         /* la tarjeta se eleva siendo más clara */
   --text:#1A1A17;--text-m:#6E6C68;--text-h:#8B897F;
   /* El terciario NO es el #9A988F del sistema oscuro. Ese tono se leía bien
      sobre negro y al invertir el fondo da 2.89:1 sobre blanco — por debajo del
      mínimo, y justo en el escalón de las notas al pie, la hora de preparado y
      los "hace N d". Es el texto más chico del módulo y el que peor aguanta el
      reflejo del congelador. #8B897F sube a 3.51:1 sobre la tarjeta blanca y no
-     baja de 3.10:1 en el peor fondo del módulo (la tarjeta anulada, #F2F1EC),
+     baja de 3.10:1 en el peor fondo del módulo (la tarjeta anulada, #F1F3F6),
      sin achatar la jerarquía: sigue un escalón por debajo del secundario (5.24:1). */
   --text-2:#6E6C68;--text-3:#8B897F;
-  --border:#E4E2DB;--border-m:#D6D4CC;--border-strong:#D6D4CC;
-  --sunken:#F7F6F2;        /* hundido = el tono de la página sobre el blanco */
+  --border:#E3E5EA;--border-m:#D5D8DE;--border-strong:#D5D8DE;
+  --sunken:#F7F8FA;        /* hundido = el tono de la página sobre el blanco */
   --panel:#FFFFFF;
   --field:#FFFFFF;
-  --dim-line:#C9C6BE;--dim-bg:#F2F1EC;
-  --scrim:rgba(247,246,242,.94);--scrim-2:rgba(26,26,23,.38);
+  --dim-line:#C7CBD2;--dim-bg:#F1F3F6;
+  --scrim:rgba(247,248,250,.94);--scrim-2:rgba(26,26,23,.38);
   /* El lima se queda SOLO donde es relleno. Como línea y como texto pasa a
      oliva: #E9FE60 sobre blanco da ~1.1:1 y no se ve. */
   --ent-fill:#E9FE60;--ent-fill-tx:#2E3300;
@@ -3489,7 +3510,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 26 ago 2026 · b43';
+const BUILD = 'v 26 ago 2026 · b44';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -10472,12 +10493,17 @@ function pdRender(){
   // a partirse en cuatro renglones y era eso lo que hacía cada fila tan alta.
   // Arriba: quién (o el motivo) y la acción, que es lo que se viene a hacer.
   // Abajo, callado: el número de despacho y hace cuánto.
+  // ── UNA LISTA VACÍA NO SE DIBUJA (26-ago) ─────────────────────────────
+  // Dos tarjetas diciendo "Nada pendiente" ocupaban media pantalla de teléfono
+  // para informar que no hay nada que hacer. Es la regla 1 del lobby, aplicada
+  // acá: si no hay nada, la sección no aparece. Y si no aparece NINGUNA, un solo
+  // renglón lo dice — no cinco tarjetas vacías.
   const secc=function(titulo,expl,ls,accion){
+    if(!ls.length) return '';
     let h='<div class="card rp-z"><div class="card-title">'+titulo
       +' <span class="pd-cnt'+(ls.length?' on':'')+'">'+ls.length+'</span></div>'
       +'<div class="rp-nota" style="margin:-4px 0 8px">'+expl+'</div>';
-    if(!ls.length) h+='<div class="cl-none">Nada pendiente.</div>';
-    else ls.forEach(function(it){
+    ls.forEach(function(it){
       h+='<div class="pd-fila"><div class="pd-fila-c">'
         +'<div class="pd-quien">'+_pdQuien(it)+'</div>'
         +'<div class="pd-meta">#'+it.id+' · '+esc(_pdCuando(it.fecha,it.dias))+'</div>'
@@ -10505,6 +10531,9 @@ function pdRender(){
   // escondería una entrega real sin dejar rastro.
   // Los datos vienen de Odoo por Despachos, no de Supabase: por eso esta sección
   // puede estar "leyendo" mientras las otras tres ya se dibujaron.
+  // Vacía NO se dibuja — salvo que esté leyendo o que Odoo haya fallado, que son
+  // dos cosas que SÍ hay que decir.
+  if(_despFac===null || _despErr || _despSinDesp.length){
   h+='<div class="card rp-z"><div class="card-title">Facturas sin despacho pendiente'
     +' <span class="pd-cnt'+(_despSinDesp.length?' on':'')+'">'
     +(_despFac===null?'·':_despSinDesp.length)+'</span></div>'
@@ -10515,7 +10544,6 @@ function pdRender(){
   // tranquilidad acá es peor que un aviso feo.
   else if(_despErr) h+='<div class="cl-none dp-mal">No pude leer las facturas de Odoo, '
     +'así que esta lista puede estar incompleta: '+esc(_despErr)+'</div>';
-  else if(!_despSinDesp.length) h+='<div class="cl-none">Nada pendiente.</div>';
   else _despSinDesp.forEach(function(f){
     // El motivo va en SU renglón, a ancho completo y debajo de la fila. Metido
     // dentro de la fila se lo comía el botón: "ya entregado el 2026-07-08 según
@@ -10531,6 +10559,7 @@ function pdRender(){
       +'<div class="pd-motivo">'+esc(f.motivo)+'</div>';
   });
   h+='</div>';
+  }
 
   // Regla 1 del lobby: si no hay nada que hacer, la sección NO aparece. Nada de
   // "todo al día" — eso es información, y la información vive adentro del módulo.
@@ -10565,6 +10594,8 @@ function pdRender(){
       +'limpian solas la próxima vez que Despachos lea Odoo.</div>';
     h+='</div>';
   }
+  // Todo vacío: UN renglón, no cinco tarjetas. Estado, no explicación.
+  if(!h) h='<div class="card rp-z"><div class="cl-none">Nada pendiente.</div></div>';
   body.innerHTML=h;
 }
 async function pdValidar(id){
@@ -15626,6 +15657,6 @@ try{ document.getElementById('homeBuild').textContent = BUILD; }catch(e){}
      pantalla con la de verdad. -->
 <div style="position:fixed;left:8px;bottom:8px;z-index:9999;background:#E9A23B;color:#241a00;
   font:600 10px/1 -apple-system,system-ui,sans-serif;letter-spacing:.08em;
-  padding:5px 8px;border-radius:999px;pointer-events:none;opacity:.92">PRUEBA · b43</div>
+  padding:5px 8px;border-radius:999px;pointer-events:none;opacity:.92">PRUEBA · b44</div>
 </body>
 </html>
