@@ -3473,7 +3473,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 26 ago 2026 · b41';
+const BUILD = 'v 26 ago 2026 · b42';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -9365,8 +9365,41 @@ function _pdfRepintar(){
   try{ if(_despAbierto!=null||_despEstado!==null) despRender(); }catch(e){}
   try{ if(_bs) bsFiltrar(); }catch(e){}
 }
-async function entPdfAbrir(facturaId, consecutivo, cliente){
+// ── VER LA FACTURA, NO COMPARTIRLA A CIEGAS (26-ago) ────────────────────
+// Antes, en el teléfono, un toque disparaba `navigator.share()` DIRECTO: se abría
+// la hoja de compartir de iOS y no había forma de mirar el PDF antes de mandarlo.
+// Andrea quiere VER primero y decidir después. Ahora un toque ABRE el PDF, y
+// compartir queda como acción secundaria: el visor de iOS ya trae su botón
+// nativo, así que no hace falta agregar ninguno.
+// SIGUEN SIENDO DOS GESTOS, la meta de b32 — solo que el segundo lo pone el
+// sistema operativo en vez de la app. Esto NO es un menú de opciones: un toque,
+// una cosa.
+//
+// ⚠️ LA PESTAÑA SE ABRE **ANTES** DEL PRIMER await, Y ES A PROPÓSITO. Safari de
+// iOS solo deja abrir una pestaña dentro del gesto del usuario; un window.open
+// después de esperar a Odoo llega tarde y lo bloquea. Como leer la factura puede
+// tardar ~40 s con el proxy dormido, la pestaña se abre YA y mientras tanto dice
+// qué está pasando: una pestaña en blanco 40 s se lee como que se rompió.
+function entPdfAbrir(facturaId, consecutivo, cliente){
   if(_pdfEstado[facturaId]==='cargando') return;
+  let w=null;
+  try{ w=window.open('', '_blank'); }catch(e){}
+  if(w){ try{
+    // El charset va explícito: la pestaña nace de about:blank y heredar la
+    // codificación del padre no está garantizado. Sin esto, "día" y los puntos
+    // suspensivos salen rotos — visto al mirar la pantalla de espera.
+    w.document.write('<!doctype html><meta charset="utf-8">'
+      +'<meta name="viewport" content="width=device-width,initial-scale=1">'
+      +'<title>Factura '+esc(String(consecutivo||'').replace(/\D/g,'').slice(-4))+'</title>'
+      +'<body style="margin:0;padding:32px 24px;font:16px/1.5 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#1a1a17;background:#f7f6f2">'
+      +'<div id="m">Buscando la factura en Odoo…</div>'
+      +'<div style="margin-top:10px;font-size:13px;color:#6b6b63">La primera del día puede tardar unos 40 segundos.</div>'
+      +'</body>');
+    w.document.close();
+  }catch(e){} }
+  return _entPdfTraer(facturaId, consecutivo, cliente, w);
+}
+async function _entPdfTraer(facturaId, consecutivo, cliente, w){
   _pdfEstado[facturaId]='cargando'; _pdfRepintar();
   try{
     // 1 · el id del adjunto. Nunca search_read: con res_field puesto no aparece.
@@ -9383,24 +9416,33 @@ async function entPdfAbrir(facturaId, consecutivo, cliente){
     const nombre=_pdfNombre(consecutivo||(mv[0]&&mv[0].name), cliente);
     const blob=new Blob([buf], {type:(a[0].mimetype||'application/pdf')});
     _pdfEstado[facturaId]='listo'; _pdfRepintar();
-    // DOS GESTOS EN EL TELÉFONO: compartir directo a WhatsApp. Donde no hay
-    // navigator.share (escritorio, y iOS si el archivo no es compartible) cae a
-    // pestaña nueva, que es el camino de siempre.
-    const file=(typeof File!=='undefined') ? new File([blob], nombre, {type:'application/pdf'}) : null;
-    if(file && navigator.canShare && navigator.canShare({files:[file]})){
-      try{ await navigator.share({files:[file], title:nombre}); return; }
-      catch(e){ if(e && e.name==='AbortError') return; }   // lo canceló el humano: no es un error
-    }
     const url=URL.createObjectURL(blob);
-    const w=window.open(url,'_blank');
-    if(!w){ const a2=document.createElement('a'); a2.href=url; a2.download=nombre;
-            document.body.appendChild(a2); a2.click(); a2.remove(); }
+    if(w && !w.closed){
+      // La pestaña ya está abierta desde el toque: solo se la manda al PDF.
+      // NO se revoca la URL — el visor la sigue usando mientras la pestaña viva.
+      // Es un PDF suelto en memoria; el costo es despreciable al lado de romperle
+      // el visor a alguien que todavía lo está mirando.
+      w.location.href=url;
+      return;
+    }
+    // Sin pestaña (bloqueada, o escritorio con el bloqueador puesto): descarga.
+    const a2=document.createElement('a'); a2.href=url; a2.download=nombre;
+    document.body.appendChild(a2); a2.click(); a2.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
   }catch(e){
-    // NUNCA EN SILENCIO: el estado queda en el botón y el detalle en el título.
-    _pdfEstado[facturaId]=(e&&e.message)||String(e);
-    _pdfRepintar();
-    alert('No pude traer el PDF de la factura: '+((e&&e.message)||e));
+    // NUNCA EN SILENCIO. Si la pestaña se abrió, el error va ADENTRO —que es
+    // donde está mirando quien tocó— y no en un alert de la pestaña de atrás.
+    const msg=(e&&e.message)||String(e);
+    _pdfEstado[facturaId]=msg; _pdfRepintar();
+    if(w && !w.closed){
+      try{
+        const el=w.document.getElementById('m');
+        if(el){ el.textContent='No pude traer el PDF: '+msg; el.style.color='#8a3b12'; }
+        else w.document.body.textContent='No pude traer el PDF: '+msg;
+        return;
+      }catch(_){}
+    }
+    alert('No pude traer el PDF de la factura: '+msg);
   }
 }
 
