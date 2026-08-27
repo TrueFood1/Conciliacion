@@ -772,3 +772,96 @@ producción sale de Odoo en el navegador. Si la alerta se calculara solo con lo
 que hay en Supabase, todo lote fabricado después del ancla saldría en negativo el
 primer día. Tiene que colgar de `rpCalcSaldos()`, que ya las suma las cuatro
 (desde b48), y no de una vista nueva.
+
+---
+
+## 15 · 🔴 ABIERTO · 130 unidades salieron de un lote que nunca se movió
+
+**El caso (27-ago-2026).** El lote **Pan Blanco `208 / 1-27`** daba **−4** en
+Inventario. Daniel contó el congelador: **21 cajas = 126 unidades físicas**,
+cajas cerradas, abiertas para verificar y todas de ese lote.
+
+**La cuenta, con las tres fuentes de acuerdo:**
+
+| | |
+|---|---|
+| Ancla del 14-ago (`CONTEO_14AGO.sql`) | **126 u** (21 cajas) |
+| Salidas registradas desde entonces | **130 u** en 8 movimientos |
+| Saldo en sistema | **−4** |
+| **Físico contado hoy** | **126 u** |
+
+Odoo, el Excel de Daniel y Truefie **coinciden en las 130**. No hay salidas
+ocultas ni un registro de más: el ledger tiene 8 movimientos, ancla incluida, y
+todos calzan contra factura. La diferencia entre lo físico y lo esperado es
+**exactamente 130** — o sea, **todo lo que se registró como salido del 208**.
+
+**Traducción: el pan del 208 nunca se movió.** Las 130 unidades salieron
+físicamente de OTROS lotes, y esos lotes tienen de más lo que al 208 le falta.
+
+### Lo que ya se descartó, con evidencia
+
+**¿Produjo Keylor Pan Blanco después del ancla y anotó `208` en el chatter en vez
+del juliano del día?** Eso habría metido 126 unidades físicas nuevas sin tocar
+ningún registro de salida. **NO.** Verificado en Odoo el 27-ago sobre TODAS las
+órdenes de Pan Blanco con `date_start` entre el 14 y el 27 de agosto, en todos
+los estados:
+
+| Orden | Inicio | Cant. | Chatter crudo | Lote |
+|---|---|---|---|---|
+| `WH/MO/01414` | 18-ago | 126 | `WH/MO/01404 WH/MO/01412 230/02 27` | `230 / 2-27` |
+| `WH/MO/01415` | 19-ago | 126 | `WH/MO/01412 231/02 27` | `231 / 2-27` |
+| `WH/MO/01420` | 24-ago | 168 | `WH/MO/01412 WH/MO/01419 236/02 27` | `236 / 2-27` |
+
+Las tres con **un solo lote legible**, ninguna ambigua, ninguna sin lote, y
+**ninguna menciona 208**. Tampoco lo menciona ninguna orden de los otros cinco
+productos en esa ventana.
+
+> ⚠️ **Y un aviso sobre cómo se verifica esto.** La primera consulta que se
+> corrió esa mañana tomaba **la última coincidencia** de lote del chatter en
+> silencio, así que **una orden ambigua se habría visto como una orden normal** —
+> justo el caso que había que descartar. Hubo que rehacerla mostrando TODAS las
+> coincidencias. Al buscar un lote mal escrito, la consulta no puede quedarse con
+> uno: tiene que decir cuántos encontró.
+
+### Las dos hipótesis que quedan, y cómo se separan
+
+Las dos explican que hoy haya 126 unidades físicas del 208. **No se distinguen
+mirando el 208** — hay que mirar los otros lotes:
+
+- **A · El 208 nunca se movió** y las 130 salieron de otros lotes (lote mal
+  elegido en el selector, 8 veces).
+  → esos lotes van a tener **físicamente MENOS** de lo que el sistema dice.
+- **B · El 208 se consumió entero** y una tanda posterior quedó **físicamente
+  rotulada 208** aunque su chatter diga otra cosa. Ojo con esto: `WH/MO/01414`
+  (lote 230) y `WH/MO/01415` (lote 231) produjeron **exactamente 126 u cada
+  una** — el mismo número. Y `CLAUDE.md` ya documenta que el papel y el chatter
+  se pueden separar (la corrección de 222 a 223 del 11-ago).
+  → entonces el **230 o el 231 va a estar físicamente ausente** mañana.
+
+**El conteo del 28-ago los separa** — pero solo si existe la foto de hoy contra
+la cual restarlo.
+
+### Por qué la foto no es opcional
+
+El reconteo **no resuelve esto, lo tapa**: después del reancle el 208 va a decir
+126 y todo va a cuadrar. `FOTO_ANTES_DEL_REANCLE.sql` congela el saldo esperado
+de cada lote de los seis productos más todos sus movimientos, en una tabla nueva
+(`ent_foto_lote_27ago`, puramente aditiva). **El conteo de mañana solo se puede
+interpretar contra esos números**: sin ellos son 34 cifras nuevas sin nada contra
+qué restarlas.
+
+Y hay que sacarle **una foto a la pantalla de Inventario** además del SQL: la app
+calcula las cuatro puntas y muestra las órdenes sin lote legible —pan real que no
+suma a ningún lote— que el SQL no ve.
+
+### Relación con los otros pendientes
+
+- **§13**: esto es el sobregiro silencioso funcionando como se predijo. Sin
+  bloqueo, ocho salidas seguidas contra un lote que no tenía producto y nadie se
+  enteró. Si el bloqueo hubiera existido, se habría frenado en la primera.
+- **§14**: y nadie lo vio hasta que Andrea abrió Inventario a mirar otra cosa.
+- **§1** (el lote sin código de producto) es la causa candidata número uno de la
+  hipótesis A: si el selector no distingue bien un lote de otro, elegir el
+  equivocado ocho veces es exactamente el error que ese pendiente describe.
+- **`CLAUDE.md`, corte del 27-ago**: este caso se pudo cruzar contra el Excel
+  porque es anterior al corte. El próximo no va a tener ese segundo testigo.
