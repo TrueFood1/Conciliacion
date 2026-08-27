@@ -357,3 +357,85 @@ tabla (`ent_factura_forzada`, append-only con su motivo, como todo lo demás) y
 decidir si la decisión es para siempre o solo para esa factura y esa fecha.
 
 Aprobado como está por Andrea el 26-ago; anotado para cuando moleste.
+
+---
+
+## 10 · ABIERTO · No se puede CAMBIAR la factura de un despacho ya vinculado
+
+**El caso vivo (26-ago-2026).** Mentha y limón se quedó con el producto de la
+entrega del 19-ago (despacho 11), cuya factura ...3484 se anuló. Andrea va a
+emitir una **factura nueva** por esas 12 unidades. Hay que apuntar el despacho 11
+a la factura nueva — y **sin registrar una entrega nueva**, porque el movimiento
+físico ya está registrado con sus lotes (`202 / 1-27` y `209 / 1-27`). Registrar
+otro descontaría esos lotes dos veces.
+
+Hoy no hay forma. El botón "Vincular factura" de Pendientes solo aparece para los
+despachos que **no tienen ninguna**: es para llenar un hueco, no para reemplazar.
+
+Con **37 reversiones administrativas al año**, esto vuelve.
+
+### La buena noticia: el dato ya sabe hacerlo
+
+`ent_pedido_factura_vigente` es **"gana la fila más reciente"**, no `not exists`:
+
+```sql
+select distinct on (pedido_id) pedido_id, factura_id, factura_nombre, anulado, ...
+  from ent_pedido_factura
+ order by pedido_id, creado_en desc;
+```
+
+O sea que **cambiar la factura ya es posible a nivel de datos**: se INSERTA una
+fila con la factura nueva y esa pasa a ser la vigente. No hace falta anular la
+anterior ni tocar el esquema. (Es justo lo contrario de `ent_anulacion` — ver §8.)
+
+### ⚠️ La mala, y es la mitad peligrosa
+
+**`v_ent_factura_despachada` NO lee el vínculo vigente. Lee
+`ent_pedido.factura_id`**, la columna que `ENTREGAS_SALIDAS.sql` §2 declara
+OBSOLETA y que no tiene grant de UPDATE:
+
+```sql
+create or replace view v_ent_factura_despachada ... as
+  select p.factura_id, p.id as pedido_id, ...
+    from ent_pedido p
+    join ent_alisto_vigente av on av.pedido_id = p.id
+   where p.origen = 'factura' and p.factura_id is not null;
+```
+
+Esa vista es la que saca de "Por preparar" las facturas ya despachadas.
+Consecuencia: **cambiar el vínculo NO va a sacar la factura nueva de "Por
+preparar"**. Va a quedar ahí, con pinta de pendiente legítima, y el primero que
+la prepare descuenta los lotes por segunda vez — exactamente lo que este pendiente
+existe para evitar.
+
+🔴 **Y esto ya es un riesgo HOY, sin construir nada**: en cuanto se emita la
+factura nueva de Mentha, va a aparecer en "Por preparar". El filtro de b39
+tampoco la agarra (su traslado `WH/OUT/02319` está `cancel`, así que no hay
+entrega validada anterior a la factura). Hasta que esto se construya, **el único
+freno es avisarle a Daniel**.
+
+### Cómo debería funcionar
+
+1. **En el detalle del despacho**, no en Pendientes: un control "Cambiar la
+   factura" disponible **también cuando ya tiene una**, mostrando cuál tiene hoy.
+2. **Motivo obligatorio, texto libre.** "La 3484 se anuló y se re-emitió como
+   ...35xx" no entra en ninguna lista cerrada.
+3. **Que diga en letras que NO registra una entrega nueva** y que los lotes no se
+   vuelven a descontar. Es la duda que va a tener quien lo use, y es lo que hace
+   que el gesto sea seguro.
+4. **`v_ent_factura_despachada` tiene que pasar a `ent_pedido_factura_vigente`.**
+   Sin esto, el punto 1 es una trampa. ⚠️ Toca la vista que alimenta "Por
+   preparar": hay que medir antes cuántas facturas entran y salen de la bandeja
+   con el cambio, contra los 23 vínculos recién escritos por
+   `VINCULOS_BACKFILL.sql`.
+5. **El historial tiene que mostrar la cadena**: a qué factura apuntaba antes, a
+   cuál apunta ahora, cuándo y por qué. El append-only ya guarda todo; falta
+   mostrarlo.
+
+### Relación con los otros pendientes
+
+- **§8** (anular es de una sola dirección) es el problema espejo: ahí falta poder
+  deshacer, acá falta poder reemplazar. Los dos salen del mismo caso real.
+- **§6**: `presentacion` es otra columna que se sigue escribiendo mal. Junto con
+  `ent_pedido.factura_id`, son dos columnas declaradas obsoletas de las que
+  todavía cuelga algo. Vale una pasada que las cierre a las dos.
