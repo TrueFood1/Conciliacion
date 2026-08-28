@@ -345,6 +345,16 @@ de nuevo con su misma fecha, líneas y lotes. Es lo que hace
 
 ## 9 · EN CURSO (26-ago) · "Despachar igual" no se persiste — y falta "Revisado"
 
+> ✅ **EL FILTRO ATRAPÓ SU PRIMER CASO REAL EN VIVO (27-ago-2026).** Apareció la
+> factura **...3504 (Bm De Uvita, 2 cajas de Pan Blanco)** marcada *"sin pedido de
+> venta en Odoo"*. Andrea confirmó: la creó Keylor para resolver algo contable, y
+> **no hay nada que entregar**. La segunda red hizo exactamente lo suyo — la
+> factura **nunca llegó a "Por preparar"**, así que nadie sacó pan del congelador
+> contra un papel administrativo. Se marca "Revisado" y sale de la lista.
+> Es la primera evidencia medida de que el filtro aparta bien, y no solo de que
+> aparta: hasta hoy solo sabíamos que filtraba 2 de 493 y que las dos eran
+> administrativas, pero por reconstrucción, no viéndolo pasar.
+
 El filtro de "Facturas sin despacho pendiente" (b39) aparta las facturas que ya
 tienen su entrega hecha en Odoo, y deja el botón **"Despachar igual"** para
 cuando el filtro se equivoque. Ese botón hoy es **de la sesión**: se guarda en
@@ -539,23 +549,30 @@ const {data:dev}=await c.from('ent_devuelto_desde_ancla').select('lote,producto_
 (dev||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote; s[k]=(s[k]||0)+(+r.uds||0); });
 ```
 
-**Por qué no es cosmético.** Es el escenario que el propio archivo de
-devoluciones advirtió y que ahora se cumple: *"con el bloqueo duro de Despachos
-eso deja de ser cosmetico: un saldo subestimado ahora IMPIDE despachar producto
-que si esta"*. Con las 12 unidades de Mentha de vuelta en el congelador y el
-saldo sin sumarlas, Daniel no va a poder despacharlas — y el pan está ahí.
+**Por qué no es cosmético.** ⚠️ **La razón que se escribió acá el 27-ago era
+FALSA y se corrigió el mismo día.** Decía, citando a `ENTREGAS_DEVOLUCIONES.sql`:
+*"con el bloqueo duro de Despachos un saldo subestimado ahora IMPIDE despachar
+producto que sí está"*. **El bloqueo duro no existe** — nunca se construyó, ver
+§13. Despachar con el saldo en cero o negativo se puede hoy, desde la pantalla.
+
+La razón verdadera es otra y alcanza igual: **sin la cuarta punta, el producto
+devuelto no aparece NUNCA**. El saldo queda por debajo de lo real de forma
+permanente —solo lo limpiaría un conteo físico que reancle, que puede tardar
+meses— y todas las decisiones que se tomen mirando ese número van a estar mal.
+Lo que era falso era la urgencia, no la necesidad.
 
 **Orden elegido** (decisión de Andrea, 27-ago): la lectura se agrega, se prueba
-**y se publica ANTES** de que se pegue el bloque del viernes. Con el bloqueo duro
-vivo, un saldo por debajo no es un número feo: es pan en el congelador que Truefie
-no deja despachar.
+**y se publica ANTES** de que se pegue el bloque del viernes. La decisión se tomó
+sobre la premisa falsa del bloqueo duro, pero **sigue siendo la correcta**: que el
+saldo lea las cuatro puntas el mismo día en que el producto llega evita que alguien
+mire un número equivocado durante el fin de semana.
 
 **Una asimetría que quedó escrita en el código.** Las otras lecturas de
 `rpCalcSaldos` se tragan el error en silencio. Ésta no: si falla, se escribe en la
 consola. Es por la DIRECCIÓN del daño — si falla la de salidas el saldo queda
 ALTO (se ofrece de más, y eso se ve al despachar); si falla la de devoluciones
-queda BAJO y el bloqueo duro impide despachar producto real, sin decir por qué.
-Un saldo que bloquea en silencio es indepurable.
+queda BAJO y esconde producto que sí está. Un saldo que va por debajo sin decir
+por qué es indepurable — y desde el 27-ago no hay Excel contra el cual notarlo.
 
 ---
 
@@ -641,3 +658,210 @@ va **segunda**, y con el lote elegido de una lista, nunca escrito.
 2. El diálogo desde el Historial, reusando `_despDialogoHTML`.
 3. El renglón de devoluciones en el detalle del Historial.
 4. La entrada suelta (sin despacho), después y con lote de lista.
+
+---
+
+## 13 · 🔴 ABIERTO · EL "BLOQUEO DURO" NO EXISTE — nunca se construyó
+
+**Descubierto el 27-ago-2026** diagnosticando el lote Pan Blanco `208 / 1-27` en
+−4. La pregunta era "¿cómo pasó el bloqueo duro?". La respuesta es que **no hay
+bloqueo que pasar.**
+
+### La evidencia, en el código
+
+`_despSaldo` —el saldo por lote— se usa en **UN SOLO lugar** de todo `index.html`:
+
+```js
+out.push({lote:L.canon, saldo:(_despSaldo ? ... : null)});   // _despLotesDe()
+```
+
+y de ahí sale a **dos** usos, los dos cosméticos:
+1. **Ordenar**: los agotados al fondo de la lista.
+2. **Rotular**: la opción dice `208 / 1-27 — agotado según sistema`.
+
+La opción **NO va `disabled`**. Se puede elegir y confirmar.
+
+Y el control que apaga el botón de confirmar, `_despPendientes()`, mira
+exactamente **dos** cosas — ninguna es el saldo:
+
+```js
+if(!_despLotesEfectivos(f,i).length) sinLote++;   // ¿se eligió lote?
+else mal++;                                       // ¿la suma de lotes da la cantidad?
+```
+
+### De dónde salió la confusión
+
+El bloqueo duro **se diseñó y se aprobó**, y quedó anotado en `BITACORA.md` como
+parte de la **Entrega 2**: *"Devoluciones (UI) + bloqueo duro. Esquema pegado,
+pantalla aprobada."* La Entrega 2 **nunca se construyó**.
+
+Y este archivo lo decía bien el 25-ago, en §4:
+
+> *"`main` está en b27, que **no tiene bloqueo duro**, así que un sobregiro habría
+> pasado en silencio."*
+
+Pero a partir del 20-ago los documentos empezaron a hablar de él **en presente**,
+como si existiera, y esa frase se propagó sin que nadie volviera al código:
+
+| Dónde | Qué dice | ¿Cierto? |
+|---|---|---|
+| `ENTREGAS_DEVOLUCIONES.sql:8` (20-ago) | "con el bloqueo duro de Despachos eso deja de ser cosmetico" | ❌ |
+| `CLAUDE.md:182` | "con el bloqueo duro de Despachos eso es no poder despachar" | ❌ |
+| `ENTREGAS_PENDIENTES.md` §11 (27-ago) | "el bloqueo duro no deja despachar" | ❌ |
+| `PEGADO_28AGO_DEVOLUCION_MENTHA.sql:52` (27-ago) | idem | ❌ |
+| `index.html` · comentario de la cuarta punta (b48) | idem | ❌ |
+| Mensaje del commit de b48 | idem | ❌ |
+| `ENTREGAS_PENDIENTES.md` §4 (25-ago) | "b27 **no tiene** bloqueo duro" | ✅ |
+
+**La lección**: una afirmación sobre el comportamiento del código repetida en seis
+documentos sigue siendo cero verificaciones. `_despSaldo` se lee en un solo lugar
+y bastaba un `grep` para saberlo. **Antes de citar una salvaguarda, ir a verla.**
+
+### Lo que esto cambia
+
+- **Un sobregiro desde la UI es posible HOY y es silencioso.** No requiere SQL.
+  Cualquier lote puede estar mal y nadie se entera — es exactamente lo que pasó.
+- **La decisión de "nunca esconder un lote" NO se toca.** Está bien pensada y
+  documentada: *"el congelador físico manda sobre el sistema"*, y esconder los
+  agotados obligó a Andrea a escribir un lote a mano el 18-ago. El bloqueo duro
+  nunca fue "esconder": es avisar y pedir confirmación al sobregirar.
+- **b48 sigue siendo correcto, pero por otra razón que la que se escribió.** La
+  cuarta punta hacía falta igual —sin ella el pan devuelto no aparece nunca—;
+  lo falso era el argumento de urgencia ("Daniel no va a poder despacharlo").
+  Sí va a poder: el número va a estar mal, nada más.
+
+### Qué construir (sin decidir todavía)
+
+**Avisar y dejar pasar con confirmación**, en línea con toda la doctrina del
+módulo (proponer y nunca bloquear; la emergencia se resuelve dentro de Truefie
+con rastro, no en el papel). Al elegir un lote cuyo saldo no alcanza: se dice
+cuánto falta, y si se confirma igual **se registra el sobregiro con su marca**,
+como ya se hace con la factura que no se pudo verificar contra Odoo.
+Un bloqueo que impide registrar lo que YA salió del congelador empuja al Excel —
+y desde el 27-ago el Excel ya no existe (ver `CLAUDE.md`).
+
+---
+
+## 14 · ABIERTO · Un saldo negativo tiene que avisar solo, en Pendientes
+
+**El caso**: el `208 / 1-27` estuvo en −4 y **nadie se enteró** hasta que Andrea
+abrió Inventario a mirar otra cosa. Un error que solo se ve si alguien pasa por
+casualidad no está siendo vigilado.
+
+**No es "lote por agotarse".** Eso se descartó a propósito y sigue descartado: un
+lote bajando es información normal de la operación. **Un negativo no es
+información, es un error** — dice que el sistema cree que salió más producto del
+que hubo, y eso solo puede ser una de tres cosas: un sobregiro real (§13), un
+lote mal tecleado, o producción que no se está sumando.
+
+**Dónde va**: en Pendientes, que desde b47 es *"lo que está MAL, ordenado por
+GRAVEDAD"*. Un negativo es de los dos primeros escalones —los que tienen producto
+o cliente del otro lado—, no de los tres de papeles.
+
+**Cumple las 5 reglas de alerta del lobby** (`CLAUDE.md`), que es el requisito
+para existir: hay algo que hacer ✓ · tiene fecha (la del movimiento que lo cruzó) ✓
+· se apaga sola cuando el saldo vuelve a cero o más, sin "marcar como visto" ✓ ·
+máximo 3 y "y N más" ✓ · ámbar solo si urge ✓.
+
+**Qué tiene que decir**, y es lo que lo hace accionable en vez de decorativo:
+producto, lote, **cuánto falta**, y **cuál fue el movimiento que lo cruzó** — que
+es la única pregunta que se va a hacer quien lo lea.
+
+⚠️ **Ojo con el falso positivo**: el saldo necesita las cuatro puntas, y la
+producción sale de Odoo en el navegador. Si la alerta se calculara solo con lo
+que hay en Supabase, todo lote fabricado después del ancla saldría en negativo el
+primer día. Tiene que colgar de `rpCalcSaldos()`, que ya las suma las cuatro
+(desde b48), y no de una vista nueva.
+
+---
+
+## 15 · 🔴 ABIERTO · 130 unidades salieron de un lote que nunca se movió
+
+**El caso (27-ago-2026).** El lote **Pan Blanco `208 / 1-27`** daba **−4** en
+Inventario. Daniel contó el congelador: **21 cajas = 126 unidades físicas**,
+cajas cerradas, abiertas para verificar y todas de ese lote.
+
+**La cuenta, con las tres fuentes de acuerdo:**
+
+| | |
+|---|---|
+| Ancla del 14-ago (`CONTEO_14AGO.sql`) | **126 u** (21 cajas) |
+| Salidas registradas desde entonces | **130 u** en 8 movimientos |
+| Saldo en sistema | **−4** |
+| **Físico contado hoy** | **126 u** |
+
+Odoo, el Excel de Daniel y Truefie **coinciden en las 130**. No hay salidas
+ocultas ni un registro de más: el ledger tiene 8 movimientos, ancla incluida, y
+todos calzan contra factura. La diferencia entre lo físico y lo esperado es
+**exactamente 130** — o sea, **todo lo que se registró como salido del 208**.
+
+**Traducción: el pan del 208 nunca se movió.** Las 130 unidades salieron
+físicamente de OTROS lotes, y esos lotes tienen de más lo que al 208 le falta.
+
+### Lo que ya se descartó, con evidencia
+
+**¿Produjo Keylor Pan Blanco después del ancla y anotó `208` en el chatter en vez
+del juliano del día?** Eso habría metido 126 unidades físicas nuevas sin tocar
+ningún registro de salida. **NO.** Verificado en Odoo el 27-ago sobre TODAS las
+órdenes de Pan Blanco con `date_start` entre el 14 y el 27 de agosto, en todos
+los estados:
+
+| Orden | Inicio | Cant. | Chatter crudo | Lote |
+|---|---|---|---|---|
+| `WH/MO/01414` | 18-ago | 126 | `WH/MO/01404 WH/MO/01412 230/02 27` | `230 / 2-27` |
+| `WH/MO/01415` | 19-ago | 126 | `WH/MO/01412 231/02 27` | `231 / 2-27` |
+| `WH/MO/01420` | 24-ago | 168 | `WH/MO/01412 WH/MO/01419 236/02 27` | `236 / 2-27` |
+
+Las tres con **un solo lote legible**, ninguna ambigua, ninguna sin lote, y
+**ninguna menciona 208**. Tampoco lo menciona ninguna orden de los otros cinco
+productos en esa ventana.
+
+> ⚠️ **Y un aviso sobre cómo se verifica esto.** La primera consulta que se
+> corrió esa mañana tomaba **la última coincidencia** de lote del chatter en
+> silencio, así que **una orden ambigua se habría visto como una orden normal** —
+> justo el caso que había que descartar. Hubo que rehacerla mostrando TODAS las
+> coincidencias. Al buscar un lote mal escrito, la consulta no puede quedarse con
+> uno: tiene que decir cuántos encontró.
+
+### Las dos hipótesis que quedan, y cómo se separan
+
+Las dos explican que hoy haya 126 unidades físicas del 208. **No se distinguen
+mirando el 208** — hay que mirar los otros lotes:
+
+- **A · El 208 nunca se movió** y las 130 salieron de otros lotes (lote mal
+  elegido en el selector, 8 veces).
+  → esos lotes van a tener **físicamente MENOS** de lo que el sistema dice.
+- **B · El 208 se consumió entero** y una tanda posterior quedó **físicamente
+  rotulada 208** aunque su chatter diga otra cosa. Ojo con esto: `WH/MO/01414`
+  (lote 230) y `WH/MO/01415` (lote 231) produjeron **exactamente 126 u cada
+  una** — el mismo número. Y `CLAUDE.md` ya documenta que el papel y el chatter
+  se pueden separar (la corrección de 222 a 223 del 11-ago).
+  → entonces el **230 o el 231 va a estar físicamente ausente** mañana.
+
+**El conteo del 28-ago los separa** — pero solo si existe la foto de hoy contra
+la cual restarlo.
+
+### Por qué la foto no es opcional
+
+El reconteo **no resuelve esto, lo tapa**: después del reancle el 208 va a decir
+126 y todo va a cuadrar. `FOTO_ANTES_DEL_REANCLE.sql` congela el saldo esperado
+de cada lote de los seis productos más todos sus movimientos, en una tabla nueva
+(`ent_foto_lote_27ago`, puramente aditiva). **El conteo de mañana solo se puede
+interpretar contra esos números**: sin ellos son 34 cifras nuevas sin nada contra
+qué restarlas.
+
+Y hay que sacarle **una foto a la pantalla de Inventario** además del SQL: la app
+calcula las cuatro puntas y muestra las órdenes sin lote legible —pan real que no
+suma a ningún lote— que el SQL no ve.
+
+### Relación con los otros pendientes
+
+- **§13**: esto es el sobregiro silencioso funcionando como se predijo. Sin
+  bloqueo, ocho salidas seguidas contra un lote que no tenía producto y nadie se
+  enteró. Si el bloqueo hubiera existido, se habría frenado en la primera.
+- **§14**: y nadie lo vio hasta que Andrea abrió Inventario a mirar otra cosa.
+- **§1** (el lote sin código de producto) es la causa candidata número uno de la
+  hipótesis A: si el selector no distingue bien un lote de otro, elegir el
+  equivocado ocho veces es exactamente el error que ese pendiente describe.
+- **`CLAUDE.md`, corte del 27-ago**: este caso se pudo cruzar contra el Excel
+  porque es anterior al corte. El próximo no va a tener ese segundo testigo.

@@ -1088,6 +1088,7 @@ tr.r-done td{background:rgba(192,208,72,.08)}
   --ent-line:#E9FE60;      /* línea, borde, texto de acento, enlace */
   --ent-line-2:#3F4A16;    /* borde derivado, más callado */
   --ent-wash:rgba(233,254,96,.08);   /* lavado de acento */
+  --seg-track:rgba(255,255,255,.07); /* pista del control segmentado */
   --warn:#E9A23B;          /* ámbar fuerte: esto necesita ojo */
   --warn-2:#C99A4E;        /* ámbar callado: nota al pie */
   --on-warn:#0E0E11;       /* texto sobre un ámbar relleno */
@@ -1153,6 +1154,7 @@ body.ent-claro{
   --ent-fill:#E9FE60;--ent-fill-tx:#2E3300;
   --ent-line:#8A9B00;--ent-line-2:#C4D14A;
   --ent-wash:rgba(138,155,0,.09);
+  --seg-track:#EDEFF2;     /* pista del segmento: un escalón bajo el fondo frío #F7F8FA */
   /* Ámbar y verde bajan de luminosidad para sobrevivir al blanco. El ámbar de
      oscuro (#E9A23B) da 2.1:1 sobre #FFFFFF — ilegible como texto. Estos dos
      pasan 4.5:1. El verde reusa el #4E7A00 que ya vive en `.tbl-clara .ok`,
@@ -1554,7 +1556,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
      todos los saldos: tiene que estar a UN toque más, no escondido en un menú. -->
 <div id="entMas" class="hidden">
   <div class="fm-h">Entregas</div>
-  <button onclick="entMasIr('historial')">Historial<span class="sub">Toda la salida registrada: por cliente, lote o fecha</span></button>
+  <button onclick="entMasIr('lotes')">Inventario<span class="sub">Cuánto queda de cada lote, hoy</span></button>
   <button onclick="entMasIr('pendientes')">Pendientes<span class="sub">Lo que hay que arreglar</span></button>
   <button onclick="entMasIr('conteo')">Conteo<span class="sub">La foto del congelador que ancla los saldos por lote</span></button>
 </div>
@@ -1756,10 +1758,14 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <div id="vReporte" class="hidden">
   <div class="faces faces-ent">
     <button class="face" onclick="irADespachos()">Entregas</button>
-    <button class="face" onclick="irAEntLotes()">Inventario</button>
-    <button class="face on">Entregas sin factura</button>
+    <button class="face on">Sin factura</button>
+    <button class="face" onclick="irAEntBuscar()">Historial</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
+  <!-- El único título que queda del módulo. La pestaña dice "Sin factura" porque
+       el nombre completo no cabe a 375px (349px contra 343 útiles, medido), así que
+       el nombre entero vive acá. Las otras cinco pantallas no llevan título: lo
+       repetían de la miga y de la pestaña. -->
   <div class="m3title" style="font-size:24px">Entregas sin factura</div>
   <div class="m3sub" style="margin-top:2px">Cada salida con su lote.</div>
   <div id="rpStatus" class="status hidden" style="margin-top:14px"></div>
@@ -1770,13 +1776,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <div id="vDespachos" class="hidden">
   <div class="faces faces-ent">
     <button class="face on">Entregas</button>
-    <button class="face" onclick="irAEntLotes()">Inventario</button>
-    <button class="face" onclick="irAReporte()">Entregas sin factura</button>
+    <button class="face" onclick="irAReporte()">Sin factura</button>
+    <button class="face" onclick="irAEntBuscar()">Historial</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
-  </div>
-  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
-    <div class="m3title" style="font-size:24px">Entregas</div>
-    <button class="btn btn-sm" onclick="despCargar(true)">Recargar</button>
   </div>
   <div id="despStatus" class="status hidden" style="margin-top:14px"></div>
   <div id="despBody" style="margin-top:14px"></div>
@@ -1790,13 +1792,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <div id="vEntLotes" class="hidden">
   <div class="faces faces-ent">
     <button class="face" onclick="irADespachos()">Entregas</button>
-    <button class="face on">Inventario</button>
-    <button class="face" onclick="irAReporte()">Entregas sin factura</button>
+    <button class="face" onclick="irAReporte()">Sin factura</button>
+    <button class="face" onclick="irAEntBuscar()">Historial</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
-  </div>
-  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
-    <div class="m3title" style="font-size:24px">Inventario</div>
-    <button class="btn btn-sm" onclick="lotCargar(true)">Recargar</button>
   </div>
   <div id="elStatus" class="status hidden" style="margin-top:14px"></div>
   <div id="elBody" style="margin-top:14px"></div>
@@ -1805,16 +1803,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <div id="vPendientes" class="hidden">
   <div class="faces faces-ent">
     <button class="face" onclick="irADespachos()">Entregas</button>
-    <button class="face" onclick="irAEntLotes()">Inventario</button>
-    <button class="face" onclick="irAReporte()">Entregas sin factura</button>
+    <button class="face" onclick="irAReporte()">Sin factura</button>
+    <button class="face" onclick="irAEntBuscar()">Historial</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
-  </div>
-  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
-    <div>
-      <div class="m3title" style="font-size:24px">Pendientes</div>
-      <div class="m3sub" style="margin-top:2px">Lo que hay que arreglar.</div>
-    </div>
-    <button class="btn btn-sm" onclick="pdCargar(true)">Recargar</button>
   </div>
   <div id="pdStatus" class="status hidden" style="margin-top:14px"></div>
   <div id="pdBody" style="margin-top:14px"></div>
@@ -1824,13 +1815,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <div id="vEntBuscar" class="hidden">
   <div class="faces faces-ent">
     <button class="face" onclick="irADespachos()">Entregas</button>
-    <button class="face" onclick="irAEntLotes()">Inventario</button>
-    <button class="face" onclick="irAReporte()">Entregas sin factura</button>
+    <button class="face" onclick="irAReporte()">Sin factura</button>
+    <button class="face on">Historial</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
-  </div>
-  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
-    <div class="m3title" style="font-size:24px">Historial</div>
-    <button class="btn btn-sm" onclick="bsCargar(true)">Recargar</button>
   </div>
   <div id="bsStatus" class="status hidden" style="margin-top:14px"></div>
   <div id="bsBody" style="margin-top:14px"></div>
@@ -1839,16 +1826,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <div id="vConteoLote" class="hidden">
   <div class="faces faces-ent">
     <button class="face" onclick="irADespachos()">Entregas</button>
-    <button class="face" onclick="irAEntLotes()">Inventario</button>
-    <button class="face" onclick="irAReporte()">Entregas sin factura</button>
+    <button class="face" onclick="irAReporte()">Sin factura</button>
+    <button class="face" onclick="irAEntBuscar()">Historial</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
-  </div>
-  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
-    <div>
-      <div class="m3title" style="font-size:24px">Conteo</div>
-      <div class="m3sub" style="margin-top:2px">Ancla los saldos por lote.</div>
-    </div>
-    <button class="btn btn-sm" id="clRecargar" onclick="cargarConteoLote(true)">Recargar lotes</button>
   </div>
   <div id="clStatus" class="status hidden" style="margin-top:14px"></div>
   <div id="clBody" style="margin-top:14px;display:none"></div>
@@ -2689,14 +2669,23 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    Reemplazan a los dos encabezados de sección apilados. El contador activo va al
    relleno lima, el mismo patrón de .pd-cnt.on y del chip del buscador: un número
    es cuántos hay, no una alerta. */
-.dp-tabs{display:flex;gap:20px;border-bottom:1px solid var(--border);margin-bottom:12px;max-width:620px}
-.dp-tab{background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;
-  padding:0 0 9px;font:inherit;font-size:14px;color:var(--text-3);cursor:pointer;
-  display:inline-flex;align-items:center;gap:7px;-webkit-tap-highlight-color:transparent}
-.dp-tab.on{color:var(--text);font-weight:600;border-bottom-color:var(--mod)}
-.dp-tab-n{font-family:var(--mono);font-size:11px;color:var(--text-3);
-  border:1px solid var(--border-strong);border-radius:999px;padding:0 6px;line-height:16px}
-.dp-tab.on .dp-tab-n{color:var(--ent-fill-tx);background:var(--ent-fill);border-color:var(--ent-fill)}
+.dp-tabs{display:flex;gap:4px;background:var(--seg-track);border-radius:11px;
+  padding:3px;margin-bottom:12px;max-width:620px}
+.dp-tab{flex:1;background:none;border:none;border-radius:8px;padding:7px 10px;
+  font:inherit;font-size:13.5px;color:var(--text-2);cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  -webkit-tap-highlight-color:transparent}
+/* ⚠️ EL INACTIVO VA EN --text-2, NO EN --text-3. Medido sobre la pista #EDEFF2:
+   --text-3 (#8B897F) da 3.05:1 y no llega al mínimo de 4.5; --text-2 da 4.55:1.
+   El tono terciario aguantaba sobre la tarjeta blanca, no sobre la pista. */
+.dp-tab.on{background:var(--panel);color:var(--text);font-weight:600;
+  /* El blanco del activo contra la pista da 1.15:1 — o sea, NADA por color solo.
+     Lo que separa al activo es la SOMBRA: se lee como una pastilla levantada, que
+     es de lo que vive un control segmentado. Sin ella el interruptor no existe. */
+  box-shadow:0 1px 2px rgba(26,26,23,.12), 0 0 0 .5px rgba(26,26,23,.05)}
+.dp-tab-n{font-family:var(--mono);font-size:11px;color:var(--text-2);
+  background:rgba(26,26,23,.06);border-radius:999px;padding:0 6px;line-height:16px}
+.dp-tab.on .dp-tab-n{color:var(--ent-fill-tx);background:var(--ent-fill)}
 .dp-lista{display:flex;flex-direction:column;gap:6px;max-width:620px}
 .dp-sep{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
   color:var(--text-3);padding-top:6px}
@@ -2710,19 +2699,21 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .dp-secc:first-child{padding-top:2px}
 .dp-secc-n{font-family:var(--mono);letter-spacing:0;font-size:11px}
 .dp-vacia{font-size:12px;color:var(--text-3);padding:2px 0 4px}
-/* La tarjeta de un PREPARADO. No es un botón entero: el botón está adentro, a la
-   derecha, porque tocar la tarjeta por accidente no puede marcar una salida. */
-.dp-prep{display:flex;align-items:center;justify-content:space-between;gap:10px;
-  border:1px solid var(--border);border-left:2px solid var(--ent-line);border-radius:10px;
-  background:var(--panel);padding:9px 10px 9px 12px}
-.dp-prep-i{display:flex;flex-direction:column;gap:2px;min-width:0}
-.dp-prep-cli{font-size:13.5px;font-weight:500;color:var(--text);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dp-prep-h{font-size:11.5px;color:var(--text-3)}
+/* La tarjeta de un PREPARADO. Nunca fue un botón entero —tocarla por accidente no
+   puede marcar una salida— y ahora comparte los TRES PISOS de `.dp-ped`: mismo
+   nombre a 15px, misma línea gris, mismas acciones abajo. Se repite el layout en
+   vez de compartir la clase a propósito: las dos usan `.vieja` con significados
+   distintos (acá "preparado ayer", allá "fuera de la ventana") y unirlas haría
+   que una regla de una pisara a la otra.
+   Lo único suyo es el filete lima de la izquierda: dice "esto ya está armado". */
+.dp-prep{display:flex;flex-direction:column;gap:7px;
+  border:1px solid var(--border);border-left:2px solid var(--ent-line);border-radius:12px;
+  background:var(--panel);padding:12px}
+.dp-prep .dp-sub{color:var(--text-3)}
 /* Anulada: gris y apagada, pero NO escondida. El producto ya está armado contra una
    factura que dejó de existir — es lo que Daniel más necesita ver, no lo que menos. */
 .dp-prep.anulada{border-left-color:var(--dim-line);background:var(--dim-bg);opacity:.72}
-.dp-prep.anulada .dp-prep-cli{color:var(--text-2)}
+.dp-prep.anulada .dp-cli{color:var(--text-2)}
 .dp-prep-anul{font-size:11.5px;line-height:1.45;color:var(--warn-2);margin-top:3px;
   white-space:normal}
 .dp-prep-nc{font-family:var(--mono);color:var(--text-3)}
@@ -2730,23 +2721,12 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* Ámbar solo lo que urge: preparado AYER o antes es lo que hay que sacar o
    devolver al congelador. Preparado hoy es normal y va en gris. */
 .dp-prep.vieja{border-left-color:var(--warn)}
-.dp-prep.vieja .dp-prep-h{color:var(--warn)}
-/* RELLENO, no contorno. El contorno era un idioma del tema oscuro, donde el lima
-   sobre negro se lee solo. En claro ese mismo lima como TEXTO da 3.10:1 sobre
-   blanco —medido— y este es justo el control que Daniel toca a las 6:30 con la
-   pantalla reflejando. Relleno lima con texto #2E3300 da 11.83:1, y es lo que la
-   paleta ya define para la acción principal. Mismo tratamiento que `.de-ok`, que
-   es la misma acción un paso más adelante: un solo botón de entregar, no dos. */
-.dp-entregar{flex:none;height:34px;padding:0 14px;border-radius:9px;
-  border:1px solid var(--ent-fill);background:var(--ent-fill);color:var(--ent-fill-tx);
-  font-family:var(--font);font-size:12.5px;font-weight:600;cursor:pointer}
-.dp-entregar:hover{filter:brightness(.96)}
-/* Deshabilitado NO es el primario con menos opacidad. Al pasar el botón a relleno
-   lima, "Anulada" quedaba como un bloque lima apagado — que a un metro sigue
-   leyéndose como el botón que hay que tocar, y acá la regla es justo la contraria.
-   Pierde el relleno y se va a gris: deja de ser una acción y pasa a ser un estado. */
-.dp-entregar:disabled{background:transparent;border-color:var(--border-strong);
-  color:var(--text-3);opacity:1;cursor:default}
+.dp-prep.vieja .dp-sub{color:var(--warn)}
+/* `.dp-entregar` vivía acá: el botón lima de la tarjeta de preparado. Lo reemplaza
+   `.dp-btn-pri`, el primario NEGRO que comparten las dos tarjetas. El lima no se
+   perdió — se mudó al PDF, que es el control que Daniel pidió poder ver, y así
+   queda UN solo acento por tarjeta en vez de dos rellenos lima compitiendo.
+   La regla del deshabilitado se mantiene y vive ahora en `.dp-btn-pri:disabled`. */
 /* El pie de entregados: una línea, no una lista. Lleva al historial. */
 /* ── Diálogo de Entregar ──────────────────────────────────────────────────
    Se abre sobre la bandeja. El cuerpo scrollea y el pie queda fijo: con seis
@@ -2819,8 +2799,8 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .de-fecha-in:disabled{opacity:.5;cursor:default}
 .dp-fecha{margin-right:auto}
 .de-btns{display:flex;gap:8px;margin-left:auto}
-/* Mismo lima y mismo borde derivado que .dp-entregar — un solo tono, sin inventar
-   intermedios. Acá va relleno porque es la acción primaria del diálogo. */
+/* Mismo lima y mismo borde derivado que el resto del módulo — un solo tono, sin
+   inventar intermedios. Acá va relleno porque es la acción primaria del diálogo. */
 .de-ok{background:var(--ent-fill);color:var(--ent-fill-tx);border:1px solid var(--ent-fill);border-radius:9px;
   height:36px;padding:0 16px;font-family:var(--font);font-size:12.5px;font-weight:600;cursor:pointer}
 .de-ok:disabled{background:transparent;color:var(--ent-line);border-color:var(--ent-line-2);opacity:.45;cursor:default}
@@ -2830,15 +2810,45 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   color:var(--text-3);cursor:pointer;font-family:var(--font)}
 .dp-hoy button:hover{color:var(--text-2)}
 .dp-hoy b{font-family:var(--mono);font-weight:500;color:var(--text-2)}
-.dp-ped{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;cursor:pointer;
-  border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:10px 12px;
+/* ── LA TARJETA, EN TRES PISOS ────────────────────────────────────────────
+   Antes era UN <button> con cuatro datos sueltos en dos renglones al mismo peso:
+   cliente, día, productos y factura, sin decir cuál se lee primero. Ahora:
+     1 · el nombre del cliente, que es lo que se busca
+     2 · una línea gris con el resto — "2 productos · factura 3502"
+     3 · las acciones, como botones de verdad
+   YA NO ES UN <button>. No puede serlo: adentro van botones reales, y un botón
+   dentro de otro es HTML inválido — el navegador lo saca del contenedor y la
+   tarjeta deja de funcionar. Es la misma razón por la que `.pdf-b` nació como
+   <span role=button>; ahora que la tarjeta es un <div>, ese span puede crecer a
+   botón grande sin romper nada. */
+.dp-ped{display:flex;flex-direction:column;gap:7px;width:100%;text-align:left;
+  border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:12px;
   color:var(--text);font:inherit}
 .dp-ped.hoy{border-color:var(--ent-line-2)}
 .dp-ped.vieja{background:transparent}
-.dp-ped.vieja .dp-cli{font-weight:400;color:var(--text-2)}
-.dp-top,.dp-bot{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.dp-cli{font-size:13.5px;font-weight:500}
-.dp-fac{font-family:var(--mono);font-size:10.5px;color:var(--text-3)}
+.dp-ped.vieja .dp-cli{color:var(--text-2)}
+.dp-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+/* Piso 1. 15px semibold: es el dato que Daniel busca en la lista. */
+.dp-cli{font-size:15px;font-weight:600;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Piso 2. Una sola línea gris, no dos datos peleando en los extremos.
+   El consecutivo va CORTO: "factura 3502" y no "0000003502" — los ceros de
+   relleno del formato de FE no son información, son formato. */
+.dp-sub{font-size:12.5px;color:var(--text-2)}
+/* Piso 3. Acciones. El primario en negro relleno; el PDF en lima relleno y
+   grande, que es el que Daniel usa en CADA entrega y pidió poder ver. */
+.dp-acc{display:flex;gap:8px;align-items:stretch}
+.dp-btn-pri{flex:1;min-height:40px;padding:0 14px;border-radius:10px;
+  border:1px solid var(--text);background:var(--text);color:var(--panel);
+  font-family:var(--font);font-size:13.5px;font-weight:600;cursor:pointer;
+  -webkit-tap-highlight-color:transparent}
+.dp-btn-pri:hover{filter:brightness(1.35)}
+/* Deshabilitado NO es el primario con menos opacidad. Un negro apagado a un metro
+   sigue leyéndose como el botón que hay que tocar, y acá la regla es la contraria:
+   pierde el relleno y se va a gris, o sea deja de ser una acción y pasa a ser un
+   estado. Es lo que hace legible el "Anulada" de una factura que ya no existe. */
+.dp-btn-pri:disabled{background:transparent;border-color:var(--border-strong);
+  color:var(--text-3);opacity:1;cursor:default;filter:none}
 /* ── El control del PDF ───────────────────────────────────────────────────
    Es un <span role=button> y no un <button> a propósito: tres de los cuatro
    lugares donde vive SON un <button> entero, y anidar botones es HTML inválido.
@@ -2874,10 +2884,15 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   color:var(--ent-fill-tx);
   cursor:pointer;white-space:nowrap;vertical-align:middle;-webkit-tap-highlight-color:transparent}
 .pdf-b:hover{background:#dff04a}
+/* GRANDE: la variante de la tarjeta. Misma píldora lima, tamaño de botón real,
+   alineada con el primario para que los dos se lean como una sola fila de
+   acciones. El chico sigue vivo donde va pegado a un texto (el diálogo y el
+   historial), que es donde un botón de 40px sería un cartel. */
+.pdf-b.grande{min-height:40px;padding:0 18px;font-size:13.5px;border-radius:10px;
+  margin-left:0;letter-spacing:.02em}
 .pdf-b.cargando{background:transparent;color:var(--text-3);
   border-color:var(--border-strong);border-style:dashed;cursor:progress}
 .pdf-b.mal{background:transparent;color:var(--warn);border-color:var(--warn-edge)}
-.dp-n{font-size:11.5px;color:var(--text-3)}
 /* Sin despacho pendiente: mismo tratamiento callado que "Anteriores sin despachar"
    —un punto menos de contraste, encabezado propio— porque tampoco es trabajo del
    día. Lo que NO se calla es el motivo: es todo lo que Andrea necesita para
@@ -3044,6 +3059,13 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .bs-fec{font-size:11px;color:var(--text-3);white-space:nowrap}
 .bs-sub{font-size:11.5px;color:var(--text-3)}
 .bs-fac{font-family:var(--mono);font-size:10.5px;color:var(--text-3)}
+/* "sin factura" NO es un consecutivo: sale de la mono y del gris de dato, y pasa
+   a texto normal en el tono de nota. Con la mono se leía como si fuera un número
+   ilegible, que es justo la confusión que este arreglo viene a sacar. */
+.bs-fac.bs-sinfac{font-family:var(--font);font-size:11px;font-style:italic}
+/* El destinatario de una salida sin cliente. Va pegado al motivo y un escalón
+   más callado: "Regalía" es el qué, el nombre es el a quién. */
+.bs-para{color:var(--text-3);font-weight:400}
 /* El detalle: el AB-RE-04 tal cual, en filas de tabla. Misma densidad que el
    resto del módulo — encabezado 11px terciario y una línea debajo. */
 .bs-det{max-width:620px;border:1px solid var(--border);border-top:none;
@@ -3566,7 +3588,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 27 ago 2026 · b48';
+const BUILD = 'v 27 ago 2026 · b50';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -8126,8 +8148,10 @@ async function rpCalcSaldos(g){
   // ⚠️ LA EXCLUSIÓN VA ACÁ Y SOLO ACÁ. En el SALDO, no en la lista de lotes: la orden
   // excluida sigue existiendo y su lote tiene que seguir apareciendo en el selector con
   // su saldo bueno. Si se filtrara en entLeerCrudo o en _entAgrupar, un lote cuya única
-  // orden esté excluida DESAPARECERÍA de la pantalla — y con el bloqueo duro de Despachos
-  // eso significa no poder despachar producto que sí está en el congelador.
+  // orden esté excluida DESAPARECERÍA de la pantalla — y un lote que no se ve es un
+  // lote que Daniel no puede elegir, o sea producto del congelador que no se puede
+  // despachar. (Este comentario decía "con el bloqueo duro"; ese bloqueo nunca se
+  // construyó, ver ENTREGAS_PENDIENTES.md §13. El motivo se sostiene sin él.)
   Object.values((g&&g.lotes)||{}).forEach(function(L){ (L.ordenes||[]).forEach(function(rec){
     if(ENT_MO_EXCLUIDAS[rec.ordenId]) return;      // ya contada en el físico del ancla
     if(rec.prodUtc && Date.parse(rec.prodUtc.replace(' ','T')+'Z')>corteMs){
@@ -8147,10 +8171,13 @@ async function rpCalcSaldos(g){
   // en pantalla no se movía. Se descubrió el 27-ago preparando la primera
   // devolución real (Mentha, 12 u que vuelven el 28-ago).
   //
-  // ⚠️ NO ES COSMÉTICO, y el archivo del esquema lo había advertido: "con el
-  // bloqueo duro de Despachos un saldo subestimado ahora IMPIDE despachar
-  // producto que sí está". Sin esta suma, el pan devuelto está en el congelador
-  // y Daniel no lo puede sacar.
+  // ⚠️ NO ES COSMÉTICO, pero OJO CON EL PORQUÉ. El archivo del esquema decía
+  // "con el bloqueo duro de Despachos un saldo subestimado ahora IMPIDE
+  // despachar producto que sí está", y eso es FALSO: el bloqueo duro nunca se
+  // construyó (§13). `_despSaldo` se usa en un solo lugar de este archivo y
+  // solo ordena y rotula — nada bloquea por saldo. La razón verdadera es más
+  // simple: sin esta suma el pan devuelto NO APARECE NUNCA. Despachar se puede
+  // igual; lo que queda mal es el número, y en silencio.
   //
   // La vista ya filtra por `recibido_en > corte`, igual que las salidas por
   // `preparado_en`: una devolución anterior al conteo ya está en el físico del
@@ -8158,8 +8185,9 @@ async function rpCalcSaldos(g){
   const {data:dev,error:eDev}=await c.from('ent_devuelto_desde_ancla').select('lote,producto_id,uds');
   // Las otras lecturas se tragan el error en silencio; ésta NO, y es por la
   // dirección del daño: si falla la de salidas el saldo queda ALTO (se ofrece
-  // de más), si falla ésta queda BAJO y el bloqueo duro impide despachar
-  // producto real. Un saldo que bloquea sin decir por qué es indepurable.
+  // de más), si falla ésta queda BAJO y esconde producto que sí está en el
+  // congelador. Un saldo que va por debajo sin decir por qué es indepurable, y
+  // desde el 27-ago no queda Excel contra el cual notarlo.
   if(eDev){ try{ console.error('[Truefie] no pude leer las devoluciones ('
     +((eDev&&eDev.message)||eDev)+'): el saldo por lote queda por DEBAJO de lo real '
     +'y Despachos puede bloquear producto que sí está.'); }catch(_){} }
@@ -8435,7 +8463,7 @@ async function despCargar(force){
   }catch(e){
     _despErr=(e&&e.message)||String(e); _despFac=[];
     _despAviso('s-err','No pude leer las facturas de Odoo: '+esc(_despErr)
-      +' — probá "Recargar". Si sigue, registrá la salida por Reporte de despacho.');
+      +' — deslizá hacia abajo para recargar. Si sigue, registrá la salida por Reporte de despacho.');
   }
   // los lotes van aparte y NO bloquean la bandeja: si fallan, se escribe el lote a mano
   despCargarLotes();
@@ -8816,13 +8844,23 @@ function despRender(){
   const viejas  =fs.filter(function(f){ return !f.enVentana; });
 
   const tarjeta=function(f,vieja){
-    return '<button class="dp-ped'+(vieja?' vieja':(f.fecha===hoy?' hoy':''))+'" onclick="despAbrir('+f.factura_id+')">'
-      +'<span class="dp-top"><span class="dp-cli">'+esc(f.cliente)+'</span>'
-      +'<span class="dp-dia'+(f.fecha===hoy?' hoy':'')+'">'+esc(_despDia(f.fecha))+'</span></span>'
-      +'<span class="dp-bot"><span class="dp-n">'+f.lineas.length
-      +(f.lineas.length===1?' producto':' productos')+'</span>'
-      +'<span class="dp-fac">'+esc(f.factura.slice(-10))+'</span>'
-      +entPdfBtn(f.factura_id, f.factura, f.cliente)+'</span></button>';
+    const n=f.lineas.length;
+    return '<div class="dp-ped'+(vieja?' vieja':(f.fecha===hoy?' hoy':''))+'">'
+      +'<div class="dp-top"><span class="dp-cli">'+esc(f.cliente)+'</span>'
+      +'<span class="dp-dia'+(f.fecha===hoy?' hoy':'')+'">'+esc(_despDia(f.fecha))+'</span></div>'
+      +'<div class="dp-sub">'+n+(n===1?' producto':' productos')
+      +' · factura '+esc(_despFacCorta(f.factura))+'</div>'
+      +'<div class="dp-acc">'
+      // ⚠️ DICE "Preparar" Y NO "Preparar y entregar" AUNQUE EL MOCKUP PEDÍA LO
+      // SEGUNDO. Este botón ABRE el pedido: no puede preparar ni entregar nada
+      // todavía, porque falta elegir de qué lote sale cada línea —sin lotes,
+      // `_despPendientes` deja el confirmar apagado—. "Preparar y entregar"
+      // existe, pero un paso más adelante, en el pie del pedido ya con los lotes
+      // puestos. Un botón que promete dos cosas y abre una pantalla es una
+      // etiqueta que miente.
+      +'<button class="dp-btn-pri" onclick="despAbrir('+f.factura_id+')">Preparar</button>'
+      +entPdfBtn(f.factura_id, f.factura, f.cliente, 'grande')
+      +'</div></div>';
   };
 
   // ── SUB-PESTAÑAS (26-ago) ─────────────────────────────────────────────
@@ -8884,16 +8922,24 @@ function despRender(){
           etiqueta='<div class="dp-prep-anul">No pude verificar la factura contra Odoo.'
             +'<br>Se registra igual y queda marcada: Andrea la revisa después.</div>';
         }
+        // MISMOS TRES PISOS que "Por preparar". Antes era una fila horizontal con
+        // el botón a la derecha: al lado de la tarjeta nueva se leían como dos
+        // módulos distintos. El primario cambia de texto según el estado, pero es
+        // el mismo botón negro en el mismo lugar.
         const btn = anulada
-          ? '<button class="dp-entregar" disabled>Anulada</button>'
-          : '<button class="dp-entregar"'+((ocupado||an===null)?' disabled':'')
+          ? '<button class="dp-btn-pri" disabled>Anulada</button>'
+          : '<button class="dp-btn-pri"'+((ocupado||an===null)?' disabled':'')
             +' onclick="despAbrirEntrega('+r.pedido_id+')">'
             +(ocupado?'Guardando…':(an===null?'Verificando…':(an.sinVerificar?'Entregar sin verificar':'Entregar')))+'</button>';
         return '<div class="dp-prep'+(vieja?' vieja':'')+(anulada?' anulada':'')+'">'
-          +'<div class="dp-prep-i"><span class="dp-prep-cli">'+esc(r.cliente_nombre||'—')+'</span>'
-          +'<span class="dp-prep-h">preparado '+esc(_despCuando(r.preparado_en))
-          +(res?(' · '+esc(res)):'')+'</span>'+etiqueta+'</div>'
-          +entPdfBtn(r.factura_id, r.factura_nombre, r.cliente_nombre)+btn+'</div>';
+          +'<div class="dp-top"><span class="dp-cli">'+esc(_entQuien(r).nombre)+'</span></div>'
+          +'<div class="dp-sub">preparado '+esc(_despCuando(r.preparado_en))
+          +(res?(' · '+esc(res)):'')
+          +(r.factura_nombre?(' · factura '+esc(_despFacCorta(r.factura_nombre))):'')+'</div>'
+          +etiqueta
+          +'<div class="dp-acc">'+btn
+          +entPdfBtn(r.factura_id, r.factura_nombre, r.cliente_nombre, 'grande')
+          +'</div></div>';
       }).join('');
     }
   }
@@ -8920,6 +8966,14 @@ function despRender(){
   body.innerHTML=h;
 }
 function despSetTab(t){ _despTab=t; despRender(); window.scrollTo(0,0); }
+// "00100001010000003502" → "3502". El consecutivo de FE son 20 dígitos: 3 de
+// sucursal + 5 de terminal + 2 de tipo + 10 de consecutivo. Los ceros a la
+// izquierda de esos 10 son relleno del formato, no información — y a 375px se
+// comen el renglón entero. Si el consecutivo fuera 0, se muestra "0" y no vacío.
+function _despFacCorta(nombre){
+  const d=String(nombre||'').replace(/\D/g,'').slice(-10).replace(/^0+/,'');
+  return d || String(nombre||'—');
+}
 function _despDia(ymd){
   const hoy=new Date(), ayer=new Date(); ayer.setDate(ayer.getDate()-1);
   if(ymd===_despYmd(hoy))  return 'hoy';
@@ -9007,7 +9061,7 @@ function despRenderPedido(body){
   // repetirlo dos veces en la misma esquina no orienta, confunde.
   let h='<button class="btn btn-sm" onclick="despCerrar()">← Volver</button>'
     +'<div class="dp-cab"><div class="dp-cab-cli">'+esc(f.cliente)+'</div>'
-    +'<div class="dp-cab-sub">'+esc(f.factura.slice(-10))
+    +'<div class="dp-cab-sub">'+esc(_despFacCorta(f.factura))
     +entPdfBtn(f.factura_id, f.factura, f.cliente)+' · '+esc(_despDia(f.fecha))+' · '
     +f.lineas.length+(f.lineas.length===1?' producto':' productos')+'</div></div>';
   h+='<div class="dp-lin">';
@@ -9418,7 +9472,7 @@ function despRenderDialogoEntrega(){
   }
 
   return _despDialogoHTML({
-    cliente: r.cliente_nombre, cuerpo: cuerpo, listo: listo, ocupado: ocupado,
+    cliente: _entQuien(r).nombre, cuerpo: cuerpo, listo: listo, ocupado: ocupado,
     sub: (r.factura_nombre?('…'+String(r.factura_nombre).slice(-4)):'sin factura')
          +' · preparado '+_despHora(r.preparado_en),
     extraCab: entPdfBtn(r.factura_id, r.factura_nombre, r.cliente_nombre),
@@ -9647,7 +9701,7 @@ function despRenderDialogoPreparar(){
     +' con cantidad distinta a la facturada.</div>';
   if(pend) cuerpo+='<div class="de-mal">'+esc(pend)+'</div>';
   return _despDialogoHTML({
-    cliente: f.cliente, cuerpo: cuerpo, listo: !pend, ocupado: _despGuardando,
+    cliente: _entQuien(f).nombre, cuerpo: cuerpo, listo: !pend, ocupado: _despGuardando,
     sub: (f.factura?('…'+String(f.factura).slice(-4)):'sin factura')
          +' · '+(entregar?'sale del congelador ahora':'queda esperando el camión'),
     fecha: _despPedFecha, setFecha: (entregar?'despSetPedFecha':''),
@@ -9933,6 +9987,40 @@ async function bsCargar(force){
 // v_ent_pedido_estado) y les cuelga `.lineas`. Muta las filas y también las devuelve.
 // Tres lecturas a Supabase, ninguna a Odoo: el diálogo tiene que abrir al instante y
 // no puede depender de que despierte el proxy.
+// ── CÓMO SE NOMBRA UNA SALIDA QUE NO TIENE CLIENTE ─────────────────────
+// UNA sola definición para todo el módulo, hermana de _entColgarDetalle y de
+// _entBucketsHTML: la regla vivía escrita SOLO adentro de Pendientes (b41) y el
+// Historial nunca la recibió. Andrea lo vio el 27-ago filtrando por el lote 208:
+// los despachos 28, 30 y 31 —las regalías del 26-ago— salían con el nombre en
+// "—", sin factura y sin PDF. Tres tarjetas que no decían absolutamente nada.
+//
+// LA CAUSA: `rpGuardar` inserta `cliente_nombre: null` cuando la salida no es
+// una venta (una regalía no tiene cliente, tiene DESTINATARIO), y cada pantalla
+// resolvía ese null por su cuenta con `||'—'`.
+//
+// LA REGLA: si un dato no aplica, se muestra el que SÍ aplica, nunca el hueco.
+// Un guión se lee como "falta un dato" cuando en realidad el dato correcto es
+// otro. Devuelve las dos partes por separado para que cada pantalla las arme
+// con su propia tipografía en vez de recibir HTML cocinado.
+const ENT_MOTIVO_N={regalia:'Regalía', reposicion:'Reposición',
+                    consumo_interno:'Consumo interno', degustacion:'Degustación',
+                    venta:'Venta', sin_clasificar:'Sin clasificar'};
+function _entQuien(o){
+  o=o||{};
+  const cli=(o.cliente_nombre||o.cliente||'').trim();
+  if(cli) return {nombre:cli, para:''};
+  const m=ENT_MOTIVO_N[o.motivo]||o.motivo||'Salida sin clasificar';
+  return {nombre:m, para:(o.destinatario||'').trim()};
+}
+// Y el rótulo de dónde iría el número de factura. Una salida sin factura no
+// tiene un número que esconder: tiene un motivo. Decir "sin factura" ahí es
+// información —explica por qué no hay PDF— y el hueco no lo era.
+function _entFacRotulo(o){
+  o=o||{};
+  if(o.factura_nombre) return _despFacCorta(o.factura_nombre);
+  return 'sin factura';
+}
+
 async function _entColgarDetalle(c, P){
   P=P||[]; if(!P.length) return P;
   const alis=P.map(function(p){ return p.alisto_id; }).filter(Boolean);
@@ -9983,7 +10071,21 @@ async function bsLeer(){
            +'alisto_id,responsable,preparado_en,salida_en,salida_registrada_en,estado,fecha_ab_re_04')
     .order('fecha_ab_re_04',{ascending:false}).limit(300);
   if(e1) throw e1;
-  return await _entColgarDetalle(c, peds||[]);
+  const P=peds||[];
+  // EL DESTINATARIO, de `ent_pedido`. `v_ent_pedido_estado` no lo expone y sin él
+  // una regalía se muestra como "Regalía" a secas, sin decir a quién — que es la
+  // mitad del dato. Se lee acá y no en la vista a propósito: cambiar la vista
+  // obliga a pegar SQL y a publicar juntas dos cosas que no dependen una de otra.
+  // Si falla, la pantalla sigue: se pierde el "para X", no la fila.
+  try{
+    const ids=P.map(function(x){ return x.pedido_id; }).filter(Boolean);
+    if(ids.length){
+      const {data:dst}=await c.from('ent_pedido').select('id,destinatario').in('id',ids);
+      const D={}; (dst||[]).forEach(function(x){ D[x.id]=x.destinatario; });
+      P.forEach(function(x){ x.destinatario=D[x.pedido_id]||''; });
+    }
+  }catch(e){}
+  return await _entColgarDetalle(c, P);
 }
 
 // Sin tildes y en minúscula: "Automercado" tiene que encontrarse escribiendo
@@ -10037,7 +10139,13 @@ function bsFiltrar(){
     && _despDiaDe(p.salida_registrada_en||p.salida_en)===_bsReg; });
   if(q){
     rs=rs.filter(function(p){
-      if(_bsCampo==='cliente')  return _bsNorm(p.cliente_nombre).indexOf(q)>=0;
+      // BUSCA POR LO QUE LA FILA MUESTRA, no por la columna. Estas filas dicen
+      // "Regalía para una escuela" y filtrando solo por `cliente_nombre`
+      // —que en una salida sin cliente es null— no se encontraban escribiendo ni
+      // "Escuela" ni "Regalía". Un buscador que no encuentra lo que la pantalla
+      // muestra es el mismo hueco del guión, un paso más adelante.
+      if(_bsCampo==='cliente'){ const w=_entQuien(p);
+        return _bsNorm(w.nombre+' '+w.para).indexOf(q)>=0; }
       if(_bsCampo==='fecha')    return _despDiaDe(p.fecha_ab_re_04)===_bsQ;
       if(_bsCampo==='lote')     return (p.lineas||[]).some(function(l){
         return (l.lotes||[]).some(function(x){ return _bsNorm(x.lote).indexOf(q)>=0; }); });
@@ -10056,12 +10164,15 @@ function bsFiltrar(){
     const cuando = p.estado==='entregado'
       ? _despCuandoSalida(p.salida_en, p.salida_registrada_en)
       : _despCuando(p.preparado_en);
+    const q=_entQuien(p);
     return '<button class="bs-fila'+(ab?' on':'')+'" onclick="bsAbrir('+p.pedido_id+')">'
-      +'<span class="bs-f1"><span class="bs-cli">'+esc(p.cliente_nombre||'—')+'</span>'
+      +'<span class="bs-f1"><span class="bs-cli">'+esc(q.nombre)
+      +(q.para?('<span class="bs-para"> para '+esc(q.para)+'</span>'):'')+'</span>'
       +'<span class="bs-fec">'+esc(cuando)+'</span></span>'
       +'<span class="bs-f2"><span class="bs-sub">'+n+(n===1?' producto':' productos')
       +(p.estado==='preparado'?' · preparado, sin salir':'')+'</span>'
-      +'<span class="bs-fac">'+esc((p.factura_nombre||'').slice(-10))+'</span>'
+      +'<span class="bs-fac'+(p.factura_nombre?'':' bs-sinfac')+'">'
+      +esc(_entFacRotulo(p))+'</span>'
       +entPdfBtn(p.factura_id, p.factura_nombre, p.cliente_nombre)+'</span></button>'
       +(ab?bsDetalle(p):'');
   }).join('');
@@ -10106,8 +10217,8 @@ function bsDetalle(p){
     +'Preparó '+esc(p.responsable||'—')+' · preparado '+esc(_despCuando(p.preparado_en))
     +(p.salida_en ? ' · salió '+esc(_despCuandoSalida(p.salida_en, p.salida_registrada_en))
                   : ' · sin salida registrada')
-    +(p.factura_nombre?' · factura '+esc(p.factura_nombre):'')
-    +(p.motivo&&p.motivo!=='venta'?' · '+esc(p.motivo.replace(/_/g,' ')):'')
+    +' · '+esc(p.factura_nombre?('factura '+_despFacCorta(p.factura_nombre)):'sin factura')
+    +(p.motivo&&p.motivo!=='venta'?' · '+esc((ENT_MOTIVO_N[p.motivo]||p.motivo).toLowerCase()):'')
     +'</div></div>';
   return h;
 }
@@ -10613,7 +10724,7 @@ async function pdLeer(){
       .select('salida_id,estado,salida_en,cliente_nombre,factura_nombre,detalle').limit(50);
     l4=(sv||[]).map(function(x){
       const dias=Math.floor((Date.now()-Date.parse(x.salida_en))/86400000);
-      return {id:x.salida_id, estado:x.estado, cliente:x.cliente_nombre||'—',
+      return {id:x.salida_id, estado:x.estado, cliente:_entQuien(x).nombre,
               fecha:String(x.salida_en||'').slice(0,10), dias:dias,
               factura:x.factura_nombre||'', detalle:x.detalle||''};
     });
@@ -10625,14 +10736,12 @@ async function pdLeer(){
 // Antes se dibujaba `esc(it.cliente)` a secas y esas filas salían con la celda en
 // blanco — un hueco que no dice nada y que encima se lee como "falta un dato".
 // Regla: si un dato no aplica, se muestra el que SÍ aplica, nunca el hueco.
-const PD_MOTIVO_N={regalia:'Regalía', reposicion:'Reposición',
-                   consumo_interno:'Consumo interno', degustacion:'Degustación',
-                   venta:'Venta', sin_clasificar:'Sin clasificar'};
+// Pendientes fue la primera pantalla que tuvo esta regla (b41) y ahora la TOMA
+// PRESTADA en vez de tener la suya: era la copia que se desincronizó — el
+// Historial nació sin ella. Se conserva exactamente la misma salida visual.
 function _pdQuien(it){
-  if(it.cliente) return esc(it.cliente);
-  const m=PD_MOTIVO_N[it.motivo]||it.motivo||'Salida sin clasificar';
-  const d=(it.destinatario||'').trim();
-  return esc(m)+(d?(' <span class="pd-para">para '+esc(d)+'</span>'):'');
+  const q=_entQuien(it);
+  return esc(q.nombre)+(q.para?(' <span class="pd-para">para '+esc(q.para)+'</span>'):'');
 }
 // FECHA RELATIVA, y la exacta SOLO si no es de esta semana. "Fecha" y "Hace" eran
 // dos columnas diciendo casi lo mismo; lo que se pregunta mirando esta lista es

@@ -46,6 +46,40 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
   - Consecuencia de diseño, más fuerte que antes: **la emergencia se resuelve
     DENTRO de Truefie, con rastro** (registrar y marcar), y nunca empujando a
     Daniel al papel. Ahora el papel ya no está.
+- **Una regla de PRESENTACIÓN escrita por pantalla se desincroniza.** Si el mismo
+  dato se dibuja en más de una vista, la regla de cómo se dibuja vive en UNA
+  función compartida, como `_entBucketsHTML` o `_entColgarDetalle`. No es estilo:
+  es que la segunda copia nunca recibe el arreglo de la primera.
+  **El caso (27-ago-2026)**: b41 arregló en Pendientes el renglón en blanco de
+  las salidas sin cliente —una regalía no tiene cliente, tiene MOTIVO y
+  destinatario— con la regla *"si un dato no aplica, se muestra el que SÍ aplica,
+  nunca el hueco"*. Pero la regla quedó escrita **adentro** de Pendientes, y el
+  Historial siguió resolviendo el null por su cuenta con `||'—'`. Andrea lo vio
+  el 27-ago filtrando por lote: tres tarjetas con "—", sin factura y sin PDF, que
+  no decían nada. **Mismo bug, otra pantalla, seis días después.** Al unificarlo
+  aparecieron cuatro lugares más con el mismo `||'—'` y un quinto derivado: el
+  buscador filtraba por `cliente_nombre`, así que la fila **mostraba** "Regalía
+  para una escuela" y no se encontraba escribiendo "escuela".
+  **Cómo se evita**: al arreglar cómo se muestra algo, `grep` del campo en todo
+  el archivo antes de tocar una sola vista. Si aparece en dos, el arreglo es una
+  función, no un parche.
+- **Una salvaguarda CITADA no es una salvaguarda VERIFICADA.** Antes de afirmar
+  que el sistema impide algo —un bloqueo, un candado, una validación— hay que ir
+  a verlo en el código. Un `grep` del nombre de la variable alcanza; leer otro
+  documento que lo afirma, no.
+  **El caso (27-ago-2026)**: el "bloqueo duro de Despachos" —que impediría
+  despachar de un lote sin saldo— se diseñó y se aprobó como parte de la Entrega
+  2, y **nunca se construyó**. `ENTREGAS_PENDIENTES.md` §4 lo decía correctamente
+  el 25-ago (*"b27 no tiene bloqueo duro, así que un sobregiro habría pasado en
+  silencio"*), pero a partir del 20-ago los documentos empezaron a nombrarlo **en
+  presente** y la frase se propagó a **seis lugares en una semana** —incluidos
+  este archivo, un comentario de `index.html` y un mensaje de commit— sin que
+  nadie volviera al código. Se descubrió recién al preguntar "¿cómo pasó el
+  bloqueo duro?" ante un lote en −4: no lo pasó, no existía.
+  `_despSaldo` se lee en **un solo lugar** de `index.html`, y solo para ordenar y
+  rotular. Bastaba un `grep` en cualquier momento de esa semana.
+  **Cómo se evita**: al citar una salvaguarda, nombrar la función o la variable
+  que la implementa. Si no se puede nombrar, no se puede citar.
 - **Cambios visuales no tocan lógica probada**: conservar ids/handlers,
   revalidar sintaxis al final. Al cambiar ids de contenedores, buscar TODOS los
   `getElementById` que los referencian.
@@ -179,8 +213,12 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
   ⚠️ **La exclusión se aplica SOLO en la suma del saldo (`rpCalcSaldos`), nunca en
   `entLeerCrudo` ni en `_entAgrupar`.** Medido el 20-ago: `WH/MO/01411` es la
   **única** orden del lote `226 / 2-27`, así que filtrarla antes lo haría
-  desaparecer del selector — y con el bloqueo duro de Despachos eso es no poder
-  despachar producto que sí está en el congelador.
+  desaparecer del selector — y un lote que no se ve es producto del congelador que
+  Daniel no puede elegir.
+  ⚠️ **Este párrafo decía "con el bloqueo duro de Despachos". ESO ERA FALSO**: el
+  bloqueo duro se aprobó como parte de la Entrega 2 y **nunca se construyó** (ver
+  `ENTREGAS_PENDIENTES.md` §13). Hoy un sobregiro desde la pantalla es posible y
+  silencioso. El motivo de arriba se sostiene igual sin la salvaguarda inventada.
   - Entonces, **por qué `date_start` igual**: por los MOs `done` con
     `date_finished` vacío o planeado a futuro (que el filtro por `date_finished`
     excluía), y por la ventana juliana de abajo. No por el doble conteo.
