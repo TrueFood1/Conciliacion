@@ -59,7 +59,7 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
   no decían nada. **Mismo bug, otra pantalla, seis días después.** Al unificarlo
   aparecieron cuatro lugares más con el mismo `||'—'` y un quinto derivado: el
   buscador filtraba por `cliente_nombre`, así que la fila **mostraba** "Regalía
-  para Escuela de Santa Ana" y no se encontraba escribiendo "Escuela".
+  para una escuela" y no se encontraba escribiendo "escuela".
   **Cómo se evita**: al arreglar cómo se muestra algo, `grep` del campo en todo
   el archivo antes de tocar una sola vista. Si aparece en dos, el arreglo es una
   función, no un parche.
