@@ -338,6 +338,26 @@ Productos terminados (IDs de producción):
 | Pizza | 472 | Paquete de 2 | 6 paq = 12 u | 20 u |
 | Galletas (Cookie Dough) | 519 | Units | 12 potes | 160 u |
 
+- **"uds" EN LA LETRA DE DANIEL NO SIEMPRE SON UNIDADES SUELTAS** (confirmado por
+  Andrea y Daniel, 28-ago-2026). Cuando Daniel escribe "uds" en su Excel o en el
+  conteo físico:
+  · **Pan Francés, Buns y Pizza → PAQUETES VENDIBLES** (de **4**, **4** y **2**
+    unidades respectivamente). Nunca panes sueltos.
+  · **Pan Blanco, Semillas y Galletas → unidades sueltas.**
+  Un "24 uds" de Francés son **24 paquetes = 96 unidades**, no 24 panes. Leerlo
+  mal descuenta 4× de menos.
+  ⚠️ **NO es lo mismo que la UoM de Odoo, aunque coincida el número.** Odoo llama
+  `Dozens` a la UoM de Francés y Buns —con `factor 0.25`, o sea **4**, no 12— y
+  `Paquete de 2` a la de Pizza. Que los dos den 4/4/2 es una coincidencia
+  afortunada, no una equivalencia: uno es cómo escribe una persona, el otro es un
+  campo de la base. Si alguna vez se separan, mandan cosas distintas. Para leer a
+  Daniel se usa esta regla; para leer a Odoo se usa `product_uom_id` → `factor`
+  (ver "UoM — NUNCA leer el nombre, SIEMPRE el id" arriba).
+  **Dónde vive en el código**: `NIV_INFO[pid].presDiv` (4/4/2) y `.cajaU`, y
+  `INV_TERM`. `rpUdsDe()` convierte con eso. Blanco/Semillas/Galletas tienen
+  `presDiv 1`, así que **un error de escala NO se nota en ellos** — no sirven
+  para descartar (auditoría del 28-ago).
+
 - **Batch = la receta base del BoM, NO una orden de producción.** Un MO puede
   ser varios batches: batches = unidades ÷ tamaño de batch (Blanco 63 = 3×21).
   Los batches/día son variables — no asumir una capacidad fija.
