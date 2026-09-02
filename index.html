@@ -2902,9 +2902,13 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .dp-nd-t{font-size:13.5px;color:var(--text-2);line-height:1.35}
 .dp-nd-f{font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:2px}
 .dp-nd-m{font-size:11.5px;color:var(--text-3);margin:3px 0 8px;line-height:1.45}
-.dp-dia{font-size:9.5px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;
-  padding:1px 7px;border-radius:999px;border:1px solid var(--border-strong);color:var(--text-3)}
-.dp-dia.hoy{color:var(--ent-fill-tx);background:var(--ent-fill);border-color:var(--ent-fill)}
+/* El día vive DENTRO de la línea gris (piso 2), no como píldora arriba a la derecha:
+   ahí le comía el ancho al nombre del cliente. Como es un dato más de esa línea,
+   toma su misma letra — una píldora de 9,5px incrustada en un renglón de 12,5px se
+   lee como un adorno. Lo único que sigue destacando es HOY, y con color, no con
+   relleno: en la lista de despachos el resto de los días son contexto. */
+.dp-dia{font-size:inherit;font-weight:500;color:var(--text-2)}
+.dp-dia.hoy{color:var(--ent-fill);font-weight:600}
 /* Lo anterior a la ventana no compite: encabezado propio, gris, y un punto menos
    de contraste. La regla es que nada desaparece, no que todo grite igual. */
 .dp-antes{margin-top:8px;border-top:1px solid var(--border);padding-top:9px;
@@ -3588,7 +3592,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 27 ago 2026 · b50';
+const BUILD = 'v 2 sep 2026 · b51';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -7928,7 +7932,12 @@ function _clRecalc(inp){
   const pie=document.getElementById('clPie'+pid);
   if(pie) pie.innerHTML=esc((NIV_INFO[pid]&&NIV_INFO[pid].nom)||pid)+' · contado hasta ahora <strong>'+_clFmtTot(pid,tp)+'</strong>'+_clCuadre(pid,tp);
   const cab=tr.closest('.cl-prod'); const tot=cab&&cab.querySelector('.cl-tot');
-  if(tot){ tot.textContent = tp ? _clFmtTot(pid,tp) : '—'; tot.classList.toggle('hay', !!tp); }
+  // innerHTML, NO textContent: _clFmtTot() devuelve HTML (el <span class="cl-tot-u">
+  // de las unidades). Con textContent la cabecera imprimía el marcado crudo
+  // —"10 cj <span class="cl-tot-u">60 u</span>"— y el número quedaba enterrado ahí
+  // adentro: se leía como que el total no se había actualizado. El pie, dos líneas
+  // arriba, siempre usó innerHTML con la misma función; ahora dicen lo mismo.
+  if(tot){ tot.innerHTML = tp ? _clFmtTot(pid,tp) : '—'; tot.classList.toggle('hay', !!tp); }
   _clTotales();
 }
 
@@ -8043,6 +8052,19 @@ function _clAgregar(pid){
   if(!cn && !confirm('No pude leer "'+crudo+'" como lote; la forma es "154 / 12-26". Lo guardo tal cual, '
                     +'pero así no cruza con ningún lote de Odoo.\n\n¿Lo dejo igual?')) return;
   const canon=cn||crudo;
+  // ⚠️ SI EL LOTE YA ESTÁ EN LA LISTA, NO SE AGREGA OTRA VEZ. Agregarlo dibujaba
+  // DOS filas del mismo lote apuntando a la MISMA clave de _clVal: se escribía en
+  // una y la otra se quedaba en blanco con "—" en unidades. Contando con guantes
+  // eso se lee como que el dato no entró, cuando sí había entrado. El total y lo
+  // que se guarda siempre estuvieron bien; lo que estaba mal era la pantalla.
+  const yaEsta=Object.values((_clLotes&&_clLotes.lotes)||{})
+    .some(function(L){ return +L.producto===+pid && L.canon===canon; });
+  if(yaEsta){
+    _clProdAbierto=pid; _clRender();
+    alert('El lote '+canon+' ya está en la lista de '+((NIV_INFO[pid]&&NIV_INFO[pid].nom)||pid)
+         +'. Anotalo en esa fila.');
+    return;
+  }
   _clExtra[pid]=_clExtra[pid]||[];
   if(_clExtra[pid].indexOf(canon)<0) _clExtra[pid].push(canon);
   _clProdAbierto=pid;
@@ -8845,11 +8867,16 @@ function despRender(){
 
   const tarjeta=function(f,vieja){
     const n=f.lineas.length;
+    // ⚠️ LA FECHA BAJÓ AL PISO 2. Vivía arriba a la derecha, dentro de `.dp-top`,
+    // peleándole el ancho al nombre del cliente: `.dp-cli` corta con ellipsis, así
+    // que en un nombre largo la píldora del día se comía justo el dato que Daniel
+    // busca en la lista. El día es contexto, no identidad — va con el resto del
+    // contexto en la línea gris: "2 productos · factura 3502 · mié 26".
     return '<div class="dp-ped'+(vieja?' vieja':(f.fecha===hoy?' hoy':''))+'">'
-      +'<div class="dp-top"><span class="dp-cli">'+esc(f.cliente)+'</span>'
-      +'<span class="dp-dia'+(f.fecha===hoy?' hoy':'')+'">'+esc(_despDia(f.fecha))+'</span></div>'
+      +'<div class="dp-top"><span class="dp-cli">'+esc(f.cliente)+'</span></div>'
       +'<div class="dp-sub">'+n+(n===1?' producto':' productos')
-      +' · factura '+esc(_despFacCorta(f.factura))+'</div>'
+      +' · factura '+esc(_despFacCorta(f.factura))
+      +' · <span class="dp-dia'+(f.fecha===hoy?' hoy':'')+'">'+esc(_despDia(f.fecha))+'</span></div>'
       +'<div class="dp-acc">'
       // ⚠️ DICE "Preparar" Y NO "Preparar y entregar" AUNQUE EL MOCKUP PEDÍA LO
       // SEGUNDO. Este botón ABRE el pedido: no puede preparar ni entregar nada
@@ -8948,7 +8975,7 @@ function despRender(){
   // Las "Facturas sin despacho pendiente" ya NO viven acá (26-ago): se mudaron a
   // Pendientes. Despachos es la pantalla de TRABAJO —lo que hay que sacar del
   // congelador— y algo que no hay que despachar no es trabajo, es ruido al lado
-  // de lo que sí. En Pendientes están junto a "sin validar en Odoo" y "sin
+  // de lo que sí. En Pendientes están junto a "sin marcar como validado" y "sin
   // factura vinculada", que es la pantalla de cosas por revisar. No se eliminó
   // nada: el motivo por fila y el botón "Despachar igual" siguen enteros.
 
@@ -9859,16 +9886,34 @@ function _lotCmp(a,z){ const A=_lotOrden(a), Z=_lotOrden(z);
 // uds → "7 cj" / "20 cj + 4 u" / "—". El factor sale de INV_TERM, la misma
 // tabla de caja física que usa el resto del sistema (se lee ACÁ ADENTRO y no en
 // un const de arriba: INV_TERM se declara al final del bloque).
+// Número en unidad de manejo: hasta 3 decimales y SIN redondear a entero.
+// "−0,75 paq" son 3 panes de un paquete de 4; "−1 paq" sería otra cosa.
+function _lotNum(n){ return (Math.round((Number(n)||0)*1000)/1000)
+  .toLocaleString('es-CR',{minimumFractionDigits:0, maximumFractionDigits:3}); }
+// ── LA UNIDAD DE MANEJO, EN UN SOLO LUGAR ────────────────────────────────
+// Francés, Buns y Pizza viven empacados (paquetes de 4, 4 y 2): nadie los cuenta
+// ni los mueve en panes sueltos. Blanco, Semillas y Galletas sí van por unidad.
+// Sale de `presDiv` de INV_TERM — la MISMA tabla que usan Conteo e Inventario,
+// no una segunda lista que se desincronice.
+function _lotUds(uds, pid){
+  const t=(typeof INV_TERM!=='undefined') ? INV_TERM.find(function(x){ return x.id===pid; }) : null;
+  const d=(t&&t.presDiv)||1;
+  return (d>1) ? (_lotNum(uds/d)+' paq') : (_lotNum(uds)+' u');
+}
 function _lotCajas(uds, pid){
   const t=(typeof INV_TERM!=='undefined') ? INV_TERM.find(function(x){ return x.id===pid; }) : null;
   const f=t&&t.factor;
   if(uds===0) return '—';                       // el guión es CERO, y solo cero
   // Un negativo NO se dibuja en cajas —no existe media caja negativa— pero tampoco
   // puede caer en el guión: "—" se lee como "nada" y esto es "bajo cero", que es
-  // una anomalía que hay que ver. Va en unidades, que es como se entiende.
-  if(!f || uds<0 || uds<f) return _rzN(uds)+' u';
+  // una anomalía que hay que ver.
+  // ⚠️ VA EN UNIDAD DE MANEJO, NO EN UNIDADES SUELTAS. Antes decía `_rzN(uds)+' u'`:
+  // para Francés/Buns un "−4 u" son −1 paquete, y para Pizza −2 paquetes. Leído como
+  // panes sueltos, el faltante se lee 4× o 2× más chico de lo que es — justo en el
+  // renglón que existe para que un saldo bajo cero se vea.
+  if(!f || uds<0 || uds<f) return _lotUds(uds, pid);
   const cj=Math.floor(uds/f), r=Math.round((uds-cj*f)*1000)/1000;
-  return _rzN(cj)+' cj'+(r?(' + '+_rzN(r)+' u'):'');
+  return _rzN(cj)+' cj'+(r?(' + '+_lotUds(r,pid)):'');
 }
 function _lotNom(pid){ const t=(typeof INV_TERM!=='undefined')
   ? INV_TERM.find(function(x){ return x.id===pid; }) : null; return (t&&t.label)||('#'+pid); }
@@ -9902,13 +9947,13 @@ function lotRender(){
     if(!ls.length) return;
     const tot=ls.reduce(function(n,x){ return n+x.uds; },0);
     h+='<div class="el-prod"><div class="el-prod-h"><span>'+esc(_lotNom(pid))+'</span>'
-      +'<span class="el-prod-n">'+esc(_lotCajas(tot,pid))+' · '+_rzN(tot)+' u</span></div>';
+      +'<span class="el-prod-n">'+esc(_lotCajas(tot,pid))+' · '+esc(_lotUds(tot,pid))+'</span></div>';
     ls.forEach(function(x){
       // Los CEROS se quedan en su lugar FIFO, en gris. El selector los manda al
       // fondo porque ahí se ELIGE; acá se LEE, y mover una fila cambia el orden
       // de entrada al congelador, que es la información.
       const cero=(x.uds===0), neg=(x.uds<0);
-      const cj=_lotCajas(x.uds,pid), u=_rzN(x.uds)+' u';
+      const cj=_lotCajas(x.uds,pid), u=_lotUds(x.uds,pid);
       // El renglón queda listo para abrir el detalle por (producto, lote) más
       // adelante: lleva las dos claves. NO lleva chevron ni onclick — un control
       // que no hace nada es peor que no tenerlo.
@@ -10570,7 +10615,7 @@ async function rpGuardar(){
 
 // ════════════════════════════════════════════════════════════════════════
 // PENDIENTES — la vista de control. Tres listas con contador propio:
-//   1 entregado en Truefie sin validar en Odoo · 2 venta sin factura vinculada ·
+//   1 entregado en Truefie sin marcar como validado · 2 venta sin factura vinculada ·
 //   3 salida sin clasificar. Cada cierre es un INSERT.
 // ════════════════════════════════════════════════════════════════════════
 let _pd=null, _pdErr='', _pdFacs={};
@@ -10788,7 +10833,7 @@ function pdRender(){
   //                            Rompe el saldo, de donde cuelga todo lo demás.
   //   2 · sin despachar 3+ d → hay un cliente esperando. Lo único con alguien afuera.
   //   3 · sin clasificar     → salió producto y no se sabe qué fue.
-  //   4 · sin validar        → Truefie y Odoo no dicen lo mismo. Contable.
+  //   4 · sin marcar         → se entregó y nadie confirmó la validación. Contable.
   //   5 · sin despacho pend. → revisión, ya resuelta con sus botones.
   // DESCARTADO A PROPÓSITO: avisar de lotes por agotarse. Un saldo bajo no es un
   // problema, es información — Andrea ya sabe cuánto producir. No va acá.
@@ -10829,7 +10874,11 @@ function pdRender(){
   h+=secc('Salida sin clasificar',
     'Daniel registró la salida; falta que las socias digan qué fue. El pendiente es un estado con nombre, no un hueco.',
     _pd.l3, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdClasifUI('+it.id+')">Clasificar</button>'; });
-  h+=secc('Entregado en Truefie, sin validar en Odoo',
+  // El rótulo NO dice "sin validar en Odoo": la lista no sabe nada de Odoo. Lo que
+  // sabe es que nadie tocó el botón "Ya validé" — la marca a mano. Decir "sin validar
+  // en Odoo" prometía un dato que Truefie no lee, y una fila podía estar validada en
+  // Odoo y seguir apareciendo acá. "Sin marcar como validado" es lo que de verdad mide.
+  h+=secc('Entregado en Truefie, sin marcar como validado',
     'Andrea valida la entrega en Odoo a mano (fase 1) y la marca acá. Si esta lista se cierra sola durante semanas, ésa es la evidencia para la escritura automática.',
     _pd.l1, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdValidar('+it.id+')">Ya validé</button>'; });
   h+=secc('Salida de venta, sin factura vinculada',
@@ -12144,7 +12193,7 @@ function cnRecMP(pid){
   const dot=document.getElementById('cn-mdot'+pid); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
   const sub=document.getElementById('cn-msub'+pid);
   if(sub) sub.textContent=_cnSub(fmtN(fis)+' '+m.uom, fmtN(m.qty)+' '+m.uom, vacio);
-  if(de){ de.textContent=vacio?'—':fmtDiff(diff)+' '+m.uom; de.className='cn-diff r '+(vacio?'':s.cls); }
+  if(de){ de.textContent=vacio?'—':_cnDifTxt(diff, m.uom, s.cls==='cn-ok'); de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
   cnResumen();
 }
@@ -12156,7 +12205,7 @@ function cnRecPremez(id){
   const dot=document.getElementById('cn-pdot'+id); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
   const sub=document.getElementById('cn-psub'+id);
   if(sub) sub.textContent=_cnSub(fmtN(fis)+' batches', fmtN(p.odoo)+' batches', vacio);
-  if(de){ de.textContent=vacio?'—':fmtDiff(diff)+' batch'; de.className='cn-diff r '+(vacio?'':s.cls); }
+  if(de){ de.textContent=vacio?'—':_cnDifTxt(diff, 'batch', s.cls==='cn-ok'); de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
   cnResumen();
 }
@@ -12166,11 +12215,36 @@ function _cnVentaTxt(t, uds){
   if(t.presDiv>1) return fmtN(uds/t.presDiv)+' '+t.venta;
   return fmtN(uds)+' u';
 }
-// Texto de la DIFERENCIA en la unidad de venta. Por paquete → paquetes (fraccionado si no llena uno);
-// resto → unidades. El semáforo se evalúa aparte (en unidad de venta), no depende de este texto.
-function _cnDiffTxt(t, diff){
-  if(t.presDiv>1) return fmtDiff(diff/t.presDiv)+' paq';
-  return fmtDiff(diff)+' u';
+// Número de una diferencia: hasta 3 decimales, sin ceros de relleno y SIN redondear
+// a entero. "0,75 paq" son tres panes de un paquete de cuatro; decir "1 paq" miente
+// sobre lo que hay en el congelador.
+const _cnNum = n => (Math.round((Number(n)||0)*1000)/1000)
+  .toLocaleString('es-CR',{minimumFractionDigits:0, maximumFractionDigits:3});
+
+// ── LA DIFERENCIA SE DICE, NO SE PINTA ───────────────────────────────────
+// Antes la celda mostraba "+4" en rojo y había que traducir el signo: ¿+4 es que
+// sobran cuatro o que Odoo tiene cuatro de más? Ahora lo dice: "sobran 4 paq" /
+// "faltan 4 paq" / "cuadra". El color queda de refuerzo; la palabra es el dato.
+//
+// ⚠️ "cuadra" ES LA MISMA DEFINICIÓN QUE USA EL CONTADOR DE DESCUADRES. Ese era el
+// bug del "3 descuadres" con 4 filas a la vista: `cnResumen()` cuenta una fila como
+// descuadre cuando |diferencia| > tol.verde, pero la celda mostraba el número igual
+// aunque estuviera DENTRO de la tolerancia. Una fila de terminado con 1 unidad de
+// diferencia (tol.verde = 1) se veía como "+1 u" —o sea, como un descuadre— y no se
+// contaba. Cuatro filas con número, tres contadas. Ahora una fila dice "cuadra"
+// exactamente cuando el contador no la cuenta, así que los dos números no pueden
+// separarse: la fuente de la verdad es `sem3()`, para los dos.
+function _cnDifTxt(cant, unidad, cuadra){
+  if(cuadra) return 'cuadra';
+  const n=Number(cant)||0;
+  if(n===0) return 'cuadra';
+  return (n>0?'sobran ':'faltan ')+_cnNum(Math.abs(n))+' '+unidad;
+}
+// Diferencia de un terminado, en la unidad en que se CONTÓ: paquetes para
+// Francés/Buns/Pizza, unidades para Blanco/Semillas/Galletas.
+function _cnDiffTxt(t, diff, cuadra){
+  if(t.presDiv>1) return _cnDifTxt(diff/t.presDiv, 'paq', cuadra);
+  return _cnDifTxt(diff, 'u', cuadra);
 }
 function cnRecTerm(id){
   const t=_cnTerm.find(x=>x.id===id); if(!t)return;
@@ -12184,21 +12258,36 @@ function cnRecTerm(id){
   const sub=document.getElementById('cn-tsub'+id);
   if(sub) sub.textContent=_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio);
   if(to){ to.textContent=vacio?'':'= '+_cnVentaTxt(t,fis); }
-  if(de){ de.textContent=vacio?'—':_cnDiffTxt(t,diff); de.className='cn-diff r '+(vacio?'':s.cls); }
+  if(de){ de.textContent=vacio?'—':_cnDiffTxt(t,diff,s.cls==='cn-ok'); de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
   cnResumen();
 }
 
+// ⚠️ POR QUÉ DECÍA "3 DESCUADRES" CON 4 FILAS A LA VISTA (2-sep).
+// La regla estaba escrita DOS veces: cada fila pintaba su color con `sem3()`, y este
+// contador repetía el umbral a mano (`Math.abs(dif) > tol.verde`). Las dos copias
+// coincidían en el número, pero no en lo que se VEÍA: la celda de diferencia mostraba
+// el número siempre, estuviera o no dentro de la tolerancia. Una fila de terminado con
+// 1 unidad de diferencia (tol.verde = 1) se leía como descuadre —tenía un número— y no
+// se contaba como tal. Cuatro filas con número, tres contadas.
+// Se arregla por los dos lados: la celda ahora dice "cuadra" cuando está dentro de la
+// tolerancia (ver `_cnDifTxt`), y el contador pregunta por `sem3()` en vez de repetir
+// el umbral. Una sola fuente: una fila es descuadre si y solo si su celda no dice
+// "cuadra". Los dos números ya no se pueden separar.
 function cnResumen(){
+  const d=cnDraft();          // UNA lectura de localStorage, no una por fila
   let desc=0, sin=0;
-  for(const m of _cnMP){ const dr=(cnDraft().mp||{})[m.pid]||{}; const {fis,vacio}=fisicoMP(m,dr);
-    if(vacio){ sin++; continue; } if(Math.abs(fis-m.qty)>_tolMP(m).verde) desc++; }
-  for(const p of _cnPremez){ const dr=(cnDraft().premez||{})[p.id]; const vacio=(dr==null||dr==='');
-    if(vacio){ sin++; continue; } if(Math.abs(_crDec(dr)-p.odoo)>CONTEO_TOL.term.verde) desc++; }
-  for(const t of _cnTerm){ const dr=(cnDraft().term||{})[t.id]||{};
+  const contar=function(diff, tol, vacio){
+    if(vacio){ sin++; return; }
+    if(sem3(diff,tol,vacio).cls!=='cn-ok') desc++;
+  };
+  for(const m of _cnMP){ const dr=(d.mp||{})[m.pid]||{}; const {fis,vacio}=fisicoMP(m,dr);
+    contar(fis-m.qty, _tolMP(m), vacio); }
+  for(const p of _cnPremez){ const dr=(d.premez||{})[p.id]; const vacio=(dr==null||dr==='');
+    contar(_crDec(dr)-p.odoo, CONTEO_TOL.term, vacio); }
+  for(const t of _cnTerm){ const dr=(d.term||{})[t.id]||{};
     const vacio=(dr.cajas==null||dr.cajas==='')&&(dr.sue==null||dr.sue==='');
-    if(vacio){ sin++; continue; } const fis=_crDec(dr.cajas)*t.factor+_crDec(dr.sue)*t.presDiv;
-    if(Math.abs(fis-t.odoo)>CONTEO_TOL.term.verde) desc++; }
+    contar(_crDec(dr.cajas)*t.factor+_crDec(dr.sue)*t.presDiv - t.odoo, CONTEO_TOL.term, vacio); }
   const el=document.getElementById('cn-resumen'); if(el) el.innerHTML=
     '<b>'+desc+'</b> descuadre'+(desc===1?'':'s')+' · <b>'+sin+'</b> sin contar';
 }
@@ -12300,9 +12389,16 @@ function _cnPresTag(txt){ return txt ? ('<span class="cn-pres">('+esc(txt)+')</s
 // fuente (_cnPresMP/_cnPresTerm) para que Conteo e Inventario nunca digan cosas distintas.
 function _invPresTag(txt){ return txt ? (' <span class="muted" style="font-size:11px">('+esc(txt)+')</span>') : ''; }
 function _cnPresMP(pe){ return pe ? (_cnPresLbl(pe)+' '+fmtN(pe.peso)+' '+pe.unidad) : ''; }
-// Producto terminado: la caja se nombra por sus UNIDADES INDIVIDUALES (factor), no por
-// paquetes — "Pan Francés (caja de 24)", no "caja 6 paq". Es como la nombra la operación.
-function _cnPresTerm(t){ return 'caja de '+t.factor; }
+// Producto terminado: la caja se nombra COMO SE ABRE. En los que vienen empacados
+// —Francés y Buns en paquetes de 4, Pizza en paquetes de 2— la caja no es "24 uds
+// sueltas", son 6 paquetes: "caja de 6 paq de 4". Eso es lo que se ve al abrirla y
+// lo que se cuenta. En Blanco/Semillas/Galletas no hay paquete intermedio, así que
+// la caja se sigue nombrando por sus unidades ("caja de 6", "caja de 12").
+// NO se toca el factor: esto es SOLO la etiqueta.
+function _cnPresTerm(t){
+  return (t.presDiv>1) ? ('caja de '+(t.factor/t.presDiv)+' paq de '+t.presDiv)
+                       : ('caja de '+t.factor);
+}
 function _cnDotCls(vacio, s){ return (!vacio && s && (s.cls==='cn-warn'||s.cls==='cn-bad')) ? s.cls : ''; }
 function _cnDot(pre, id, vacio, s){ return '<span class="cn-dot '+_cnDotCls(vacio,s)+'" id="cn-'+pre+'dot'+id+'"></span>'; }
 function _cnPresLbl(pe){ return pe ? (_CN_SING[pe.lab]||pe.lab) : ''; }
@@ -12325,7 +12421,7 @@ function cnRender(){
       +(conv?('<span class="cn-conv">'+esc(conv)+'</span>'):'')+_cnDot('m',m.pid,vacio,s)+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
       +'<td class="cn-sub" id="cn-msub'+m.pid+'">'+subMP+'</td>'
       +'<td class="cn-count">'+empIn+(empIn&&!(pe&&pe.noSuelto)?' + ':'')+sueIn+'</td>'
-      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-mdif'+m.pid+'">'+(vacio?'—':fmtDiff(diff)+' '+m.uom)+'</td></tr>';
+      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-mdif'+m.pid+'">'+(vacio?'—':_cnDifTxt(diff, m.uom, s.cls==='cn-ok'))+'</td></tr>';
   }
   document.getElementById('cn-mp').innerHTML=mp+'</tbody></table>';
   // PREMEZCLAS (# batches directo, sin suelto)
@@ -12335,7 +12431,7 @@ function cnRender(){
     pm+='<tr><td class="cn-nm">'+esc(p.label)+_cnDot('p',p.id,vacio,s)+'</td><td class="cn-odoo">'+fmtN(p.odoo)+' batches</td>'
       +'<td class="cn-sub" id="cn-psub'+p.id+'">'+_cnSub(fmtN(fis)+' batches', fmtN(p.odoo)+' batches', vacio)+'</td>'
       +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr!=null?esc(dr):'')+'" oninput="cnPremez('+p.id+',this.value)" placeholder="0"><span class="cn-lbl">batches</span><span class="cn-lblm">bat</span></td>'
-      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-pdif'+p.id+'">'+(vacio?'—':fmtDiff(diff)+' batch')+'</td></tr>';
+      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-pdif'+p.id+'">'+(vacio?'—':_cnDifTxt(diff, 'batch', s.cls==='cn-ok'))+'</td></tr>';
   }
   document.getElementById('cn-premez').innerHTML=pm+'</tbody></table>';
   // PRODUCTO TERMINADO — se cuenta en la UNIDAD DE VENTA (Francés/Buns por paq de 4, Pizza por paq de 2,
@@ -12349,7 +12445,7 @@ function cnRender(){
       +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr.cajas!=null?esc(dr.cajas):'')+'" oninput="cnTermCajas('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">cajas</span><span class="cn-lblm">caj</span> + '
       +'<input class="cn-in" inputmode="numeric" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnTermSue('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(t.venta)+'</span><span class="cn-lblm">'+esc(t.venta)+'</span>'
       +'<span class="cn-ttot" id="cn-ttot'+t.id+'">'+(vacio?'':'= '+_cnVentaTxt(t,fis))+'</span></td>'
-      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-tdif'+t.id+'">'+(vacio?'—':_cnDiffTxt(t,diff))+'</td></tr>';
+      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-tdif'+t.id+'">'+(vacio?'—':_cnDiffTxt(t,diff,s.cls==='cn-ok'))+'</td></tr>';
   }
   document.getElementById('cn-term').innerHTML=tm+'</tbody></table>';
   cnResumen();
