@@ -3048,6 +3048,29 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .el-lote.cero .el-lote-n,.el-lote.cero .el-lote-c{color:var(--text-3)}
 /* Negativo: anomalía, y las anomalías se ven. Ámbar, que es el que avisa. */
 .el-lote.neg .el-lote-c{color:var(--warn)}
+/* ── Desglose del saldo: Ancla · Producción · Salidas · Devoluciones · Merma ──
+   Va DEBAJO del renglón del lote y en un escalón tipográfico menos: es de qué está
+   hecho el número de arriba, no otro número que compita con él. Envuelve en
+   pantalla angosta en vez de desbordar — se lee en el congelador, en teléfono. */
+.el-des{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 7px;
+  padding:0 0 9px 0;margin-top:-4px;font-family:var(--mono);font-size:11px;color:var(--text-3)}
+.el-des-i{white-space:nowrap}
+.el-des-r{color:var(--text-3);opacity:.72;margin-right:4px;font-family:var(--font)}
+.el-des-s{opacity:.35}
+/* ── Las dos mermas que no bajan de ningún lote ──
+   Deliberadamente DISTINTAS entre sí, no dos variantes del mismo cartel: son dos
+   problemas diferentes. La "sin lote" es un hecho cerrado (nunca se va a poder
+   asignar) y va en gris. La "dudosa" espera una decisión y va en ámbar, que en
+   este sistema es el color de lo que hay que mirar. */
+.el-merma{display:grid;grid-template-columns:1fr auto;gap:2px 12px;
+  margin-top:8px;padding:9px 11px;border-radius:9px;font-size:12px}
+.el-merma-t{font-weight:600}
+.el-merma-n{font-family:var(--mono);white-space:nowrap;text-align:right}
+.el-merma-x{grid-column:1/-1;font-size:11px;line-height:1.5;color:var(--text-3);margin-top:2px}
+.el-merma-sin{background:rgba(255,255,255,.03);border:.5px solid var(--border)}
+.el-merma-sin .el-merma-t,.el-merma-sin .el-merma-n{color:var(--text-2)}
+.el-merma-dud{background:rgba(233,162,59,.07);border:.5px solid rgba(233,162,59,.35)}
+.el-merma-dud .el-merma-t,.el-merma-dud .el-merma-n{color:var(--warn)}
 .bs-reg{display:flex;align-items:center;gap:10px;margin-top:12px;max-width:620px;
   border:1px solid var(--border);border-radius:9px;padding:8px 11px;
   font-size:12px;color:var(--text-2)}
@@ -3592,7 +3615,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 2 sep 2026 · b51';
+const BUILD = 'v 3 sep 2026 · b52';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -5932,6 +5955,26 @@ async function uomFactor(uomId){
   const r=await odooCall('uom.uom','read',[[uomId]],{fields:['factor']});
   _uomFac[uomId]=(r.length&&r[0].factor)||1; return _uomFac[uomId];
 }
+// ── EL FACTOR DE UoM, UNA SOLA DEFINICIÓN ───────────────────────────────
+// `uomFactor` (de a uno) y `uomFactores` (en lote) llenan y leen LA MISMA caché
+// `_uomFac`. Antes había tres implementaciones de la misma cuenta —ésta, la de
+// `_clLeerStock` y la de Despachos— cada una con su propio `read` de uom.uom y su
+// propio mapa. Coincidían, que es justo lo peligroso: es el modo de falla del
+// umbral que estaba en `sem3()` y repetido a mano en `cnResumen()`, y del `||'—'`
+// que estaba en cinco lugares. Coinciden hasta el día que alguien toca una.
+// El módulo de Devoluciones va a necesitar exactamente esta misma conversión.
+async function uomFactores(ids){
+  const faltan=[...new Set((ids||[]).map(Number).filter(function(i){ return i && _uomFac[i]==null; }))];
+  if(faltan.length){
+    const us=await odooCall('uom.uom','read',[faltan],{fields:['id','factor'],context:{lang:'es_CR'}});
+    us.forEach(function(u){ _uomFac[u.id]=u.factor||1; });
+  }
+  return _uomFac;
+}
+// Lector SÍNCRONO, para usar después de `uomFactores()` (por ejemplo dentro de un
+// .map() que no puede ser async). Por ID, nunca por nombre: `Paquete de 4` [37] y
+// `Docenas` [2] se llaman los dos "Dozens" en inglés y valen 4 y 12.
+function uomFac(id){ return _uomFac[id]!=null ? _uomFac[id] : 1; }
 
 // ── Sub-pestañas de Finanzas y Operaciones ──────────────────────────────
 // Cambian SIN recargar (show/hide de vistas); cada una carga sus datos la 1ª vez que se abre.
@@ -6142,8 +6185,22 @@ function _isoWk(dt){
   return t.getUTCFullYear()+'-W'+String(wk).padStart(2,'0');
 }
 function _ymd(dt){ return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
-// date_finished de Odoo viene en UTC; a fecha CR (UTC−6) antes de agrupar por día (trampa CLAUDE.md).
-function _crDate(dt){ if(!dt) return ''; const d=new Date(String(dt).replace(' ','T')+'Z'); return new Date(d.getTime()-6*3600000).toISOString().slice(0,10); }
+// ── EL TIEMPO DE ODOO, EN UN SOLO LUGAR ─────────────────────────────────
+// Odoo devuelve 'YYYY-MM-DD HH:MM:SS' SIN zona, y siempre es UTC. Convertirlo mal
+// es el error del 19-ago-2026: comparar timestamps UTC crudos contra un corte
+// escrito en hora CR dio por doble-contada una tanda que estaba del lado correcto.
+// `_odooMs` es el ÚNICO lugar donde se interpreta ese formato. Todo lo que compare
+// contra el corte del ancla —producción y merma— pasa por acá, para que no puedan
+// discrepar: dos copias de esta línea es una que se desincroniza.
+function _odooMs(dt){
+  if(!dt) return NaN;
+  return Date.parse(String(dt).replace(' ','T')+'Z');
+}
+// …y de ahí a fecha CR (UTC−6, sin horario de verano) para agrupar por día.
+function _crDate(dt){
+  const ms=_odooMs(dt);
+  return isNaN(ms) ? '' : new Date(ms-6*3600000).toISOString().slice(0,10);
+}
 
 // ── plan_config (Supabase; fila más reciente por clave manda). Fallback a defaults. ──
 async function nivConfig(){
@@ -7467,6 +7524,42 @@ async function entLeerCrudo(desdeYmd){
             capMsgs:msgs.length>=20000, capMos:mos.length>=5000}); }
   return out;
 }
+// ── LA MERMA, LEÍDA EN VIVO DE ODOO (quinta punta) ──────────────────────
+// Se lee igual que la producción: en vivo, por `odooCall`, sin escribir nada en
+// Supabase y sin tabla nueva. Odoo sigue siendo solo lectura.
+//
+// ⚠️ LOS SEIS TERMINADOS TIENEN `tracking = none`, ASÍ QUE EL SCRAP NO SABE DE QUÉ
+// LOTE ES. Medido el 2-sep-2026: los 97 scraps de terminado de 2026 tienen `lot_id`
+// VACÍO, los 97. El lote sale por `production_id` → la MO → el lote del chatter, o
+// sea por el MISMO resolvedor que ya usa la producción (`_entAgrupar`). Acá no se
+// vuelve a parsear ningún chatter: se indexa lo que esa función ya resolvió.
+//
+// ⚠️ `date_done` ES LA FECHA DE TECLEO, NO LA DEL DESECHO. Medido sobre los 97:
+// `date_done − create_date` va de 0 a 2 SEGUNDOS, y `write_date` cae el mismo día
+// en los 97 — Odoo lo pone solo al crear y nadie lo edita. Odoo NO guarda en ningún
+// campo cuándo se botó el pan de verdad. Consecuencia: un scrap registrado después
+// de un conteo físico puede corresponder a pan que ese conteo YA no vio, y restarlo
+// lo descontaría dos veces. Por eso esos casos NO se restan a ciegas: van a la línea
+// "merma dudosa" (ver `_rpCalcularPuntas`).
+async function entLeerMerma(desdeYmd){
+  const sc=await odooCall('stock.scrap','search_read',
+    [[['state','=','done'],['product_id','in',ENT_PROD],['date_done','>=',desdeYmd]]],
+    {fields:['id','name','date_done','product_id','scrap_qty','product_uom_id','production_id'],
+     limit:5000, order:'date_done'});
+  const out=[];
+  for(const s of sc){
+    // La UoM por ID, NUNCA por nombre, y con la MISMA función que usa todo lo demás
+    // (`uomFactor`, cacheada). Medido: 3 de los 97 no están en Units — SP/00266 y
+    // SP/00278 en `Paquete de 4` [37] y SP/00283 en `Paquete de 2` [38]. Sumados
+    // crudos entrarían 4× y 2× cortos.
+    const fac=await uomFactor(s.product_uom_id&&s.product_uom_id[0]);
+    out.push({scrap:s.name, scrapId:s.id, producto:s.product_id[0],
+              uds:(s.scrap_qty||0)/(fac||1), scrapUtc:s.date_done,
+              ordenId:(s.production_id&&s.production_id[0])||null});
+  }
+  return out;
+}
+
 // ── LISTA DE LOTES ACTIVOS (Pieza 1): órdenes done de los últimos `meses`, agrupadas por lote OK.
 // Devuelve {lotes:{key:{...ordenes}}, buckets:{sin_lote,ambiguo,anio_invalido}}. Alimenta el
 // selector de Daniel Y el conteo inicial. Casos raros SIEMPRE explícitos (nunca se asumen).
@@ -7989,11 +8082,10 @@ async function _clLeerStock(){
   const ps=await odooCall('product.product','read',[ENT_PROD],
     {fields:['id','qty_available','uom_id'],context:{lang:'es_CR'}});
   const uids=[...new Set(ps.map(function(p){ return p.uom_id&&p.uom_id[0]; }).filter(Boolean))];
-  const us=await odooCall('uom.uom','read',[uids],{fields:['id','factor'],context:{lang:'es_CR'}});
-  const F={}; us.forEach(function(u){ F[u.id]=u.factor||1; });
+  await uomFactores(uids);        // llena la caché compartida; ya no hay un mapa propio acá
   const out={};
   ps.forEach(function(p){
-    const f=F[p.uom_id&&p.uom_id[0]]||1;
+    const f=uomFac(p.uom_id&&p.uom_id[0]);
     out[p.id]=(p.qty_available||0)/f;            // → unidades individuales
   });
   return out;
@@ -8159,13 +8251,29 @@ async function rpCargarLotes(){
 }
 // saldo(producto,lote) = conteo del ANCLA + fabricado DESPUÉS del corte − entregado después.
 // Sin ancla confirmada devuelve null: los lotes se listan sin "quedan N" (no se inventa).
+// Devuelve SOLO el mapa de saldos, que es lo que usan Reporte, Despachos y Lotes.
+// El cálculo vive en `_rpCalcularPuntas`, una sola vez: esta función es una vista
+// de aquélla. Dos funciones que calculen el saldo por su cuenta es una que se
+// desincroniza — el modo de falla del umbral repetido entre sem3() y cnResumen().
 async function rpCalcSaldos(g){
+  const p=await _rpCalcularPuntas(g);
+  return p ? p.saldo : null;
+}
+// El cálculo completo: el saldo Y de qué está hecho. Devuelve
+//   {saldo:{clave:uds}, detalle:{clave:{ancla,produccion,salidas,devoluciones,merma}},
+//    mermaSinLote:{pid:uds}, mermaDudosa:{pid:uds}, mermaSinLoteDet, mermaDudosaDet}
+async function _rpCalcularPuntas(g){
   const c=sbClient(); if(!c) return null;
   const {data:anc,error:e1}=await c.from('ent_ancla').select('id,fecha,corte').limit(1);
   if(e1||!anc||!anc.length) return null;
   const A=anc[0], s={};
+  // Desglose por lote. Se llena en paralelo con `s` — mismo recorrido, mismos
+  // números: el detalle no puede contradecir al saldo porque sale del mismo paso.
+  const det={}, D=function(k){ return det[k]=det[k]||
+    {ancla:0, produccion:0, salidas:0, devoluciones:0, merma:0}; };
   const {data:lin}=await c.from('ent_conteo_linea').select('producto_id,lote,uds').eq('conteo_id',A.id);
-  (lin||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote; s[k]=(s[k]||0)+(+r.uds||0); });
+  (lin||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote;
+    s[k]=(s[k]||0)+(+r.uds||0); D(k).ancla+=(+r.uds||0); });
   const corteMs=Date.parse(A.corte);
   // ⚠️ LA EXCLUSIÓN VA ACÁ Y SOLO ACÁ. En el SALDO, no en la lista de lotes: la orden
   // excluida sigue existiendo y su lote tiene que seguir apareciendo en el selector con
@@ -8176,15 +8284,16 @@ async function rpCalcSaldos(g){
   // construyó, ver ENTREGAS_PENDIENTES.md §13. El motivo se sostiene sin él.)
   Object.values((g&&g.lotes)||{}).forEach(function(L){ (L.ordenes||[]).forEach(function(rec){
     if(ENT_MO_EXCLUIDAS[rec.ordenId]) return;      // ya contada en el físico del ancla
-    if(rec.prodUtc && Date.parse(rec.prodUtc.replace(' ','T')+'Z')>corteMs){
-      const k=(+L.producto)+'|'+L.canon; s[k]=(s[k]||0)+(rec.uds||0); } }); });
+    if(rec.prodUtc && _odooMs(rec.prodUtc)>corteMs){
+      const k=(+L.producto)+'|'+L.canon; s[k]=(s[k]||0)+(rec.uds||0); D(k).produccion+=(rec.uds||0); } }); });
   // El nombre dice lo que resta: lo que SALIÓ DEL CONGELADOR, que es lo que se
   // descuenta al PREPARAR — no al entregar. El ancla cuenta lo que está adentro,
   // y un pedido preparado ya salió de ahí. (Se llamaba ent_entregado_desde_ancla
   // y el nombre pasó a ser mentira el día que preparar y entregar se separaron;
   // el alias viejo sigue vivo en Supabase un build por si algo quedó apuntando.)
   const {data:ent}=await c.from('ent_salido_del_congelador_desde_ancla').select('lote,producto_id,uds');
-  (ent||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote; s[k]=(s[k]||0)-(+r.uds||0); });
+  (ent||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote;
+    s[k]=(s[k]||0)-(+r.uds||0); D(k).salidas+=(+r.uds||0); });
   // ── LA CUARTA PUNTA (b48) — lo que VOLVIÓ al congelador ────────────────
   // `disponible = ancla + producción − salidas + devoluciones`. Las tres
   // primeras estaban acá desde siempre; la cuarta vivía SOLO en el esquema.
@@ -8213,8 +8322,68 @@ async function rpCalcSaldos(g){
   if(eDev){ try{ console.error('[Truefie] no pude leer las devoluciones ('
     +((eDev&&eDev.message)||eDev)+'): el saldo por lote queda por DEBAJO de lo real '
     +'y Despachos puede bloquear producto que sí está.'); }catch(_){} }
-  (dev||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote; s[k]=(s[k]||0)+(+r.uds||0); });
-  return s;
+  (dev||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote;
+    s[k]=(s[k]||0)+(+r.uds||0); D(k).devoluciones+=(+r.uds||0); });
+
+  // ── LA QUINTA PUNTA (b52) — lo que se DESECHÓ ──────────────────────────
+  // `disponible = ancla + producción − salidas + devoluciones − merma`.
+  // Antes la merma no era ninguna de las cuatro: Odoo movía el pan de WH/Stock a
+  // Virtual/Desecho y el saldo por lote seguía contándolo. El lote quedaba inflado.
+  //
+  // EL LOTE SALE DE LA MO, NO DEL SCRAP. Los seis terminados están en
+  // `tracking = none`, así que `lot_id` viene vacío en los 97 scraps de 2026
+  // (medido). Se indexa `ordenId → lote` desde lo que `_entAgrupar` YA resolvió:
+  // el resolvedor MO→lote es UNO y es el de la producción. Acá no se parsea chatter.
+  const moLote={};
+  Object.values((g&&g.lotes)||{}).forEach(function(L){
+    (L.ordenes||[]).forEach(function(rec){
+      moLote[rec.ordenId]={key:(+L.producto)+'|'+L.canon, producto:+L.producto,
+                           canon:L.canon, prodUtc:rec.prodUtc}; }); });
+
+  const mermaSinLote={}, mermaDudosa={}, mermaSinLoteDet=[], mermaDudosaDet=[];
+  let merma=[];
+  try{
+    // Solo hace falta desde el corte: lo anterior ya está absorbido por el conteo
+    // físico. Dos días de margen para no perder nada por el huso.
+    merma=await entLeerMerma(_ymd(new Date(corteMs-2*86400000)));
+  }catch(e){
+    // Mismo criterio que las devoluciones y por la misma razón: la dirección del
+    // daño. Si esta lectura falla el saldo queda ALTO —se ofrece pan que ya se
+    // botó— y nada avisa. Se dice en consola en vez de tragárselo.
+    try{ console.error('[Truefie] no pude leer la merma de Odoo ('
+      +((e&&e.message)||e)+'): el saldo por lote queda por ENCIMA de lo real.'); }catch(_){}
+  }
+  merma.forEach(function(m){
+    // MISMA función de tiempo que la producción (`_odooMs`): comparar el corte con
+    // dos parsers distintos es el error del 19-ago esperando a repetirse.
+    if(!(_odooMs(m.scrapUtc)>corteMs)) return;        // ya está en el físico del ancla
+    // Si la producción de esa orden no se sumó, su merma tampoco se resta. Restarla
+    // dejaría el lote corto por partida doble.
+    if(m.ordenId && ENT_MO_EXCLUIDAS[m.ordenId]) return;
+    const L=m.ordenId ? moLote[m.ordenId] : null;
+    if(!L){
+      // NO SE SABE DE CUÁL LOTE ES. Sin MO —o con una MO fuera de la ventana de
+      // lotes activos— no hay lote al cual restarle. No se ignora ni se resta del
+      // total sin decirlo: se muestra en su propia línea.
+      mermaSinLote[m.producto]=(mermaSinLote[m.producto]||0)+m.uds;
+      mermaSinLoteDet.push(m); return;
+    }
+    if(!(_odooMs(L.prodUtc)>corteMs)){
+      // NO SE SABE SI YA ESTÁ DESCONTADA. El lote se produjo ANTES del conteo, así
+      // que su pan estaba en el congelador cuando Daniel contó; el scrap se registró
+      // DESPUÉS. Como `date_done` es la fecha de tecleo y no la del desecho (medido),
+      // no se puede saber si el pan ya faltaba en esa foto. Restarlo podría
+      // descontarlo dos veces; ignorarlo podría dejar el lote inflado. Se muestra y
+      // lo decide una persona.
+      mermaDudosa[m.producto]=(mermaDudosa[m.producto]||0)+m.uds;
+      mermaDudosaDet.push(Object.assign({lote:L.canon}, m)); return;
+    }
+    s[L.key]=(s[L.key]||0)-m.uds; D(L.key).merma+=m.uds;
+  });
+
+  return {saldo:s, detalle:det, corteMs:corteMs,
+          mermaSinLote:mermaSinLote, mermaDudosa:mermaDudosa,
+          mermaSinLoteDet:mermaSinLoteDet, mermaDudosaDet:mermaDudosaDet};
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -8477,6 +8646,9 @@ async function despCargar(force){
       const us=await odooCall('uom.uom','search_read',[[['category_id.name','=','Unidad']]],
         {fields:['id','name','factor'],limit:100,context:{lang:'es_CR'}});
       _despUom={}; us.forEach(function(u){ _despUom[u.id]=u; });
+      // El nombre se guarda acá (lo usa el selector); el FACTOR va a la caché
+      // compartida, que es la única definición de la conversión en el archivo.
+      await uomFactores(us.map(function(u){ return u.id; }));
     }
     const hoy=new Date(), d0=new Date(); d0.setDate(d0.getDate()-(DESP_VENTANA-1));
     const desde = _despYmd(d0) < DESP_DESDE ? DESP_DESDE : _despYmd(d0);
@@ -8670,7 +8842,7 @@ async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
       enVentana: m.invoice_date >= desdeVentana,
       lineas: lin.map(function(l){
         const uid=(l.product_uom_id&&l.product_uom_id[0])||1;
-        const u=_despUom[uid], f=(u&&u.factor)||1;
+        const u=_despUom[uid], f=uomFac(uid);   // factor por la caché compartida, no por _despUom
         const q=l.quantity||0;
         return {producto_id:l.product_id[0], producto:(NIV_INFO[l.product_id[0]]||{}).nom||l.product_id[1],
                 uom_id:uid, uom_nombre:(u&&u.name)||'?', uom_factor:f,
@@ -9851,7 +10023,7 @@ function irADespachos(){
 // Y AL REVÉS: un lote fabricado DESPUÉS del ancla y que todavía no salió está en
 // los activos y no en el ancla. Por eso son las dos fuentes y no una.
 // ════════════════════════════════════════════════════════════════════════
-let _lot=null, _lotSaldo=null, _lotErr='', _lotCargando=false;
+let _lot=null, _lotSaldo=null, _lotErr='', _lotCargando=false, _lotPuntas=null;
 
 function irAEntLotes(){
   _modShow('vEntLotes'); crumbSet('Entregas','Inventario');
@@ -9866,8 +10038,12 @@ async function lotCargar(force){
           st.innerHTML='<span class="spin"></span>Leyendo lotes de Odoo y saldos de Supabase…'; }
   try{
     _lot=await entLotesActivos(3);
-    _lotSaldo=await rpCalcSaldos(_lot);      // null = no hay ancla confirmada
-  }catch(e){ _lotErr=(e&&e.message)||String(e); _lot=null; _lotSaldo=null; }
+    // Se pide el cálculo COMPLETO (saldo + de qué está hecho) en una sola pasada.
+    // No se vuelve a llamar a rpCalcSaldos: sería calcular dos veces lo mismo y
+    // abrir la puerta a que el desglose y el total no coincidan.
+    _lotPuntas=await _rpCalcularPuntas(_lot);
+    _lotSaldo=_lotPuntas ? _lotPuntas.saldo : null;   // null = no hay ancla confirmada
+  }catch(e){ _lotErr=(e&&e.message)||String(e); _lot=null; _lotSaldo=null; _lotPuntas=null; }
   _lotCargando=false;
   if(st) st.classList.add('hidden');
   lotRender();
@@ -9918,6 +10094,54 @@ function _lotCajas(uds, pid){
 function _lotNom(pid){ const t=(typeof INV_TERM!=='undefined')
   ? INV_TERM.find(function(x){ return x.id===pid; }) : null; return (t&&t.label)||('#'+pid); }
 
+// ── DE QUÉ ESTÁ HECHO EL SALDO DE UN LOTE ───────────────────────────────
+// Ancla · Producción · Salidas · Devoluciones · Merma · Saldo, en ese orden, que
+// es el orden de la fórmula. La MERMA VA EN SU PROPIA COLUMNA y NUNCA sumada
+// dentro de "salidas": son cosas distintas —una salió a un cliente, la otra se
+// botó— y meterlas juntas hace que el número de salidas mienta sobre lo despachado.
+// Los términos en cero no se dibujan: un lote que nunca tuvo merma no tiene por qué
+// mostrar "merma 0", y el renglón se lee de un vistazo con guantes.
+function _lotDesglose(pid, lote){
+  const d=_lotPuntas && _lotPuntas.detalle && _lotPuntas.detalle[pid+'|'+lote];
+  if(!d) return '';
+  const partes=[];
+  const add=function(rot, v, signo){
+    if(!v) return;
+    partes.push('<span class="el-des-i"><span class="el-des-r">'+rot+'</span>'
+      +(signo||'')+esc(_lotUds(v,pid))+'</span>');
+  };
+  add('ancla', d.ancla);
+  add('producción', d.produccion, '+');
+  add('salidas', d.salidas, '−');
+  add('devoluciones', d.devoluciones, '+');
+  add('merma', d.merma, '−');
+  if(partes.length<2) return '';        // con un solo término no hay nada que desglosar
+  return '<div class="el-des">'+partes.join('<span class="el-des-s">·</span>')+'</div>';
+}
+// Las dos mermas que no bajan de ningún lote. Rótulos deliberadamente distintos:
+// el primero es un problema de IDENTIDAD (¿de cuál lote?), el segundo de TIEMPO
+// (¿ya estaba descontada?). Cada uno dice qué hacer con él.
+function _lotMermaAparte(pid){
+  if(!_lotPuntas) return '';
+  const sin=(_lotPuntas.mermaSinLote||{})[pid]||0;
+  const dud=(_lotPuntas.mermaDudosa||{})[pid]||0;
+  let h='';
+  if(sin) h+='<div class="el-merma el-merma-sin">'
+    +'<span class="el-merma-t">Merma sin lote identificado</span>'
+    +'<span class="el-merma-n">−'+esc(_lotUds(sin,pid))+'</span>'
+    +'<span class="el-merma-x">El scrap de Odoo no dice de qué orden salió, así que no '
+    +'se puede restar de ningún lote. Está descontada del producto pero no de la lista '
+    +'de arriba: por eso los lotes no suman el total.</span></div>';
+  if(dud) h+='<div class="el-merma el-merma-dud">'
+    +'<span class="el-merma-t">Merma dudosa · puede que ya esté descontada</span>'
+    +'<span class="el-merma-n">−'+esc(_lotUds(dud,pid))+'</span>'
+    +'<span class="el-merma-x">Se registró DESPUÉS del conteo, pero de un lote producido '
+    +'ANTES. Odoo solo guarda cuándo se tecleó el desecho, no cuándo se botó el pan, así '
+    +'que no se sabe si el conteo físico ya lo excluyó. NO se restó: restarla podría '
+    +'descontarla dos veces.</span></div>';
+  return h;
+}
+
 function lotRender(){
   const body=document.getElementById('elBody'); if(!body) return;
   if(_lotErr){ body.innerHTML='<div class="dp-vacia dp-mal">No pude leer los lotes: '+esc(_lotErr)+'</div>'; return; }
@@ -9962,8 +10186,15 @@ function lotRender(){
         +'<span class="el-lote-n">'+esc(x.lote)+'</span>'
         +'<span class="el-lote-c">'+esc(cj)
         // Las unidades al lado SOLO si dicen algo distinto: "4 u   4 u" es ruido.
-        +(cj!==u?('<span class="el-lote-u">'+esc(u)+'</span>'):'')+'</span></div>';
+        +(cj!==u?('<span class="el-lote-u">'+esc(u)+'</span>'):'')+'</span></div>'
+        + _lotDesglose(pid, x.lote);
     });
+    // ── LAS DOS MERMAS QUE NO SE PUEDEN RESTAR DE NINGÚN LOTE ──────────
+    // Van al pie del PRODUCTO, no de un lote, porque no pertenecen a ninguno.
+    // Son DOS COSAS DISTINTAS y el rótulo tiene que dejarlo claro: una es no
+    // saber DE CUÁL lote, la otra es no saber SI ya está descontada. Confundirlas
+    // las vuelve "merma rara", que no se puede accionar.
+    h+=_lotMermaAparte(pid);
     h+='</div>';
   });
   if(!h) h='<div class="dp-vacia">No hay ningún lote con saldo.</div>';
@@ -15590,12 +15821,11 @@ async function listaMP(){
   let prods=await odooCall('product.product','read',[ids],{fields:['id','name','uom_id']});
   prods=prods.filter(p=>!MP_EXCLUIR.test(p.name));    // quitar Agua (no se controla)
   const uomIds=[...new Set(prods.map(p=>p.uom_id&&p.uom_id[0]).filter(Boolean))];
-  const ufRows=uomIds.length?await odooCall('uom.uom','read',[uomIds],{fields:['id','factor']}):[];
-  const uf={}; ufRows.forEach(u=>uf[u.id]=u.factor||1);
+  await uomFactores(uomIds);        // caché compartida: una sola definición del factor
   const q=await odooCall('stock.quant','read_group',[[['product_id','in',ids],['location_id.usage','=','internal']],['quantity'],['product_id']],{lazy:false});
   const oh={}; q.forEach(r=>{ const pid=r.product_id&&r.product_id[0]; if(pid) oh[pid]=(oh[pid]||0)+(r.quantity||0); });
   return prods.map(p=>{
-    const uomName=(p.uom_id&&p.uom_id[1])||'', factor=uf[(p.uom_id&&p.uom_id[0])]||1, qty=oh[p.id]||0;
+    const uomName=(p.uom_id&&p.uom_id[1])||'', factor=uomFac(p.uom_id&&p.uom_id[0]), qty=oh[p.id]||0;
     const m={pid:p.id, name:p.name, uom:uomName, qty, qtyRef:qty/factor, refU:refUnitDe(uomName)};  // qtyRef en kg/L (unidad de referencia)
     return _mpDisplay(m);
   }).sort((a,b)=>a.name.localeCompare(b.name,'es'));
