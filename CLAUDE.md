@@ -24,6 +24,23 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
   `python3 diagnostico_permisos.py` y `python3 odoo_read.py --quien`. Es el caso
   más caro de la regla "una salvaguarda citada no es una salvaguarda verificada",
   y le pasó justo a la afirmación de que la salvaguarda era real.
+- **NUNCA borrar un directorio fuera del repo, y JAMÁS con `rm -rf`.** Lo que está
+  fuera de `Conciliacion/` no tiene git detrás: no hay `git checkout` que lo
+  devuelva, `rm -rf` no pasa por la Papelera, y si no hay respaldo del día, no hay
+  nada. La limpieza de archivos temporales va al scratchpad de la sesión, no a
+  carpetas del usuario.
+  **Y `rmdir` que falla es una SEÑAL, no un obstáculo.** `rmdir` solo borra
+  carpetas vacías; que se queje significa que adentro hay algo que no pusiste vos.
+  Ahí se mira qué es y se pregunta — no se escala a `rm -rf`, que es justo la
+  reacción que convierte un aviso en una pérdida.
+  **El caso (2-sep-2026)**: `Practica CC/.claude/` tenía un `launch.json` viejo del
+  preview **y las skills `/cierre` y `/retomar`**. Al limpiar la config del
+  servidor de pruebas corrí `rmdir .claude`, falló por no estar vacía —esa era la
+  advertencia— y después `rm -rf .claude`. **Se perdieron las dos skills.** El
+  directorio padre no es repo git, la Papelera estaba vacía y los únicos snapshots
+  del disco eran de actualizaciones del sistema. `retomar` se pudo recuperar solo
+  porque su texto había entrado en la conversación esa mañana; `cierre` no.
+  Pasó **dos veces el mismo día**, con la misma carpeta.
 - **Diagnosticar antes de arreglar**: ante números raros, primero lectura
   read-only (árbol de MP, script de diagnóstico), después el fix. No adivinar.
 - **Validar contra la fuente**: todo número nuevo se cruza contra el pivot
