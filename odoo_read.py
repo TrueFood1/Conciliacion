@@ -12,10 +12,23 @@ escritura en Odoo, y lo único que impedía un `write` desde acá era la lista
 `LECTURA_OK` de abajo — o sea, una salvaguarda CITADA, no un permiso. Bastaba un
 método fuera de la lista, o un descuido al editar la lista, para escribir en
 producción con credenciales de dueña.
-Ahora el candado es de Odoo: uid 28 pertenece al grupo `Solo Lectura Lobby` [76],
-que tiene 18 reglas de acceso y CERO con permiso de escritura. Aunque alguien
-borrara `LECTURA_OK` entero, Odoo rechazaría la escritura. `LECTURA_OK` se queda
-igual, como segunda capa — pero ya no es la única.
+⚠️ CUANDO ESCRIBÍ ESTO, EL 2-SEP, DIJE QUE EL CANDADO YA ERA "UN PERMISO DE ODOO
+PORQUE EL GRUPO 76 TIENE CERO ESCRITURA". ERA FALSO, Y LO COPIÉ DE OTRO DOCUMENTO
+SIN MEDIRLO — el mismo error que estaba corrigiendo. Medido ese día: uid 28 tenía
+write y create sobre stock.picking, stock.move, stock.scrap y stock.move.line, y
+un `write()` real sobre `WH/OUT/02346` (albarán ya validado) devolvió True.
+
+Desde el 3-sep-2026 SÍ es un permiso: Andrea le quitó `[42] Inventory / User` al
+usuario y le dejó una ACL de solo lectura de stock.scrap sobre el grupo
+`Solo Lectura Lobby` [76]. Vuelto a medir: stock.picking, stock.move, stock.scrap,
+account.move y product.product en write=False.
+Queda abierto `stock.move.line` (write/create/unlink), concedido a todo usuario
+interno, no al grupo. `LECTURA_OK` se queda como segunda capa — y sigue siendo la
+única que cubre ese modelo.
+
+El detalle completo, con las tablas de antes y después, está en
+DIAGNOSTICO_ESCRITURA_ODOO.md §4. Para comprobarlo hoy, en vez de citarlo:
+    python3 diagnostico_permisos.py     (los pasos 1 y 2 no modifican nada)
 
 Uso:
     python3 odoo_read.py --probe      # test de conexión + UoM + clientes

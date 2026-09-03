@@ -11,6 +11,19 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
 - **Producción es SOLO LECTURA.** Candado de 3 capas: allowlist deny-by-default
   en `odooRpc` + Conciliación bloqueada en prod + banner "⚠ PRODUCCIÓN · solo
   lectura". Nunca debilitarlo ni rodearlo.
+  ⚠️ **Y la tercera capa —el usuario de Odoo— NO EXISTIÓ hasta el 3-sep-2026,
+  mientras este archivo y `DIAGNOSTICO_ESCRITURA_ODOO.md` afirmaban que sí.**
+  Medido el 2-sep: uid 28 (`Lobby Solo Lectura`) tenía `write` y `create` sobre
+  `stock.picking`, `stock.move`, `stock.scrap` y `stock.move.line`, las `ir.rules`
+  tampoco frenaban, y un `write()` real sobre **`WH/OUT/02346`** —albarán ya
+  validado— **devolvió `True`**. Se arregló quitándole `[42] Inventory / User` al
+  usuario; vuelto a medir, los cinco modelos quedaron en `write=False`.
+  **Sigue abierto `stock.move.line`** (write/create/unlink), concedido a todo
+  usuario interno: ahí el único freno sigue siendo `LECTURA_OK`.
+  **No volver a CITAR que el candado es real: correrlo** —
+  `python3 diagnostico_permisos.py` y `python3 odoo_read.py --quien`. Es el caso
+  más caro de la regla "una salvaguarda citada no es una salvaguarda verificada",
+  y le pasó justo a la afirmación de que la salvaguarda era real.
 - **Diagnosticar antes de arreglar**: ante números raros, primero lectura
   read-only (árbol de MP, script de diagnóstico), después el fix. No adivinar.
 - **Validar contra la fuente**: todo número nuevo se cruza contra el pivot
