@@ -141,21 +141,32 @@ def quien():
     for g in sorted(gs, key=lambda x: x["full_name"]):
         print(f"  [{g['id']:4}] {g['full_name']}")
 
+    # ⚠️ ESTE BLOQUE ES OPCIONAL Y NO PUEDE MATAR EL RESTO. uid 28 normalmente NO
+    # puede leer `ir.model.access` ("Contact your administrator..."), que es
+    # coherente con ser un usuario recortado. La prueba de lectura de los modelos
+    # —que es la que decide si el diagnóstico de merma se reproduce— va DESPUÉS y
+    # tiene que correr igual.
     gids = [g["id"] for g in gs]
-    acls = call("ir.model.access", "search_read",
-                ["|", ["group_id", "in", gids], ["group_id", "=", False]],
-                fields=["name","model_id","group_id","perm_write","perm_create","perm_unlink"])
-    escribe = [a for a in acls if a["perm_write"] or a["perm_create"] or a["perm_unlink"]]
-    print(f"\n── ACL QUE ALCANZAN A ESTE USUARIO: {len(acls)} ──")
-    print(f"  con permiso de escritura/creación/borrado: {len(escribe)}")
-    if not escribe:
-        print("  ✓ CERO. El candado es de Odoo, no de la lista de Python.")
-    else:
-        print("  ⚠️ hay escritura alcanzable — el candado NO es solo de Odoo:")
-        for a in sorted(escribe, key=lambda x: x["model_id"][1]):
-            g = a["group_id"][1] if a.get("group_id") else "(sin grupo = TODOS los internos)"
-            print(f"     {a['model_id'][1][:34]:34} {g[:38]:38} "
-                  f"w{int(a['perm_write'])} c{int(a['perm_create'])} u{int(a['perm_unlink'])}")
+    print(f"\n── ACL QUE ALCANZAN A ESTE USUARIO ──")
+    try:
+        acls = call("ir.model.access", "search_read",
+                    ["|", ["group_id", "in", gids], ["group_id", "=", False]],
+                    fields=["name","model_id","group_id","perm_write","perm_create","perm_unlink"])
+        escribe = [a for a in acls if a["perm_write"] or a["perm_create"] or a["perm_unlink"]]
+        print(f"  alcanzables: {len(acls)}  ·  con escritura/creación/borrado: {len(escribe)}")
+        if not escribe:
+            print("  ✓ CERO por ACL.")
+        else:
+            print("  ⚠️ hay ACL con escritura alcanzable:")
+            for a in sorted(escribe, key=lambda x: x["model_id"][1]):
+                g = a["group_id"][1] if a.get("group_id") else "(sin grupo = TODOS los internos)"
+                print(f"     {a['model_id'][1][:34]:34} {g[:38]:38} "
+                      f"w{int(a['perm_write'])} c{int(a['perm_create'])} u{int(a['perm_unlink'])}")
+    except BaseException as e:                    # SystemExit incluido: `call` sale con sys.exit
+        print(f"  ⓘ no se puede leer ir.model.access con este usuario — {str(e)[:120]}")
+        print("    Es lo esperado en un usuario recortado, y NO prueba que no haya")
+        print("    escritura: solo que no podemos verlo por acá. La medición de verdad")
+        print("    es `python3 diagnostico_permisos.py`, que prueba el candado en vivo.")
 
     # ── ¿sigue leyendo lo que el proyecto necesita? ──
     print("\n── LECTURA DE LOS MODELOS QUE USA EL PROYECTO ──")
@@ -169,6 +180,40 @@ def quien():
             print(f"  ❌ {modelo:20} NO SE PUEDE LEER — {e}")
         except Exception as e:
             print(f"  ❌ {modelo:20} NO SE PUEDE LEER — {type(e).__name__}: {str(e)[:90]}")
+
+    # ── LA PRUEBA QUE DECIDE: el diagnóstico de merma, tal cual ──────────
+    # No basta con "puedo contar stock.scrap": el diagnóstico del 2-sep leyó
+    # campos concretos (lote, UoM, MO ligada). Si uid 28 puede contar pero no
+    # puede leer `production_id`, el reporte no se reproduce. Se corre la MISMA
+    # consulta y se comparan los totales medidos ese día: 106 en el rango, 97 de
+    # los seis terminados.
+    print("\n── ¿SE REPRODUCE EL DIAGNÓSTICO DE MERMA? ──")
+    TERM = {451, 452, 453, 503, 472, 519}
+    try:
+        rows = call("stock.scrap", "search_read",
+                    ["|", ["date_done", ">=", "2026-01-01 00:00:00"],
+                          ["create_date", ">=", "2026-01-01 00:00:00"]],
+                    fields=["id","name","date_done","create_date","product_id","lot_id",
+                            "scrap_qty","product_uom_id","state","origin","picking_id",
+                            "production_id","location_id","scrap_location_id"],
+                    order="date_done")
+        n_term = sum(1 for r in rows if r.get("product_id") and r["product_id"][0] in TERM)
+        print(f"  scraps en el rango 2026 : {len(rows):>4}   (medido el 2-sep como uid 23: 106)")
+        print(f"  de los seis terminados  : {n_term:>4}   (medido el 2-sep como uid 23:  97)")
+        con_mo = sum(1 for r in rows if r.get("production_id"))
+        print(f"  con production_id legible: {con_mo:>4}   (el lote sale de la MO, no del scrap)")
+        if len(rows) == 106 and n_term == 97:
+            print("  ✓ IDÉNTICO. El diagnóstico se reproduce entero por el camino nuevo.")
+        else:
+            print("  ⚠️ los totales NO coinciden con lo medido como uid 23.")
+            print("     Puede ser merma nueva registrada desde el 2-sep (mirá las fechas)")
+            print("     o filas que uid 28 no ve. Reportarlo ANTES de tocar permisos.")
+    except SystemExit as e:
+        print(f"  ❌ NO SE PUEDE — {e}")
+        print("     El diagnóstico de merma NO se reproduce con uid 28. Reportar")
+        print("     ANTES de tocar permisos en Odoo.")
+    except Exception as e:
+        print(f"  ❌ NO SE PUEDE — {type(e).__name__}: {str(e)[:120]}")
 
 
 if __name__ == "__main__":
