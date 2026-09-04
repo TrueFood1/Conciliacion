@@ -31,6 +31,10 @@ description: Ritual de cierre de una sesión donde se tocó código en el repo C
   Dato medido, por si sirve: entre el 16-jul y el 2-sep esta skill se invocó
   18 veces, y las 18 desde la app de escritorio
   (`entrypoint: claude-desktop`). O sea que sí cargaba en la app.
+
+  ⚠ MODIFICADA el 2026-09-04, después de restaurarla: se le agregó el
+  «Paso 0 — Respaldo de las skills», que NO venía en el original y está
+  rotulado como agregado ahí mismo. El resto del cuerpo sigue siendo textual.
 ─────────────────────────────────────────────────────────────────────── -->
 
 # /cierre — cierre técnico + bitácora
@@ -47,6 +51,45 @@ que se olvidó → `main` se movió por web sin que nadie lo notara).
   commit). El checklist técnico es `Conciliacion/CIERRE_TECNICO.md`.
 - Ramas: `dev` = respaldo del trabajo en curso (push SIEMPRE acá). `main` = lo
   que GitHub Pages publica (solo se mueve con decisión explícita de Andrea).
+
+## Paso 0 — Respaldo de las skills (AGREGADO el 2026-09-04, no venía en el original)
+
+Estas skills viven en `Practica CC/.claude/skills/`, **fuera del repo**: ningún
+commit las cubre. El 2026-09-02 un `rm -rf .claude` las borró sin red. La copia
+versionada es `Conciliacion/herramientas/skills/`; este paso existe para que las
+dos no se separen, y va **antes** del Paso 1 para que lo que cambie entre en el
+mismo commit.
+
+```bash
+diff -r .claude/skills Conciliacion/herramientas/skills --exclude=README.md
+```
+
+Según lo que devuelva:
+
+- **Sin salida** → las dos copias coinciden. Seguí al Paso 1.
+- **Sale la diferencia** (una línea `diff -r … viva repo` y abajo las líneas con
+  `<` y `>`) o **`Only in .claude/skills`** → la copia viva cambió, o hay una
+  skill nueva. Sincronizá, y que entre en el commit del Paso 1:
+  ```bash
+  cp -R .claude/skills/. Conciliacion/herramientas/skills/
+  ```
+- **`Only in Conciliacion/herramientas/skills`** → falta algo en la copia viva.
+  **PARÁ y avisá antes de tocar nada.** Puede ser que Andrea la borró a
+  propósito, o que se perdió como el 2-sep. **No la borres del respaldo**: es el
+  único lugar donde queda. Se restaura al revés:
+  ```bash
+  cp -R Conciliacion/herramientas/skills/<nombre> .claude/skills/
+  ```
+- **`.claude/skills` no existe** → se perdió la copia viva entera. Mismo caso que
+  el anterior: restaurar desde el respaldo, nunca al revés.
+
+Este archivo se respalda a sí mismo: si editás `/cierre`, el `diff` del próximo
+cierre lo detecta. Lo que el respaldo **no** cubre es el frontmatter perdido de
+una skill que nunca se haya commiteado — para eso están los transcripts
+(`~/.claude/projects/*.jsonl`, ahí queda el cuerpo entero de cada invocación).
+
+Decilo en el reporte del Paso 4, aunque sea una línea: "respaldo de skills: sin
+cambios".
 
 ## Paso 1 — Checklist técnico
 

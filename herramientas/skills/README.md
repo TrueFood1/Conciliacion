@@ -33,5 +33,11 @@ Después hay que reiniciar la sesión: las skills se leen al arrancar.
 R="$(git rev-parse --show-toplevel)" && diff -r "$R/../.claude/skills" "$R/herramientas/skills" --exclude=README.md
 ```
 
-Conviene que `/cierre` corra ese `diff` y avise si difieren — así la skill se
-respalda a sí misma. Todavía no está agregado.
+`/cierre` ya corre ese `diff` solo: es su **Paso 0**, y va antes del commit, así
+que lo que cambie en la copia viva entra en el mismo commit. La skill se
+respalda a sí misma.
+
+Los cuatro casos están probados (4-sep-2026): copias iguales, copia viva
+editada, falta una skill en la viva (el escenario del 2-sep — sale
+`Only in …/herramientas/skills`), y carpeta viva inexistente. En los dos
+últimos el Paso 0 manda **parar y avisar**, y nunca borrar del respaldo.
