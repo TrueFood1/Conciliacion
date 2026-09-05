@@ -1,0 +1,36 @@
+# ─────────────────────────────────────────────────────────────────────────
+#  VIGIA DEL RESPALDO
+#
+#  El correo de fallo de GitHub solo llega si el job CORRE y falla. Si el
+#  respaldo deja de correr —workflow deshabilitado, cron roto— no llega
+#  nada, y ese es justo el modo de falla que importa.
+#
+#  Este vigia corre aparte y falla a proposito cuando el sello esta viejo.
+#  Su punto ciego: si lo que muere es Actions entero, el vigia muere con
+#  el. Esa capa la cubre /retomar, que mira el sello desde la Mac.
+# ─────────────────────────────────────────────────────────────────────────
+
+name: Vigia del respaldo
+
+on:
+  schedule:
+    - cron: '41 13 * * 1'   # lunes 07:41 en Costa Rica
+  workflow_dispatch:
+
+jobs:
+  vigia:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: El sello no puede tener mas de 3 dias
+        run: |
+          set -euo pipefail
+          test -f SELLO.md || { echo "::error::no hay SELLO.md: el respaldo nunca corrio bien"; exit 1; }
+          SELLO=$(grep '^ULTIMO_RESPALDO_OK:' SELLO.md | awk '{print $2}')
+          test -n "$SELLO" || { echo "::error::SELLO.md no tiene fecha legible"; exit 1; }
+          DIAS=$(( ( $(date -u +%s) - $(date -u -d "$SELLO" +%s) ) / 86400 ))
+          echo "ultimo respaldo bueno: $SELLO (hace $DIAS dias)"
+          if [ "$DIAS" -gt 3 ]; then
+            echo "::error::el ultimo respaldo bueno fue hace $DIAS dias ($SELLO). El respaldo diario dejo de correr."
+            exit 1
+          fi

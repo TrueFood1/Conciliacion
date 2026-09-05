@@ -1,0 +1,139 @@
+# ─────────────────────────────────────────────────────────────────────────
+#  RESPALDO DIARIO DE LA BASE DE TRUEFIE
+#
+#  ⛔ REGLA QUE NO SE NEGOCIA
+#  Este workflow vive en el repo PRIVADO TrueFood1/respaldo-truefie.
+#  NUNCA moverlo ni copiarlo a TrueFood1/Conciliacion, que es PUBLICO.
+#  El dump lleva nombres de clientes, cantidades y fechas. Un solo commit
+#  de este archivo en el repo publico expone todo el historial de entregas,
+#  y borrarlo despues no lo saca de la historia de git.
+#  Tampoco mover aca el secret SUPABASE_DB_URL: son credenciales completas
+#  de la base.
+#
+#  Por que existe: desde el 28-ago-2026 Truefie es el UNICO registro de
+#  entregas (se retiro el Excel de despachos) y el proyecto de Supabase
+#  esta en plan Free, que no tiene ningun respaldo automatico.
+# ─────────────────────────────────────────────────────────────────────────
+
+name: Respaldo diario
+
+on:
+  schedule:
+    # 09:17 UTC = 03:17 en Costa Rica (UTC-6, sin horario de verano).
+    # A las y 17 a proposito: GitHub avisa que los jobs de la hora en punto
+    # se retrasan o se descartan cuando hay mucha carga.
+    - cron: '17 9 * * *'
+  workflow_dispatch:        # para poder correrlo a mano desde la pestana Actions
+
+permissions:
+  contents: write           # unico permiso que necesita: commitear el dump aca
+
+concurrency:
+  group: respaldo
+  cancel-in-progress: false
+
+jobs:
+  respaldo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar pg_dump 17
+        run: |
+          # El pg_dump que trae el runner es mas viejo que el Postgres de
+          # Supabase y se niega a volcar ("server version mismatch").
+          # pg_dump nuevo SI puede volcar servidores viejos, por eso el 17.
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /usr/share/keyrings/pgdg.gpg
+          echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          pg_dump --version
+
+      - name: Volcar la base entera
+        env:
+          URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${URL:-}" ]; then
+            echo "::error::falta el secret SUPABASE_DB_URL"; exit 1
+          fi
+          FECHA=$(date -u +%Y-%m-%d)
+          mkdir -p respaldos
+          ARCHIVO="respaldos/truefie_${FECHA}.sql.gz"
+          # Cadena del POOLER en modo sesion (IPv4). La conexion directa de
+          # Supabase es IPv6 y los runners de GitHub no tienen IPv6.
+          pg_dump "$URL" --no-owner --no-privileges | gzip -9 > "$ARCHIVO"
+          echo "ARCHIVO=$ARCHIVO" >> "$GITHUB_ENV"
+          echo "FECHA=$FECHA"     >> "$GITHUB_ENV"
+
+      - name: Verificar que el archivo llego y pesa lo que debe
+        run: |
+          set -euo pipefail
+          # Que pg_dump haya salido con codigo 0 NO alcanza: puede escribir
+          # un archivo vacio, truncado o sin datos. Cinco pruebas sobre el
+          # archivo mismo.
+
+          # 1 · existe y no esta vacio
+          test -s "$ARCHIVO" || { echo "::error::el dump no existe o esta vacio"; exit 1; }
+
+          # 2 · el gzip esta integro (atrapa el truncado a mitad de camino)
+          gzip -t "$ARCHIVO" || { echo "::error::el gzip esta corrupto"; exit 1; }
+
+          BYTES=$(wc -c < "$ARCHIVO")
+          echo "pesa $BYTES bytes"
+
+          # 3 · piso absoluto
+          if [ "$BYTES" -lt 2000 ]; then
+            echo "::error::el dump pesa $BYTES bytes, por debajo del piso de 2000"; exit 1
+          fi
+
+          # 4 · tiene estructura Y datos de Entregas, no un esquema vacio
+          TABLAS=$(gzip -dc "$ARCHIVO" | grep -c '^CREATE TABLE' || true)
+          echo "$TABLAS tablas"
+          if [ "$TABLAS" -lt 18 ]; then
+            echo "::error::solo $TABLAS CREATE TABLE; se esperaban 18 o mas (las ent_*)"; exit 1
+          fi
+          gzip -dc "$ARCHIVO" | grep -q 'ent_pedido' \
+            || { echo "::error::no aparece ent_pedido: el dump no trae Entregas"; exit 1; }
+          gzip -dc "$ARCHIVO" | grep -q '^COPY ' \
+            || { echo "::error::no hay ni un COPY: el dump trae esquema pero no datos"; exit 1; }
+
+          # 5 · no encogio contra el ultimo respaldo bueno.
+          #     Atrapa la perdida silenciosa de datos: un dump que sale bien
+          #     formado pero con la mitad de las filas.
+          ANTERIOR=$(ls -1 respaldos/truefie_*.sql.gz 2>/dev/null | grep -v "^${ARCHIVO}$" | tail -1 || true)
+          if [ -n "$ANTERIOR" ]; then
+            ANTES=$(wc -c < "$ANTERIOR")
+            echo "anterior: $ANTERIOR ($ANTES bytes)"
+            if [ "$BYTES" -lt $(( ANTES / 2 )) ]; then
+              echo "::error::el dump pesa $BYTES y el anterior $ANTES — encogio mas de la mitad"; exit 1
+            fi
+          else
+            echo "es el primero, no hay con que comparar"
+          fi
+          echo "verificacion superada"
+
+      - name: Guardar y sellar
+        run: |
+          set -euo pipefail
+          # El sello cumple dos funciones: deja el estado a la vista, y es
+          # actividad en el repo (contra el apagado de workflows por
+          # inactividad).
+          {
+            echo "# Sello del respaldo"
+            echo
+            echo "ULTIMO_RESPALDO_OK: $FECHA"
+            echo
+            echo "Archivo: \`$ARCHIVO\`"
+            echo "Corrida: $GITHUB_RUN_ID"
+            echo
+            echo "Lo escribe el workflow. No editar a mano."
+          } > SELLO.md
+          git config user.name  "Respaldo automatico"
+          git config user.email "294949761+TrueFood1@users.noreply.github.com"
+          git add respaldos SELLO.md
+          git commit -m "Respaldo $FECHA" || { echo "::error::no habia nada que commitear"; exit 1; }
+          git push

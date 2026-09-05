@@ -30,6 +30,10 @@ description: Arranque de sesión en el repo Conciliacion. Lee el bloque más rec
   Dato medido, por si sirve: entre el 16-jul y el 2-sep esta skill se invocó
   21 veces, y las 21 desde la app de escritorio
   (`entrypoint: claude-desktop`). O sea que sí cargaba en la app.
+
+  ⚠ MODIFICADA el 2026-09-04, después de restaurarla: se le agregó el
+  «Paso 0 — Sello del respaldo», que NO venía en el original y está
+  rotulado como agregado ahí mismo. El resto del cuerpo sigue siendo textual.
 ─────────────────────────────────────────────────────────────────────── -->
 
 # /retomar — cargar contexto al abrir sesión
@@ -41,6 +45,37 @@ bitácora primero".
 
 - El repo git es la subcarpeta `Conciliacion/` → git con `git -C Conciliacion …`.
 - La bitácora es `Conciliacion/BITACORA.md` (gitignored).
+
+## Paso 0 — Sello del respaldo (AGREGADO el 2026-09-04, no venía en el original)
+
+Desde el 28-ago-2026 Truefie es el **único** registro de entregas, y el
+proyecto de Supabase está en plan Free, que no tiene respaldo automático. El
+respaldo diario corre en GitHub Actions, en el repo privado
+`TrueFood1/respaldo-truefie`, y deja la fecha de la última corrida buena en
+`SELLO.md`.
+
+Este paso existe porque las otras tres alarmas viven adentro de GitHub: el
+correo de fallo, el vigía semanal y el propio workflow. **Si lo que se cae es
+Actions, las tres se caen juntas y en silencio.** Esta es la única que mira
+desde afuera, y aprovecha que Andrea abre sesión casi todos los días.
+
+```bash
+git -C respaldo-truefie fetch -q origin main && git -C respaldo-truefie show origin/main:SELLO.md | grep '^ULTIMO_RESPALDO_OK:'
+```
+
+- **Fecha de hoy o de ayer** → todo bien. Una línea en el reporte del Paso 3:
+  "respaldo al día (<fecha>)". Nada más.
+- **Más de 2 días** → **decilo fuerte, arriba de todo el reporte**, antes de la
+  bitácora. No es un detalle: significa que el respaldo dejó de correr y que
+  la base viva volvió a ser la única copia. Ofrecé correr el workflow a mano
+  desde la pestaña Actions del repo privado (`workflow_dispatch`).
+- **No existe la carpeta `respaldo-truefie`** → el clon local no está hecho.
+  Decilo, no lo trates como que el respaldo falló: son cosas distintas.
+- **El `fetch` falla** → puede ser falta de red o de credenciales. Distinguilo
+  del caso anterior antes de alarmar.
+
+No “arregles” el sello a mano nunca: lo escribe el workflow, y editarlo es
+apagar la alarma en vez de atender el fuego.
 
 ## Paso 1 — Leer la bitácora
 
