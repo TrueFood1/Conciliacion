@@ -9341,7 +9341,14 @@ function _boRefNueva(){ return 'm'+Date.now().toString(36)+Math.random().toStrin
 // porque una escritura por tecla en 3G traba el campo.
 function boTocar(origen, ref, datos, meta, agrupar){
   const k=_boK(origen,ref), d=_boLee();
-  d[k]={origen:origen, ref:String(ref), datos:datos, meta:meta||(d[k]&&d[k].meta)||null, en:Date.now()};
+  const m=meta||(d[k]&&d[k].meta)||null;
+  // ⚠️ LA META VIAJA ADENTRO DE `datos`. `datos` es lo ÚNICO que llega a Supabase:
+  // si el cliente y el número de factura viven aparte, en el aparato que hizo el
+  // borrador se ven y en CUALQUIER OTRO no — que es justo el caso para el que
+  // existe todo esto. Medido en el navegador el 7-sep-2026: las dos filas de la
+  // tira decían "Despacho sin factura", la de CSU incluida.
+  const payload=Object.assign({}, datos, {meta:m});
+  d[k]={origen:origen, ref:String(ref), datos:payload, meta:m, en:Date.now()};
   _boEscribe(d);
   if(_boTimer[k]){ clearTimeout(_boTimer[k]); delete _boTimer[k]; }
   if(agrupar) _boTimer[k]=setTimeout(function(){ delete _boTimer[k]; _boSubir(origen,ref,'abierto',null); }, BO_AGRUPA);
@@ -9484,11 +9491,15 @@ function _boCuando(ts){ try{ return _despCuando(ts)||''; }catch(e){ return ''; }
 function boTiraHTML(){
   if(!_boAbiertos || !_boAbiertos.length) return '';
   const filas=_boAbiertos.map(function(b){
-    const m=(b.datos&&b.datos.meta)||{};
+    // Primero lo que vino de la NUBE (sirve en cualquier aparato), y lo local
+    // como respaldo para un borrador que todavía no subió.
     const loc=_boLee()[_boK(b.origen,b.ref)];
-    const meta=(loc&&loc.meta)||m;
-    const quien=(meta&&meta.cliente)||'Despacho sin factura';
-    const fac=(meta&&meta.factura)?(' · factura '+_despFacCorta(meta.factura)):'';
+    const meta=(b.datos&&b.datos.meta)||(loc&&loc.meta)||{};
+    const fac=meta.factura?(' · factura '+_despFacCorta(meta.factura)):'';
+    // El rótulo de respaldo depende del ORIGEN: "Despacho sin factura" es
+    // correcto para un manual y falso para uno que nació de una factura.
+    const quien=meta.cliente || (meta.factura ? ('Factura '+_despFacCorta(meta.factura))
+              : (b.origen==='factura' ? 'Entrega con factura' : 'Despacho sin factura'));
     const n=_boContarLotes(b.datos);
     const abre=(b.origen==='factura')
       ? 'despAbrir('+(+b.ref)+')'
