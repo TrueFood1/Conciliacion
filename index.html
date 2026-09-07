@@ -2797,6 +2797,25 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   height:36px;padding:0 9px;outline:none;box-sizing:border-box;max-width:100%}
 .de-fecha-in:focus{border-color:var(--ent-line)}
 .de-fecha-in:disabled{opacity:.5;cursor:default}
+/* ── LA TIRA DE BORRADORES SIN CERRAR ──────────────────────────────────
+   Va arriba de las pestañas y NO grita: es un recordatorio, no una alarma.
+   Ámbar solo en el rótulo; el resto en los grises del módulo. Toque de 44px
+   de alto mínimo, que es el piso del módulo — se usa con guantes de frío. */
+.bo-tira{border:1px solid var(--border);border-left:3px solid var(--warn);
+  border-radius:10px;padding:10px 12px;margin-bottom:14px;background:var(--surface-2)}
+.bo-cab{font-size:12px;font-weight:600;color:var(--warn);text-transform:uppercase;
+  letter-spacing:.04em;display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.bo-estado{font-size:11px;font-weight:400;color:var(--text-2);text-transform:none;letter-spacing:0}
+.bo-estado.mal{color:var(--stop-tx)}
+.bo-fila{display:block;width:100%;text-align:left;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:6px;
+  min-height:44px;font-family:var(--font);cursor:pointer}
+.bo-fila:active{background:var(--surface-2)}
+.bo-f1{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.bo-cli{font-size:14px;font-weight:600;color:var(--text)}
+.bo-cu{font-size:12px;color:var(--text-2);white-space:nowrap}
+.bo-f2{display:block;font-size:12px;color:var(--text-2);margin-top:2px}
+.bo-pie{font-size:11.5px;color:var(--text-2);line-height:1.45;margin-top:2px}
 .dp-fecha{margin-right:auto}
 .de-btns{display:flex;gap:8px;margin-left:auto}
 /* Mismo lima y mismo borde derivado que el resto del módulo — un solo tono, sin
@@ -3615,7 +3634,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 3 sep 2026 · b52';
+const BUILD = 'v 7 sep 2026 · b53';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -8211,20 +8230,43 @@ let _rp=null, _rpLotes=null, _rpSaldo=null, _rpClientes=null, _rpGuardando=false
 function irAReporte(){
   _modShow('vReporte'); crumbSet('Entregas','Entregas sin factura');
   if(!_rp) _rpReset(true);
+  else _rpVencerFecha();     // la fecha pegada de otro día no sobrevive a volver a entrar
   rpRender();
   if(!_rpLotes) rpCargarLotes();
 }
 // `tipo` es lo que se elige en pantalla ('venta' | 'sin'); `motivo` es lo que va a
 // la base. Con venta son lo mismo; sin factura, `tipo` abre la lista y `motivo`
 // queda vacío hasta que se elija uno — porque sin motivo no se puede guardar.
+// LA FECHA SE PEGA ENTRE DESPACHOS DEL MISMO DÍA A PROPÓSITO —cargar cinco salidas
+// seguidas sin retipearla es la comodidad que buscaba `_rpReset(false)`—, pero
+// hasta b52 se pegaba TAMBIÉN ENTRE DÍAS, y eso no lo quería nadie.
+//
+// MEDIDO EL 7-sep-2026: el pedido 44 (CSU) nació con `fecha_despacho` 2026-09-03
+// —el día del despacho a Abner, el guardado inmediatamente anterior— estando su
+// alisto fechado el 7-sep 07:58. La causa: `irAReporte` solo llama a
+// `_rpReset(true)` cuando `_rp` es null, o sea UNA VEZ POR CARGA DE PÁGINA. En una
+// PWA que queda abierta días, la fecha de la primera vez sobrevive a toda la
+// semana. Y la MISMA `_rp.fecha` alimenta `salida_en` con el mediodía puesto a
+// mano (10829), así que el AB-RE-04 salió con el día equivocado Y sin hora.
+//
+// `fechaDia` es EL DÍA EN QUE LA FECHA SE PUSO. Si no es hoy, está vencida: se
+// conserva dentro del día y se suelta al cambiar de día. Una fecha de ayer elegida
+// a conciencia sobrevive mientras siga siendo el mismo día en que se eligió, que
+// es exactamente el alcance de la comodidad.
+function _rpVencerFecha(){
+  if(!_rp) return;
+  if(_rp.fechaDia===_despHoy()) return;
+  _rp.fecha=_despHoy(); _rp.fechaDia=_despHoy();
+}
 function _rpReset(todo){
-  const fecha=(_rp&&!todo)?_rp.fecha:_ymd(new Date());
+  const fecha=(_rp&&!todo&&_rp.fechaDia===_despHoy())?_rp.fecha:_ymd(new Date());
   // pres:'uds' = la UNIDAD CHICA del producto, no la caja (26-ago). 'uds' no
   // significa "unidades sueltas" sino "la presentación menuda de ESE producto":
   // rpUdsDe la resuelve con NIV_INFO.presDiv, que vale 1 en Blanco/Semillas/
   // Cookie Dough y 4/4/2 en Francés/Buns/Pizza. Una regalía casi nunca es una
   // caja entera, y el default es lo que se acepta sin mirar.
-  _rp={fecha:fecha, cliente:null, tipo:null, motivo:null, destinatario:'', lineas:[],
+  _rp={fecha:fecha, fechaDia:_despHoy(), cliente:null, tipo:null, motivo:null,
+       destinatario:'', lineas:[],
        verCeros:false, cur:{pid:null, cant:'', pres:'uds', lotes:{}}};
 }
 // ── LOS MOTIVOS DE UNA SALIDA SIN FACTURA ───────────────────────────────
@@ -8555,8 +8597,10 @@ async function _despIntentarAnuladas(pedir, intento){
 // Costa Rica (UTC−6) devuelve el día SIGUIENTE a partir de las 18:00. Nunca se
 // notó porque Despachos se usa a las 6:30 am, pero "Entregados hoy" se mira a
 // cualquier hora y con UTC habría dejado de contar a las 6 de la tarde.
-function _despYmd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')
-                            +'-'+String(d.getDate()).padStart(2,'0'); }
+// _despYmd ERA UNA COPIA EXACTA de _ymd (6187), carácter por carácter. Se deja el
+// nombre porque lo usan varias pantallas, pero con UNA sola implementación: dos
+// copias de una conversión de fecha son dos lugares donde arreglar el mismo bug.
+function _despYmd(d){ return _ymd(d); }
 function _despHoy(){ return _despYmd(new Date()); }
 // El día de un timestamptz de Supabase, en hora de acá.
 function _despDiaDe(ts){ if(!ts) return ''; const d=new Date(ts);
@@ -8653,6 +8697,13 @@ async function despCargar(force){
     const hoy=new Date(), d0=new Date(); d0.setDate(d0.getDate()-(DESP_VENTANA-1));
     const desde = _despYmd(d0) < DESP_DESDE ? DESP_DESDE : _despYmd(d0);
     _despFac = await despLeerFacturas(DESP_DESDE, _despYmd(hoy), desde);
+    // Lo elegido sobrevive a abrir y cerrar, así que hay que soltarlo en algún lado
+    // o `_despEdit` crece para siempre. Acá: la factura que ya no vuelve de Odoo
+    // —preparada desde otro aparato, o anulada— se lleva lo suyo. Si reaparece,
+    // reaparece vacía, que es lo correcto: nadie sabe qué le pasó mientras tanto.
+    const vivas={}; (_despFac||[]).forEach(function(x){ vivas[x.factura_id]=1; });
+    Object.keys(_despEdit).forEach(function(k){
+      if(!vivas[k.slice(0,k.indexOf(':'))]) delete _despEdit[k]; });
     const st=document.getElementById('despStatus'); if(st) st.classList.add('hidden');
   }catch(e){
     _despErr=(e&&e.message)||String(e); _despFac=[];
@@ -9071,7 +9122,10 @@ function despRender(){
     return '<button class="dp-tab'+(_despTab===k?' on':'')+'" onclick="despSetTab(\''+k+'\')">'
       +esc(txt)+'<span class="dp-tab-n">'+n+'</span></button>';
   };
-  let h='<div class="dp-tabs">'
+  // REQUISITO 2: lo que quedó sin cerrar va ARRIBA DE LAS PESTAÑAS, antes que
+  // nada. Un borrador que hay que ir a buscar es un borrador que se olvida.
+  let h=boTiraHTML()
+    +'<div class="dp-tabs">'
     +stab('preparar','Por preparar',(_despFac===null?'·':fs.length))
     +stab('entregar','Por entregar',(_despEstado===null?'·':prep.length))
     +'</div><div class="dp-lista">';
@@ -9192,8 +9246,29 @@ function _despDia(ymd){
 // sea cuatro números para una sola cosa, y dejaba pasar un "5 de 2" — más
 // repartido que el total. Ahora la línea normal tiene UN control: el selector.
 // Cinco toques y confirmar es el 90% de las veces.
-function despAbrir(fid){ _despAbierto=fid; _despEdit={}; _despPedFecha=''; _despPrepAbierto=0; despRender(); window.scrollTo(0,0); }
-function despCerrar(){ _despAbierto=null; _despEdit={}; _despPedFecha=''; _despPrepAbierto=0; despRender(); }
+// ⚠️ ABRIR Y CERRAR NO BORRAN LO ELEGIDO (7-sep-2026). Hasta b52 las dos líneas
+// hacían `_despEdit={}`, así que abrir OTRA factura para mirar algo —o cerrar la
+// tarjeta un momento— tiraba a la basura los lotes que Daniel llevaba anotados,
+// en silencio y sin que fallara nada. `_despEdit` está indexado por
+// `factura_id:línea` desde siempre: aguanta varias facturas a la vez sin tocar
+// nada más. Lo único que hacía falta era dejar de vaciarlo.
+// Lo que SÍ se borra sigue borrándose, pero por factura y en su momento:
+// `_despOlvidar(fid)` después de confirmar, y las facturas que ya no vuelven de
+// Odoo en cada recarga.
+function despAbrir(fid){ _despAbierto=fid; _despPedFecha=''; _despPrepAbierto=0;
+  boRestaurarFactura(fid);   // lo local se aplica ya; lo de la nube repinta cuando llega
+  despRender(); window.scrollTo(0,0); }
+function despCerrar(){
+  // Si había un número a medio agrupar, sube ANTES de salir: irse de la pantalla
+  // no puede ser la forma de perder la última tecla.
+  if(_despAbierto!=null) boFlush('factura', _despAbierto);
+  _despAbierto=null; _despPedFecha=''; _despPrepAbierto=0; despRender(); }
+// Olvida lo elegido de UNA factura. `factura_id` es numérico y la llave lleva ':',
+// así que el prefijo no puede pisar a otra ('123:' no prefija '1234:0').
+function _despOlvidar(fid){
+  const pre=fid+':';
+  Object.keys(_despEdit).forEach(function(k){ if(k.indexOf(pre)===0) delete _despEdit[k]; });
+}
 // El gemelo de despSetFecha para el atajo. Redibuja SOLO el pie: un despRender()
 // acá rehace los selectores de lote y perdería el lote a medio elegir.
 function despSetPedFecha(v){
@@ -9211,10 +9286,293 @@ function despPieRender(){
 function _despKey(fid,i){ return fid+':'+i; }
 // Estado de una línea. `partido` y `editando` son las dos excepciones: mientras
 // estén en false, la línea muestra el camino corto.
+// ════════════════════════════════════════════════════════════════════════
+// EL BORRADOR PERSISTENTE DEL ALISTO (7-sep-2026)
+//
+// EL CASO QUE LO ABRIÓ: Daniel se quedó sin batería en el iPad a mitad de la
+// entrega de Automercado. Terminó de entregar de memoria y los lotes de Pan
+// Blanco se perdieron; ocho horas después la entrega no estaba en Truefie y el
+// dato dependía de que contestara el chofer.
+//
+// DOS CAPAS, y cada una tapa lo que la otra no puede:
+//   · localStorage — instantáneo, aguanta que se cierre la app y que no haya
+//     internet. Es la misma forma que ya usan el Conteo (`tf_conteo_draft`) y
+//     el Inventario (`tf_inv_draft`): un JSON y dos accesores, nada más.
+//   · Supabase — sobrevive a que el APARATO muera, que es el caso de hoy y el
+//     que importa. Daniel agarra el teléfono y sigue donde iba.
+//
+// ⛔ NO TOCA NINGÚN SALDO. Nada se descuenta hasta que Daniel cierra la entrega.
+//    Un borrador abandonado no deja producto restado. Decisión no negociable de
+//    Andrea, del mismo tipo que el defecto ya medido en
+//    `ent_salido_del_congelador_desde_ancla` (descontar en el momento
+//    equivocado). Se cumple por construcción: ninguna función de saldo llama a
+//    nada de este bloque.
+//
+// EL BLOQUEO DURO SIGUE INTACTO: `_despLineaOK` manda igual al cerrar. El
+// borrador no es una forma de cerrar sin lote — es lo que hace que ESPERAR por
+// el lote no cueste nada.
+//
+// LA LLAVE ES LA ENTREGA, NO EL APARATO NI LA SESIÓN. Medido antes de diseñar:
+// mientras Daniel alista, el `ent_pedido` TODAVÍA NO EXISTE (se inserta dentro
+// de `despConfirmar`). Lo que sí existe y es estable es la factura de Odoo; en
+// el camino manual, un uuid que se genera al primer toque. De ahí (origen, ref).
+// ════════════════════════════════════════════════════════════════════════
+const BO_LS='tf_ent_borrador';
+const BO_AGRUPA=700;      // ms sin teclas antes de subir un número que se está escribiendo
+let _boTimer={}, _boAbiertos=null, _boErr='', _boSubiendo=0;
+
+function _boLee(){ try{ return JSON.parse(localStorage.getItem(BO_LS)||'{}'); }catch(e){ return {}; } }
+function _boEscribe(d){ try{ localStorage.setItem(BO_LS, JSON.stringify(d)); }catch(e){} }
+function _boK(origen,ref){ return origen+'|'+ref; }
+// De qué aparato salió. Es DIAGNÓSTICO, no identidad: el borrador se sigue en el
+// teléfono aunque se haya empezado en el iPad, que es todo el punto.
+function _boAparato(){
+  try{ let v=localStorage.getItem('tf_aparato');
+       if(!v){ v=(Math.random().toString(36).slice(2)+Date.now().toString(36)).slice(0,12);
+               localStorage.setItem('tf_aparato',v); }
+       return v; }catch(e){ return 'sin-local'; }
+}
+function _boRefNueva(){ return 'm'+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+
+// ── ESCRITURA ───────────────────────────────────────────────────────────
+// Local SIEMPRE y ya (es la red de seguridad y no puede esperar a la nube).
+// Supabase: inmediato al elegir o quitar un lote, agrupado mientras se escribe
+// un número. Todo cambio llega; solo se fusionan las teclas de un mismo número,
+// porque una escritura por tecla en 3G traba el campo.
+function boTocar(origen, ref, datos, meta, agrupar){
+  const k=_boK(origen,ref), d=_boLee();
+  d[k]={origen:origen, ref:String(ref), datos:datos, meta:meta||(d[k]&&d[k].meta)||null, en:Date.now()};
+  _boEscribe(d);
+  if(_boTimer[k]){ clearTimeout(_boTimer[k]); delete _boTimer[k]; }
+  if(agrupar) _boTimer[k]=setTimeout(function(){ delete _boTimer[k]; _boSubir(origen,ref,'abierto',null); }, BO_AGRUPA);
+  else _boSubir(origen,ref,'abierto',null);
+}
+function boFlush(origen,ref){
+  const k=_boK(origen,ref);
+  if(_boTimer[k]){ clearTimeout(_boTimer[k]); delete _boTimer[k]; _boSubir(origen,ref,'abierto',null); }
+}
+// APPEND-ONLY: cada toque INSERTA. No hay update en ninguna parte, y tampoco
+// habría cómo — la RLS de `ent_alisto_borrador` solo tiene select e insert.
+async function _boSubir(origen, ref, estado, pedidoId){
+  const c=sbClient(); if(!c) return;
+  const r=_boLee()[_boK(origen,ref)];
+  if(!r && estado!=='cerrado') return;
+  _boSubiendo++; _boPintar();
+  try{
+    const {data:{user}}=await c.auth.getUser();
+    const {error}=await c.from('ent_alisto_borrador').insert({
+      origen:origen, ref:String(ref), estado:estado||'abierto', pedido_id:pedidoId||null,
+      datos:(r&&r.datos)||{}, dispositivo:_boAparato(),
+      creado_por:(user&&user.email)||'desconocido'});
+    if(error) throw error;
+    _boErr='';
+  }catch(e){
+    // NO INTERRUMPE. Lo local ya está guardado, así que el trabajo de Daniel no
+    // se pierde por esto; lo que se pierde es la copia que sobrevive al aparato,
+    // y eso se DICE en la tira en vez de callarlo.
+    _boErr=(e&&e.message)||String(e);
+  }
+  _boSubiendo--; _boPintar();
+}
+
+// ── LECTURA ─────────────────────────────────────────────────────────────
+async function _boBajar(origen, ref){
+  const c=sbClient(); if(!c) return;
+  try{
+    const {data,error}=await c.from('ent_alisto_borrador_vigente')
+      .select('estado,datos,creado_en,creado_por,dispositivo')
+      .eq('origen',origen).eq('ref',String(ref)).limit(1);
+    if(error) throw error;
+    const r=(data||[])[0]; if(!r || r.estado!=='abierto') return;
+    const k=_boK(origen,ref), loc=_boLee()[k];
+    // GANA EL MÁS NUEVO, y puede ser el local: si el aparato estuvo sin internet,
+    // lo de acá es más fresco que lo de la nube y pisarlo sería perder trabajo.
+    const enNube=new Date(r.creado_en).getTime();
+    if(loc && loc.en && enNube<=loc.en) return;
+    const d=_boLee();
+    d[k]={origen:origen, ref:String(ref), datos:r.datos, meta:(loc&&loc.meta)||null, en:enNube};
+    _boEscribe(d);
+    if(origen==='factura' && _despAbierto===ref){
+      const f=_despFacAbierta();
+      if(f && _boAplicarFactura(f, r.datos)) despRender();
+    }
+  }catch(e){ _boErr=(e&&e.message)||String(e); }
+}
+// REQUISITO 2: al abrir el módulo, lo que quedó sin cerrar se ve de una.
+async function boCargarAbiertos(){
+  const c=sbClient(); if(!c){ _boAbiertos=[]; return; }
+  try{
+    const {data,error}=await c.from('ent_alisto_borrador_vigente')
+      .select('origen,ref,estado,datos,creado_en,creado_por,dispositivo')
+      .eq('estado','abierto').order('creado_en',{ascending:false}).limit(40);
+    if(error) throw error;
+    _boAbiertos=data||[]; _boErr='';
+  }catch(e){ _boAbiertos=[]; _boErr=(e&&e.message)||String(e); }
+  try{ despRender(); }catch(e){}
+}
+
+// ── EL CAMINO CON FACTURA ───────────────────────────────────────────────
+// La foto son las líneas que Daniel tocó. Va la FIRMA de cada línea junto con lo
+// elegido: si en Odoo cambió el producto o la cantidad, esa línea no se
+// restaura. Es la misma regla que ya aplica `_despEst` en memoria — una sola
+// definición de "esto ya no corresponde", no dos.
+function _boFotoFactura(f){
+  const out={lineas:{}};
+  (f.lineas||[]).forEach(function(L,i){
+    const e=_despEdit[_despKey(f.factura_id,i)];
+    if(e) out.lineas[i]={sig:e.sig, cant:e.cant, partido:!!e.partido, lotes:e.lotes};
+  });
+  return out;
+}
+function _boAlgoElegido(foto){
+  const L=(foto&&foto.lineas)||{};
+  return Object.keys(L).some(function(k){
+    return ((L[k]&&L[k].lotes)||[]).some(function(x){ return x && x.lote; }); });
+}
+function _boAplicarFactura(f, foto){
+  if(!f || !foto || !foto.lineas) return 0;
+  let n=0;
+  Object.keys(foto.lineas).forEach(function(k){
+    const i=+k, L=f.lineas[i]; if(!L) return;
+    const e=foto.lineas[k];
+    if(!e || e.sig!==_despFirma(L)) return;   // la línea cambió en Odoo: no se arrastra
+    _despEdit[_despKey(f.factura_id,i)]={sig:e.sig, cant:e.cant, editando:false,
+                                         partido:!!e.partido, lotes:e.lotes};
+    n++;
+  });
+  return n;
+}
+function boGuardarFactura(agrupar){
+  const f=_despFacAbierta(); if(!f) return;
+  const foto=_boFotoFactura(f);
+  // Abrir una factura para mirarla NO deja rastro. Sin un solo lote elegido no
+  // hay borrador: una fila por cada vez que alguien mira sería ruido, y la tira
+  // de "sin cerrar" se llenaría de cosas que nadie empezó.
+  if(!_boAlgoElegido(foto)) return;
+  boTocar('factura', f.factura_id, foto,
+          {factura:f.factura, cliente:f.cliente, n:(f.lineas||[]).length, fecha:f.fecha},
+          agrupar);
+}
+function boRestaurarFactura(fid){
+  const loc=_boLee()[_boK('factura',fid)];
+  const f=(_despFac||[]).find(function(x){ return x.factura_id===fid; });
+  if(f && loc && loc.datos) _boAplicarFactura(f, loc.datos);   // lo local, ya
+  _boBajar('factura', fid);                                    // la nube, cuando llegue
+}
+
+// ── CERRAR ──────────────────────────────────────────────────────────────
+// REQUISITO 6: el borrador deja de estar ACTIVO pero no se borra. Cerrar es
+// insertar una fila con estado='cerrado' y el `pedido_id` que recién nació —
+// así queda ligado al pedido y sirve de evidencia de cómo se armó la entrega.
+async function boCerrar(origen, ref, pedidoId){
+  try{
+    const k=_boK(origen,ref);
+    if(_boTimer[k]){ clearTimeout(_boTimer[k]); delete _boTimer[k]; }
+    await _boSubir(origen, ref, 'cerrado', pedidoId||null);
+    const d=_boLee(); delete d[k]; _boEscribe(d);
+  }catch(e){}      // la entrega YA está guardada: esto no puede tirarla abajo
+  try{ boCargarAbiertos(); }catch(e){}
+}
+
+// ── LA TIRA DE BORRADORES SIN CERRAR ────────────────────────────────────
+function _boPintar(){
+  const el=document.getElementById('boEstado'); if(!el) return;
+  el.textContent=_boSubiendo?'guardando…':(_boErr?'sin guardar en la nube':'');
+  el.className='bo-estado'+(_boErr&&!_boSubiendo?' mal':'');
+}
+function _boCuando(ts){ try{ return _despCuando(ts)||''; }catch(e){ return ''; } }
+function boTiraHTML(){
+  if(!_boAbiertos || !_boAbiertos.length) return '';
+  const filas=_boAbiertos.map(function(b){
+    const m=(b.datos&&b.datos.meta)||{};
+    const loc=_boLee()[_boK(b.origen,b.ref)];
+    const meta=(loc&&loc.meta)||m;
+    const quien=(meta&&meta.cliente)||'Despacho sin factura';
+    const fac=(meta&&meta.factura)?(' · factura '+_despFacCorta(meta.factura)):'';
+    const n=_boContarLotes(b.datos);
+    const abre=(b.origen==='factura')
+      ? 'despAbrir('+(+b.ref)+')'
+      : 'boAbrirManual(\''+String(b.ref).replace(/'/g,'&#39;')+'\')';
+    return '<button class="bo-fila" onclick="'+abre+'">'
+      +'<span class="bo-f1"><span class="bo-cli">'+esc(quien)+'</span>'
+      +'<span class="bo-cu">'+esc(_boCuando(b.creado_en))+'</span></span>'
+      +'<span class="bo-f2">'+n+(n===1?' lote anotado':' lotes anotados')+esc(fac)
+      +' · lo dejó '+esc((b.creado_por||'').split('@')[0])+'</span></button>';
+  }).join('');
+  return '<div class="bo-tira"><div class="bo-cab">Sin cerrar'
+    +'<span id="boEstado" class="bo-estado"></span></div>'+filas
+    +'<div class="bo-pie">Lo anotado está guardado. Nada se descontó del inventario todavía: '
+    +'eso pasa cuando se cierra la entrega.</div></div>';
+}
+// ── EL CAMINO MANUAL (Reporte de despacho, sin factura) ─────────────────
+// Acá NO hay factura de Odoo, así que la `ref` es un uuid que se genera al
+// primer toque y vive en `_rp`. Es la única parte del diseño donde la identidad
+// la inventa la pantalla, y por eso la tira de "sin cerrar" es la que la vuelve
+// a encontrar desde otro aparato.
+//
+// ⚠️ LA FOTO NO GUARDA LA FECHA, a propósito. `_rp.fecha` se pega dentro del día
+// y vence al cambiar de día (`_rpVencerFecha`); si el borrador la trajera de
+// vuelta, un borrador de tres días resucitaría la fecha vieja — que es justo el
+// bug del pedido 44, por otra puerta. Al retomar, la fecha la vuelve a poner la
+// pantalla: hoy.
+function _boRefDe_rp(){
+  if(!_rp) return null;
+  if(!_rp.boRef) _rp.boRef=_boRefNueva();
+  return _rp.boRef;
+}
+function _boFotoManual(){
+  if(!_rp) return {lineas:{}};
+  return {manual:{lineas:_rp.lineas, cur:_rp.cur, cliente:_rp.cliente, tipo:_rp.tipo,
+                  motivo:_rp.motivo, destinatario:_rp.destinatario},
+          lineas:{}};   // `lineas` vacío: el contador de lotes de la tira usa el de abajo
+}
+function _boAlgoManual(){
+  return !!(_rp && (( _rp.lineas && _rp.lineas.length) ||
+                    (_rp.cur && _rp.cur.lotes && Object.keys(_rp.cur.lotes).length)));
+}
+function boGuardarManual(agrupar){
+  if(!_boAlgoManual()) return;                 // sin nada cargado no hay borrador
+  const ref=_boRefDe_rp(); if(!ref) return;
+  const q=(_rp.cliente&&_rp.cliente.nombre)||_rp.destinatario||null;
+  boTocar('manual', ref, _boFotoManual(),
+          {cliente:q, factura:null, n:(_rp.lineas||[]).length}, agrupar);
+}
+function boAbrirManual(ref){
+  const b=(_boAbiertos||[]).find(function(x){ return x.origen==='manual' && String(x.ref)===String(ref); });
+  const loc=_boLee()[_boK('manual',ref)];
+  const m=((b&&b.datos&&b.datos.manual)) || ((loc&&loc.datos&&loc.datos.manual)) || null;
+  irAReporte();                                 // esto ya pone la fecha de HOY
+  if(m){
+    _rp.lineas=m.lineas||[]; _rp.cur=m.cur||{pid:null,cant:'',pres:'uds',lotes:{}};
+    _rp.cliente=m.cliente||null; _rp.tipo=m.tipo||null; _rp.motivo=m.motivo||null;
+    _rp.destinatario=m.destinatario||'';
+    _rp.boRef=String(ref);
+    rpRender();
+  }
+}
+function _boContarLotes(datos){
+  // el manual cuenta sus lotes desde sus líneas; el de factura, desde `lineas`
+  const M=datos&&datos.manual;
+  if(M){ let n=0; (M.lineas||[]).forEach(function(l){ n+=((l&&l.lotes)||[]).length; });
+         n+=Object.keys((M.cur&&M.cur.lotes)||{}).length; return n; }
+  const L=(datos&&datos.lineas)||{}; let n=0;
+  Object.keys(L).forEach(function(k){
+    ((L[k]&&L[k].lotes)||[]).forEach(function(x){ if(x&&x.lote) n++; }); });
+  return n;
+}
+
+// LA FIRMA DE LA LÍNEA FACTURADA. Ahora que lo elegido sobrevive, puede quedar
+// colgando de una línea que en Odoo cambió de producto o de cantidad. Arrastrarla
+// en silencio sería peor que perderla: la tarjeta mostraría una cantidad vieja con
+// pinta de correcta. Si la firma no coincide, ESA línea arranca de cero; las demás
+// de la misma factura no se tocan.
+function _despFirma(L){ return (L&&L.producto_id)+'|'+(L&&L.cant_uom); }
 function _despEst(f,i){
-  const k=_despKey(f.factura_id,i);
-  if(!_despEdit[k]) _despEdit[k]={cant:f.lineas[i].cant_uom, editando:false, partido:false,
-                                  lotes:[{lote:'',cant:null}]};
+  const k=_despKey(f.factura_id,i), sig=_despFirma(f.lineas[i]);
+  const e=_despEdit[k];
+  if(!e || e.sig!==sig)
+    _despEdit[k]={sig:sig, cant:f.lineas[i].cant_uom, editando:false, partido:false,
+                  lotes:[{lote:'',cant:null}]};
   return _despEdit[k];
 }
 // Sin partir, la cantidad del único lote ES el total: no hay nada que sumar ni
@@ -9386,6 +9744,7 @@ function despPartir(i){ const f=_despFacAbierta(); if(!f) return;
   e.partido=true;
   // lo ya elegido se conserva y arranca con toda la cantidad
   e.lotes=[{lote:e.lotes[0].lote, cant:e.cant}, {lote:'', cant:null}];
+  boGuardarFactura(false);
   despRender(); }
 // oninput: se escribe al estado y se PARCHA. Nada de despRender() acá — un
 // re-render en cada tecla mata el foco y cierra el teclado del teléfono.
@@ -9394,11 +9753,13 @@ function despSetCant(i,v){
   const e=_despEst(f,i);
   e.cant=(v===''?0:+v);
   if(!e.partido && e.lotes[0]) e.lotes[0].cant=e.cant;
+  boGuardarFactura(true);           // escribir un número: agrupado
   _despPatch(f,i);
 }
 function despSetLoteCant(i,j,v){
   const f=_despFacAbierta(); if(!f) return;
   _despEst(f,i).lotes[j].cant=(v===''?null:+v);
+  boGuardarFactura(true);
   _despPatch(f,i);
 }
 function _despPatch(f,i){
@@ -9423,6 +9784,7 @@ function despQuitarLote(i,j){
     e.partido=false;
     e.lotes=[{lote:(e.lotes[0]&&e.lotes[0].lote)||'', cant:e.cant}];
   }
+  boGuardarFactura(false);
   despRender();
 }
 function despSetLote(i,j,v){ const f=_despFacAbierta(); if(!f) return;
@@ -9439,9 +9801,10 @@ function despSetLote(i,j,v){ const f=_despFacAbierta(); if(!f) return;
         despRender(); return; } } }
   e.lotes[j].lote=v;
   if(!e.partido) e.lotes[0].cant=e.cant;
+  boGuardarFactura(false);          // elegir un lote sube al instante
   despRender(); }
 function despMasLote(i){ const f=_despFacAbierta(); if(!f) return;
-  _despEst(f,i).lotes.push({lote:'',cant:null}); despRender(); }
+  _despEst(f,i).lotes.push({lote:'',cant:null}); boGuardarFactura(false); despRender(); }
 function _despFacAbierta(){ return (_despFac||[]).find(function(x){ return x.factura_id===_despAbierto; }); }
 
 // ¿Este lote escrito a mano existe de verdad? Un lote inventado no es un registro sin efecto:
@@ -9582,7 +9945,11 @@ async function despConfirmar(entregar){
         +((e6&&e6.message)||e6)+' — marcala con el botón Entregar.');
     }
     _despFac=(_despFac||[]).filter(function(x){ return x.factura_id!==f.factura_id; });
-    _despAbierto=null; _despEdit={}; _despPedFecha=''; _despPrepAbierto=0;   // nada se hereda al pedido siguiente
+    // El borrador se CIERRA, no se borra: queda como evidencia de cómo se armó
+    // la entrega, ligado al pedido que acaba de nacer. No tira si falla.
+    await boCerrar('factura', f.factura_id, ped.id);
+    _despOlvidar(f.factura_id);   // solo ESTA: lo de las otras facturas sigue en pie
+    _despAbierto=null; _despPedFecha=''; _despPrepAbierto=0;   // nada se hereda al pedido siguiente
     despRender();
     despCargarEstado();    // pasa a "Preparado" (o a "Entregados hoy")
     despCargarLotes();     // el saldo por lote cambió
@@ -9989,6 +10356,7 @@ async function despEntregar(pedidoId){
 function irADespachos(){
   _modShow('vDespachos'); crumbSet('Entregas','Entregas');   // la miga muestra uno solo
   entPdfPrecalentar();      // el proxy despierta mientras Daniel mira la bandeja
+  boCargarAbiertos();       // lo sin cerrar, visible de una (requisito 2)
   despCargar(false);
 }
 
@@ -10650,8 +11018,16 @@ function rpRender(){
   }
   // La fecha al pie y chiquita: casi siempre es hoy. Y NO se pregunta quién
   // despacha — eso sale de la sesión, igual que en Despachos.
+  // SI NO ES HOY, SE DICE. Una fecha de atrás puede ser correcta —el reporte se
+  // llena al día siguiente— pero tiene que estar a la vista antes de guardar, no
+  // descubrirse en el AB-RE-04 cuatro días después. Es la misma idea que el
+  // bloqueo del lote: la fricción va donde está la persona que sabe.
+  const _rpHoy=_despHoy(), _rpVieja=(R.fecha!==_rpHoy);
   h+='<div class="rp-pie"><span class="rp-pie-l">Día de la salida</span>'
-    +'<input type="date" class="de-fecha-in" value="'+esc(R.fecha)+'" onchange="_rp.fecha=this.value">'
+    +'<input type="date" class="de-fecha-in" value="'+esc(R.fecha)+'" '
+    +'onchange="_rp.fecha=this.value;_rp.fechaDia=_despHoy();rpRender()">'
+    +(_rpVieja?('<span class="rp-nota" style="color:var(--warn)">no es hoy ('
+      +esc(_despDiaFrase(R.fecha))+')</span>'):'')
     +'</div>'
     +'<button class="btn btn-amarillo rp-guardar" id="rpSave" onclick="rpGuardar()">Guardar despacho</button>'
     +'<div id="rpSaveMsg" style="margin-top:10px;font-size:12.5px"></div></div>';
@@ -10706,7 +11082,7 @@ function rpLotesHtml(){
                      :(L.extra?'<span class="rp-saldo">agregado</span>':''))
       +'</button>'
       +(sel?('<input type="number" min="0" step="1" inputmode="numeric" class="cl-in rp-lotein rp-dest" value="'+esc(cur.lotes[L.canon])+'" '
-        +'oninput="_rp.cur.lotes[\''+esc(L.canon).replace(/'/g,'&#39;')+'\']=this.value;rpValidarLotes()">'):'')
+        +'oninput="_rp.cur.lotes[\''+esc(L.canon).replace(/'/g,'&#39;')+'\']=this.value;rpValidarLotes();boGuardarManual(true)">'):'')
       +'</div>';
   });
   if(enCero.length) h+='<button class="rp-ceros" onclick="_rp.verCeros=!_rp.verCeros;rpRender()">'
@@ -10717,11 +11093,12 @@ function rpLotesHtml(){
 }
 function rpToggleLote(canon){
   const cur=_rp.cur;
-  if(cur.lotes[canon]!=null){ delete cur.lotes[canon]; rpRender(); return; }
+  if(cur.lotes[canon]!=null){ delete cur.lotes[canon]; boGuardarManual(false); rpRender(); return; }
   // al elegirlo se llena con lo que FALTA para completar la cantidad
   const total=+cur.cant||0;
   const usado=Object.values(cur.lotes).reduce(function(s,v){return s+(+v||0);},0);
   cur.lotes[canon]=Math.max(0,total-usado)||total;
+  boGuardarManual(false);
   rpRender();
 }
 function rpLoteManual(){
@@ -10760,12 +11137,14 @@ function rpAgregarLinea(){
     return {lote:cn, cant_present:+cur.lotes[cn], cant_uds:rpUdsDe(cur.pid,cur.pres,+cur.lotes[cn]), orden:i}; });
   _rp.lineas.push({producto_id:cur.pid, presentacion:cur.pres, cant_present:+cur.cant, cant_uds:uds, lotes:lotes});
   _rp.cur={pid:null, cant:'', pres:cur.pres, lotes:{}};   // conserva la presentación: cliente y fecha ya viven arriba
+  boGuardarManual(false);
   rpRender();
 }
 function rpEditarLinea(i){
   const l=_rp.lineas.splice(i,1)[0]; if(!l) return;
   const lotes={}; l.lotes.forEach(function(x){ lotes[x.lote]=x.cant_present; });
   _rp.cur={pid:l.producto_id, cant:String(l.cant_present), pres:l.presentacion, lotes:lotes};
+  boGuardarManual(false);
   rpRender();
 }
 
@@ -10780,6 +11159,14 @@ async function rpGuardar(){
   if(_rp.tipo==='venta' && !_rp.cliente){ pon('var(--warn)','Falta el cliente.'); return; }
   if(!_rp.motivo){ pon('var(--warn)','Falta el motivo de la salida.'); return; }
   if(!_rp.lineas.length){ pon('var(--warn)','No hay ninguna línea cargada.'); return; }
+  // LA FECHA TAMBIÉN SE VALIDA. Hasta b52 esta función revisaba cliente, motivo y
+  // líneas, y de la fecha no decía nada — se guardaba lo que hubiera. La ventana ya
+  // estaba escrita en `_despFechaOK` para el OTRO camino (la fecha editable de
+  // Despachos), con su razón puesta: "una salida guardada con la fecha equivocada
+  // no la ve nadie después". Se reusa esa, no se escribe una segunda.
+  if(!_despFechaOK(_rp.fecha)){
+    pon('var(--stop-tx)','El día de la salida ('+esc(_rp.fecha)+') está fuera de la ventana de '
+      +DESP_FECHA_DIAS+' días. Corregilo abajo antes de guardar.'); return; }
   const c=sbClient(); if(!c){ pon('var(--stop-tx)','No hay sesión de Supabase.'); return; }
   _rpGuardando=true; btn.disabled=true; pon('var(--busy)','Guardando…');
   let paso='pedido';
@@ -10834,6 +11221,10 @@ async function rpGuardar(){
       +(_rp.lineas.length===1?'':'s')+(_rp.cliente?(' de '+esc(_rp.cliente.nombre))
         :((_rp.destinatario||'').trim()?(' a '+esc(_rp.destinatario.trim())):''))
       +(_rp.tipo==='sin'?(' · '+esc((RP_MOTIVOS.find(function(m){return m.k===_rp.motivo;})||{}).n||_rp.motivo)):'')+'.');
+    // El borrador se cierra contra el pedido recién creado y deja de estar
+    // activo, pero la cadena de filas queda como evidencia. `_rp.boRef` se suelta
+    // para que el despacho siguiente sea un borrador nuevo y no una continuación.
+    if(_rp.boRef){ const _r=_rp.boRef; _rp.boRef=null; await boCerrar('manual', _r, ped.id); }
     _rpReset(false);                       // conserva la fecha; cliente y tipo se eligen de nuevo
     rpRender(); rpCargarLotes();           // saldos frescos
     const m2=document.getElementById('rpSaveMsg'); if(m2&&msg.textContent) m2.textContent=msg.textContent;
