@@ -140,11 +140,18 @@ select av.alisto_id,
 --     join ent_alisto a on a.id = s.alisto_id
 --    where a.pedido_id = 44 order by s.creado_en;
 --
--- 3c · NINGÚN SALDO SE MOVIÓ. Tiene que dar exactamente lo mismo que el 7-sep:
---      451 → 713 · 452 → 121 · 453 → 1636 · 472 → 424 · 503 → 1444 · 519 → 101
---      (son unidades individuales, la escala interna del motor; en unidad de
---       venta eso es Blanco 713 u · Semillas 121 u · Francés 409 paq ·
---       Pizza 212 paq · Buns 361 paq · Galletas 101 u)
+-- 3c · NINGÚN SALDO SE MOVIÓ.
+--
+-- ⚠️ ESTA VERIFICACIÓN SE REESCRIBIÓ, y conviene decir por qué. Decía "tiene que dar
+-- exactamente lo mismo que el 7-sep: 713 · 121 · 1636 · 424 · 1444 · 101". Estaba mal
+-- de dos maneras:
+--   · era un número de una medición VIEJA usado como objetivo de HOY. El 8-sep se
+--     registraron doce pedidos, así que dio 693 · 24 · 1264 · 328 · 1216 · 97 y por un
+--     momento pareció que la corrección había movido los seis saldos;
+--   · y estaba en unidades sueltas, contra la regla del 7-sep.
+-- La versión buena es DIFERENCIAL y vive en VERIFICACION_B56_PEDIDO44.sql: calcula el
+-- saldo con la corrección y sin ella, en unidad de VENTA, y compara. Medido el 8-sep:
+-- diferencia CERO en los seis productos. Eso sigue siendo cierto mañana.
 --
 --   select a.producto_id,
 --          sum(a.u) - coalesce(sum(s.uds),0) as saldo

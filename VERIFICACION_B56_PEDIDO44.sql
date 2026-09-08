@@ -79,10 +79,20 @@ with correccion as (
                left join salido_sin s
                       on s.lote = a.lote and s.producto_id = a.producto_id
               group by a.producto_id)
-select c.producto_id, sin.saldo as sin_la_correccion, c.saldo as con_la_correccion,
-       c.saldo - sin.saldo as dif
-  from con c join sin on sin.producto_id = c.producto_id
- order by 1;
+select pres.nombre                              as producto,
+       round(sin.saldo / pres.div, 3)            as sin_la_correccion,
+       round(c.saldo   / pres.div, 3)            as con_la_correccion,
+       pres.rotulo                               as unidad,
+       round((c.saldo - sin.saldo) / pres.div, 3) as dif
+  from con c
+  join sin  on sin.producto_id = c.producto_id
+  join (values (451,'Pan Blanco',1,'unidades'), (452,'Pan de Semillas',1,'unidades'),
+               (453,'Pan Frances',4,'paquetes'), (472,'Pizza Crust',2,'paquetes'),
+               (503,'Buns',4,'paquetes'),        (519,'Galletas',1,'unidades'))
+         as pres(producto_id, nombre, div, rotulo) on pres.producto_id = c.producto_id
+ order by pres.nombre;
+-- El saldo sale en UNIDAD DE VENTA, no en unidades sueltas: `cant_uds` guarda
+-- individuales y eso es asunto de la columna, no del reporte.
 -- Esperado: dif = 0 en los seis. MEDIDO el 8-sep: 0 / 0 / 0 / 0 / 0 / 0.
 
 -- ══ 4 · el vinculo a la factura, de la tabla del vinculo y de la columna vieja,

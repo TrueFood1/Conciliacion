@@ -391,16 +391,33 @@ select pedido_id, cliente_nombre, factura_nombre, estado, n_lineas,
  where pedido_id = 48;
 
 -- ── 8e · LOS SEIS FANTASMAS DESAPARECIERON, Y NINGUN LOTE REAL SE MOVIO ──
--- Despues de migrar: no queda ninguna cadena invalida tratada como lote, y el
--- balde por producto da lo esperado en unidad de VENTA — Blanco 105 unidades,
--- Semillas 2 unidades, Frances 2 paquetes, Buns 2 paquetes (o sea 105, 2, 8 y 8
--- unidades individuales, que es la escala de la columna).
-select ali.producto_id, al.lote, sum(al.cant_uds) as uds_individuales
+-- LA CONSULTA DEVUELVE UNIDAD DE VENTA, NO UNIDADES SUELTAS. `cant_uds` guarda
+-- unidades individuales, y eso es asunto de la columna: la SALIDA se rotula como se
+-- cuenta en el congelador. Blanco, Semillas y Galletas van por unidad; Frances,
+-- Buns y Pizza por paquete (de 4, 4 y 2). La conversion va adentro del SQL para que
+-- nadie tenga que deshacer un factor de memoria — que es lo que desvio el caso del
+-- lote 191 durante horas. La tabla de division es la misma `presDiv` de INV_TERM.
+with pres(producto_id, nombre, div, rotulo) as (values
+  (451,'Pan Blanco',      1, 'unidades'),
+  (452,'Pan de Semillas', 1, 'unidades'),
+  (453,'Pan Frances',     4, 'paquetes'),
+  (472,'Pizza Crust',     2, 'paquetes'),
+  (503,'Buns',            4, 'paquetes'),
+  (519,'Galletas',        1, 'unidades'))
+select pres.nombre                                    as producto,
+       al.lote,
+       round(sum(al.cant_uds) / pres.div, 3)           as cantidad,
+       pres.rotulo                                     as unidad
   from ent_alisto_lote_efectivo al
   join ent_alisto_linea ali on ali.id = al.linea_id
+  join pres on pres.producto_id = ali.producto_id
  where al.lote !~ '^\d{1,3} / \d{1,2}-\d{2}$'
- group by ali.producto_id, al.lote
- order by ali.producto_id, al.lote;
--- ESPERADO: solo filas con lote = 'NO DETERMINADO' — 451 → 105 · 452 → 2 ·
--- 453 → 8 · 503 → 8 — mas la unica fila que se deja quieta a proposito,
--- 472 con '183 - 12/26' → 84, del alisto reemplazado del 18-ago.
+ group by pres.nombre, pres.rotulo, pres.div, al.lote
+ order by pres.nombre, al.lote;
+-- ESPERADO: solo filas con lote = 'NO DETERMINADO' —
+--     Pan Blanco       105 unidades
+--     Pan de Semillas    2 unidades
+--     Pan Frances        2 paquetes
+--     Buns               2 paquetes
+-- mas la unica fila que se deja quieta a proposito: Pizza Crust '183 - 12/26',
+-- 42 paquetes, del alisto reemplazado del 18-ago.
