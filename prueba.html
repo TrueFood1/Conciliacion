@@ -9262,7 +9262,11 @@ function despCerrar(){
   // Si había un número a medio agrupar, sube ANTES de salir: irse de la pantalla
   // no puede ser la forma de perder la última tecla.
   if(_despAbierto!=null) boFlush('factura', _despAbierto);
-  _despAbierto=null; _despPedFecha=''; _despPrepAbierto=0; despRender(); }
+  _despAbierto=null; _despPedFecha=''; _despPrepAbierto=0; despRender();
+  // Y se relee la tira: "← Volver" no sale del módulo, así que sin esto la
+  // pantalla se queda con la foto de cuando se entró. Es el momento justo —
+  // acá es donde alguien mira qué falta— y trae también lo que dejó otro aparato.
+  boCargarAbiertos(); }
 // Olvida lo elegido de UNA factura. `factura_id` es numérico y la llave lleva ':',
 // así que el prefijo no puede pisar a otra ('123:' no prefija '1234:0').
 function _despOlvidar(fid){
@@ -9320,6 +9324,9 @@ function _despKey(fid,i){ return fid+':'+i; }
 const BO_LS='tf_ent_borrador';
 const BO_AGRUPA=700;      // ms sin teclas antes de subir un número que se está escribiendo
 let _boTimer={}, _boAbiertos=null, _boErr='', _boSubiendo=0;
+// El email de la sesión, cacheado al primer uso. Sirve para pintar la tira al
+// instante sin esperar a la nube; si todavía no se sabe, la fila dice "vos".
+let _boYo='';
 
 function _boLee(){ try{ return JSON.parse(localStorage.getItem(BO_LS)||'{}'); }catch(e){ return {}; } }
 function _boEscribe(d){ try{ localStorage.setItem(BO_LS, JSON.stringify(d)); }catch(e){} }
@@ -9352,6 +9359,7 @@ function boTocar(origen, ref, datos, meta, agrupar){
   // Si el aparato muere en el medio, esto es lo que lo hace recuperable.
   d[k]={origen:origen, ref:String(ref), datos:payload, meta:m, en:Date.now(), subido:false};
   _boEscribe(d);
+  _boEnTira(origen, ref, payload);   // la tira ya es correcta, sin ir a la nube
   if(_boTimer[k]){ clearTimeout(_boTimer[k]); delete _boTimer[k]; }
   if(agrupar) _boTimer[k]=setTimeout(function(){ delete _boTimer[k]; _boSubir(origen,ref,'abierto',null); }, BO_AGRUPA);
   else _boSubir(origen,ref,'abierto',null);
@@ -9369,6 +9377,7 @@ async function _boSubir(origen, ref, estado, pedidoId){
   _boSubiendo++; _boPintar();
   try{
     const {data:{user}}=await c.auth.getUser();
+    _boYo=(user&&user.email)||_boYo;
     const {error}=await c.from('ent_alisto_borrador').insert({
       origen:origen, ref:String(ref), estado:estado||'abierto', pedido_id:pedidoId||null,
       datos:(r&&r.datos)||{}, dispositivo:_boAparato(),
@@ -9384,6 +9393,33 @@ async function _boSubir(origen, ref, estado, pedidoId){
     _boMarcar(origen, ref, false);
   }
   _boSubiendo--; _boPintar();
+}
+
+// ── LA TIRA SE MANTIENE SOLA ────────────────────────────────────────────
+// Hasta b53 la tira se llenaba UNA sola vez, al entrar al módulo
+// (`irADespachos` → `boCargarAbiertos`). Con factura se sale con "← Volver",
+// que llama a `despCerrar()` y NO sale del módulo: `_boAbiertos` seguía siendo
+// la foto de antes de que el borrador existiera, así que la tira no aparecía.
+// Sin factura se volvía pasando por la entrada del módulo, se releía, y sí
+// aparecía. Medido por Andrea en el celular el 7-sep-2026: el requisito 2 se
+// cumplía por un camino y no por el otro.
+//
+// Se arregla por los dos lados: la tira se actualiza EN MEMORIA en cuanto se
+// toca —así es correcta al instante y también sin señal— y además se relee de
+// la nube al salir del pedido, que es cuando puede haber algo de otro aparato.
+function _boEnTira(origen, ref, datos){
+  if(!Array.isArray(_boAbiertos)) _boAbiertos=[];
+  const fila={origen:origen, ref:String(ref), estado:'abierto', datos:datos,
+              creado_en:new Date().toISOString(), creado_por:_boYo||'',
+              dispositivo:_boAparato()};
+  const i=_boAbiertos.findIndex(function(x){
+    return x.origen===origen && String(x.ref)===String(ref); });
+  if(i>=0) _boAbiertos[i]=fila; else _boAbiertos.unshift(fila);
+}
+function _boFueraDeTira(origen, ref){
+  if(!Array.isArray(_boAbiertos)) return;
+  _boAbiertos=_boAbiertos.filter(function(x){
+    return !(x.origen===origen && String(x.ref)===String(ref)); });
 }
 
 // ── LO QUE QUEDÓ SIN SUBIR ──────────────────────────────────────────────
@@ -9529,6 +9565,7 @@ async function boCerrar(origen, ref, pedidoId){
     if(_boTimer[k]){ clearTimeout(_boTimer[k]); delete _boTimer[k]; }
     await _boSubir(origen, ref, 'cerrado', pedidoId||null);
     const d=_boLee(); delete d[k]; _boEscribe(d);
+    _boFueraDeTira(origen, ref);
   }catch(e){}      // la entrega YA está guardada: esto no puede tirarla abajo
   try{ boCargarAbiertos(); }catch(e){}
 }
@@ -9560,7 +9597,9 @@ function boTiraHTML(){
       +'<span class="bo-f1"><span class="bo-cli">'+esc(quien)+'</span>'
       +'<span class="bo-cu">'+esc(_boCuando(b.creado_en))+'</span></span>'
       +'<span class="bo-f2">'+n+(n===1?' lote anotado':' lotes anotados')+esc(fac)
-      +' · lo dejó '+esc((b.creado_por||'').split('@')[0])+'</span></button>';
+      // Recién tocado y todavía sin confirmar de la nube, `creado_por` puede venir
+      // vacío. "lo dejó " a secas se lee como un dato roto; "vos" es la verdad.
+      +' · lo dejó '+esc((b.creado_por||'').split('@')[0]||'vos')+'</span></button>';
   }).join('');
   return '<div class="bo-tira"><div class="bo-cab">Sin cerrar'
     +'<span id="boEstado" class="bo-estado"></span></div>'+filas
