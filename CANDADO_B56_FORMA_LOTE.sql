@@ -23,15 +23,40 @@
 -- ════════════════════════════════════════════════════════════════════════
 
 
--- ── 1 · ANTES: cuantas filas NO pasarian el candado ──────────────────────
--- ESPERADO: 7. Seis 'sin lote'/'Sin lote' y un '183 - 12/26'. Si son mas, PARAR:
--- alguien escribio texto libre nuevo despues del censo del 8-sep.
-select '[' || alt.lote || ']' as cadena_exacta, count(*) as filas
+-- ── 1 · ANTES: cuantas FILAS no pasarian el candado ──────────────────────
+-- La primera version de esto agrupaba por cadena y devolvia GRUPOS, no filas — con
+-- tres grupos era facil leer "3" donde el numero que importa es 7. Lo pidio Andrea
+-- y tiene razon: el candado se enfrenta a filas.
+--
+-- ⚠️ EL ESPERADO NO SE CITA DEL CENSO DEL 8-SEP. Ese censo dio 7 filas a las 16:00
+-- (cinco 'sin lote', una 'Sin lote', una '183 - 12/26') y Daniel siguio registrando
+-- despues. La migracion NO cambia estas filas —es append-only, escribe en
+-- ent_alisto_lote_correccion— asi que deberian seguir siendo 7. "Deberian" es
+-- justo lo que hay que dejar de decir: se mide antes de pegar el candado.
+--
+-- Si el total es 7 y el desglose es el de abajo, seguir. Si es MAS, PARAR: alguien
+-- escribio texto libre nuevo y hay que decidir que hacer con esa fila antes.
+select count(*) as filas_totales,
+       count(distinct alt.lote) as cadenas_distintas
   from ent_alisto_lote alt
  where alt.lote !~ '^\d{1,3} / \d{1,2}-\d{2}$'
+   and alt.lote <> 'NO DETERMINADO';
+
+-- 1b · el desglose FILA POR FILA, para que no quede duda de cual es cual y de
+--      cuales ya tienen su correccion puesta por la migracion.
+select alt.id as alisto_lote_id, a.pedido_id, ali.producto_id,
+       '[' || alt.lote || ']' as cadena_exacta, alt.cant_uds,
+       (select count(*) from ent_alisto_lote_correccion c
+         where c.alisto_lote_id = alt.id) as tiene_correccion
+  from ent_alisto_lote alt
+  join ent_alisto_linea ali on ali.id = alt.linea_id
+  join ent_alisto a on a.id = ali.alisto_id
+ where alt.lote !~ '^\d{1,3} / \d{1,2}-\d{2}$'
    and alt.lote <> 'NO DETERMINADO'
- group by alt.lote
- order by alt.lote;
+ order by a.pedido_id, alt.id;
+-- ESPERADO: 7 filas. Las seis de los pedidos 48, 55 y 56 con tiene_correccion = 1,
+-- y la del pedido 2 ('183 - 12/26') con tiene_correccion = 0, porque se deja quieta.
+-- Si alguna de las seis tiene 0, la migracion no la agarro: PARAR.
 
 
 -- ── 2 · EL CANDADO ───────────────────────────────────────────────────────
