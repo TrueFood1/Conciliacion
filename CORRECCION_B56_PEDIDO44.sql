@@ -70,7 +70,19 @@
 -- Tiene que devolver UNA fila, cliente CORPORACION SUPERMERCADOS UNIDOS,
 -- factura 00100001010000003515, preparado_en el 7-sep y salida_en el 3-sep.
 -- Si devuelve otra cosa, NO SEGUIR.
-select p.id as pedido, p.cliente_nombre, p.factura_nombre,
+--
+-- ⚠️ LA FACTURA SE LEE DE `ent_pedido_factura_vigente`, NO DE
+-- `ent_pedido.factura_nombre`. La primera versión de esta consulta leía la
+-- columna de `ent_pedido` y devolvió NULL, que se lee como "el vínculo no
+-- existe" — y es falso. ENTREGAS_SALIDAS.sql §2 declara esa columna OBSOLETA:
+-- el vínculo vive SOLO en `ent_pedido_factura`. El pedido 44 nació `origen =
+-- 'manual'` (sin factura), así que `despConfirmar` nunca escribió esa columna;
+-- Andrea vinculó la 3515 desde Pendientes el 7-sep, y eso escribe únicamente en
+-- la tabla del vínculo. Es exactamente la razón por la que la columna se
+-- declaró obsoleta: leerla contesta mal.
+select p.id as pedido, p.cliente_nombre,
+       fv.factura_nombre                     as factura_del_vinculo,
+       p.factura_nombre                      as factura_columna_obsoleta,
        av.alisto_id,
        av.preparado_en,
        (av.preparado_en at time zone 'America/Costa_Rica') as preparado_en_cr,
@@ -79,6 +91,8 @@ select p.id as pedido, p.cliente_nombre, p.factura_nombre,
   from ent_pedido p
   join ent_alisto_vigente av on av.pedido_id = p.id
   left join ent_salida_vigente sv on sv.alisto_id = av.alisto_id
+  left join ent_pedido_factura_vigente fv
+         on fv.pedido_id = p.id and fv.anulado = false
  where p.id = 44;
 
 
