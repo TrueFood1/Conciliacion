@@ -293,14 +293,22 @@ begin
     return;                                  -- 0 filas = ya estaba resuelto
   end if;
 
+  -- El INSERT va adentro de un CTE y no suelto detrás del `return query`. Las dos
+  -- formas hacen lo mismo, pero esta es indiscutiblemente un SELECT: no depende
+  -- de que `return query` acepte una sentencia que escribe, y de paso los
+  -- nombres salen calificados por `ins`, sin poder chocar con los parámetros de
+  -- salida de la función, que se llaman igual (id, evento_id, aprobado…).
   return query
-  insert into rrhh_evento_aprob (evento_id, aprobado, tipo_final, destino_final,
-                                 motivo, creado_por)
-  values (p_evento_id, p_aprobado, p_tipo_final, p_destino_final, p_motivo,
-          coalesce(auth.jwt() ->> 'email', 'desconocido'))
-  returning rrhh_evento_aprob.id, rrhh_evento_aprob.evento_id,
-            rrhh_evento_aprob.aprobado, rrhh_evento_aprob.creado_por,
-            rrhh_evento_aprob.creado_en;
+  with ins as (
+    insert into rrhh_evento_aprob (evento_id, aprobado, tipo_final, destino_final,
+                                   motivo, creado_por)
+    values (p_evento_id, p_aprobado, p_tipo_final, p_destino_final, p_motivo,
+            coalesce(auth.jwt() ->> 'email', 'desconocido'))
+    returning rrhh_evento_aprob.id, rrhh_evento_aprob.evento_id,
+              rrhh_evento_aprob.aprobado, rrhh_evento_aprob.creado_por,
+              rrhh_evento_aprob.creado_en
+  )
+  select ins.id, ins.evento_id, ins.aprobado, ins.creado_por, ins.creado_en from ins;
 end $$;
 
 
