@@ -85,15 +85,22 @@ create or replace view ent_salido_del_congelador_desde_ancla
 -- ── VERIFICACIÓN, para pegar DESPUÉS ────────────────────────────────────
 -- Tiene que devolver exactamente estas seis filas:
 --
---   select producto_id,
+--   select a.producto_id,
 --          sum(a.u) - coalesce(sum(s.uds),0) as saldo
 --     from (select producto_id, lote, sum(uds) u from ent_conteo_linea
 --            where conteo_id = (select id from ent_ancla) group by 1,2) a
 --     left join ent_salido_del_congelador_desde_ancla s
 --            on s.lote = a.lote and s.producto_id = a.producto_id
---    group by 1 order by 1;
+--    group by a.producto_id order by 1;
+--
+--   ⚠️ `a.producto_id`, NO `producto_id` a secas: las dos tablas del join tienen
+--   una columna con ese nombre y Postgres corta con "column reference is
+--   ambiguous". La primera versión de esta consulta lo tenía mal y Andrea lo
+--   corrigió al correrla el 7-sep-2026.
 --
 --   451 → 713 · 452 → 121 · 453 → 1636 · 472 → 424 · 503 → 1444 · 519 → 101
+--
+--   ✅ APLICADO Y VERIFICADO el 7-sep-2026: las seis filas dieron exacto.
 --
 -- Si Buns no da 1444, algo salió distinto de lo medido: NO seguir, avisar.
 

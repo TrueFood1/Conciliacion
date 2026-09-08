@@ -2801,6 +2801,18 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    Va arriba de las pestañas y NO grita: es un recordatorio, no una alarma.
    Ámbar solo en el rótulo; el resto en los grises del módulo. Toque de 44px
    de alto mínimo, que es el piso del módulo — se usa con guantes de frío. */
+/* ── El camino sin factura, ofrecido en la bandeja ────────────────────── */
+/* Superficie neutra, NO ámbar: no es una alarma, es una opción. El ámbar de esta
+   pantalla está reservado para "el dato está viejo", que sí lo es. */
+.dp-sinfac{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  border:1px solid var(--border);border-radius:10px;padding:11px 12px;
+  margin-top:10px;background:var(--surface-2)}
+.dp-sinfac-t{flex:1;min-width:180px;font-size:12.5px;color:var(--text-2);line-height:1.45}
+.dp-sinfac-b{font-family:var(--font);font-size:13px;font-weight:600;color:var(--text);
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  min-height:44px;padding:0 16px;cursor:pointer;white-space:nowrap}
+.dp-sinfac-b:active{background:var(--surface-2)}
+
 /* ── La antiguedad del dato + el boton Actualizar ─────────────────────── */
 .dp-edad{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-2);
   margin-bottom:10px;flex-wrap:wrap}
@@ -3646,7 +3658,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 7 sep 2026 · b54';
+const BUILD = 'v 7 sep 2026 · b55';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -8492,7 +8504,7 @@ function _despUomCorta(uomId, uomNombre){
 // Se descartó el refresco periódico (setInterval): el proxy en Render se duerme
 // y arranca en frío ~40 s; despertarlo cada pocos minutos es caro para lo que
 // resuelve.
-const DESP_VIEJO_MIN = 5;
+const DESP_VIEJO_MIN = 5;   // aprobado por Andrea el 7-sep-2026
 let _despLeidoEn = 0;          // instante de la última lectura BUENA. 0 = nunca hubo
 let _despRefrescando = false;  // hay una relectura en curso
 
@@ -9193,9 +9205,16 @@ function despRender(){
     if(_despFac===null){
       h+='<div class="dp-vacia">Leyendo facturas de Odoo…</div>';
     }else if(!orden.length){
-      h+='<div class="dp-vacia">'+(_despErr?'No se pudieron leer las facturas de Odoo.':'Nada por preparar.')+'</div>';
+      // Vacía o rota: acá el camino sin factura NO es una alternativa, es LA
+      // opción. Ofrecerlo es lo único útil que puede decir esta pantalla.
+      h+='<div class="dp-vacia">'+(_despErr?'No se pudieron leer las facturas de Odoo.':'Nada por preparar.')+'</div>'
+        +despSinFacturaHTML(_despErr?'error':'vacia');
     }else{
       h+=orden.map(function(f){ return tarjeta(f,!f.enVentana); }).join('');
+      // Con facturas en la lista pero el dato viejo, va DEBAJO y en tono neutro:
+      // lo que hace falta puede estar y no verse. Si la lista está fresca no se
+      // dice nada — ofrecerlo siempre lo convertiría en ruido y se dejaría de leer.
+      if(_despViejo()) h+=despSinFacturaHTML('vieja');
     }
   }else{
     if(_despEstErr){
@@ -9339,6 +9358,33 @@ function despEdadHTML(){
       +esc(edad)+btn+'</div>';
   return '<div class="dp-edad'+(_despViejo()?' viejo':'')+'">Facturas leídas '
     +esc(edad)+btn+'</div>';
+}
+// ── EL CAMINO SIN FACTURA, OFRECIDO DONDE HACE FALTA ───────────────────
+// Existía desde siempre, pero había que ir a buscarlo — y eso lo volvía un plan
+// B. El 7-sep Daniel entregó a Bmquepos sin registrarlo porque "no le aparecía
+// la factura", y medido: la factura 3517 nació a las 11:24, junto con el
+// albarán. Si él miró antes, NINGÚN refresco la habría traído. Para ese caso el
+// camino correcto es éste, y tiene que estar a la vista justo cuando la bandeja
+// no alcanza — no escondido detrás de otra pantalla.
+//
+// UNA sola definición del texto y del botón. Se ofrece en tres situaciones, y si
+// cada una lo escribiera por su cuenta serían tres redacciones que se separan.
+// Es la misma lección de `_entQuien`.
+//
+// El tono NO es de disculpa: "también es un camino completo", no "si no queda
+// otra". Un rodeo que se ofrece como rodeo se sigue usando como rodeo.
+const DESP_SINFAC={
+  vacia:'No hay facturas esperando. Si igual vas a entregar algo, registralo sin '
+       +'factura: la factura se vincula después y el registro queda completo.',
+  vieja:'Esta lista puede estar atrasada. Si lo que vas a entregar no aparece, '
+       +'actualizá — o registralo sin factura, que también es un camino completo.',
+  error:'No se pudieron leer las facturas de Odoo. La entrega se puede registrar '
+       +'sin factura y vincularle la factura después.'
+};
+function despSinFacturaHTML(motivo){
+  return '<div class="dp-sinfac"><span class="dp-sinfac-t">'
+    +esc(DESP_SINFAC[motivo]||DESP_SINFAC.vacia)+'</span>'
+    +'<button class="dp-sinfac-b" onclick="irAReporte()">Registrar sin factura</button></div>';
 }
 function despActualizar(){ despCargar(true, true); }   // A · a un toque
 // B · al entrar a la pantalla y al volver de segundo plano, si esta viejo.
