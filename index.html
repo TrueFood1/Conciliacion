@@ -2801,6 +2801,18 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    Va arriba de las pestañas y NO grita: es un recordatorio, no una alarma.
    Ámbar solo en el rótulo; el resto en los grises del módulo. Toque de 44px
    de alto mínimo, que es el piso del módulo — se usa con guantes de frío. */
+/* ── La antiguedad del dato + el boton Actualizar ─────────────────────── */
+.dp-edad{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-2);
+  margin-bottom:10px;flex-wrap:wrap}
+.dp-edad.viejo{color:var(--warn)}
+.dp-edad.mal{color:var(--stop-tx)}
+.dp-edad.cargando{color:var(--busy)}
+/* 44px, el piso tactil del modulo — el mismo que la tira de borradores. Se
+   toca con guantes de frio a las 6:30; 32px era comodo de mirar y no de dar. */
+.dp-act{margin-left:auto;font-family:var(--font);font-size:13px;font-weight:600;
+  color:var(--text);background:var(--surface-2);border:1px solid var(--border);
+  border-radius:8px;min-height:44px;padding:0 16px;cursor:pointer}
+.dp-act:active{background:var(--surface)}
 .bo-tira{border:1px solid var(--border);border-left:3px solid var(--warn);
   border-radius:10px;padding:10px 12px;margin-bottom:14px;background:var(--surface-2)}
 .bo-cab{font-size:12px;font-weight:600;color:var(--warn);text-transform:uppercase;
@@ -3634,7 +3646,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 7 sep 2026 · b53';
+const BUILD = 'v 7 sep 2026 · b54';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -8464,6 +8476,26 @@ const DESP_UOM_CORTA = {
 function _despUomCorta(uomId, uomNombre){
   return DESP_UOM_CORTA[+uomId] || uomNombre || 'u';
 }
+// ── EL REFRESCO DE FACTURAS (7-sep-2026) ───────────────────────────────
+// EL CASO: la factura 3515 de CSU se creó en Odoo a las 06:20 y Daniel alistó a
+// las 07:58 sin verla. 98 minutos. Hasta b53 las facturas se leían UNA VEZ POR
+// CARGA DE PÁGINA y no había ni refresco automático, ni botón, ni forma de saber
+// que el dato estaba viejo. En una PWA que queda abierta, "una vez por carga"
+// puede ser una vez por semana.
+//
+// UMBRAL: 5 minutos. La operación es a ráfagas entre las 6 y las 8 de la mañana,
+// que es cuando aparecen las facturas del día; entrar y salir de la bandeja más
+// seguido que cada 5 minutos es normal entre entrega y entrega, así que un
+// umbral más chico releería sin que hubiera nada nuevo. Y la relectura va en
+// SEGUNDO PLANO —la lista vieja se queda en pantalla— así que un proxy dormido
+// no tapa nada: solo tarda.
+// Se descartó el refresco periódico (setInterval): el proxy en Render se duerme
+// y arranca en frío ~40 s; despertarlo cada pocos minutos es caro para lo que
+// resuelve.
+const DESP_VIEJO_MIN = 5;
+let _despLeidoEn = 0;          // instante de la última lectura BUENA. 0 = nunca hubo
+let _despRefrescando = false;  // hay una relectura en curso
+
 const DESP_VENTANA = 3;              // días hacia atrás, contando hoy
 // ARRANQUE DEL MÓDULO. Sin esto la bandeja del lunes abre con 82 facturas de
 // semanas anteriores que ya se despacharon a mano, y Daniel no puede distinguir
@@ -8674,16 +8706,23 @@ function _despAviso(cls,html){
 }
 
 // ── LECTURA ─────────────────────────────────────────────────────────────
-async function despCargar(force){
+async function despCargar(force, silencioso){
   const body=document.getElementById('despBody');
   // El estado se refresca SIEMPRE, aunque las facturas estén en caché: la lista
   // de "preparado" es la que puede haber cambiado desde otro teléfono, y es
   // barata (una vista de Supabase, sin Odoo).
   despCargarEstado();
   if(_despFac && !force){ despRender(); return; }
-  _despErr=''; _despFac=null;
-  _despAviso('s-info','Leyendo facturas de Odoo… la primera consulta del día puede tardar ~40 s.');
-  if(body) body.innerHTML='';
+  _despErr='';
+  // SILENCIOSO = relectura en segundo plano: la lista que ya está NO se borra.
+  // Sin esto, un refresco automático dejaría la pantalla en blanco hasta 40 s si
+  // el proxy está dormido, y eso se lee como "se colgó".
+  if(!silencioso){
+    _despFac=null;
+    _despAviso('s-info','Leyendo facturas de Odoo… la primera consulta del día puede tardar ~40 s.');
+    if(body) body.innerHTML='';
+  }
+  _despRefrescando=true;
   despRender();                 // la sección "Preparado" no espera a Odoo
   try{
     if(!_despUom){
@@ -8697,6 +8736,10 @@ async function despCargar(force){
     const hoy=new Date(), d0=new Date(); d0.setDate(d0.getDate()-(DESP_VENTANA-1));
     const desde = _despYmd(d0) < DESP_DESDE ? DESP_DESDE : _despYmd(d0);
     _despFac = await despLeerFacturas(DESP_DESDE, _despYmd(hoy), desde);
+    // ⚠️ SOLO acá se marca la hora de lectura. Si la relectura falla no se toca,
+    // que es todo el punto: si se marcara igual, la etiqueta diría "recién" sobre
+    // un dato viejo — peor que no tener refresco.
+    _despLeidoEn = Date.now();
     // Lo elegido sobrevive a abrir y cerrar, así que hay que soltarlo en algún lado
     // o `_despEdit` crece para siempre. Acá: la factura que ya no vuelve de Odoo
     // —preparada desde otro aparato, o anulada— se lleva lo suyo. Si reaparece,
@@ -8706,10 +8749,17 @@ async function despCargar(force){
       if(!vivas[k.slice(0,k.indexOf(':'))]) delete _despEdit[k]; });
     const st=document.getElementById('despStatus'); if(st) st.classList.add('hidden');
   }catch(e){
-    _despErr=(e&&e.message)||String(e); _despFac=[];
-    _despAviso('s-err','No pude leer las facturas de Odoo: '+esc(_despErr)
-      +' — deslizá hacia abajo para recargar. Si sigue, registrá la salida por Reporte de despacho.');
+    _despErr=(e&&e.message)||String(e);
+    // En silencioso NO se borra la lista ni se tapa la pantalla con un cartel: lo
+    // que había sigue sirviendo. El fallo se dice en la línea de antigüedad, que
+    // pasa a rojo — visible, pero sin sacar a nadie de lo que estaba haciendo.
+    if(!silencioso){
+      _despFac=[];
+      _despAviso('s-err','No pude leer las facturas de Odoo: '+esc(_despErr)
+        +' — deslizá hacia abajo para recargar. Si sigue, registrá la salida por Reporte de despacho.');
+    }
   }
+  _despRefrescando=false;
   // los lotes van aparte y NO bloquean la bandeja: si fallan, se escribe el lote a mano
   despCargarLotes();
   despRender();
@@ -9124,7 +9174,8 @@ function despRender(){
   };
   // REQUISITO 2: lo que quedó sin cerrar va ARRIBA DE LAS PESTAÑAS, antes que
   // nada. Un borrador que hay que ir a buscar es un borrador que se olvida.
-  let h=boTiraHTML()
+  let h=despEdadHTML()
+    +boTiraHTML()
     +'<div class="dp-tabs">'
     +stab('preparar','Por preparar',(_despFac===null?'·':fs.length))
     +stab('entregar','Por entregar',(_despEstado===null?'·':prep.length))
@@ -9258,6 +9309,52 @@ function _despDia(ymd){
 function despAbrir(fid){ _despAbierto=fid; _despPedFecha=''; _despPrepAbierto=0;
   boRestaurarFactura(fid);   // lo local se aplica ya; lo de la nube repinta cuando llega
   despRender(); window.scrollTo(0,0); }
+// ── D · LA ANTIGUEDAD DEL DATO, y A · EL BOTON ──────────────────────────
+// D es la que hace que A sirva. Sin ella el boton depende de que alguien
+// SOSPECHE que falta algo, y el 7-sep Daniel no tenia por que sospecharlo: la
+// pantalla se veia igual de completa con la factura de CSU adentro que sin ella.
+function _despViejo(){
+  return !_despLeidoEn || (Date.now()-_despLeidoEn) > DESP_VIEJO_MIN*60000;
+}
+function _despHace(ms){
+  const m=Math.floor(ms/60000);
+  if(m<1)  return 'recién';
+  if(m<60) return 'hace '+m+' min';
+  const h=Math.floor(m/60);
+  return 'hace '+h+' h'+(m%60?' '+(m%60)+' min':'');
+}
+function despEdadHTML(){
+  // Cargando: se DICE lo de los 40 s. Un spinner mudo durante 40 segundos se lee
+  // como que se colgo, y entonces alguien recarga la pagina a mitad de camino.
+  if(_despRefrescando)
+    return '<div class="dp-edad cargando"><span class="spin"></span>'
+      +'Leyendo facturas de Odoo… la primera del día puede tardar ~40 s'
+      +'</div>';
+  const btn='<button class="dp-act" onclick="despActualizar()">Actualizar</button>';
+  if(!_despLeidoEn)
+    return '<div class="dp-edad">Facturas sin leer todavía'+btn+'</div>';
+  const edad=_despHace(Date.now()-_despLeidoEn);
+  if(_despErr)
+    return '<div class="dp-edad mal">No se pudieron actualizar — mostrando las de '
+      +esc(edad)+btn+'</div>';
+  return '<div class="dp-edad'+(_despViejo()?' viejo':'')+'">Facturas leídas '
+    +esc(edad)+btn+'</div>';
+}
+function despActualizar(){ despCargar(true, true); }   // A · a un toque
+// B · al entrar a la pantalla y al volver de segundo plano, si esta viejo.
+// No corre si nunca se leyo (de eso se encarga la carga normal) ni si ya hay una
+// relectura andando.
+function despRefrescarSiViejo(){
+  if(_despRefrescando || !_despFac || !_despViejo()) return;
+  despCargar(true, true);
+}
+window.addEventListener('DOMContentLoaded', function(){
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState!=='hidden') despRefrescarSiViejo();
+  });
+  window.addEventListener('online', despRefrescarSiViejo);
+});
+
 function despCerrar(){
   // Si había un número a medio agrupar, sube ANTES de salir: irse de la pantalla
   // no puede ser la forma de perder la última tecla.
@@ -10460,6 +10557,7 @@ function irADespachos(){
   entPdfPrecalentar();      // el proxy despierta mientras Daniel mira la bandeja
   boCargarAbiertos();       // lo sin cerrar, visible de una (requisito 2)
   despCargar(false);
+  despRefrescarSiViejo();   // B · si la lista ya estaba pero vieja, se relee detras
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -11314,10 +11412,21 @@ async function rpGuardar(){
     // pone mediodía, que no se parece a ninguna hora de despacho real, y la nota
     // lo deja escrito. Un now() acá pondría una hora con pinta de medida.
     paso='salida';
-    const {error:e6}=await c.from('ent_salida').insert({
-      alisto_id:al.id, salida_en:_rp.fecha+'T12:00:00-06:00',
-      nota:'Reporte de despacho: la fecha es la registrada, la hora NO es medida',
-      creado_por:email});
+    // ⚠️ LA MISMA FUNCION QUE EL CAMINO CON FACTURA, no una copia con otra regla.
+    // Hasta b53 esto escribia SIEMPRE mediodia, incluso cuando el despacho se
+    // registraba HOY y la hora real se sabia. Como el dia de la salida y el del
+    // registro coincidian, `_despCuandoSalida` mostraba la hora — o sea que el
+    // Historial enseñaba "12:00" con cara de medida. Rompia exactamente la regla
+    // que la puso ahi (Andrea, 25-ago): la hora se muestra SOLO si esta medida.
+    // `_despSalidaPayload` devuelve {} cuando la fecha es hoy, y entonces gana el
+    // `default now()` de la base, que si es una hora real. Solo una fecha de atras
+    // escribe el mediodia, y con su nota.
+    //
+    // Es la diferencia que hacia de "sin factura" un camino de segunda: el dia que
+    // Daniel hizo lo correcto (CSU, 7-sep), el sistema le dejo peor rastro que si
+    // hubiera esperado la factura.
+    const {error:e6}=await c.from('ent_salida').insert(
+      Object.assign({alisto_id:al.id, creado_por:email}, _despSalidaPayload(_rp.fecha)));
     if(e6) throw e6;
     pon('var(--good)','Despacho #'+ped.id+' guardado — '+_rp.lineas.length+' línea'
       +(_rp.lineas.length===1?'':'s')+(_rp.cliente?(' de '+esc(_rp.cliente.nombre))
