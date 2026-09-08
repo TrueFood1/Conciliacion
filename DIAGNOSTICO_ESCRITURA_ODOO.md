@@ -95,9 +95,65 @@ Las tres capas, medidas:
 | 2 · Proxy de lectura (`server.js`) | allowlist `LECTURA_OK`, deny-by-default | servidor |
 | 3 · **El usuario de Odoo** | el proxy se autentica como **`Lobby Solo Lectura`** (uid 28), grupo **`Solo Lectura Lobby` [76]** | **Odoo** |
 
-**La capa 3 es real, no cosmética**: el grupo 76 tiene **18 reglas de acceso y
-CERO con permiso de escritura**. Aunque alguien se saltara las capas 1 y 2, Odoo
-rechazaría la escritura. Eso es bueno y conviene no perderlo.
+> ## 🔴 CORRECCIÓN DEL 3-SEP-2026 — ESTO ERA FALSO
+>
+> Acá decía: *"La capa 3 es real, no cosmética: el grupo 76 tiene 18 reglas de
+> acceso y CERO con permiso de escritura. Aunque alguien se saltara las capas 1 y
+> 2, Odoo rechazaría la escritura."*
+>
+> **Nunca se midió. Y cuando se midió, era al revés.**
+>
+> **El hecho, con fecha y número de documento:** el **2-sep-2026**, conectado como
+> **uid 28 (`Lobby Solo Lectura`)** contra `truefood.odoo.com`, un
+> `stock.picking.write()` sobre **`WH/OUT/02346`** (id 3103) — **un albarán ya
+> validado, `state = done`** — **devolvió `True`**. La escritura pasó. Se escribió
+> el campo `note` con su propio valor actual, así que ningún dato cambió; lo único
+> que se movió fue `write_date` (`2026-09-02 22:36:25` → `2026-09-03 02:39:03`).
+>
+> Medido el mismo día con `check_access_rights`, antes de escribir nada:
+>
+> | Modelo | read | write | create | unlink |
+> |---|:--:|:--:|:--:|:--:|
+> | `stock.picking` | ✅ | **✅** | **✅** | **✅** |
+> | `stock.move` | ✅ | **✅** | **✅** | ❌ |
+> | `stock.scrap` | ✅ | **✅** | **✅** | ❌ |
+> | `stock.move.line` | ✅ | **✅** | **✅** | **✅** |
+>
+> Y las `ir.rules` **tampoco** frenaban: `check_access_rule('write')` sobre ese
+> mismo albarán pasaba. Ni permisos ni reglas. Venía del grupo
+> **`[42] Inventory / User`**, que el usuario tenía.
+>
+> O sea: durante todo ese tiempo **la capa 3 no existió**, y lo único que impidió
+> escribir en el inventario de producción fueron las capas 1 y 2 — dos copias de
+> una lista de JavaScript.
+>
+> ### Después del cambio de permisos (3-sep-2026)
+>
+> Andrea le quitó `[42] Inventory / User` al usuario y le creó una ACL de **solo
+> lectura** de `stock.scrap` para el grupo `[76]` (quitar `[42]` rompía esa
+> lectura, y con ella el diagnóstico de merma). Vuelto a medir:
+>
+> | Modelo | read | write | create | unlink |
+> |---|:--:|:--:|:--:|:--:|
+> | `stock.picking` | ✅ | ❌ | ❌ | ❌ |
+> | `stock.move` | ✅ | ❌ | ❌ | ❌ |
+> | `stock.scrap` | ✅ | ❌ | ❌ | ❌ |
+> | `account.move` | ✅ | ❌ | ❌ | ❌ |
+> | `product.product` | ✅ | ❌ | ❌ | ❌ |
+>
+> **Desde el 3-sep-2026 la capa 3 sí es un permiso de Odoo.** No lo fue antes.
+>
+> **Lo que sigue abierto**, y no lo arregla quitar `[42]`:
+> `stock.move.line` conserva **write / create / unlink**, porque ese permiso está
+> concedido a `Tipos de usuario / Usuario interno` — a *cualquier* usuario interno,
+> y uid 28 tiene que serlo para usar la API. Escribir ahí es tocar cantidades de
+> movimiento: inventario real. (El origen del permiso es documentación del 25-ago,
+> **no medido**: uid 28 no puede leer `ir.model.access`.)
+> Y las `ir.rules` siguen sin bloquear: la defensa es **una** capa, la ACL.
+>
+> **Cómo se vuelve a comprobar** — correrlo, nunca volver a citarlo:
+> `python3 diagnostico_permisos.py` (los pasos 1 y 2 no modifican nada) y
+> `python3 odoo_read.py --quien`.
 
 **⚠️ Y acá está la respuesta que cambia la decisión: Odoo NO puede expresar un
 permiso tan estrecho.** Las ACL de Odoo (`ir.model.access`) son por **modelo y

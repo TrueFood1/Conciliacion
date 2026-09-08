@@ -11,6 +11,36 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
 - **Producción es SOLO LECTURA.** Candado de 3 capas: allowlist deny-by-default
   en `odooRpc` + Conciliación bloqueada en prod + banner "⚠ PRODUCCIÓN · solo
   lectura". Nunca debilitarlo ni rodearlo.
+  ⚠️ **Y la tercera capa —el usuario de Odoo— NO EXISTIÓ hasta el 3-sep-2026,
+  mientras este archivo y `DIAGNOSTICO_ESCRITURA_ODOO.md` afirmaban que sí.**
+  Medido el 2-sep: uid 28 (`Lobby Solo Lectura`) tenía `write` y `create` sobre
+  `stock.picking`, `stock.move`, `stock.scrap` y `stock.move.line`, las `ir.rules`
+  tampoco frenaban, y un `write()` real sobre **`WH/OUT/02346`** —albarán ya
+  validado— **devolvió `True`**. Se arregló quitándole `[42] Inventory / User` al
+  usuario; vuelto a medir, los cinco modelos quedaron en `write=False`.
+  **Sigue abierto `stock.move.line`** (write/create/unlink), concedido a todo
+  usuario interno: ahí el único freno sigue siendo `LECTURA_OK`.
+  **No volver a CITAR que el candado es real: correrlo** —
+  `python3 diagnostico_permisos.py` y `python3 odoo_read.py --quien`. Es el caso
+  más caro de la regla "una salvaguarda citada no es una salvaguarda verificada",
+  y le pasó justo a la afirmación de que la salvaguarda era real.
+- **NUNCA borrar un directorio fuera del repo, y JAMÁS con `rm -rf`.** Lo que está
+  fuera de `Conciliacion/` no tiene git detrás: no hay `git checkout` que lo
+  devuelva, `rm -rf` no pasa por la Papelera, y si no hay respaldo del día, no hay
+  nada. La limpieza de archivos temporales va al scratchpad de la sesión, no a
+  carpetas del usuario.
+  **Y `rmdir` que falla es una SEÑAL, no un obstáculo.** `rmdir` solo borra
+  carpetas vacías; que se queje significa que adentro hay algo que no pusiste vos.
+  Ahí se mira qué es y se pregunta — no se escala a `rm -rf`, que es justo la
+  reacción que convierte un aviso en una pérdida.
+  **El caso (2-sep-2026)**: `Practica CC/.claude/` tenía un `launch.json` viejo del
+  preview **y las skills `/cierre` y `/retomar`**. Al limpiar la config del
+  servidor de pruebas corrí `rmdir .claude`, falló por no estar vacía —esa era la
+  advertencia— y después `rm -rf .claude`. **Se perdieron las dos skills.** El
+  directorio padre no es repo git, la Papelera estaba vacía y los únicos snapshots
+  del disco eran de actualizaciones del sistema. `retomar` se pudo recuperar solo
+  porque su texto había entrado en la conversación esa mañana; `cierre` no.
+  Pasó **dos veces el mismo día**, con la misma carpeta.
 - **Diagnosticar antes de arreglar**: ante números raros, primero lectura
   read-only (árbol de MP, script de diagnóstico), después el fix. No adivinar.
 - **Validar contra la fuente**: todo número nuevo se cruza contra el pivot
@@ -337,6 +367,26 @@ Productos terminados (IDs de producción):
 | Buns | 503 | Paquete de 4 | 6 paq = 24 u | 75 u |
 | Pizza | 472 | Paquete de 2 | 6 paq = 12 u | 20 u |
 | Galletas (Cookie Dough) | 519 | Units | 12 potes | 160 u |
+
+- **"uds" EN LA LETRA DE DANIEL NO SIEMPRE SON UNIDADES SUELTAS** (confirmado por
+  Andrea y Daniel, 28-ago-2026). Cuando Daniel escribe "uds" en su Excel o en el
+  conteo físico:
+  · **Pan Francés, Buns y Pizza → PAQUETES VENDIBLES** (de **4**, **4** y **2**
+    unidades respectivamente). Nunca panes sueltos.
+  · **Pan Blanco, Semillas y Galletas → unidades sueltas.**
+  Un "24 uds" de Francés son **24 paquetes = 96 unidades**, no 24 panes. Leerlo
+  mal descuenta 4× de menos.
+  ⚠️ **NO es lo mismo que la UoM de Odoo, aunque coincida el número.** Odoo llama
+  `Dozens` a la UoM de Francés y Buns —con `factor 0.25`, o sea **4**, no 12— y
+  `Paquete de 2` a la de Pizza. Que los dos den 4/4/2 es una coincidencia
+  afortunada, no una equivalencia: uno es cómo escribe una persona, el otro es un
+  campo de la base. Si alguna vez se separan, mandan cosas distintas. Para leer a
+  Daniel se usa esta regla; para leer a Odoo se usa `product_uom_id` → `factor`
+  (ver "UoM — NUNCA leer el nombre, SIEMPRE el id" arriba).
+  **Dónde vive en el código**: `NIV_INFO[pid].presDiv` (4/4/2) y `.cajaU`, y
+  `INV_TERM`. `rpUdsDe()` convierte con eso. Blanco/Semillas/Galletas tienen
+  `presDiv 1`, así que **un error de escala NO se nota en ellos** — no sirven
+  para descartar (auditoría del 28-ago).
 
 - **Batch = la receta base del BoM, NO una orden de producción.** Un MO puede
   ser varios batches: batches = unidades ÷ tamaño de batch (Blanco 63 = 3×21).

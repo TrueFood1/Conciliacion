@@ -3,15 +3,42 @@
 """
 Lector de Odoo producción — SOLO LECTURA, XML-RPC directo (sin proxy).
 El proxy truefood-proxy.onrender.com daba Access Denied en prod (está pineado al
-demo); la key es válida directo. Candado deny-by-default: allowlist de lectura.
-Credenciales desde conexion_prod.env (gitignored). La API key nunca se imprime.
+demo); la key es válida directo. Credenciales desde conexion_prod.env (gitignored).
+La API key nunca se imprime.
+
+⚠️ ENTRA COMO `Lobby Solo Lectura` (uid 28), NO COMO Andrea (uid 23).
+Hasta el 2-sep-2026 entraba con la cuenta de Andrea, que TIENE permisos de
+escritura en Odoo, y lo único que impedía un `write` desde acá era la lista
+`LECTURA_OK` de abajo — o sea, una salvaguarda CITADA, no un permiso. Bastaba un
+método fuera de la lista, o un descuido al editar la lista, para escribir en
+producción con credenciales de dueña.
+⚠️ CUANDO ESCRIBÍ ESTO, EL 2-SEP, DIJE QUE EL CANDADO YA ERA "UN PERMISO DE ODOO
+PORQUE EL GRUPO 76 TIENE CERO ESCRITURA". ERA FALSO, Y LO COPIÉ DE OTRO DOCUMENTO
+SIN MEDIRLO — el mismo error que estaba corrigiendo. Medido ese día: uid 28 tenía
+write y create sobre stock.picking, stock.move, stock.scrap y stock.move.line, y
+un `write()` real sobre `WH/OUT/02346` (albarán ya validado) devolvió True.
+
+Desde el 3-sep-2026 SÍ es un permiso: Andrea le quitó `[42] Inventory / User` al
+usuario y le dejó una ACL de solo lectura de stock.scrap sobre el grupo
+`Solo Lectura Lobby` [76]. Vuelto a medir: stock.picking, stock.move, stock.scrap,
+account.move y product.product en write=False.
+Queda abierto `stock.move.line` (write/create/unlink), concedido a todo usuario
+interno, no al grupo. `LECTURA_OK` se queda como segunda capa — y sigue siendo la
+única que cubre ese modelo.
+
+El detalle completo, con las tablas de antes y después, está en
+DIAGNOSTICO_ESCRITURA_ODOO.md §4. Para comprobarlo hoy, en vez de citarlo:
+    python3 diagnostico_permisos.py     (los pasos 1 y 2 no modifican nada)
 
 Uso:
     python3 odoo_read.py --probe      # test de conexión + UoM + clientes
+    python3 odoo_read.py --quien      # con qué usuario entra y qué permisos tiene
 """
 import sys, os, xmlrpc.client
 
-# Candado: allowlist de lectura (igual que LECTURA_OK en index.html). Denegar por defecto.
+# Candado 2 (defensa en profundidad): allowlist de lectura, igual que LECTURA_OK en
+# index.html y en el proxy. Denegar por defecto. NO es el candado principal: el
+# principal es el usuario de Odoo (ver el aviso de arriba).
 LECTURA_OK = {"search","search_read","read","search_count","read_group","fields_get",
               "name_search","name_get","default_get","get_views","load_views",
               "web_search_read","web_read","web_read_group","read_progress_bar"}
@@ -30,9 +57,23 @@ def load_env(path="conexion_prod.env"):
         if not line or line.startswith("#") or "=" not in line: continue
         k, v = line.split("=", 1)
         env[k.strip()] = v.strip()
-    for k in ("ODOO_URL","ODOO_DB","ODOO_USER","ODOO_APIKEY"):
+    for k in ("ODOO_URL","ODOO_DB"):
         if not env.get(k):
             sys.exit(f"[FALTA] {k} vacío en conexion_prod.env")
+    # ── El usuario: SIEMPRE el de solo lectura ────────────────────────────
+    # Sin fallback silencioso a ODOO_USER. Un fallback dejaría el agujero abierto
+    # justo el día que alguien borre una línea del .env, y sin decir nada.
+    if not env.get("ODOO_LECTOR_USER") or not env.get("ODOO_LECTOR_APIKEY"):
+        sys.exit(
+            "[FALTA] ODOO_LECTOR_USER / ODOO_LECTOR_APIKEY en conexion_prod.env.\n"
+            "  Son las credenciales de `Lobby Solo Lectura` (uid 28) — las mismas que\n"
+            "  usa el proxy en Render (ODOO_LOGIN / ODOO_APIKEY).\n"
+            "  Este lector ya NO entra con la cuenta de Andrea: esa tiene permisos de\n"
+            "  escritura y el candado quedaba en una lista de Python.\n"
+            "  Ver conexion_prod.env.example."
+        )
+    env["ODOO_USER"]   = env["ODOO_LECTOR_USER"]
+    env["ODOO_APIKEY"] = env["ODOO_LECTOR_APIKEY"]
     return env
 
 ENV = None; _UID = None; _MODELS = None
@@ -91,8 +132,107 @@ def probe():
         print(f"  [{p['id']}] {p['name']}")
     if len(parts)>40: print(f"  … (+{len(parts)-40} más en el CSV)")
 
+def quien():
+    """Con qué usuario entra y QUÉ PUEDE ESCRIBIR — medido en Odoo, no citado.
+
+    Es el chequeo que convierte la frase "entra como solo lectura" en un hecho
+    verificable. Si alguna vez vuelve a aparecer un permiso de escritura, esto lo
+    dice; leer otro documento que afirma que no lo hay, no."""
+    env = load_env()
+    _connect()
+    print(f"URL = {env['ODOO_URL']}  ·  DB = {env['ODOO_DB']}")
+    me = call("res.users", "read", [_UID], fields=["id","login","name","groups_id","active"])
+    u = me[0]
+    print(f"\n── USUARIO ──\n  uid   = {u['id']}\n  login = {u['login']}\n  name  = {u['name']}")
+    if u["id"] == 28:
+        print("  ✓ es el uid 28 esperado (Lobby Solo Lectura)")
+    else:
+        print(f"  ⚠️ NO es el uid 28 — revisá ODOO_LECTOR_USER en conexion_prod.env")
+
+    gs = call("res.groups", "read", u["groups_id"], fields=["id","full_name"])
+    print(f"\n── GRUPOS ({len(gs)}) ──")
+    for g in sorted(gs, key=lambda x: x["full_name"]):
+        print(f"  [{g['id']:4}] {g['full_name']}")
+
+    # ⚠️ ESTE BLOQUE ES OPCIONAL Y NO PUEDE MATAR EL RESTO. uid 28 normalmente NO
+    # puede leer `ir.model.access` ("Contact your administrator..."), que es
+    # coherente con ser un usuario recortado. La prueba de lectura de los modelos
+    # —que es la que decide si el diagnóstico de merma se reproduce— va DESPUÉS y
+    # tiene que correr igual.
+    gids = [g["id"] for g in gs]
+    print(f"\n── ACL QUE ALCANZAN A ESTE USUARIO ──")
+    try:
+        acls = call("ir.model.access", "search_read",
+                    ["|", ["group_id", "in", gids], ["group_id", "=", False]],
+                    fields=["name","model_id","group_id","perm_write","perm_create","perm_unlink"])
+        escribe = [a for a in acls if a["perm_write"] or a["perm_create"] or a["perm_unlink"]]
+        print(f"  alcanzables: {len(acls)}  ·  con escritura/creación/borrado: {len(escribe)}")
+        if not escribe:
+            print("  ✓ CERO por ACL.")
+        else:
+            print("  ⚠️ hay ACL con escritura alcanzable:")
+            for a in sorted(escribe, key=lambda x: x["model_id"][1]):
+                g = a["group_id"][1] if a.get("group_id") else "(sin grupo = TODOS los internos)"
+                print(f"     {a['model_id'][1][:34]:34} {g[:38]:38} "
+                      f"w{int(a['perm_write'])} c{int(a['perm_create'])} u{int(a['perm_unlink'])}")
+    except BaseException as e:                    # SystemExit incluido: `call` sale con sys.exit
+        print(f"  ⓘ no se puede leer ir.model.access con este usuario — {str(e)[:120]}")
+        print("    Es lo esperado en un usuario recortado, y NO prueba que no haya")
+        print("    escritura: solo que no podemos verlo por acá. La medición de verdad")
+        print("    es `python3 diagnostico_permisos.py`, que prueba el candado en vivo.")
+
+    # ── ¿sigue leyendo lo que el proyecto necesita? ──
+    print("\n── LECTURA DE LOS MODELOS QUE USA EL PROYECTO ──")
+    for modelo, dom in [("stock.scrap", []), ("product.product", []), ("stock.picking", []),
+                        ("mrp.production", []), ("account.move", []), ("res.partner", []),
+                        ("uom.uom", []), ("stock.quant", []), ("stock.move", [])]:
+        try:
+            n = call(modelo, "search_count", dom)
+            print(f"  ✓ {modelo:20} {n:>7} filas legibles")
+        except SystemExit as e:
+            print(f"  ❌ {modelo:20} NO SE PUEDE LEER — {e}")
+        except Exception as e:
+            print(f"  ❌ {modelo:20} NO SE PUEDE LEER — {type(e).__name__}: {str(e)[:90]}")
+
+    # ── LA PRUEBA QUE DECIDE: el diagnóstico de merma, tal cual ──────────
+    # No basta con "puedo contar stock.scrap": el diagnóstico del 2-sep leyó
+    # campos concretos (lote, UoM, MO ligada). Si uid 28 puede contar pero no
+    # puede leer `production_id`, el reporte no se reproduce. Se corre la MISMA
+    # consulta y se comparan los totales medidos ese día: 106 en el rango, 97 de
+    # los seis terminados.
+    print("\n── ¿SE REPRODUCE EL DIAGNÓSTICO DE MERMA? ──")
+    TERM = {451, 452, 453, 503, 472, 519}
+    try:
+        rows = call("stock.scrap", "search_read",
+                    ["|", ["date_done", ">=", "2026-01-01 00:00:00"],
+                          ["create_date", ">=", "2026-01-01 00:00:00"]],
+                    fields=["id","name","date_done","create_date","product_id","lot_id",
+                            "scrap_qty","product_uom_id","state","origin","picking_id",
+                            "production_id","location_id","scrap_location_id"],
+                    order="date_done")
+        n_term = sum(1 for r in rows if r.get("product_id") and r["product_id"][0] in TERM)
+        print(f"  scraps en el rango 2026 : {len(rows):>4}   (medido el 2-sep como uid 23: 106)")
+        print(f"  de los seis terminados  : {n_term:>4}   (medido el 2-sep como uid 23:  97)")
+        con_mo = sum(1 for r in rows if r.get("production_id"))
+        print(f"  con production_id legible: {con_mo:>4}   (el lote sale de la MO, no del scrap)")
+        if len(rows) == 106 and n_term == 97:
+            print("  ✓ IDÉNTICO. El diagnóstico se reproduce entero por el camino nuevo.")
+        else:
+            print("  ⚠️ los totales NO coinciden con lo medido como uid 23.")
+            print("     Puede ser merma nueva registrada desde el 2-sep (mirá las fechas)")
+            print("     o filas que uid 28 no ve. Reportarlo ANTES de tocar permisos.")
+    except SystemExit as e:
+        print(f"  ❌ NO SE PUEDE — {e}")
+        print("     El diagnóstico de merma NO se reproduce con uid 28. Reportar")
+        print("     ANTES de tocar permisos en Odoo.")
+    except Exception as e:
+        print(f"  ❌ NO SE PUEDE — {type(e).__name__}: {str(e)[:120]}")
+
+
 if __name__ == "__main__":
     if "--probe" in sys.argv:
         probe()
+    elif "--quien" in sys.argv:
+        quien()
     else:
         print(__doc__)
