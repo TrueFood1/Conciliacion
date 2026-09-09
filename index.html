@@ -2430,6 +2430,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .rp-lotebtn{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;background:var(--sunken);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:13px;padding:9px 11px;cursor:pointer}
 .rp-lote.on .rp-lotebtn{border-color:var(--ent-line);color:var(--text)}
 .rp-lote.ago .rp-lotebtn{opacity:.45}
+/* VIEJO = fuera de la ventana de 3 meses de producción, pero con saldo. Se puede
+   elegir; el gris dice que no es de la tanda corriente. No se esconde: el
+   congelador manda sobre el sistema. */
+.rp-lote.viejo .rp-lotebtn{color:var(--text-3);border-style:dashed}
 /* ⚠️ EL LOTE NO SE PARTE (26-ago). El nombre iba como nodo de texto suelto dentro
    de un flex, así que al elegir el lote —que agrega el input de 76px al lado— el
    botón se quedaba sin ancho y "208 / 1-27" se rompía en TRES renglones, cortado
@@ -2632,6 +2636,11 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .cl-resumen{margin-top:10px;font-size:11.5px;color:var(--text-3);line-height:1.7}
 .cl-resumen b{color:var(--ent-line);font-weight:600;font-variant-numeric:tabular-nums}
 .cl-tag{font-size:10px;color:var(--text-3);border:1px solid var(--border);border-radius:999px;padding:1px 6px;margin-left:4px}
+/* Por qué un lote está en la lista de conteo si no lo produjo la ventana de 3 meses.
+   VIEJO = tiene saldo contra el ancla anterior. BUSCAR = el sistema no lo conoce y
+   se sospecha que hay cajas igual (ENT_LOTES_A_BUSCAR). */
+.cl-tag-v{color:var(--warn);border-color:rgba(233,162,59,.45)}
+.cl-tag-b{color:var(--stop-tx);border-color:rgba(255,138,138,.45)}
 .cl-add{margin-top:10px}
 /* Los dos campos en rejilla pareja y el botón EN SU PROPIA LÍNEA del flujo vertical.
    Antes el botón iba dentro del mismo flex que los campos, alineado al pie de la nota:
@@ -3114,6 +3123,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .el-merma-sin .el-merma-t,.el-merma-sin .el-merma-n{color:var(--text-2)}
 .el-merma-dud{background:rgba(233,162,59,.07);border:.5px solid rgba(233,162,59,.35)}
 .el-merma-dud .el-merma-t,.el-merma-dud .el-merma-n{color:var(--warn)}
+/* Salidas sin lote imputado. ROJO = excepción pendiente de resolver, con una acción
+   detrás. El ámbar es de la merma dudosa, que no tiene ninguna. */
+.el-merma-ind{background:rgba(226,75,74,.07);border:.5px solid rgba(226,75,74,.35)}
+.el-merma-ind .el-merma-t,.el-merma-ind .el-merma-n{color:var(--stop-tx)}
 .bs-reg{display:flex;align-items:center;gap:10px;margin-top:12px;max-width:620px;
   border:1px solid var(--border);border-radius:9px;padding:8px 11px;
   font-size:12px;color:var(--text-2)}
@@ -3658,7 +3671,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 7 sep 2026 · b55';
+const BUILD = 'v 8 sep 2026 · b56';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -7435,6 +7448,26 @@ const ENT_MO_EXCLUIDAS = {
               +'el producto ya estaba terminado y contado en el físico. Sumarla lo cuenta '
               +'dos veces: el saldo daba 316 y el correcto es 156.'},
 };
+// ── LOTES QUE HAY QUE BUSCAR AUNQUE EL SISTEMA NO LOS CONOZCA (b56) ─────
+// El conteo del viernes es la ÚNICA oportunidad de recuperar un lote que se cayó
+// de todas las fuentes: no está en la ventana de 3 meses de Odoo (es viejo) y
+// tampoco en el ancla (nadie lo contó la vez pasada). Para el sistema no existe,
+// y sin embargo puede haber cajas en el congelador.
+//
+// Se pone acá, a mano y con su razón, en vez de derivarlo: es una lista de
+// SOSPECHAS, y una sospecha no se puede calcular. Cada entrada se BORRA en cuanto
+// el conteo la resuelva — si el viernes no aparece nada, esa línea se va.
+//
+// Francés 182 / 12-26: documentado el 25-ago con 8 unidades (2 paquetes) de saldo
+// real, junto con los otros cuatro lotes fuera de ventana. Medido el 8-sep contra
+// la base: NO está en el ancla del 28-ago ni en ninguna salida, o sea que el
+// conteo de ese día no lo incluyó. Los otros cuatro sí están y salen solos por la
+// unión; este es el único que hay que ir a buscar.
+const ENT_LOTES_A_BUSCAR = {
+  453: [{lote:'182 / 12-26',
+         razon:'documentado el 25-ago con 2 paquetes; el ancla del 28-ago no lo contó'}],
+};
+
 // Verifica cada exclusión contra Odoo. Misma disciplina que verificarExclusiones() de
 // costos: si la huella no calza, la exclusión NO se aplica y se reporta.
 async function verificarExclusionesMO(){
@@ -7630,6 +7663,87 @@ function _entAgrupar(crudo, anioSet){
   return {lotes, buckets};
 }
 
+// ── EL CENTINELA DE LA EXCEPCIÓN, NOMBRADO UNA SOLA VEZ (b56) ───────────
+// 'NO DETERMINADO' es un VALOR de lote, no un booleano aparte: el motor indexa por
+// `producto|lote` como texto en todas partes, así que el balde de las salidas sin
+// lote imputado es UNA clave conocida por producto y la aritmética de saldos no se
+// toca. La cadena vive acá y no escrita a mano en cada comparación — es la misma
+// disciplina que la clave del lote: si el nombre cambia, cambia en un lugar.
+// El candado de la base es `ent_alisto_lote_lote_forma` (ENTREGAS_INDETERMINADO.sql).
+const ENT_LOTE_INDET = 'NO DETERMINADO';
+
+// ── LA UNIÓN DE LAS DOS FUENTES, EN UN SOLO LUGAR (b56) ─────────────────
+// `entLotesActivos(3)` solo ve lo fabricado en los últimos 3 meses. El SALDO ve
+// todo lo que el ancla contó, por viejo que sea. Un lote que salió de esa ventana
+// y todavía tiene producto existe en el segundo y no en el primero.
+//
+// Inventario ya iteraba la unión desde el 26-ago, pero con el cálculo escrito
+// adentro de su render; el selector de Daniel nunca lo recibió y por eso escondía
+// producto real. Caso del 8-sep: Pizza 120/10-26 con 4 paquetes en el congelador
+// —tres salieron a Green Center ese mismo día— y no se podía elegir. Los otros
+// cuatro ya estaban documentados desde el 25-ago: Pizza 82/9-26 y 107/10-26,
+// Semillas 126/11-26 y Francés 182/12-26.
+//
+// Ésta es LA función de la unión: Inventario, el selector con factura, el de sin
+// factura y el validador del lote escrito a mano salen todos de acá. Una segunda
+// implementación es una que se desincroniza — el modo de falla de siempre.
+//
+// LA VENTANA DE 3 MESES NO SE AMPLÍA. Es la lectura del chatter de Odoo, la que
+// tarda 40 s en frío, y ampliarla no ganaría nada: lo que está en el congelador ya
+// vive en los saldos, que es la otra mitad de esta unión.
+//
+// Devuelve {pid:[{pid,lote,saldo,activo,key}]}. `saldo` null = no hay ancla, o el
+// lote no figura en ella: no se inventa un cero. `activo` = está dentro de la
+// ventana de producción, y es lo que separa "lo normal" de "lo viejo con saldo".
+function entLotesUnion(g, saldo){
+  const act={};
+  Object.values((g&&g.lotes)||{}).forEach(function(L){ act[(+L.producto)+'|'+L.canon]=L; });
+  const claves={};
+  Object.keys(act).forEach(function(k){ claves[k]=1; });
+  Object.keys(saldo||{}).forEach(function(k){ claves[k]=1; });
+  const porProd={};
+  Object.keys(claves).forEach(function(k){
+    const i=k.indexOf('|'), pid=+k.slice(0,i), lote=k.slice(i+1);
+    const A=act[k]||null;
+    (porProd[pid]=porProd[pid]||[]).push({pid:pid, lote:lote,
+      saldo:(saldo && saldo[k]!=null) ? (+saldo[k]) : null,
+      activo:!!A, key:A?A.key:null});
+  });
+  return porProd;
+}
+// EL ORDEN DE UN SELECTOR, también en un solo lugar. Primero lo que se puede
+// despachar —activos, y después los viejos con saldo—, y al fondo lo agotado: un
+// agotado no se puede elegir, un viejo con saldo sí. Dentro de cada grupo, FIFO
+// de verdad por `_lotCmp` (vencimiento, no juliano pelado: el juliano se repite
+// cada año y mezclaría `350 / 12-26` con `010 / 6-27`).
+function entLoteCmpSel(a,z){
+  const aa=(a.saldo!=null&&a.saldo<=0)?1:0, zz=(z.saldo!=null&&z.saldo<=0)?1:0;
+  if(aa!==zz) return aa-zz;                          // agotados al fondo
+  if(!a.activo!==!z.activo) return a.activo?-1:1;    // los viejos con saldo, después
+  return _lotCmp(a.lote, z.lote);
+}
+// LO QUE VE UN SELECTOR. Decisión de Andrea (8-sep): se muestra TODO lote con
+// saldo mayor a cero, sin importar cuándo se produjo — Truefie tiene que mostrar
+// todo lo disponible.
+//   · activo (dentro de la ventana): siempre, con saldo o sin él. Es la regla
+//     vieja y no se toca: "NUNCA se esconde un lote", el congelador manda sobre
+//     el sistema.
+//   · viejo (fuera de la ventana): solo si le queda saldo. Un viejo agotado no se
+//     puede despachar y llenaría la lista de renglones muertos — tampoco se veía
+//     antes de b56, así que no se pierde nada.
+//   · el CENTINELA nunca: 'NO DETERMINADO' no es una caja que se pueda ir a buscar
+//     al congelador. Hoy queda afuera igual por el filtro de saldo (su saldo solo
+//     resta, así que nunca es > 0), pero se excluye POR NOMBRE a propósito: que algo
+//     no aparezca por un efecto secundario de otra regla es exactamente como se
+//     rompe cuando esa otra regla cambia. Cuando entre el punto 3.2, la excepción va
+//     a ofrecerse en su propio bloque rojo al fondo, no como un lote de la lista.
+function entLotesSelector(g, saldo, pid){
+  return ((entLotesUnion(g, saldo)[+pid])||[])
+    .filter(function(x){ return x.lote!==ENT_LOTE_INDET; })
+    .filter(function(x){ return x.activo || (x.saldo!=null && x.saldo>0); })
+    .sort(entLoteCmpSel);
+}
+
 // ════════════════════════════════════════════════════════════════════════
 // CONTEO POR LOTE — el ANCLA de saldos del módulo de Entregas (Pieza 4).
 // Es una FOTO del congelador: qué lotes hay y cuánto de cada uno. Todo lo
@@ -7638,6 +7752,10 @@ function _entAgrupar(crudo, anioSet){
 // Odoo sigue SOLO LECTURA — acá solo se escribe en Supabase.
 // ════════════════════════════════════════════════════════════════════════
 let _clLotes=null, _clExtra={}, _clGuardando=false, _clHuerfanos=[];
+// El saldo contra el ancla VIGENTE (la anterior). Es lo que permite ofrecer para
+// contar un lote viejo que ya no está en la ventana de producción de Odoo. null =
+// no se pudo calcular (sin ancla o sin sesión): se cuenta igual, sin esos lotes.
+let _clSaldo=null;
 // Exclusiones de ENT_MO_EXCLUIDAS verificadas contra Odoo. Se muestran ACÁ, en el panel
 // de lotes, porque es la pantalla donde se mira de qué está hecho el saldo. Una exclusión
 // rota no se aplica —el motor la ignora— pero tiene que verse, o el lote queda inflado
@@ -7750,6 +7868,51 @@ function _clUds(pid, cajas, sueltas){
   return (+cajas||0)*I.cajaU + (+sueltas||0)*I.presDiv;
 }
 
+// ── LA LISTA DE LOTES A CONTAR DE UN PRODUCTO, EN UN SOLO LUGAR (b56) ───
+// LO QUE HAY QUE CONTAR NO ES SOLO LO QUE SE PRODUJO. Cuatro fuentes, y ninguna
+// tapa a otra:
+//   1. la ventana de 3 meses del chatter de Odoo — la lista de siempre;
+//   2. los VIEJOS CON SALDO, por la misma unión que usan Inventario y los dos
+//      selectores. Es lo que faltaba: si un lote viejo con producto no se ofrece
+//      para contar, el ancla NUEVA lo deja en cero y el pan que está en el
+//      congelador desaparece del sistema para siempre. En el selector el agujero
+//      esconde producto un día; acá lo borra;
+//   3. ENT_LOTES_A_BUSCAR — los que no están en ninguna de las dos y se sospecha
+//      que existen igual (hoy: Francés 182 / 12-26);
+//   4. los agregados a mano en esta sesión (_clExtra).
+//
+// VA EN UNA FUNCIÓN Y NO ADENTRO DEL RENDER porque `_clAgregar` tiene que ver
+// EXACTAMENTE esta lista: si no, escribir a mano un lote que la pantalla ya está
+// dibujando contesta "no está en la lista", que es falso, y agrega una segunda
+// fila apuntando a la misma clave de _clVal — el bug de las dos filas otra vez.
+// `base` son los lotes de Odoo del producto, que el render ya separó de los
+// huérfanos; si no se pasa, se derivan acá.
+function _clLotesDe(pid, base){
+  const out=[], vistos={};
+  (base || Object.values((_clLotes&&_clLotes.lotes)||{})
+            .filter(function(L){ return +L.producto===+pid; })
+  ).forEach(function(L){ if(vistos[L.canon]) return; vistos[L.canon]=1; out.push(L); });
+  ((entLotesUnion(_clLotes, _clSaldo))[+pid]||[]).forEach(function(x){
+    if(x.lote===ENT_LOTE_INDET) return;   // no es una caja: no se cuenta
+    if(x.activo || vistos[x.lote]) return;
+    if(!(x.saldo!=null && x.saldo>0)) return;
+    vistos[x.lote]=1;
+    out.push({key:'v:'+pid+':'+x.lote, canon:x.lote, viejo:true, saldo:x.saldo});
+  });
+  (ENT_LOTES_A_BUSCAR[pid]||[]).forEach(function(b){
+    if(vistos[b.lote]) return; vistos[b.lote]=1;
+    out.push({key:'b:'+pid+':'+b.lote, canon:b.lote, buscar:true, razon:b.razon});
+  });
+  (_clExtra[pid]||[]).forEach(function(x){
+    if(vistos[x]) return; vistos[x]=1;
+    out.push({key:'x:'+pid+':'+x, canon:x, extra:true});
+  });
+  // FIFO real (vencimiento, no juliano pelado): la misma función que ordena
+  // Inventario y los dos selectores. Deja los viejos arriba, que es donde sirven
+  // en una pantalla cuya pregunta es "¿queda algo de esto?".
+  return out.sort(function(a,z){ return _lotCmp(a.canon, z.canon); });
+}
+
 async function cargarConteoLote(force){
   const st=document.getElementById('clStatus'), body=document.getElementById('clBody');
   if(_clLotes && !force){ _clRender(); return; }
@@ -7767,6 +7930,12 @@ async function cargarConteoLote(force){
   // El stock de Odoo, para que la pantalla cuadre SOLA mientras se cuenta. Si falla,
   // no pasa nada: se cuenta igual y no se muestra la comparación.
   try{ _clStock=await _clLeerStock(); }catch(e){ _clStock=null; }
+  // EL SALDO CONTRA EL ANCLA ANTERIOR (b56). Sin esto la lista de lotes a contar es
+  // solo la ventana de 3 meses de producción, y un lote más viejo con producto real
+  // no se ofrece — o sea que nadie lo cuenta, y el ancla nueva lo deja en cero para
+  // siempre. Es el mismo agujero que tenía el selector de Daniel, en la pantalla que
+  // lo vuelve permanente. No bloquea: si no hay ancla o falla, se cuenta igual.
+  try{ _clSaldo=await rpCalcSaldos(_clLotes); }catch(e){ _clSaldo=null; }
   // El render va SIEMPRE, haya fallado la lectura o no: la pantalla tiene que poder
   // usarse a mano aunque Odoo no conteste. Y si el propio render revienta, se dice.
   try{ _clRender(); }
@@ -7788,10 +7957,7 @@ function _clRender(){
     if(pid && porProd[pid]) porProd[pid].push(L);
     else _clHuerfanos.push(L);   // lote de un producto fuera de ENT_PROD: se dice, no se pierde
   });
-  ENT_PROD.forEach(function(pid){
-    (_clExtra[pid]||[]).forEach(function(x){ porProd[pid].push({key:'x:'+pid+':'+x, canon:x, extra:true}); });
-    porProd[pid].sort(function(a,z){ return String(a.canon).localeCompare(String(z.canon),'es'); });
-  });
+  ENT_PROD.forEach(function(pid){ porProd[pid]=_clLotesDe(pid, porProd[pid]); });
 
   let h='';
   // Tres motivos por los que la lista puede venir corta, los tres DICHOS en texto.
@@ -7851,7 +8017,8 @@ function _clRender(){
       +'</button>';
     if(abierto){
       h+='<div class="cl-cuerpo">';
-      if(!ls.length) h+='<div class="cl-none">Sin lotes en la ventana de 3 meses. Si hay producto físico, agregalo abajo.</div>';
+      if(!ls.length) h+='<div class="cl-none">Sin lotes: ni en la ventana de 3 meses de producción, '
+        +'ni con saldo en el ancla anterior. Si hay producto físico, agregalo abajo.</div>';
       else{
         // colgroup = los dos ejes verticales de captura. El encabezado "Unidades" faltaba:
         // la fila tenía 4 celdas y la cabecera 3, y esa columna quedaba sin nombre.
@@ -7865,7 +8032,15 @@ function _clRender(){
           const V=_clGet(pid,L.canon);
           const u0=_clUds(pid,V.c,V.s);
           h+='<tr data-pid="'+pid+'" data-lote="'+esc(L.canon)+'">'
-            +'<td class="cl-lote">'+esc(L.canon)+(L.extra?' <span class="cl-tag">agregado</span>':'')+'</td>'
+            +'<td class="cl-lote">'+esc(L.canon)
+              +(L.extra?' <span class="cl-tag">agregado</span>':'')
+              // El saldo va en unidad de VENTA y rotulado "según sistema": es lo que
+              // habría que encontrar, no lo que hay. Lo que hay lo dice el congelador.
+              +(L.viejo?(' <span class="cl-tag cl-tag-v">fuera de ventana · según sistema '
+                         +esc(_lotUds(L.saldo,pid))+'</span>'):'')
+              +(L.buscar?' <span class="cl-tag cl-tag-b" title="'+esc(L.razon||'')
+                         +'">a buscar · el sistema no lo tiene</span>':'')
+              +'</td>'
             +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_c" value="'+esc(V.c)+'" oninput="_clRecalc(this)"></td>'
             +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_s" value="'+esc(V.s)+'" oninput="_clRecalc(this)"></td>'
             +'<td class="cl-uds" id="'+id+'_u">'+(u0?_rzN(u0):'—')+'</td></tr>';
@@ -8192,8 +8367,10 @@ function _clAgregar(pid){
   // una y la otra se quedaba en blanco con "—" en unidades. Contando con guantes
   // eso se lee como que el dato no entró, cuando sí había entrado. El total y lo
   // que se guarda siempre estuvieron bien; lo que estaba mal era la pantalla.
-  const yaEsta=Object.values((_clLotes&&_clLotes.lotes)||{})
-    .some(function(L){ return +L.producto===+pid && L.canon===canon; });
+  // MISMA LISTA QUE DIBUJA LA PANTALLA (b56), no solo los lotes de Odoo: desde que
+  // la lista incluye viejos con saldo y lotes a buscar, mirar únicamente `_clLotes`
+  // contestaría "no está" sobre una fila que está a la vista.
+  const yaEsta=_clLotesDe(pid).some(function(L){ return L.canon===canon; });
   if(yaEsta){
     _clProdAbierto=pid; _clRender();
     alert('El lote '+canon+' ya está en la lista de '+((NIV_INFO[pid]&&NIV_INFO[pid].nom)||pid)
@@ -9835,25 +10012,14 @@ function _despLineaOK(f,i){
   return Math.abs(suma-(+e.cant||0))<1e-9;
 }
 function _despLotesDe(pid){
-  if(!_despLotes||!_despLotes.lotes) return [];
-  const out=[];
-  Object.values(_despLotes.lotes).forEach(function(L){
-    if(+L.producto!==+pid) return;
-    const k=pid+'|'+L.canon;
-    // NUNCA se esconde un lote. Antes esta línea lo sacaba de la lista cuando el saldo daba ≤ 0,
-    // que es lo contrario de lo que hace el Reporte —"agotados al fondo, en gris, NUNCA ocultos:
-    // el congelador físico manda sobre el sistema"—. Dos pantallas con la regla al revés sobre el
-    // mismo dato, y el resultado fue que Andrea tuvo que escribir un lote a mano el 18-ago.
-    // Va a importar más todavía: hoy nada se descuenta porque falta la vista de saldos, así que
-    // en cuanto empiece a descontarse habría desaparecido medio selector.
-    out.push({lote:L.canon, saldo:(_despSaldo?(_despSaldo[k]!=null?_despSaldo[k]:null):null)});
-  });
-  out.sort(function(a,z){
-    const aa=(a.saldo!=null&&a.saldo<=0)?1:0, zz=(z.saldo!=null&&z.saldo<=0)?1:0;
-    if(aa!==zz) return aa-zz;                                       // agotados al fondo
-    return String(a.lote).localeCompare(String(z.lote),'es');
-  });
-  return out;
+  // NUNCA se esconde un lote con producto, y ahora eso incluye a los VIEJOS.
+  // Dos veces se estrechó de más esta lista: primero filtraba por saldo ≤ 0 —y el
+  // 18-ago Andrea tuvo que escribir un lote a mano—, y hasta b56 salía SOLO de
+  // `_despLotes.lotes`, o sea los últimos 3 meses de producción, así que un lote
+  // más viejo con saldo real no se podía elegir (Pizza 120/10-26, el 8-sep).
+  // Las dos reglas viven ahora en `entLotesSelector`, la MISMA que usa el camino
+  // sin factura y la misma unión que dibuja Inventario.
+  return entLotesSelector(_despLotes, _despSaldo, pid);
 }
 
 function despRenderPedido(body){
@@ -9946,10 +10112,25 @@ function _despPieHTML(f){
 function _despSel(i,j,lt,disp,cls){
   let h='<select class="dp-lsel '+cls+'" onchange="despSetLote('+i+','+j+',this.value)">'
     +'<option value="">Elegir lote</option>';
-  disp.forEach(function(d){
-    const ago=(d.saldo!=null&&d.saldo<=0)?' — agotado según sistema':'';
-    h+='<option value="'+esc(d.lote)+'"'+(lt.lote===d.lote?' selected':'')+'>'+esc(d.lote+ago)+'</option>';
-  });
+  // LOS VIEJOS VAN AL FONDO, APARTE Y CON EL SALDO A LA VISTA. Un <option> no se
+  // puede pintar de gris en iOS —el selector nativo es una rueda—, así que el
+  // separador hace acá el trabajo que el gris hace en Inventario: se ven, se
+  // pueden elegir, y se lee que son de otro grupo. El saldo va SOLO en ellos: es
+  // lo que explica por qué se están ofreciendo estando fuera de la ventana.
+  // Y va en unidad de venta (`_lotUds`), nunca en panes sueltos.
+  const _op=function(d){
+    const ago=(d.saldo!=null&&d.saldo<=0) ? ' — agotado según sistema'
+            : (!d.activo && d.saldo!=null) ? (' — quedan '+_lotUds(d.saldo, d.pid)) : '';
+    return '<option value="'+esc(d.lote)+'"'+(lt.lote===d.lote?' selected':'')
+      +'>'+esc(d.lote+ago)+'</option>';
+  };
+  disp.forEach(function(d){ if(d.activo) h+=_op(d); });
+  const _viejos=disp.filter(function(d){ return !d.activo; });
+  if(_viejos.length){
+    h+='<optgroup label="Más viejos, con saldo">';
+    _viejos.forEach(function(d){ h+=_op(d); });
+    h+='</optgroup>';
+  }
   if(lt.lote && !disp.some(function(d){return d.lote===lt.lote;}))
     h+='<option value="'+esc(lt.lote)+'" selected>'+esc(lt.lote)+'</option>';
   h+='<option value="__">Escribir a mano…</option></select>';
@@ -10071,12 +10252,16 @@ function _despFacAbierta(){ return (_despFac||[]).find(function(x){ return x.fac
 //   desconocido  → no hay ningún lote así en Odoo. Sí es anomalía: se avisa (no se bloquea).
 //   ilegible     → no tiene forma de lote. Se guarda igual, pero no va a cruzar con nada.
 function _loteConocido(pid, txt){
-  const ls=(_despLotes&&_despLotes.lotes)?Object.values(_despLotes.lotes).filter(function(L){ return +L.producto===+pid; }):[];
+  // LA MISMA LISTA QUE VE EL SELECTOR (b56). Si un lote viejo con saldo se puede
+  // elegir del desplegable, escribirlo a mano no puede contestar "no existe": dos
+  // reglas distintas sobre el mismo dato en la misma pantalla es exactamente el
+  // aviso que entrena a ignorar avisos.
+  const ls=entLotesSelector(_despLotes, _despSaldo, pid);
   const v=String(txt==null?'':txt).trim(), canon=_entCanon(v);
   if(!canon) return {nivel:'ilegible', canon:v,
     msg:'No pude leer "'+v+'" como lote; la forma es "154 / 12-26". Lo guardo tal cual, pero así '
        +'no cruza con ningún lote de Odoo: esa salida no se resta de ningún saldo.'};
-  if(ls.some(function(L){ return L.canon===canon; }))
+  if(ls.some(function(L){ return L.lote===canon; }))
     return canon===v ? {nivel:'ok', canon:canon, msg:''}
                      : {nivel:'formato', canon:canon,
                         msg:'Ese lote existe; en el sistema se escribe "'+canon+'".'};
@@ -10084,10 +10269,14 @@ function _loteConocido(pid, txt){
     msg:'No hay lotes de este producto leídos de Odoo, así que no puedo verificarlo.'};
   // Mismo día juliano y distinto vencimiento = casi seguro el mismo lote, mal transcrito.
   const ddd=(canon.match(/^\d{1,3}/)||[])[0];
-  const casi=ddd?ls.filter(function(L){ return String(L.ddd)===String(+ddd); }).map(function(L){ return L.canon; }):[];
+  // El día juliano sale del propio texto del lote y no de `L.ddd`: la lista ahora
+  // trae también lotes VIEJOS, que vienen del saldo y no de una orden de Odoo, así
+  // que no tienen ese campo. Es el mismo número, leído del mismo lugar que arriba.
+  const _ddd=function(l){ const m=String(l||'').match(/^\d{1,3}/); return m?+m[0]:null; };
+  const casi=ddd?ls.filter(function(L){ return _ddd(L.lote)===+ddd; }).map(function(L){ return L.lote; }):[];
   return {nivel:'desconocido', canon:canon, msg: casi.length
     ? ('Ese lote no existe en Odoo. Con el día '+(+ddd)+' hay: '+casi.join(' · ')+'.')
-    : ('Ese lote no existe en Odoo para este producto. Los que hay: '+ls.map(function(L){return L.canon;}).join(' · ')+'.')};
+    : ('Ese lote no existe en Odoo para este producto. Los que hay: '+ls.map(function(L){return L.lote;}).join(' · ')+'.')};
 }
 
 // ── CONFIRMAR · DOS CAMINOS ─────────────────────────────────────────────
@@ -10732,6 +10921,31 @@ function _lotDesglose(pid, lote){
   if(partes.length<2) return '';        // con un solo término no hay nada que desglosar
   return '<div class="el-des">'+partes.join('<span class="el-des-s">·</span>')+'</div>';
 }
+// ── LAS SALIDAS SIN LOTE IMPUTADO (b56) ─────────────────────────────────
+// Producto que SALIÓ del congelador sin que se supiera de qué lote. El total del
+// producto tiene que bajar, pero ningún lote puede bajar — si no se dice, la suma
+// de los lotes va a decir para siempre que hay de más.
+//
+// ES EL TERCER CASO DE UN PATRÓN QUE YA EXISTÍA, no un patrón nuevo: la merma sin
+// lote y la merma dudosa ya se dibujan así, con su número y su explicación, al pie
+// del PRODUCTO y no de un lote. Se reusa su CSS.
+//
+// Va en ROJO y no en ámbar: es una EXCEPCIÓN pendiente de resolver, con una acción
+// concreta detrás (asignarle su lote real cuando aparezca el dato), y el módulo ya
+// decidió que la excepción se ve en rojo. El ámbar es de la merma dudosa, que no
+// tiene acción — nadie puede averiguar si ya estaba descontada.
+//
+// `n` viene en positivo (el saldo del centinela es negativo; el llamador lo invierte).
+function _lotSinImputar(pid, n){
+  if(!(n>0)) return '';
+  return '<div class="el-merma el-merma-ind">'
+    +'<span class="el-merma-t">Salidas sin lote imputado</span>'
+    +'<span class="el-merma-n">−'+esc(_lotUds(n,pid))+'</span>'
+    +'<span class="el-merma-x">Salió del congelador sin que se supiera de qué lote. '
+    +'Está descontado del total del producto pero NO de ningún lote de la lista: por eso '
+    +'los lotes no suman el total. Se resuelve asignándole su lote real cuando aparezca el '
+    +'dato, y el próximo conteo físico lo deja en cero solo.</span></div>';
+}
 // Las dos mermas que no bajan de ningún lote. Rótulos deliberadamente distintos:
 // el primero es un problema de IDENTIDAD (¿de cuál lote?), el segundo de TIEMPO
 // (¿ya estaba descontada?). Cada uno dice qué hacer con él.
@@ -10769,21 +10983,36 @@ function lotRender(){
   }
   // LA UNIÓN: las claves del saldo (todo lo que tiene o tuvo producto) más los
   // lotes activos (lo fabricado después del ancla).
-  const claves={};
-  Object.keys(_lotSaldo).forEach(function(k){ claves[k]=1; });
-  Object.values(_lot.lotes||{}).forEach(function(L){ claves[(+L.producto)+'|'+L.canon]=1; });
+  // El cálculo se mudó a `entLotesUnion` (b56), tal cual estaba: lo que cambió es
+  // que ahora el selector de Daniel sale de esta MISMA función y no de una copia
+  // que nunca existió. Acá el `null` (lote activo que no figura en el ancla) se
+  // dibuja como 0, que es lo que esta pantalla mostraba desde el 26-ago.
   const porProd={};
-  Object.keys(claves).forEach(function(k){
-    const i=k.indexOf('|'), pid=+k.slice(0,i), lote=k.slice(i+1);
-    (porProd[pid]=porProd[pid]||[]).push({lote:lote, uds:(+_lotSaldo[k]||0)});
+  const _uni=entLotesUnion(_lot, _lotSaldo);
+  Object.keys(_uni).forEach(function(pid){
+    porProd[+pid]=_uni[pid].map(function(x){ return {lote:x.lote, uds:(x.saldo||0)}; });
   });
   const ids=(typeof INV_TERM!=='undefined') ? INV_TERM.map(function(t){ return t.id; })
                                             : Object.keys(porProd).map(Number);
   let h='';
   ids.forEach(function(pid){
-    const ls=(porProd[pid]||[]).sort(function(a,z){ return _lotCmp(a.lote,z.lote); });
-    if(!ls.length) return;
-    const tot=ls.reduce(function(n,x){ return n+x.uds; },0);
+    // ── EL BALDE SALE DE LA LISTA DE LOTES (b56) ──────────────────────
+    // 'NO DETERMINADO' es una clave del saldo como cualquier otra, así que la unión
+    // la trae; pero dibujarla como un renglón de lote sería mentir dos veces: dice
+    // que existe un lote con ese nombre, y lo muestra con saldo negativo, que en
+    // esta pantalla significa "anomalía". No es una anomalía: es producto que salió
+    // sin que se supiera de qué lote, y tiene su propia línea.
+    //
+    // EL TOTAL DEL PRODUCTO NO CAMBIA. `ind` es negativo (solo resta), así que
+    // sumarlo aparte da el mismo número que daba cuando estaba en la lista:
+    // disponible = suma de saldos por lote − salidas sin lote imputado.
+    const todo=(porProd[pid]||[]);
+    const ind=todo.filter(function(x){ return x.lote===ENT_LOTE_INDET; })
+                  .reduce(function(n,x){ return n+x.uds; },0);
+    const ls=todo.filter(function(x){ return x.lote!==ENT_LOTE_INDET; })
+                 .sort(function(a,z){ return _lotCmp(a.lote,z.lote); });
+    if(!ls.length && !ind) return;
+    const tot=ls.reduce(function(n,x){ return n+x.uds; },0) + ind;
     h+='<div class="el-prod"><div class="el-prod-h"><span>'+esc(_lotNom(pid))+'</span>'
       +'<span class="el-prod-n">'+esc(_lotCajas(tot,pid))+' · '+esc(_lotUds(tot,pid))+'</span></div>';
     ls.forEach(function(x){
@@ -10808,6 +11037,7 @@ function lotRender(){
     // Son DOS COSAS DISTINTAS y el rótulo tiene que dejarlo claro: una es no
     // saber DE CUÁL lote, la otra es no saber SI ya está descontada. Confundirlas
     // las vuelve "merma rara", que no se puede accionar.
+    h+=_lotSinImputar(pid, -ind);
     h+=_lotMermaAparte(pid);
     h+='</div>';
   });
@@ -11301,16 +11531,19 @@ function rpLotesHtml(){
   let h='<div class="rp-cond"><div class="rp-sec-t">Lote'
     +(Object.keys(cur.lotes).length>1?' — partido entre varios':'')+'</div>';
   if(!_rpLotes){ return h+'<div class="cl-none">Leyendo lotes de Odoo…</div></div>'; }
-  const ls=Object.values(_rpLotes.lotes||{}).filter(function(L){ return +L.producto===pid; })
-    .map(function(L){ const k=pid+'|'+L.canon;
-      return {canon:L.canon, key:L.key, saldo:_rpSaldo?(_rpSaldo[k]!=null?_rpSaldo[k]:null):null}; });
+  // MISMA UNIÓN Y MISMO ORDEN QUE EL CAMINO CON FACTURA (b56). Antes salía solo de
+  // `_rpLotes.lotes` y escondía exactamente lo mismo que escondía el otro selector.
+  // Cada entrada lleva `lote` y `canon`: `lote` es el nombre que usa el criterio
+  // compartido, `canon` el que este render viene usando desde siempre.
+  const ls=entLotesSelector(_rpLotes, _rpSaldo, pid)
+    .map(function(x){ return {lote:x.lote, canon:x.lote, key:x.key,
+                              saldo:x.saldo, activo:x.activo}; });
+  // Un lote agregado a mano es, por definición, uno que el sistema no conoce: va
+  // con los activos, no al fondo con los viejos.
   (_rp._extra&&_rp._extra[pid]||[]).forEach(function(cn){
-    if(!ls.some(function(x){return x.canon===cn;})) ls.push({canon:cn,key:'x',saldo:null,extra:true}); });
-  ls.sort(function(a,z){
-    const aa=(a.saldo!=null&&a.saldo<=0)?1:0, zz=(z.saldo!=null&&z.saldo<=0)?1:0;
-    if(aa!==zz) return aa-zz;                                  // agotados al fondo
-    return String(a.key).localeCompare(String(z.key),'es');    // FIFO: clave = añoProd-ddd
-  });
+    if(!ls.some(function(x){return x.canon===cn;}))
+      ls.push({lote:cn,canon:cn,key:'x',saldo:null,activo:true,extra:true}); });
+  ls.sort(entLoteCmpSel);
   // Un lote en cero YA ELEGIDO no se esconde: esconderlo borraría de la vista
   // una cantidad que sigue contando en la línea.
   const enCero=ls.filter(function(L){ return L.saldo!=null && L.saldo<=0 && cur.lotes[L.canon]==null; });
@@ -11319,12 +11552,12 @@ function rpLotesHtml(){
   else if(!vis.length) h+='<div class="cl-none">Ningún lote de este producto tiene saldo.</div>';
   vis.forEach(function(L){
     const sel=cur.lotes[L.canon]!=null, ago=(L.saldo!=null&&L.saldo<=0);
-    h+='<div class="rp-lote'+(sel?' on':'')+(ago?' ago':'')+'">'
+    h+='<div class="rp-lote'+(sel?' on':'')+(ago?' ago':'')+(L.activo?'':' viejo')+'">'
       +'<button class="rp-lotebtn" onclick="rpToggleLote(\''+esc(L.canon).replace(/'/g,'&#39;')+'\')">'
       // El nombre del lote, en su propio span y con nowrap: es el dato principal
       // y no puede ser el que ceda el ancho. Ver el CSS de .rp-lote-n.
       +'<span class="rp-lote-n">'+esc(L.canon)+'</span>'
-      +(L.saldo!=null?('<span class="rp-saldo">'+(ago?'agotado':('quedan '+_rzN(L.saldo)))+'</span>')
+      +(L.saldo!=null?('<span class="rp-saldo">'+(ago?'agotado':('quedan '+esc(_lotUds(L.saldo,pid))))+'</span>')
                      :(L.extra?'<span class="rp-saldo">agregado</span>':''))
       +'</button>'
       +(sel?('<input type="number" min="0" step="1" inputmode="numeric" class="cl-in rp-lotein rp-dest" value="'+esc(cur.lotes[L.canon])+'" '

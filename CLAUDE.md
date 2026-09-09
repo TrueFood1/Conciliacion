@@ -41,6 +41,31 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
   del disco eran de actualizaciones del sistema. `retomar` se pudo recuperar solo
   porque su texto había entrado en la conversación esa mañana; `cierre` no.
   Pasó **dos veces el mismo día**, con la misma carpeta.
+- **LAS CANTIDADES SE DICEN SIEMPRE EN LA UNIDAD DE VENTA DEL PRODUCTO**
+  (regla de Andrea, 7-sep-2026). Nunca traducir a unidades individuales para
+  explicar algo — ni en un reporte, ni en un comentario, ni en un mensaje de
+  commit.
+
+  | Producto | se dice en | y también en |
+  |---|---|---|
+  | Pan Blanco, Semillas, Galletas | **unidad** | caja |
+  | Pan Francés, Buns, Pizza | **paquete** (de 4, 4 y 2) | caja |
+
+  **De dónde salió**: leer "5 sueltas" del conteo de Buns como panes en vez de
+  paquetes desvió el caso del lote 191 durante horas — se construyó una brecha
+  de "17 unidades" que no existía, y se la persiguió hasta descubrir que era un
+  error de escala y no un faltante. Traducir a unidades individuales no aclara:
+  introduce un factor de 4 que después alguien tiene que deshacer de memoria.
+
+  Es la **regla hermana** de "UoM — NUNCA leer el nombre, SIEMPRE el id": aquella
+  gobierna cómo se LEE a Odoo, ésta cómo se ESCRIBE para las personas. La
+  conversión interna se sigue haciendo con `product_uom_id` → `factor` (para
+  Odoo) y con `NIV_INFO[pid].presDiv` / `.cajaU` (para Daniel); lo que cambia es
+  que el número que sale a la superficie ya no viaja en unidades base.
+
+  Al decir un saldo, decilo como se cuenta en el congelador: "52 cajas +
+  5 paquetes", no "1.268 unidades".
+
 - **Diagnosticar antes de arreglar**: ante números raros, primero lectura
   read-only (árbol de MP, script de diagnóstico), después el fix. No adivinar.
 - **Validar contra la fuente**: todo número nuevo se cruza contra el pivot
