@@ -3123,6 +3123,10 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .el-merma-sin .el-merma-t,.el-merma-sin .el-merma-n{color:var(--text-2)}
 .el-merma-dud{background:rgba(233,162,59,.07);border:.5px solid rgba(233,162,59,.35)}
 .el-merma-dud .el-merma-t,.el-merma-dud .el-merma-n{color:var(--warn)}
+/* Salidas sin lote imputado. ROJO = excepción pendiente de resolver, con una acción
+   detrás. El ámbar es de la merma dudosa, que no tiene ninguna. */
+.el-merma-ind{background:rgba(226,75,74,.07);border:.5px solid rgba(226,75,74,.35)}
+.el-merma-ind .el-merma-t,.el-merma-ind .el-merma-n{color:var(--stop-tx)}
 .bs-reg{display:flex;align-items:center;gap:10px;margin-top:12px;max-width:620px;
   border:1px solid var(--border);border-radius:9px;padding:8px 11px;
   font-size:12px;color:var(--text-2)}
@@ -7659,6 +7663,15 @@ function _entAgrupar(crudo, anioSet){
   return {lotes, buckets};
 }
 
+// ── EL CENTINELA DE LA EXCEPCIÓN, NOMBRADO UNA SOLA VEZ (b56) ───────────
+// 'NO DETERMINADO' es un VALOR de lote, no un booleano aparte: el motor indexa por
+// `producto|lote` como texto en todas partes, así que el balde de las salidas sin
+// lote imputado es UNA clave conocida por producto y la aritmética de saldos no se
+// toca. La cadena vive acá y no escrita a mano en cada comparación — es la misma
+// disciplina que la clave del lote: si el nombre cambia, cambia en un lugar.
+// El candado de la base es `ent_alisto_lote_lote_forma` (ENTREGAS_INDETERMINADO.sql).
+const ENT_LOTE_INDET = 'NO DETERMINADO';
+
 // ── LA UNIÓN DE LAS DOS FUENTES, EN UN SOLO LUGAR (b56) ─────────────────
 // `entLotesActivos(3)` solo ve lo fabricado en los últimos 3 meses. El SALDO ve
 // todo lo que el ancla contó, por viejo que sea. Un lote que salió de esa ventana
@@ -7718,8 +7731,15 @@ function entLoteCmpSel(a,z){
 //   · viejo (fuera de la ventana): solo si le queda saldo. Un viejo agotado no se
 //     puede despachar y llenaría la lista de renglones muertos — tampoco se veía
 //     antes de b56, así que no se pierde nada.
+//   · el CENTINELA nunca: 'NO DETERMINADO' no es una caja que se pueda ir a buscar
+//     al congelador. Hoy queda afuera igual por el filtro de saldo (su saldo solo
+//     resta, así que nunca es > 0), pero se excluye POR NOMBRE a propósito: que algo
+//     no aparezca por un efecto secundario de otra regla es exactamente como se
+//     rompe cuando esa otra regla cambia. Cuando entre el punto 3.2, la excepción va
+//     a ofrecerse en su propio bloque rojo al fondo, no como un lote de la lista.
 function entLotesSelector(g, saldo, pid){
   return ((entLotesUnion(g, saldo)[+pid])||[])
+    .filter(function(x){ return x.lote!==ENT_LOTE_INDET; })
     .filter(function(x){ return x.activo || (x.saldo!=null && x.saldo>0); })
     .sort(entLoteCmpSel);
 }
@@ -7873,6 +7893,7 @@ function _clLotesDe(pid, base){
             .filter(function(L){ return +L.producto===+pid; })
   ).forEach(function(L){ if(vistos[L.canon]) return; vistos[L.canon]=1; out.push(L); });
   ((entLotesUnion(_clLotes, _clSaldo))[+pid]||[]).forEach(function(x){
+    if(x.lote===ENT_LOTE_INDET) return;   // no es una caja: no se cuenta
     if(x.activo || vistos[x.lote]) return;
     if(!(x.saldo!=null && x.saldo>0)) return;
     vistos[x.lote]=1;
@@ -10900,6 +10921,31 @@ function _lotDesglose(pid, lote){
   if(partes.length<2) return '';        // con un solo término no hay nada que desglosar
   return '<div class="el-des">'+partes.join('<span class="el-des-s">·</span>')+'</div>';
 }
+// ── LAS SALIDAS SIN LOTE IMPUTADO (b56) ─────────────────────────────────
+// Producto que SALIÓ del congelador sin que se supiera de qué lote. El total del
+// producto tiene que bajar, pero ningún lote puede bajar — si no se dice, la suma
+// de los lotes va a decir para siempre que hay de más.
+//
+// ES EL TERCER CASO DE UN PATRÓN QUE YA EXISTÍA, no un patrón nuevo: la merma sin
+// lote y la merma dudosa ya se dibujan así, con su número y su explicación, al pie
+// del PRODUCTO y no de un lote. Se reusa su CSS.
+//
+// Va en ROJO y no en ámbar: es una EXCEPCIÓN pendiente de resolver, con una acción
+// concreta detrás (asignarle su lote real cuando aparezca el dato), y el módulo ya
+// decidió que la excepción se ve en rojo. El ámbar es de la merma dudosa, que no
+// tiene acción — nadie puede averiguar si ya estaba descontada.
+//
+// `n` viene en positivo (el saldo del centinela es negativo; el llamador lo invierte).
+function _lotSinImputar(pid, n){
+  if(!(n>0)) return '';
+  return '<div class="el-merma el-merma-ind">'
+    +'<span class="el-merma-t">Salidas sin lote imputado</span>'
+    +'<span class="el-merma-n">−'+esc(_lotUds(n,pid))+'</span>'
+    +'<span class="el-merma-x">Salió del congelador sin que se supiera de qué lote. '
+    +'Está descontado del total del producto pero NO de ningún lote de la lista: por eso '
+    +'los lotes no suman el total. Se resuelve asignándole su lote real cuando aparezca el '
+    +'dato, y el próximo conteo físico lo deja en cero solo.</span></div>';
+}
 // Las dos mermas que no bajan de ningún lote. Rótulos deliberadamente distintos:
 // el primero es un problema de IDENTIDAD (¿de cuál lote?), el segundo de TIEMPO
 // (¿ya estaba descontada?). Cada uno dice qué hacer con él.
@@ -10950,9 +10996,23 @@ function lotRender(){
                                             : Object.keys(porProd).map(Number);
   let h='';
   ids.forEach(function(pid){
-    const ls=(porProd[pid]||[]).sort(function(a,z){ return _lotCmp(a.lote,z.lote); });
-    if(!ls.length) return;
-    const tot=ls.reduce(function(n,x){ return n+x.uds; },0);
+    // ── EL BALDE SALE DE LA LISTA DE LOTES (b56) ──────────────────────
+    // 'NO DETERMINADO' es una clave del saldo como cualquier otra, así que la unión
+    // la trae; pero dibujarla como un renglón de lote sería mentir dos veces: dice
+    // que existe un lote con ese nombre, y lo muestra con saldo negativo, que en
+    // esta pantalla significa "anomalía". No es una anomalía: es producto que salió
+    // sin que se supiera de qué lote, y tiene su propia línea.
+    //
+    // EL TOTAL DEL PRODUCTO NO CAMBIA. `ind` es negativo (solo resta), así que
+    // sumarlo aparte da el mismo número que daba cuando estaba en la lista:
+    // disponible = suma de saldos por lote − salidas sin lote imputado.
+    const todo=(porProd[pid]||[]);
+    const ind=todo.filter(function(x){ return x.lote===ENT_LOTE_INDET; })
+                  .reduce(function(n,x){ return n+x.uds; },0);
+    const ls=todo.filter(function(x){ return x.lote!==ENT_LOTE_INDET; })
+                 .sort(function(a,z){ return _lotCmp(a.lote,z.lote); });
+    if(!ls.length && !ind) return;
+    const tot=ls.reduce(function(n,x){ return n+x.uds; },0) + ind;
     h+='<div class="el-prod"><div class="el-prod-h"><span>'+esc(_lotNom(pid))+'</span>'
       +'<span class="el-prod-n">'+esc(_lotCajas(tot,pid))+' · '+esc(_lotUds(tot,pid))+'</span></div>';
     ls.forEach(function(x){
@@ -10977,6 +11037,7 @@ function lotRender(){
     // Son DOS COSAS DISTINTAS y el rótulo tiene que dejarlo claro: una es no
     // saber DE CUÁL lote, la otra es no saber SI ya está descontada. Confundirlas
     // las vuelve "merma rara", que no se puede accionar.
+    h+=_lotSinImputar(pid, -ind);
     h+=_lotMermaAparte(pid);
     h+='</div>';
   });
