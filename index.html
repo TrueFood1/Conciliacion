@@ -948,6 +948,74 @@ body[data-mod="personal"] .main{
 .vac-ped{font-size:13px;color:var(--text-2);margin-top:10px;text-align:center}
 .vac-n{color:var(--text);font-variant-numeric:tabular-nums}
 .vac-sub{font-size:12px;color:var(--text-2);margin-top:4px}
+/* ── PERSONAL · CALENDARIO DE AUSENCIAS ──
+   Cinco capas que hay que poder distinguir de un vistazo, y una restricción que
+   manda sobre el gusto: EL NARANJA DEL MÓDULO NO RELLENA (ver el bloque de
+   `body[data-mod="personal"]`). Un chip lavado en naranja a 16% es, de lejos,
+   indistinguible de una alerta ámbar.
+   Entonces el color va donde identifica y no donde decora:
+     · la BARRA IZQUIERDA del chip lleva el color de la categoría —naranja
+       vacación, azul frío permiso—, y el fondo se queda en superficie neutra;
+     · APROBADO vs PENDIENTE no es otro color, es sólido vs contorno punteado.
+       Mismo criterio que ya usa Mis vacaciones para lo que todavía no se aprobó;
+     · el DÍA CERRADO no tiene color: cambia la superficie de la celda. Es
+       estructura, no categoría — la fábrica no abre, no es que alguien falte.
+   El azul (#7FB0D9) se eligió por descarte: tenía que ser claramente distinto
+   del ámbar (#E0A050), que en este sistema significa "se te viene encima". */
+.cal-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cal-mes{font-size:15px;font-weight:600;min-width:132px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.cal-dow{background:var(--bg2);color:var(--text-h);font-size:10px;font-weight:600;letter-spacing:.04em;text-align:center;padding:7px 0}
+.cal-d{background:var(--bg);min-height:82px;padding:5px 5px 6px}
+.cal-d.out{background:var(--bg2)}
+.cal-d.out .cal-n{color:var(--border-m)}
+.cal-d.cerrado{background:var(--bg3)}
+.cal-n{font-size:11px;color:var(--text-h);font-variant-numeric:tabular-nums}
+.cal-d.hoy .cal-n{color:var(--mod);font-weight:700}
+.cal-cerr{font-size:9px;color:var(--text-h);margin-top:2px;line-height:1.25;text-transform:uppercase;letter-spacing:.03em}
+.cal-chip{display:block;font-size:10px;line-height:1.35;margin-top:3px;padding:2px 5px;border-radius:3px;background:var(--bg3);
+  border-left:3px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-chip.pend{background:transparent;border:1px dashed var(--border-m);border-left:3px dashed transparent}
+.cal-chip.vac{border-left-color:#FF671D;color:#F0A882}
+.cal-chip.vac.pend{border-color:#8A4E2E;border-left-color:#8A4E2E;color:#C9906E}
+.cal-chip.per{border-left-color:#7FB0D9;color:#A9C9E2}
+.cal-chip.per.pend{border-color:#41627C;border-left-color:#41627C;color:#7E9DB4}
+.cal-mas{font-size:9px;color:var(--text-h);margin-top:2px}
+/* La leyenda NO es una explicación de uso: dice qué significa cada marca, que es
+   definición del dato. Sin ella, "sólido vs punteado" es un enigma. */
+.cal-leg{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:11px;color:var(--text-h)}
+.cal-leg span{display:flex;align-items:center;gap:5px}
+.cal-leg i{width:11px;height:11px;border-radius:2px;display:inline-block;border-left:3px solid}
+.cal-leg i.vac{border-left-color:#FF671D;background:var(--bg3)}
+.cal-leg i.vacp{border:1px dashed #8A4E2E;border-left:3px dashed #8A4E2E}
+.cal-leg i.per{border-left-color:#7FB0D9;background:var(--bg3)}
+.cal-leg i.perp{border:1px dashed #41627C;border-left:3px dashed #41627C}
+.cal-leg i.cer{border:none;background:var(--bg3);width:13px;height:13px}
+/* La bandeja de las socias. Una fila por solicitud, con lo que hace falta para
+   decidir y nada más. */
+.per-sol{border-top:1px solid var(--border);padding:12px 0;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.per-sol-t{flex:1 1 240px;min-width:0}
+.per-sol-q{font-size:14px;color:var(--text)}
+.per-sol-f{font-size:12px;color:var(--text-m);margin-top:3px}
+.per-sol-m{font-size:12px;color:var(--text-h);margin-top:4px;font-style:italic}
+.per-sol-b{display:flex;gap:8px}
+.per-cnt{font-size:13px;color:var(--text-m);margin-top:4px}
+.per-est{font-size:11px;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+.per-est.pend{color:var(--text-h)}
+.per-est.ok{color:var(--green)}
+.per-est.no{color:var(--text-m)}
+@media(max-width:700px){
+  .cal-d{min-height:58px;padding:3px}
+  .cal-chip{font-size:9px;padding:1px 3px;margin-top:2px}
+  .cal-mes{min-width:110px;font-size:14px}
+}
+/* Opción elegida y botón de acción, EN EL COLOR DEL MÓDULO y sin relleno.
+   No se usa `.btn-p` ni `.btn-g`: los dos son lima (#C0D048), que es el color de
+   acción del sistema. En Entregas eso no choca porque el acento del módulo ES
+   lima; acá dejaría dos acentos en la misma vista, y el estándar pide uno. */
+.per-opt.on,.per-go{border-color:var(--mod);color:var(--mod);font-weight:600}
+.per-go:hover{background:var(--bg3)}
+.faces-per{flex-wrap:wrap}
 /* ── M3 — Asistente de conciliación (presentación; lógica intacta) ── */
 .m3card{background:var(--bg);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:1rem;overflow:hidden}
 .m3head{padding:1rem 1.25rem .75rem}
@@ -3605,9 +3673,14 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
      Primera pantalla del módulo Personal y primera de Truefie pensada para el
      EQUIPO, no para las socias. El diseño está escrito en el bloque "PANTALLA
      MIS VACACIONES" de la sección 8 de PERSONAL_ESQUEMA.sql; acá se implementa
-     eso y nada más. Sin barra de pestañas: el módulo tiene una sola pantalla y
-     una pestaña sola no informa nada (mismo criterio que el rótulo del lobby). -->
+     eso y nada más.
+     LA BARRA DE PESTAÑAS ENTRA EL 8-set: hasta hoy el módulo tenía UNA pantalla y
+     una pestaña sola no informa nada. Con el calendario son cuatro (tres para el
+     equipo: "Días cerrados" es de las socias), y ahí la barra sí informa. La
+     dibuja _perTabs() y no está escrita a mano en el HTML, justamente porque una
+     de las cuatro depende del perfil. -->
 <div id="vVacaciones" class="hidden">
+  <div class="faces faces-per" id="perTabsVac"></div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
       <div class="m3title" style="font-size:24px">Mis vacaciones</div>
@@ -3619,6 +3692,69 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   </div>
   <div id="vacStatus" class="status hidden" style="margin-top:14px"></div>
   <div id="vacBody" style="margin-top:14px"></div>
+</div>
+
+<!-- ── PERSONAL · CALENDARIO DE AUSENCIAS ───────────────────────────────────
+     La primera pantalla del sistema donde alguien del equipo ve una fila de
+     otra persona. Lo que se abre está acotado en PERSONAL_CALENDARIO.sql y se
+     hace cumplir del lado del servidor: persona, fecha, tipo y estado. Ni el
+     motivo, ni las incapacidades, ni nada de plata.
+     El subtítulo dice de qué mes y qué cuenta, que es definición del dato: sin
+     eso, un calendario con la mitad de las marcas se lee como si faltaran. -->
+<div id="vCalendario" class="hidden">
+  <div class="faces faces-per" id="perTabsCal"></div>
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <div class="m3title" style="font-size:24px">Calendario</div>
+      <div class="m3sub" style="margin-top:2px">Vacaciones, permisos y días cerrados de todo el equipo.</div>
+    </div>
+    <div class="cal-bar">
+      <button class="btn btn-sm" onclick="calMes(-1)" aria-label="Mes anterior">‹</button>
+      <div class="cal-mes" id="calMesTit">—</div>
+      <button class="btn btn-sm" onclick="calMes(1)" aria-label="Mes siguiente">›</button>
+      <button class="btn btn-sm" onclick="calCargar(true)">Recargar</button>
+    </div>
+  </div>
+  <div id="calStatus" class="status hidden" style="margin-top:14px"></div>
+  <div id="calBody" style="margin-top:14px"></div>
+  <div id="calBandeja" style="margin-top:26px"></div>
+</div>
+
+<!-- ── PERSONAL · PEDIR DÍAS ────────────────────────────────────────────────
+     Vacación y permiso en un solo formulario porque para quien pide son la
+     misma gestión —"no voy a estar del 5 al 7"— y separarlas en dos pantallas
+     obliga a elegir la categoría antes de saber que hay dos. La diferencia sí
+     es real y va abajo, dicha en una línea: la vacación descuenta del saldo y
+     el permiso no.
+     Las dos caen en tablas distintas (rrhh_evento · rrhh_permiso), eso lo
+     resuelve solEnviar() y no tiene por qué verse. -->
+<div id="vSolicitar" class="hidden">
+  <div class="faces faces-per" id="perTabsSol"></div>
+  <div class="m3title" style="font-size:24px">Pedir días</div>
+  <div class="m3sub" style="margin-top:2px">Días corridos · lo aprueban Andrea o Lorena.</div>
+  <div id="solStatus" class="status hidden" style="margin-top:14px"></div>
+  <div id="solForm" style="margin-top:16px;max-width:460px"></div>
+  <div id="solMias" style="margin-top:30px"></div>
+</div>
+
+<!-- ── PERSONAL · DÍAS CERRADOS ─────────────────────────────────────────────
+     Solo socias. La pestaña ni se dibuja para el equipo y la RLS lo hace
+     cumplir igual del lado del servidor (rrhh_feriado_ins / _upd / _del), así
+     que esconder la pestaña es cortesía, no seguridad.
+     Es la única tabla del módulo que se edita y se borra: de un feriado no
+     cuelga ningún pago ya hecho. El porqué completo está en el .sql. -->
+<div id="vDiasCerrados" class="hidden">
+  <div class="faces faces-per" id="perTabsFer"></div>
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <div class="m3title" style="font-size:24px">Días cerrados</div>
+      <div class="m3sub" style="margin-top:2px">Feriados y cierres de planta.</div>
+    </div>
+    <button class="btn btn-sm" onclick="ferCargar(true)">Recargar</button>
+  </div>
+  <div id="ferStatus" class="status hidden" style="margin-top:14px"></div>
+  <div id="ferForm" style="margin-top:16px;max-width:460px"></div>
+  <div id="ferBody" style="margin-top:24px"></div>
 </div>
 
 <!-- ── NINGUNA PANTALLA MUDA (26-ago) ──────────────────────────────────────
@@ -4115,7 +4251,7 @@ const ACCESO_VISTAS = {
   conciliacion: ['vUpload'],
   operaciones:  ['vProduccion','vMermas','vInventario','vPlan','vResumen','vConteo'],
   entregas:     ['vConteoLote','vReporte','vPendientes','vDespachos','vEntBuscar','vEntLotes'],
-  personal:     ['vVacaciones'],
+  personal:     ['vVacaciones','vCalendario','vSolicitar','vDiasCerrados'],
 };
 let _accesoMods=null;   // se llena al entrar; null = todavía no se sabe → no se restringe
 function accesoPuede(mod){ return !_accesoMods || _accesoMods==='todo' || _accesoMods.indexOf(mod)>=0; }
@@ -4306,7 +4442,8 @@ function volverLobby(){
 let _vacDatos=null;
 
 function irAVacaciones(){
-  _modShow('vVacaciones'); crumbSet('Personal','Mis vacaciones');
+  _modShow('vVacaciones'); crumbSet('Personal','Mis vacaciones'); _perTabs('vacaciones');
+  perPerfil();   // decide si la pestaña "Días cerrados" existe. No bloquea el saldo.
   vacCargar(false);
 }
 // Aviso de pantalla. Sin tipo, se apaga. NUNCA se deja el cuerpo mudo.
@@ -4404,6 +4541,662 @@ function _vacRender(){
       +'<td style="text-align:right">'+_vacDias(f.dias_tomados)+'</td></tr>';
   });
   body.innerHTML=h+'</tbody></table>'+avisoPed;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// PERSONAL · CALENDARIO DE AUSENCIAS
+// ════════════════════════════════════════════════════════════════════════
+// Implementa PERSONAL_CALENDARIO.sql. Tres cosas que vienen de ahí y que no se
+// pueden "arreglar" desde acá:
+//
+// 1. EL RECORTE ES DEL SERVIDOR, SIEMPRE. `v_rrhh_calendario` devuelve el equipo
+//    entero con cuatro campos y ninguno sensible; `v_rrhh_permiso` devuelve lo
+//    tuyo (o todo, si sos socia) CON el motivo. Son dos puertas distintas a
+//    propósito: el motivo es texto libre y ahí alguien va a escribir algo médico.
+//    Si algún día el calendario necesita más dato, se agranda la función del
+//    .sql — no se junta con la otra consulta acá.
+//
+// 2. QUIÉN APRUEBA LO DECIDE LA RLS, no `_perEsSocia`. Esa variable existe para
+//    dibujar (mostrar la pestaña, mostrar la bandeja) y falla CERRADA: si la
+//    consulta del perfil no contesta, queda en false. Un empleado que forzara el
+//    botón se estrella contra la política del servidor igual.
+//
+// 3. LA CARRERA ENTRE LAS DOS SOCIAS SE RESUELVE EN LA ESCRITURA. Andrea y
+//    Lorena aprueban las dos, sin jerarquía, así que las dos pueden tener la
+//    misma solicitud abierta. Refrescar la lista antes no alcanza —siempre queda
+//    el instante entre dibujar y tocar—, así que las dos escrituras van con la
+//    condición "todavía está pendiente" adentro: el UPDATE de permisos la lleva
+//    en el WHERE y en su política, y las vacaciones pasan por
+//    rrhh_resolver_evento(), que no inserta si ya hay resolución. Las dos
+//    devuelven CERO FILAS cuando se pierde la carrera, y cero filas no es un
+//    error: es "la otra ya decidió", y se dice quién y qué.
+
+const PER_MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
+               'setiembre','octubre','noviembre','diciembre'];
+const PER_DOW=['L','M','M','J','V','S','D'];
+// Solo socias: la última en `true`. La pestaña no se dibuja para el equipo.
+const PER_TABS=[['vacaciones','Mis vacaciones','irAVacaciones()',false],
+                ['calendario','Calendario','irACalendario()',false],
+                ['pedir','Pedir días','irASolicitar()',false],
+                ['cerrados','Días cerrados','irADiasCerrados()',true]];
+const PER_TABS_CONT=['perTabsVac','perTabsCal','perTabsSol','perTabsFer'];
+
+let _perEsSocia=false, _perPerfilOk=false, _perEmail=null, _perYoCache=undefined,
+    _perTabActiva='vacaciones';
+
+// La barra de pestañas se dibuja en las CUATRO pantallas de una sola pasada: son
+// cuatro `innerHTML` de nada y evita que una pantalla quede con la barra vieja.
+// Nace sin "Días cerrados" y la agrega cuando se sabe que quien mira es socia
+// (ver perPerfil) — al revés, la pestaña parpadearía y desaparecería.
+function _perTabs(activa){
+  if(activa) _perTabActiva=activa;
+  let h='';
+  PER_TABS.forEach(function(t){
+    if(t[3] && !_perEsSocia) return;
+    const on=(t[0]===_perTabActiva);
+    h+='<button class="face'+(on?' on':'')+'"'+(on?'':' onclick="'+t[2]+'"')+'>'+t[1]+'</button>';
+  });
+  PER_TABS_CONT.forEach(function(id){ const el=document.getElementById(id); if(el) el.innerHTML=h; });
+}
+
+async function perEmail(){
+  if(_perEmail!==null) return _perEmail;
+  try{ const {data}=await sbClient().auth.getUser();
+       _perEmail=((data&&data.user&&data.user.email)||'').trim().toLowerCase(); }
+  catch(e){ _perEmail=''; }
+  return _perEmail;
+}
+
+// ¿Es socia quien mira? Sale de `v_acceso_usuario`, que es la fuente de verdad
+// del sistema (ACCESOS_ESQUEMA.sql) — NO de la lista quemada en el HTML, que es
+// cosmética y encima no nombra a nadie del equipo. La consulta no lleva filtro:
+// la RLS ya devuelve la fila propia y nada más.
+// Falla CERRADA: sin respuesta, no es socia. Es la dirección segura de errar —
+// una socia que ve de menos recarga; un empleado que ve de más ya vio.
+async function perPerfil(){
+  if(_perPerfilOk) return _perEsSocia;
+  try{
+    const c=sbClient(); if(!c) throw new Error('sin conexión');
+    const {data,error}=await c.from('v_acceso_usuario').select('perfil,activo');
+    if(error) throw error;
+    _perEsSocia=(data||[]).some(function(r){ return r.activo && r.perfil==='socias'; });
+    _perPerfilOk=true;
+  }catch(e){ _perEsSocia=false; }
+  _perTabs(null);
+  return _perEsSocia;
+}
+
+// ¿Qué persona del equipo es quien mira? Null = la cuenta no está enlazada a una
+// fila de `rrhh_persona`, que es el caso de las socias (no son empleadas) y
+// también el fallo silencioso del módulo: un correo que no calza. Se distingue
+// una cosa de la otra por el perfil, y se dice en pantalla.
+async function perYo(){
+  if(_perYoCache!==undefined) return _perYoCache;
+  try{
+    const em=await perEmail(); if(!em) return null;
+    const {data,error}=await sbClient().from('rrhh_persona').select('id,nombre').ilike('email',em);
+    if(error) throw error;
+    // Se cachea solo lo que CONTESTÓ. Una lista vacía es una respuesta ("no sos
+    // del equipo") y se guarda; un error de red no lo es, y guardarlo dejaba a
+    // Daniela marcada "sin enlazar" hasta que recargara la página.
+    _perYoCache=(data&&data.length)?data[0]:null;
+  }catch(e){ return null; }
+  return _perYoCache;
+}
+
+// ── Fechas. Todo en texto 'YYYY-MM-DD' y nunca `new Date('2026-09-15')`: eso lo
+// parsea como UTC y en Costa Rica (UTC−6) devuelve el 14 a las 18:00, o sea el
+// día ANTERIOR. Un calendario corrido un día no se nota hasta que alguien no
+// viene el día que no era.
+function _perISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _perDe(s){ const p=String(s||'').slice(0,10).split('-');
+  return new Date(+p[0]||2000,(+p[1]||1)-1,+p[2]||1); }
+function _perMasDias(d,n){ return new Date(d.getFullYear(),d.getMonth(),d.getDate()+n); }
+function _perDias(a,b){ return Math.round((_perDe(b)-_perDe(a))/86400000)+1; }
+function _perFecha(s){ const d=_perDe(s); return d.getDate()+' '+PER_MES[d.getMonth()].slice(0,3)+' '+d.getFullYear(); }
+function _perRango(a,b){
+  if(!b || a===b) return _perFecha(a);
+  const x=_perDe(a), y=_perDe(b);
+  return (x.getMonth()===y.getMonth() && x.getFullYear()===y.getFullYear())
+    ? x.getDate()+' → '+_perFecha(b) : _perFecha(a)+' → '+_perFecha(b);
+}
+function _perNom(n){ return String(n||'—').trim().split(/\s+/)[0]; }
+function _perDiasTxt(n){ return n+(Math.abs(n)===1?' día':' días'); }
+function _perAviso(id,tipo,html){
+  const st=document.getElementById(id); if(!st) return;
+  if(!tipo){ st.classList.add('hidden'); st.innerHTML=''; return; }
+  st.className='status '+tipo; st.classList.remove('hidden'); st.innerHTML=html;
+}
+// Los errores de Postgres que la pantalla sabe traducir. El resto sale crudo:
+// un mensaje raro en pantalla se puede leer por teléfono; uno tragado, no.
+function _perErr(e){
+  const m=String((e&&(e.message||e.msg))||e||'');
+  if(/sin_solape|23P01|exclu/i.test(m)) return 'Ese día ya está cargado — se pisa con otro día cerrado.';
+  if(/row-level security|violates row-level|42501|permission denied/i.test(m))
+    return 'Tu cuenta no tiene permiso para esto (lo revisa Andrea).';
+  return m;
+}
+
+// ── EL CALENDARIO ───────────────────────────────────────────────────────
+let _calYM=null, _calDatos=null, _calPend=null;
+
+function irACalendario(){
+  _modShow('vCalendario'); crumbSet('Personal','Calendario'); _perTabs('calendario');
+  if(!_calYM){ const h=new Date(); _calYM={y:h.getFullYear(),m:h.getMonth()}; }
+  perPerfil().then(function(){ calCargar(false); });
+}
+function calMes(d){
+  if(!_calYM) return;
+  const x=new Date(_calYM.y,_calYM.m+d,1);
+  _calYM={y:x.getFullYear(),m:x.getMonth()};
+  _calRender();
+}
+async function calCargar(force){
+  const body=document.getElementById('calBody'); if(!body) return;
+  if(_calDatos && !force){ _calRender(); return; }
+  _perAviso('calStatus','s-info','<span class="spin"></span>Leyendo el calendario…');
+  try{
+    const c=sbClient(); if(!c) throw new Error('no hay conexión a Supabase');
+    // Desde el 1° de enero del año pasado. No se trae "todo" ni se pide por mes:
+    // con tres personas son decenas de filas, así que una sola lectura alcanza
+    // para navegar meses sin volver a la red — y el techo evita que dentro de
+    // cinco años esta pantalla arrastre un historial que nadie mira.
+    const desde=(new Date().getFullYear()-1)+'-01-01';
+    const {data,error}=await c.from('v_rrhh_calendario')
+      .select('fuente,ref_id,persona_id,nombre,fecha,fecha_fin,estado,etiqueta')
+      .gte('fecha_fin',desde);
+    if(error) throw error;
+    _calDatos=data||[];
+    _calRender();
+    // CERO FILAS NO ES "NO PASA NADA". Con los días cerrados sembrados, el
+    // calendario nunca viene vacío por falta de datos: viene vacío cuando
+    // `acceso_perfil()` devuelve null del otro lado —la cuenta no está en
+    // acceso_usuario— y entonces la función del calendario corta antes de
+    // mirar nada. Dibujar una cuadrícula en blanco sin decirlo es el fallo
+    // mudo que este módulo ya tuvo una vez.
+    if(!_calDatos.length){
+      _perAviso('calStatus','s-warn','El calendario vino vacío: ni ausencias ni días cerrados. '
+        +'Suele significar que tu cuenta todavía no tiene perfil en Personal — lo enlaza Andrea.');
+    }else{ _perAviso('calStatus',''); }
+    if(_perEsSocia) calBandeja(true);
+  }catch(e){
+    _perAviso('calStatus','s-err','No pude leer el calendario: '+esc(_perErr(e)));
+  }
+}
+
+function _calRender(){
+  const body=document.getElementById('calBody'); if(!body||!_calYM) return;
+  const y=_calYM.y, m=_calYM.m;
+  const tit=document.getElementById('calMesTit');
+  if(tit) tit.textContent=PER_MES[m].charAt(0).toUpperCase()+PER_MES[m].slice(1)+' '+y;
+
+  // Un renglón por día que dura la ausencia: una vacación del 5 al 9 tiene que
+  // pintar los cinco días, no solo el primero.
+  const porDia={};
+  (_calDatos||[]).forEach(function(r){
+    let d=_perDe(r.fecha); const fin=_perDe(r.fecha_fin||r.fecha);
+    for(let i=0; d<=fin && i<420; i++){ const k=_perISO(d);
+      (porDia[k]=porDia[k]||[]).push(r); d=_perMasDias(d,1); }
+  });
+
+  const prim=new Date(y,m,1);
+  const arranque=(prim.getDay()+6)%7;            // la semana empieza en LUNES
+  const largo=new Date(y,m+1,0).getDate();
+  const celdas=Math.ceil((arranque+largo)/7)*7;
+  const hoy=_perISO(new Date());
+
+  let h='<div class="cal-grid">';
+  PER_DOW.forEach(function(d){ h+='<div class="cal-dow">'+d+'</div>'; });
+  for(let i=0;i<celdas;i++){
+    const dt=_perMasDias(prim,i-arranque), k=_perISO(dt), fuera=(dt.getMonth()!==m);
+    const ev=porDia[k]||[];
+    const cerr=ev.filter(function(e){ return e.fuente==='feriado'||e.fuente==='cierre'; });
+    const gente=ev.filter(function(e){ return e.fuente==='vacacion'||e.fuente==='permiso'; });
+    h+='<div class="cal-d'+(fuera?' out':'')+(cerr.length?' cerrado':'')+(k===hoy?' hoy':'')+'">'
+      +  '<div class="cal-n">'+dt.getDate()+'</div>';
+    if(cerr.length) h+='<div class="cal-cerr">'+esc(cerr[0].etiqueta||'Cerrado')+'</div>';
+    gente.slice(0,3).forEach(function(e){
+      const pend=(e.estado==='pendiente');
+      h+='<div class="cal-chip '+(e.fuente==='vacacion'?'vac':'per')+(pend?' pend':'')+'" title="'
+        + esc((e.nombre||'')+' · '+(e.fuente==='vacacion'?'vacaciones':'permiso')+' · '+(pend?'pendiente':'aprobado'))
+        + '">'+esc(_perNom(e.nombre))+'</div>';
+    });
+    if(gente.length>3) h+='<div class="cal-mas">+'+(gente.length-3)+'</div>';
+    h+='</div>';
+  }
+  h+='</div>'
+   + '<div class="cal-leg">'
+   +   '<span><i class="vac"></i>Vacación</span>'
+   +   '<span><i class="vacp"></i>Vacación pendiente</span>'
+   +   '<span><i class="per"></i>Permiso</span>'
+   +   '<span><i class="perp"></i>Permiso pendiente</span>'
+   +   '<span><i class="cer"></i>Día cerrado</span>'
+   + '</div>';
+  body.innerHTML=h;
+}
+
+// ── LA BANDEJA (solo quien puede aprobar) ───────────────────────────────
+// El contador vive acá y no en el lobby a propósito: una alerta del lobby tiene
+// que tener FECHA DE VENCIMIENTO y apagarse sola (las 5 reglas de CLAUDE.md), y
+// una solicitud sin resolver no vence ningún día. Es información, y la
+// información vive adentro del módulo.
+async function calBandeja(force){
+  const box=document.getElementById('calBandeja'); if(!box) return;
+  if(!_perEsSocia){ box.innerHTML=''; return; }
+  if(_calPend && !force){ _calBandejaRender(); return; }
+  try{
+    const c=sbClient(); if(!c) return;
+    // Dos consultas porque son dos tablas distintas, y las dos ya vienen
+    // recortadas por RLS: corridas por una socia traen a todo el equipo.
+    const [rp,rv]=await Promise.all([
+      c.from('v_rrhh_permiso')
+       .select('id,persona_id,nombre,fecha_inicio,fecha_fin,dias,motivo,creado_en')
+       .eq('estado','pendiente'),
+      c.from('v_rrhh_solicitud').select('id,persona_id,nombre,fecha,dias,motivo,creado_en')
+       .eq('tipo','vacaciones')
+    ]);
+    if(rp.error) throw rp.error;
+    if(rv.error) throw rv.error;
+    _calPend=[]
+      .concat((rp.data||[]).map(function(r){ return {fuente:'permiso', id:r.id, nombre:r.nombre,
+        ini:r.fecha_inicio, fin:r.fecha_fin, dias:r.dias, motivo:r.motivo, creado:r.creado_en}; }))
+      .concat((rv.data||[]).map(function(r){ return {fuente:'vacacion', id:r.id, nombre:r.nombre,
+        ini:r.fecha, fin:_perISO(_perMasDias(_perDe(r.fecha),(Number(r.dias)||1)-1)),
+        dias:Number(r.dias)||1, motivo:r.motivo, creado:r.creado_en}; }));
+    _calBandejaRender();
+  }catch(e){
+    box.innerHTML='<div class="status s-err">No pude leer las solicitudes pendientes: '+esc(_perErr(e))+'</div>';
+  }
+}
+function _calBandejaRender(){
+  const box=document.getElementById('calBandeja'); if(!box) return;
+  const p=(_calPend||[]).slice().sort(function(a,b){ return String(a.ini).localeCompare(String(b.ini)); });
+  // Sin pendientes no se dibuja nada. "Todo al día" es la primera de las cinco
+  // reglas: informar no es alertar, y una lista vacía es ruido con marco.
+  if(!p.length){ box.innerHTML=''; return; }
+  let h='<div class="m3title" style="font-size:16px">Esperando tu visto bueno</div>'
+       +'<div class="per-cnt">'+p.length+(p.length===1?' solicitud':' solicitudes')+' sin resolver.</div>';
+  p.forEach(function(s){
+    h+='<div class="per-sol">'
+      +  '<div class="per-sol-t">'
+      +    '<div class="per-sol-q">'+esc(s.nombre||'—')+' · '
+      +      (s.fuente==='vacacion'?'vacaciones':'permiso')+'</div>'
+      +    '<div class="per-sol-f">'+esc(_perRango(s.ini,s.fin))+' · '+_perDiasTxt(s.dias)+'</div>'
+      +    (s.motivo?'<div class="per-sol-m">'+esc(s.motivo)+'</div>':'')
+      +  '</div>'
+      +  '<div class="per-sol-b">'
+      +    '<button class="btn btn-sm per-go" onclick="perResolver(\''+s.fuente+'\','+s.id+',true)">Aprobar</button>'
+      +    '<button class="btn btn-sm btn-warn" onclick="perResolver(\''+s.fuente+'\','+s.id+',false)">Rechazar</button>'
+      +  '</div>'
+      +'</div>';
+  });
+  box.innerHTML=h;
+}
+
+// APROBAR O RECHAZAR. El contrato con el servidor es el mismo para los dos
+// caminos y es lo único que hay que recordar de esta función: CERO FILAS
+// significa "ya la resolvió la otra socia", no significa error. Ver la sección 4
+// de PERSONAL_CALENDARIO.sql.
+async function perResolver(fuente,id,ok){
+  const s=(_calPend||[]).filter(function(x){ return x.fuente===fuente && x.id===id; })[0];
+  const quien=(s&&s.nombre)||'esta solicitud';
+  if(!confirm((ok?'¿Aprobar ':'¿Rechazar ')+(s?(s.fuente==='vacacion'?'la vacación de ':'el permiso de ')+quien
+      +' ('+_perRango(s.ini,s.fin)+')':quien)+'?\n\nUna vez resuelta no se cambia.')) return;
+  let nota=null;
+  if(!ok){ nota=prompt('Motivo del rechazo (opcional) — lo va a ver quien lo pidió:',''); }
+  _perAviso('calStatus','s-info','<span class="spin"></span>Registrando la decisión…');
+  try{
+    const c=sbClient(); if(!c) throw new Error('no hay conexión a Supabase');
+    let filas=null;
+    if(fuente==='permiso'){
+      // `resuelto_por` y `resuelto_en` NO van en el payload: los escribe el
+      // trigger del servidor con el correo del JWT y el reloj de Postgres. Y el
+      // `.eq('estado','pendiente')` es la mitad cliente del candado.
+      const {data,error}=await c.from('rrhh_permiso')
+        .update({estado: ok?'aprobado':'rechazado', resolucion_nota:(nota||null)})
+        .eq('id',id).eq('estado','pendiente').select();
+      if(error) throw error;
+      filas=data||[];
+    }else{
+      const {data,error}=await c.rpc('rrhh_resolver_evento',
+        {p_evento_id:id, p_aprobado:!!ok, p_motivo:(nota||null)});
+      if(error) throw error;
+      filas=data||[];
+    }
+    if(!filas.length){ await _perYaResuelta(fuente,id); }
+    else{ await _perTrasResolver('s-ok',(ok?'Aprobada.':'Rechazada.')+' Queda registrado a tu nombre.'); }
+  }catch(e){
+    _perAviso('calStatus','s-err','No pude registrar la decisión: '+esc(_perErr(e)));
+  }
+}
+
+// CERO FILAS. Se va a buscar QUIÉN decidió y QUÉ, porque "no se pudo" a secas
+// deja a Andrea sin saber si su decisión valió o no — y la respuesta correcta
+// casi siempre es "sí, ya está resuelta, y no hace falta que hagas nada".
+// El aviso se escribe DESPUÉS de recargar. Al revés, calCargar() lo borra al
+// terminar y la respuesta a "¿se aplicó mi decisión?" dura medio segundo.
+async function _perTrasResolver(tipo,msg){
+  _calDatos=null; _calPend=null;
+  await calCargar(true);
+  _perAviso('calStatus',tipo,msg);
+}
+async function _perYaResuelta(fuente,id){
+  let quien='', que='', cuando='';
+  try{
+    const c=sbClient();
+    if(fuente==='permiso'){
+      const {data}=await c.from('v_rrhh_permiso')
+        .select('estado,resuelto_por,resuelto_en').eq('id',id).limit(1);
+      if(data&&data.length){ que=data[0].estado; quien=data[0].resuelto_por||''; cuando=data[0].resuelto_en||''; }
+    }else{
+      const {data}=await c.from('v_rrhh_evento_estado')
+        .select('estado,aprobado_por,aprobado_en').eq('id',id).limit(1);
+      if(data&&data.length){ que=data[0].estado; quien=data[0].aprobado_por||''; cuando=data[0].aprobado_en||''; }
+    }
+  }catch(e){}
+  // Si SIGUE pendiente, no hubo carrera: la RLS no dejó pasar el UPDATE porque
+  // quien lo intentó no es socia. Dos causas distintas para el mismo "0 filas",
+  // y decir la equivocada manda a buscar el problema al lugar que no es.
+  if(que==='pendiente'){
+    _perAviso('calStatus','s-warn','La solicitud sigue pendiente: tu cuenta no tiene permiso para resolverla. '
+      +'Aprobar es de las socias.');
+    return;
+  }
+  const cd=cuando?(' el '+_perFecha(String(cuando).slice(0,10))):'';
+  await _perTrasResolver('s-warn',
+    'No se cambió nada: '+(quien?esc(quien):'la otra socia')+' ya la había '
+    + esc(que==='rechazado'?'rechazado':(que==='aprobado'?'aprobado':'resuelto'))+cd
+    + '. Tu decisión no se aplicó — una solicitud se resuelve una sola vez.');
+}
+
+// ── PEDIR DÍAS ──────────────────────────────────────────────────────────
+let _solTipo='vacaciones', _solSaldo=null, _solMias=null;
+
+function irASolicitar(){
+  _modShow('vSolicitar'); crumbSet('Personal','Pedir días'); _perTabs('pedir');
+  perPerfil().then(function(){ solCargar(false); });
+}
+function solTipo(t){
+  _solTipo=t;
+  const a=document.getElementById('solOptVac'), b=document.getElementById('solOptPer');
+  if(a) a.classList.toggle('on', t==='vacaciones');
+  if(b) b.classList.toggle('on', t==='permiso');
+  _solResumen();
+}
+async function solCargar(force){
+  const form=document.getElementById('solForm'); if(!form) return;
+  _perAviso('solStatus','s-info','<span class="spin"></span>Cargando…');
+  try{
+    const yo=await perYo();
+    // Una socia no es empleada: no tiene fila en `rrhh_persona` y por eso no
+    // puede pedirse días a sí misma. Se dice cuál de los dos casos es, porque
+    // "no podés pedir" a secas se lee como un error del sistema.
+    if(!yo){
+      form.innerHTML='';
+      document.getElementById('solMias').innerHTML='';
+      _perAviso('solStatus','s-warn', _perEsSocia
+        ? 'Esta pantalla es para el equipo de producción. Vos aprobás lo que piden, en el Calendario.'
+        : 'Tu cuenta no está enlazada a una persona en Personal, así que todavía no podés pedir días. Lo enlaza Andrea.');
+      return;
+    }
+    _perAviso('solStatus','');
+    const c=sbClient();
+    const {data:sal}=await c.from('v_rrhh_vacacion_saldo')
+      .select('persona_id,dias_disponibles').eq('persona_id',yo.id);
+    _solSaldo=(sal&&sal.length)?Number(sal[0].dias_disponibles)||0:null;
+    if(!form.innerHTML || force) _solForm(); else _solResumen();
+    await solMias(true);
+  }catch(e){
+    _perAviso('solStatus','s-err','No pude cargar la pantalla: '+esc(_perErr(e)));
+  }
+}
+function _solForm(){
+  const form=document.getElementById('solForm'); if(!form) return;
+  const hoy=_perISO(new Date());
+  form.innerHTML=
+     '<div class="field"><label>Qué pedís</label>'
+   +   '<div style="display:flex;gap:8px">'
+   +     '<button class="btn per-opt'+(_solTipo==='vacaciones'?' on':'')+'" id="solOptVac" onclick="solTipo(\'vacaciones\')">Vacación</button>'
+   +     '<button class="btn per-opt'+(_solTipo==='permiso'?' on':'')+'" id="solOptPer" onclick="solTipo(\'permiso\')">Permiso</button>'
+   +   '</div></div>'
+   + '<div class="field-row">'
+   +   '<div class="field"><label>Del</label><input id="solIni" type="date" value="'+hoy+'" onchange="_solResumen()"></div>'
+   +   '<div class="field"><label>Al</label><input id="solFin" type="date" value="'+hoy+'" onchange="_solResumen()"></div>'
+   + '</div>'
+   + '<div class="field"><label>Motivo (opcional)</label>'
+   +   '<input id="solMotivo" placeholder="Una línea"></div>'
+   + '<div id="solResumen" class="per-cnt" style="margin-bottom:12px"></div>'
+   + '<button class="btn per-go" onclick="solEnviar()">Enviar solicitud</button>';
+  _solResumen();
+}
+// El resumen es ESTADO DEL DATO, no instrucciones: cuántos días salen de las dos
+// fechas, cuánto saldo queda, y el aviso cuando se piden más días de los que hay.
+// La diferencia entre las dos categorías se dice acá porque cambia el número —
+// el permiso no descuenta saldo— y eso no se puede adivinar mirando el formulario.
+function _solResumen(){
+  const box=document.getElementById('solResumen'); if(!box) return;
+  const ini=(document.getElementById('solIni')||{}).value||'';
+  const fin=(document.getElementById('solFin')||{}).value||ini;
+  if(!ini){ box.innerHTML=''; return; }
+  if(fin && fin<ini){ box.innerHTML='<span style="color:var(--amber)">La fecha final es anterior a la inicial.</span>'; return; }
+  const n=_perDias(ini,fin||ini);
+  let h=_perDiasTxt(n)+' corridos.';
+  if(_solTipo==='vacaciones'){
+    h+=(_solSaldo===null) ? ' No pude leer tu saldo.'
+      : ' Tenés '+_perDiasTxt(_solSaldo)+' de saldo.';
+    if(_solSaldo!==null && n>_solSaldo)
+      h+=' <span style="color:var(--amber)">Estás pidiendo más de lo que tenés.</span>';
+  }else{
+    h+=' El permiso no descuenta días de vacaciones.';
+  }
+  box.innerHTML=h;
+}
+async function solEnviar(){
+  const yo=await perYo(); if(!yo) return;
+  const ini=(document.getElementById('solIni')||{}).value||'';
+  const fin=(document.getElementById('solFin')||{}).value||ini;
+  const mot=((document.getElementById('solMotivo')||{}).value||'').trim();
+  if(!ini) return _perAviso('solStatus','s-warn','Falta la fecha de inicio.');
+  if(fin<ini) return _perAviso('solStatus','s-warn','La fecha final es anterior a la inicial.');
+  const dias=_perDias(ini,fin);
+  _perAviso('solStatus','s-info','<span class="spin"></span>Enviando…');
+  try{
+    const c=sbClient(); if(!c) throw new Error('no hay conexión a Supabase');
+    const em=await perEmail();
+    if(_solTipo==='vacaciones'){
+      // Va a `rrhh_evento` con el mismo camino que ya define el pegado 2: la
+      // solicitud es la fila, la aprobación es otra tabla, y el saldo solo baja
+      // cuando está aprobada. `dias` y `horas is null` los pide el CHECK.
+      const {error}=await c.from('rrhh_evento').insert({
+        persona_id:yo.id, fecha:ini, tipo:'vacaciones', dias:dias,
+        motivo:(mot||null), creado_por:(em||'desconocido')});
+      if(error) throw error;
+    }else{
+      const {error}=await c.from('rrhh_permiso').insert({
+        persona_id:yo.id, fecha_inicio:ini, fecha_fin:fin,
+        motivo:(mot||null), estado:'pendiente', creado_por:(em||'desconocido')});
+      if(error) throw error;
+    }
+    const mm=document.getElementById('solMotivo'); if(mm) mm.value='';
+    _calDatos=null; _calPend=null;
+    await solCargar(false);
+    _perAviso('solStatus','s-ok','Pedido. Queda esperando el visto bueno de Andrea o Lorena.');
+  }catch(e){
+    _perAviso('solStatus','s-err','No pude enviar la solicitud: '+esc(_perErr(e)));
+  }
+}
+// MIS SOLICITUDES. Lo pedido y sin aprobar no baja el saldo (misma advertencia
+// que ya hace Mis vacaciones), así que si esta lista no existiera, quien pidió
+// tres días el lunes entraría el martes y concluiría que se perdió.
+async function solMias(force){
+  const box=document.getElementById('solMias'); if(!box) return;
+  if(_solMias && !force){ _solMiasRender(); return; }
+  try{
+    const yo=await perYo(); if(!yo){ box.innerHTML=''; return; }
+    const c=sbClient();
+    const [rp,rv]=await Promise.all([
+      c.from('v_rrhh_permiso')
+       .select('id,fecha_inicio,fecha_fin,dias,motivo,estado,resolucion_nota,resuelto_por')
+       .eq('persona_id',yo.id),
+      c.from('v_rrhh_evento_estado').select('id,fecha,dias,motivo,estado,aprobado_por')
+       .eq('persona_id',yo.id).eq('tipo','vacaciones')
+    ]);
+    if(rp.error) throw rp.error;
+    if(rv.error) throw rv.error;
+    _solMias=[]
+      .concat((rp.data||[]).map(function(r){ return {tipo:'Permiso', ini:r.fecha_inicio, fin:r.fecha_fin,
+        dias:r.dias, motivo:r.motivo, estado:r.estado, nota:r.resolucion_nota, por:r.resuelto_por}; }))
+      .concat((rv.data||[]).map(function(r){ return {tipo:'Vacación', ini:r.fecha,
+        fin:_perISO(_perMasDias(_perDe(r.fecha),(Number(r.dias)||1)-1)), dias:Number(r.dias)||1,
+        motivo:r.motivo, estado:(r.estado==='solicitado'?'pendiente':r.estado), por:r.aprobado_por}; }));
+    _solMiasRender();
+  }catch(e){
+    box.innerHTML='<div class="status s-err">No pude leer tus solicitudes: '+esc(_perErr(e))+'</div>';
+  }
+}
+function _solMiasRender(){
+  const box=document.getElementById('solMias'); if(!box) return;
+  const f=(_solMias||[]).slice().sort(function(a,b){ return String(b.ini).localeCompare(String(a.ini)); });
+  if(!f.length){ box.innerHTML=''; return; }
+  let h='<div class="m3title" style="font-size:16px">Lo que pediste</div>';
+  f.forEach(function(s){
+    const cl=(s.estado==='aprobado')?'ok':((s.estado==='pendiente')?'pend':'no');
+    h+='<div class="per-sol"><div class="per-sol-t">'
+      +  '<div class="per-sol-q">'+esc(s.tipo)+' · '+esc(_perRango(s.ini,s.fin))+'</div>'
+      +  '<div class="per-sol-f">'+_perDiasTxt(s.dias)+(s.motivo?' · '+esc(s.motivo):'')+'</div>'
+      +  (s.nota?'<div class="per-sol-m">'+esc(s.nota)+'</div>':'')
+      +'</div>'
+      +'<div class="per-est '+cl+'">'+esc(s.estado)+(s.por&&s.estado!=='pendiente'?'<div class="per-sol-f" style="text-transform:none;font-weight:400">'+esc(s.por)+'</div>':'')+'</div>'
+      +'</div>';
+  });
+  box.innerHTML=h;
+}
+
+// ── DÍAS CERRADOS (CRUD, solo socias) ───────────────────────────────────
+let _ferDatos=null, _ferEdit=null, _ferTipoSel='feriado';
+
+function irADiasCerrados(){
+  _modShow('vDiasCerrados'); crumbSet('Personal','Días cerrados'); _perTabs('cerrados');
+  perPerfil().then(function(){ ferCargar(false); });
+}
+async function ferCargar(force){
+  const box=document.getElementById('ferBody'); if(!box) return;
+  const form=document.getElementById('ferForm');
+  // La pestaña no se le dibuja al equipo, pero llegar acá igual es posible (una
+  // recarga a mitad de camino). Se muestra la lista y se esconde el formulario:
+  // los días cerrados no son secretos, administrarlos sí es de las socias. Y la
+  // RLS lo hace cumplir del lado del servidor pase lo que pase acá.
+  if(form) form.innerHTML = _perEsSocia ? _ferFormHTML() : '';
+  if(_ferDatos && !force){ _ferRender(); return; }
+  _perAviso('ferStatus','s-info','<span class="spin"></span>Leyendo los días cerrados…');
+  try{
+    const c=sbClient(); if(!c) throw new Error('no hay conexión a Supabase');
+    const {data,error}=await c.from('rrhh_feriado')
+      .select('id,fecha,fecha_fin,descripcion,tipo').order('fecha',{ascending:false});
+    if(error) throw error;
+    _ferDatos=data||[]; _perAviso('ferStatus',''); _ferRender();
+  }catch(e){
+    _perAviso('ferStatus','s-err','No pude leer los días cerrados: '+esc(_perErr(e)));
+  }
+}
+function _ferFormHTML(){
+  const hoy=_perISO(new Date());
+  return '<div class="field-row">'
+   +   '<div class="field"><label>Del</label><input id="ferIni" type="date" value="'+hoy+'"></div>'
+   +   '<div class="field"><label>Al (opcional)</label><input id="ferFin" type="date"></div>'
+   + '</div>'
+   + '<div class="field"><label>Qué es</label><input id="ferDesc" placeholder="Feriado o motivo del cierre"></div>'
+   + '<div class="field"><label>Tipo</label>'
+   +   '<div style="display:flex;gap:8px">'
+   +     '<button class="btn per-opt'+(_ferTipoSel==='feriado'?' on':'')+'" id="ferOptFer" onclick="ferTipo(\'feriado\')">Feriado</button>'
+   +     '<button class="btn per-opt'+(_ferTipoSel==='cierre'?' on':'')+'" id="ferOptCie" onclick="ferTipo(\'cierre\')">Cierre de planta</button>'
+   +   '</div></div>'
+   + '<div style="display:flex;gap:8px;align-items:center">'
+   +   '<button class="btn per-go" onclick="ferGuardar()" id="ferBtn">Agregar</button>'
+   +   '<button class="btn btn-sm" onclick="ferCancelar()" id="ferCancel" style="display:none">Cancelar</button>'
+   + '</div>';
+}
+function ferTipo(t){
+  _ferTipoSel=t;
+  const a=document.getElementById('ferOptFer'), b=document.getElementById('ferOptCie');
+  if(a) a.classList.toggle('on', t==='feriado');
+  if(b) b.classList.toggle('on', t==='cierre');
+}
+function ferCancelar(){
+  _ferEdit=null; _ferTipoSel='feriado';
+  const f=document.getElementById('ferForm'); if(f) f.innerHTML=_ferFormHTML();
+  _perAviso('ferStatus','');
+}
+function ferEditar(id){
+  const r=(_ferDatos||[]).filter(function(x){ return x.id===id; })[0]; if(!r) return;
+  _ferEdit=id;
+  const f=document.getElementById('ferForm'); if(f) f.innerHTML=_ferFormHTML();
+  const set=function(i,v){ const el=document.getElementById(i); if(el) el.value=v||''; };
+  set('ferIni',r.fecha); set('ferFin',r.fecha_fin); set('ferDesc',r.descripcion);
+  ferTipo(r.tipo||'feriado');
+  const b=document.getElementById('ferBtn'); if(b) b.textContent='Guardar cambios';
+  const c=document.getElementById('ferCancel'); if(c) c.style.display='';
+}
+async function ferGuardar(){
+  const ini=(document.getElementById('ferIni')||{}).value||'';
+  const fin=(document.getElementById('ferFin')||{}).value||'';
+  const desc=((document.getElementById('ferDesc')||{}).value||'').trim();
+  if(!ini)  return _perAviso('ferStatus','s-warn','Falta la fecha.');
+  if(!desc) return _perAviso('ferStatus','s-warn','Falta decir qué es.');
+  if(fin && fin<ini) return _perAviso('ferStatus','s-warn','La fecha final es anterior a la inicial.');
+  _perAviso('ferStatus','s-info','<span class="spin"></span>Guardando…');
+  try{
+    const c=sbClient(); if(!c) throw new Error('no hay conexión a Supabase');
+    const fila={fecha:ini, fecha_fin:(fin||null), descripcion:desc, tipo:_ferTipoSel};
+    if(_ferEdit){
+      const {error}=await c.from('rrhh_feriado').update(fila).eq('id',_ferEdit);
+      if(error) throw error;
+    }else{
+      const em=await perEmail();
+      fila.creado_por=em||'desconocido';
+      const {error}=await c.from('rrhh_feriado').insert(fila);
+      if(error) throw error;
+    }
+    _ferEdit=null; _ferTipoSel='feriado'; _calDatos=null;
+    const f=document.getElementById('ferForm'); if(f) f.innerHTML=_ferFormHTML();
+    await ferCargar(true);
+    _perAviso('ferStatus','s-ok','Guardado.');
+  }catch(e){
+    _perAviso('ferStatus','s-err','No pude guardar: '+esc(_perErr(e)));
+  }
+}
+async function ferBorrar(id){
+  const r=(_ferDatos||[]).filter(function(x){ return x.id===id; })[0];
+  if(!confirm('¿Borrar "'+((r&&r.descripcion)||'este día')+'"?')) return;
+  try{
+    const c=sbClient(); if(!c) throw new Error('no hay conexión a Supabase');
+    const {error}=await c.from('rrhh_feriado').delete().eq('id',id);
+    if(error) throw error;
+    _ferDatos=null; _calDatos=null;
+    await ferCargar(true);
+    _perAviso('ferStatus','s-ok','Borrado.');
+  }catch(e){
+    _perAviso('ferStatus','s-err','No pude borrar: '+esc(_perErr(e)));
+  }
+}
+function _ferRender(){
+  const box=document.getElementById('ferBody'); if(!box) return;
+  const f=_ferDatos||[];
+  if(!f.length){ box.innerHTML='<div class="per-cnt">Todavía no hay días cerrados cargados.</div>'; return; }
+  let h='<table><thead><tr><th>Cuándo</th><th>Qué es</th><th>Tipo</th><th></th></tr></thead><tbody>';
+  f.forEach(function(r){
+    const n=_perDias(r.fecha, r.fecha_fin||r.fecha);
+    h+='<tr><td>'+esc(_perRango(r.fecha, r.fecha_fin))+(n>1?'<div class="vac-sub">'+_perDiasTxt(n)+'</div>':'')+'</td>'
+      +'<td>'+esc(r.descripcion||'—')+'</td>'
+      +'<td>'+(r.tipo==='cierre'?'Cierre de planta':'Feriado')+'</td>'
+      +'<td style="text-align:right;white-space:nowrap">'
+      + (_perEsSocia
+          ? '<button class="btn btn-sm" onclick="ferEditar('+r.id+')">Editar</button> '
+            +'<button class="btn btn-sm btn-warn" onclick="ferBorrar('+r.id+')">Borrar</button>'
+          : '')
+      +'</td></tr>';
+  });
+  box.innerHTML=h+'</tbody></table>';
 }
 
 function setProgress(pct,msg){
