@@ -913,3 +913,183 @@ DIBUJA de un resultado ya filtrado; el `.limit(300)` recorta lo que se LEE antes
 de filtrar. Los dos mensajes tienen que poder aparecer a la vez y decir cosas
 distintas — si se los unifica en una sola frase, se pierde justo la diferencia
 que importa.
+
+---
+
+## 17 · 🔴 ABIERTO · La columna "Unidades" del Conteo está en unidades individuales
+
+Reportado por Andrea el 10-sep-2026, con el borrador del conteo abierto
+(23:07, 27 líneas, los 6 productos tecleados).
+
+**NO ES UN ERROR DE DATOS Y NO BLOQUEA CONFIRMAR EL ANCLA.** Se diagnosticó ese
+mismo día antes de que Andrea confirmara: `ent_conteo_linea` guarda `cajas`,
+`sueltas` **y** `uds`, y `uds` está en unidades individuales, que es exactamente
+lo que el motor espera. Es el número correcto en la unidad equivocada.
+
+**Qué pasa.** `_clUds(pid, cajas, sueltas)` devuelve
+`cajas × cajaU + sueltas × presDiv`, o sea **unidades individuales**, y la
+columna las muestra crudas bajo el rótulo "Unidades". Francés y Buns salen ×4 y
+Pizza ×2 respecto de la unidad de venta. El pie (`_clFmtTot`) arrastra lo mismo:
+"13 cj + 2 u" más un "320 u".
+
+**Blanco, Semillas y Galletas se ven bien por casualidad**: tienen `presDiv: 1`,
+así que unidad individual y unidad de venta coinciden y el error es invisible en
+ellos. Es el mismo punto ciego de la auditoría del 28-ago — no sirven para
+descartar.
+
+### Lo que se verificó, y por qué el ancla es segura
+
+Las cinco puntas del saldo y el cuadre contra Odoo están **todas** en unidades
+individuales, medido en el código el 10-sep:
+
+| punta | de dónde | unidad |
+|---|---|---|
+| ancla | `_clUds` | individuales |
+| producción | `qty_produced / factor` (`index.html` 8391) | individuales |
+| salidas | `cant_uom / uom_factor` (11163) | individuales |
+| devoluciones | `ent_devuelto_desde_ancla.uds` | individuales |
+| merma | `scrap_qty / factor` (8426) | individuales |
+| cuadre Odoo | `qty_available / factor` (`_clLeerStock`) | individuales |
+
+**Lo que lo cierra**: `_lotUds(uds, pid)` —con la que Inventario y los dos
+selectores muestran un saldo— **divide entre `presDiv`**. El motor guarda
+unidades individuales y convierte solo al mostrar. La pantalla de Conteo es la
+única que no hace esa división.
+
+Las 12 filas que reportó Andrea reconcilian exactas por los dos lados
+(`13×24 + 2×4 = 320` y `320/4 = 80`): es el mismo dato en dos unidades, no dos
+datos distintos.
+
+### Al arreglarlo
+
+Dividir entre `presDiv` y rotular la columna "Paquetes" / "Unidades" según el
+producto, como ya hace `_lotUds`. **No tocar `_clUds` ni lo que se guarda** — eso
+está bien y el motor entero depende de ello.
+
+El factor vive dos veces y eso tiene su propio pendiente: **§20**. Al arreglar
+esta pantalla, que lea de una sola.
+
+---
+
+## 18 · 🟠 ABIERTO · La columna de sueltas queda fuera de pantalla en iPhone vertical
+
+Reportado por Andrea el 10-sep-2026.
+
+**Qué pasa.** En vertical, en iPhone, la tabla de conteo se corta y la columna de
+unidades sueltas no se ve. Solo aparece girando el teléfono.
+
+**Por qué importa más de lo que parece.** No es incomodidad: es que **Daniel
+podría contar todo como cajas sin enterarse de que existe la otra columna**. Un
+lote con 3 sueltas se guardaría con 0 sueltas, y el ancla nacería corta sin que
+nada avise. Es el mismo tipo de daño que el lote que no se ofrece para contar
+(§ del selector, b56): lo que la pantalla no muestra, el conteo lo pierde.
+
+Va junto con **§17**: las dos son de la misma tabla y conviene tocarla una sola
+vez.
+
+---
+
+## 19 · 🟠 ABIERTO · El encabezado dice "solo lectura" durante el conteo
+
+Reportado por Andrea el 10-sep-2026.
+
+**Qué pasa.** El banner de producción dice "solo lectura" mientras se cuenta, con
+sesión iniciada y guardando bien.
+
+**Por qué el rótulo es engañoso, y por qué igual hay algo verdadero abajo.** La
+regla madre "Producción es SOLO LECTURA" es sobre **Odoo**, no sobre Supabase: el
+conteo escribe en Supabase, que nunca fue de solo lectura. Pero el banner se lee
+como "esta pantalla no guarda", que es falso y en el peor momento — con el
+congelador abierto y guantes puestos.
+
+Al arreglarlo, **no basta con quitarlo**: lo que el banner dice de verdad
+—"Truefie no le escribe a Odoo"— es información que cambia cómo se lee la
+pantalla, y por la regla del estándar visual eso se queda. Lo que hay que
+arreglar es que no se lea como si la pantalla no guardara.
+
+---
+
+## 20 · 🟠 ABIERTO · El factor caja→unidad vive DOS VECES
+
+Detectado el 10-sep-2026 diagnosticando §17.
+
+**Qué pasa.** La misma conversión está escrita en dos tablas distintas del
+`index.html`:
+
+| | dónde | cómo se llama |
+|---|---|---|
+| `NIV_INFO` | 6900-6905 | `cajaU` · `presDiv` |
+| `INV_TERM` | 17327 | `factor` · `presDiv` |
+
+Con los mismos números: Francés 24/4, Buns 24/4, Pizza 12/2, Blanco y Semillas
+6/1, Galletas 12/1. **Hoy coinciden.**
+
+**Por qué es un pendiente y no una curiosidad.** Es el modo de falla favorito de
+este proyecto, y ya cobró cuatro veces: la regla del renglón en blanco que
+Pendientes arregló y el Historial no recibió; la unión de lotes que vivía dentro
+del render de Inventario y el selector de Daniel nunca vio; `_despYmd` que era
+copia carácter por carácter de `_ymd`; las dos redacciones de "vigente" que
+`ent_alisto_vigente` vino a unificar. **La segunda copia nunca recibe el arreglo
+de la primera** — y acá lo que se desincronizaría es un factor de 4, o sea que el
+síntoma sería un número plausible y equivocado, no una pantalla rota.
+
+Y hay una diferencia peligrosa entre las dos que conviene ver antes de tocar
+nada: **`NIV_INFO` la usan el planificador y el nivelador** (`cajaU` aparece en
+7813, 7828, 7839, 7885, 7904, 7957), no solo Entregas. Unificar hacia el lado
+equivocado movería números de producción. La consumidora natural es `INV_TERM`,
+que es la tabla de los seis terminados y la que ya usa `_lotUds`.
+
+**No urge**: mientras coincidan, nada falla. Se arregla cuando se toque §17.
+
+---
+
+## 21 · 🟠 ABIERTO · Producción registrada DESPUÉS del ancla con fecha ANTERIOR
+
+Caso real del conteo del 10-sep-2026. Es el espejo de `ENT_MO_EXCLUIDAS`.
+
+**El caso.** El lote **Semillas `252 / 6-27`** se agregó al conteo con "Agregar un
+lote que no está" porque Keylor todavía no había registrado esa producción en
+Odoo. Daniel lo contó físicamente: **28 cj + 1 u = 169 uds**, y así entró al
+ancla. Keylor la va a registrar **mañana, con fecha de ayer** — o sea anterior al
+corte.
+
+### La respuesta, leída del código
+
+**No se suma dos veces.** En `_rpCalcularPuntas()` la producción entra solo si es
+**estrictamente posterior** al corte:
+
+```js
+if(rec.prodUtc && _odooMs(rec.prodUtc) > corteMs){ ... s[k] += rec.uds ... }
+```
+
+Una MO con fecha anterior al corte se ignora, que es exactamente lo correcto: su
+pan ya está dentro de la foto del ancla. El comportamiento por defecto es el
+bueno y **no hay que hacer nada**.
+
+### ⚠️ Pero depende de un campo que nadie mira, y de cuál fecha ponga Keylor
+
+`rec.prodUtc` es **`date_start`**, no `date_finished` (`index.html` 8391). Así que
+la pregunta real no es "¿la registra con fecha de ayer?" sino **"¿qué queda en
+`date_start`?"**:
+
+- **`date_start` de ayer** → anterior al corte → se ignora. Correcto.
+- **`date_start` de mañana** (si al registrarla la orden se abre y cierra en el
+  momento) → **posterior al corte → se suma**, y el lote 252 queda inflado en 169
+  uds, **en silencio**. Los números cierran solos y nada avisa.
+
+Es el mismo mecanismo del 14-ago con Galletas `226 / 2-27` (§ de la bitácora y
+`ENT_MO_EXCLUIDAS`), solo que al revés: allá la orden entró minutos DESPUÉS del
+corte con el pan ya contado; acá puede entrar días después con la misma
+consecuencia.
+
+**Qué hacer cuando Keylor registre**: mirar `date_start` de esa MO en UTC contra
+el corte del ancla del 10-sep — y recordar que `14-ago 16:00 CR = 14-ago 22:00
+UTC`, así que comparar crudo invierte el resultado. Si cae después del corte, la
+orden va a `ENT_MO_EXCLUIDAS` con su huella completa.
+
+### Un segundo cabo, más chico
+
+El lote se tecleó a mano como `252 / 6-27`. Cuando aparezca la MO, `_entParseLote`
+va a derivar su forma canónica del chatter. **Si el chatter dice otra cosa, van a
+ser dos claves distintas** y el ancla quedará colgando de una que la producción
+nunca alimenta. Vale confirmarlo el mismo día.
