@@ -58,3 +58,88 @@ una ley, y obliga a mentirle al sistema para reflejar lo que de verdad va a pasa
 Al construirlo: el aviso tiene que decir **cuánto** se está pasando y **de qué
 supuesto** (cuántas personas), no solo "te pasaste". Y el motivo de haberlo
 superado se escribe, como todo lo demás del proyecto.
+
+---
+
+## P1 · Personal · `PERSONAL_STORAGE.sql` está aprobado y nunca se estrenó
+
+Detectado el 10-sep-2026 diseñando el bucket de los tickets, buscando un
+precedente de subida de archivos.
+
+**Qué pasa.** `PERSONAL_STORAGE.sql` lleva escrito *"✅ APROBADO POR ANDREA
+24-ago-2026 — se levanta el STOP de diseño"* y diseña dos buckets privados
+(`justificantes`, `aguinaldos`) con sus políticas, sus funciones de carpeta y su
+paso manual en el panel. **El código nunca lo usó.** Medido: `grep` de `.upload(`
+y de `createSignedUrl` sobre `index.html` el 10-sep-2026 → **cero apariciones de
+cada uno**. Ni una pantalla sube ni muestra un archivo.
+
+**Es el CUARTO caso del mismo patrón** — una decisión escrita, aprobada, y nunca
+implementada, con los documentos hablando de ella como si existiera. Los tres
+anteriores, todos ya documentados:
+
+| | Qué se dio por hecho | Cómo se descubrió |
+|---|---|---|
+| El bloqueo duro de Despachos | "impide despachar sin saldo" | preguntando por un lote en −4 (`ENTREGAS_PENDIENTES.md` §13) |
+| La capa 3 del candado de producción | "el usuario de Odoo no puede escribir" | midiendo un `write()` real, que devolvió `True` (`CLAUDE.md`) |
+| La CUARTA PUNTA del saldo | `ent_devuelto_desde_ancla`, pegada y sin lector | buscando a mano al preparar la primera devolución (`CLAUDE.md`) |
+| **`PERSONAL_STORAGE.sql`** | "Truefie ya guarda archivos" | buscando un precedente para los tickets |
+
+Los cuatro tienen la misma forma: **el esquema o el permiso existen en el papel,
+y lo que falta es el código que los usaría** — o al revés. Y en los cuatro, lo
+que lo destapó fue ir a mirar, nunca una alerta.
+
+### Lo PRIMERO al retomarlo
+
+**Medir si los dos buckets existen de verdad**, antes de decidir nada:
+
+```sql
+select id, public, file_size_limit from storage.buckets order by id;
+```
+
+Son tres cosas distintas y hay que separarlas:
+
+- **No existen** → el pegado del 24-ago no llegó a correrse, o falló en el
+  `insert into storage.buckets` por permisos (el propio archivo lo prevé).
+- **Existen y `public = false`** → todo bien: hay esquema esperando código.
+- **Existen y `public = true`** → 🔴 **urgente**. El bucket serviría las fotos de
+  notas médicas y la hoja del aguinaldo a cualquiera con la URL, sin login. Hoy
+  no hay archivos adentro porque nada sube — o sea que el riesgo es de mañana,
+  no de hoy, pero se arregla ahora.
+
+Nada de esto se puede contestar leyendo: ver **H1**, que es la razón por la que
+nadie se habría enterado.
+
+---
+
+## H1 · Herramientas · `esquema_check.py` NO MIRA STORAGE
+
+Detectado el 10-sep-2026, junto con **P1**.
+
+**Qué pasa.** `esquema_check.py` saca los objetos de los `from('tabla')` del
+`index.html` y los sondea por REST. **Los buckets de Storage no son tablas y no
+aparecen en ningún `from()`**, así que quedan enteramente fuera de su alcance: el
+chequeo puede dar ✓ con un bucket inexistente, o —peor— con uno **público**.
+
+**Esto no es un pendiente de código, es un punto ciego de la herramienta de
+seguridad.** El chequeo tiene ya dos puntos ciegos documentados en `CLAUDE.md`
+(no ve lo que el código todavía no llama; no ve las llamadas por variable). Éste
+es el tercero, y es el único que puede callar sobre una **exposición de datos**:
+desde el 26-ago el archivo lee los objetos sensibles **al revés** —`permission
+denied` = ✓, filas = 🔴 fuga— justamente por la lección de `v_acceso_usuario`, y
+esa lógica no llega a Storage.
+
+### Qué habría que agregarle
+
+- Leer `storage.buckets` y **bloquear si alguno tiene `public = true`**. Es el
+  equivalente exacto de la regla de los objetos sensibles: en un bucket privado,
+  "no puedo entrar" es el resultado bueno.
+- Comprobar que cada bucket declarado en los `.sql` del repo **existe**, con la
+  misma distinción de siempre entre deuda nueva (bloquea) y deuda vieja (avisa).
+- Comprobar que no hay políticas de `update` ni `delete` sobre `storage.objects`
+  para esos buckets — el append-only de archivos hoy se sostiene solo en que
+  nadie las escribió.
+
+⚠️ **Ojo con la anon key acá.** Preguntarle a Storage con la anon key tiene la
+misma trampa que preguntarle a una tabla con RLS: puede contestar "vacío" en vez
+de "no tenés permiso", y ese vacío no prueba nada. La comprobación de `public`
+necesita SQL (`pg_lector.py`), no REST.
