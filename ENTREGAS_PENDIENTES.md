@@ -865,3 +865,51 @@ suma a ningún lote— que el SQL no ve.
   equivocado ocho veces es exactamente el error que ese pendiente describe.
 - **`CLAUDE.md`, corte del 27-ago**: este caso se pudo cruzar contra el Excel
   porque es anterior al corte. El próximo no va a tener ese segundo testigo.
+
+---
+
+## 16 · 🟠 ABIERTO · El Historial corta en 300 y no lo dice
+
+Detectado el 10-sep-2026 leyendo los filtros de la pantalla para especificar la
+exportación. **No es el exportador** — el exportador consulta aparte y trae todo
+lo que el filtro pida (decisión de Andrea, 10-sep). Esto es el arreglo de la
+pantalla, y va por su cuenta.
+
+**Qué pasa.** `bsLeer()` ([index.html:11985](index.html)) trae los pedidos con
+`.order('fecha_ab_re_04', {ascending:false}).limit(300)`. Es un **techo duro y
+anterior a cualquier filtro**: lo que no entró en esos 300 no está en memoria, y
+entonces **ningún filtro lo puede encontrar**. Escribir el nombre de un cliente
+viejo devuelve "Ninguna entrega con eso", que es indistinguible de "ese cliente
+nunca compró".
+
+**La pantalla ya sabe hacer esto bien, dos renglones más abajo.** `BS_TOPE = 60`
+es el tope de DIBUJO y sí se anuncia:
+
+```
+y 12 más — afiná la búsqueda.
+```
+
+O sea que la regla —*"lo que no se dibuja se DICE; un corte callado se lee como
+'esto es todo', que es la peor respuesta posible en una búsqueda"*— ya está
+escrita en el propio archivo, en el comentario de `bsFiltrar()`. Lo que falta es
+aplicarla al otro tope, el que de verdad esconde datos.
+
+**Hoy no muerde y por eso es 🟠.** El día que el histórico pase de 300 pedidos,
+muerde en silencio. La primera medición al retomarlo es cuántos hay:
+
+```sql
+select count(*) as pedidos_con_alisto from v_ent_pedido_estado;
+```
+
+### Qué hay que construir
+
+Que `bsLeer()` pida **301** y, si vuelven 301, guarde la señal de que hay más y
+la pantalla lo diga con la misma voz que el otro tope — algo como *"solo los 300
+más recientes; hay más historial"*. Pedir uno de más es el truco barato para
+saber si se cortó sin traer un `count` aparte.
+
+⚠️ **No confundir los dos topes al arreglarlo.** `BS_TOPE` recorta lo que se
+DIBUJA de un resultado ya filtrado; el `.limit(300)` recorta lo que se LEE antes
+de filtrar. Los dos mensajes tienen que poder aparecer a la vez y decir cosas
+distintas — si se los unifica en una sola frase, se pierde justo la diferencia
+que importa.
