@@ -19,8 +19,13 @@
 -- razón: el chatter de WH/MO/01359 (producida el 2-jul-2026) lo escribió Keylor
 -- el mismo día de producción, 2-jul 22:51, y dice literal "183/01 27".
 --
--- Además cuadra solo: el AA-MM del lote es el VENCIMIENTO, y la vida útil son 6
--- meses. Producción 2-jul + 6 = enero 2027 → `1-27`. Los lotes vecinos lo
+-- Además cuadra solo: el AA-MM del lote es el VENCIMIENTO, y la vida útil era de 6
+-- meses EN ESA ÉPOCA. Producción 2-jul + 6 = enero 2027 → `1-27`.
+-- ⚠️ LA VIDA ÚTIL CAMBIÓ DESPUÉS: True Food pasó el congelado de 6 a 9 meses, y la
+-- frontera es por ORDEN, no por fecha — hasta WH/MO/01436 son 6 meses, desde
+-- WH/MO/01437 son 9 (las dos del 2-sep-2026). Este análisis es de julio-2026, así
+-- que el "+6" de acá es el correcto PARA ESTE LOTE; no se puede reusar la cuenta
+-- en un lote posterior a 01436 sin cambiarla por +9. Ver ENT_VIDA_MESES. Los lotes vecinos lo
 -- confirman: 163 (producido el 12-jun) vence 12-26, y 190 (producido el 9-jul)
 -- vence 1-27. Un 183 venciendo en 12-26 sería el único fuera de la regla.
 --
