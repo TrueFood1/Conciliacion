@@ -7330,7 +7330,9 @@ async function rzDiagEscenarios(body){
 // Formato de 4 campos:  DDD [C] / M AA
 //   · DDD = día juliano de PRODUCCIÓN (2-3 díg)
 //   · C   = código de producto (OPCIONAL): Blanco 2·Semillas 4·Francés 1·Buns 3·Pizza 5·Galletas 6
-//   · M/AA = fecha de VENCIMIENTO (producción + ~6 meses) → AA LLEGA A 27 (confirmado 17-jul).
+//   · M/AA = fecha de VENCIMIENTO. CONVIVEN DOS ÉPOCAS DE VIDA ÚTIL (ver ENT_VIDA_MESES):
+//     producción + 6 meses hasta WH/MO/01436, producción + 9 meses desde WH/MO/01437.
+//     → AA LLEGA A 27 (confirmado 17-jul).
 // El año de PRODUCCIÓN se ancla en date_start de la orden (dato duro), NO en AA.
 //
 // ⚠️ EL CÓDIGO ES PARTE DE LA IDENTIDAD DEL LOTE, y la forma canónica NO lo lleva.
@@ -7352,10 +7354,27 @@ const ENT_PROD=[451,452,453,503,472,519];                     // los 6 productos
 const ENT_COD={451:2,452:4,453:1,503:3,472:5,519:6};
 // ── VENTANA DE VENCIMIENTO (regla derivada, Andrea 12-ago-2026) ──────────
 // El AA del lote es el VENCIMIENTO, no la producción. Una lista fija de años
-// (24-27) se vencía cada enero Y dejaba pasar errores: con 6 meses de vida útil,
+// (24-27) se vencía cada enero Y dejaba pasar errores: con la vida útil vigente,
 // nada vivo HOY puede vencer en 24 o 25 — un "24" leído hoy es mis-parseo, no un
 // lote viejo. Así que el rango se deriva del calendario y se corre solo.
-const ENT_VIDA_MESES   = 6;   // vida útil del producto congelado
+//
+// ⚠️ CONVIVEN DOS VIDAS ÚTILES, Y LA FRONTERA ES POR ORDEN, NO POR FECHA.
+// True Food pasó el congelado de 6 a 9 meses (decisión del 2-sep-2026). El corte
+// NO es un día: las DOS órdenes del 2-sep caen una de cada lado.
+//     · hasta  WH/MO/01436  (Pizza Crust, 2-sep-2026, lote `245 / 3-27`) → 6 meses
+//     · desde  WH/MO/01437  (Semillas,    2-sep-2026, lote `245 / 6-27`) → 9 meses
+// `01436` NO ES UN ERROR: Andrea lo verificó contra la bolsa el 13-sep y dice
+// `245 / 3-27`. Escribir la regla como "desde el 2-sep son 9 meses" haría ver esa
+// Pizza como un lote mal transcripto y mandaría a corregir un dato que está bien.
+// Por eso la frontera se nombra con los dos números de orden y no con la fecha.
+//
+// POR QUÉ 9 Y NO 6: la ventana tiene que cubrir la época MÁS LARGA, porque un
+// lote de 6 meses vence antes y entra igual. Medido el 13-sep-2026 sobre las 182
+// órdenes done de 2026 con lote legible: 174 a +6 meses y 8 a +9, y las 8 son
+// exactamente de `01437` en adelante. Con la constante en 6 esos 8 caían en
+// `anio_invalido` y desaparecían del selector de alisto y del Conteo — 170 lotes
+// ok con 6 contra 178 con 9, sin que ningún otro lote se moviera.
+const ENT_VIDA_MESES   = 9;   // vida útil VIGENTE (era 6 hasta WH/MO/01436, ver arriba)
 const ENT_MARGEN_MESES = 2;   // hacia atrás: producto por vencer o recién vencido que sigue en el congelador
 // Ventana válida en MESES ABSOLUTOS (año×12+mes), para comparar sin bordes de año.
 function _entVentanaVenc(hoy){
@@ -10858,8 +10877,17 @@ async function lotCargar(force){
 }
 // FIFO DE VERDAD, no por juliano pelado. El juliano se repite cada año, así que
 // ordenar por él solo mezclaría `350 / 12-26` con `010 / 6-27`. El vencimiento
-// (M-AA) sale del mismo string y es monótono con la producción —vence 6 meses
-// después—, así que (AA, M, DDD) da el orden real de entrada al congelador.
+// (M-AA) sale del mismo string, así que (AA, M, DDD) da el orden real de entrada
+// al congelador.
+//
+// ⚠️ ESTE COMENTARIO DECÍA "vence 6 meses después" COMO SI FUERA UNIVERSAL. Ya no
+// lo es: conviven dos vidas útiles, 6 meses hasta WH/MO/01436 y 9 desde
+// WH/MO/01437 (ver ENT_VIDA_MESES). El orden NO se rompe, porque esta función LEE
+// el vencimiento del string en vez de calcularlo; lo que cambia es que en la
+// frontera el hueco entre dos lotes consecutivos salta 3 meses. Verificado el
+// 13-sep-2026 corriendo _lotCmp sobre los lotes de 2026: 172 pares consecutivos
+// comparados por producto, CERO discordancias entre el orden FIFO y el orden de
+// producción real, cruce de épocas incluido.
 function _lotOrden(lote){
   const m=/^(\d{1,3})\s*\/\s*(\d{1,2})-(\d{2})$/.exec(String(lote||''));
   if(!m) return [9999,99,999];
@@ -12200,7 +12228,7 @@ async function rzDiagLotes(body){
     body.innerHTML='<div class="rz-wrap" style="font-size:13px;color:var(--text-2);line-height:1.6">'
       +'<style>.rz-wrap{--ent:#E9FE60}</style>'
       +'<h3 style="color:var(--text);font-size:15px;margin:0 0 4px">Extractor de lote v2 — cobertura (validación Etapa 1)</h3>'
-      +'<div style="color:var(--text-3);margin-bottom:16px;max-width:900px">Órdenes <b style="color:var(--text-2)">done</b> de los 6 productos desde <b style="color:var(--text-2)">2025-01-01</b>. El lote se lee del chatter (comentario de Keylor) con la regla v2. El año de PRODUCCIÓN se ancla en <code>date_start</code>; <b style="color:var(--text-2)">M/AA es la fecha de vencimiento</b> (producción + ~6 meses). Solo lectura de Odoo.'+(capado?' <b style="color:#C99A4E">⚠ lectura tope: hay más datos de los leídos, la cobertura es aproximada.</b>':'')+'</div>'
+      +'<div style="color:var(--text-3);margin-bottom:16px;max-width:900px">Órdenes <b style="color:var(--text-2)">done</b> de los 6 productos desde <b style="color:var(--text-2)">2025-01-01</b>. El lote se lee del chatter (comentario de Keylor) con la regla v2. El año de PRODUCCIÓN se ancla en <code>date_start</code>; <b style="color:var(--text-2)">M/AA es la fecha de vencimiento</b> (producción + 6 meses hasta la orden WH/MO/01436, + 9 meses desde WH/MO/01437: la vida útil cambió el 2-sep-2026 y las dos épocas conviven). Solo lectura de Odoo.'+(capado?' <b style="color:#C99A4E">⚠ lectura tope: hay más datos de los leídos, la cobertura es aproximada.</b>':'')+'</div>'
 
       // las dos reglas, lado a lado
       +'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:20px">'
