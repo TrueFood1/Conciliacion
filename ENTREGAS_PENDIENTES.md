@@ -919,7 +919,24 @@ que importa.
 ## 17 · 🔴 ABIERTO · La columna "Unidades" del Conteo está en unidades individuales
 
 Reportado por Andrea el 10-sep-2026, con el borrador del conteo abierto
-(23:07, 27 líneas, los 6 productos tecleados).
+(27 líneas, los 6 productos tecleados). Ese borrador es el que quedó como
+**ancla vigente**: `ent_ancla` id 6, corte **10-sep-2026 17:07:50 CR =
+10-sep-2026 23:07:50 UTC** (medido con `pg_lector` el 13-sep-2026, M10 de
+`MEDICION_EXCEPCIONES.sql`).
+
+⚠️ **LA HORA VA SIEMPRE CON SU ZONA, Y EN LOS DOS FORMATOS.** Este párrafo
+decía `23:07` a secas. Ese número calza al minuto con el corte en **UTC**, no
+con la hora de acá: a las 23:07 CR del 10-sep ya era el 11-sep en UTC. Se
+arrastró durante tres días como si fuera hora local, y de ahí salió el
+"11-sep 05:07 UTC" con el que se venían comparando las órdenes —seis horas
+corrido—. `America/Costa_Rica` es UTC−6 sin horario de verano.
+
+Es el mismo error del 19-ago-2026 que ya está en el `CLAUDE.md`: un timestamp
+de Odoo o de Postgres anotado sin decir el huso. No cambió ninguna conclusión
+—la orden más nueva de los seis terminados, `WH/MO/01453`, arranca el
+9-sep 23:54 UTC, casi un día antes incluso del corte corregido— pero habría
+cambiado la respuesta para cualquier tanda producida entre las 17:07 y las
+23:07 CR de ese día.
 
 **NO ES UN ERROR DE DATOS Y NO BLOQUEA CONFIRMAR EL ANCLA.** Se diagnosticó ese
 mismo día antes de que Andrea confirmara: `ent_conteo_linea` guarda `cajas`,
@@ -1093,3 +1110,72 @@ El lote se tecleó a mano como `252 / 6-27`. Cuando aparezca la MO, `_entParseLo
 va a derivar su forma canónica del chatter. **Si el chatter dice otra cosa, van a
 ser dos claves distintas** y el ancla quedará colgando de una que la producción
 nunca alimenta. Vale confirmarlo el mismo día.
+
+
+---
+
+## 22 · 🔴 ABIERTO · M12 **no** es el "antes" de 7e, y el plan dice que sí
+
+Encontrado el 13-sep-2026, al preparar la aplicación de
+`ENTREGAS_EXCEPCIONES_LINEA.sql`. **Nada aplicado todavía.**
+
+El encabezado del plan (§0, línea 84 de ese archivo) dice: *"M12 · el balde del
+alisto hoy, en unidad de venta. **Es el ANTES de 7e**."* Es falso: son dos
+consultas distintas.
+
+```sql
+M12:  ... from ent_salido_del_congelador_desde_ancla s
+       where s.lote = 'NO DETERMINADO'      group by ...  order by pres.nombre
+
+7e :  ... from ent_salido_del_congelador_desde_ancla s
+       (SIN where)                          group by ...  order by pres.nombre, s.lote
+```
+
+M12 mira **sólo el balde del centinela** — medido el 13-sep: **0 filas**. 7e mira
+**todos los lotes**. Usar el 0 de M12 como patrón de comparación y después correr
+7e haría aparecer la foto entera de saldos como si fuera un cambio, y se leería
+como que la migración rompió algo.
+
+**Qué hay que hacer:** correr **la consulta de 7e, tal cual**, inmediatamente
+antes de pegar, y otra vez después. El propio 7e lo dice y explica por qué:
+
+> *"⚠️ DIFERENCIAL, no contra numeros medidos otro dia. Comparar la misma consulta
+> ANTES y DESPUES de pegar, en la misma sesion. Un 'esperado' copiado de una
+> medicion de ayer ya fallo una vez (bitacora 8-sep): con doce pedidos de por
+> medio parecio que la correccion habia roto los seis saldos."*
+
+O sea: el error que 7e documenta **ya estaba cometido dentro del propio plan que
+lo advierte**, una sección más arriba.
+
+### Una trampa hermana, en el mismo archivo
+
+**7e y 7f NO están comentadas.** Todo el §7 vive en comentarios salvo esas dos,
+que son `select` ejecutables al final del archivo. Si se pega el archivo entero,
+se aplican §1–§6 y acto seguido corren 7e y 7f — o sea que se obtiene el
+**después** de 7e sin tener nunca el **antes**. Segunda razón para medir primero
+y por separado.
+
+### Y el archivo no trae transacción
+
+`ENTREGAS_EXCEPCIONES_LINEA.sql` no tiene `begin/commit`: se aplica sentencia por
+sentencia y un error a mitad deja la mitad puesta, sin aviso. Para la próxima
+sesión quedó preparado `PARA_PEGAR_EXCEPCIONES_1a6.sql`, que es el cuerpo §1–§6
+**copia literal** envuelto en `begin; … commit;` (Postgres soporta DDL
+transaccional, así que pasa a ser todo o nada), y `PARA_PEGAR_EXCEPCIONES_7abc.sql`
+con 7a/7b/7c descomentadas para pegar de a una. **Ninguno de los dos se corrió.**
+
+### El control de 7f va por IDS, no por cantidad
+
+Decisión de Andrea, 13-sep. `select tipo, count(*)` no alcanza: si la vista nueva
+cambia de semántica y devuelve **seis filas distintas**, el número pasa igual. El
+control es que `v_ent_excepcion_pendiente` con `tipo = 'lote_no_determinado'`
+devuelva exactamente `alisto_lote_id` **{164, 184, 192, 193, 194, 195}**, pedidos
+**48, 55 y 56**. Seis distintas = parar.
+
+Medido el 13-sep con `pg_lector` sobre la vista vieja: las seis son del
+**8-sep-2026**, entre las **09:16:57 y las 14:28:11 CR** (15:16:57 a 20:28:11
+UTC), **todas anteriores al corte del ancla**. Ninguna mueve el saldo de hoy, y
+corregirlas no movería ningún número: `ent_salido_del_congelador_desde_ancla`
+filtra por `preparado_en > corte` y quedan del otro lado. Queda por decidir si se
+cierran como absorbidas por el reancle o se dejan abiertas como historia.
+
