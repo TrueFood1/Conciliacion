@@ -1104,12 +1104,36 @@ el corte del ancla del 10-sep — y recordar que `14-ago 16:00 CR = 14-ago 22:00
 UTC`, así que comparar crudo invierte el resultado. Si cae después del corte, la
 orden va a `ENT_MO_EXCLUIDAS` con su huella completa.
 
-### Un segundo cabo, más chico
+### Un segundo cabo, más chico — ✅ CERRADO el 13-sep-2026
 
-El lote se tecleó a mano como `252 / 6-27`. Cuando aparezca la MO, `_entParseLote`
-va a derivar su forma canónica del chatter. **Si el chatter dice otra cosa, van a
-ser dos claves distintas** y el ancla quedará colgando de una que la producción
-nunca alimenta. Vale confirmarlo el mismo día.
+**Lo que decía este apartado** (y se deja escrito, porque la trampa sigue viva
+aunque esta instancia esté cerrada): el lote se tecleó a mano como `252 / 6-27`;
+cuando apareciera la MO, `_entParseLote` iba a derivar su forma canónica del
+chatter, y **si el chatter decía otra cosa iban a ser dos claves distintas**, con
+el ancla colgando de una que la producción nunca alimenta.
+
+**Pasó exactamente eso.** La MO apareció el 11-sep-2026 —`WH/MO/01453`, Pan de
+Semillas, `date_start` 9-sep 17:54 CR— y su chatter decía `252/03 27`, **no**
+`6-27`. Eran dos claves distintas: `452|252 / 3-27` contra `452|252 / 6-27`.
+
+**Pero no era un error de transcripción.** Era el cambio de vida útil de 6 a 9
+meses (decisión de True Food del 2-sep-2026), que ya estaba en el papel y en el
+ancla y todavía no había bajado al chatter de Odoo. Medido el 13-sep sobre las
+182 órdenes *done* de 2026 con lote legible: **174 a +6 meses y 8 a +9**, y las 8
+de `WH/MO/01437` en adelante.
+
+**Cómo se cerró.** Andrea corrigió los ocho chatters en Odoo —**editando** el
+mensaje, no agregando otro, que habría dejado las órdenes en `ambiguo`— y se subió
+`ENT_VIDA_MESES` de 6 a 9 (`6766f32`). Verificado el 13-sep corriendo
+`_entParseLote` **real** bajo `jsc` sobre el chatter ya corregido: deriva
+`452|252 / 6-27`, que **coincide exacto con lo tecleado en el ancla**. Los otros
+dos lotes del mismo caso también calzan: `503|251 / 6-27` (Buns) y
+`519|251 / 6-27` (Galletas).
+
+**Lo que deja como lección**, que es por qué no se borra: el lote vive en texto
+libre en el chatter, así que una regla de negocio nueva puede tardar días en
+llegar ahí. Entre el 2 y el 11-sep el papel decía una cosa y Odoo otra, y el
+único síntoma visible habría sido un lote que desaparece del selector.
 
 
 ---
