@@ -129,10 +129,14 @@ alter table ent_alisto_linea
 alter table ent_alisto_linea
   add constraint ent_alisto_linea_no_entrega_ok check (
     case when no_se_entrega then
-           motivo_no_entrega in ('agotado','otro')
+           -- COALESCE Y NO EL `in` PELADO: un CHECK se satisface si la expresion da
+           -- TRUE *O NULL*, y con motivo_no_entrega = NULL el `in` daba NULL, la
+           -- conjuncion entera quedaba en NULL y la fila ENTRABA. Medido el 14-sep
+           -- evaluando la expresion con un select. Ver el bloque de abajo.
+           coalesce(motivo_no_entrega in ('agotado','otro'), false)
            -- "otro" SIN nota es un motivo que no dice nada: queda prohibido en la base.
            and (motivo_no_entrega <> 'otro'
-                or (nota_no_entrega is not null and length(btrim(nota_no_entrega)) >= 10))
+                or (nota_no_entrega is not null and length(btrim(nota_no_entrega)) >= 6))
            and no_entrega_por is not null and length(btrim(no_entrega_por)) > 0
            and no_entrega_en  is not null
            -- LO QUE HACE VERDAD "no mueve ningun saldo", en el motor y no en la pantalla.
@@ -146,12 +150,31 @@ alter table ent_alisto_linea
 
 comment on constraint ent_alisto_linea_no_entrega_ok on ent_alisto_linea is
   'La marca "no se entrega" viaja con su motivo, su firma y su hora, y con las cantidades '
-  'en cero. Sin marca, los seis campos van nulos: no hay marca a medias en ninguna direccion.';
+  'en cero. Sin marca, los seis campos van nulos: no hay marca a medias en ninguna direccion. '
+  'La nota del motivo "otro" exige 6 caracteres como minimo (era 10 hasta el '
+  '15-sep-2026: "consigna", de 8, no pasaba).';
 
--- El minimo de 10 caracteres de la nota es la misma regla que `fuente` en
--- ent_alisto_lote_correccion: no alcanza para "ok" ni "no", si alcanza para
--- "no llego el camion". Es una perilla: si a Daniel con guantes le resulta
--- larga, se baja acá y en ningun otro lado.
+-- ⚠️ EL MINIMO DE LA NOTA ES 6, Y YA NO ES LA MISMA REGLA QUE `fuente`.
+-- Nacio en 10, igual que `fuente` en ent_alisto_lote_correccion, con el argumento
+-- de que 10 no alcanza para "ok" ni "no" pero si para "no llego el camion". El
+-- 15-sep-2026 se bajo a 6 y las dos reglas se separaron: `fuente` sigue en 10, y
+-- la nota de rechazo de `autorizacion_nota_ok` tambien. Si se vuelven a tocar hay
+-- que tocarlas a mano una por una: no hay nada que las ate.
+--
+-- POR QUE SE BAJO, el caso concreto: la entrega de GREEN CENTER del 8-sep-2026
+-- (factura 00100001010000003524, borrador de alisto 139) quedo abierta y no se
+-- podia cerrar. El motivo real era una CONSIGNA, que no esta en la lista cerrada
+-- `('agotado','otro')`, asi que el unico registro posible era motivo 'otro' con
+-- nota "consigna" — y "consigna" tiene 8 caracteres, dos menos que el minimo. El
+-- bloque que existe para que una excepcion se pueda registrar estaba impidiendo
+-- registrar la primera excepcion real que aparecio.
+--
+-- ⚠️ ESTO DESBLOQUEA EL CASO, NO LO MODELA. La consigna sigue viviendo en texto
+-- libre, que es justo lo que el §1 dice que no sirve: "el motivo es EL DATO y un
+-- campo libre no se puede sumar". Si la consigna se repite, el arreglo de fondo es
+-- un motivo propio en la lista cerrada, no una nota mas corta.
+-- Es una perilla: si a Daniel con guantes le resulta larga, se baja acá y en
+-- ningun otro lado.
 
 
 -- ════════════════════════════════════════════════════════════════════════
