@@ -245,24 +245,58 @@ create trigger ent_alisto_linea_marca_trg
 create table if not exists ent_alisto_linea_autorizacion (
   id               bigint generated always as identity primary key,
   alisto_linea_id  bigint not null references ent_alisto_linea(id),
-  decision         text   not null check (decision in ('autorizada','rechazada')),
-  nota             text,
+  -- NO HAY COLUMNA `decision`, Y ESE ES EL MODELO. La fila ES la validacion:
+  -- que exista dice que una socia la valido. Ver el bloque de abajo.
+  nota             text,                      -- OPCIONAL, sin minimo de largo
   creado_en        timestamptz not null default now(),
-  creado_por       text   not null,
-  -- Rechazar sin decir por que no es una decision, es un boton. La nota
-  -- obligatoria la confirmo Andrea el 10-sep.
-  constraint autorizacion_nota_ok check (
-    decision <> 'rechazada' or (nota is not null and length(btrim(nota)) >= 10))
+  creado_por       text   not null
 );
 create index if not exists ent_alisto_linea_autorizacion_idx
   on ent_alisto_linea_autorizacion (alisto_linea_id, creado_en desc);
 
 comment on table ent_alisto_linea_autorizacion is
-  'El visto bueno de una socia sobre una linea marcada "no se entrega". Append-only: manda la '
-  'fila mas reciente por alisto_linea_id. NINGUNA de las dos decisiones mueve un saldo: el pan '
-  'ya salio o ya no salio, y eso es un hecho fisico cerrado. "rechazada" dice "esto no debio '
-  'marcarse" y deja el caso a la vista; deshacerlo de verdad es anular el alisto y registrarlo '
-  'de nuevo, que es el unico camino que deja rastro de las dos versiones.';
+  'El visto bueno de una socia sobre una linea marcada "no se entrega". LA FILA ES LA VALIDACION: '
+  'que exista dice que una socia la valido, y no hay columna que interpretar. La nota es OPCIONAL. '
+  'Append-only: manda la fila mas reciente por alisto_linea_id. NO mueve ningun saldo: el pan ya '
+  'salio o ya no salio, y eso es un hecho fisico cerrado. Hasta el 15-sep-2026 hubo una columna '
+  '`decision` con "autorizada"/"rechazada"; se quito porque la socia no puede negar un hecho '
+  'consumado y "rechazada" no se uso nunca (0 filas en la tabla al quitarla). Para deshacer una '
+  'marca equivocada se anula el alisto y se registra de nuevo, que es el unico camino que deja '
+  'rastro de las dos versiones.';
+
+-- ⚠️ POR QUE NO HAY 'autorizada' / 'rechazada' · CAMBIO DEL 15-SEP-2026
+-- El §3 nacio con `decision text not null check (decision in ('autorizada',
+-- 'rechazada'))` y un CHECK `autorizacion_nota_ok` que exigia nota >= 10 cuando
+-- la decision era 'rechazada'. Los dos se quitaron. El motivo, de Andrea:
+--
+--   LA SOCIA NO PUEDE NEGAR NADA. El pan ya salio del congelador o ya no salio:
+--   es un hecho fisico cerrado, y ninguna decision administrativa lo mueve. El
+--   propio comentario de arriba ya lo decia ("NINGUNA de las dos decisiones
+--   mueve un saldo") sin sacar la conclusion: si ninguna mueve nada, no son dos
+--   decisiones, es una sola.
+--
+--   EN LA PRACTICA SIEMPRE VALIDA. Lo unico que varia es si quiere dejar una
+--   nota. 'rechazada' no era un caso de uso: era una simetria inventada.
+--
+--   UNA COLUMNA CON UN SOLO VALOR NO INFORMA. Leerla siempre devuelve lo mismo,
+--   y obliga a quien lea la tabla en seis meses a preguntarse que otros valores
+--   hubo. Dos valores donde uno nunca se usa es un modelo que miente; uno solo
+--   es un modelo que no dice nada. Por eso se fue la columna entera y no se
+--   dejo con un valor unico: la FILA es el dato.
+--
+-- Se pudo hacer sin migrar nada porque la tabla tenia 0 filas (medido el
+-- 15-sep 08:46 CR = 14:46 UTC, antes de tocarla). Con filas escritas habria
+-- sido una perdida de informacion.
+--
+-- Aplicado con CAMBIO_AUTORIZACION.sql, en una sola transaccion y en este
+-- orden obligatorio: (a) drop de los dos CHECK, escritos a la vista para que no
+-- murieran en silencio con la columna; (b) redefinicion de la vista del §5;
+-- (c) drop de la columna; (d) comentario. La vista VA ANTES: mientras dependa
+-- de `decision`, el DROP COLUMN falla, y el CASCADE que lo destrabaria borraria
+-- la vista.
+--
+-- EL GUARDIA DE ABAJO NO SE TOCO: su cuerpo no menciona `decision` ni una vez
+-- (medido sobre pg_get_functiondef, no sobre este archivo).
 
 -- ── EL GUARDIA · mismo patron que ent_alisto_lote_correccion_guard ──────
 create or replace function ent_alisto_linea_autorizacion_guard()
@@ -420,14 +454,21 @@ create or replace view v_ent_excepcion_pendiente
     left join ent_pedido_factura_vigente fv
            on fv.pedido_id = p.id and fv.anulado = false
     left join lateral (
-      select x.decision
+      -- SONDA DE EXISTENCIA, NO LECTURA DE UN VALOR. Se pregunta si HAY fila de
+      -- validacion, no que dice. Antes del 15-sep-2026 esto sondaba `x.decision`
+      -- y filtraba por `au.decision is null`, que hacia exactamente lo mismo:
+      -- `decision` era not null, asi que solo daba null cuando el lateral no
+      -- devolvia fila. Al quitarse la columna se paso a `x.id`, que es la misma
+      -- pregunta dicha sin rodeos.
+      select x.id
         from ent_alisto_linea_autorizacion x
        where x.alisto_linea_id = ali.id
        order by x.creado_en desc
        limit 1) au on true
    where ali.no_se_entrega
-     and au.decision is null;   -- autorizada Y rechazada salen de la lista: las dos son
-                                -- una decision tomada. Lo pendiente es lo NO decidido.
+     and au.id is null;         -- pendiente = NADIE la valido todavia. Una vez validada
+                                -- sale de la lista, y no hay forma de volver a entrar:
+                                -- para deshacer se anula el alisto y se registra de nuevo.
 
 -- ⚠️ SOLO MIRA EL ALISTO VIGENTE, las dos mitades. Una excepcion que colgaba de
 -- un alisto anulado y reemplazado no es un pendiente: se fue con el alisto.
