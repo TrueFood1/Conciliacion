@@ -2998,22 +2998,38 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    con producto saliendo (lima). Es una línea apagada a propósito. El borde
    izquierdo ya es el único estado que la tarjeta comunica, así que se suma
    ahí y no se inventa una señal nueva. */
-.dp-l.marcada{border-left-color:var(--text-3);background:var(--surface-2)}
-.dp-l.marcada .dp-l-pr{color:var(--text-2)}
+/* NO ALCANZABA CON EL BORDE. Medido con Andrea el 15-sep: la tarjeta marcada se
+   distinguia poco de una normal. Ahora la diferencia es de PRIMER vistazo y por
+   cuatro vias a la vez: franja gruesa a la izquierda, fondo rayado, el nombre
+   del producto tachado, y la tarjeta entera atenuada. Es la unica tarjeta del
+   modulo que se raya: el patron no compite con nada. */
+.dp-l.marcada{border-left:6px solid var(--text-3);opacity:.92;
+  background:var(--surface-2);
+  background-image:repeating-linear-gradient(135deg,
+    transparent 0 9px, rgba(255,255,255,.028) 9px 18px)}
+.dp-l.marcada .dp-l-pr{color:var(--text-2);text-decoration:line-through;
+  text-decoration-color:var(--text-3);text-decoration-thickness:1px}
+/* El 0 no grita: lo que grita es el rotulo de al lado. Un cero grande y solo se
+   lee como "todavia no puse la cantidad". */
+.dp-l.marcada .dp-l-cant b{color:var(--text-3);font-weight:500}
 /* El selector se APAGA, no desaparece: que se vea que ahí iba un lote y que
    no hay ninguno es parte de lo que la tarjeta tiene que decir. */
 .dp-l.marcada .dp-lsel{opacity:.5;pointer-events:none}
-.dp-nm-pill{display:inline-flex;align-items:center;gap:5px;align-self:flex-start;
-  background:var(--surface);border:1px solid var(--border-strong);border-radius:20px;
-  padding:2px 9px;font-size:11px;color:var(--text-2);white-space:nowrap}
-.dp-nm-pill::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--text-3)}
+.dp-nm-pill{display:flex;align-items:center;justify-content:center;gap:6px;
+  background:var(--text-3);border-radius:7px;padding:5px 10px;
+  font-size:11.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--surface);white-space:nowrap}
+.dp-nm-pill::before{content:'✕';font-size:10px;font-weight:700}
 /* Motivo, nota, firma y hora. Lo que la socia va a leer después para validar:
    si no se ve acá, no se escribió. */
 .dp-nm-info{font-size:11.5px;color:var(--text-2);line-height:1.5;word-break:break-word}
 .dp-nm-info b{color:var(--text);font-weight:500}
 .dp-nm-nota{font-style:italic}
 .dp-nm-firma{color:var(--text-3);font-size:11px}
-.dp-nofact{font-size:12.5px;color:var(--text-2);white-space:nowrap}
+/* "no entregado N" es LA frase de la tarjeta: la que contesta que paso. Va en
+   ambar, que en este modulo ya significa "mira esto", y en el renglon de arriba
+   del todo para que se lea antes que el selector apagado. */
+.dp-nofact{font-size:13px;color:var(--warn);font-weight:600;white-space:nowrap}
 /* Deshacer vive mientras el alisto no se cierre. Después no existe: la fila ya
    está en la base y el único camino es anular el alisto y registrarlo de nuevo. */
 .dp-deshacer{align-self:flex-end;background:none;border:none;padding:2px 0;cursor:pointer;
@@ -3054,6 +3070,23 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .dp-otro{align-self:flex-end;background:none;border:none;padding:2px 0;cursor:pointer;
   font-family:var(--font);font-size:11.5px;color:var(--ent-line)}
 .dp-l-fin .dp-otro{align-self:auto}
+/* GRIS Y A LA IZQUIERDA, contra el lima de "+ otro lote" a la derecha. Dos
+   acciones distintas no pueden parecerse: una agrega un lote, la otra dice que
+   no hubo ninguno. */
+.dp-nose{align-self:auto;background:none;border:none;padding:2px 0;cursor:pointer;
+  font-family:var(--font);font-size:11.5px;color:var(--text-3)}
+.dp-nose:hover{text-decoration:underline;color:var(--warn)}
+.dp-l-fin2{justify-content:space-between}
+/* ── EL CENTINELA, VISUALMENTE OPUESTO A LA MARCA ───────────────────────
+   La marca "no se entrega" es GRIS y apagada: no salio nada. El centinela es
+   AMBAR y encendido: SI salio, y resta del saldo — lo que falta es saber de
+   donde. Compartir color seria decir que son la misma cosa. */
+.dp-ind-av{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dp-ind-pill{display:inline-flex;align-items:center;gap:5px;background:var(--warn);
+  color:#1a1400;border-radius:7px;padding:4px 9px;font-size:11px;font-weight:600;
+  letter-spacing:.03em;text-transform:uppercase;white-space:nowrap}
+.dp-ind-pill::before{content:'?';font-weight:700}
+.dp-ind-mot{font-size:11.5px;color:var(--text-2)}
 .dp-otro:hover{text-decoration:underline}
 /* La cantidad es un botón que PARECE texto hasta que se toca. Sin edición no
    hay ruido; el lápiz dice que se puede sin gritar. */
@@ -10161,11 +10194,22 @@ function despRenderPedido(body){
         +'</div>'
         +'<button class="dp-deshacer" onclick="despDesmarcar('+i+')">Deshacer</button>';
     }else if(!e.partido){
+      // Un centinela elegido se anuncia: la tarjeta no puede parecer normal
+      // cuando lo que va a salir no tiene lote conocido.
+      const _ind=(e.lotes[0]&&e.lotes[0].lote===ENT_LOTE_INDET)?e.lotes[0].indet:null;
+      if(_ind) h+='<div class="dp-ind-av"><span class="dp-ind-pill">salió sin lote</span>'
+        +'<span class="dp-ind-mot">'+esc(_despIndetTxt(_ind.motivo))+'</span></div>';
       // EL CASO NORMAL ES UNA LÍNEA: un solo selector, sin campo de cantidad —
       // la cantidad es la de la factura y ya está arriba.
       h+='<div class="dp-l-bot">'+_despSel(i,0,e.lotes[0],disp,'')+'</div>'
-        +'<div class="dp-l-fin"><button class="dp-otro" onclick="despPartir('+i+')">+ otro lote</button>'
-        +'<button class="dp-otro" onclick="despMarcaAbrir('+i+')">No se entrega</button></div>';
+        // "+ otro lote" QUEDA DONDE SIEMPRE ESTUVO, a la derecha y en lima. Daniel
+        // ya lo tiene en la memoria muscular; moverlo para hacerle lugar a un boton
+        // nuevo le cobra el cambio al gesto que ya funciona. El boton nuevo entra a
+        // la IZQUIERDA y en gris: distinto lugar y distinto color, para que no se
+        // toque uno creyendo tocar el otro.
+        +'<div class="dp-l-fin dp-l-fin2">'
+        +'<button class="dp-nose" onclick="despMarcaAbrir('+i+')">No se entrega</button>'
+        +'<button class="dp-otro" onclick="despPartir('+i+')">+ otro lote</button></div>';
     }else{
       e.lotes.forEach(function(lt,j){
         h+='<div class="dp-l-bot">'+_despSel(i,j,lt,disp,'p')
@@ -10176,8 +10220,8 @@ function despRenderPedido(body){
           +'title="Quitar este lote" aria-label="Quitar este lote">×</button>'
           +'</div>';
       });
-      h+='<div class="dp-l-fin"><button class="dp-otro" onclick="despMasLote('+i+')">+ otro lote</button>'
-        +'<button class="dp-otro" onclick="despMarcaAbrir('+i+')">No se entrega</button>'
+      h+='<div class="dp-l-fin"><button class="dp-nose" onclick="despMarcaAbrir('+i+')">No se entrega</button>'
+        +'<button class="dp-otro" onclick="despMasLote('+i+')">+ otro lote</button>'
         +'<span class="dp-suma" id="dpSum'+i+'">'+_despSumaMsg(f,i)+'</span></div>';
     }
     h+='</div>';
@@ -10188,6 +10232,7 @@ function despRenderPedido(body){
   // pantalla y no puede quedar abierto sobre un pedido que ya se guardó.
   h+=despRenderDialogoPreparar();
   h+=despRenderHojaMotivo();
+  h+=despRenderHojaIndet();
   body.innerHTML=h;
   // El foco va a la nota apenas aparece: si el motivo es "otro", escribir es lo
   // unico que falta para que el boton se prenda.
@@ -10250,7 +10295,17 @@ function _despSel(i,j,lt,disp,cls){
   }
   if(lt.lote && !disp.some(function(d){return d.lote===lt.lote;}))
     h+='<option value="'+esc(lt.lote)+'" selected>'+esc(lt.lote)+'</option>';
-  h+='<option value="__">Escribir a mano…</option></select>';
+  // ── EL CENTINELA, EN EL SELECTOR ──────────────────────────────────────
+  // SALIO PRODUCTO Y NO SE SABE DE QUE LOTE. Es lo contrario de "no se
+  // entrega": aca SI salio, y por eso RESTA del saldo — solo que no se le puede
+  // imputar a ningun lote. Hasta hoy no se podia elegir desde esta pantalla: la
+  // unica salida era inventar un lote o dejar la linea sin lote, y las seis
+  // filas del 8-sep tuvieron que corregirse despues por SQL, con dos grafias
+  // distintas ("Sin lote" y "sin lote") porque cada quien escribio lo que
+  // quiso. Ofrecerlo evita que eso se repita.
+  h+='<option value="'+esc(ENT_LOTE_INDET)+'"'+(lt.lote===ENT_LOTE_INDET?' selected':'')
+    +'>No sé de qué lote salió</option>'
+    +'<option value="__">Escribir a mano…</option></select>';
   return h;
 }
 function _despSumaMsg(f,i){
@@ -10342,6 +10397,9 @@ function despQuitarLote(i,j){
 }
 function despSetLote(i,j,v){ const f=_despFacAbierta(); if(!f) return;
   const e=_despEst(f,i);
+  // El centinela no se elige y ya: pide su motivo, de lista cerrada. Sin motivo
+  // no se guarda — lo exige `ent_alisto_lote_motivo_ok` en la base, no la pantalla.
+  if(v===ENT_LOTE_INDET){ despIndetAbrir(i,j); return; }
   if(v==='__'){ const t=prompt('Lote (forma "154 / 12-26"):',e.lotes[j].lote||'');
     if(t==null){ despRender(); return; } v=String(t).trim();
     if(v){ const L=f.lineas[i], r=_loteConocido(L.producto_id, v);
@@ -10470,6 +10528,78 @@ function despRenderHojaMotivo(){
     listo: _despMarcaLista(), ocupado:false,
     cerrar: 'despMarcaCerrar()', ok: 'despMarcaConfirmar()', okTxt: 'Marcar',
     okId: 'nmOk'});
+}
+// ── EL CENTINELA "NO DETERMINADO" · SALIO, PERO NO SE SABE DE DONDE ─────────
+// ⚠️ NO CONFUNDIR CON LA MARCA "no se entrega". Son opuestos, y viven en la
+// misma tarjeta:
+//   · "no se entrega"   el producto NO salio -> cant_uds = 0, NO mueve el saldo,
+//                       vive en ent_alisto_linea.
+//   · "NO DETERMINADO"  el producto SI salio y no se sabe de que lote -> RESTA
+//                       del saldo, vive en ent_alisto_lote como un lote mas,
+//                       con la cadena centinela por valor.
+// Por eso uno apaga el selector y el otro lo USA.
+//
+// LA FORMA SE COPIO DE LA BASE, no se invento: `ent_alisto_lote_motivo_ok` exige
+// motivo_indeterminado de esta lista de cuatro + indeterminado_por + indeterminado_en
+// cuando lote = 'NO DETERMINADO'. Verificado contra pg_get_constraintdef el 15-sep.
+// Es la MISMA lista de cuatro que ent_conteo_linea_motivo_ok.
+//
+// (Las seis filas del 8-sep llegaron por otro camino —se escribieron con texto
+// libre y se corrigieron despues via ent_alisto_lote_correccion—, asi que NO son
+// el molde: ese es el camino de arreglar lo ya escrito, no el de escribirlo bien.)
+const ENT_INDET_MOTIVOS=[
+  {v:'sticker_caido',    t:'Se cayó el sticker'},
+  {v:'caja_sin_sticker', t:'La caja vino sin sticker'},
+  {v:'chofer_no_reporto',t:'El chofer no reportó los lotes'},
+  {v:'no_se_anoto',      t:'No se anotó al momento'}
+];
+let _despIDLinea=null, _despIDSlot=0, _despIDMotivo='';
+function despIndetAbrir(i,j){
+  const f=_despFacAbierta(); if(!f) return;
+  _despIDLinea=i; _despIDSlot=j; _despIDMotivo='';
+  _despQuien();
+  despRender();
+}
+function despIndetCerrar(){ _despIDLinea=null; despRender(); }
+function despIndetSetMotivo(m){ _despIDMotivo=m; despRender(); }
+async function despIndetConfirmar(){
+  const f=_despFacAbierta(); if(!f || _despIDLinea==null || !_despIDMotivo) return;
+  const i=_despIDLinea, j=_despIDSlot, e=_despEst(f,i);
+  const quien=await _despQuien();
+  e.lotes[j]=Object.assign({}, e.lotes[j], {
+    lote: ENT_LOTE_INDET,
+    indet: {motivo:_despIDMotivo, por:(quien||'desconocido'), en:new Date().toISOString()}
+  });
+  if(!e.partido) e.lotes[0].cant=e.cant;
+  _despIDLinea=null;
+  boGuardarFactura(false);
+  despRender();
+}
+function _despIndetTxt(v){
+  const m=ENT_INDET_MOTIVOS.find(function(x){ return x.v===v; });
+  return m?m.t:(v||'—');
+}
+function despRenderHojaIndet(){
+  if(_despIDLinea==null) return '';
+  const f=_despFacAbierta(); if(!f) return '';
+  const L=f.lineas[_despIDLinea]; if(!L) return '';
+  let cuerpo='<div class="nm-grupo">';
+  ENT_INDET_MOTIVOS.forEach(function(m){
+    const sel=(_despIDMotivo===m.v);
+    cuerpo+='<label class="nm-op'+(sel?' sel':'')+'">'
+      +'<input type="radio" name="idMotivo"'+(sel?' checked':'')
+      +' onchange="despIndetSetMotivo(\''+m.v+'\')">'
+      +'<span><span class="nm-op-t">'+esc(m.t)+'</span></span></label>';
+  });
+  cuerpo+='</div>'
+    +'<div class="de-nota">Esto dice que el producto SÍ salió del congelador y que no '
+    +'se pudo identificar de qué lote. Resta del saldo igual, sin poder imputarse. '
+    +'Una socia lo resuelve después.</div>';
+  return _despDialogoHTML({
+    cliente: esc(L.producto),
+    sub: 'no sé de qué lote salió',
+    cuerpo: cuerpo, listo: !!_despIDMotivo, ocupado:false,
+    cerrar: 'despIndetCerrar()', ok: 'despIndetConfirmar()', okTxt: 'Registrar'});
 }
 function _despMotivoTxt(v){
   const m=ENT_NM_MOTIVOS.find(function(x){ return x.v===v; });
@@ -10639,8 +10769,19 @@ async function despConfirmar(entregar){
       // linea o salio del congelador (y dice de que lote) o no salio.
       if(mk) continue;
       const lotes=e.lotes.filter(function(x){ return x.lote && +x.cant>0; })
-        .map(function(x,k){ return {linea_id:al.id, lote:x.lote,
-                                    cant_uds:(+x.cant||0)/L.uom_factor, orden:k}; });
+        .map(function(x,k){
+          const fl={linea_id:al.id, lote:x.lote,
+                    cant_uds:(+x.cant||0)/L.uom_factor, orden:k};
+          // EL CENTINELA VIAJA CON SU MOTIVO, en la MISMA fila y el MISMO insert.
+          // `ent_alisto_lote_motivo_ok` lo exige: con lote = 'NO DETERMINADO', las
+          // tres columnas son obligatorias. Asi no existe el estado intermedio
+          // "centinela sin motivo" que hubo que corregir a mano el 8-sep.
+          if(x.lote===ENT_LOTE_INDET && x.indet){
+            fl.motivo_indeterminado=x.indet.motivo;
+            fl.indeterminado_por=x.indet.por;
+            fl.indeterminado_en=x.indet.en;
+          }
+          return fl; });
       if(lotes.length){ const {error:e5}=await c.from('ent_alisto_lote').insert(lotes); if(e5) throw e5; }
     }
     // La segunda etapa, solo si se pidió. `salida_en` queda en el now() de la
