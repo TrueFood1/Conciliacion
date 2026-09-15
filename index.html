@@ -3087,6 +3087,19 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   letter-spacing:.03em;text-transform:uppercase;white-space:nowrap}
 .dp-ind-pill::before{content:'?';font-weight:700}
 .dp-ind-mot{font-size:11.5px;color:var(--text-2)}
+/* ── EL LOTE ELEGIDO QUE YA NO EXISTE ────────────────────────────────────
+   ROJO, que en este modulo no se usa para nada mas. El ambar ya significa
+   "mira esto" (cantidad distinta, salio sin lote) y el gris "no salio": esto
+   es otra cosa, y es la unica que dice "lo que hay puesto no sirve". El borde
+   izquierdo va rojo por la misma razon que el resto usa el borde: es el estado
+   de la tarjeta, leido de un vistazo. */
+.dp-l.obsoleto{border-left-color:var(--stop-tx,#E5484D)}
+.dp-obs{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:8px;
+  background:rgba(229,72,77,.10);border:1px solid rgba(229,72,77,.35)}
+.dp-obs-t{font-size:12px;font-weight:600;color:var(--stop-tx,#E5484D)}
+.dp-obs-m{font-size:11.5px;color:var(--text-2);line-height:1.45}
+/* El <option> del lote muerto tambien se rotula, porque en iOS el selector es
+   una rueda nativa y no se puede pintar: el texto es la unica via. */
 .dp-otro:hover{text-decoration:underline}
 /* La cantidad es un botón que PARECE texto hasta que se toca. Sin edición no
    hay ruido; el lápiz dice que se puede sin gritar. */
@@ -10128,10 +10141,57 @@ function _despLineaOK(f,i){
   // lote que elegir ni suma que cuadrar: pedirle un lote seria pedirle que diga
   // de donde salio algo que no salio. Va ANTES de todo lo demas a proposito.
   if(e.marca) return true;
+  // UN LOTE OBSOLETO DEJA LA LINEA SIN RESOLVER. No se borra la eleccion —eso es
+  // trabajo de Daniel— pero no se puede seguir con ella puesta.
+  if(_despObsoletosDe(f,i).length) return false;
   if(!lt.length) return false;
   if(!e.partido) return true;
   const suma=lt.reduce(function(s,x){ return s+(+x.cant||0); },0);
   return Math.abs(suma-(+e.cant||0))<1e-9;
+}
+// ── UN LOTE ELEGIDO QUE YA NO EXISTE ────────────────────────────────────
+// EL HUECO, medido el 15-sep. `_despSel` agrega al final de la lista el lote
+// YA ELEGIDO cuando no esta entre los ofrecidos (linea del `if(lt.lote &&
+// !disp.some(...))`). Eso es correcto para un lote tecleado a mano —sin eso, un
+// re-render borraria lo escrito— pero NO distingue "lo acabas de escribir" de
+// "quedo guardado en un borrador y el lote ya no existe". Un borrador retomado
+// mostraba el lote fantasma como valido, y al guardar la salida iba contra una
+// clave sin saldo: el lote real conservaba su saldo completo, en silencio.
+//
+// PASA POR DOS CAMINOS DISTINTOS, y los dos se vieron el mismo dia:
+//   · el lote se CORRIGIO  (246 / 3-27 -> 246 / 6-27, el 15-sep)
+//   · el lote ENVEJECIO    (120 / 10-26: fuera de la ventana de 3 meses y sin
+//                           saldo en el ancla nueva). Cada ancla nueva puede
+//                           dejar obsoletos los lotes de cualquier borrador.
+//
+// ⚠️ LA CARRERA DE CARGA. `_despLotes` se llena async (despCargarLotes) y el
+// borrador se restaura al abrir la factura, que puede ser antes. Sin cuidado, un
+// selector vacio haria ver TODO como obsoleto y el aviso saldria siempre — y un
+// aviso que sale siempre entrena a ignorarlo. Por eso el veredicto solo se emite
+// con CERTEZA: sin lista cargada, o con la lista vacia, NO HAY VEREDICTO. Cuando
+// la lista llega, `despCargarLotes` ya hace `if(_despAbierto) despRender()`, asi
+// que la revalidacion es automatica y el aviso aparece solo entonces.
+function _despLoteObsoleto(pid, lote){
+  if(!lote || lote===ENT_LOTE_INDET) return null;
+  if(_despLotes===null) return null;                    // todavia cargando
+  const ls=entLotesSelector(_despLotes, _despSaldo, pid);
+  if(!ls.length) return null;                           // sin lista no hay veredicto
+  if(ls.some(function(L){ return L.lote===lote; })) return null;
+  // El mensaje sale de `_loteConocido`, que ya lo escribe bien y ya sabe decir
+  // "Con el dia 246 hay: 246 / 6-27". No se reescribe aca.
+  return {lote:lote, msg:(_loteConocido(pid, lote)||{}).msg||'Ese lote ya no existe.'};
+}
+// Los obsoletos de UNA linea. Una marcada "no se entrega" no tiene lote que
+// revisar: se sale antes.
+function _despObsoletosDe(f,i){
+  const e=_despEst(f,i);
+  if(e.marca) return [];
+  const L=f.lineas[i], out=[];
+  (e.lotes||[]).forEach(function(x,j){
+    const o=_despLoteObsoleto(L.producto_id, x&&x.lote);
+    if(o) out.push({j:j, lote:o.lote, msg:o.msg});
+  });
+  return out;
 }
 function _despLotesDe(pid){
   // NUNCA se esconde un lote con producto, y ahora eso incluye a los VIEJOS.
@@ -10163,7 +10223,9 @@ function despRenderPedido(body){
     const dif=!mk && Math.abs(e.cant-L.cant_uom)>1e-9, ok=_despLineaOK(f,i);
     // El borde izquierdo es TODO el estado que hace falta: lima = tiene lote,
     // gris = falta. De un vistazo se ve qué queda, sin leer una palabra.
-    h+='<div class="dp-l'+(e.partido?' full':'')+(mk?' marcada':(ok?' ok':''))+(dif?' dif':'')+'">'
+    const _hayObs=!mk && _despObsoletosDe(f,i).length>0;
+    h+='<div class="dp-l'+(e.partido?' full':'')+(mk?' marcada':(ok?' ok':''))
+      +(_hayObs?' obsoleto':'')+(dif?' dif':'')+'">'
       +'<div class="dp-l-top">'
       +'<span class="dp-l-pr">'+esc(L.producto)+'</span>'
       +(mk
@@ -10194,6 +10256,13 @@ function despRenderPedido(body){
         +'</div>'
         +'<button class="dp-deshacer" onclick="despDesmarcar('+i+')">Deshacer</button>';
     }else if(!e.partido){
+      // EL AVISO DEL LOTE OBSOLETO, arriba de todo. Es lo primero que hay que
+      // leer: la eleccion que esta puesta no sirve. El texto sale de
+      // `_loteConocido`, que ya dice "Con el dia 246 hay: 246 / 6-27".
+      const _ob=_despObsoletosDe(f,i);
+      if(_ob.length) h+='<div class="dp-obs">'
+        +'<span class="dp-obs-t">'+esc(_ob[0].lote)+' ya no existe</span>'
+        +'<span class="dp-obs-m">'+esc(_ob[0].msg)+'</span></div>';
       // Un centinela elegido se anuncia: la tarjeta no puede parecer normal
       // cuando lo que va a salir no tiene lote conocido.
       const _ind=(e.lotes[0]&&e.lotes[0].lote===ENT_LOTE_INDET)?e.lotes[0].indet:null;
@@ -10211,6 +10280,11 @@ function despRenderPedido(body){
         +'<button class="dp-nose" onclick="despMarcaAbrir('+i+')">No se entrega</button>'
         +'<button class="dp-otro" onclick="despPartir('+i+')">+ otro lote</button></div>';
     }else{
+      const _obP=_despObsoletosDe(f,i);
+      if(_obP.length) h+='<div class="dp-obs">'
+        +'<span class="dp-obs-t">'+esc(_obP.map(function(x){return x.lote;}).join(' · '))
+        +(_obP.length===1?' ya no existe':' ya no existen')+'</span>'
+        +'<span class="dp-obs-m">'+esc(_obP[0].msg)+'</span></div>';
       e.lotes.forEach(function(lt,j){
         h+='<div class="dp-l-bot">'+_despSel(i,j,lt,disp,'p')
           +'<input class="dp-lq" type="number" min="0" step="any" inputmode="decimal" '
@@ -10293,8 +10367,14 @@ function _despSel(i,j,lt,disp,cls){
     _viejos.forEach(function(d){ h+=_op(d); });
     h+='</optgroup>';
   }
-  if(lt.lote && !disp.some(function(d){return d.lote===lt.lote;}))
-    h+='<option value="'+esc(lt.lote)+'" selected>'+esc(lt.lote)+'</option>';
+  // EL LOTE YA ELEGIDO QUE NO ESTA EN LA LISTA. Sin esto, un lote tecleado a
+  // mano se perderia en cada re-render. Pero si ADEMAS quedo obsoleto, se rotula:
+  // el mismo <option> tiene que poder decir "esto ya no existe".
+  if(lt.lote && !disp.some(function(d){return d.lote===lt.lote;})){
+    const _obs=(disp.length && lt.lote!==ENT_LOTE_INDET);
+    h+='<option value="'+esc(lt.lote)+'" selected>'
+      +esc(lt.lote+(_obs?' — ya no existe':''))+'</option>';
+  }
   // ── EL CENTINELA, EN EL SELECTOR ──────────────────────────────────────
   // SALIO PRODUCTO Y NO SE SABE DE QUE LOTE. Es lo contrario de "no se
   // entrega": aca SI salio, y por eso RESTA del saldo — solo que no se le puede
@@ -10320,13 +10400,14 @@ function _despSumaMsg(f,i){
 // NO es un aviso que se pueda ignorar: deja la línea incompleta y el botón
 // deshabilitado, igual que si faltara el lote.
 function _despPendientes(f){
-  let sinLote=0, mal=0, marcadas=0;
+  let sinLote=0, mal=0, marcadas=0, obsoletos=0;
   f.lineas.forEach(function(L,i){
     // LAS MARCADAS SE CUENTAN PRIMERO. `_despLineaOK` devuelve true para ellas,
     // asi que si se consultara antes saldrian por el return y no se contarian
     // nunca: el pie diria que no falta nada y no mencionaria que hay lineas que
     // no se entregan. Se cuentan aca y se sigue de largo.
     if(_despEst(f,i).marca){ marcadas++; return; }
+    if(_despObsoletosDe(f,i).length){ obsoletos++; return; }
     if(_despLineaOK(f,i)) return;
     if(!_despLotesEfectivos(f,i).length) sinLote++; else mal++;
   });
@@ -10339,8 +10420,11 @@ function _despPendientes(f){
   // Las marcadas NO son un pendiente: no frenan el boton. Se dicen igual, porque
   // el pie es lo que Daniel lee antes de apretar y tiene que saber que esta
   // mandando un pedido con lineas que no salen.
+  // Los obsoletos SI frenan: la eleccion apunta a un lote que no existe.
+  if(obsoletos) p.push(obsoletos===1 ? 'Un lote elegido ya no existe'
+                                     : obsoletos+' lotes elegidos ya no existen');
   if(marcadas) p.push(marcadas+(marcadas===1?' no se entrega':' no se entregan'));
-  return {txt:p.join(' · '), frena:!!(sinLote||mal)};
+  return {txt:p.join(' · '), frena:!!(sinLote||mal||obsoletos)};
 }
 function despEditar(i){ const f=_despFacAbierta(); if(!f) return;
   _despEst(f,i).editando=true; despRender(); }
@@ -10378,7 +10462,8 @@ function _despPatch(f,i){
   const ok2=document.getElementById('despOk2'); if(ok2) ok2.disabled=pend.frena;
   const caja=document.querySelectorAll('#despBody .dp-l')[i];
   if(caja){ caja.classList.toggle('ok', _despLineaOK(f,i) && !_despEst(f,i).marca);
-            caja.classList.toggle('marcada', !!_despEst(f,i).marca); }
+            caja.classList.toggle('marcada', !!_despEst(f,i).marca);
+            caja.classList.toggle('obsoleto', !_despEst(f,i).marca && _despObsoletosDe(f,i).length>0); }
 }
 // QUITAR UNA LÍNEA AGREGADA POR ERROR. Antes no se podía: se agregaba un lote de
 // más y la única salida era abandonar el pedido y volver a elegir todo.
@@ -10670,6 +10755,22 @@ async function despConfirmar(entregar){
   if(_despGuardando) return;
   const f=_despFacAbierta(); if(!f) return;
   const pend=_despPendientes(f); if(pend.frena){ alert(pend.txt); return; }
+  // ── LA CUARTA CAPA · EL ULTIMO PORTON, JUSTO ANTES DE ESCRIBIR ────────
+  // El aviso de la tarjeta evita que Daniel siga con un lote fantasma; esto evita
+  // que llegue a la base aunque el aviso falle. Son capas distintas a proposito:
+  // la de arriba depende del render, esta no. Si la lista de lotes cargo DESPUES
+  // de que la pantalla se dibujo, o si algo repinto sin revalidar, aca se corta.
+  const _obs=[];
+  f.lineas.forEach(function(L,i){
+    _despObsoletosDe(f,i).forEach(function(o){ _obs.push(L.producto+': '+o.lote); });
+  });
+  if(_obs.length){
+    alert('No guardo: '+(_obs.length===1?'este lote ya no existe':'estos lotes ya no existen')
+      +'.\n\n'+_obs.join('\n')
+      +'\n\nElegilos de nuevo en la lista. Si se guardara asi, esa salida no se '
+      +'restaria de ningun lote real y el saldo del lote bueno quedaria inflado.');
+    return;
+  }
   const btn=document.getElementById('despOk'), btn2=document.getElementById('despOk2');
   // "Guardando…" va en el botón QUE SE APRETÓ. Antes iba siempre en `despOk`, así
   // que apretar "Preparar y entregar" ponía el aviso en "Preparar" — raro desde
