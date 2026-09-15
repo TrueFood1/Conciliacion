@@ -2993,6 +2993,47 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .dp-l.full{grid-column:1/-1}
 .dp-l.ok{border-left-color:var(--ent-line)}
 .dp-l.dif{border-left-color:var(--warn)}
+/* ── LA LÍNEA QUE NO SE ENTREGA ──────────────────────────────────────────
+   GRIS, y el gris es el mensaje: no es un pendiente (ámbar) ni algo resuelto
+   con producto saliendo (lima). Es una línea apagada a propósito. El borde
+   izquierdo ya es el único estado que la tarjeta comunica, así que se suma
+   ahí y no se inventa una señal nueva. */
+.dp-l.marcada{border-left-color:var(--text-3);background:var(--surface-2)}
+.dp-l.marcada .dp-l-pr{color:var(--text-2)}
+/* El selector se APAGA, no desaparece: que se vea que ahí iba un lote y que
+   no hay ninguno es parte de lo que la tarjeta tiene que decir. */
+.dp-l.marcada .dp-lsel{opacity:.5;pointer-events:none}
+.dp-nm-pill{display:inline-flex;align-items:center;gap:5px;align-self:flex-start;
+  background:var(--surface);border:1px solid var(--border-strong);border-radius:20px;
+  padding:2px 9px;font-size:11px;color:var(--text-2);white-space:nowrap}
+.dp-nm-pill::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--text-3)}
+/* Motivo, nota, firma y hora. Lo que la socia va a leer después para validar:
+   si no se ve acá, no se escribió. */
+.dp-nm-info{font-size:11.5px;color:var(--text-2);line-height:1.5;word-break:break-word}
+.dp-nm-info b{color:var(--text);font-weight:500}
+.dp-nm-nota{font-style:italic}
+.dp-nm-firma{color:var(--text-3);font-size:11px}
+.dp-nofact{font-size:12.5px;color:var(--text-2);white-space:nowrap}
+/* Deshacer vive mientras el alisto no se cierre. Después no existe: la fila ya
+   está en la base y el único camino es anular el alisto y registrarlo de nuevo. */
+.dp-deshacer{align-self:flex-end;background:none;border:none;padding:2px 0;cursor:pointer;
+  font-family:var(--font);font-size:11.5px;color:var(--text-3)}
+.dp-deshacer:hover{text-decoration:underline;color:var(--warn)}
+/* ── LA HOJA DE MOTIVOS ──────────────────────────────────────────────── */
+.nm-grupo{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.nm-op{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;cursor:pointer;
+  border:1px solid var(--border);border-radius:9px;background:var(--surface-2)}
+.nm-op.sel{border-color:var(--ent-line)}
+.nm-op input{margin:2px 0 0;accent-color:var(--ent-line);flex:none}
+.nm-op>span{display:block;min-width:0}
+.nm-op-t{display:block;font-size:14px;color:var(--text);line-height:1.3}
+.nm-op-s{display:block;font-size:11.5px;color:var(--text-2);line-height:1.4;margin-top:3px}
+.nm-nota{width:100%;box-sizing:border-box;background:var(--surface-2);
+  border:1px solid var(--border-strong);border-radius:9px;padding:10px 12px;
+  font-family:var(--font);font-size:14px;color:var(--text);min-height:76px;resize:vertical}
+.nm-nota:focus{outline:none;border-color:var(--ent-line)}
+.de-nota{padding:14px;margin:10px 0;border-radius:8px;font-size:13px;line-height:1.5;
+  background:var(--surface-2);color:var(--text-2)}
 /* Compacta: producto arriba, cantidad debajo — apiladas, porque en 171px una
    fila con las dos deja al selector sin aire. Partida: vuelven a la misma fila,
    que ahí sí hay ancho. */
@@ -9859,13 +9900,22 @@ function _boFotoFactura(f){
   const out={lineas:{}};
   (f.lineas||[]).forEach(function(L,i){
     const e=_despEdit[_despKey(f.factura_id,i)];
-    if(e) out.lineas[i]={sig:e.sig, cant:e.cant, partido:!!e.partido, lotes:e.lotes};
+    // ⚠️ LOS CAMPOS SE ENUMERAN A MANO: un campo nuevo en `_despEdit` NO viaja
+    // solo. `marca` se agrego aca y en `_boAplicarFactura`; si se agrega otro,
+    // van los dos lugares o el borrador lo pierde en silencio.
+    if(e) out.lineas[i]={sig:e.sig, cant:e.cant, partido:!!e.partido, lotes:e.lotes,
+                         marca:(e.marca||null)};
   });
   return out;
 }
+// QUE CUENTA COMO "EMPEZO". Hasta el 15-sep-2026 esto medía solo lotes elegidos,
+// y una linea marcada "no se entrega" NO tiene lote: un alisto donde Daniel solo
+// marco faltantes no generaba borrador, o sea que ese trabajo no sobrevivia al
+// aparato ni aparecia en la tira de "sin cerrar". Marcar TAMBIEN es empezar.
 function _boAlgoElegido(foto){
   const L=(foto&&foto.lineas)||{};
   return Object.keys(L).some(function(k){
+    if(L[k] && L[k].marca) return true;
     return ((L[k]&&L[k].lotes)||[]).some(function(x){ return x && x.lote; }); });
 }
 function _boAplicarFactura(f, foto){
@@ -9876,7 +9926,8 @@ function _boAplicarFactura(f, foto){
     const e=foto.lineas[k];
     if(!e || e.sig!==_despFirma(L)) return;   // la línea cambió en Odoo: no se arrastra
     _despEdit[_despKey(f.factura_id,i)]={sig:e.sig, cant:e.cant, editando:false,
-                                         partido:!!e.partido, lotes:e.lotes};
+                                         partido:!!e.partido, lotes:e.lotes,
+                                         marca:(e.marca||null)};
     n++;
   });
   return n;
@@ -10003,6 +10054,10 @@ function _boContarLotes(datos){
          n+=Object.keys((M.cur&&M.cur.lotes)||{}).length; return n; }
   const L=(datos&&datos.lineas)||{}; let n=0;
   Object.keys(L).forEach(function(k){
+    // Una marcada cuenta como UNA cosa resuelta, igual que un lote elegido: la
+    // tira mide cuanto trabajo hay adentro, no cuantos lotes se eligieron. Sin
+    // esto un borrador de puras marcas se anunciaba como vacio.
+    if(L[k] && L[k].marca){ n++; return; }
     ((L[k]&&L[k].lotes)||[]).forEach(function(x){ if(x&&x.lote) n++; }); });
   return n;
 }
@@ -10018,7 +10073,13 @@ function _despEst(f,i){
   const e=_despEdit[k];
   if(!e || e.sig!==sig)
     _despEdit[k]={sig:sig, cant:f.lineas[i].cant_uom, editando:false, partido:false,
-                  lotes:[{lote:'',cant:null}]};
+                  lotes:[{lote:'',cant:null}],
+                  // LA MARCA "no se entrega". null = la linea sale normal. Cuando
+                  // esta puesta lleva {motivo, nota, por, en}: firma y hora se
+                  // capturan AL MARCAR, no al guardar — el hecho es cuando Daniel
+                  // marco, y un borrador retomado dos dias despues no puede fingir
+                  // que se marco hoy.
+                  marca:null};
   return _despEdit[k];
 }
 // Sin partir, la cantidad del único lote ES el total: no hay nada que sumar ni
@@ -10030,6 +10091,10 @@ function _despLotesEfectivos(f,i){
 }
 function _despLineaOK(f,i){
   const e=_despEst(f,i), lt=_despLotesEfectivos(f,i);
+  // UNA LINEA MARCADA ESTA RESUELTA. No salio del congelador, asi que no tiene
+  // lote que elegir ni suma que cuadrar: pedirle un lote seria pedirle que diga
+  // de donde salio algo que no salio. Va ANTES de todo lo demas a proposito.
+  if(e.marca) return true;
   if(!lt.length) return false;
   if(!e.partido) return true;
   const suma=lt.reduce(function(s,x){ return s+(+x.cant||0); },0);
@@ -10059,13 +10124,21 @@ function despRenderPedido(body){
   h+='<div class="dp-lin">';
   f.lineas.forEach(function(L,i){
     const e=_despEst(f,i), disp=_despLotesDe(L.producto_id);
-    const dif=Math.abs(e.cant-L.cant_uom)>1e-9, ok=_despLineaOK(f,i);
+    const mk=e.marca;
+    // Una linea marcada nunca esta "dif": su cantidad es 0 a proposito, no por
+    // un ajuste. Pintarla ambar diria que algo esta mal, y no lo esta.
+    const dif=!mk && Math.abs(e.cant-L.cant_uom)>1e-9, ok=_despLineaOK(f,i);
     // El borde izquierdo es TODO el estado que hace falta: lima = tiene lote,
     // gris = falta. De un vistazo se ve qué queda, sin leer una palabra.
-    h+='<div class="dp-l'+(e.partido?' full':'')+(ok?' ok':'')+(dif?' dif':'')+'">'
+    h+='<div class="dp-l'+(e.partido?' full':'')+(mk?' marcada':(ok?' ok':''))+(dif?' dif':'')+'">'
       +'<div class="dp-l-top">'
       +'<span class="dp-l-pr">'+esc(L.producto)+'</span>'
-      +(e.editando
+      +(mk
+        // Marcada: la cantidad es 0 y no se edita. El numero de al lado es lo que
+        // SE IBA a entregar, en unidad de venta — el que Daniel reconoce, no las
+        // unidades individuales que guarda la base.
+        ? ('<span class="dp-l-cant" style="cursor:default"><b>0</b> '+esc(L.uom_nombre||'')+'</span>')
+        : e.editando
          ? ('<span class="dp-l-cant"><input class="dp-cant" type="number" min="0" step="any" '
             +'inputmode="decimal" value="'+e.cant+'" oninput="despSetCant('+i+',this.value)" '
             +'onblur="despFinEdit('+i+')" autofocus> '+esc(L.uom_nombre)+'</span>')
@@ -10074,11 +10147,25 @@ function despRenderPedido(body){
             +'<span class="dp-lapiz" aria-hidden="true">✎</span></button>'))
       +'</div>'
       +(dif?'<div class="dp-fact">facturado '+_rzN(L.cant_uom)+'</div>':'');
-    if(!e.partido){
+    if(mk){
+      // EL SELECTOR SE APAGA, NO DESAPARECE. Que se vea el hueco donde iba el
+      // lote es parte de lo que la tarjeta dice: aca no se eligio nada porque no
+      // habia nada que elegir.
+      h+='<div class="dp-nofact">no entregado '+_rzN(L.cant_uom)
+        +(L.uom_nombre?(' '+esc(L.uom_nombre)):'')+'</div>'
+        +'<div class="dp-l-bot">'+_despSel(i,0,{lote:''},[],'')+'</div>'
+        +'<span class="dp-nm-pill">no se entrega</span>'
+        +'<div class="dp-nm-info"><b>'+esc(_despMotivoTxt(mk.motivo))+'</b>'
+        +(mk.nota?(' · <span class="dp-nm-nota">'+esc(mk.nota)+'</span>'):'')
+        +'<div class="dp-nm-firma">'+esc(mk.por||'—')+' · '+esc(_despCuando(mk.en)||'')+'</div>'
+        +'</div>'
+        +'<button class="dp-deshacer" onclick="despDesmarcar('+i+')">Deshacer</button>';
+    }else if(!e.partido){
       // EL CASO NORMAL ES UNA LÍNEA: un solo selector, sin campo de cantidad —
       // la cantidad es la de la factura y ya está arriba.
       h+='<div class="dp-l-bot">'+_despSel(i,0,e.lotes[0],disp,'')+'</div>'
-        +'<button class="dp-otro" onclick="despPartir('+i+')">+ otro lote</button>';
+        +'<div class="dp-l-fin"><button class="dp-otro" onclick="despPartir('+i+')">+ otro lote</button>'
+        +'<button class="dp-otro" onclick="despMarcaAbrir('+i+')">No se entrega</button></div>';
     }else{
       e.lotes.forEach(function(lt,j){
         h+='<div class="dp-l-bot">'+_despSel(i,j,lt,disp,'p')
@@ -10090,6 +10177,7 @@ function despRenderPedido(body){
           +'</div>';
       });
       h+='<div class="dp-l-fin"><button class="dp-otro" onclick="despMasLote('+i+')">+ otro lote</button>'
+        +'<button class="dp-otro" onclick="despMarcaAbrir('+i+')">No se entrega</button>'
         +'<span class="dp-suma" id="dpSum'+i+'">'+_despSumaMsg(f,i)+'</span></div>';
     }
     h+='</div>';
@@ -10099,7 +10187,12 @@ function despRenderPedido(body){
   // Al final del mismo innerHTML, igual que el de Entregar: se repinta con la
   // pantalla y no puede quedar abierto sobre un pedido que ya se guardó.
   h+=despRenderDialogoPreparar();
+  h+=despRenderHojaMotivo();
   body.innerHTML=h;
+  // El foco va a la nota apenas aparece: si el motivo es "otro", escribir es lo
+  // unico que falta para que el boton se prenda.
+  const _nt=document.getElementById('nmNota');
+  if(_nt){ try{ _nt.focus(); _nt.setSelectionRange(_nt.value.length,_nt.value.length); }catch(e){} }
 }
 // El pie, aparte, porque ahora se redibuja solo cuando cambia la fecha.
 // LA FECHA ES DEL ATAJO, NO DE "Preparar". Preparar no marca ninguna salida, así
@@ -10107,7 +10200,7 @@ function despRenderPedido(body){
 // "Sale" y vive al lado del botón que sí la registra.
 function _despPieHTML(f){
   const pend=_despPendientes(f);
-  return '<div class="cl-none" id="dpPend">'+(pend?esc(pend):'')+'</div>'
+  return '<div class="cl-none" id="dpPend">'+(pend.txt?esc(pend.txt):'')+'</div>'
     +'<div class="dp-btns">'
     +'<label class="dp-fecha"><span class="dp-fecha-l">Día de entrega</span>'
     +'<input type="date" class="de-fecha-in" value="'+esc(_despPedFecha||_despHoy())+'" '
@@ -10122,9 +10215,9 @@ function _despPieHTML(f){
     // necesidad — el relleno solo ya manda la jerarquía.
     // El lima entra por `btn-amarillo`, que es --ent-fill + --ent-fill-tx: token de
     // RELLENO con su texto pareado, como manda b31. No se dibuja un borde lima.
-    +'<button class="btn" id="despOk"'+(pend?' disabled':'')
+    +'<button class="btn" id="despOk"'+(pend.frena?' disabled':'')
     +' onclick="despPedirConfirmar(false)">Preparar</button>'
-    +'<button class="btn btn-amarillo" id="despOk2"'+(pend?' disabled':'')
+    +'<button class="btn btn-amarillo" id="despOk2"'+(pend.frena?' disabled':'')
     +' onclick="despPedirConfirmar(true)">Preparar y entregar</button>'
     +'</div>';
 }
@@ -10172,8 +10265,13 @@ function _despSumaMsg(f,i){
 // NO es un aviso que se pueda ignorar: deja la línea incompleta y el botón
 // deshabilitado, igual que si faltara el lote.
 function _despPendientes(f){
-  let sinLote=0, mal=0;
+  let sinLote=0, mal=0, marcadas=0;
   f.lineas.forEach(function(L,i){
+    // LAS MARCADAS SE CUENTAN PRIMERO. `_despLineaOK` devuelve true para ellas,
+    // asi que si se consultara antes saldrian por el return y no se contarian
+    // nunca: el pie diria que no falta nada y no mencionaria que hay lineas que
+    // no se entregan. Se cuentan aca y se sigue de largo.
+    if(_despEst(f,i).marca){ marcadas++; return; }
     if(_despLineaOK(f,i)) return;
     if(!_despLotesEfectivos(f,i).length) sinLote++; else mal++;
   });
@@ -10183,7 +10281,11 @@ function _despPendientes(f){
   const p=[];
   if(sinLote) p.push('Falta'+(sinLote===1?' el lote de 1 producto':'n lotes en '+sinLote+' productos'));
   if(mal)     p.push('La suma de lotes no da la cantidad en '+mal+(mal===1?' producto':' productos'));
-  return p.join(' · ');
+  // Las marcadas NO son un pendiente: no frenan el boton. Se dicen igual, porque
+  // el pie es lo que Daniel lee antes de apretar y tiene que saber que esta
+  // mandando un pedido con lineas que no salen.
+  if(marcadas) p.push(marcadas+(marcadas===1?' no se entrega':' no se entregan'));
+  return {txt:p.join(' · '), frena:!!(sinLote||mal)};
 }
 function despEditar(i){ const f=_despFacAbierta(); if(!f) return;
   _despEst(f,i).editando=true; despRender(); }
@@ -10216,11 +10318,12 @@ function _despPatch(f,i){
   const sp=document.getElementById('dpSum'+i);
   if(sp) sp.innerHTML=_despSumaMsg(f,i);
   const pend=_despPendientes(f);
-  const pd=document.getElementById('dpPend'); if(pd) pd.textContent=pend||'';
-  const ok=document.getElementById('despOk');   if(ok)  ok.disabled=!!pend;
-  const ok2=document.getElementById('despOk2'); if(ok2) ok2.disabled=!!pend;
+  const pd=document.getElementById('dpPend'); if(pd) pd.textContent=pend.txt||'';
+  const ok=document.getElementById('despOk');   if(ok)  ok.disabled=pend.frena;
+  const ok2=document.getElementById('despOk2'); if(ok2) ok2.disabled=pend.frena;
   const caja=document.querySelectorAll('#despBody .dp-l')[i];
-  if(caja) caja.classList.toggle('ok', _despLineaOK(f,i));
+  if(caja){ caja.classList.toggle('ok', _despLineaOK(f,i) && !_despEst(f,i).marca);
+            caja.classList.toggle('marcada', !!_despEst(f,i).marca); }
 }
 // QUITAR UNA LÍNEA AGREGADA POR ERROR. Antes no se podía: se agregaba un lote de
 // más y la única salida era abandonar el pedido y volver a elegir todo.
@@ -10253,6 +10356,125 @@ function despSetLote(i,j,v){ const f=_despFacAbierta(); if(!f) return;
   if(!e.partido) e.lotes[0].cant=e.cant;
   boGuardarFactura(false);          // elegir un lote sube al instante
   despRender(); }
+// ── LA MARCA "NO SE ENTREGA" ─────────────────────────────────────────────────
+// Daniel esta frente al congelador y el producto no esta. Hasta hoy la unica
+// salida era dejar la linea sin lote —y entonces el boton no se prendia y el
+// pedido no se podia cerrar— o inventar un lote, que es peor. La marca dice lo
+// que paso: esta linea NO salio.
+//
+// LA MARCA NO ES UNA DECISION ADMINISTRATIVA: es un hecho fisico que Daniel
+// constata. Por eso la puede poner cualquiera que este alistando. Lo que viene
+// despues —el visto bueno de una socia— es otra cosa y vive en otra tabla.
+//
+// FIRMA Y HORA SE CAPTURAN AL MARCAR, no al guardar. El hecho es "cuando Daniel
+// marco", y un borrador retomado dos dias despues no puede fingir que se marco
+// hoy. Viajan dentro del borrador.
+const ENT_NM_MOTIVOS=[
+  {v:'agotado', t:'Agotado',
+   s:'No quedaba producto en el congelador.'},
+  {v:'otro',    t:'Otro',
+   s:'Cualquier otra razon. Pide una nota, porque "otro" sin explicar no dice nada.'}
+];
+// El minimo de la nota. LO EXIGE LA BASE: el CHECK ent_alisto_linea_no_entrega_ok
+// pide length(btrim(nota)) >= 6 cuando el motivo es 'otro'. Si se cambia aca y no
+// alla, la pantalla deja escribir algo que el insert va a rechazar.
+const ENT_NM_NOTA_MIN=6;
+let _despNMLinea=null;              // indice de la linea que se esta marcando, o null
+let _despNMMotivo='';               // 'agotado' | 'otro' | ''
+let _despNMNota='';
+let _despNMYo='';                   // email de la sesion, cacheado (ver _despQuien)
+
+// EL EMAIL NO SE PUEDE LEER DE FORMA SINCRONA: las 15 lecturas del archivo son
+// `await c.auth.getUser()`. Se pide una vez y se guarda, para que marcar no
+// dependa de la red cada vez.
+async function _despQuien(){
+  if(_despNMYo) return _despNMYo;
+  try{ const c=sbClient(); if(!c) return '';
+       const {data}=await c.auth.getUser();
+       _despNMYo=((data&&data.user&&data.user.email)||'').trim(); }catch(e){}
+  return _despNMYo;
+}
+function despMarcaAbrir(i){
+  const f=_despFacAbierta(); if(!f) return;
+  _despNMLinea=i; _despNMMotivo=''; _despNMNota='';
+  _despQuien();                      // se pide ya, para que este cuando confirme
+  despRender();
+}
+function despMarcaCerrar(){ _despNMLinea=null; despRender(); }
+function despMarcaSetMotivo(m){ _despNMMotivo=m; despRender(); }
+// oninput: NO se re-renderiza. Un render por tecla mata el foco y cierra el
+// teclado del telefono — es la misma razon por la que despSetCant parcha en vez
+// de repintar. Solo se toca el disabled del boton.
+function despMarcaSetNota(v){
+  _despNMNota=v;
+  const b=document.getElementById('nmOk'); if(b) b.disabled=!_despMarcaLista();
+}
+// EL BOTON SE PRENDE O NO SE PRENDE, Y NO SE DICE POR QUE. Sin contador de
+// caracteres: un numero que baja es ruido mientras se escribe, y la regla real
+// —que la nota diga algo— no se mide en digitos.
+function _despMarcaLista(){
+  if(!_despNMMotivo) return false;
+  if(_despNMMotivo!=='otro') return true;
+  return String(_despNMNota||'').trim().length>=ENT_NM_NOTA_MIN;
+}
+async function despMarcaConfirmar(){
+  const f=_despFacAbierta(); if(!f || _despNMLinea==null) return;
+  if(!_despMarcaLista()) return;
+  const i=_despNMLinea, e=_despEst(f,i);
+  const quien=await _despQuien();
+  e.marca={motivo:_despNMMotivo,
+           nota:(_despNMMotivo==='otro' ? String(_despNMNota).trim() : null),
+           por:(quien||'desconocido'),
+           en:new Date().toISOString()};
+  // Una linea marcada NO lleva lote: el candado excluyente de la base lo prohibe
+  // (ent_alisto_lote_excluyente_trg) y la cantidad va en cero. Se limpia lo que
+  // hubiera para que la pantalla no muestre un lote que no se va a guardar.
+  e.partido=false; e.lotes=[{lote:'',cant:null}]; e.editando=false;
+  _despNMLinea=null;
+  boGuardarFactura(false);
+  despRender();
+}
+// DESHACER solo existe mientras el alisto no se cierre: hasta "Preparar" no hay
+// ninguna fila en Supabase. Despues no hay deshacer — se anula el alisto y se
+// registra de nuevo, que es el unico camino que deja rastro de las dos versiones.
+function despDesmarcar(i){
+  const f=_despFacAbierta(); if(!f) return;
+  const e=_despEst(f,i);
+  e.marca=null;
+  e.cant=f.lineas[i].cant_uom;       // vuelve a lo facturado
+  boGuardarFactura(false);
+  despRender();
+}
+function despRenderHojaMotivo(){
+  if(_despNMLinea==null) return '';
+  const f=_despFacAbierta(); if(!f) return '';
+  const L=f.lineas[_despNMLinea]; if(!L) return '';
+  const un=L.uom_nombre||'';
+  let cuerpo='<div class="nm-grupo">';
+  ENT_NM_MOTIVOS.forEach(function(m){
+    const sel=(_despNMMotivo===m.v);
+    cuerpo+='<label class="nm-op'+(sel?' sel':'')+'">'
+      +'<input type="radio" name="nmMotivo"'+(sel?' checked':'')
+      +' onchange="despMarcaSetMotivo(\''+m.v+'\')">'
+      +'<span><span class="nm-op-t">'+esc(m.t)+'</span>'
+      +'<span class="nm-op-s">'+esc(m.s)+'</span></span></label>';
+  });
+  cuerpo+='</div>';
+  if(_despNMMotivo==='otro')
+    cuerpo+='<textarea class="nm-nota" id="nmNota" placeholder="Que paso"'
+      +' oninput="despMarcaSetNota(this.value)">'+esc(_despNMNota)+'</textarea>';
+  return _despDialogoHTML({
+    cliente: esc(L.producto),
+    sub: 'no se entrega · '+_rzN(L.cant_uom)+(un?(' '+un):'')+' facturado',
+    cuerpo: cuerpo,
+    listo: _despMarcaLista(), ocupado:false,
+    cerrar: 'despMarcaCerrar()', ok: 'despMarcaConfirmar()', okTxt: 'Marcar',
+    okId: 'nmOk'});
+}
+function _despMotivoTxt(v){
+  const m=ENT_NM_MOTIVOS.find(function(x){ return x.v===v; });
+  return m?m.t:(v||'—');
+}
 function despMasLote(i){ const f=_despFacAbierta(); if(!f) return;
   _despEst(f,i).lotes.push({lote:'',cant:null}); boGuardarFactura(false); despRender(); }
 function _despFacAbierta(){ return (_despFac||[]).find(function(x){ return x.factura_id===_despAbierto; }); }
@@ -10317,7 +10539,7 @@ function _loteConocido(pid, txt){
 async function despConfirmar(entregar){
   if(_despGuardando) return;
   const f=_despFacAbierta(); if(!f) return;
-  const pend=_despPendientes(f); if(pend){ alert(pend); return; }
+  const pend=_despPendientes(f); if(pend.frena){ alert(pend.txt); return; }
   const btn=document.getElementById('despOk'), btn2=document.getElementById('despOk2');
   // "Guardando…" va en el botón QUE SE APRETÓ. Antes iba siempre en `despOk`, así
   // que apretar "Preparar y entregar" ponía el aviso en "Preparar" — raro desde
@@ -10384,11 +10606,38 @@ async function despConfirmar(entregar){
       pedido_id:ped.id, responsable:quien, creado_por:quien}).select('id').single();
     if(e3) throw e3;
     for(let i=0;i<f.lineas.length;i++){
-      const L=f.lineas[i], e=_despEst(f,i);
-      const {data:al,error:e4}=await c.from('ent_alisto_linea').insert({
-        alisto_id:ali.id, producto_id:L.producto_id,
-        cant_uds:(+e.cant||0)/L.uom_factor, cant_uom:(+e.cant||0)}).select('id').single();
+      const L=f.lineas[i], e=_despEst(f,i), mk=e.marca;
+      // ── LA LINEA MARCADA VA POR OTRO CAMINO ────────────────────────────
+      // Los seis campos de la marca viajan en el MISMO insert que la linea, no
+      // en un update posterior: el §1 lo pide asi para que no exista el estado
+      // intermedio "marcada y sin motivo".
+      //
+      // LOS NUMEROS, Y POR QUE ASI:
+      //   cant_uds = 0 y cant_uom = 0 — el CHECK los exige EXACTOS (verificado
+      //     contra pg_get_constraintdef: `cant_uds = (0)::numeric`). Son lo que
+      //     hace verdad "no mueve ningun saldo", en el motor y no en la pantalla.
+      //   cant_no_entregada = lo facturado EN UNIDADES INDIVIDUALES, o sea
+      //     cant_uom / uom_factor. El comentario de la columna dice "en unidades
+      //     individuales" y la vista la expone como `cant_uds`. Guardarla en
+      //     unidad de venta metería un Frances de 3 paquetes como 3 en vez de 12,
+      //     y el error entraría callado en cualquier suma futura.
+      const fila = mk
+        ? {alisto_id:ali.id, producto_id:L.producto_id,
+           cant_uds:0, cant_uom:0,
+           cant_no_entregada:(+L.cant_uom||0)/L.uom_factor,
+           no_se_entrega:true,
+           motivo_no_entrega:mk.motivo,
+           nota_no_entrega:(mk.motivo==='otro' ? mk.nota : null),
+           no_entrega_por:mk.por,
+           no_entrega_en:mk.en}
+        : {alisto_id:ali.id, producto_id:L.producto_id,
+           cant_uds:(+e.cant||0)/L.uom_factor, cant_uom:(+e.cant||0)};
+      const {data:al,error:e4}=await c.from('ent_alisto_linea').insert(fila).select('id').single();
       if(e4) throw e4;
+      // Y NINGUN LOTE PARA UNA MARCADA. No es una optimizacion: el trigger
+      // ent_alisto_lote_excluyente_trg rechaza el insert, y con razon — una
+      // linea o salio del congelador (y dice de que lote) o no salio.
+      if(mk) continue;
       const lotes=e.lotes.filter(function(x){ return x.lote && +x.cant>0; })
         .map(function(x,k){ return {linea_id:al.id, lote:x.lote,
                                     cant_uds:(+x.cant||0)/L.uom_factor, orden:k}; });
@@ -10689,7 +10938,7 @@ function _despDialogoHTML(d){
       : '')
     +'<div class="de-btns"><button class="btn btn-sm" onclick="'+d.cerrar+'"'
     +(d.ocupado?' disabled':'')+'>Cancelar</button>'
-    +'<button class="de-ok"'+dis+' onclick="'+d.ok+'">'
+    +'<button class="de-ok"'+(d.okId?(' id="'+d.okId+'"'):'')+dis+' onclick="'+d.ok+'">'
     +esc(d.ocupado?'Guardando…':d.okTxt)+'</button>'
     +'</div></div></div></div>';
 }
@@ -10723,9 +10972,11 @@ function despRenderDialogoPreparar(){
   // Lo que ANTES iba escondido al final del confirm(). Acá está donde se mira.
   if(dif) cuerpo+='<div class="de-mal">'+dif+(dif===1?' línea sale':' líneas salen')
     +' con cantidad distinta a la facturada.</div>';
-  if(pend) cuerpo+='<div class="de-mal">'+esc(pend)+'</div>';
+  // El aviso de las marcadas NO va en rojo: no es un error, es lo que se va a
+  // guardar. Rojo solo cuando algo frena.
+  if(pend.txt) cuerpo+='<div class="de-'+(pend.frena?'mal':'nota')+'">'+esc(pend.txt)+'</div>';
   return _despDialogoHTML({
-    cliente: _entQuien(f).nombre, cuerpo: cuerpo, listo: !pend, ocupado: _despGuardando,
+    cliente: _entQuien(f).nombre, cuerpo: cuerpo, listo: !pend.frena, ocupado: _despGuardando,
     sub: (f.factura?('…'+String(f.factura).slice(-4)):'sin factura')
          +' · '+(entregar?'sale del congelador ahora':'queda esperando el camión'),
     fecha: _despPedFecha, setFecha: (entregar?'despSetPedFecha':''),
