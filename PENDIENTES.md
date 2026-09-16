@@ -143,3 +143,75 @@ esa lógica no llega a Storage.
 misma trampa que preguntarle a una tabla con RLS: puede contestar "vacío" en vez
 de "no tenés permiso", y ese vacío no prueba nada. La comprobación de `public`
 necesita SQL (`pg_lector.py`), no REST.
+
+---
+
+## H2 · 🟠 ABIERTO · `esquema_check.py` no ve NINGUNA de las cuatro tablas donde se ESCRIBE
+
+Anotado el 16-sep-2026, preparando b60. **Pedido por Andrea.**
+
+### Qué pasa
+
+El chequeo saca los objetos con un regex de literales:
+
+```python
+def objetos_de(txt): return set(re.findall(r"from\('([a-z_][a-z0-9_]*)'\)", txt))
+```
+
+Así que `c.from(t)` dentro de un helper se le escapa. **Esto no es nuevo**: es el
+punto ciego 2 que `CLAUDE.md` ya documenta, con su incidente del 19-ago
+(`ent_pedido_motivo_vigente` y `ent_pedido_valida_vigente` — Pendientes caída en
+producción y el chequeo en ✓).
+
+### Lo que sí es nuevo, y es la razón de anotarlo aparte
+
+**Los objetos que se le escapan son justamente los de ESCRITURA.** Medido hoy:
+`index.html` tiene exactamente **dos** llamadas por variable, y no es casualidad
+cuáles son:
+
+| línea | helper | qué hace |
+|---|---|---|
+| 13090 | `q(t,sel)` | **lee** cuatro vistas de Pendientes |
+| 13602 | `pdInsert(tabla,fila,texto)` | **escribe**, y es el único `insert` genérico del archivo |
+
+Por `pdInsert` pasan **cuatro tablas, las cuatro invisibles para el chequeo**:
+
+- `ent_alisto_linea_autorizacion` ← el «Visto» de b60
+- `ent_pedido_valida` ← "Ya validé"
+- `ent_pedido_motivo` ← "Clasificar"
+- `ent_pedido_factura` ← "Vincular"
+
+De los 27 `.insert(` del archivo, éstas son las que el portón no mira. Las otras
+23 escriben con el nombre puesto y sí se ven.
+
+### Por qué importa más que un punto ciego de lectura
+
+**La dirección del daño es distinta.** Un objeto de LECTURA que falta rompe una
+pantalla entera y a la vista: es lo que pasó el 19-ago, Pendientes no cargaba y
+se notó el mismo día. Un objeto de ESCRITURA que falta no rompe nada hasta que
+alguien **toca el botón** — después de haber tomado la decisión y escrito la
+nota, sobre un caso real, y en un camino que se recorre pocas veces (el «Visto»
+lo tocan dos personas y solo cuando hay excepciones abiertas).
+
+El paso 6 del `CIERRE_TECNICO.md` existe por el incidente del 17-ago: se publicó
+código que dependía de un `.sql` sin pegar. **Ese portón hoy no cubre ninguna de
+las cuatro escrituras del módulo.**
+
+### Estado hoy (medido el 16-sep, sondeo REST con la anon key)
+
+Las cuatro existen — ninguna devuelve `42P01` ni `PGRST205`. O sea que **no hay
+nada roto ahora**: esto es el portón, no un incendio.
+
+⚠️ Y ese sondeo prueba EXISTENCIA y nada más. Un `200` con lista vacía no
+distingue "legible" de "la RLS filtró todo" cuando la tabla puede estar vacía.
+
+### Qué habría que agregarle
+
+- Sumar al regex las llamadas con literal dentro de los helpers de escritura:
+  `pdInsert('tabla'` es un literal, solo que no pegado a `.from(`. Un segundo
+  patrón lo caza hoy mismo y cuesta una línea.
+- Mejor todavía, y más a prueba del próximo helper: **sacar los literales de
+  cualquier llamada que termine en un objeto de Supabase**, no solo de `from(`.
+- Y dejar escrito en la salida **cuántos objetos se vieron por cada camino**.
+  Como en el punto ciego 1: si el contador no se mueve cuando se agrega una
+  escritura nueva, el chequeo está mirando para otro lado.
