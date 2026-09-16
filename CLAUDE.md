@@ -213,6 +213,22 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
   ⚠️ **Y no se lee con la anon key.** `information_schema` y `pg_constraint` no
   salen por REST: para verificar esto desde afuera hace falta `pg_lector.py`.
 
+  **LA MISMA REGLA VALE PARA EL PASO DE ARMAR EL PEGADO, y se pagó el mismo día.**
+  Para aislar el bloque se dio un `sed -n '141,476p'` con el número de línea
+  sacado de "el segundo `begin;`" — adivinado, sin comprobar. El archivo tiene
+  **14** `begin;`: los tres primeros son las pruebas P0 y el transaccional es el
+  **cuarto**. Se pegó **P0-a** en vez de §A+§B+§C. No se escribió nada (P0-a
+  termina en `rollback`), pero se perdió una vuelta entera.
+
+  **Nunca aislar un bloque por número de línea.** Se extrae por estructura —el
+  único `commit;`, y el último `begin;` antes de él— y se comprueba **el archivo
+  ya escrito** antes de ofrecerlo: un `begin`, un `commit`, **cero `rollback`**,
+  que empiece y termine donde debe, y que NO contenga marcas de las pruebas. Si
+  alguna falla, no se ofrece.
+
+  > El paso que nadie verifica es el que falla. Vale para el pegado, para el
+  > `sed` que lo prepara, y para el que venga después.
+
 - **Credenciales nunca por el chat** ni impresas en output: van directo a
   `conexion_prod.env`; confirmar presencia con sí/no, sin mostrar la key.
 - Explicar en español simple; reportar con evidencia (números, no adjetivos).
