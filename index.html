@@ -2592,11 +2592,14 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    tabla es el visto — no hay columna que interpretar.
    AGRUPADO POR PEDIDO, que es la unidad en la que se mira: la socia no revisa
    líneas sueltas, revisa "qué pasó con el pedido de Green Center".
-   LOS DOS COLORES SON LOS DEL ALISTO, tal cual, y por la razón que ya está
-   escrita allá arriba (.dp-nm-pill / .dp-ind-pill): gris sólido = no salió;
-   ámbar en contorno = sí salió y falta saber de dónde. Compartir color sería
-   decir que son la misma cosa. Se REUSAN esas clases, no se copian: una segunda
-   redacción del mismo color es la que se desincroniza. */
+   UNA SOLA RAMA: solo las marcadas "no se entrega" (decisión de Andrea, 16-sep;
+   el porqué está entero en pdLeer). Una salida "sin lote" no es un pendiente, es
+   historia: nadie va a saber nunca de qué lote salió, el sistema ya descuenta
+   bien, y la diferencia se salda al volver a contar. Estaban acá solo porque el
+   criterio de la vista —"el lote dice NO DETERMINADO"— es cierto para siempre.
+   LA PÍLDORA ES LA DEL ALISTO, tal cual: `.dp-nm-pill`, gris sólida. Se REUSA la
+   clase, no se copia — una segunda redacción del mismo color es la que se
+   desincroniza. */
 .pd-exc-ped{border:1px solid var(--border);border-radius:10px;background:var(--sunken);
   padding:11px 12px;margin-bottom:9px}
 .pd-exc-cab{display:flex;align-items:baseline;justify-content:space-between;gap:9px;flex-wrap:wrap}
@@ -2641,12 +2644,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .pd-exc-mas:hover{color:var(--text-2)}
 .pd-exc-nn{width:100%;box-sizing:border-box;background:var(--field);border:1px solid var(--border-strong);
   border-radius:8px;color:var(--text);font:inherit;font-size:16px;padding:8px 10px;margin:6px 0 8px;resize:vertical}
-/* Por qué una fila "sin lote" NO tiene botón: ver el comentario de pdExcHTML.
-   ⚠️ MEDIDO: esto vivia EN CADA FILA y con ocho filas sin lote el mismo renglon
-   aparecia ocho veces, ocupando el lugar de la accion y compitiendo con el dato.
-   Se dice UNA VEZ POR PEDIDO, que es donde la socia lee "y esto que hago con
-   esto" — sigue al lado de las filas que explica, sin repetirse. */
-.pd-exc-sin{font-size:11px;color:var(--text-3);line-height:1.45;margin-top:5px}
 @media(max-width:700px){
   .rp-prods{grid-template-columns:repeat(2,1fr)}
   .rp-prod{padding:16px 6px;font-size:14px}
@@ -12921,12 +12918,36 @@ async function pdLeer(){
     const esSocia=(acc||[]).some(function(a){
       return String(a.email||'').trim().toLowerCase()===yo && a.perfil==='socias'; });
     if(esSocia && yo){
+      // ⚠️ SOLO LA RAMA `no_se_entrega`. Decision de Andrea, 16-sep-2026, y el
+      // porque importa mas que el filtro:
+      //   Una salida "sin lote" NO ES UN PENDIENTE, ES HISTORIA. Nadie va a saber
+      //   nunca de que lote salio —el producto se entrego y el sticker se cayo
+      //   hace dias— y el sistema YA hace lo correcto: descuenta del producto sin
+      //   imputar a ningun lote. La diferencia real aparece al volver a contar, y
+      //   ahi se ajusta el ancla. No hay nada que resolver antes de eso.
+      //   Lo que las metia en la lista era el criterio de la vista: "el lote dice
+      //   NO DETERMINADO" es cierto PARA SIEMPRE, asi que no salian nunca. Una
+      //   lista de la que nada sale deja de leerse, y se lleva puestas a las que
+      //   si tienen algo que hacer.
+      // EL FILTRO VA ACA Y NO EN LA VISTA, tambien decidido: las dos ramas siguen
+      // existiendo. `v_ent_excepcion_pendiente_pedido` expone `n_sin_lote` justo
+      // para que cada consumidor parta la lista a su gusto; filtrar en la vista lo
+      // dejaria en 0 para siempre y le sacaria el dato al contador del lobby que
+      // ese mismo archivo dice que va a alimentar.
+      // PENDIENTE ANOTADO, NO CONSTRUIDO: las "sin lote" deberian cerrarse solas
+      // cuando un ancla nueva las absorbe —el mismo argumento que cerro las 6 del
+      // 8-sep—. Requiere definir que significa "absorbida por un ancla", y eso es
+      // otra conversacion.
       const [lin,ped]=await Promise.all([
         c.from('v_ent_excepcion_pendiente')
          .select('tipo,pedido_id,origen,cliente_nombre,factura_nombre,producto_id,cant_uds,motivo,nota,registrada_por,preparado_en,alisto_lote_id,alisto_linea_id')
-         .limit(300),
+         .eq('tipo','no_se_entrega').limit(300),
+        // Se sigue leyendo la vista por pedido —de ahi sale `desde`, que es la
+        // antiguedad— pero el conteo que se dibuja es `n_no_entrega`, no `n`:
+        // `n` cuenta las dos ramas y diria 6 sobre una tarjeta con 4 filas.
         c.from('v_ent_excepcion_pendiente_pedido')
-         .select('pedido_id,desde,n,n_no_entrega,n_sin_lote,cliente_nombre,factura_nombre') ]);
+         .select('pedido_id,desde,n_no_entrega,cliente_nombre,factura_nombre')
+         .gt('n_no_entrega',0) ]);
       if(lin.error) throw lin.error;
       if(ped.error) throw ped.error;
       exc={yo:yo, peds:(ped.data||[]), lins:(lin.data||[])};
@@ -13280,20 +13301,44 @@ function pdExcHTML(){
   if(E.err) return '<div class="card rp-z"><div class="card-title">Por resolver</div>'
     +'<div class="cl-none dp-mal">No pude leer las excepciones: '+esc(E.err)
     +' — si dice que no existe la vista, falta pegar <strong>ENTREGAS_EXCEPCIONES_LINEA.sql</strong>.</div></div>';
-  if(!E.peds.length) return '';
+  // Vacío no se dibuja (regla 1 del lobby). La decisión la toman las LÍNEAS, más
+  // abajo: `E.peds` puede traer filas cuyas líneas no vinieron.
 
-  // Las líneas, repartidas a su pedido. El orden de los pedidos es por ANTIGÜEDAD:
-  // lo que lleva más tiempo esperando va arriba, que es la pregunta que trae a una
-  // socia a esta lista ("¿qué quedó colgando?"), no el número de pedido.
-  const porPed={};
-  E.lins.forEach(function(l){ (porPed[l.pedido_id]=porPed[l.pedido_id]||[]).push(l); });
-  const peds=E.peds.slice().sort(function(a,z){
-    return Date.parse(a.desde||0)-Date.parse(z.desde||0); });
+  // ⚠️ LA LISTA SE ARMA DESDE LAS LÍNEAS, NO DESDE `E.peds`, y esto se midió:
+  // recorriendo `E.peds` salían TARJETAS VACÍAS —"#44 · 0 líneas"— para los pedidos
+  // cuyas líneas quedaron afuera del filtro. Hoy el `.gt('n_no_entrega',0)` de la
+  // consulta las evita, pero apoyarse en eso es apoyarse en que dos consultas
+  // separadas siempre concuerden: el `limit(300)` de las líneas, un filtro que
+  // alguien cambie, o una fila que entre entre una lectura y la otra rompen el
+  // acuerdo. Se dibuja lo que hay para dibujar, y la vista por pedido aporta el
+  // dato que las líneas no traen bien —`desde`, la antigüedad— con la línea como
+  // respaldo si esa fila no vino.
+  const porPed={}, orden=[];
+  E.lins.forEach(function(l){
+    if(l.tipo!=='no_se_entrega') return;
+    if(!porPed[l.pedido_id]){ porPed[l.pedido_id]=[]; orden.push(l.pedido_id); }
+    porPed[l.pedido_id].push(l);
+  });
+  if(!orden.length) return '';
+  const pedDe={}; (E.peds||[]).forEach(function(x){ pedDe[x.pedido_id]=x; });
+  // El orden es por ANTIGÜEDAD: lo que lleva más tiempo esperando va arriba, que es
+  // la pregunta que trae a una socia a esta lista ("¿qué quedó colgando?"), no el
+  // número de pedido.
+  const peds=orden.map(function(id){
+    const r=pedDe[id]||{}, l0=porPed[id][0];
+    return {pedido_id:id,
+            desde: r.desde || l0.preparado_en,
+            n_no_entrega: porPed[id].length,
+            cliente_nombre: r.cliente_nombre || l0.cliente_nombre,
+            factura_nombre: r.factura_nombre || l0.factura_nombre};
+  }).sort(function(a,z){ return Date.parse(a.desde||0)-Date.parse(z.desde||0); });
+  // El contador cuenta LO QUE SE DIBUJA, por la misma razón.
+  const total=orden.reduce(function(a,id){ return a+porPed[id].length; },0);
 
   let h='<div class="card rp-z"><div class="card-title">Por resolver'
-    +' <span class="pd-cnt on">'+E.lins.length+'</span></div>'
-    +'<div class="rp-nota" style="margin:-4px 0 10px">Excepciones que quedaron abiertas al alistar. '
-    +'«Visto» no autoriza ni deshace nada —el pan ya salió o ya no salió—: deja escrito que una socia las miró.</div>';
+    +' <span class="pd-cnt on">'+total+'</span></div>'
+    +'<div class="rp-nota" style="margin:-4px 0 10px">Líneas marcadas «no se entrega» que ninguna socia miró todavía. '
+    +'«Visto» no autoriza ni deshace nada —el pan ya salió o ya no salió—: deja escrito que alguien las miró.</div>';
 
   peds.forEach(function(p){
     const ls=porPed[p.pedido_id]||[];
@@ -13303,27 +13348,22 @@ function pdExcHTML(){
       +'<div class="pd-exc-dias">'+(d===null?'—':(d<=0?'hoy':(d===1?'1 día':d+' días')))+'</div></div>'
       +'<div class="pd-exc-meta">#'+p.pedido_id
       +(p.factura_nombre?(' · '+esc(p.factura_nombre)):' · sin factura')
-      +' · '+p.n+(p.n===1?' línea':' líneas')
-      // Los dos tipos se cuentan por separado en la cabecera: "3 líneas" no dice si
-      // son tres cosas que no salieron o tres que salieron sin lote, y son opuestas.
-      +(p.n_no_entrega&&p.n_sin_lote ? (' ('+p.n_no_entrega+' no se entrega · '+p.n_sin_lote+' sin lote)') : '')
-      +'</div>'
-      // El aviso de las "sin lote" va ACA y no en cada fila: una vez por pedido, al
-      // lado de las filas que explica. Ver .pd-exc-sin para qué se midió.
-      +(p.n_sin_lote ? ('<div class="pd-exc-sin">Las «sin lote» no se cierran mirándolas: se cierran '
-        +'asignándoles el lote real, y esa pantalla todavía no existe.</div>') : '');
+      // `n_no_entrega` y NO `n`: `n` cuenta las dos ramas de la vista y diría "6
+      // líneas" sobre una tarjeta que dibuja 4. Se cuenta lo que se muestra.
+      +' · '+p.n_no_entrega+(p.n_no_entrega===1?' línea':' líneas')
+      +'</div>';
 
     ls.forEach(function(l){
-      const esNM=(l.tipo==='no_se_entrega');
+      // GUARDA, no filtro: el `.eq('tipo','no_se_entrega')` de la consulta ya las
+      // dejó afuera. Esto existe para que el día que alguien saque ese `.eq` la
+      // pantalla no empiece a dibujar filas sin botón en silencio.
+      if(l.tipo!=='no_se_entrega') return;
       const lid=l.alisto_linea_id;
       h+='<div class="pd-exc-lin"><div class="pd-exc-c">'
-        +'<div class="pd-exc-tipo">'
-        // Las píldoras del alisto, TAL CUAL: gris sólido = no salió, ámbar en
-        // contorno = sí salió y falta saber de dónde. Mismas clases, mismo
-        // significado, una sola definición.
-        +(esNM?'<span class="dp-nm-pill">no se entrega</span>'
-              :'<span class="dp-ind-pill">sin lote</span>')
-        +'</div>'
+        // La píldora del alisto, TAL CUAL. Se queda aunque ahora todas las filas
+        // sean del mismo tipo: es la marca que la socia ya leyó en la pantalla de
+        // alisto, y reusarla es lo que hace que las dos pantallas hablen igual.
+        +'<div class="pd-exc-tipo"><span class="dp-nm-pill">no se entrega</span></div>'
         +'<div class="pd-exc-prod"><b>'+esc(_lotNom(l.producto_id))+'</b> · '
         +esc(_lotUds(l.cant_uds, l.producto_id))+'</div>'
         +'<div class="pd-exc-det'+(l.nota?' cortada':'')+'"'
@@ -13338,22 +13378,12 @@ function pdExcHTML(){
         +'<div class="pd-exc-firma">'+esc(l.registrada_por||'—')+'</div>'
         +'</div>';
 
-      // ⚠️ EL BOTÓN SOLO EXISTE PARA "no se entrega", Y NO ES UNA OMISIÓN.
-      // ent_alisto_linea_autorizacion cuelga de una LÍNEA del alisto
-      // (alisto_linea_id not null references ent_alisto_linea). Una fila "sin
-      // lote" no tiene línea: su identidad es alisto_lote_id, que es otra tabla.
-      // Tres candados independientes lo impiden, y cada uno alcanza:
-      //   · el not null rechaza el insert;
-      //   · el trigger ent_alisto_linea_autorizacion_guard contesta "la línea no
-      //     está marcada no se entrega: no hay nada que autorizar";
-      //   · y la rama (a) de la vista NO filtra por autorización —solo la (b)—,
-      //     así que la fila no saldría de la lista aunque las dos anteriores
-      //     cedieran.
-      // Dibujar el botón igual sería prometer una acción que la base rechaza. Lo
-      // que de verdad cierra una "sin lote" es asignarle el lote real, y esa
-      // pantalla no existe todavía (ent_alisto_lote_correccion no tiene UI).
-      // Se dice en la fila, en vez de dejar un hueco que se lee como "falta algo".
-      if(!esNM){ h+='</div>'; return; }
+      // TODAS las filas de esta tarjeta tienen botón, y eso no es casualidad: es
+      // la consecuencia de que solo entre la rama `no_se_entrega`.
+      // `ent_alisto_linea_autorizacion` cuelga de una LÍNEA del alisto
+      // (`alisto_linea_id not null references ent_alisto_linea`), así que solo esa
+      // rama tiene a qué colgarse. Mientras la lista y la acción salgan del mismo
+      // criterio, no puede volver a aparecer una fila que no se pueda tocar.
       const ocupada=(_pdExcGuardando===lid);
       h+='<div class="pd-exc-acc">'
         +'<button class="btn btn-sm pd-acc"'+(ocupada?' disabled':'')

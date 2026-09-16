@@ -1251,3 +1251,44 @@ ambiguo.
 **La regla, de acá en adelante.** Una regla escrita para un módulo va scopeada a
 su `#vXxx`. Un selector de clase suelto en la hoja global aplica a toda la app,
 no al módulo donde uno lo escribió.
+
+---
+
+## 24 · 🟠 ABIERTO · Las "sin lote" no se cierran nunca — les falta que un ancla las absorba
+
+Anotado el 16-sep-2026 al construir la tarjeta «Por resolver», y **no
+construido**. Decisión de Andrea ese mismo día.
+
+**Qué pasa.** `v_ent_excepcion_pendiente`, rama (a), lista las salidas cuyo lote
+quedó en `'NO DETERMINADO'`. Su criterio es *"el lote dice NO DETERMINADO"*, y eso
+**es cierto para siempre**: nada lo cambia nunca, así que ninguna fila sale de esa
+lista jamás. Hoy son 8.
+
+**Por qué eso no es un pendiente.** Una salida sin lote **no es algo por
+resolver, es historia**. Nadie va a saber nunca de qué lote salió: el producto ya
+se entregó y el sticker se cayó hace días. Y el sistema **ya hace lo correcto** —
+descuenta del producto sin imputar a ningún lote. La diferencia real aparece
+cuando se vuelve a contar, y ahí se ajusta el ancla. No hay nada que hacer antes
+de eso.
+
+**Qué se hizo el 16-sep.** La tarjeta «Por resolver» filtra en la pantalla y
+muestra **solo** la rama `no_se_entrega`. Quedan 4 líneas, todas accionables.
+**La vista NO se tocó**: las dos ramas siguen existiendo, y
+`v_ent_excepcion_pendiente_pedido` sigue exponiendo `n_sin_lote` para quien lo
+necesite. Filtrar en la vista lo dejaría en 0 para siempre.
+
+**Lo que falta, y es lo difícil.** Que una "sin lote" **se cierre sola** cuando un
+ancla nueva la absorbe — el mismo argumento que cerró las seis del 8-sep. Requiere
+definir qué significa exactamente *"absorbida por un ancla"*:
+
+- ¿Basta con que el ancla sea posterior a `preparado_en`? Un ancla nueva ya
+  reconcilia el saldo del producto, así que la salida sin lote quedó contabilizada
+  en el conteo — pero eso hay que **medirlo**, no suponerlo.
+- ¿Qué pasa con una salida sin lote registrada **después** del corte del ancla
+  vigente? Ésa todavía no fue absorbida por nada.
+- ¿Se refleja en la vista (un `where` contra `ent_ancla.corte`) o en una columna
+  que alguien escriba? Lo primero se apaga solo; lo segundo necesita quién.
+
+**Por qué no urge.** Nadie está esperando, no hay plata en juego y el saldo ya es
+correcto. Lo único que costaba era ensuciar una lista de trabajo, y eso se
+resolvió sacándolas de la pantalla.
