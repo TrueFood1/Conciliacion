@@ -71,31 +71,91 @@ select pg_get_constraintdef(oid) as def_antes
 
 
 -- ════════════════════════════════════════════════════════════════════════
--- P0 · LAS DOS QUE TIENEN QUE FALLAR **ANTES** DE APLICAR
--- Si alguna pasa, el diagnostico esta mal y NO se aplica nada.
--- Las dos CREAN su fila: una prueba que no encuentra a quien probar no prueba
--- nada y dice "Success" (la 7a del 14-sep).
+-- P0 · LO QUE TIENE QUE PASAR **ANTES** DE APLICAR NADA
+--
+-- ⚠️ CADA PRUEBA SE CONSTRUYE SU PROPIO CASO. Nada de
+-- `(select id from ent_alisto_linea order by id desc limit 1)`: esa version
+-- fallo el 15-sep con el error EQUIVOCADO —la ultima linea resulto ser una de
+-- las cuatro que Andrea marco "no se entrega" en Green Center, y el trigger
+-- excluyente la rechazo antes de que el CHECK de motivos llegara a evaluarse—.
+-- Es el mismo modo de falla de la 7a del 14-sep: una prueba que depende del
+-- estado de los datos en vez de crear su caso no prueba lo que dice probar, y
+-- el dia que se equivoca lo hace en silencio o con el error de otro.
+--
+-- Todo queda dentro de begin/rollback: no se escribe nada.
 -- ════════════════════════════════════════════════════════════════════════
 
--- P0-a · ESPERADO: ERROR de ent_alisto_lote_motivo_ok. 'otro' todavia no existe.
+-- P0-0 · CONTROL · ESPERADO: PASA (Success, y la fila del eco)
+--        SIN ESTA NO SE PUEDE LEER NINGUNA DE LAS OTRAS DOS. Prueba que la
+--        escalera funciona: que la linea nace SIN marcar y acepta un lote
+--        normal. Si P0-0 falla, P0-a va a "fallar" por la escalera rota y no
+--        por el CHECK — que es exactamente lo que paso hoy.
 begin;
-  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden,
-         motivo_indeterminado, indeterminado_por, indeterminado_en)
-  select (select id from ent_alisto_linea order by id desc limit 1),
-         'NO DETERMINADO', 1, 0, 'otro', 'prueba-p0a', now();
+  -- LA ESCALERA PROPIA: pedido -> alisto -> linea NO marcada, firmada 'prueba-p0-0'.
+  -- CUATRO SENTENCIAS SEPARADAS, a proposito: el trigger BEFORE INSERT de
+  -- ent_alisto_lote lee la linea de la TABLA, y una linea creada en un CTE de la
+  -- misma sentencia todavia no es visible ("no existe la linea %").
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por)
+  values (current_date, 'manual', 'regalia', 'prueba-p0-0');
+  insert into ent_alisto (pedido_id, responsable, creado_por)
+  select id, 'prueba-p0-0', 'prueba-p0-0' from ent_pedido where creado_por = 'prueba-p0-0';
+  insert into ent_alisto_linea (alisto_id, producto_id, cant_uds, cant_uom)
+  select id, 451, 1, 1 from ent_alisto where creado_por = 'prueba-p0-0';
+
+  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden)
+  select l.id, '100 / 1-27', 1, 0
+    from ent_alisto_linea l
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-p0-0';
+  select 'P0-0 OK: la escalera anda y la linea no esta marcada' as resultado;
 rollback;
 
--- P0-b · ⚠️ ESPERADO: **PASA**, y no deberia. Es el hueco del NULL: el CHECK
---        dice `lote <> '...' OR (motivo = ANY(...) AND ...)`, y con motivo NULL
---        el ANY da NULL, el OR da NULL, y un CHECK NULL se considera cumplido.
---        Es el MISMO hueco que el 15-sep se cerro en ent_alisto_linea. Si esta
---        PASA, queda demostrado que hoy se puede escribir un centinela mudo.
+-- P0-a · ESPERADO: ERROR de ent_alisto_lote_motivo_ok.
+--        El texto tiene que decir "ent_alisto_lote_motivo_ok". Si dice
+--        "no se entrega" o "no existe la linea", la escalera se rompio:
+--        volver a P0-0.
 begin;
-  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden,
-         motivo_indeterminado, indeterminado_por, indeterminado_en)
-  select (select id from ent_alisto_linea order by id desc limit 1),
-         'NO DETERMINADO', 1, 0, null, 'prueba-p0b', now();
-  -- si llego aca sin error, el hueco esta abierto
+  -- LA ESCALERA PROPIA: pedido -> alisto -> linea NO marcada, firmada 'prueba-p0a'.
+  -- CUATRO SENTENCIAS SEPARADAS, a proposito: el trigger BEFORE INSERT de
+  -- ent_alisto_lote lee la linea de la TABLA, y una linea creada en un CTE de la
+  -- misma sentencia todavia no es visible ("no existe la linea %").
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por)
+  values (current_date, 'manual', 'regalia', 'prueba-p0a');
+  insert into ent_alisto (pedido_id, responsable, creado_por)
+  select id, 'prueba-p0a', 'prueba-p0a' from ent_pedido where creado_por = 'prueba-p0a';
+  insert into ent_alisto_linea (alisto_id, producto_id, cant_uds, cant_uom)
+  select id, 451, 1, 1 from ent_alisto where creado_por = 'prueba-p0a';
+
+  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden, motivo_indeterminado, indeterminado_por, indeterminado_en)
+  select l.id, 'NO DETERMINADO', 1, 0, 'otro', 'prueba-p0a', now()
+    from ent_alisto_linea l
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-p0a';
+rollback;
+
+-- P0-b · ⚠️ ESPERADO: **PASA**, y no deberia.
+--        Es el hueco del NULL: el CHECK dice
+--        `lote <> '...' OR (motivo = ANY(...) AND ...)`, y con motivo NULL el
+--        ANY da NULL, el OR da NULL, y un CHECK NULL se considera cumplido.
+--        Si PASA, queda demostrado que hoy se puede escribir un centinela mudo,
+--        y el coalesce de §A tiene razon de ser.
+begin;
+  -- LA ESCALERA PROPIA: pedido -> alisto -> linea NO marcada, firmada 'prueba-p0b'.
+  -- CUATRO SENTENCIAS SEPARADAS, a proposito: el trigger BEFORE INSERT de
+  -- ent_alisto_lote lee la linea de la TABLA, y una linea creada en un CTE de la
+  -- misma sentencia todavia no es visible ("no existe la linea %").
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por)
+  values (current_date, 'manual', 'regalia', 'prueba-p0b');
+  insert into ent_alisto (pedido_id, responsable, creado_por)
+  select id, 'prueba-p0b', 'prueba-p0b' from ent_pedido where creado_por = 'prueba-p0b';
+  insert into ent_alisto_linea (alisto_id, producto_id, cant_uds, cant_uom)
+  select id, 451, 1, 1 from ent_alisto where creado_por = 'prueba-p0b';
+
+  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden, motivo_indeterminado, indeterminado_por, indeterminado_en)
+  select l.id, 'NO DETERMINADO', 1, 0, null, 'prueba-p0b', now()
+    from ent_alisto_linea l
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-p0b';
   select 'HUECO ABIERTO: el centinela sin motivo entro' as resultado;
 rollback;
 
@@ -272,102 +332,304 @@ commit;
 
 
 -- ════════════════════════════════════════════════════════════════════════
--- PRUEBAS · todas CREAN la fila que van a probar, y todas terminan en rollback.
--- Correr DESPUES de §A y §B. Cada una dice que tiene que pasar.
+-- PRUEBAS · correr DESPUES de §A, §B y §D.
+--
+-- ⚠️ CADA UNA SE CONSTRUYE SU CASO (pedido -> alisto -> linea sin marcar). La
+-- version anterior tomaba `(select id from ent_alisto_linea order by id desc
+-- limit 1)` y el 15-sep P0-a fallo con el error de OTRO candado: la ultima
+-- linea resulto ser una de las cuatro marcadas "no se entrega" en Green Center,
+-- y el trigger excluyente la rechazo antes de que el CHECK de motivos se
+-- evaluara. Una prueba que depende del estado de los datos no prueba lo que
+-- dice probar.
+--
+-- LAS 62 SENTENCIAS ESTAN PLANIFICADAS CON `explain` (15-sep, solo lectura): no
+-- ejecuta, solo planifica, asi que valida tabla, columna, tipo y join sin
+-- escribir nada. Las 4 de T1/T2/T4/T5 no planifican todavia porque nombran
+-- nota_indeterminado, que la crea §A — por eso van despues.
+-- Todas construyen su propio caso y terminan en rollback. Cada una dice que
+-- tiene que pasar. T0 es el CONTROL: si T0 falla, ninguna de las demas se puede
+-- leer — las que esperan ERROR estarian "pasando" por la escalera rota.
 -- ════════════════════════════════════════════════════════════════════════
 
--- T1 · 'otro' con nota de 6 → ESPERADO: PASA (Success, 1 fila)
+-- T0 · CONTROL · un lote normal en una linea sin marcar → ESPERADO: PASA
 begin;
-  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden,
-         motivo_indeterminado, nota_indeterminado, indeterminado_por, indeterminado_en)
-  select (select id from ent_alisto_linea order by id desc limit 1),
-         'NO DETERMINADO', 1, 0, 'otro', 'mojado', 'prueba-t1', now();
-  select 'T1 OK: otro con nota de 6 entro' as resultado;
+  -- LA ESCALERA PROPIA: pedido -> alisto -> linea NO marcada, firmada 'prueba-t0'.
+  -- CUATRO SENTENCIAS SEPARADAS, a proposito: el trigger BEFORE INSERT de
+  -- ent_alisto_lote lee la linea de la TABLA, y una linea creada en un CTE de la
+  -- misma sentencia todavia no es visible ("no existe la linea %").
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por)
+  values (current_date, 'manual', 'regalia', 'prueba-t0');
+  insert into ent_alisto (pedido_id, responsable, creado_por)
+  select id, 'prueba-t0', 'prueba-t0' from ent_pedido where creado_por = 'prueba-t0';
+  insert into ent_alisto_linea (alisto_id, producto_id, cant_uds, cant_uom)
+  select id, 451, 1, 1 from ent_alisto where creado_por = 'prueba-t0';
+
+  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden)
+  select l.id, '100 / 1-27', 1, 0
+    from ent_alisto_linea l
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-t0';
+  select 'T0 OK: la escalera anda' as resultado;
+rollback;
+
+-- T1 · 'otro' con nota de 6 → ESPERADO: PASA
+begin;
+  -- LA ESCALERA PROPIA: pedido -> alisto -> linea NO marcada, firmada 'prueba-t1'.
+  -- CUATRO SENTENCIAS SEPARADAS, a proposito: el trigger BEFORE INSERT de
+  -- ent_alisto_lote lee la linea de la TABLA, y una linea creada en un CTE de la
+  -- misma sentencia todavia no es visible ("no existe la linea %").
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por)
+  values (current_date, 'manual', 'regalia', 'prueba-t1');
+  insert into ent_alisto (pedido_id, responsable, creado_por)
+  select id, 'prueba-t1', 'prueba-t1' from ent_pedido where creado_por = 'prueba-t1';
+  insert into ent_alisto_linea (alisto_id, producto_id, cant_uds, cant_uom)
+  select id, 451, 1, 1 from ent_alisto where creado_por = 'prueba-t1';
+
+  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden, motivo_indeterminado, nota_indeterminado, indeterminado_por, indeterminado_en)
+  select l.id, 'NO DETERMINADO', 1, 0, 'otro', 'mojado', 'prueba-t1', now()
+    from ent_alisto_linea l
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-t1';
+  select 'T1 OK' as resultado;
 rollback;
 
 -- T2 · 'otro' con nota de 5 → ESPERADO: ERROR
 begin;
-  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden,
-         motivo_indeterminado, nota_indeterminado, indeterminado_por, indeterminado_en)
-  select (select id from ent_alisto_linea order by id desc limit 1),
-         'NO DETERMINADO', 1, 0, 'otro', 'corta', 'prueba-t2', now();
+  -- LA ESCALERA PROPIA: pedido -> alisto -> linea NO marcada, firmada 'prueba-t2'.
+  -- CUATRO SENTENCIAS SEPARADAS, a proposito: el trigger BEFORE INSERT de
+  -- ent_alisto_lote lee la linea de la TABLA, y una linea creada en un CTE de la
+  -- misma sentencia todavia no es visible ("no existe la linea %").
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por)
+  values (current_date, 'manual', 'regalia', 'prueba-t2');
+  insert into ent_alisto (pedido_id, responsable, creado_por)
+  select id, 'prueba-t2', 'prueba-t2' from ent_pedido where creado_por = 'prueba-t2';
+  insert into ent_alisto_linea (alisto_id, producto_id, cant_uds, cant_uom)
+  select id, 451, 1, 1 from ent_alisto where creado_por = 'prueba-t2';
+
+  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden, motivo_indeterminado, nota_indeterminado, indeterminado_por, indeterminado_en)
+  select l.id, 'NO DETERMINADO', 1, 0, 'otro', 'corta', 'prueba-t2', now()
+    from ent_alisto_linea l
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-t2';
 rollback;
 
 -- T3 · 'otro' SIN nota → ESPERADO: ERROR
 begin;
-  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden,
-         motivo_indeterminado, indeterminado_por, indeterminado_en)
-  select (select id from ent_alisto_linea order by id desc limit 1),
-         'NO DETERMINADO', 1, 0, 'otro', 'prueba-t3', now();
+  -- LA ESCALERA PROPIA: pedido -> alisto -> linea NO marcada, firmada 'prueba-t3'.
+  -- CUATRO SENTENCIAS SEPARADAS, a proposito: el trigger BEFORE INSERT de
+  -- ent_alisto_lote lee la linea de la TABLA, y una linea creada en un CTE de la
+  -- misma sentencia todavia no es visible ("no existe la linea %").
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por)
+  values (current_date, 'manual', 'regalia', 'prueba-t3');
+  insert into ent_alisto (pedido_id, responsable, creado_por)
+  select id, 'prueba-t3', 'prueba-t3' from ent_pedido where creado_por = 'prueba-t3';
+  insert into ent_alisto_linea (alisto_id, producto_id, cant_uds, cant_uom)
+  select id, 451, 1, 1 from ent_alisto where creado_por = 'prueba-t3';
+
+  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden, motivo_indeterminado, indeterminado_por, indeterminado_en)
+  select l.id, 'NO DETERMINADO', 1, 0, 'otro', 'prueba-t3', now()
+    from ent_alisto_linea l
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-t3';
 rollback;
 
--- T4 · 'otro' con nota de espacios y 6 letras → ESPERADO: PASA
---      El minimo se mide al RECORTAR: "  mojado  " son 6, no 10.
+-- T4 · 'otro' con espacios alrededor → ESPERADO: PASA
+--       El minimo se mide al RECORTAR: "  mojado  " son 6, no 10.
 begin;
-  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden,
-         motivo_indeterminado, nota_indeterminado, indeterminado_por, indeterminado_en)
-  select (select id from ent_alisto_linea order by id desc limit 1),
-         'NO DETERMINADO', 1, 0, 'otro', '  mojado  ', 'prueba-t4', now();
+  -- LA ESCALERA PROPIA: pedido -> alisto -> linea NO marcada, firmada 'prueba-t4'.
+  -- CUATRO SENTENCIAS SEPARADAS, a proposito: el trigger BEFORE INSERT de
+  -- ent_alisto_lote lee la linea de la TABLA, y una linea creada en un CTE de la
+  -- misma sentencia todavia no es visible ("no existe la linea %").
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por)
+  values (current_date, 'manual', 'regalia', 'prueba-t4');
+  insert into ent_alisto (pedido_id, responsable, creado_por)
+  select id, 'prueba-t4', 'prueba-t4' from ent_pedido where creado_por = 'prueba-t4';
+  insert into ent_alisto_linea (alisto_id, producto_id, cant_uds, cant_uom)
+  select id, 451, 1, 1 from ent_alisto where creado_por = 'prueba-t4';
+
+  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden, motivo_indeterminado, nota_indeterminado, indeterminado_por, indeterminado_en)
+  select l.id, 'NO DETERMINADO', 1, 0, 'otro', '  mojado  ', 'prueba-t4', now()
+    from ent_alisto_linea l
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-t4';
   select 'T4 OK: se mide al recortar' as resultado;
 rollback;
 
 -- T5 · nota de 6 espacios → ESPERADO: ERROR (btrim la deja en 0)
 begin;
-  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden,
-         motivo_indeterminado, nota_indeterminado, indeterminado_por, indeterminado_en)
-  select (select id from ent_alisto_linea order by id desc limit 1),
-         'NO DETERMINADO', 1, 0, 'otro', '      ', 'prueba-t5', now();
+  -- LA ESCALERA PROPIA: pedido -> alisto -> linea NO marcada, firmada 'prueba-t5'.
+  -- CUATRO SENTENCIAS SEPARADAS, a proposito: el trigger BEFORE INSERT de
+  -- ent_alisto_lote lee la linea de la TABLA, y una linea creada en un CTE de la
+  -- misma sentencia todavia no es visible ("no existe la linea %").
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por)
+  values (current_date, 'manual', 'regalia', 'prueba-t5');
+  insert into ent_alisto (pedido_id, responsable, creado_por)
+  select id, 'prueba-t5', 'prueba-t5' from ent_pedido where creado_por = 'prueba-t5';
+  insert into ent_alisto_linea (alisto_id, producto_id, cant_uds, cant_uom)
+  select id, 451, 1, 1 from ent_alisto where creado_por = 'prueba-t5';
+
+  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden, motivo_indeterminado, nota_indeterminado, indeterminado_por, indeterminado_en)
+  select l.id, 'NO DETERMINADO', 1, 0, 'otro', '      ', 'prueba-t5', now()
+    from ent_alisto_linea l
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-t5';
 rollback;
 
 -- T6 · EL HUECO CERRADO: motivo NULL → ESPERADO: ERROR
---      Esta es P0-b otra vez. Antes de §A pasaba — ahora tiene que reventar.
+--       Es P0-b otra vez. Antes de §A pasaba — ahora tiene que reventar.
 begin;
-  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden,
-         motivo_indeterminado, indeterminado_por, indeterminado_en)
-  select (select id from ent_alisto_linea order by id desc limit 1),
-         'NO DETERMINADO', 1, 0, null, 'prueba-t6', now();
+  -- LA ESCALERA PROPIA: pedido -> alisto -> linea NO marcada, firmada 'prueba-t6'.
+  -- CUATRO SENTENCIAS SEPARADAS, a proposito: el trigger BEFORE INSERT de
+  -- ent_alisto_lote lee la linea de la TABLA, y una linea creada en un CTE de la
+  -- misma sentencia todavia no es visible ("no existe la linea %").
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por)
+  values (current_date, 'manual', 'regalia', 'prueba-t6');
+  insert into ent_alisto (pedido_id, responsable, creado_por)
+  select id, 'prueba-t6', 'prueba-t6' from ent_pedido where creado_por = 'prueba-t6';
+  insert into ent_alisto_linea (alisto_id, producto_id, cant_uds, cant_uom)
+  select id, 451, 1, 1 from ent_alisto where creado_por = 'prueba-t6';
+
+  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden, motivo_indeterminado, indeterminado_por, indeterminado_en)
+  select l.id, 'NO DETERMINADO', 1, 0, null, 'prueba-t6', now()
+    from ent_alisto_linea l
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-t6';
 rollback;
 
 -- T7 · LOS VIEJOS SIGUEN VALIDOS: 'chofer_no_reporto' → ESPERADO: PASA
---      Si esta falla, la fila 184 quedo huerfana y hay que revertir §A.
+--       Si esta falla, la correccion #1 del 8-sep quedo huerfana: revertir §A.
 begin;
-  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden,
-         motivo_indeterminado, indeterminado_por, indeterminado_en)
-  select (select id from ent_alisto_linea order by id desc limit 1),
-         'NO DETERMINADO', 1, 0, 'chofer_no_reporto', 'prueba-t7', now();
+  -- LA ESCALERA PROPIA: pedido -> alisto -> linea NO marcada, firmada 'prueba-t7'.
+  -- CUATRO SENTENCIAS SEPARADAS, a proposito: el trigger BEFORE INSERT de
+  -- ent_alisto_lote lee la linea de la TABLA, y una linea creada en un CTE de la
+  -- misma sentencia todavia no es visible ("no existe la linea %").
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por)
+  values (current_date, 'manual', 'regalia', 'prueba-t7');
+  insert into ent_alisto (pedido_id, responsable, creado_por)
+  select id, 'prueba-t7', 'prueba-t7' from ent_pedido where creado_por = 'prueba-t7';
+  insert into ent_alisto_linea (alisto_id, producto_id, cant_uds, cant_uom)
+  select id, 451, 1, 1 from ent_alisto where creado_por = 'prueba-t7';
+
+  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden, motivo_indeterminado, indeterminado_por, indeterminado_en)
+  select l.id, 'NO DETERMINADO', 1, 0, 'chofer_no_reporto', 'prueba-t7', now()
+    from ent_alisto_linea l
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-t7';
   select 'T7 OK: los cuatro viejos siguen entrando' as resultado;
 rollback;
 
--- T8 · 'caja_sin_sticker' → ESPERADO: PASA (el otro que sale de la pantalla)
+-- T8 · 'caja_sin_sticker' → ESPERADO: PASA
 begin;
-  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden,
-         motivo_indeterminado, indeterminado_por, indeterminado_en)
-  select (select id from ent_alisto_linea order by id desc limit 1),
-         'NO DETERMINADO', 1, 0, 'caja_sin_sticker', 'prueba-t8', now();
+  -- LA ESCALERA PROPIA: pedido -> alisto -> linea NO marcada, firmada 'prueba-t8'.
+  -- CUATRO SENTENCIAS SEPARADAS, a proposito: el trigger BEFORE INSERT de
+  -- ent_alisto_lote lee la linea de la TABLA, y una linea creada en un CTE de la
+  -- misma sentencia todavia no es visible ("no existe la linea %").
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por)
+  values (current_date, 'manual', 'regalia', 'prueba-t8');
+  insert into ent_alisto (pedido_id, responsable, creado_por)
+  select id, 'prueba-t8', 'prueba-t8' from ent_pedido where creado_por = 'prueba-t8';
+  insert into ent_alisto_linea (alisto_id, producto_id, cant_uds, cant_uom)
+  select id, 451, 1, 1 from ent_alisto where creado_por = 'prueba-t8';
+
+  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden, motivo_indeterminado, indeterminado_por, indeterminado_en)
+  select l.id, 'NO DETERMINADO', 1, 0, 'caja_sin_sticker', 'prueba-t8', now()
+    from ent_alisto_linea l
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-t8';
   select 'T8 OK' as resultado;
 rollback;
 
 -- T9 · un motivo inventado → ESPERADO: ERROR
 begin;
-  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden,
-         motivo_indeterminado, indeterminado_por, indeterminado_en)
-  select (select id from ent_alisto_linea order by id desc limit 1),
-         'NO DETERMINADO', 1, 0, 'se_perdio', 'prueba-t9', now();
+  -- LA ESCALERA PROPIA: pedido -> alisto -> linea NO marcada, firmada 'prueba-t9'.
+  -- CUATRO SENTENCIAS SEPARADAS, a proposito: el trigger BEFORE INSERT de
+  -- ent_alisto_lote lee la linea de la TABLA, y una linea creada en un CTE de la
+  -- misma sentencia todavia no es visible ("no existe la linea %").
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por)
+  values (current_date, 'manual', 'regalia', 'prueba-t9');
+  insert into ent_alisto (pedido_id, responsable, creado_por)
+  select id, 'prueba-t9', 'prueba-t9' from ent_pedido where creado_por = 'prueba-t9';
+  insert into ent_alisto_linea (alisto_id, producto_id, cant_uds, cant_uom)
+  select id, 451, 1, 1 from ent_alisto where creado_por = 'prueba-t9';
+
+  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden, motivo_indeterminado, indeterminado_por, indeterminado_en)
+  select l.id, 'NO DETERMINADO', 1, 0, 'se_perdio', 'prueba-t9', now()
+    from ent_alisto_linea l
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-t9';
 rollback;
 
 -- T10 · §B · una correccion con 'otro' y nota de 6 → ESPERADO: PASA
 begin;
+  -- LA ESCALERA PROPIA: pedido -> alisto -> linea NO marcada, firmada 'prueba-t10'.
+  -- CUATRO SENTENCIAS SEPARADAS, a proposito: el trigger BEFORE INSERT de
+  -- ent_alisto_lote lee la linea de la TABLA, y una linea creada en un CTE de la
+  -- misma sentencia todavia no es visible ("no existe la linea %").
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por)
+  values (current_date, 'manual', 'regalia', 'prueba-t10');
+  insert into ent_alisto (pedido_id, responsable, creado_por)
+  select id, 'prueba-t10', 'prueba-t10' from ent_pedido where creado_por = 'prueba-t10';
+  insert into ent_alisto_linea (alisto_id, producto_id, cant_uds, cant_uom)
+  select id, 451, 1, 1 from ent_alisto where creado_por = 'prueba-t10';
+
+  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden, motivo_indeterminado, indeterminado_por, indeterminado_en)
+  select l.id, 'NO DETERMINADO', 1, 0, 'no_se_anoto', 'prueba-t10', now()
+    from ent_alisto_linea l
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-t10';
+
+  -- ⚠️ DOS FRENOS DEL TRIGGER ent_alisto_lote_correccion_guard, los dos
+  -- descubiertos leyendo la funcion antes de escribir esto:
+  --   FRENO 1 · solo se corrige una EXCEPCION. Si el lote original tiene forma
+  --             canonica, el trigger rechaza. Por eso la fila de arriba nace
+  --             con 'NO DETERMINADO' y no con un lote normal.
+  --   FRENO 2 · sin sesion de Supabase (SQL Editor) `creado_por` TIENE que
+  --             empezar con 'correccion-sql'. Con 'prueba-t10' pelado el
+  --             trigger rechaza — y T10 habria "fallado" por la firma, no por
+  --             el CHECK.
   insert into ent_alisto_lote_correccion (alisto_lote_id, lote, motivo, nota, creado_por)
-  select (select id from ent_alisto_lote order by id desc limit 1),
-         'NO DETERMINADO', 'otro', 'mojado', 'prueba-t10';
+  select al.id, 'NO DETERMINADO', 'otro', 'mojado', 'correccion-sql-t10'
+    from ent_alisto_lote al
+    join ent_alisto_linea l on l.id = al.linea_id
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-t10';
   select 'T10 OK' as resultado;
 rollback;
 
--- T11 · §B · una correccion con 'otro' sin nota → ESPERADO: ERROR
+-- T11 · §B · una correccion con 'otro' SIN nota → ESPERADO: ERROR
 begin;
+  -- LA ESCALERA PROPIA: pedido -> alisto -> linea NO marcada, firmada 'prueba-t11'.
+  -- CUATRO SENTENCIAS SEPARADAS, a proposito: el trigger BEFORE INSERT de
+  -- ent_alisto_lote lee la linea de la TABLA, y una linea creada en un CTE de la
+  -- misma sentencia todavia no es visible ("no existe la linea %").
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por)
+  values (current_date, 'manual', 'regalia', 'prueba-t11');
+  insert into ent_alisto (pedido_id, responsable, creado_por)
+  select id, 'prueba-t11', 'prueba-t11' from ent_pedido where creado_por = 'prueba-t11';
+  insert into ent_alisto_linea (alisto_id, producto_id, cant_uds, cant_uom)
+  select id, 451, 1, 1 from ent_alisto where creado_por = 'prueba-t11';
+
+  insert into ent_alisto_lote (linea_id, lote, cant_uds, orden, motivo_indeterminado, indeterminado_por, indeterminado_en)
+  select l.id, 'NO DETERMINADO', 1, 0, 'no_se_anoto', 'prueba-t11', now()
+    from ent_alisto_linea l
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-t11';
+
+  -- ⚠️ DOS FRENOS DEL TRIGGER ent_alisto_lote_correccion_guard, los dos
+  -- descubiertos leyendo la funcion antes de escribir esto:
+  --   FRENO 1 · solo se corrige una EXCEPCION. Si el lote original tiene forma
+  --             canonica, el trigger rechaza. Por eso la fila de arriba nace
+  --             con 'NO DETERMINADO' y no con un lote normal.
+  --   FRENO 2 · sin sesion de Supabase (SQL Editor) `creado_por` TIENE que
+  --             empezar con 'correccion-sql'. Con 'prueba-t10' pelado el
+  --             trigger rechaza — y T10 habria "fallado" por la firma, no por
+  --             el CHECK.
   insert into ent_alisto_lote_correccion (alisto_lote_id, lote, motivo, creado_por)
-  select (select id from ent_alisto_lote order by id desc limit 1),
-         'NO DETERMINADO', 'otro', 'prueba-t11';
+  select al.id, 'NO DETERMINADO', 'otro', 'correccion-sql-t11'
+    from ent_alisto_lote al
+    join ent_alisto_linea l on l.id = al.linea_id
+    join ent_alisto a on a.id = l.alisto_id
+   where a.creado_por = 'prueba-t11';
 rollback;
 
 -- T12 · §B · las seis correcciones del 8-sep siguen validas
