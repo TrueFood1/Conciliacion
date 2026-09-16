@@ -4,8 +4,9 @@
 -- ellos es 'otro' + nota. La BASE tiene que aceptar 'otro' — hoy no lo acepta y
 -- la columna de la nota no existe.
 --
--- ⚠️ NO SE PEGA POR PARTES. Cada seccion es una unidad — el orden importa
--- (la columna antes del CHECK que la nombra).
+-- ⚠️ NO SE PEGA POR PARTES. Cada seccion es una unidad — el orden importa:
+-- la columna (§A) antes del CHECK que la nombra, y antes de las vistas (§D)
+-- que la leen.
 --
 -- ⚠️ ESTA VERSION DE LA APP (b59) NO SE PUEDE PUBLICAR ANTES DE PEGAR ESTO.
 -- La pantalla ya ofrece "Otro" — sin el CHECK nuevo, elegirlo hace que el INSERT
@@ -192,6 +193,85 @@ commit;
 
 
 -- ════════════════════════════════════════════════════════════════════════
+-- §D · LAS DOS VISTAS — que la nota LLEGUE a la cola de las socias
+--
+-- POR QUE ENTRA EN EL MISMO PEGADO (decision de Andrea, 15-sep). Sin esto se
+-- podria escribir "Otro — se mojo la caja" y la socia que tiene que resolverlo
+-- veria 'otro' pelado. Publicar un campo que nadie puede leer no sirve de nada.
+--
+-- ES CHICO, Y ESTA MEDIDO: dos `create or replace`, y las dos SOLO AGREGAN UNA
+-- COLUMNA AL FINAL. Postgres permite eso aunque la vista tenga dependientes —
+-- lo que prohibe es quitar, renombrar o cambiar el tipo de una columna que ya
+-- existe. `ent_alisto_lote_efectivo` tiene TRES dependientes
+-- (ent_salido_del_congelador_desde_ancla, v_ent_excepcion_pendiente,
+-- v_ent_indeterminado_pendiente) y ninguno se toca: ninguno se rompe.
+-- No hay `drop view` en ninguna parte de esta seccion. Si hiciera falta uno,
+-- seria otra conversacion.
+--
+-- EL CUERPO ES COPIA LITERAL de pg_get_viewdef. Lo unico agregado va marcado
+-- con "NUEVO" al lado.
+-- ════════════════════════════════════════════════════════════════════════
+begin;
+
+-- D.1 · ent_alisto_lote_efectivo
+--   La nota sigue la MISMA regla que el lote, el motivo y el quien: si hay
+--   correccion, manda la correccion. Es el `coalesce(c.X, al.X)` que la vista ya
+--   usa tres veces — no se inventa una cuarta regla para el cuarto campo.
+--
+--   ⚠️ CONSECUENCIA MEDIBLE, dicha antes de pegar: las SEIS correcciones del
+--   8-sep tienen nota (179-192 caracteres, "Migracion b56: ...") y motivos que
+--   NO son 'otro'. Con este coalesce esas seis filas van a mostrar su nota de
+--   migracion al lado de un motivo que no es 'otro'. Es correcto —es la nota
+--   efectiva de esa fila— y es MAS de lo que se ve hoy, que es el motivo pelado.
+--   D10 las lista para que se vea exactamente cuales son.
+create or replace view ent_alisto_lote_efectivo as
+ SELECT al.id,
+    al.linea_id,
+    al.cant_uds,
+    al.orden,
+    COALESCE(c.lote, al.lote) AS lote,
+    al.lote AS lote_original,
+    COALESCE(c.motivo, al.motivo_indeterminado) AS motivo_indeterminado,
+    COALESCE(c.creado_por, al.indeterminado_por) AS excepcion_por,
+    c.fuente AS resuelto_con,
+    c.id IS NOT NULL AS corregido,
+    COALESCE(c.nota, al.nota_indeterminado) AS nota_indeterminado   -- NUEVO, al final
+   FROM ent_alisto_lote al
+     LEFT JOIN LATERAL ( SELECT x.id,
+            x.lote,
+            x.motivo,
+            x.fuente,
+            x.creado_por,
+            x.nota                                                  -- NUEVO
+           FROM ent_alisto_lote_correccion x
+          WHERE x.alisto_lote_id = al.id
+          ORDER BY x.creado_en DESC
+         LIMIT 1) c ON true;
+
+-- D.2 · v_ent_indeterminado_pendiente — la cola que miran las socias
+create or replace view v_ent_indeterminado_pendiente as
+ SELECT p.id AS pedido_id,
+    p.origen,
+    p.cliente_nombre,
+    COALESCE(fv.factura_nombre, p.factura_nombre) AS factura_nombre,
+    ali.producto_id,
+    ale.cant_uds,
+    ale.motivo_indeterminado,
+    ale.excepcion_por,
+    av.preparado_en,
+    ale.id AS alisto_lote_id,
+    ale.nota_indeterminado                                          -- NUEVO, al final
+   FROM ent_alisto_lote_efectivo ale
+     JOIN ent_alisto_linea ali ON ali.id = ale.linea_id
+     JOIN ent_alisto_vigente av ON av.alisto_id = ali.alisto_id
+     JOIN ent_pedido p ON p.id = av.pedido_id
+     LEFT JOIN ent_pedido_factura_vigente fv ON fv.pedido_id = p.id AND fv.anulado = false
+  WHERE ale.lote = 'NO DETERMINADO'::text;
+
+commit;
+
+
+-- ════════════════════════════════════════════════════════════════════════
 -- PRUEBAS · todas CREAN la fila que van a probar, y todas terminan en rollback.
 -- Correr DESPUES de §A y §B. Cada una dice que tiene que pasar.
 -- ════════════════════════════════════════════════════════════════════════
@@ -369,6 +449,31 @@ select id, lote, motivo_indeterminado, nota_indeterminado
         and indeterminado_en is not null ) );
 
 
+-- D9 · §D · las dos vistas exponen la nota, y AL FINAL
+--      ESPERADO: ent_alisto_lote_efectivo -> posicion 11
+--                v_ent_indeterminado_pendiente -> posicion 11
+select table_name, column_name, ordinal_position
+  from information_schema.columns
+ where column_name = 'nota_indeterminado'
+   and table_name in ('ent_alisto_lote_efectivo','v_ent_indeterminado_pendiente')
+ order by 1;
+
+-- D10 · §D · que ve la socia AHORA en la cola          [ESPERADO: 6 filas]
+--       Las seis del 8-sep, cada una con su nota de migracion. Antes de §D esta
+--       consulta no se podia ni escribir.
+select alisto_lote_id, producto_id, cant_uds, motivo_indeterminado,
+       left(coalesce(nota_indeterminado,'(sin nota)'), 50) as nota
+  from v_ent_indeterminado_pendiente
+ order by alisto_lote_id;
+
+-- D11 · §D · los tres dependientes siguen vivos y contestando
+--       ESPERADO: 7e = 902 uds / 8 filas (igual que A5 y D6), y las otras dos
+--       sin error. Una vista que se rompe al recrear su base no avisa sola.
+select (select count(*) from ent_salido_del_congelador_desde_ancla) as filas_7e,
+       (select sum(uds) from ent_salido_del_congelador_desde_ancla) as uds_7e,
+       (select count(*) from v_ent_excepcion_pendiente)             as filas_excepcion,
+       (select count(*) from v_ent_indeterminado_pendiente)         as filas_cola;
+
 -- ════════════════════════════════════════════════════════════════════════
 -- ⚠️ NO SE PEGA · TRES COSAS QUE APARECIERON MIDIENDO, PARA DECIDIR APARTE
 --
@@ -387,9 +492,6 @@ select id, lote, motivo_indeterminado, nota_indeterminado
 --      and (motivo_indeterminado = 'otro' or nota_indeterminado is null)
 --    No se incluyo para no divergir del hermano sin que Andrea lo decida.
 --
--- 3. LA NOTA NO LLEGA A LA COLA DE LAS SOCIAS. `v_ent_indeterminado_pendiente` y
---    `ent_alisto_lote_efectivo` exponen motivo_indeterminado y NO la nota nueva.
---    O sea que se va a poder escribir "Otro — se mojo la caja" y la socia que
---    tiene que resolverlo va a ver "otro" pelado. Agregar la columna a las dos
---    vistas es el cierre natural de este cambio, pero toca vistas y va aparte.
+-- (El tercer punto que estaba aca —la nota que no llegaba a la cola de las
+--  socias— dejo de ser pendiente: se midio, resulto chico y entro como §D.)
 -- ════════════════════════════════════════════════════════════════════════
