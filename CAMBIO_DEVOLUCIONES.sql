@@ -1,23 +1,22 @@
 -- ════════════════════════════════════════════════════════════════════════
 -- CAMBIO_DEVOLUCIONES.sql · 16-sep-2026
--- ⚠️⚠️ APLICADO EL 16-sep-2026 POR ANDREA. §A + §B + §C, en la transaccion unica.
+-- ⚠️ NO APLICADO. Intento fallido el 16-sep-2026.
 --
--- 🔴 **APLICADO SIN VERIFICAR CON LAS NUEVE PRUEBAS.** D0 a D8 NO se corrieron.
---    Esperan al usuario de pruebas que se esta diseñando (PENDIENTES H3): son
---    nueve pegados a mano hoy, o cero en un par de dias. Decision de Andrea.
+-- 🔴 SE INTENTO PEGAR §A+§B+§C Y **NO ENTRO**. El editor contesto "Success. No
+--    rows returned" y sin embargo `pedido_id` y `causa` NO existen en
+--    ent_devolucion (V1 devolvio 0 filas). O sea que un "Success" del editor NO
+--    prueba que el DDL se haya aplicado — anotado aca porque es la trampa que
+--    hizo falso a este mismo header durante unos minutos.
 --
--- 🔴 **NO PUBLICAR NINGUNA PANTALLA DE DEVOLUCIONES HASTA QUE LAS NUEVE HAYAN
---    CORRIDO.** El esquema aplicado no rompe nada por si solo —hoy no hay
---    codigo que escriba en ninguna de estas tablas— pero eso deja de ser cierto
---    en el momento en que exista la pantalla. Es el incidente del 17-ago al
---    reves: alla se publico codigo sin el SQL; aca hay SQL sin verificar, y
---    publicar encima lo convertiria en el mismo problema.
+-- ⚠️ ESTE HEADER LLEGO A DECIR "APLICADO" Y ERA MENTIRA. Lo escribi sobre el
+--    anuncio de que se iba a pegar, sin esperar la verificacion. Es el error del
+--    15-sep con CAMBIO_AUTORIZACION.sql en la direccion contraria: alla el header
+--    decia NO SE CORRIO y estaba pegado; aca decia aplicado y no lo estaba.
+--    LA REGLA, entonces, en las dos direcciones: este header se toca DESPUES de
+--    V1/V3, nunca antes, y nunca sobre lo que alguien dijo que iba a hacer.
 --
--- QUE SI SE VERIFICO al aplicar: las tres P0 (la escalera anda, el candado del
--- lote rechaza "183 - 12/26", y el agujero de pedido/causa existia), mas la
--- verificacion V1/V3/V5/V6 de que las columnas y las tablas quedaron y de que
--- no se movio ni una fila.
---
+-- 🔴 NO PUBLICAR NINGUNA PANTALLA DE DEVOLUCIONES. Sigue valiendo, y ahora por
+--    partida doble: el esquema no esta, y las nueve pruebas tampoco corrieron.
 -- Tres cosas, y ninguna se puede pegar sola:
 --   §A  `ent_devolucion` gana `pedido_id` y `causa`.
 --   §B  la vista del EXCESO — la que marca cuando vuelve mas de lo que salio.
