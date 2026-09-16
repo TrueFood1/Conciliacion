@@ -1588,11 +1588,15 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <!-- El "+" de Entregas: lo que no es de todos los días. El Conteo por lote se
      hace unas pocas veces al año y no compite con lo diario, pero es el ANCLA de
-     todos los saldos: tiene que estar a UN toque más, no escondido en un menú. -->
+     todos los saldos: tiene que estar a UN toque más, no escondido en un menú.
+     Desde el 16-sep quedan DOS: Inventario y Conteo. «Pendientes» salió de acá y
+     pasó a pestaña fija —es la pregunta diaria de una socia, y una pregunta diaria
+     detrás de un menú es una que no se hace—. `entMasIr('pendientes')` se conserva
+     en el despachador aunque ya nadie lo llame: es la puerta que usa cualquier
+     atajo viejo, y sacarla no gana nada. -->
 <div id="entMas" class="hidden">
   <div class="fm-h">Entregas</div>
   <button onclick="entMasIr('lotes')">Inventario<span class="sub">Cuánto queda de cada lote, hoy</span></button>
-  <button onclick="entMasIr('pendientes')">Pendientes<span class="sub">Lo que hay que arreglar</span></button>
   <button onclick="entMasIr('conteo')">Conteo<span class="sub">La foto del congelador que ancla los saldos por lote</span></button>
 </div>
 
@@ -1795,6 +1799,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irADespachos()">Entregas</button>
     <button class="face on">Sin factura</button>
     <button class="face" onclick="irAEntBuscar()">Historial</button>
+    <button class="face face-pend" onclick="irAPendientes()">Pendientes</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <!-- El único título que queda del módulo. La pestaña dice "Sin factura" porque
@@ -1813,6 +1818,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face on">Entregas</button>
     <button class="face" onclick="irAReporte()">Sin factura</button>
     <button class="face" onclick="irAEntBuscar()">Historial</button>
+    <button class="face face-pend" onclick="irAPendientes()">Pendientes</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div id="despStatus" class="status hidden" style="margin-top:14px"></div>
@@ -1829,6 +1835,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irADespachos()">Entregas</button>
     <button class="face" onclick="irAReporte()">Sin factura</button>
     <button class="face" onclick="irAEntBuscar()">Historial</button>
+    <button class="face face-pend" onclick="irAPendientes()">Pendientes</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div id="elStatus" class="status hidden" style="margin-top:14px"></div>
@@ -1840,6 +1847,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irADespachos()">Entregas</button>
     <button class="face" onclick="irAReporte()">Sin factura</button>
     <button class="face" onclick="irAEntBuscar()">Historial</button>
+    <button class="face face-pend on">Pendientes</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div id="pdStatus" class="status hidden" style="margin-top:14px"></div>
@@ -1852,6 +1860,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irADespachos()">Entregas</button>
     <button class="face" onclick="irAReporte()">Sin factura</button>
     <button class="face on">Historial</button>
+    <button class="face face-pend" onclick="irAPendientes()">Pendientes</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div id="bsStatus" class="status hidden" style="margin-top:14px"></div>
@@ -1863,6 +1872,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irADespachos()">Entregas</button>
     <button class="face" onclick="irAReporte()">Sin factura</button>
     <button class="face" onclick="irAEntBuscar()">Historial</button>
+    <button class="face face-pend" onclick="irAPendientes()">Pendientes</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div id="clStatus" class="status hidden" style="margin-top:14px"></div>
@@ -2586,6 +2596,88 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .pd-clasif{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin:4px 0 10px;font-size:12px;color:var(--text-3)}
 .pd-clasif button{background:var(--field);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-2);font:inherit;font-size:12.5px;padding:8px 11px;cursor:pointer}
 .pd-clasif button:hover{color:var(--text);border-color:var(--ent-line)}
+/* ── «Por resolver» · las excepciones que quedaron abiertas (16-sep) ──────
+   NO es una pantalla de autorización. El pan ya salió o ya no salió: no hay nada
+   que decidir, y por eso el botón dice "Visto" y no "Autorizar". La fila EN la
+   tabla es el visto — no hay columna que interpretar.
+   UNA SOLA RAMA: solo las marcadas "no se entrega" (decisión de Andrea, 16-sep;
+   el porqué está entero en pdLeer). Una salida "sin lote" no es un pendiente, es
+   historia.
+   ── LA JERARQUÍA, que es lo que se rehízo el 16-sep ──────────────────────
+   El cliente es el ENCABEZADO DEL GRUPO y el producto un ÍTEM adentro. Antes
+   estaban a 13,5px/500 y 12,5px/500: un punto y medio de diferencia y nada más,
+   así que el cliente se leía como un producto más de la lista.
+   Se separan por TAMAÑO, PESO y AIRE, no por color — el color en este módulo ya
+   tiene significados tomados (ámbar "mirá esto", gris "no salió", rojo "no sirve")
+   y gastar uno en jerarquía se los come.
+     · cliente  15px / 600 / -.02em de tracking — el mismo tratamiento que
+                `.card-title` y `.m3title`, que son los otros encabezados de la app
+     · producto 13px / 500 — dos puntos menos y un escalón de peso
+   El renglón gris del pedido va en medio, y el borde superior de la primera fila
+   hace de subrayado del encabezado: no hace falta una regla de más. */
+.pd-exc-ped{border:1px solid var(--border);border-radius:10px;background:var(--sunken);
+  padding:11px 12px 2px;margin-bottom:9px}
+.pd-exc-cab{display:flex;align-items:baseline;justify-content:space-between;gap:9px;flex-wrap:wrap}
+.pd-exc-cli{font-size:15px;color:var(--text);font-weight:600;letter-spacing:-.02em;min-width:0}
+/* Los días que lleva esperando son EL dato de esta pantalla: no es cuántas son,
+   es hace cuánto que nadie las mira. Por eso van a la derecha y en tabular. */
+.pd-exc-dias{font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pd-exc-meta{font-size:11px;color:var(--text-3);margin-top:3px;padding-bottom:9px;
+  font-variant-numeric:tabular-nums}
+/* ── LA FILA · UNA fila, no un bloque ────────────────────────────────────
+   DOS renglones y siempre los mismos: arriba qué es, abajo por qué. Se tiene que
+   poder barrer con la vista.
+   ⚠️ ES UNA REJILLA Y NO UNA COLUMNA DE TEXTO CON BOTONES AL LADO, y la razón se
+   midió a 375px: con los botones ocupando su columna a lo alto de toda la fila, al
+   renglón del producto le quedaban 180px y necesitaba 220 —"Pan de Semillas · 6 u"
+   más la marca—, así que se partía y cada fila pasaba a TRES renglones. Acortar la
+   marca no alcanzaba: "no se entrega" apretada seguía pidiendo 212.
+   Con la rejilla, el renglón de arriba cruza las DOS columnas y dispone de los 283
+   completos; los botones se apoyan en el renglón de abajo, al lado del motivo, que
+   además es donde se está mirando cuando se decide tocarlos. */
+.pd-exc-lin{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;
+  align-items:center;padding:9px 0;border-top:1px solid var(--border)}
+.pd-exc-prod{grid-column:1/-1}
+.pd-exc-det{grid-column:1}
+.pd-exc-acc{grid-column:2}
+/* Sin motivo —no debería pasar, la base lo exige— la rejilla ya hace lo correcto
+   sola: el renglón 1 está ocupado entero por el producto, así que los botones caen
+   al 2 por colocación automática. No hace falta una regla, y la que había escrito
+   acá no hacía nada (verificado). */
+.pd-exc-prod{font-size:13px;color:var(--text-2);line-height:1.4}
+.pd-exc-prod b{color:var(--text);font-weight:500}
+/* ⚠️ DOS COSAS QUE NO SE PARTEN NUNCA, las dos medidas a 375px:
+   · la marca se partía en "NO SE / ENTREGA". Con `nowrap` baja ENTERA al renglón
+     de abajo si no entra, que es lo que una marca tiene que hacer. Va scopeado y
+     no sobre `.cl-badge-b`, que es del sistema de diseño compartido: acá hace
+     falta por el largo de ESTE texto.
+   · la CANTIDAD se partía del número: "Pan de Semillas · 6" y abajo "u". Eso es
+     exactamente lo que el módulo no puede hacer — la unidad de manejo es parte
+     del número ("6 paq" y "6 u" son cantidades distintas) y separarlas invita a
+     leer el número solo. Mismo criterio que `.cl-lote`, que tampoco se parte. */
+.pd-exc-prod .cl-badge-b{white-space:nowrap;letter-spacing:.02em;padding:1px 5px;margin-left:5px}
+.pd-exc-cant{white-space:nowrap}
+/* El motivo y la nota, en gris, debajo. El motivo pesa un escalón más que la nota
+   porque es el dato; la nota es el matiz. */
+.pd-exc-det{font-size:11.5px;color:var(--text-3);line-height:1.45;margin-top:2px;
+  word-break:break-word}
+.pd-exc-det b{color:var(--text-2);font-weight:500}
+.pd-exc-nota{font-style:italic}
+/* ⚠️ MEDIDO: las notas de migración del 8-sep traen ~190 caracteres. Sin recorte
+   una sola fila se comía la pantalla y tapaba a las otras. DOS renglones, y se
+   despliega al tocar: recortar no es esconder si se puede abrir. */
+.pd-exc-det.cortada{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;cursor:pointer}
+/* La acción: el enlace primero y el botón después, contra el borde. "Nota" es un
+   enlace y no un botón porque la nota es OPCIONAL — dos botones harían parecer
+   que hay dos caminos, y hay uno. */
+.pd-exc-acc{flex:none;display:flex;align-items:center;gap:10px}
+.pd-exc-mas{background:none;border:none;color:var(--text-3);font:inherit;font-size:11.5px;
+  padding:0;cursor:pointer;text-decoration:underline;white-space:nowrap}
+.pd-exc-mas:hover{color:var(--text-2)}
+.pd-exc-mas.on{color:var(--text-2)}
+.pd-exc-nn{width:100%;box-sizing:border-box;background:var(--field);border:1px solid var(--border-strong);
+  border-radius:8px;color:var(--text);font:inherit;font-size:16px;padding:8px 10px;margin:0 0 9px;resize:vertical}
 @media(max-width:700px){
   .rp-prods{grid-template-columns:repeat(2,1fr)}
   .rp-prod{padding:16px 6px;font-size:14px}
@@ -2595,6 +2687,17 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* Barra del módulo Entregas. Las pestañas que todavía no existen se ven, en gris y
    sin respuesta al toque: dicen que el módulo tiene más, sin fingir que ya está. */
 .faces-ent .face.face-soon{opacity:.34;cursor:default;pointer-events:none}
+/* ── La pestaña «Pendientes», solo para socias (16-sep) ───────────────────
+   `display:none` y no `opacity`/`visibility`: para Daniel no tiene que quedar NI
+   EL HUECO donde iría — un espacio vacío en una barra de cuatro se lee como que
+   algo no cargó.
+   OCULTA POR DEFECTO, y se prende con la clase en el <body> cuando
+   `accesoSocia()` contesta que sí. El orden importa: si el default fuera visible,
+   Daniel la vería durante el medio segundo que tarda la lectura, y un parpadeo de
+   algo que no le toca es peor que medio segundo de menos. Misma dirección que el
+   default de ACCESO_USUARIOS: de menos, nunca de más. */
+.face-pend{display:none}
+body.es-socia .face-pend{display:block}
 /* ── Conteo por lote ──
    Se cuenta DENTRO del congelador: frío, guantes, prisa. Todo el diseño responde a eso:
    productos colapsados (los seis en pantalla), uno abierto a la vez, filas a la mitad de
@@ -3807,7 +3910,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 15 sep 2026 · b59';
+const BUILD = 'v 16 sep 2026 · b60';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -4185,6 +4288,7 @@ async function authEntrar(){
     document.getElementById('vAuth').classList.add('hidden');   // conectado → recién ahora dejamos ver el lobby
     setSaludo();                                                // saluda a quien está autenticado (no un nombre fijo)
     await accesoCargar();                                       // qué módulos dibuja el lobby (cosmético)
+    accesoSocia();                                              // pinta la pestaña «Pendientes» cuando conteste
   }else if(msg){
     msg.style.color='#FF8A8A'; msg.textContent='No pude conectar a producción. Reintentá.';
     document.getElementById('btnSalir').classList.add('hidden');
@@ -4258,6 +4362,44 @@ function accesoPuede(mod){ return !_accesoMods || _accesoMods==='todo' || _acces
 function accesoModDeVista(v){
   for(const m in ACCESO_VISTAS){ if(ACCESO_VISTAS[m].indexOf(v)>=0) return m; }
   return null;   // vista sin módulo declarado → libre
+}
+// ── ¿ES SOCIA? · UNA sola definición, y sale de la BASE ──────────────────
+// La usan dos cosas que tienen que contestar igual: la pestaña «Pendientes» y la
+// tarjeta «Por resolver» que vive adentro. Si cada una preguntara por su lado,
+// el día que se separen alguien ve una pestaña que lo lleva a una pantalla vacía.
+//
+// ⚠️ NO USA `ACCESO_USUARIOS`, el mapa de acá arriba: ese es el hardcodeado que
+// lleva encima el cartel "ESTO ES COSMÉTICO, NO ES SEGURIDAD". Quien decide si un
+// «Visto» entra es `acceso_es_socia()`, que lee `acceso_usuario.perfil`. Se
+// pregunta donde manda, y así la pantalla y la base no pueden discrepar.
+//
+// SE RESUELVE UNA VEZ y se cachea, incluyendo la promesa: sin eso, dos llamadas
+// juntas al entrar disparaban dos lecturas.
+// ANTE LA DUDA, NO: si falla la lectura o no hay sesión, devuelve false. Es la
+// misma regla que el default de ACCESO_USUARIOS —"ver de menos, no de más"— y acá
+// además es gratis, porque el trigger igual rechazaría el insert.
+let _socia=null, _sociaProm=null;
+async function accesoSocia(){
+  if(_socia!==null) return _socia;
+  if(!_sociaProm) _sociaProm=(async function(){
+    try{
+      const c=sbClient(); if(!c) return false;
+      const {data:{user}}=await c.auth.getUser();
+      const yo=((user&&user.email)||'').trim().toLowerCase();
+      if(!yo) return false;
+      // `ilike` sin comodines = igualdad sin distinguir mayúsculas, la MISMA
+      // comparación que hacen la RLS y el trigger. Se filtra en el servidor y se
+      // vuelve a comparar acá porque un `_` en un correo sí es comodín para ilike.
+      const {data:acc}=await c.from('v_acceso_usuario').select('email,perfil').ilike('email',yo).limit(5);
+      return (acc||[]).some(function(a){
+        return String(a.email||'').trim().toLowerCase()===yo && a.perfil==='socias'; });
+    }catch(e){ return false; }
+  })();
+  _socia=await _sociaProm;
+  // Las seis barras de Entregas son HTML estático —`_modShow` solo prende y apaga
+  // vistas, no las vuelve a dibujar—, así que pintar UNA vez alcanza para las seis.
+  document.body.classList.toggle('es-socia', _socia);
+  return _socia;
 }
 async function accesoCargar(){
   let email='';
@@ -11346,6 +11488,10 @@ function _pdfRepintar(){
   // Repinta la vista que esté abierta, sin saber cuál es: cada render es idempotente.
   try{ if(_despAbierto!=null||_despEstado!==null) despRender(); }catch(e){}
   try{ if(_bs) bsFiltrar(); }catch(e){}
+  // Pendientes es el quinto lugar desde el 16-sep. Sin esta línea el control se
+  // queda en "PDF" mientras Odoo tarda sus ~40 s: el estado existe y no se ve, que
+  // es exactamente lo que este componente se propuso no hacer.
+  try{ if(_pd) pdRender(); }catch(e){}
 }
 // ── VER LA FACTURA, NO COMPARTIRLA A CIEGAS (26-ago) ────────────────────
 // Antes, en el teléfono, un toque disparaba `navigator.share()` DIRECTO: se abría
@@ -12800,8 +12946,28 @@ async function pdDecidir(facturaId, facturaNombre, decision){
   }
 }
 
+// ⚠️ LA BARRA SE DESLIZA SOLA HASTA LA PESTAÑA ACTIVA. Medido a 375px con las
+// cuatro pestañas: la barra pide 387px y tiene 343, y «Pendientes» —que es la
+// última— terminaba en 347: quedaba CORTADA por 4px, con su subrayado a medias.
+// Es exactamente el defecto que el CSS de `@media(max-width:700px)` ya tiene
+// documentado para la barra de Finanzas: "había que deslizar la barra para ver
+// dónde estabas parado". En iPad (720 de barra para 403 de pestañas) no se dispara,
+// y en teléfono corre una sola vez al entrar.
+// Se calcula desde la pestaña activa y no "hasta el final" para que siga sirviendo
+// el día que se agregue una quinta.
+function entBarraALaActiva(vistaId){
+  try{
+    const b=document.querySelector('#'+vistaId+' .faces-ent'); if(!b) return;
+    const on=b.querySelector('.face.on'); if(!on) return;
+    const falta=on.offsetLeft+on.offsetWidth-b.clientWidth;
+    if(falta>0) b.scrollLeft=falta+8;      // +8 de aire, para que no quede al ras
+  }catch(e){}
+}
 async function irAPendientes(){
   _modShow('vPendientes'); crumbSet('Entregas','Pendientes');
+  entBarraALaActiva('vPendientes');
+  entPdfPrecalentar();      // hay PDF en esta pantalla desde el 16-sep: el proxy
+                            // despierta mientras la socia lee la lista
   pdCargar(false);
   // "Facturas sin despacho pendiente" sale de Odoo, no de Supabase. Se dispara
   // SIN await: las tres listas de Supabase se dibujan al instante y esta aparece
@@ -12825,12 +12991,102 @@ async function pdCargar(force){
 }
 async function pdLeer(){
   const c=sbClient(); if(!c) throw new Error('sin sesión de Supabase');
+  // ⚠️ VA ANTES QUE TODO, Y NO ES ESTETICA. Estaba abajo, junto a l4, y ahi quedaba
+  // DESPUES del `return` temprano de "no hay pedidos": con la bandeja vacia la
+  // seccion entera desaparecia sin decir nada. Las excepciones no dependen de la
+  // lista de pedidos —salen de sus propias vistas— asi que no tienen por que
+  // colgar de que esa lista traiga algo. Medido con el cliente interceptado.
+  // ── «POR RESOLVER» · LAS EXCEPCIONES ABIERTAS (16-sep) ────────────────
+  // Sale de v_ent_excepcion_pendiente (la línea) y v_ent_excepcion_pendiente_pedido
+  // (el agrupado). Las DOS, y no una sola con un group by acá: el contador del
+  // lobby ya sale de la vista por pedido, y calcularlo otra vez en JS sería una
+  // segunda definición de "pendiente" — exactamente lo que la vista existe para
+  // evitar (está escrito en ENTREGAS_EXCEPCIONES_LINEA.sql §5).
+  //
+  // ⚠️ SOLO PARA SOCIAS, Y EL PERFIL SE LEE DE LA BASE. `_accesoMods==='todo'`
+  // parecía el atajo obvio y no sirve: es el mapa HARDCODEADO de este archivo, el
+  // que tiene encima el cartel "ESTO ES COSMÉTICO, NO ES SEGURIDAD". Quien decide
+  // si un insert entra es `acceso_es_socia()`, que lee `acceso_usuario.perfil`. Si
+  // la pantalla preguntara por el mapa y la base por la tabla, serían dos
+  // redacciones de la misma regla — y el día que se separen, alguien ve un botón
+  // que la base le va a rechazar. Se pregunta donde manda.
+  // `v_acceso_usuario` tiene grant a authenticated y su RLS ya deja que cada quien
+  // se vea a sí mismo, así que esta lectura no necesita ser socia para contestar.
+  let exc=null;
+  try{
+    // La MISMA pregunta que decide si se dibuja la pestaña, hecha con la misma
+    // función. Ver `accesoSocia()`.
+    const esSocia=await accesoSocia();
+    if(esSocia){
+      // ⚠️ SOLO LA RAMA `no_se_entrega`. Decision de Andrea, 16-sep-2026, y el
+      // porque importa mas que el filtro:
+      //   Una salida "sin lote" NO ES UN PENDIENTE, ES HISTORIA. Nadie va a saber
+      //   nunca de que lote salio —el producto se entrego y el sticker se cayo
+      //   hace dias— y el sistema YA hace lo correcto: descuenta del producto sin
+      //   imputar a ningun lote. La diferencia real aparece al volver a contar, y
+      //   ahi se ajusta el ancla. No hay nada que resolver antes de eso.
+      //   Lo que las metia en la lista era el criterio de la vista: "el lote dice
+      //   NO DETERMINADO" es cierto PARA SIEMPRE, asi que no salian nunca. Una
+      //   lista de la que nada sale deja de leerse, y se lleva puestas a las que
+      //   si tienen algo que hacer.
+      // EL FILTRO VA ACA Y NO EN LA VISTA, tambien decidido: las dos ramas siguen
+      // existiendo. `v_ent_excepcion_pendiente_pedido` expone `n_sin_lote` justo
+      // para que cada consumidor parta la lista a su gusto; filtrar en la vista lo
+      // dejaria en 0 para siempre y le sacaria el dato al contador del lobby que
+      // ese mismo archivo dice que va a alimentar.
+      // PENDIENTE ANOTADO, NO CONSTRUIDO: las "sin lote" deberian cerrarse solas
+      // cuando un ancla nueva las absorbe —el mismo argumento que cerro las 6 del
+      // 8-sep—. Requiere definir que significa "absorbida por un ancla", y eso es
+      // otra conversacion.
+      const [lin,ped]=await Promise.all([
+        c.from('v_ent_excepcion_pendiente')
+         .select('tipo,pedido_id,origen,cliente_nombre,factura_nombre,producto_id,cant_uds,motivo,nota,registrada_por,preparado_en,alisto_lote_id,alisto_linea_id')
+         .eq('tipo','no_se_entrega').limit(300),
+        // Se sigue leyendo la vista por pedido —de ahi sale `desde`, que es la
+        // antiguedad— pero el conteo que se dibuja es `n_no_entrega`, no `n`:
+        // `n` cuenta las dos ramas y diria 6 sobre una tarjeta con 4 filas.
+        c.from('v_ent_excepcion_pendiente_pedido')
+         .select('pedido_id,desde,n_no_entrega,cliente_nombre,factura_nombre')
+         .gt('n_no_entrega',0) ]);
+      if(lin.error) throw lin.error;
+      if(ped.error) throw ped.error;
+      // ── EL factura_id PARA EL PDF (16-sep) ────────────────────────────
+      // Ninguna de las dos vistas lo expone: traen `factura_nombre`, que sirve
+      // para leer y no para pedirle el PDF a Odoo. Se lee aparte y NO se toca la
+      // vista para agregarlo.
+      // ⚠️ SE COPIA EL MISMO `coalesce` QUE HACE LA VISTA, y el orden importa:
+      // allá es `coalesce(fv.factura_nombre, p.factura_nombre)` con el join atado
+      // a `fv.anulado = false`. O sea manda el VINCULO vigente y el pedido queda de
+      // respaldo. Si acá se invirtiera, una factura vinculada después de nacer el
+      // pedido abriría el PDF de la vieja mientras la pantalla muestra el nombre de
+      // la nueva — el nombre y el PDF serían de facturas distintas.
+      // Un pedido manual sin vincular no tiene ninguno de los dos: queda en null y
+      // `entPdfBtn` no dibuja nada, que es justo lo que se busca.
+      const pids=[...new Set((lin.data||[]).map(function(x){ return x.pedido_id; }))];
+      const facDe={};
+      if(pids.length){
+        const [pp,vv]=await Promise.all([
+          c.from('ent_pedido').select('id,factura_id').in('id',pids),
+          c.from('ent_pedido_factura_vigente').select('pedido_id,factura_id,anulado')
+           .in('pedido_id',pids).eq('anulado',false) ]);
+        (pp.data||[]).forEach(function(x){ if(x.factura_id) facDe[x.id]=x.factura_id; });
+        (vv.data||[]).forEach(function(x){ if(x.factura_id) facDe[x.pedido_id]=x.factura_id; });
+      }
+      exc={peds:(ped.data||[]), lins:(lin.data||[]), facDe:facDe};
+    }else{
+      exc={peds:[], lins:[], noSocia:true};
+    }
+  }catch(e){
+    // Las vistas pueden no estar pegadas todavía. Que falte una sección nueva no
+    // puede tumbar las cinco que ya funcionan — mismo criterio que l4.
+    exc={peds:[], lins:[], err:(e&&e.message)||String(e)};
+  }
   const {data:peds,error:e1}=await c.from('ent_pedido')
     .select('id,fecha_despacho,cliente_id,cliente_nombre,motivo,origen,destinatario,creado_en')
     .order('creado_en',{ascending:false}).limit(300);
   if(e1) throw e1;
   const ids=(peds||[]).map(function(p){return p.id;});
-  if(!ids.length) return {l1:[],l2:[],l3:[]};
+  if(!ids.length) return {l1:[],l2:[],l3:[],l4:[],exc:exc};
   const q=function(t,sel){ return c.from(t).select(sel).in('pedido_id',ids); };
   const [mot,fac,val,als]=await Promise.all([
     q('ent_pedido_motivo_vigente','pedido_id,motivo,clasificado_en'),
@@ -12891,7 +13147,7 @@ async function pdLeer(){
               factura:x.factura_nombre||'', detalle:x.detalle||''};
     });
   }catch(e){ l4=[]; }    // la vista puede no existir todavía: no rompe Pendientes
-  return {l1:l1,l2:l2,l3:l3,l4:l4};
+  return {l1:l1,l2:l2,l3:l3,l4:l4,exc:exc};
 }
 // ── CÓMO SE NOMBRA UNA FILA QUE NO TIENE CLIENTE ────────────────────────
 // Una salida sin factura NO tiene cliente: tiene MOTIVO y, a veces, destinatario.
@@ -12988,6 +13244,13 @@ function pdRender(){
     h+='</div>';
   }
 
+  // ── «POR RESOLVER» · VA ACA, Y EL LUGAR ES PARTE DE LA DECISION ──────
+  // Despues de lo que tiene a alguien esperando afuera (las facturas sin
+  // despachar) y antes de lo administrativo (clasificar, marcar, revisar).
+  // Una excepcion abierta no tiene a nadie esperando —el pan ya salio o ya no
+  // salio— pero una "sin lote" SI deja el saldo de ese producto incompleto,
+  // que es el criterio 1 del orden de esta pantalla.
+  h+=pdExcHTML();
   h+=secc('Salida sin clasificar',
     'Daniel registró la salida; falta que las socias digan qué fue. El pendiente es un estado con nombre, no un hueco.',
     _pd.l3, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdClasifUI('+it.id+')">Clasificar</button>'; });
@@ -13106,6 +13369,194 @@ function pdRender(){
   if(!h) h='<div class="card rp-z"><div class="cl-none">Nada pendiente.</div></div>';
   body.innerHTML=h;
 }
+// ════════════════════════════════════════════════════════════════════════
+// «POR RESOLVER» · LAS EXCEPCIONES ABIERTAS · SOLO SOCIAS (16-sep-2026)
+// ════════════════════════════════════════════════════════════════════════
+// NO ES UNA PANTALLA DE AUTORIZACIÓN, y el botón lo dice: "Visto". El pan ya
+// salió o ya no salió — es un hecho físico cerrado y no hay nada que decidir.
+// Lo único que agrega una socia al mirarlo es que ALGUIEN LO MIRÓ, y eso es
+// exactamente lo que la fila en ent_alisto_linea_autorizacion significa: la fila
+// ES el visto, no hay columna que interpretar. (El modelo anterior tenía
+// 'autorizada'/'rechazada'; se quitó el 15-sep porque "rechazada" no se usó
+// nunca y una socia no puede negar un hecho consumado.)
+//
+// ⚠️ LA LISTA DE MOTIVOS DE ABAJO ES PARA LEER, NO PARA OFRECER. Son CINCO, y
+// ENT_INDET_MOTIVOS —la que se ofrece al escribir— tiene TRES. No es un descuido:
+// la pantalla dejó de ofrecer 'caja_sin_sticker' y 'chofer_no_reporto' el 15-sep,
+// pero la base los sigue aceptando y 'chofer_no_reporto' ESTÁ EN USO (la
+// corrección #1 del 8-sep, sobre el alisto_lote 184, la entrega de Automercado).
+// Si esta lista tuviera tres, esa fila saldría con el código crudo en pantalla.
+// Sacar de la vista ≠ sacar de la base: es lo que rompe un historial.
+const PD_EXC_MOT={
+  no_se_anoto:      'No se anotó al momento',
+  sticker_caido:    'Se cayó el sticker',
+  caja_sin_sticker: 'La caja no traía sticker',
+  chofer_no_reporto:'El chofer no lo reportó',
+  otro:             'Otro'
+};
+function _pdExcMot(tipo,v){
+  if(!v) return '—';
+  return (tipo==='no_se_entrega') ? _despMotivoTxt(v) : (PD_EXC_MOT[v] || v);
+}
+// Hace cuánto espera. Se mide desde `preparado_en` —cuándo se alistó—, que es lo
+// que la vista por pedido devuelve como `desde`. No desde la fecha del pedido:
+// la excepción nace al alistar, no al pedir.
+function _pdExcDias(iso){
+  const t=Date.parse(iso||''); if(isNaN(t)) return null;
+  return Math.floor((Date.now()-t)/86400000);
+}
+let _pdExcNota={};      // alisto_linea_id → texto tipeado, mientras no se guarde
+let _pdExcAbierta=0;    // alisto_linea_id con el campo de nota desplegado, o 0
+let _pdExcGuardando=0;  // alisto_linea_id que se está guardando ahora mismo
+
+function pdExcHTML(){
+  const E=(_pd&&_pd.exc)||null;
+  if(!E) return '';
+  // Quien no es socia no ve NADA: ni la tarjeta, ni un "no tenés permiso". Una
+  // tarjeta vacía que explica por qué está vacía es superficie que no le sirve a
+  // nadie — la misma regla 1 del lobby que usan las otras cinco secciones.
+  if(E.noSocia) return '';
+  // Si la lectura falló SÍ se dice. Callarlo dejaría a la socia con la pantalla
+  // completa y sin una de las listas, creyendo que no hay nada pendiente: es la
+  // misma razón por la que "Facturas sin despacho" no dice "nada pendiente"
+  // cuando Odoo falla.
+  if(E.err) return '<div class="card rp-z"><div class="card-title">Por resolver</div>'
+    +'<div class="cl-none dp-mal">No pude leer las excepciones: '+esc(E.err)
+    +' — si dice que no existe la vista, falta pegar <strong>ENTREGAS_EXCEPCIONES_LINEA.sql</strong>.</div></div>';
+  // Vacío no se dibuja (regla 1 del lobby). La decisión la toman las LÍNEAS, más
+  // abajo: `E.peds` puede traer filas cuyas líneas no vinieron.
+
+  // ⚠️ LA LISTA SE ARMA DESDE LAS LÍNEAS, NO DESDE `E.peds`, y esto se midió:
+  // recorriendo `E.peds` salían TARJETAS VACÍAS —"#44 · 0 líneas"— para los pedidos
+  // cuyas líneas quedaron afuera del filtro. Hoy el `.gt('n_no_entrega',0)` de la
+  // consulta las evita, pero apoyarse en eso es apoyarse en que dos consultas
+  // separadas siempre concuerden: el `limit(300)` de las líneas, un filtro que
+  // alguien cambie, o una fila que entre entre una lectura y la otra rompen el
+  // acuerdo. Se dibuja lo que hay para dibujar, y la vista por pedido aporta el
+  // dato que las líneas no traen bien —`desde`, la antigüedad— con la línea como
+  // respaldo si esa fila no vino.
+  const porPed={}, orden=[];
+  E.lins.forEach(function(l){
+    if(l.tipo!=='no_se_entrega') return;
+    if(!porPed[l.pedido_id]){ porPed[l.pedido_id]=[]; orden.push(l.pedido_id); }
+    porPed[l.pedido_id].push(l);
+  });
+  if(!orden.length) return '';
+  const pedDe={}; (E.peds||[]).forEach(function(x){ pedDe[x.pedido_id]=x; });
+  // El orden es por ANTIGÜEDAD: lo que lleva más tiempo esperando va arriba, que es
+  // la pregunta que trae a una socia a esta lista ("¿qué quedó colgando?"), no el
+  // número de pedido.
+  const facDe=E.facDe||{};
+  const peds=orden.map(function(id){
+    const r=pedDe[id]||{}, l0=porPed[id][0];
+    return {pedido_id:id,
+            desde: r.desde || l0.preparado_en,
+            n_no_entrega: porPed[id].length,
+            cliente_nombre: r.cliente_nombre || l0.cliente_nombre,
+            factura_nombre: r.factura_nombre || l0.factura_nombre,
+            factura_id: facDe[id]||null};
+  }).sort(function(a,z){ return Date.parse(a.desde||0)-Date.parse(z.desde||0); });
+  // El contador cuenta LO QUE SE DIBUJA, por la misma razón.
+  const total=orden.reduce(function(a,id){ return a+porPed[id].length; },0);
+
+  // Sin párrafo explicativo (decisión de Andrea, 16-sep): la tarjeta se explica
+  // sola. El título dice qué es, la marca de cada fila dice qué pasó y el botón
+  // dice qué hacer. Un párrafo que repite eso es el que nadie lee.
+  let h='<div class="card rp-z"><div class="card-title">Por resolver'
+    +' <span class="pd-cnt on">'+total+'</span></div>';
+
+  peds.forEach(function(p){
+    const ls=porPed[p.pedido_id]||[];
+    const d=_pdExcDias(p.desde);
+    h+='<div class="pd-exc-ped"><div class="pd-exc-cab">'
+      +'<div class="pd-exc-cli">'+esc(p.cliente_nombre||'—')+'</div>'
+      +'<div class="pd-exc-dias">'+(d===null?'—':(d<=0?'hoy':(d===1?'1 día':d+' días')))+'</div></div>'
+      +'<div class="pd-exc-meta">#'+p.pedido_id
+      // EL PDF, al lado del consecutivo y no del número de pedido: el PDF es de la
+      // FACTURA, y en los otros cuatro lugares donde vive este control va pegado al
+      // consecutivo. Se REUSA `entPdfBtn` —el componente de b32— tal cual: trae sus
+      // propios estados ("PDF…", "PDF ✕" con el motivo en el title), abre la pestaña
+      // dentro del gesto para que Safari de iOS no la bloquee, y **devuelve cadena
+      // vacía cuando no hay factura_id**. O sea que el pedido manual no necesita un
+      // `if` acá: el control no existe, en vez de existir y fallar.
+      +(p.factura_nombre?(' · '+esc(p.factura_nombre)+entPdfBtn(p.factura_id,p.factura_nombre,p.cliente_nombre)):' · sin factura')
+      // `n_no_entrega` y NO `n`: `n` cuenta las dos ramas de la vista y diría "6
+      // líneas" sobre una tarjeta que dibuja 4. Se cuenta lo que se muestra.
+      +' · '+p.n_no_entrega+(p.n_no_entrega===1?' línea':' líneas')
+      +'</div>';
+
+    ls.forEach(function(l){
+      // GUARDA, no filtro: el `.eq('tipo','no_se_entrega')` de la consulta ya las
+      // dejó afuera. Esto existe para que el día que alguien saque ese `.eq` la
+      // pantalla no empiece a dibujar filas sin botón en silencio.
+      if(l.tipo!=='no_se_entrega') return;
+      const lid=l.alisto_linea_id;
+      // ⚠️ LA MARCA VA AL LADO DEL PRODUCTO, no arriba en su propio renglón, y
+      // usa `.cl-badge-b` —el chip neutro del sistema de diseño: 9,5px, versalitas,
+      // contorno gris— en vez de `.dp-nm-pill`. La píldora del alisto es un bloque
+      // sólido porque allá ES la noticia de la tarjeta; acá todas las filas son lo
+      // mismo, así que repetirla cuatro veces en bloque era una columna de barras
+      // grises compitiendo con los nombres. `cl-` está en los diez prefijos que el
+      // barrido del 15-sep declaró sistema de diseño compartido (pendiente 23):
+      // reusarlo es lo correcto, escribir un doceavo chip gris es lo que se
+      // desincroniza.
+      // SIN CORREO (decisión de Andrea, 16-sep): en esta lista siempre es Daniel o
+      // una socia. Quién firmó sigue entero en la tabla y se ve en el Historial.
+      h+='<div class="pd-exc-lin">'
+        +'<div class="pd-exc-prod"><b>'+esc(_lotNom(l.producto_id))+'</b> · '
+        +'<span class="pd-exc-cant">'+esc(_lotUds(l.cant_uds, l.producto_id))+'</span>'
+        +'<span class="cl-badge-b">no se entrega</span></div>'
+        +'<div class="pd-exc-det'+(l.nota?' cortada':'')+'"'
+        +(l.nota?' onclick="this.classList.toggle(\'cortada\')"':'')
+        +'><b>'+esc(_pdExcMot(l.tipo,l.motivo))+'</b>'
+        +(l.nota?(' · <span class="pd-exc-nota">'+esc(l.nota)+'</span>'):'')
+        +'</div>';
+
+      // TODAS las filas de esta tarjeta tienen botón, y eso no es casualidad: es
+      // la consecuencia de que solo entre la rama `no_se_entrega`.
+      // `ent_alisto_linea_autorizacion` cuelga de una LÍNEA del alisto
+      // (`alisto_linea_id not null references ent_alisto_linea`), así que solo esa
+      // rama tiene a qué colgarse. Mientras la lista y la acción salgan del mismo
+      // criterio, no puede volver a aparecer una fila que no se pueda tocar.
+      const ocupada=(_pdExcGuardando===lid);
+      // "Nota" NO desaparece al abrirse: es el mismo enlace que abre y cierra. Antes
+      // se escondía mientras el campo estaba abierto y no quedaba forma de cerrarlo
+      // sin guardar.
+      h+='<div class="pd-exc-acc">'
+        +'<button class="pd-exc-mas'+(_pdExcAbierta===lid?' on':'')
+        +'" onclick="pdExcNota('+lid+')">Nota</button>'
+        +'<button class="btn btn-sm pd-acc"'+(ocupada?' disabled':'')
+        +' onclick="pdVisto('+lid+')">'+(ocupada?'Guardando…':'Visto')+'</button>'
+        +'</div></div>';
+      if(_pdExcAbierta===lid){
+        // La nota es OPCIONAL —la base ya no la exige— así que el campo no bloquea
+        // el botón: se puede guardar con o sin ella. Por eso "Visto" sigue siendo
+        // el mismo botón de arriba y esto es solo un campo más.
+        h+='<textarea class="pd-exc-nn" rows="2" placeholder="Opcional — qué hay que decir de esta línea"'
+          +' oninput="_pdExcNota['+lid+']=this.value">'+esc(_pdExcNota[lid]||'')+'</textarea>';
+      }
+    });
+    h+='</div>';
+  });
+  return h+'</div>';
+}
+function pdExcNota(lid){ _pdExcAbierta=(_pdExcAbierta===lid)?0:lid; pdRender(); }
+// El insert. `creado_por` lo pone pdInsert con el email de la sesión, y NO es un
+// adorno: el trigger compara contra el email del JWT y rechaza si no coincide
+// ("la firma no se elige"). Por eso no hay ningún campo de firma en pantalla.
+async function pdVisto(lid){
+  _pdExcGuardando=lid; pdRender();
+  const nota=String(_pdExcNota[lid]||'').trim();
+  try{
+    const ok=await pdInsert('ent_alisto_linea_autorizacion',
+      {alisto_linea_id:lid, nota:nota||null}, 'registrar el visto');
+    // Solo si GUARDO se tira la nota. Si el insert falla —el trigger rechazando la
+    // firma, o la columna `decision` todavia viva en la base— lo tipeado se queda
+    // en pantalla: hacer que la socia lo vuelva a escribir es castigarla por un
+    // error que no es suyo.
+    if(ok){ delete _pdExcNota[lid]; if(_pdExcAbierta===lid) _pdExcAbierta=0; }
+  }finally{ _pdExcGuardando=0; pdRender(); }
+}
 async function pdValidar(id){
   if(!confirm('¿Ya validaste la entrega del despacho #'+id+' en Odoo?\n\nEsto solo lo marca en Truefie — no escribe nada en Odoo.')) return;
   await pdInsert('ent_pedido_valida',{pedido_id:id,anulado:false},'marcar la validación');
@@ -13151,7 +13602,10 @@ async function pdInsert(tabla,fila,texto){
     const {error}=await c.from(tabla).insert(fila);
     if(error) throw error;
     await pdCargar(true);
-  }catch(e){ alert('No se pudo '+texto+': '+((e&&e.message)||e)); }
+    return true;
+  // Devuelve si guardo o no. Los tres llamadores viejos lo ignoran; «Visto» lo usa
+  // para no borrar la nota que la socia acaba de tipear cuando el insert falla.
+  }catch(e){ alert('No se pudo '+texto+': '+((e&&e.message)||e)); return false; }
 }
 
 // ── TARJETA DEL LOBBY: la pregunta del día contestada de un vistazo ──────
