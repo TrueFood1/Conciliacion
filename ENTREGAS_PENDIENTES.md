@@ -578,9 +578,19 @@ por qué es indepurable — y desde el 27-ago no hay Excel contra el cual notarl
 
 ## 12 · ABIERTO · La pantalla de DEVOLUCIONES (Entrega 2)
 
-**Estado**: el primer caso real (Mentha, 28-ago) se resolvió **a mano con SQL**
-(`PEGADO_28AGO_DEVOLUCION_MENTHA.sql`, gitignored). Esto es la especificación
-para que el segundo no requiera SQL.
+**Estado**: **nunca se registró una devolución en el sistema.** `ent_devolucion`
+está vacía — 0 filas, 0 anuladas, medido el 16-sep-2026.
+
+⚠️ **Y eso es lo correcto, no un olvido.** Esta línea decía hasta hoy que el
+primer caso real (Mentha, 28-ago) *"se resolvió a mano con SQL"*. **Es falso**, y
+el error venía del §12 original. Lo que la bitácora del 27-ago decidió, textual,
+fue que Daniel recibiera la devolución (6 Blanco `208` + 6 Semillas `209`) y
+**contara después**, para que el ancla nueva ya la incluyera y
+`PEGADO_28AGO_DEVOLUCION_MENTHA.sql` **«NO se corre»** — el SQL era el plan B por
+si Lusof llegaba tarde. El pan volvió, el conteo físico lo absorbió, y el archivo
+nunca se pegó. **El saldo no está corto.**
+
+Esto es la especificación para el primer caso que se registre de verdad.
 
 > ⚠️ **REESCRITO EL 16-sep-2026.** La versión anterior de este §12 se escribió el
 > 27-ago, y entraba por el **despacho en el Historial**, con **motivo de texto
