@@ -1588,11 +1588,15 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 <!-- El "+" de Entregas: lo que no es de todos los días. El Conteo por lote se
      hace unas pocas veces al año y no compite con lo diario, pero es el ANCLA de
-     todos los saldos: tiene que estar a UN toque más, no escondido en un menú. -->
+     todos los saldos: tiene que estar a UN toque más, no escondido en un menú.
+     Desde el 16-sep quedan DOS: Inventario y Conteo. «Pendientes» salió de acá y
+     pasó a pestaña fija —es la pregunta diaria de una socia, y una pregunta diaria
+     detrás de un menú es una que no se hace—. `entMasIr('pendientes')` se conserva
+     en el despachador aunque ya nadie lo llame: es la puerta que usa cualquier
+     atajo viejo, y sacarla no gana nada. -->
 <div id="entMas" class="hidden">
   <div class="fm-h">Entregas</div>
   <button onclick="entMasIr('lotes')">Inventario<span class="sub">Cuánto queda de cada lote, hoy</span></button>
-  <button onclick="entMasIr('pendientes')">Pendientes<span class="sub">Lo que hay que arreglar</span></button>
   <button onclick="entMasIr('conteo')">Conteo<span class="sub">La foto del congelador que ancla los saldos por lote</span></button>
 </div>
 
@@ -1795,6 +1799,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irADespachos()">Entregas</button>
     <button class="face on">Sin factura</button>
     <button class="face" onclick="irAEntBuscar()">Historial</button>
+    <button class="face face-pend" onclick="irAPendientes()">Pendientes</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <!-- El único título que queda del módulo. La pestaña dice "Sin factura" porque
@@ -1813,6 +1818,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face on">Entregas</button>
     <button class="face" onclick="irAReporte()">Sin factura</button>
     <button class="face" onclick="irAEntBuscar()">Historial</button>
+    <button class="face face-pend" onclick="irAPendientes()">Pendientes</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div id="despStatus" class="status hidden" style="margin-top:14px"></div>
@@ -1829,6 +1835,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irADespachos()">Entregas</button>
     <button class="face" onclick="irAReporte()">Sin factura</button>
     <button class="face" onclick="irAEntBuscar()">Historial</button>
+    <button class="face face-pend" onclick="irAPendientes()">Pendientes</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div id="elStatus" class="status hidden" style="margin-top:14px"></div>
@@ -1840,6 +1847,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irADespachos()">Entregas</button>
     <button class="face" onclick="irAReporte()">Sin factura</button>
     <button class="face" onclick="irAEntBuscar()">Historial</button>
+    <button class="face face-pend on">Pendientes</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div id="pdStatus" class="status hidden" style="margin-top:14px"></div>
@@ -1852,6 +1860,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irADespachos()">Entregas</button>
     <button class="face" onclick="irAReporte()">Sin factura</button>
     <button class="face on">Historial</button>
+    <button class="face face-pend" onclick="irAPendientes()">Pendientes</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div id="bsStatus" class="status hidden" style="margin-top:14px"></div>
@@ -1863,6 +1872,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <button class="face" onclick="irADespachos()">Entregas</button>
     <button class="face" onclick="irAReporte()">Sin factura</button>
     <button class="face" onclick="irAEntBuscar()">Historial</button>
+    <button class="face face-pend" onclick="irAPendientes()">Pendientes</button>
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div id="clStatus" class="status hidden" style="margin-top:14px"></div>
@@ -2677,6 +2687,17 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* Barra del módulo Entregas. Las pestañas que todavía no existen se ven, en gris y
    sin respuesta al toque: dicen que el módulo tiene más, sin fingir que ya está. */
 .faces-ent .face.face-soon{opacity:.34;cursor:default;pointer-events:none}
+/* ── La pestaña «Pendientes», solo para socias (16-sep) ───────────────────
+   `display:none` y no `opacity`/`visibility`: para Daniel no tiene que quedar NI
+   EL HUECO donde iría — un espacio vacío en una barra de cuatro se lee como que
+   algo no cargó.
+   OCULTA POR DEFECTO, y se prende con la clase en el <body> cuando
+   `accesoSocia()` contesta que sí. El orden importa: si el default fuera visible,
+   Daniel la vería durante el medio segundo que tarda la lectura, y un parpadeo de
+   algo que no le toca es peor que medio segundo de menos. Misma dirección que el
+   default de ACCESO_USUARIOS: de menos, nunca de más. */
+.face-pend{display:none}
+body.es-socia .face-pend{display:block}
 /* ── Conteo por lote ──
    Se cuenta DENTRO del congelador: frío, guantes, prisa. Todo el diseño responde a eso:
    productos colapsados (los seis en pantalla), uno abierto a la vez, filas a la mitad de
@@ -4267,6 +4288,7 @@ async function authEntrar(){
     document.getElementById('vAuth').classList.add('hidden');   // conectado → recién ahora dejamos ver el lobby
     setSaludo();                                                // saluda a quien está autenticado (no un nombre fijo)
     await accesoCargar();                                       // qué módulos dibuja el lobby (cosmético)
+    accesoSocia();                                              // pinta la pestaña «Pendientes» cuando conteste
   }else if(msg){
     msg.style.color='#FF8A8A'; msg.textContent='No pude conectar a producción. Reintentá.';
     document.getElementById('btnSalir').classList.add('hidden');
@@ -4340,6 +4362,44 @@ function accesoPuede(mod){ return !_accesoMods || _accesoMods==='todo' || _acces
 function accesoModDeVista(v){
   for(const m in ACCESO_VISTAS){ if(ACCESO_VISTAS[m].indexOf(v)>=0) return m; }
   return null;   // vista sin módulo declarado → libre
+}
+// ── ¿ES SOCIA? · UNA sola definición, y sale de la BASE ──────────────────
+// La usan dos cosas que tienen que contestar igual: la pestaña «Pendientes» y la
+// tarjeta «Por resolver» que vive adentro. Si cada una preguntara por su lado,
+// el día que se separen alguien ve una pestaña que lo lleva a una pantalla vacía.
+//
+// ⚠️ NO USA `ACCESO_USUARIOS`, el mapa de acá arriba: ese es el hardcodeado que
+// lleva encima el cartel "ESTO ES COSMÉTICO, NO ES SEGURIDAD". Quien decide si un
+// «Visto» entra es `acceso_es_socia()`, que lee `acceso_usuario.perfil`. Se
+// pregunta donde manda, y así la pantalla y la base no pueden discrepar.
+//
+// SE RESUELVE UNA VEZ y se cachea, incluyendo la promesa: sin eso, dos llamadas
+// juntas al entrar disparaban dos lecturas.
+// ANTE LA DUDA, NO: si falla la lectura o no hay sesión, devuelve false. Es la
+// misma regla que el default de ACCESO_USUARIOS —"ver de menos, no de más"— y acá
+// además es gratis, porque el trigger igual rechazaría el insert.
+let _socia=null, _sociaProm=null;
+async function accesoSocia(){
+  if(_socia!==null) return _socia;
+  if(!_sociaProm) _sociaProm=(async function(){
+    try{
+      const c=sbClient(); if(!c) return false;
+      const {data:{user}}=await c.auth.getUser();
+      const yo=((user&&user.email)||'').trim().toLowerCase();
+      if(!yo) return false;
+      // `ilike` sin comodines = igualdad sin distinguir mayúsculas, la MISMA
+      // comparación que hacen la RLS y el trigger. Se filtra en el servidor y se
+      // vuelve a comparar acá porque un `_` en un correo sí es comodín para ilike.
+      const {data:acc}=await c.from('v_acceso_usuario').select('email,perfil').ilike('email',yo).limit(5);
+      return (acc||[]).some(function(a){
+        return String(a.email||'').trim().toLowerCase()===yo && a.perfil==='socias'; });
+    }catch(e){ return false; }
+  })();
+  _socia=await _sociaProm;
+  // Las seis barras de Entregas son HTML estático —`_modShow` solo prende y apaga
+  // vistas, no las vuelve a dibujar—, así que pintar UNA vez alcanza para las seis.
+  document.body.classList.toggle('es-socia', _socia);
+  return _socia;
 }
 async function accesoCargar(){
   let email='';
@@ -11428,6 +11488,10 @@ function _pdfRepintar(){
   // Repinta la vista que esté abierta, sin saber cuál es: cada render es idempotente.
   try{ if(_despAbierto!=null||_despEstado!==null) despRender(); }catch(e){}
   try{ if(_bs) bsFiltrar(); }catch(e){}
+  // Pendientes es el quinto lugar desde el 16-sep. Sin esta línea el control se
+  // queda en "PDF" mientras Odoo tarda sus ~40 s: el estado existe y no se ve, que
+  // es exactamente lo que este componente se propuso no hacer.
+  try{ if(_pd) pdRender(); }catch(e){}
 }
 // ── VER LA FACTURA, NO COMPARTIRLA A CIEGAS (26-ago) ────────────────────
 // Antes, en el teléfono, un toque disparaba `navigator.share()` DIRECTO: se abría
@@ -12882,8 +12946,28 @@ async function pdDecidir(facturaId, facturaNombre, decision){
   }
 }
 
+// ⚠️ LA BARRA SE DESLIZA SOLA HASTA LA PESTAÑA ACTIVA. Medido a 375px con las
+// cuatro pestañas: la barra pide 387px y tiene 343, y «Pendientes» —que es la
+// última— terminaba en 347: quedaba CORTADA por 4px, con su subrayado a medias.
+// Es exactamente el defecto que el CSS de `@media(max-width:700px)` ya tiene
+// documentado para la barra de Finanzas: "había que deslizar la barra para ver
+// dónde estabas parado". En iPad (720 de barra para 403 de pestañas) no se dispara,
+// y en teléfono corre una sola vez al entrar.
+// Se calcula desde la pestaña activa y no "hasta el final" para que siga sirviendo
+// el día que se agregue una quinta.
+function entBarraALaActiva(vistaId){
+  try{
+    const b=document.querySelector('#'+vistaId+' .faces-ent'); if(!b) return;
+    const on=b.querySelector('.face.on'); if(!on) return;
+    const falta=on.offsetLeft+on.offsetWidth-b.clientWidth;
+    if(falta>0) b.scrollLeft=falta+8;      // +8 de aire, para que no quede al ras
+  }catch(e){}
+}
 async function irAPendientes(){
   _modShow('vPendientes'); crumbSet('Entregas','Pendientes');
+  entBarraALaActiva('vPendientes');
+  entPdfPrecalentar();      // hay PDF en esta pantalla desde el 16-sep: el proxy
+                            // despierta mientras la socia lee la lista
   pdCargar(false);
   // "Facturas sin despacho pendiente" sale de Odoo, no de Supabase. Se dispara
   // SIN await: las tres listas de Supabase se dibujan al instante y esta aparece
@@ -12930,18 +13014,10 @@ async function pdLeer(){
   // se vea a sí mismo, así que esta lectura no necesita ser socia para contestar.
   let exc=null;
   try{
-    const {data:{user}}=await c.auth.getUser();
-    const yo=((user&&user.email)||'').trim().toLowerCase();
-    // `ilike` sin comodines = igualdad sin distinguir mayusculas, que es la MISMA
-    // comparacion que hacen la RLS y el trigger (`lower(email) = lower(...)`). Se
-    // filtra en el servidor y ademas se vuelve a comparar aca: un `_` en un correo
-    // SI es comodin para ilike, asi que el filtro acerca y la comparacion decide.
-    // Traer la tabla entera y buscarme adentro era peor: una socia ve todas las
-    // filas, y con un limite cualquiera mi propia fila puede quedar afuera.
-    const {data:acc}=await c.from('v_acceso_usuario').select('email,perfil').ilike('email',yo).limit(5);
-    const esSocia=(acc||[]).some(function(a){
-      return String(a.email||'').trim().toLowerCase()===yo && a.perfil==='socias'; });
-    if(esSocia && yo){
+    // La MISMA pregunta que decide si se dibuja la pestaña, hecha con la misma
+    // función. Ver `accesoSocia()`.
+    const esSocia=await accesoSocia();
+    if(esSocia){
       // ⚠️ SOLO LA RAMA `no_se_entrega`. Decision de Andrea, 16-sep-2026, y el
       // porque importa mas que el filtro:
       //   Una salida "sin lote" NO ES UN PENDIENTE, ES HISTORIA. Nadie va a saber
@@ -12974,14 +13050,36 @@ async function pdLeer(){
          .gt('n_no_entrega',0) ]);
       if(lin.error) throw lin.error;
       if(ped.error) throw ped.error;
-      exc={yo:yo, peds:(ped.data||[]), lins:(lin.data||[])};
+      // ── EL factura_id PARA EL PDF (16-sep) ────────────────────────────
+      // Ninguna de las dos vistas lo expone: traen `factura_nombre`, que sirve
+      // para leer y no para pedirle el PDF a Odoo. Se lee aparte y NO se toca la
+      // vista para agregarlo.
+      // ⚠️ SE COPIA EL MISMO `coalesce` QUE HACE LA VISTA, y el orden importa:
+      // allá es `coalesce(fv.factura_nombre, p.factura_nombre)` con el join atado
+      // a `fv.anulado = false`. O sea manda el VINCULO vigente y el pedido queda de
+      // respaldo. Si acá se invirtiera, una factura vinculada después de nacer el
+      // pedido abriría el PDF de la vieja mientras la pantalla muestra el nombre de
+      // la nueva — el nombre y el PDF serían de facturas distintas.
+      // Un pedido manual sin vincular no tiene ninguno de los dos: queda en null y
+      // `entPdfBtn` no dibuja nada, que es justo lo que se busca.
+      const pids=[...new Set((lin.data||[]).map(function(x){ return x.pedido_id; }))];
+      const facDe={};
+      if(pids.length){
+        const [pp,vv]=await Promise.all([
+          c.from('ent_pedido').select('id,factura_id').in('id',pids),
+          c.from('ent_pedido_factura_vigente').select('pedido_id,factura_id,anulado')
+           .in('pedido_id',pids).eq('anulado',false) ]);
+        (pp.data||[]).forEach(function(x){ if(x.factura_id) facDe[x.id]=x.factura_id; });
+        (vv.data||[]).forEach(function(x){ if(x.factura_id) facDe[x.pedido_id]=x.factura_id; });
+      }
+      exc={peds:(ped.data||[]), lins:(lin.data||[]), facDe:facDe};
     }else{
-      exc={yo:yo, peds:[], lins:[], noSocia:true};
+      exc={peds:[], lins:[], noSocia:true};
     }
   }catch(e){
     // Las vistas pueden no estar pegadas todavía. Que falte una sección nueva no
     // puede tumbar las cinco que ya funcionan — mismo criterio que l4.
-    exc={yo:'', peds:[], lins:[], err:(e&&e.message)||String(e)};
+    exc={peds:[], lins:[], err:(e&&e.message)||String(e)};
   }
   const {data:peds,error:e1}=await c.from('ent_pedido')
     .select('id,fecha_despacho,cliente_id,cliente_nombre,motivo,origen,destinatario,creado_en')
@@ -13348,13 +13446,15 @@ function pdExcHTML(){
   // El orden es por ANTIGÜEDAD: lo que lleva más tiempo esperando va arriba, que es
   // la pregunta que trae a una socia a esta lista ("¿qué quedó colgando?"), no el
   // número de pedido.
+  const facDe=E.facDe||{};
   const peds=orden.map(function(id){
     const r=pedDe[id]||{}, l0=porPed[id][0];
     return {pedido_id:id,
             desde: r.desde || l0.preparado_en,
             n_no_entrega: porPed[id].length,
             cliente_nombre: r.cliente_nombre || l0.cliente_nombre,
-            factura_nombre: r.factura_nombre || l0.factura_nombre};
+            factura_nombre: r.factura_nombre || l0.factura_nombre,
+            factura_id: facDe[id]||null};
   }).sort(function(a,z){ return Date.parse(a.desde||0)-Date.parse(z.desde||0); });
   // El contador cuenta LO QUE SE DIBUJA, por la misma razón.
   const total=orden.reduce(function(a,id){ return a+porPed[id].length; },0);
@@ -13372,7 +13472,14 @@ function pdExcHTML(){
       +'<div class="pd-exc-cli">'+esc(p.cliente_nombre||'—')+'</div>'
       +'<div class="pd-exc-dias">'+(d===null?'—':(d<=0?'hoy':(d===1?'1 día':d+' días')))+'</div></div>'
       +'<div class="pd-exc-meta">#'+p.pedido_id
-      +(p.factura_nombre?(' · '+esc(p.factura_nombre)):' · sin factura')
+      // EL PDF, al lado del consecutivo y no del número de pedido: el PDF es de la
+      // FACTURA, y en los otros cuatro lugares donde vive este control va pegado al
+      // consecutivo. Se REUSA `entPdfBtn` —el componente de b32— tal cual: trae sus
+      // propios estados ("PDF…", "PDF ✕" con el motivo en el title), abre la pestaña
+      // dentro del gesto para que Safari de iOS no la bloquee, y **devuelve cadena
+      // vacía cuando no hay factura_id**. O sea que el pedido manual no necesita un
+      // `if` acá: el control no existe, en vez de existir y fallar.
+      +(p.factura_nombre?(' · '+esc(p.factura_nombre)+entPdfBtn(p.factura_id,p.factura_nombre,p.cliente_nombre)):' · sin factura')
       // `n_no_entrega` y NO `n`: `n` cuenta las dos ramas de la vista y diría "6
       // líneas" sobre una tarjeta que dibuja 4. Se cuenta lo que se muestra.
       +' · '+p.n_no_entrega+(p.n_no_entrega===1?' línea':' líneas')
