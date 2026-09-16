@@ -1,22 +1,55 @@
 -- ════════════════════════════════════════════════════════════════════════
 -- CAMBIO_DEVOLUCIONES.sql · 16-sep-2026
--- ⚠️ NO APLICADO. Intento fallido el 16-sep-2026.
+-- ✅ APLICADO EL 16-sep-2026, Y VERIFICADO DESPUES (no antes — ver abajo).
+--    Evidencia: el select interno dio **2 · 1 · 3**; V1 → `pedido_id bigint NO`
+--    (el NOT NULL entro) y `causa text YES`; V3 → las 3 tablas + las 2 vistas +
+--    el indice; V5 → 0 filas, identico a 0e. Reconfirmado aparte con pg_lector.
 --
--- 🔴 SE INTENTO PEGAR §A+§B+§C Y **NO ENTRO**. El editor contesto "Success. No
---    rows returned" y sin embargo `pedido_id` y `causa` NO existen en
---    ent_devolucion (V1 devolvio 0 filas). O sea que un "Success" del editor NO
---    prueba que el DDL se haya aplicado — anotado aca porque es la trampa que
---    hizo falso a este mismo header durante unos minutos.
+-- 🔴 **APLICADO SIN CORRER LAS NUEVE PRUEBAS.** D0 a D8 NO se corrieron. Esperan
+--    al usuario de pruebas (PENDIENTES H3, en diseño): son nueve pegados a mano
+--    hoy, o cero en un par de dias. Decision de Andrea.
 --
--- ⚠️ ESTE HEADER LLEGO A DECIR "APLICADO" Y ERA MENTIRA. Lo escribi sobre el
---    anuncio de que se iba a pegar, sin esperar la verificacion. Es el error del
---    15-sep con CAMBIO_AUTORIZACION.sql en la direccion contraria: alla el header
---    decia NO SE CORRIO y estaba pegado; aca decia aplicado y no lo estaba.
---    LA REGLA, entonces, en las dos direcciones: este header se toca DESPUES de
---    V1/V3, nunca antes, y nunca sobre lo que alguien dijo que iba a hacer.
+-- 🔴 **NO PUBLICAR NINGUNA PANTALLA DE DEVOLUCIONES HASTA QUE LAS NUEVE CORRAN.**
+--    El esquema solo no rompe nada: hoy no hay una linea de codigo que escriba en
+--    estas tablas. Deja de ser cierto en el momento en que exista la pantalla. Es
+--    el incidente del 17-ago al reves — alla se publico codigo sin el SQL; aca hay
+--    SQL sin verificar, y publicar encima lo vuelve el mismo problema.
 --
--- 🔴 NO PUBLICAR NINGUNA PANTALLA DE DEVOLUCIONES. Sigue valiendo, y ahora por
---    partida doble: el esquema no esta, y las nueve pruebas tampoco corrieron.
+-- ⚠️ HALLAZGO AL VERIFICAR: **V4 DIO 12, NO 0.** Ver la nota en §C y en V4.
+--
+-- ════════════════════════════════════════════════════════════════════════
+-- LO QUE COSTO APLICARLO, que vale mas que el cambio
+-- ════════════════════════════════════════════════════════════════════════
+-- Tres pasos fallaron en cadena, y los tres por lo mismo: **nadie los verificaba.**
+--
+-- 1 · EL PRIMER PEGADO DIJO "Success. No rows returned" Y NO APLICO NADA.
+--     Medido despues con pg_lector: 0 columnas, 0 check, 0 vistas, 0 tablas, 0
+--     politicas — y, esto salio bien, 0 a medias, porque la transaccion era una
+--     sola. Causa probable: **seleccion parcial en el editor** (Supabase corre
+--     solo lo seleccionado, y el bloque arranca con ~40 lineas de comentario;
+--     un tramo de puro comentario devuelve exactamente ese mensaje).
+--     **El `select` interno de antes del commit lo hace imposible**: o se ve la
+--     fila 2·1·3, o no llego hasta ahi y se sabe en el momento.
+--
+-- 2 · SOBRE ESE "Success" SE ESCRIBIO QUE ESTABA APLICADO. Este header y la
+--     bitacora afirmaron durante unos minutos algo falso. Es el error del 15-sep
+--     con CAMBIO_AUTORIZACION.sql en la direccion contraria. La regla, en las dos:
+--     **el header y la bitacora se tocan DESPUES de la verificacion**, nunca sobre
+--     lo que alguien anuncio que iba a hacer.
+--
+-- 3 · AISLAR EL BLOQUE CON `sed -n '141,476p'` DIO EL PEDAZO EQUIVOCADO y se pego
+--     **P0-a** en vez de §A+§B+§C — salio el error del lote_check, y no se
+--     escribio nada solo porque P0-a termina en rollback. El numero salio de
+--     suponer que el `begin;` transaccional era el segundo: hay **14** begin, los
+--     tres primeros son las P0 y el transaccional es el **cuarto**. Y los numeros
+--     se habian corrido al agregar el select del punto 1.
+--     **Un bloque no se aisla por numero de linea.** Se extrae por contenido —el
+--     unico `commit;`, y el ultimo `begin;` antes de el— y se comprueba el archivo
+--     YA ESCRITO antes de ofrecerlo: un begin, un commit, cero rollback, que
+--     empiece y termine donde debe, y que no traiga marcas de las pruebas.
+--
+-- Las tres estan escritas como regla en CLAUDE.md, reglas madre.
+--
 -- Tres cosas, y ninguna se puede pegar sola:
 --   §A  `ent_devolucion` gana `pedido_id` y `causa`.
 --   §B  la vista del EXCESO — la que marca cuando vuelve mas de lo que salio.
@@ -406,7 +439,19 @@ create or replace view v_ent_odoo_pendiente
     from ent_odoo_pendiente p
    where not exists (select 1 from ent_odoo_hecho h where h.pendiente_id = p.id);
 
--- RLS Y GRANTS · select + insert y nada mas, en politica Y en grant.
+-- RLS Y GRANTS · select + insert y nada mas **EN POLITICA**.
+-- ⚠️ EN GRANT NO, Y ESTO SE MIDIO DESPUES DE APLICAR: `anon` y `authenticated`
+-- quedan con UPDATE y DELETE sobre las tres tablas (12 = 3 tablas x 2 privilegios
+-- x 2 roles). No lo pone este archivo: es el default de Supabase sobre `public`,
+-- y un `grant select, insert` AGREGA, no revoca. Este comentario decia "en
+-- politica Y en grant" y era FALSO.
+-- QUE PROTEGE IGUAL: la RLS esta activa y no hay politica de update ni de delete,
+-- asi que por PostgREST un update o un delete no toca ninguna fila. El append-only
+-- se sostiene por la RLS, no por el grant.
+-- ES LA MISMA DEUDA DEL §6 de ENTREGAS_EXCEPCIONES_LINEA.sql —"los grants abiertos
+-- (anon con los siete privilegios) quedan como deuda, por decision de Andrea"— y
+-- estas tres tablas se suman a esa lista. No se toca aca: revocar defaults es una
+-- sesion de permisos, no un anexo de este cambio.
 alter table ent_odoo_pendiente       enable row level security;
 alter table ent_odoo_pendiente_linea enable row level security;
 alter table ent_odoo_hecho           enable row level security;
@@ -661,7 +706,11 @@ select table_name, table_type from information_schema.tables
                       'ent_odoo_hecho','v_ent_odoo_pendiente')
  order by 1;
 
--- V4 · sin UPDATE ni DELETE en ninguna tabla nueva  [0 filas]
+-- V4 · ⚠️ DIO **12**, NO 0. La expectativa estaba MAL escrita, no el resultado:
+--      `anon` y `authenticated` traen UPDATE y DELETE por el default de Supabase
+--      sobre `public`, y `grant select, insert` agrega sin revocar. 12 = 3 tablas
+--      x 2 privilegios x 2 roles. Protege la RLS (no hay politica de update ni de
+--      delete), no el grant. Se suma a la deuda del §6. Ver la nota en §C.
 select table_name, privilege_type, grantee
   from information_schema.role_table_grants
  where table_name in ('ent_odoo_pendiente','ent_odoo_pendiente_linea','ent_odoo_hecho')
