@@ -8824,6 +8824,9 @@ let _despSinDesp=[], _despForzar={};
 let _despTab='preparar';
 let _despFac=null, _despUom=null, _despErr='', _despAbierto=null, _despLotes=null,
     _despSaldo=null, _despEdit={}, _despGuardando=false;
+// Corte del ancla vigente en ms. null = no se pudo leer (sin sesion o sin ancla):
+// sin el no se filtra nada, porque filtrar a ciegas esconderia producto real.
+let _despCorteMs=null;
 // El estado de los pedidos YA preparados. Sale de v_ent_pedido_estado, o sea
 // ENTERO de Supabase: se dibuja al instante, sin esperar los ~40 s del arranque
 // en frío del proxy de Odoo. Es a propósito — lo que hay que hacer AHORA MISMO
@@ -9256,7 +9259,15 @@ async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
 
 async function despCargarLotes(){
   try{ _despLotes = await entLotesActivos(3); }catch(e){ _despLotes={lotes:{}}; }
-  try{ _despSaldo = await rpCalcSaldos(_despLotes); }catch(e){ _despSaldo=null; }
+  // EL CORTE DEL ANCLA YA VENIA CALCULADO Y SE TIRABA. `rpCalcSaldos` es un
+  // envoltorio de `_rpCalcularPuntas` que se queda solo con `.saldo` y descarta
+  // `.corteMs`. Se llama al de adentro para quedarse con los dos: el corte hace
+  // falta para saber que lotes son POSTERIORES al ancla, que son los unicos que
+  // pueden existir fisicamente sin tener saldo todavia.
+  try{ const _p = await _rpCalcularPuntas(_despLotes);
+       _despSaldo   = _p ? _p.saldo   : null;
+       _despCorteMs = _p ? _p.corteMs : null;
+  }catch(e){ _despSaldo=null; _despCorteMs=null; }
   if(_despAbierto) despRender();
 }
 
@@ -10173,13 +10184,37 @@ function _despLineaOK(f,i){
 // que la revalidacion es automatica y el aviso aparece solo entonces.
 function _despLoteObsoleto(pid, lote){
   if(!lote || lote===ENT_LOTE_INDET) return null;
-  if(_despLotes===null) return null;                    // todavia cargando
-  const ls=entLotesSelector(_despLotes, _despSaldo, pid);
-  if(!ls.length) return null;                           // sin lista no hay veredicto
-  if(ls.some(function(L){ return L.lote===lote; })) return null;
-  // El mensaje sale de `_loteConocido`, que ya lo escribe bien y ya sabe decir
-  // "Con el dia 246 hay: 246 / 6-27". No se reescribe aca.
-  return {lote:lote, msg:(_loteConocido(pid, lote)||{}).msg||'Ese lote ya no existe.'};
+  // EL VEREDICTO SE MIDE CONTRA LO QUE EL SELECTOR OFRECE, no contra el universo
+  // entero. Desde que la lista muestra solo lo disponible, las dos cosas dejaron
+  // de ser lo mismo: un lote agotado sigue en el universo pero ya no se ofrece, y
+  // comparar contra el universo lo daba por bueno — el aviso no salia y el
+  // selector lo pegaba al final igual. Medido al construirlo: `215 / 2-27` pasaba
+  // sin marca.
+  //
+  // Y EL CANDADO DE LA INCERTIDUMBRE YA NO PUEDE SER "la lista esta vacia":
+  // con la regla nueva una lista vacia es un estado LEGITIMO (no queda nada de
+  // ese producto), y tratarla como "no se" apagaria el aviso justo cuando todo
+  // esta agotado. Se pregunta por el ESTADO de la carga, que es lo que de verdad
+  // distingue "no sabemos" de "sabemos que no hay".
+  if(_despEstadoLista()!=='ok') return null;
+  const disp=_despLotesDe(pid);
+  if(disp.some(function(L){ return L.lote===lote; })) return null;
+  // ── DOS CAUSAS, DOS MENSAJES (decision de Andrea, 15-sep) ────────────
+  // Desde que el selector ofrece solo lo disponible, un lote puede quedar fuera
+  // por DOS razones muy distintas, y decirle "no existe en Odoo" a un lote que
+  // existe y se acabo seria mentirle a quien lo lee:
+  //   · EXISTE pero se agoto   -> el saldo llego a cero
+  //   · NO EXISTE              -> nunca existio, o se corrigio (246 / 3-27)
+  // `_loteConocido` sigue intacta y se usa solo para el segundo caso: su texto
+  // ya sabe decir "Con el dia 246 hay: 246 / 6-27", y sigue sirviendo al lote
+  // tecleado a mano y al Reporte, que no cambiaron.
+  const universo=entLotesSelector(_despLotes, _despSaldo, pid);
+  if(universo.some(function(L){ return L.lote===lote; }))
+    return {lote:lote, agotado:true,
+            msg:'De ese lote ya no queda: el saldo esta en cero. '
+               +'Si todavia hay cajas en el congelador, escribilo a mano.'};
+  return {lote:lote, agotado:false,
+          msg:(_loteConocido(pid, lote)||{}).msg||'Ese lote ya no existe.'};
 }
 // Los obsoletos de UNA linea. Una marcada "no se entrega" no tiene lote que
 // revisar: se sale antes.
@@ -10189,7 +10224,10 @@ function _despObsoletosDe(f,i){
   const L=f.lineas[i], out=[];
   (e.lotes||[]).forEach(function(x,j){
     const o=_despLoteObsoleto(L.producto_id, x&&x.lote);
-    if(o) out.push({j:j, lote:o.lote, msg:o.msg});
+    // Se arrastra el objeto ENTERO. Reconstruirlo campo por campo perdia
+    // `agotado`, y la tarjeta decia "ya no existe" sobre un lote que existe y
+    // solo se acabo — justo la distincion que estos dos mensajes vienen a hacer.
+    if(o) out.push(Object.assign({j:j}, o));
   });
   return out;
 }
@@ -10201,7 +10239,46 @@ function _despLotesDe(pid){
   // más viejo con saldo real no se podía elegir (Pizza 120/10-26, el 8-sep).
   // Las dos reglas viven ahora en `entLotesSelector`, la MISMA que usa el camino
   // sin factura y la misma unión que dibuja Inventario.
-  return entLotesSelector(_despLotes, _despSaldo, pid);
+  // ── SOLO LO DISPONIBLE (15-sep-2026, decision de Andrea) ──────────────
+  // DISPONIBLE = saldo > 0 en el ancla vigente, MAS lo producido DESPUES del
+  // corte (que no puede tener saldo todavia pero existe en el congelador).
+  // SE ACABO LA VENTANA DE 3 MESES COMO CRITERIO DE QUE OFRECER.
+  //
+  // POR QUE. Medido el 15-sep: de los 60 lotes que se ofrecian en los seis
+  // productos, 32 tenian saldo cero o ni siquiera figuraban en el ancla. Pan
+  // Blanco ofrecia 20 y solo 8 estaban en el congelador: los otros 12 son
+  // produccion de junio a agosto ya consumida, que se seguia ofreciendo solo
+  // porque caia dentro de la ventana. Elegir uno de esos manda la salida contra
+  // un lote que no tiene de donde restar.
+  //
+  // ⚠️ SIN CORTE NO SE FILTRA. Si no se pudo leer el ancla (`_despCorteMs`
+  // null), se devuelve la lista entera: filtrar a ciegas esconderia producto que
+  // si esta. Mejor una lista larga que una lista que miente por omision.
+  //
+  // ⚠️ EL CONTEO NO PASA POR ACA, Y NO DEBE. Usa `entLotesUnion` directo, porque
+  // es lo que CREA la proxima ancla: tiene que ver todo lo que PODRIA estar en
+  // el congelador, incluido lo que el ancla anterior da por agotado. Si el ancla
+  // se equivoco, el conteo es el lugar donde eso se corrige. El Reporte tampoco
+  // pasa por aca. Por eso el cambio vive en `_despLotesDe` y no en
+  // `entLotesSelector`, que es compartida.
+  const todos=entLotesSelector(_despLotes, _despSaldo, pid);
+  if(_despCorteMs==null) return todos;
+  return todos.filter(function(d){
+    if(d.saldo!=null && d.saldo>0) return true;
+    return _despProducidoPostCorte(pid, d.lote);
+  });
+}
+// ¿Este lote se produjo DESPUES del corte del ancla? Se mira la hora cruda de
+// Odoo de sus ordenes (`prodUtc`), comparada en el mismo huso que el corte —
+// los dos son instantes UTC. Comparar crudo contra una hora CR es el error del
+// 19-ago, y aca volveria a dar el resultado invertido.
+function _despProducidoPostCorte(pid, lote){
+  if(_despCorteMs==null) return false;
+  const L=Object.values((_despLotes&&_despLotes.lotes)||{}).find(function(x){
+    return +x.producto===+pid && x.canon===lote; });
+  if(!L) return false;
+  return (L.ordenes||[]).some(function(o){
+    const t=_odooMs(o&&o.prodUtc); return !isNaN(t) && t>_despCorteMs; });
 }
 
 function despRenderPedido(body){
@@ -10248,7 +10325,7 @@ function despRenderPedido(body){
       // habia nada que elegir.
       h+='<div class="dp-nofact">no entregado '+_rzN(L.cant_uom)
         +(L.uom_nombre?(' '+esc(L.uom_nombre)):'')+'</div>'
-        +'<div class="dp-l-bot">'+_despSel(i,0,{lote:''},[],'')+'</div>'
+        +'<div class="dp-l-bot">'+_despSel(i,0,{lote:''},[],'',L.producto_id)+'</div>'
         +'<span class="dp-nm-pill">no se entrega</span>'
         +'<div class="dp-nm-info"><b>'+esc(_despMotivoTxt(mk.motivo))+'</b>'
         +(mk.nota?(' · <span class="dp-nm-nota">'+esc(mk.nota)+'</span>'):'')
@@ -10261,7 +10338,8 @@ function despRenderPedido(body){
       // `_loteConocido`, que ya dice "Con el dia 246 hay: 246 / 6-27".
       const _ob=_despObsoletosDe(f,i);
       if(_ob.length) h+='<div class="dp-obs">'
-        +'<span class="dp-obs-t">'+esc(_ob[0].lote)+' ya no existe</span>'
+        +'<span class="dp-obs-t">'+esc(_ob[0].lote)
+        +(_ob[0].agotado?' ya no queda':' ya no existe')+'</span>'
         +'<span class="dp-obs-m">'+esc(_ob[0].msg)+'</span></div>';
       // Un centinela elegido se anuncia: la tarjeta no puede parecer normal
       // cuando lo que va a salir no tiene lote conocido.
@@ -10270,7 +10348,7 @@ function despRenderPedido(body){
         +'<span class="dp-ind-mot">'+esc(_despIndetTxt(_ind.motivo))+'</span></div>';
       // EL CASO NORMAL ES UNA LÍNEA: un solo selector, sin campo de cantidad —
       // la cantidad es la de la factura y ya está arriba.
-      h+='<div class="dp-l-bot">'+_despSel(i,0,e.lotes[0],disp,'')+'</div>'
+      h+='<div class="dp-l-bot">'+_despSel(i,0,e.lotes[0],disp,'',L.producto_id)+'</div>'
         // "+ otro lote" QUEDA DONDE SIEMPRE ESTUVO, a la derecha y en lima. Daniel
         // ya lo tiene en la memoria muscular; moverlo para hacerle lugar a un boton
         // nuevo le cobra el cambio al gesto que ya funciona. El boton nuevo entra a
@@ -10283,10 +10361,11 @@ function despRenderPedido(body){
       const _obP=_despObsoletosDe(f,i);
       if(_obP.length) h+='<div class="dp-obs">'
         +'<span class="dp-obs-t">'+esc(_obP.map(function(x){return x.lote;}).join(' · '))
-        +(_obP.length===1?' ya no existe':' ya no existen')+'</span>'
+        +(_obP.length===1?(_obP[0].agotado?' ya no queda':' ya no existe')
+                         :' ya no estan disponibles')+'</span>'
         +'<span class="dp-obs-m">'+esc(_obP[0].msg)+'</span></div>';
       e.lotes.forEach(function(lt,j){
-        h+='<div class="dp-l-bot">'+_despSel(i,j,lt,disp,'p')
+        h+='<div class="dp-l-bot">'+_despSel(i,j,lt,disp,'p',L.producto_id)
           +'<input class="dp-lq" type="number" min="0" step="any" inputmode="decimal" '
           +'placeholder="0" value="'+(lt.cant==null?'':lt.cant)+'" '
           +'oninput="despSetLoteCant('+i+','+j+',this.value)">'
@@ -10345,9 +10424,28 @@ function _despPieHTML(f){
 // mismo borde, mismo fondo, misma altura. Sin monospace — la tipografía del
 // sistema no tiene excepciones. Y muestra SOLO el lote: el saldo en unidades
 // era ruido para elegir.
-function _despSel(i,j,lt,disp,cls){
+// ── EL ESTADO DE LA LISTA, QUE NO ES LO MISMO QUE "NO HAY LOTES" ────────
+// Desde que el selector ofrece solo lo disponible, una lista vacia dejo de ser
+// imposible — y por eso hay que distinguir POR QUE esta vacia. Un desplegable
+// mudo es peor que uno largo: no se sabe si no hay producto, si no cargo, o si
+// la pantalla esta rota, y las tres se arreglan distinto.
+//   'cargando' · todavia no volvio Odoo (Render duerme: hasta ~50 s)
+//   'fallo'    · volvio sin nada Y sin saldos: no sabemos nada
+//   'ok'       · sabemos, y si esta vacio es porque no queda
+function _despEstadoLista(){
+  if(_despLotes===null) return 'cargando';
+  const n=Object.keys((_despLotes&&_despLotes.lotes)||{}).length;
+  if(!n && !_despSaldo) return 'fallo';
+  return 'ok';
+}
+function _despSel(i,j,lt,disp,cls,pid){
+  const _est=_despEstadoLista();
   let h='<select class="dp-lsel '+cls+'" onchange="despSetLote('+i+','+j+',this.value)">'
-    +'<option value="">Elegir lote</option>';
+    +'<option value="">'+(
+        _est==='cargando' ? 'Cargando lotes…'
+      : _est==='fallo'    ? 'No se pudo cargar la lista — reintentando'
+      : (!disp.length     ? 'No queda saldo de ningún lote'
+                          : 'Elegir lote'))+'</option>';
   // LOS VIEJOS VAN AL FONDO, APARTE Y CON EL SALDO A LA VISTA. Un <option> no se
   // puede pintar de gris en iOS —el selector nativo es una rueda—, así que el
   // separador hace acá el trabajo que el gris hace en Inventario: se ven, se
@@ -10371,9 +10469,9 @@ function _despSel(i,j,lt,disp,cls){
   // mano se perderia en cada re-render. Pero si ADEMAS quedo obsoleto, se rotula:
   // el mismo <option> tiene que poder decir "esto ya no existe".
   if(lt.lote && !disp.some(function(d){return d.lote===lt.lote;})){
-    const _obs=(disp.length && lt.lote!==ENT_LOTE_INDET);
+    const _o=(disp.length && lt.lote!==ENT_LOTE_INDET) ? _despLoteObsoleto(pid, lt.lote) : null;
     h+='<option value="'+esc(lt.lote)+'" selected>'
-      +esc(lt.lote+(_obs?' — ya no existe':''))+'</option>';
+      +esc(lt.lote+(_o?(_o.agotado?' — ya no queda':' — ya no existe'):''))+'</option>';
   }
   // ── EL CENTINELA, EN EL SELECTOR ──────────────────────────────────────
   // SALIO PRODUCTO Y NO SE SABE DE QUE LOTE. Es lo contrario de "no se
@@ -10421,8 +10519,8 @@ function _despPendientes(f){
   // el pie es lo que Daniel lee antes de apretar y tiene que saber que esta
   // mandando un pedido con lineas que no salen.
   // Los obsoletos SI frenan: la eleccion apunta a un lote que no existe.
-  if(obsoletos) p.push(obsoletos===1 ? 'Un lote elegido ya no existe'
-                                     : obsoletos+' lotes elegidos ya no existen');
+  if(obsoletos) p.push(obsoletos===1 ? 'Un lote elegido ya no esta disponible'
+                                     : obsoletos+' lotes elegidos ya no estan disponibles');
   if(marcadas) p.push(marcadas+(marcadas===1?' no se entrega':' no se entregan'));
   return {txt:p.join(' · '), frena:!!(sinLote||mal||obsoletos)};
 }
