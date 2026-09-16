@@ -752,7 +752,7 @@ datos que ya están**, no salir a reconstruirlos.
 | Causa | texto libre obligatorio | lista cerrada + nota |
 | Tope | avisa por lote | **avisa** (se conserva), y queda marcado |
 | Fecha | editable, con el texto del 26-ago | **igual, se conserva** |
-| Ligada a factura | **no**, suelta a propósito | **sí**, por `pedido_id` |
+| Ligada a factura | **no**, suelta a propósito | **sí**, `pedido_id` NOT NULL |
 
 - **La entrada** cambió porque el flujo nuevo arranca por el cliente, no por "lo
   del 26-ago vuelve". La red que justificaba el camino viejo —lotes precargados,
@@ -766,8 +766,43 @@ datos que ya están**, no salir a reconstruirlos.
   `ENTREGAS_DEVOLUCIONES.sql` —*"Suelta: NO se liga a factura... esperar a saber
   contra qué factura fue es esperar a nunca"*—. Sigue siendo un buen argumento
   para una devolución que llega por teléfono; **deja de aplicar cuando el flujo
-  ARRANCA por la entrega**: nunca se está en el caso de no saberla. Si algún día
-  vuelve la entrada suelta, `pedido_id` tiene que poder ser NULL para ella.
+  ARRANCA por la entrega**: nunca se está en el caso de no saberla.
+
+### 🔴 La entrada suelta queda CERRADA, por decisión
+
+Decidido por Andrea el **16-sep-2026**. `ent_devolucion.pedido_id` es **NOT
+NULL**: no existe la devolución sin entrega. Queda escrito acá con el argumento
+completo para que **no se vuelva a discutir**.
+
+**Por qué ahora y no en cualquier momento.** Se midió con §0: la tabla tiene
+**cero filas**. Los costos no son simétricos:
+
+| | hoy (0 filas) | después, con filas |
+|---|---|---|
+| nullable → NOT NULL | gratis | scan completo, **y falla con una sola fila suelta** |
+| NOT NULL → nullable | — | `alter column drop not null`, instantáneo |
+
+Y hay un cierre que endurece la asimetría: **si alguna vez se escribiera una
+devolución suelta, el NOT NULL dejaría de estar disponible para siempre.** No se
+puede rellenar un `pedido_id` que no existe, y el módulo **no tiene grant de
+DELETE en ninguna tabla**. Quedaría convivir con la columna floja.
+
+**Por qué no se pierde nada.** El flujo arranca por cliente y entregas, así que
+**incluso una devolución avisada por teléfono va a tener su pedido** — solo que
+elegido después, cuando el producto llega. Que es además el momento correcto
+según el criterio del 26-ago: se registra cuando LLEGA, no cuando avisan.
+
+**Lo que se cierra de paso, y no es menor.** La rama `pedido_id is null or (...)`
+del CHECK era un **escape alcanzable desde la app**, no teórico: una fila sin
+pedido no pasaba por ninguna validación de causa, y la RLS de `ent_devolucion` es
+`with check (true)` para cualquier autenticado. Y en `v_ent_devolucion_exceso`, el
+filtro `where dv.pedido_id is not null` hacía que una devolución suelta fuera
+**invisible** para el control del exceso.
+
+⚠️ **Si algún día se quiere reabrir**, es una sola sentencia
+(`alter table ent_devolucion alter column pedido_id drop not null`) **más** volver
+a poner las dos cosas de arriba: la rama del CHECK y el filtro de la vista. Las
+tres van juntas o el escape vuelve sin que nadie lo decida.
 
 ---
 

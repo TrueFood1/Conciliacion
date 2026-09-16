@@ -16,6 +16,15 @@
 -- CAMBIO_AUTORIZACION.sql: decia "NO SE CORRIO" y estaba pegado hace un dia.
 -- Cuando se pegue esto, cambiar esta linea Y anotarlo en la bitacora.
 --
+-- ⚠️ ESTE ARCHIVO ES DE **UNA SOLA CORRIDA**. El `add column` de §A va sin
+-- `if not exists` a proposito: si se re-pega, Postgres grita y la transaccion se
+-- deshace entera, que es lo correcto. Antes de pegarlo, mirar 0c y 0d.
+--
+-- ⚠️ SE CIERRA LA ENTRADA SUELTA (decision de Andrea, 16-sep, con la tabla en 0
+-- filas). `pedido_id` es NOT NULL. El argumento entero esta en §A; en una linea:
+-- hoy es gratis y manana no, y el flujo nuevo hace que hasta una devolucion
+-- avisada por telefono tenga su pedido.
+--
 -- LO QUE **NO** CAMBIA, y es deliberado:
 --   · NO hay tope que bloquee. Devolver mas de lo que salio ENTRA y queda
 --     marcado. Decision de Andrea del 16-sep, revertida por ella misma el mismo
@@ -44,13 +53,12 @@ select count(*) as filas, min(fecha) as primera, max(fecha) as ultima,
          where x.entidad='devolucion' and x.entidad_id=d.id)) as anuladas
   from ent_devolucion d;
 
--- 0b · las filas VIEJAS, una por una. Son las que el CHECK de §A no puede
---      romper: nacieron sin pedido y sin causa, y eso era lo correcto entonces.
-select d.id, d.fecha, d.cliente_nombre, left(coalesce(d.nota,''),50) as nota,
-       d.creado_por, count(l.id) as lineas
-  from ent_devolucion d
-  left join ent_devolucion_linea l on l.devolucion_id = d.id
- group by 1,2,3,4,5 order by d.id;
+-- 0b · cabeceras y lineas, de un saque. Reemplaza a la version vieja (que
+--      listaba las filas una por una): medido el 16-sep, las dos dan CERO, y con
+--      la cabecera vacia no puede haber lineas — el FK de `devolucion_id` lo
+--      impide. ⚠️ Los dos ceros son lo que habilita el NOT NULL de §A.
+select (select count(*) from ent_devolucion)       as cabeceras,
+       (select count(*) from ent_devolucion_linea) as lineas;
 
 -- 0c · ⚠️ EL NUMERO QUE MANDA. Si NO da cero, alguna columna ya existe y este
 --      archivo fue pegado antes — PARAR, no volver a pegarlo a ciegas.
@@ -89,6 +97,11 @@ select p.pedido_id, p.cliente_nombre, p.factura_nombre, count(al.id) as lotes
 -- silencio o con el error de otro.
 --
 -- Todo dentro de begin/rollback: no se escribe nada.
+--
+-- ⚠️ LAS TRES SON DE **ANTES** Y SOLO DE ANTES. Insertan devoluciones sin
+-- `pedido_id`, que es legal hoy y deja de serlo en cuanto §A corra. Re-correrlas
+-- despues del commit da not-null y NO significa que algo se rompio: significa que
+-- §A hizo su trabajo. La que comprueba eso a proposito es D4.
 -- ════════════════════════════════════════════════════════════════════════
 
 -- P0-0 · CONTROL · ESPERADO: PASA (Success, y la fila del eco)
@@ -150,32 +163,54 @@ begin;
 -- despacho porque comparte el pedido. `v_ent_pedido_estado` ya expone las dos,
 -- con el mismo coalesce(fv, p) que usa el resto del modulo.
 --
--- ⚠️ ESTO REVIERTE UNA DECISION ESCRITA. `ENTREGAS_DEVOLUCIONES.sql` dice
--- "Suelta: NO se liga a factura... esperar a saber contra que factura fue es
--- esperar a nunca". Seguia siendo cierto para una devolucion que llega por
--- telefono; deja de aplicar cuando el flujo ARRANCA por la entrega. Por eso la
--- columna es NULLABLE: la entrada suelta sigue siendo posible el dia que se
--- construya, y las filas viejas (la de Mentha del 28-ago) siguen validas.
+-- ⚠️ NOT NULL, Y LA RAZON ES UNA VENTANA QUE SE CIERRA. Decidido por Andrea el
+-- 16-sep, DESPUES de medir: `ent_devolucion` tiene CERO filas. Los costos no son
+-- simetricos y por eso la decision es hoy o nunca:
+--   · nullable -> NOT NULL manana: scan completo, y FALLA si existe una sola fila
+--     suelta. Y esa fila no se podria arreglar: no se puede rellenar un pedido que
+--     no existe, y el modulo no tiene grant de DELETE en ninguna tabla. Quedaria
+--     convivir con la columna floja para siempre.
+--   · NOT NULL -> nullable manana: `alter column pedido_id drop not null`,
+--     instantaneo y siempre funciona.
+-- O sea que NOT NULL hoy no cierra ninguna puerta, y nullable hoy SI cierra la
+-- otra en cuanto se escriba una suelta.
+--
+-- ⚠️ Y LA RAMA `pedido_id is null or (...)` ERA UN ESCAPE REAL, no teorico. Una
+-- fila sin pedido no pasaba por NINGUNA validacion de causa, y la RLS de
+-- ent_devolucion es `with check (true)` para cualquier autenticado: ese camino se
+-- alcanza desde el cliente de la app, no solo desde el SQL Editor.
+--
+-- ⚠️ QUE SE PIERDE, dicho completo: la ENTRADA SUELTA que defendia
+-- `ENTREGAS_DEVOLUCIONES.sql` ("una devolucion llega por telefono o en el camion
+-- de vuelta, y esperar a saber contra que factura fue es esperar a nunca"). Se
+-- cierra POR DECISION, con este argumento: el flujo nuevo arranca por cliente y
+-- entregas, asi que incluso una devolucion avisada por telefono va a tener su
+-- pedido — solo que elegido despues, cuando el producto llega. Queda escrito en
+-- ENTREGAS_PENDIENTES §12 para que no se vuelva a discutir.
+--
+-- ⚠️ SIN `if not exists`, A PROPOSITO. Si la columna ya existiera, `if not
+-- exists` la saltaria EN SILENCIO y el archivo seguiria de largo: quedaria una
+-- columna nullable debajo de un archivo que dice NOT NULL, que es la peor de las
+-- divergencias porque nadie la ve. Sin el, Postgres grita "column already exists"
+-- y la transaccion entera se deshace. Este archivo es de UNA sola corrida, y 0c
+-- es lo que hay que mirar antes.
 alter table ent_devolucion
-  add column if not exists pedido_id bigint references ent_pedido(id),
-  add column if not exists causa     text;
+  add column pedido_id bigint not null references ent_pedido(id),
+  add column causa     text;
 
 create index if not exists ent_devolucion_pedido_idx on ent_devolucion (pedido_id);
 
--- EL CANDADO DE FORMA, colgado de `pedido_id` y no suelto.
---
--- ⚠️ POR QUE VA COLGADO. Un CHECK suelto sobre `causa` romperia las filas
--- viejas, que nacieron sin causa y eran correctas asi. Colgandolo de
--- `pedido_id is null` se dice exactamente lo que se quiere decir: **lo que entra
--- por la pantalla nueva tiene causa; lo viejo se queda como esta.** Es la misma
--- forma que `ent_conteo_linea_motivo_ok` (`lote <> 'NO DETERMINADO' or ...`) y
--- `ent_alisto_linea_no_entrega_ok`.
+-- EL CANDADO DE FORMA. Ya no cuelga de nada: con `pedido_id` NOT NULL, TODA fila
+-- de esta tabla entro por la pantalla nueva y toda fila tiene que decir por que.
+-- (Hasta el 16-sep esto estaba escrito `pedido_id is null or (...)`, para no
+-- romper filas viejas. No hay filas viejas: la tabla esta vacia.)
 --
 -- ⚠️ Y LOS `coalesce` NO SON ADORNO. En Postgres un CHECK se satisface con TRUE
 -- **o con NULL**. Sin el coalesce, `causa = null` haria NULL a toda la
 -- conjuncion y la fila entraria igual — que es EXACTAMENTE el hueco medido el
 -- 14-ago en `ent_alisto_linea_no_entrega_ok` y que quedo abierto. Aca se cierra
--- de entrada en vez de descubrirlo despues.
+-- de entrada en vez de descubrirlo despues. D3-bis existe para cazar a quien los
+-- saque.
 --
 -- El minimo de la nota es 6 y es EL MISMO numero que ENT_NM_NOTA_MIN y
 -- ENT_INDET_NOTA_MIN, a proposito: tres minimos distintos para el mismo tipo de
@@ -183,14 +218,16 @@ create index if not exists ent_devolucion_pedido_idx on ent_devolucion (pedido_i
 -- porque "consigna" (8) no pasaba.
 alter table ent_devolucion drop constraint if exists ent_devolucion_causa_ok;
 alter table ent_devolucion add constraint ent_devolucion_causa_ok check (
-  pedido_id is null or (
-        coalesce(causa in ('producto_equivocado','otro'), false)
-    and (causa <> 'otro' or coalesce(length(btrim(nota)) >= 6, false))
-  ));
+      coalesce(causa in ('producto_equivocado','otro'), false)
+  and (causa <> 'otro' or coalesce(length(btrim(nota)) >= 6, false))
+  );
 
 comment on column ent_devolucion.pedido_id is
-  'Contra QUE entrega vuelve. NULL = devolucion suelta (las viejas, y la entrada por '
-  'telefono el dia que se construya). Con pedido, `causa` es obligatoria.';
+  'Contra QUE entrega vuelve. NOT NULL desde el 16-sep-2026: no hay devolucion suelta. '
+  'El flujo arranca por cliente y entregas, asi que hasta una devolucion avisada por '
+  'telefono tiene su pedido, elegido cuando el producto llega. Se decidio con la tabla '
+  'en CERO filas porque despues deja de ser gratis: una sola fila suelta lo impediria '
+  'para siempre (no hay grant de DELETE ni forma de rellenar un pedido inexistente).';
 -- ⚠️ Y LA VISTA VIGENTE TIENE QUE EXPONERLAS, o §B no compila. `ent_devolucion_vigente`
 -- se escribio el 20-ago, antes de que estas columnas existieran, y lista sus campos uno
 -- por uno: sin este `create or replace` la vista del exceso falla con
@@ -240,10 +277,13 @@ create or replace view v_ent_devolucion_exceso
       join ent_alisto_lote    al on al.linea_id  = li.id
      group by 1,2,3
   ), volvio as (
+    -- SIN `where dv.pedido_id is not null`: con la columna NOT NULL esa condicion
+    -- es siempre verdadera. Y dejarla escrita seria peor que redundante — diria
+    -- que existe un caso sin pedido, que es justo lo que §A cerro. Mientras estuvo,
+    -- hacia que una devolucion suelta fuera INVISIBLE para esta vista.
     select dv.pedido_id, dl.producto_id, dl.lote, sum(dl.cant_uds) as uds_volvio
       from ent_devolucion_vigente dv
       join ent_devolucion_linea   dl on dl.devolucion_id = dv.devolucion_id
-     where dv.pedido_id is not null
      group by 1,2,3
   )
   select v.pedido_id, v.producto_id, v.lote,
@@ -457,13 +497,19 @@ begin;
   select 'D3-bis MAL: entro otro sin nota — se perdio el coalesce' as resultado;
 rollback;
 
--- D4 · CONTROL · ESPERADO: PASA. Las filas VIEJAS siguen siendo legales: sin
---      pedido no se exige causa. Si esta falla, el CHECK quedo demasiado ancho y
---      las devoluciones ya escritas estan en infraccion.
+-- D4 · ESPERADO: **ERROR** — `null value in column "pedido_id" violates not-null`.
+--      ⚠️ ESTA PRUEBA SE INVIRTIO EL 16-sep. Hasta esa fecha era un CONTROL que
+--      tenia que PASAR ("la devolucion suelta sigue entrando sin causa"), porque la
+--      columna era nullable. Con la opcion A ya no: la suelta NO entra, y eso es lo
+--      que hay que comprobar.
+--      Se deja escrito el cambio porque una prueba que quedo midiendo lo contrario
+--      de lo que se construyo es el modo de falla del 15-sep (P0-a "fallando" por
+--      la escalera rota) y el de la 7a del 14-ago: da el resultado de otra cosa y
+--      nadie lo nota.
 begin;
   insert into ent_devolucion (fecha, cliente_id, cliente_nombre, creado_por)
   values (current_date, 999999, 'PRUEBA d4 suelta', 'prueba-d4');
-  select 'D4 OK: la devolucion suelta sigue entrando sin causa' as resultado;
+  select 'D4 MAL: entro una devolucion sin pedido' as resultado;
 rollback;
 
 -- D5 · §B · la vista del exceso MARCA y NO BLOQUEA.
@@ -547,7 +593,10 @@ rollback;
 -- DESPUES · VERIFICAR. Solo lectura.
 -- ════════════════════════════════════════════════════════════════════════
 
--- V1 · las dos columnas existen y son nullables   [2 filas, los dos YES]
+-- V1 · las dos columnas existen   [2 filas · pedido_id NO · causa YES]
+--      ⚠️ `pedido_id` tiene que decir is_nullable = NO. Si dice YES, el
+--      `add column` se salteo y la columna quedo floja debajo de un archivo que
+--      dice lo contrario.
 select column_name, data_type, is_nullable
   from information_schema.columns
  where table_name = 'ent_devolucion' and column_name in ('pedido_id','causa')
@@ -576,8 +625,9 @@ select table_name, privilege_type, grantee
 select producto_id, sum(uds) as uds, count(*) as filas
   from ent_devuelto_desde_ancla group by 1 order by 1;
 
--- V6 · las devoluciones viejas siguen ahi, intactas y sin pedido ni causa.
---      Tiene que dar lo mismo que 0a/0b, con pedido_id y causa en NULL.
+-- V6 · la tabla sigue vacia                         [0 filas]
+--      §A/§B/§C no escriben ninguna fila, y las pruebas van todas en rollback.
+--      Si aca aparece algo, alguna prueba se corrio sin su `rollback`.
 select id, fecha, cliente_nombre, pedido_id, causa from ent_devolucion order by id;
 
 -- V7 · sin rastro de las pruebas    [0 en las tres]
