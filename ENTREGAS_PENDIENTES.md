@@ -1203,3 +1203,51 @@ corregirlas no movería ningún número: `ent_salido_del_congelador_desde_ancla`
 filtra por `preparado_en > corte` y quedan del otro lado. Queda por decidir si se
 cierran como absorbidas por el reancle o se dejan abiertas como historia.
 
+
+---
+
+## 23 · 🟠 ABIERTO · El prefijo `rp-` de CSS lo usan dos módulos
+
+**Decisión de Andrea, 15-sep-2026: NO va en b59.** Hoy están scopeados y no hacen
+daño; tocar una pantalla que anda bien, en la publicación que Daniel usa mañana,
+no vale la pena. Queda anotado para después.
+
+**Qué pasa.** `rp-` quiere decir dos cosas distintas en la misma hoja de estilos:
+
+- **Finanzas** — "resultado producto": `rp-des`, `rp-desk`, `rp-dr`, `rp-mov`,
+  en el costo por producto (`#vResultados`, nacidas el 10-ago en `fabe4d9`).
+- **Entregas** — "reporte de despacho": 31 clases, de `rp-sec` a `rp-lotebtn`,
+  nacidas el 13-ago en `85a0cba`. Tres días después.
+
+**Lo que ya costó.** `rp-nota` era el único nombre que las dos listas compartían,
+y la regla de Finanzas `.rp-mov,.rp-des,.rp-nota{display:none}` estaba **sin
+scope**, así que escondía las notas de Entregas. Consecuencia medida el 15-sep:
+**todos** los avisos de validación de "Entregas sin factura" llevaban **33 días
+invisibles**, en todo ancho de pantalla — "Falta elegir el lote.", "Los lotes
+suman 8 y la cantidad es 10 — tiene que dar igual.", "Sin motivo no se puede
+guardar.", "Elegí una de las dos para seguir." y "no es hoy (…)". El botón se
+quedaba quieto y no decía por qué.
+
+Arreglado ese mismo día scopeando la regla a `#vResultados` (ver el comentario
+largo en el CSS, línea ~398). **Hoy no queda ninguna regla `.rp-*` de Finanzas
+sin scope**, verificado.
+
+**Por qué sigue abierto.** El arreglo tapó el choque, no la causa: el espacio de
+nombres sigue repartido. El día que alguien escriba `rp-mov` en Entregas —y
+"movimiento" es una palabra probable ahí— vuelve a pasar, y la próxima vez puede
+no encontrarla nadie: ésta apareció porque hubo que escribir un texto nuevo y no
+se veía, no porque alguien revisara el CSS.
+
+**Lo que hay que hacer.** Renombrar las cuatro de Finanzas a `cp-` (costo por
+producto): `cp-des`, `cp-desk`, `cp-dr`, `cp-mov`. Son 4 clases, ~8 reglas y ~4
+usos, todos dentro de `#vResultados` (verificado: son sus únicas apariciones).
+
+**Lo que NO hay que renombrar.** Los otros diez prefijos que comparten dos o más
+módulos —`btn`, `card`, `face`, `faces`, `s`, `mes`, `live`, `tbl`, `valid`,
+`cl`— son el sistema de diseño: mismo nombre, misma cosa en todos lados.
+Compartir no es chocar. El barrido del 15-sep midió los 11 y `rp` es el único
+ambiguo.
+
+**La regla, de acá en adelante.** Una regla escrita para un módulo va scopeada a
+su `#vXxx`. Un selector de clase suelto en la hoja global aplica a toda la app,
+no al módulo donde uno lo escribió.
