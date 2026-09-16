@@ -13183,11 +13183,15 @@ function pdRender(){
   // para informar que no hay nada que hacer. Es la regla 1 del lobby, aplicada
   // acá: si no hay nada, la sección no aparece. Y si no aparece NINGUNA, un solo
   // renglón lo dice — no cinco tarjetas vacías.
+  // `expl` VACIA = la tarjeta va sin renglón de explicación, y queda el título con
+  // su contador y nada más — la forma de «Por resolver». No es un caso especial
+  // metido a la fuerza: una explicación que no explica nada es ruido, y el lugar
+  // donde se decide eso es cada llamada, no el helper.
   const secc=function(titulo,expl,ls,accion){
     if(!ls.length) return '';
     let h='<div class="card rp-z"><div class="card-title">'+titulo
       +' <span class="pd-cnt'+(ls.length?' on':'')+'">'+ls.length+'</span></div>'
-      +'<div class="rp-nota" style="margin:-4px 0 8px">'+expl+'</div>';
+      +(expl?('<div class="rp-nota" style="margin:-4px 0 8px">'+expl+'</div>'):'');
     ls.forEach(function(it){
       h+='<div class="pd-fila"><div class="pd-fila-c">'
         +'<div class="pd-quien">'+_pdQuien(it)+'</div>'
@@ -13258,8 +13262,15 @@ function pdRender(){
   // sabe es que nadie tocó el botón "Ya validé" — la marca a mano. Decir "sin validar
   // en Odoo" prometía un dato que Truefie no lee, y una fila podía estar validada en
   // Odoo y seguir apareciendo acá. "Sin marcar como validado" es lo que de verdad mide.
-  h+=secc('Entregado en Truefie, sin marcar como validado',
-    'Andrea valida la entrega en Odoo a mano (fase 1) y la marca acá. Si esta lista se cierra sola durante semanas, ésa es la evidencia para la escritura automática.',
+  // SIN PÁRRAFO (16-sep, decisión de Andrea). El que había —"Andrea valida la
+  // entrega en Odoo a mano (fase 1)… ésa es la evidencia para la escritura
+  // automática"— hablaba de en qué fase está construido el sistema y de qué haría
+  // falta para automatizarlo. Eso es una nota de diseño, y ésta es una pantalla de
+  // trabajo: el título dice qué falta y el botón dice qué hacer. Mismo criterio que
+  // «Por resolver», que quedó con el título y el contador solos.
+  // (El razonamiento de por qué el TÍTULO está redactado así se conserva arriba:
+  // eso sí sigue siendo útil para quien lea el código.)
+  h+=secc('Entregado en Truefie, sin marcar como validado', '',
     _pd.l1, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdValidar('+it.id+')">Ya validé</button>'; });
   h+=secc('Salida de venta, sin factura vinculada',
     'Solo salidas de tipo venta: una regalía sin factura no es un pendiente, es lo correcto.',
