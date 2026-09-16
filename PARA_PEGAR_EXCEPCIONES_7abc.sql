@@ -165,7 +165,9 @@
 
 
 -- ── 7c-2-bis · motivo 'otro' SIN nota ──────────────────────────────────
--- El CHECK exige: motivo <> 'otro'  OR  (nota is not null and length(btrim(nota)) >= 10)
+-- El CHECK exige: motivo <> 'otro'  OR  (nota is not null and length(btrim(nota)) >= 6)
+-- (era >= 10 hasta el 15-sep-2026; se bajo a 6 porque "consigna", de 8 caracteres,
+--  no pasaba y era el caso real que origino el bloque. Ver CAMBIO_NOTA_MIN_B.sql.)
    begin;
      insert into ent_alisto_linea
             (alisto_id, producto_id, cant_uds, cant_uom,
