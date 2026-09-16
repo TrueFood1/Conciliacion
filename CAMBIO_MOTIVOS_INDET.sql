@@ -206,7 +206,6 @@ alter table ent_alisto_lote add constraint ent_alisto_lote_motivo_ok check (
   )
 );
 
-commit;
 
 
 -- ════════════════════════════════════════════════════════════════════════
@@ -219,7 +218,6 @@ commit;
 -- La tabla YA tiene columna `nota` (las seis correcciones del 8-sep la usan,
 -- 179-192 caracteres cada una), asi que solo se le pide lo mismo que a §A.
 -- ════════════════════════════════════════════════════════════════════════
-begin;
 
 alter table ent_alisto_lote_correccion drop constraint correccion_motivo_ok;
 
@@ -235,7 +233,6 @@ alter table ent_alisto_lote_correccion add constraint correccion_motivo_ok check
   )
 );
 
-commit;
 
 
 -- ════════════════════════════════════════════════════════════════════════
@@ -271,7 +268,6 @@ commit;
 -- EL CUERPO ES COPIA LITERAL de pg_get_viewdef. Lo unico agregado va marcado
 -- con "NUEVO" al lado.
 -- ════════════════════════════════════════════════════════════════════════
-begin;
 
 -- D.1 · ent_alisto_lote_efectivo
 --   La nota sigue la MISMA regla que el lote, el motivo y el quien: si hay
@@ -328,6 +324,14 @@ create or replace view v_ent_indeterminado_pendiente as
      LEFT JOIN ent_pedido_factura_vigente fv ON fv.pedido_id = p.id AND fv.anulado = false
   WHERE ale.lote = 'NO DETERMINADO'::text;
 
+
+-- ── FIN DEL PEGADO ──────────────────────────────────────────────────────
+-- UNA SOLA TRANSACCION PARA §A + §B + §D (antes eran tres). Postgres hace DDL
+-- transaccional, asi que esto es TODO O NADA: si algo revienta en §D, la
+-- columna de §A y los dos CHECK se deshacen solos y la base queda como estaba.
+-- Con tres transacciones separadas, un error en §D dejaba la base a mitad de
+-- camino: columna creada, CHECK nuevo, vistas viejas. Es el mismo criterio con
+-- el que se armo PARA_PEGAR_EXCEPCIONES_1a6.sql.
 commit;
 
 
