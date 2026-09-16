@@ -5,15 +5,27 @@
 --    (el NOT NULL entro) y `causa text YES`; V3 → las 3 tablas + las 2 vistas +
 --    el indice; V5 → 0 filas, identico a 0e. Reconfirmado aparte con pg_lector.
 --
--- 🔴 **APLICADO SIN CORRER LAS NUEVE PRUEBAS.** D0 a D8 NO se corrieron. Esperan
---    al usuario de pruebas (PENDIENTES H3, en diseño): son nueve pegados a mano
---    hoy, o cero en un par de dias. Decision de Andrea.
+-- ✅ **LAS NUEVE PRUEBAS CORRIERON, LAS NUEVE EN VERDE** (16-sep, Andrea, una
+--    por una desde el SQL Editor). D0 paso (la escalera nueva anda) · D1 rechazo
+--    la causa inventada · D2 la falta de causa · D3 la nota corta · D3-bis la nota
+--    NULL —con `nota = null` en el DETAIL, o sea el `coalesce` visto funcionando—
+--    · D4 dio 23502 en `pedido_id` (la entrada suelta, cerrada) · D5 devolvio
+--    `10 · 6 · 4` (marca sin bloquear) · D6 rechazo la NC sin devolucion · D7
+--    devolvio `6 · 0.25 · 24` (las dos ramas del tipo, y el factor) · D8 vacio la
+--    cola al marcar hecho.
+--    V7 despues: CERO filas `prueba-%` en las cinco tablas. Nada quedo escrito.
 --
--- 🔴 **NO PUBLICAR NINGUNA PANTALLA DE DEVOLUCIONES HASTA QUE LAS NUEVE CORRAN.**
---    El esquema solo no rompe nada: hoy no hay una linea de codigo que escriba en
---    estas tablas. Deja de ser cierto en el momento en que exista la pantalla. Es
---    el incidente del 17-ago al reves — alla se publico codigo sin el SQL; aca hay
---    SQL sin verificar, y publicar encima lo vuelve el mismo problema.
+-- 🔴 **LO QUE LAS NUEVE NO PROBARON: que marcar hecho sea solo de socias.**
+--    La politica `ent_odoo_hecho_ins` exige `acceso_es_socia()`, pero el SQL
+--    Editor entra como `postgres`, que SALTEA LA RLS. D8 paso sin ejercitarla: si
+--    la politica estuviera mal escrita, D8 seguiria en verde. Esto NO se puede
+--    probar desde el SQL Editor por construccion — hace falta una sesion de la app
+--    (o los dos roles del pendiente H3). Anotado, no resuelto.
+--
+-- ⚠️ SECUENCIAS QUEMADAS, y es esperado: `nextval` no se deshace con el rollback.
+--    Despues de las nueve, `ent_devolucion.id` va en 11 y `ent_pedido.id` en 88
+--    sin que exista ninguna fila. Los ids van a tener huecos. Es cosmetico, pero
+--    conviene que este escrito antes de que alguien lo vea y se preocupe.
 --
 -- ⚠️ HALLAZGO AL VERIFICAR: **V4 DIO 12, NO 0.** Ver la nota en §C y en V4.
 --
