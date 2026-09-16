@@ -26,13 +26,25 @@ LOS DOS CANDADOS (defensa en profundidad, igual que odoo_read.py)
   citada. Por eso existe el 2.
 
 LA CONTRASENA
-  Nunca en disco, nunca como argumento (no sale en `ps`), nunca en el
-  historial del shell, nunca impresa. Entra por el portapapeles o por stdin,
-  vive en memoria y se va con el proceso.
+  Nunca como argumento (no sale en `ps`), nunca en el historial del shell,
+  nunca impresa. Sale de `conexion_db.env`, al lado de este script, y si ese
+  archivo no esta cae al portapapeles. Vive en memoria y se va con el proceso.
+
+  ⚠️ ESTO CAMBIO EL 15-SEP-2026 Y CONVIENE DECIRLO DERECHO: hasta esa fecha la
+  clave NO tocaba el disco, solo el portapapeles. El portapapeles se pisa solo
+  —el 14 y el 15-sep se perdio SEIS veces, una por cada `pbcopy` de la sesion,
+  y cada perdida corto el trabajo a la mitad— asi que se eligio a conciencia
+  cambiar "nunca en disco" por "en un archivo gitignored". Es el mismo trato
+  que ya tiene `conexion_prod.env` con la API key de Odoo. El repo es PUBLICO:
+  la proteccion es `*.env` en el .gitignore, verificado con `git check-ignore`,
+  mas la regla de settings.json que pregunta siempre ante un `git add -f`.
+  Si eso no alcanza, la alternativa medida es el Llavero de macOS (`security
+  find-generic-password`), que no deja la clave en claro en ningun archivo.
 
 COMO SE USA
     python3 pg_lector.py --clave "select 1"
-        Toma la contrasena del portapapeles (copiala del gestor primero).
+        Toma la contrasena de conexion_db.env; si no existe, del portapapeles.
+        La linea de arriba de la salida dice de cual de los dos salio.
 
     python3 pg_lector.py --clave --archivo consultas.sql
         Varias consultas separadas por ';' en un archivo, una sola conexion.
@@ -62,6 +74,52 @@ LECTURA_OK = ("select", "with", "table", "values", "explain", "show")
 def clave_del_portapapeles():
     """La contrasena, tal como quedo en el portapapeles. No se imprime."""
     return del_portapapeles().strip("\r\n").strip()
+
+
+# Archivo de credenciales, hermano de conexion_prod.env (el de Odoo). Vive al
+# lado de este script, NO en la raiz del repo, y esta cubierto por `*.env` del
+# .gitignore. El repo es publico: verificado con `git check-ignore`.
+ARCHIVO_CLAVE = os.path.join(_AQUI, "conexion_db.env")
+
+
+def _clave_del_archivo(path=ARCHIVO_CLAVE):
+    """SUPABASE_DB_PASSWORD del archivo, o None si no hay archivo ni clave.
+
+    Mismo formato y mismo parseo que `load_env` de odoo_read.py: KEY=valor,
+    una por linea, '#' comenta. Devolver None en vez de morir es lo que deja
+    caer al portapapeles sin romper nada de lo que ya funcionaba.
+    """
+    if not os.path.exists(path):
+        return None
+    try:
+        for linea in open(path, encoding="utf-8"):
+            linea = linea.strip()
+            if not linea or linea.startswith("#") or "=" not in linea:
+                continue
+            k, v = linea.split("=", 1)
+            if k.strip() == "SUPABASE_DB_PASSWORD":
+                v = v.strip()
+                return v or None
+    except OSError:
+        return None
+    return None
+
+
+def clave(path=ARCHIVO_CLAVE):
+    """La contrasena y de donde salio: (clave, origen).
+
+    EL ARCHIVO MANDA, EL PORTAPAPELES ES LA RED. El portapapeles se pisa solo:
+    el 14 y el 15-sep se perdio seis veces, una por cada `pbcopy` de la sesion,
+    y cada perdida costaba una vuelta. El archivo no se pisa.
+
+    El respaldo NO es un fallback silencioso de los que el repo prohibe: los dos
+    caminos llevan a la MISMA credencial y el origen se dice en pantalla, asi
+    que nadie puede creer que entro por un lado cuando entro por el otro.
+    """
+    c = _clave_del_archivo(path)
+    if c:
+        return c, "archivo"
+    return clave_del_portapapeles(), "portapapeles"
 
 
 def _sin_comentarios(sql):
@@ -209,12 +267,16 @@ def main():
     else:
         print("falta la consulta (o --archivo)"); return
 
-    clave = clave_del_portapapeles()
-    if not clave:
-        print("el portapapeles esta vacio: copia la contrasena y volve a correr"); return
-    print("clave leida del portapapeles: %d caracteres (no se imprime)" % len(clave))
+    secreto, origen = clave()
+    if not secreto:
+        print("no hay clave: ni %s ni el portapapeles la tienen.\n"
+              "  Para dejarla fija (una sola vez):\n"
+              "    printf 'SUPABASE_DB_PASSWORD=%%s\\n' \"$(pbpaste)\" > %s\n"
+              "  o copiala al portapapeles y volve a correr."
+              % (ARCHIVO_CLAVE, ARCHIVO_CLAVE)); return
+    print("clave leida del %s: %d caracteres (no se imprime)" % (origen, len(secreto)))
     try:
-        with Lector(clave) as db:
+        with Lector(secreto) as db:
             print("✅ conectado como %s\n" % USUARIO)
             for sql in sqls:
                 print("── %s" % " ".join(sql.split())[:90])
