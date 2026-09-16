@@ -395,7 +395,42 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .res-pcell .nm i{width:8px;height:8px;border-radius:2px;flex-shrink:0}
 .res-pcell .mg{font-size:20px;color:var(--text);margin-top:7px;font-variant-numeric:tabular-nums}
 .res-pcell .cu{font-size:11.5px;color:var(--text-3);margin-top:3px;font-variant-numeric:tabular-nums}
-.rp-mov,.rp-des,.rp-nota{display:none}   /* desglose y nota: solo teléfono */
+/* ⚠️ SCOPEADO A #vResultados (15-sep-2026). Esta regla es de Resultados, donde
+   `rp-` quiere decir "resultado producto"; pero SIN scope pegaba también en
+   Entregas, donde `rp-` quiere decir "reporte de despacho". Dos módulos, el mismo
+   prefijo `rp-`, y el más viejo escondiendo al más nuevo.
+   MEDIDO el 15-sep en la pantalla de Entregas sin factura: las 3 `.rp-nota` del
+   DOM, `display:none` las 3, a 1280px Y a 375px. No es un problema de teléfono
+   contra escritorio: la regla que las vuelve a mostrar en teléfono también está
+   scopeada a #vResultados, así que Entregas no la ve NUNCA, en ningún ancho.
+
+   LA CRONOLOGÍA, rastreada con `git log -S`:
+     · 10-ago  fabe4d9  nace la regla, sin scope, para el costo por producto.
+     · 13-ago  85a0cba  nace "Reporte de despacho" y reusa el prefijo `rp-`.
+                        Tres días de diferencia, y nadie tenía por qué mirar.
+                        Desde ese commit nacieron MUDOS:
+                          #rpLoteMsg   "Falta elegir el lote." y "Los lotes
+                                       suman 8 y la cantidad es 10 — tiene que
+                                       dar igual."
+                          #rpLineaMsg  "Falta el producto." / "Falta la cantidad."
+     · 25-ago  b153da5  "Sin motivo no se puede guardar."   nace mudo
+     · 26-ago  eaa1639  "Elegí una de las dos para seguir." nace mudo
+     · 07-sep  6255fde  "no es hoy (…)" al lado de la fecha nace mudo
+   O sea: TODOS los avisos de validación de esa pantalla, 33 días, y cada aviso
+   nuevo cayendo en el mismo pozo sin que el pozo se viera. El botón se quedaba
+   quieto y no decía por qué; quien lo usaba tenía que adivinar qué faltaba.
+
+   CÓMO APARECIÓ: buscando dónde se veía el texto del centinela nuevo, que es una
+   `.rp-nota` más. No lo encontró una revisión de CSS — lo encontró escribir un
+   texto nuevo y no verlo. Los otros cinco nunca tuvieron a nadie que los buscara.
+
+   ⚠️ LA LECCIÓN: dos módulos con el mismo prefijo corto y reglas sin scope. Un selector de clase suelto en la hoja global aplica
+   a TODA la app, no al módulo donde uno lo escribió. Si se agrega una regla para
+   un módulo, va scopeada a su #vXxx.
+   `.rp-mov`, `.rp-des`, `.rp-desk` y `.rp-dr` se usan SOLO dentro de
+   #vResultados (verificado: únicas apariciones, en el costo por producto), así
+   que el scope no les cambia nada. */
+#vResultados .rp-mov,#vResultados .rp-des,#vResultados .rp-nota{display:none}
 @media(max-width:920px){.res-prod{grid-template-columns:repeat(2,1fr)}.res-pcell{border-bottom:1px solid var(--border)}}
 /* ══════════ FINANZAS EN TELÉFONO: mismo lenguaje que el resto ══════════
    Métricas apiladas de a dos, listas de una línea, sin textos explicativos largos.
@@ -2445,6 +2480,13 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .rp-lotein{width:76px;flex:none}
 .rp-ceros{background:none;border:none;padding:6px 0 0;font:inherit;font-size:11.5px;
   color:var(--text-3);text-decoration:underline;cursor:pointer}
+/* El bloque del centinela ("no sé de qué lote salió"). Ámbar al BORDE y no de
+   relleno: es la opción C que se eligió el 15-sep para la píldora de Despachos —
+   el marrón venía del fondo sólido. Separado de la lista por su propio borde,
+   porque no es un lote de la lista. */
+.rp-indet{margin-top:10px;padding:10px 12px;border:1px solid var(--border-m);
+  border-radius:10px}
+.rp-indet.on{border-color:var(--warn)}
 
 /* ── ENTREGAS SIN FACTURA · rediseño del formulario (26-ago) ─────────────
    JERARQUÍA POR ESPACIO Y ETIQUETAS CHICAS, NO POR BORDES. Antes eran tres
@@ -7862,6 +7904,79 @@ function entLotesSelector(g, saldo, pid){
     .sort(entLoteCmpSel);
 }
 
+// ── TERCERA CAPA · LO QUE SE PUEDE ELEGIR HOY (15-sep-2026, Andrea) ─────
+// TRES CAPAS, de la mas ancha a la mas angosta, y cada pantalla para en la suya:
+//   1. entLotesUnion       TODO lo que PODRIA estar en el congelador.
+//                          -> el Conteo (crea la proxima ancla: tiene que ver
+//                             hasta lo que el ancla anterior da por agotado, que
+//                             es donde eso se corrige) y el Inventario (lee, no
+//                             elige) paran aca. A PROPOSITO.
+//   2. entLotesSelector    lo elegible EN PRINCIPIO: sin centinela, y los viejos
+//                          solo con saldo.
+//                          -> `_loteConocido` y la sonda de `_despLoteObsoleto`
+//                             paran aca, A PROPOSITO: el que escribe un lote a
+//                             mano tiene que poder escribir uno agotado sin que
+//                             le contesten "no existe", y el aviso de obsoleto
+//                             necesita el universo para distinguir "se acabo" de
+//                             "nunca existio".
+//   3. entLotesDisponibles lo elegible HOY.
+//                          -> las DOS pantallas que eligen, y solo ellas.
+//
+// DISPONIBLE = saldo > 0 en el ancla vigente, MAS lo producido DESPUES del corte
+// (que no puede tener saldo todavia pero existe en el congelador).
+// SE ACABO LA VENTANA DE 3 MESES COMO CRITERIO DE QUE OFRECER.
+//
+// POR QUE. Medido el 15-sep: de los 60 lotes que se ofrecian en los seis
+// productos, 33 no figuraban siquiera en el ancla. Pan Blanco ofrecia 20 y solo 8
+// estaban en el congelador: los otros 12 son produccion de junio a agosto ya
+// consumida, que se seguia ofreciendo solo porque caia dentro de la ventana.
+// Elegir uno de esos manda la salida contra un lote que no tiene de donde restar.
+//
+// ⚠️ POR QUE ES UNA FUNCION Y NO UN FILTRO ADENTRO DE UNA PANTALLA. Esta regla
+// nacio el 15-sep escrita adentro de `_despLotesDe`, o sea en UNA de las dos
+// pantallas que eligen. Ese mismo dia se midio el resultado: el camino SIN
+// factura seguia ofreciendo los doce lotes muertos de Pan Blanco. No hizo falta
+// que nadie copiara la regla mal — alcanzo con escribirla en un lado y que el
+// otro no la llamara. Por eso vive aca, al lado de las otras dos capas.
+//
+// ⚠️ SIN CORTE NO SE FILTRA. Si no se pudo leer el ancla (`corteMs` null) se
+// devuelve la lista entera: filtrar a ciegas esconderia producto que si esta.
+// Mejor una lista larga que una lista que miente por omision.
+//
+// ⚠️ NULL NO ES CERO. Es LA trampa de esta capa, y ya se pago una vez.
+// `entLotesUnion` lo documenta arriba: `saldo` null significa "no hay ancla, o el
+// lote NO FIGURA en ella", y no se inventa un cero. El camino sin factura tenia
+// desde el 26-ago un filtro que parecia hacer exactamente esto —escondia los de
+// `saldo <= 0`— y no atrapaba NADA: el ancla vigente tiene 27 lotes y los 27
+// tienen saldo > 0, o sea CERO lotes en cero en los seis productos. Los 33 lotes
+// muertos que igual se ofrecian no valen cero: valen null.
+// Por eso la condicion de abajo esta escrita en POSITIVO (`saldo != null &&
+// saldo > 0`): pregunta por lo que SI se sabe, y el null queda afuera por lo que
+// no se sabe de el. Escrita al reves —descartar los `<= 0`— vuelve a dejar pasar
+// a los null, que aca son la mayoria de la lista.
+function entLotesDisponibles(g, saldo, corteMs, pid){
+  const todos=entLotesSelector(g, saldo, pid);
+  if(corteMs==null) return todos;
+  return todos.filter(function(d){
+    if(d.saldo!=null && d.saldo>0) return true;      // EN POSITIVO: ver arriba
+    return entProducidoPostCorte(g, pid, d.lote, corteMs);
+  });
+}
+// ¿Este lote se produjo DESPUES del corte del ancla? Se mira la hora cruda de
+// Odoo de sus ordenes (`prodUtc`), comparada en el mismo huso que el corte — los
+// dos son instantes UTC. Comparar crudo contra una hora CR es el error del
+// 19-ago, y aca volveria a dar el resultado invertido.
+// Recibe `g` y `corteMs` en vez de leer los globales de Despachos: la misma
+// pregunta se la hacen las dos pantallas, cada una con su propia carga.
+function entProducidoPostCorte(g, pid, lote, corteMs){
+  if(corteMs==null) return false;
+  const L=Object.values((g&&g.lotes)||{}).find(function(x){
+    return +x.producto===+pid && x.canon===lote; });
+  if(!L) return false;
+  return (L.ordenes||[]).some(function(o){
+    const t=_odooMs(o&&o.prodUtc); return !isNaN(t) && t>corteMs; });
+}
+
 // ════════════════════════════════════════════════════════════════════════
 // CONTEO POR LOTE — el ANCLA de saldos del módulo de Entregas (Pieza 4).
 // Es una FOTO del congelador: qué lotes hay y cuánto de cada uno. Todo lo
@@ -8545,6 +8660,11 @@ async function guardarConteoLote(){
 // ════════════════════════════════════════════════════════════════════════
 const RP_COLOR={451:'#378ADD',452:'#84BD00',453:'#D4537E',503:'#7F77DD',472:'#FF751F',519:'#ED93B1'};
 let _rp=null, _rpLotes=null, _rpSaldo=null, _rpClientes=null, _rpGuardando=false;
+// EL CORTE DEL ANCLA VIGENTE, en ms. Es lo que separa "no tiene saldo porque se
+// acabo" de "no tiene saldo porque se produjo DESPUES de la foto". Sin el no se
+// puede filtrar por disponible, y por eso esta pantalla no filtraba: el corte se
+// calculaba y se tiraba. null = no se pudo leer el ancla -> no se filtra nada.
+let _rpCorteMs=null;
 
 function irAReporte(){
   _modShow('vReporte'); crumbSet('Entregas','Entregas sin factura');
@@ -8584,9 +8704,12 @@ function _rpReset(todo){
   // rpUdsDe la resuelve con NIV_INFO.presDiv, que vale 1 en Blanco/Semillas/
   // Cookie Dough y 4/4/2 en Francés/Buns/Pizza. Una regalía casi nunca es una
   // caja entera, y el default es lo que se acepta sin mirar.
+  // `indet` = el motivo del centinela de ESTA linea (null mientras no haya uno);
+  // `indetAbierto` = el selector de motivos esta desplegado. `verCeros` se fue con
+  // el filtro viejo de saldo<=0 — ver el comentario de `rpLotesHtml`.
   _rp={fecha:fecha, fechaDia:_despHoy(), cliente:null, tipo:null, motivo:null,
        destinatario:'', lineas:[],
-       verCeros:false, cur:{pid:null, cant:'', pres:'uds', lotes:{}}};
+       cur:{pid:null, cant:'', pres:'uds', lotes:{}, indet:null, indetAbierto:false}};
 }
 // ── LOS MOTIVOS DE UNA SALIDA SIN FACTURA ───────────────────────────────
 // Lista cerrada, sin texto libre: el motivo es EL DATO —dentro de seis meses lo
@@ -8606,8 +8729,14 @@ function rpSetMotivo(k){ _rp.motivo=k; rpRender(); }
 async function rpCargarLotes(){
   try{ _rpLotes=await entLotesActivos(3); }
   catch(e){ _rpLotes={lotes:{},buckets:{}, _err:(e&&e.message)||String(e)}; }
-  try{ _rpSaldo=await rpCalcSaldos(_rpLotes); }
-  catch(e){ _rpSaldo=null; }
+  // ⚠️ EL CORTE YA VENIA CALCULADO Y SE TIRABA. `rpCalcSaldos` es un envoltorio de
+  // `_rpCalcularPuntas` que se queda solo con `.saldo` y descarta `.corteMs`.
+  // Despachos ya lo salteaba por esto mismo (ver `despCargarLotes`); esta pantalla
+  // no, y era la mitad de la razon por la que seguia ofreciendo lotes muertos.
+  try{ const _p=await _rpCalcularPuntas(_rpLotes);
+       _rpSaldo   = _p ? _p.saldo   : null;
+       _rpCorteMs = _p ? _p.corteMs : null;
+  }catch(e){ _rpSaldo=null; _rpCorteMs=null; }
   rpRender();
 }
 // saldo(producto,lote) = conteo del ANCLA + fabricado DESPUÉS del corte − entregado después.
@@ -10126,7 +10255,11 @@ function boAbrirManual(ref){
   const m=((b&&b.datos&&b.datos.manual)) || ((loc&&loc.datos&&loc.datos.manual)) || null;
   irAReporte();                                 // esto ya pone la fecha de HOY
   if(m){
-    _rp.lineas=m.lineas||[]; _rp.cur=m.cur||{pid:null,cant:'',pres:'uds',lotes:{}};
+    _rp.lineas=m.lineas||[];
+    _rp.cur=m.cur||{pid:null,cant:'',pres:'uds',lotes:{},indet:null,indetAbierto:false};
+    // Un selector de motivos a medio abrir no es estado que valga la pena
+    // resucitar; el motivo YA elegido (`cur.indet`) si, y viene en `m.cur`.
+    _rp.cur.indetAbierto=false;
     _rp.cliente=m.cliente||null; _rp.tipo=m.tipo||null; _rp.motivo=m.motivo||null;
     _rp.destinatario=m.destinatario||'';
     _rp.boRef=String(ref);
@@ -10261,53 +10394,12 @@ function _despObsoletosDe(f,i){
   return out;
 }
 function _despLotesDe(pid){
-  // NUNCA se esconde un lote con producto, y ahora eso incluye a los VIEJOS.
-  // Dos veces se estrechó de más esta lista: primero filtraba por saldo ≤ 0 —y el
-  // 18-ago Andrea tuvo que escribir un lote a mano—, y hasta b56 salía SOLO de
-  // `_despLotes.lotes`, o sea los últimos 3 meses de producción, así que un lote
-  // más viejo con saldo real no se podía elegir (Pizza 120/10-26, el 8-sep).
-  // Las dos reglas viven ahora en `entLotesSelector`, la MISMA que usa el camino
-  // sin factura y la misma unión que dibuja Inventario.
-  // ── SOLO LO DISPONIBLE (15-sep-2026, decision de Andrea) ──────────────
-  // DISPONIBLE = saldo > 0 en el ancla vigente, MAS lo producido DESPUES del
-  // corte (que no puede tener saldo todavia pero existe en el congelador).
-  // SE ACABO LA VENTANA DE 3 MESES COMO CRITERIO DE QUE OFRECER.
-  //
-  // POR QUE. Medido el 15-sep: de los 60 lotes que se ofrecian en los seis
-  // productos, 32 tenian saldo cero o ni siquiera figuraban en el ancla. Pan
-  // Blanco ofrecia 20 y solo 8 estaban en el congelador: los otros 12 son
-  // produccion de junio a agosto ya consumida, que se seguia ofreciendo solo
-  // porque caia dentro de la ventana. Elegir uno de esos manda la salida contra
-  // un lote que no tiene de donde restar.
-  //
-  // ⚠️ SIN CORTE NO SE FILTRA. Si no se pudo leer el ancla (`_despCorteMs`
-  // null), se devuelve la lista entera: filtrar a ciegas esconderia producto que
-  // si esta. Mejor una lista larga que una lista que miente por omision.
-  //
-  // ⚠️ EL CONTEO NO PASA POR ACA, Y NO DEBE. Usa `entLotesUnion` directo, porque
-  // es lo que CREA la proxima ancla: tiene que ver todo lo que PODRIA estar en
-  // el congelador, incluido lo que el ancla anterior da por agotado. Si el ancla
-  // se equivoco, el conteo es el lugar donde eso se corrige. El Reporte tampoco
-  // pasa por aca. Por eso el cambio vive en `_despLotesDe` y no en
-  // `entLotesSelector`, que es compartida.
-  const todos=entLotesSelector(_despLotes, _despSaldo, pid);
-  if(_despCorteMs==null) return todos;
-  return todos.filter(function(d){
-    if(d.saldo!=null && d.saldo>0) return true;
-    return _despProducidoPostCorte(pid, d.lote);
-  });
-}
-// ¿Este lote se produjo DESPUES del corte del ancla? Se mira la hora cruda de
-// Odoo de sus ordenes (`prodUtc`), comparada en el mismo huso que el corte —
-// los dos son instantes UTC. Comparar crudo contra una hora CR es el error del
-// 19-ago, y aca volveria a dar el resultado invertido.
-function _despProducidoPostCorte(pid, lote){
-  if(_despCorteMs==null) return false;
-  const L=Object.values((_despLotes&&_despLotes.lotes)||{}).find(function(x){
-    return +x.producto===+pid && x.canon===lote; });
-  if(!L) return false;
-  return (L.ordenes||[]).some(function(o){
-    const t=_odooMs(o&&o.prodUtc); return !isNaN(t) && t>_despCorteMs; });
+  // LA REGLA NO VIVE ACA. Las tres capas estan juntas arriba, al lado de
+  // `entLotesUnion` y `entLotesSelector`, y esta pantalla solo elige la tercera y
+  // le pasa lo que cargo. Vivio aca exactamente un dia (15-sep) y en ese dia el
+  // camino sin factura quedo afuera del filtro — el por que, en
+  // `entLotesDisponibles`.
+  return entLotesDisponibles(_despLotes, _despSaldo, _despCorteMs, pid);
 }
 
 function despRenderPedido(body){
@@ -10844,12 +10936,20 @@ function _despFacAbierta(){ return (_despFac||[]).find(function(x){ return x.fac
 //                  interrumpe. La corrección se ve sola, en el valor del campo.
 //   desconocido  → no hay ningún lote así en Odoo. Sí es anomalía: se avisa (no se bloquea).
 //   ilegible     → no tiene forma de lote. Se guarda igual, pero no va a cruzar con nada.
-function _loteConocido(pid, txt){
+// ⚠️ RECIBE LAS CARGAS, con las de Despachos por defecto (15-sep). Los dos
+// caminos hacen la MISMA pregunta sobre datos distintos: Despachos carga
+// `_despLotes`/`_despSaldo` y el camino sin factura `_rpLotes`/`_rpSaldo`. Leer
+// los globales de uno desde el otro no da un aviso peor: da uno invertido.
+function _loteConocido(pid, txt, g, saldo){
+  const _g=(g!==undefined)?g:_despLotes, _s=(g!==undefined)?saldo:_despSaldo;
   // LA MISMA LISTA QUE VE EL SELECTOR (b56). Si un lote viejo con saldo se puede
   // elegir del desplegable, escribirlo a mano no puede contestar "no existe": dos
   // reglas distintas sobre el mismo dato en la misma pantalla es exactamente el
   // aviso que entrena a ignorar avisos.
-  const ls=entLotesSelector(_despLotes, _despSaldo, pid);
+  // ⚠️ LA CAPA 2, NO LA 3: a propósito. Un lote agotado se tiene que poder
+  // escribir a mano sin que esta función conteste "no existe" — para eso está el
+  // aviso de obsoleto, que distingue "ya no queda" de "nunca existió".
+  const ls=entLotesSelector(_g, _s, pid);
   const v=String(txt==null?'':txt).trim(), canon=_entCanon(v);
   if(!canon) return {nivel:'ilegible', canon:v,
     msg:'No pude leer "'+v+'" como lote; la forma es "154 / 12-26". Lo guardo tal cual, pero así '
@@ -12177,56 +12277,167 @@ function rpElegirProd(pid){ _rp.cur.pid=pid; _rp.cur.lotes={}; rpRender(); }
 // los agotados iban en gris al fondo, con el argumento de que "el congelador
 // físico manda sobre el sistema". Medido en uso: los que están en cero son la
 // MAYORÍA, así que la lista quedaba llena de renglones que no se pueden elegir y
-// el lote bueno había que buscarlo. Ahora los de saldo cero NO se dibujan.
-// El argumento viejo NO se tira, se mueve: los ceros siguen a un toque de
-// distancia ("ver los N en cero") y "Agregar un lote que no está" sigue ahí para
-// el caso real de producto en el congelador que el sistema no conoce. Esconder
-// no es negar: el contador dice cuántos hay.
-// Sin ancla confirmada no hay saldo de nada (todos null) y entonces se listan
-// todos — filtrar por un saldo que no existe sería esconder a ciegas.
+// el lote bueno había que buscarlo. El argumento viejo NO se tira, se mueve:
+// "Agregar un lote que no está" sigue ahí para el caso real de producto en el
+// congelador que el sistema no conoce. Esconder no es negar.
+//
+// ⚠️⚠️ Y ESE FILTRO NO ATRAPÓ NUNCA NADA — NULL NO ES CERO (medido el 15-sep).
+// Escondía los de `saldo <= 0`, detrás de un botón "ver los N en cero". Contra el
+// ancla vigente: sus 27 lotes tienen los 27 saldo > 0, o sea CERO lotes en cero
+// en los seis productos. Ese botón no llegó a aparecer jamás y el filtro no
+// escondió un solo renglón en veinte días.
+// Los 33 lotes muertos que igual se ofrecían —doce de ellos en Pan Blanco, los
+// que Andrea vio en la captura— no valen CERO: valen NULL, porque no figuran en
+// el ancla. `entLotesUnion` lo deja escrito: null = "no hay ancla, o el lote no
+// figura en ella", y no se inventa un cero. Y la condición era
+// `L.saldo!=null && L.saldo<=0`: excluía al null A PROPÓSITO y por la razón
+// correcta —no esconder a ciegas lo que no se sabe— solo que lo que no se sabía
+// era la mayoría de la lista. Un filtro que se lee como si funcionara.
+//
+// LA REGLA BUENA ES OTRA CAPA Y VIVE ARRIBA: `entLotesDisponibles` pregunta en
+// POSITIVO (saldo > 0, o producido después del corte), así que el null queda
+// afuera por lo que no se sabe de él y no por una comparación que no lo alcanza.
+// El mecanismo de "ver los N en cero" se fue con el filtro viejo: después de
+// `entLotesDisponibles` no puede quedar en la lista un lote en cero que no sea
+// uno YA ELEGIDO, y esos se muestran siempre. Dejarlo habría sido dejar código
+// muerto con cara de vivo, que es como se vuelve a escribir el mismo error.
+//
+// Sin ancla confirmada no hay corte ni saldos y se listan todos: filtrar a
+// ciegas escondería producto que sí está.
 function rpLotesHtml(){
   const cur=_rp.cur, pid=cur.pid;
   let h='<div class="rp-cond"><div class="rp-sec-t">Lote'
     +(Object.keys(cur.lotes).length>1?' — partido entre varios':'')+'</div>';
   if(!_rpLotes){ return h+'<div class="cl-none">Leyendo lotes de Odoo…</div></div>'; }
-  // MISMA UNIÓN Y MISMO ORDEN QUE EL CAMINO CON FACTURA (b56). Antes salía solo de
-  // `_rpLotes.lotes` y escondía exactamente lo mismo que escondía el otro selector.
-  // Cada entrada lleva `lote` y `canon`: `lote` es el nombre que usa el criterio
-  // compartido, `canon` el que este render viene usando desde siempre.
-  const ls=entLotesSelector(_rpLotes, _rpSaldo, pid)
+  // LA MISMA CAPA QUE EL CAMINO CON FACTURA, y ahora de verdad: hasta el 15-sep
+  // las dos pantallas compartían `entLotesSelector`, pero el filtro de
+  // disponibilidad estaba escrito adentro de la OTRA.
+  const _uni=entLotesSelector(_rpLotes, _rpSaldo, pid);
+  const ls=entLotesDisponibles(_rpLotes, _rpSaldo, _rpCorteMs, pid)
     .map(function(x){ return {lote:x.lote, canon:x.lote, key:x.key,
                               saldo:x.saldo, activo:x.activo}; });
   // Un lote agregado a mano es, por definición, uno que el sistema no conoce: va
-  // con los activos, no al fondo con los viejos.
+  // con los activos, no al fondo con los viejos. Entra ANTES que el rescate de
+  // abajo para que conserve su rótulo "agregado" cuando además esté elegido.
   (_rp._extra&&_rp._extra[pid]||[]).forEach(function(cn){
     if(!ls.some(function(x){return x.canon===cn;}))
       ls.push({lote:cn,canon:cn,key:'x',saldo:null,activo:true,extra:true}); });
+  // ⚠️ LO YA ELEGIDO VUELVE A LA LISTA, ESTÉ O NO DISPONIBLE. Es la regla del
+  // `246 / 3-27` del 15-sep: el filtro decide qué se OFRECE, nunca le borra una
+  // elección a una persona. `rpEditarLinea` reabre una línea ya cargada y
+  // `boAbrirManual` un borrador de ayer; sin esto, un lote que quedó fuera del
+  // filtro desaparecía de la vista con su cantidad adentro: la suma dejaba de dar
+  // y no había ningún lugar donde ver por qué.
+  // El centinela no entra acá: tiene bloque propio al pie.
+  Object.keys(cur.lotes).forEach(function(cn){
+    if(cn===ENT_LOTE_INDET) return;
+    if(ls.some(function(x){ return x.canon===cn; })) return;
+    const u=_uni.find(function(x){ return x.lote===cn; });
+    ls.push({lote:cn, canon:cn, key:(u?u.key:'x'), saldo:(u?u.saldo:null),
+             activo:(u?u.activo:true), fuera:true});
+  });
   ls.sort(entLoteCmpSel);
-  // Un lote en cero YA ELEGIDO no se esconde: esconderlo borraría de la vista
-  // una cantidad que sigue contando en la línea.
-  const enCero=ls.filter(function(L){ return L.saldo!=null && L.saldo<=0 && cur.lotes[L.canon]==null; });
-  const vis=_rp.verCeros ? ls : ls.filter(function(L){ return enCero.indexOf(L)<0; });
-  if(!ls.length) h+='<div class="cl-none">Sin lotes de este producto en la ventana. Agregalo a mano.</div>';
-  else if(!vis.length) h+='<div class="cl-none">Ningún lote de este producto tiene saldo.</div>';
-  vis.forEach(function(L){
+  if(!ls.length) h+='<div class="cl-none">'
+    +(_rpCorteMs==null
+       ? 'Sin lotes de este producto en la ventana. Agregalo a mano.'
+       : 'No queda saldo de ningún lote de este producto. Si todavía hay cajas en el '
+        +'congelador, agregalo a mano.')
+    +'</div>';
+  ls.forEach(function(L){
     const sel=cur.lotes[L.canon]!=null, ago=(L.saldo!=null&&L.saldo<=0);
     h+='<div class="rp-lote'+(sel?' on':'')+(ago?' ago':'')+(L.activo?'':' viejo')+'">'
       +'<button class="rp-lotebtn" onclick="rpToggleLote(\''+esc(L.canon).replace(/'/g,'&#39;')+'\')">'
       // El nombre del lote, en su propio span y con nowrap: es el dato principal
       // y no puede ser el que ceda el ancho. Ver el CSS de .rp-lote-n.
       +'<span class="rp-lote-n">'+esc(L.canon)+'</span>'
-      +(L.saldo!=null?('<span class="rp-saldo">'+(ago?'agotado':('quedan '+esc(_lotUds(L.saldo,pid))))+'</span>')
-                     :(L.extra?'<span class="rp-saldo">agregado</span>':''))
+      // Un rescatado dice POR QUÉ sigue en la lista. Sin ese rótulo parecería que
+      // el filtro no corrió, que es justo lo contrario de lo que pasó.
+      +(L.fuera ? '<span class="rp-saldo">ya elegido — sin saldo</span>'
+       : (L.saldo!=null?('<span class="rp-saldo">'+(ago?'agotado':('quedan '+esc(_lotUds(L.saldo,pid))))+'</span>')
+                       :(L.extra?'<span class="rp-saldo">agregado</span>':'')))
       +'</button>'
       +(sel?('<input type="number" min="0" step="1" inputmode="numeric" class="cl-in rp-lotein rp-dest" value="'+esc(cur.lotes[L.canon])+'" '
         +'oninput="_rp.cur.lotes[\''+esc(L.canon).replace(/'/g,'&#39;')+'\']=this.value;rpValidarLotes();boGuardarManual(true)">'):'')
       +'</div>';
   });
-  if(enCero.length) h+='<button class="rp-ceros" onclick="_rp.verCeros=!_rp.verCeros;rpRender()">'
-    +(_rp.verCeros?'ocultar los ':'ver los ')+enCero.length+' en cero</button>';
   h+='<div><button class="btn btn-sm cl-add" onclick="rpLoteManual()">Agregar un lote que no está</button></div>'
+    +rpIndetHtml()
     +'<div id="rpLoteMsg" class="rp-nota"></div></div>';
   return h;
+}
+
+// ── EL CENTINELA "NO DETERMINADO", TAMBIÉN ACÁ (15-sep-2026) ─────────────
+// Existía solo en el camino con factura. EL HUECO, medido: `rpValidarLotes` exige
+// al menos un lote y que los lotes sumen la cantidad exacta — así que una salida
+// de la que NO se sabe el lote (el sticker que se cayó, el chofer que no anotó)
+// no se podía registrar de ninguna forma en esta pantalla. La salida ocurrió
+// igual: lo único que faltaba era dónde escribirla, y lo que se escribe cuando no
+// hay dónde es un lote inventado.
+//
+// NO ES UN LOTE DE LA LISTA, y por eso va en bloque propio al pie:
+// `entLotesSelector` lo excluye POR NOMBRE a propósito —'NO DETERMINADO' no es
+// una caja que se pueda ir a buscar al congelador— y ese comentario ya dejaba
+// anunciada esta excepción.
+//
+// RESTA DEL SALDO IGUAL: el producto SÍ salió. (La marca "no se entrega" de
+// Despachos es lo opuesto y no aplica acá: sin factura no hay línea previa que
+// marcar — se declara lo que salió, y lo que no salió no se escribe.)
+function rpIndetHtml(){
+  const cur=_rp.cur, on=(cur.lotes[ENT_LOTE_INDET]!=null);
+  if(!on && !cur.indetAbierto)
+    return '<div><button class="rp-ceros" onclick="rpIndetAbrir()">No sé de qué lote salió</button></div>';
+  if(!on){
+    // LOS MISMOS CUATRO MOTIVOS QUE EL CAMINO CON FACTURA, de la misma constante.
+    // La lista la exige la base (`ent_alisto_lote_motivo_ok`); una segunda copia
+    // acá sería una que se desincroniza el día que la lista cambie.
+    let c='<div class="rp-indet"><div class="rp-sec-t">No sé de qué lote salió</div>'
+      +'<div class="nm-grupo">';
+    ENT_INDET_MOTIVOS.forEach(function(m){
+      c+='<label class="nm-op"><input type="radio" name="rpIdMot" '
+        +'onchange="rpIndetElegir(\''+m.v+'\')">'
+        +'<span><span class="nm-op-t">'+esc(m.t)+'</span></span></label>'; });
+    return c+'</div>'
+      +'<div class="rp-nota">Esto dice que el producto SÍ salió del congelador y que no '
+      +'se pudo identificar de qué lote. Resta del saldo igual, sin poder imputarse. '
+      +'Una socia lo resuelve después.</div>'
+      +'<button class="rp-ceros" onclick="_rp.cur.indetAbierto=false;rpRender()">cancelar</button>'
+      +'</div>';
+  }
+  return '<div class="rp-indet on">'
+    +'<div class="dp-ind-av"><span class="dp-ind-pill">salió sin lote</span>'
+    +'<span class="dp-ind-mot">'+esc(_despIndetTxt((cur.indet&&cur.indet.motivo)||''))+'</span></div>'
+    +'<div class="rp-lote on" style="margin-top:8px">'
+    +'<button class="rp-lotebtn" onclick="rpIndetQuitar()">'
+    +'<span class="rp-lote-n">'+esc(ENT_LOTE_INDET)+'</span>'
+    +'<span class="rp-saldo">quitar</span></button>'
+    +'<input type="number" min="0" step="1" inputmode="numeric" class="cl-in rp-lotein rp-dest" '
+    +'value="'+esc(cur.lotes[ENT_LOTE_INDET])+'" '
+    +'oninput="_rp.cur.lotes[\''+ENT_LOTE_INDET+'\']=this.value;rpValidarLotes();boGuardarManual(true)">'
+    +'</div></div>';
+}
+function rpIndetAbrir(){ _rp.cur.indetAbierto=true;
+  _despQuien();                      // se pide ya, para que este cuando elija
+  rpRender(); }
+async function rpIndetElegir(m){
+  const cur=_rp.cur, quien=await _despQuien();
+  // EL MOTIVO Y EL CENTINELA NACEN JUNTOS, en el mismo gesto. Es lo que evita el
+  // estado intermedio "centinela sin motivo" que el 8-sep hubo que corregir a
+  // mano en seis filas.
+  cur.indet={motivo:m, por:(quien||'desconocido'), en:new Date().toISOString()};
+  cur.indetAbierto=false;
+  // al elegirlo se llena con lo que FALTA, igual que `rpToggleLote`
+  const total=+cur.cant||0;
+  const usado=Object.values(cur.lotes).reduce(function(s,v){return s+(+v||0);},0);
+  cur.lotes[ENT_LOTE_INDET]=Math.max(0,total-usado)||total;
+  boGuardarManual(false);
+  rpRender();
+}
+function rpIndetQuitar(){
+  const cur=_rp.cur;
+  delete cur.lotes[ENT_LOTE_INDET];
+  cur.indet=null; cur.indetAbierto=false;
+  boGuardarManual(false);
+  rpRender();
 }
 function rpToggleLote(canon){
   const cur=_rp.cur;
@@ -12242,11 +12453,25 @@ function rpLoteManual(){
   const pid=_rp.cur.pid; if(!pid) return;
   const v=prompt('Lote de '+((NIV_INFO[pid]&&NIV_INFO[pid].nom)||pid)+' que no está en la lista\n(forma "154 / 12-26"):');
   if(!v||!String(v).trim()) return;
-  // Igual que en el conteo y en Despachos: se guarda canónico, nunca lo tecleado.
-  const crudo=String(v).trim(), cn=_entCanon(crudo);
-  if(!cn && !confirm('No pude leer "'+crudo+'" como lote; la forma es "154 / 12-26". Lo guardo tal cual, '
-                    +'pero así no cruza con ningún lote de Odoo.\n\n¿Lo dejo igual?')) return;
-  const canon=cn||crudo;
+  // ⚠️ AHORA SE VERIFICA, IGUAL QUE EL CAMINO CON FACTURA (15-sep). Hasta hoy
+  // esta función canonizaba el texto y lo agregaba sin mirar nada: es exactamente
+  // el caso del 18-ago —se escribió "183 - 12/26" y el lote real era "183 / 1-27"—
+  // en la única pantalla donde el aviso que se construyó para ése nunca llegó.
+  // Un lote inventado no es un registro sin efecto: las unidades salen contra una
+  // clave `producto|lote` que no le corresponde a ninguna orden de Odoo, así que
+  // el lote REAL conserva su saldo completo para siempre y la disponibilidad
+  // queda inflada, en silencio.
+  // NO SE BLOQUEA —el congelador físico manda sobre el sistema—: se avisa, y el
+  // aviso ofrece el lote parecido, que en aquel caso era el correcto.
+  // ⚠️ SE LE PASAN LAS CARGAS DE ESTA PANTALLA. `_loteConocido` leía `_despLotes`
+  // y `_despSaldo` a la fuerza, y acá pueden estar vacíos (son de otra pantalla):
+  // habría contestado "no existe" sobre absolutamente cualquier lote.
+  const r=_loteConocido(pid, v, _rpLotes, _rpSaldo);
+  // 'formato' no interrumpe: existe, se escribe distinto, se guarda canónico y la
+  // corrección se ve sola en el renglón. Los otros dos sí preguntan.
+  if((r.nivel==='desconocido' || r.nivel==='ilegible')
+     && !confirm(r.msg+'\n\n¿Lo agrego igual?')) return;
+  const canon=r.canon;
   _rp._extra=_rp._extra||{}; _rp._extra[pid]=_rp._extra[pid]||[];
   if(_rp._extra[pid].indexOf(canon)<0) _rp._extra[pid].push(canon);
   rpRender();
@@ -12256,7 +12481,17 @@ function rpValidarLotes(){
   const total=+cur.cant||0;
   const suma=Object.values(cur.lotes).reduce(function(s,v){return s+(+v||0);},0);
   const ks=Object.keys(cur.lotes);
-  if(!ks.length){ el.textContent='Falta elegir el lote.'; return false; }
+  // ⚠️ EL CENTINELA CUENTA COMO LOTE, y es la razón de existir del bloque de
+  // arriba: hasta el 15-sep ESTA función era la que hacía imposible registrar una
+  // salida sin lote conocido. Pedía un lote, y el único "lote" honesto en ese caso
+  // no se podía elegir en esta pantalla. La salida ocurría igual.
+  if(!ks.length){ el.textContent='Falta elegir el lote. Si no se sabe de cuál salió, '
+    +'está el botón "No sé de qué lote salió".'; return false; }
+  // Lo que NO se afloja es el motivo: la base lo exige (`ent_alisto_lote_motivo_ok`
+  // pide los tres campos cuando el lote es 'NO DETERMINADO') y además es EL dato
+  // que le deja a una socia resolverlo después. Sin él, "no sé" no dice nada.
+  if(cur.lotes[ENT_LOTE_INDET]!=null && !(cur.indet&&cur.indet.motivo)){
+    el.textContent='Falta decir por qué no se sabe el lote.'; return false; }
   if(Math.abs(suma-total)>0.001){
     el.textContent='Los lotes suman '+_rzN(suma)+' y la cantidad es '+_rzN(total)+' — tiene que dar igual.';
     return false;
@@ -12271,16 +12506,27 @@ function rpAgregarLinea(){
   if(!rpValidarLotes()){ pon(''); return; }
   const uds=rpUdsDe(cur.pid,cur.pres,+cur.cant);
   const lotes=Object.keys(cur.lotes).map(function(cn,i){
-    return {lote:cn, cant_present:+cur.lotes[cn], cant_uds:rpUdsDe(cur.pid,cur.pres,+cur.lotes[cn]), orden:i}; });
+    const o={lote:cn, cant_present:+cur.lotes[cn],
+             cant_uds:rpUdsDe(cur.pid,cur.pres,+cur.lotes[cn]), orden:i};
+    // EL CENTINELA VIAJA CON SU MOTIVO, pegado a la fila que lo lleva. Guardarlo
+    // aparte sería volver a abrir el estado "centinela sin motivo".
+    if(cn===ENT_LOTE_INDET && cur.indet) o.indet=cur.indet;
+    return o; });
   _rp.lineas.push({producto_id:cur.pid, presentacion:cur.pres, cant_present:+cur.cant, cant_uds:uds, lotes:lotes});
-  _rp.cur={pid:null, cant:'', pres:cur.pres, lotes:{}};   // conserva la presentación: cliente y fecha ya viven arriba
+  _rp.cur={pid:null, cant:'', pres:cur.pres, lotes:{}, indet:null, indetAbierto:false};   // conserva la presentación: cliente y fecha ya viven arriba
   boGuardarManual(false);
   rpRender();
 }
 function rpEditarLinea(i){
   const l=_rp.lineas.splice(i,1)[0]; if(!l) return;
-  const lotes={}; l.lotes.forEach(function(x){ lotes[x.lote]=x.cant_present; });
-  _rp.cur={pid:l.producto_id, cant:String(l.cant_present), pres:l.presentacion, lotes:lotes};
+  // El motivo del centinela vuelve con la línea: reabrirla no puede perderlo, o
+  // el guardado siguiente choca contra `ent_alisto_lote_motivo_ok` sin que se
+  // entienda por qué. Y un lote que mientras tanto quedó sin saldo vuelve igual a
+  // la lista — ver la regla del `246 / 3-27` en `rpLotesHtml`.
+  const lotes={}; let ind=null;
+  l.lotes.forEach(function(x){ lotes[x.lote]=x.cant_present; if(x.indet) ind=x.indet; });
+  _rp.cur={pid:l.producto_id, cant:String(l.cant_present), pres:l.presentacion,
+           lotes:lotes, indet:ind, indetAbierto:false};
   boGuardarManual(false);
   rpRender();
 }
@@ -12337,7 +12583,16 @@ async function rpGuardar(){
         alisto_id:al.id, producto_id:l.producto_id, cant_uds:l.cant_uds }).select('id').single();
       if(e4) throw e4;
       const {error:e5}=await c.from('ent_alisto_lote').insert(l.lotes.map(function(x){
-        return {linea_id:ali.id, lote:x.lote, cant_uds:x.cant_uds, orden:x.orden}; }));
+        const fl={linea_id:ali.id, lote:x.lote, cant_uds:x.cant_uds, orden:x.orden};
+        // EL CENTINELA VIAJA CON SU MOTIVO, en la MISMA fila y el MISMO insert,
+        // igual que en `despConfirmar`. `ent_alisto_lote_motivo_ok` lo exige: con
+        // lote = 'NO DETERMINADO' las tres columnas son obligatorias.
+        if(x.lote===ENT_LOTE_INDET && x.indet){
+          fl.motivo_indeterminado=x.indet.motivo;
+          fl.indeterminado_por=x.indet.por;
+          fl.indeterminado_en=x.indet.en;
+        }
+        return fl; }));
       if(e5) throw e5;
     }
     // El Reporte de despacho se llena DESPUÉS de que la salida ocurrió: no es una
