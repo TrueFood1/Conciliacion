@@ -1,6 +1,22 @@
 -- ════════════════════════════════════════════════════════════════════════
 -- CAMBIO_DEVOLUCIONES.sql · 16-sep-2026
--- Preparado. NO SE CORRIO.
+-- ⚠️⚠️ APLICADO EL 16-sep-2026 POR ANDREA. §A + §B + §C, en la transaccion unica.
+--
+-- 🔴 **APLICADO SIN VERIFICAR CON LAS NUEVE PRUEBAS.** D0 a D8 NO se corrieron.
+--    Esperan al usuario de pruebas que se esta diseñando (PENDIENTES H3): son
+--    nueve pegados a mano hoy, o cero en un par de dias. Decision de Andrea.
+--
+-- 🔴 **NO PUBLICAR NINGUNA PANTALLA DE DEVOLUCIONES HASTA QUE LAS NUEVE HAYAN
+--    CORRIDO.** El esquema aplicado no rompe nada por si solo —hoy no hay
+--    codigo que escriba en ninguna de estas tablas— pero eso deja de ser cierto
+--    en el momento en que exista la pantalla. Es el incidente del 17-ago al
+--    reves: alla se publico codigo sin el SQL; aca hay SQL sin verificar, y
+--    publicar encima lo convertiria en el mismo problema.
+--
+-- QUE SI SE VERIFICO al aplicar: las tres P0 (la escalera anda, el candado del
+-- lote rechaza "183 - 12/26", y el agujero de pedido/causa existia), mas la
+-- verificacion V1/V3/V5/V6 de que las columnas y las tablas quedaron y de que
+-- no se movio ni una fila.
 --
 -- Tres cosas, y ninguna se puede pegar sola:
 --   §A  `ent_devolucion` gana `pedido_id` y `causa`.
@@ -622,6 +638,12 @@ select table_name, privilege_type, grantee
  order by 1,2;
 
 -- V5 · ⚠️ NADA SE MOVIO. Tiene que dar EXACTAMENTE lo mismo que 0e.
+--      MEDIDO en 0e el 16-sep: **0 filas**. Asi que V5 tiene que dar 0 filas.
+--      Si devuelve aunque sea una, algo escribio: §A/§B/§C no insertan nada y las
+--      pruebas van todas en rollback. Seria el momento de parar y mirar que.
+--      (Ojo: 0 filas no es "no hay devoluciones que contar". La vista filtra por
+--      `recibido_en > corte`, y ademas ent_devolucion esta vacia — las dos cosas
+--      dan 0 y por caminos distintos.)
 select producto_id, sum(uds) as uds, count(*) as filas
   from ent_devuelto_desde_ancla group by 1 order by 1;
 
