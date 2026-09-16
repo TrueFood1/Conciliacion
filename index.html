@@ -2590,60 +2590,84 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    NO es una pantalla de autorización. El pan ya salió o ya no salió: no hay nada
    que decidir, y por eso el botón dice "Visto" y no "Autorizar". La fila EN la
    tabla es el visto — no hay columna que interpretar.
-   AGRUPADO POR PEDIDO, que es la unidad en la que se mira: la socia no revisa
-   líneas sueltas, revisa "qué pasó con el pedido de Green Center".
    UNA SOLA RAMA: solo las marcadas "no se entrega" (decisión de Andrea, 16-sep;
    el porqué está entero en pdLeer). Una salida "sin lote" no es un pendiente, es
-   historia: nadie va a saber nunca de qué lote salió, el sistema ya descuenta
-   bien, y la diferencia se salda al volver a contar. Estaban acá solo porque el
-   criterio de la vista —"el lote dice NO DETERMINADO"— es cierto para siempre.
-   LA PÍLDORA ES LA DEL ALISTO, tal cual: `.dp-nm-pill`, gris sólida. Se REUSA la
-   clase, no se copia — una segunda redacción del mismo color es la que se
-   desincroniza. */
+   historia.
+   ── LA JERARQUÍA, que es lo que se rehízo el 16-sep ──────────────────────
+   El cliente es el ENCABEZADO DEL GRUPO y el producto un ÍTEM adentro. Antes
+   estaban a 13,5px/500 y 12,5px/500: un punto y medio de diferencia y nada más,
+   así que el cliente se leía como un producto más de la lista.
+   Se separan por TAMAÑO, PESO y AIRE, no por color — el color en este módulo ya
+   tiene significados tomados (ámbar "mirá esto", gris "no salió", rojo "no sirve")
+   y gastar uno en jerarquía se los come.
+     · cliente  15px / 600 / -.02em de tracking — el mismo tratamiento que
+                `.card-title` y `.m3title`, que son los otros encabezados de la app
+     · producto 13px / 500 — dos puntos menos y un escalón de peso
+   El renglón gris del pedido va en medio, y el borde superior de la primera fila
+   hace de subrayado del encabezado: no hace falta una regla de más. */
 .pd-exc-ped{border:1px solid var(--border);border-radius:10px;background:var(--sunken);
-  padding:11px 12px;margin-bottom:9px}
+  padding:11px 12px 2px;margin-bottom:9px}
 .pd-exc-cab{display:flex;align-items:baseline;justify-content:space-between;gap:9px;flex-wrap:wrap}
-.pd-exc-cli{font-size:13.5px;color:var(--text);font-weight:500;min-width:0}
+.pd-exc-cli{font-size:15px;color:var(--text);font-weight:600;letter-spacing:-.02em;min-width:0}
 /* Los días que lleva esperando son EL dato de esta pantalla: no es cuántas son,
    es hace cuánto que nadie las mira. Por eso van a la derecha y en tabular. */
 .pd-exc-dias{font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums;white-space:nowrap}
-.pd-exc-meta{font-size:11px;color:var(--text-3);margin-top:3px;font-variant-numeric:tabular-nums}
-.pd-exc-lin{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
-  padding:9px 0 0;margin-top:9px;border-top:1px solid var(--border)}
-.pd-exc-c{min-width:0;flex:1}
-.pd-exc-prod{font-size:12.5px;color:var(--text-2);line-height:1.4}
+.pd-exc-meta{font-size:11px;color:var(--text-3);margin-top:3px;padding-bottom:9px;
+  font-variant-numeric:tabular-nums}
+/* ── LA FILA · UNA fila, no un bloque ────────────────────────────────────
+   DOS renglones y siempre los mismos: arriba qué es, abajo por qué. Se tiene que
+   poder barrer con la vista.
+   ⚠️ ES UNA REJILLA Y NO UNA COLUMNA DE TEXTO CON BOTONES AL LADO, y la razón se
+   midió a 375px: con los botones ocupando su columna a lo alto de toda la fila, al
+   renglón del producto le quedaban 180px y necesitaba 220 —"Pan de Semillas · 6 u"
+   más la marca—, así que se partía y cada fila pasaba a TRES renglones. Acortar la
+   marca no alcanzaba: "no se entrega" apretada seguía pidiendo 212.
+   Con la rejilla, el renglón de arriba cruza las DOS columnas y dispone de los 283
+   completos; los botones se apoyan en el renglón de abajo, al lado del motivo, que
+   además es donde se está mirando cuando se decide tocarlos. */
+.pd-exc-lin{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;
+  align-items:center;padding:9px 0;border-top:1px solid var(--border)}
+.pd-exc-prod{grid-column:1/-1}
+.pd-exc-det{grid-column:1}
+.pd-exc-acc{grid-column:2}
+/* Sin motivo —no debería pasar, la base lo exige— la rejilla ya hace lo correcto
+   sola: el renglón 1 está ocupado entero por el producto, así que los botones caen
+   al 2 por colocación automática. No hace falta una regla, y la que había escrito
+   acá no hacía nada (verificado). */
+.pd-exc-prod{font-size:13px;color:var(--text-2);line-height:1.4}
 .pd-exc-prod b{color:var(--text);font-weight:500}
-.pd-exc-det{font-size:11.5px;color:var(--text-2);line-height:1.5;margin-top:3px;word-break:break-word}
+/* ⚠️ DOS COSAS QUE NO SE PARTEN NUNCA, las dos medidas a 375px:
+   · la marca se partía en "NO SE / ENTREGA". Con `nowrap` baja ENTERA al renglón
+     de abajo si no entra, que es lo que una marca tiene que hacer. Va scopeado y
+     no sobre `.cl-badge-b`, que es del sistema de diseño compartido: acá hace
+     falta por el largo de ESTE texto.
+   · la CANTIDAD se partía del número: "Pan de Semillas · 6" y abajo "u". Eso es
+     exactamente lo que el módulo no puede hacer — la unidad de manejo es parte
+     del número ("6 paq" y "6 u" son cantidades distintas) y separarlas invita a
+     leer el número solo. Mismo criterio que `.cl-lote`, que tampoco se parte. */
+.pd-exc-prod .cl-badge-b{white-space:nowrap;letter-spacing:.02em;padding:1px 5px;margin-left:5px}
+.pd-exc-cant{white-space:nowrap}
+/* El motivo y la nota, en gris, debajo. El motivo pesa un escalón más que la nota
+   porque es el dato; la nota es el matiz. */
+.pd-exc-det{font-size:11.5px;color:var(--text-3);line-height:1.45;margin-top:2px;
+  word-break:break-word}
+.pd-exc-det b{color:var(--text-2);font-weight:500}
 .pd-exc-nota{font-style:italic}
-/* ⚠️ MEDIDO: las seis filas del 8-sep traen la MISMA nota de migracion de ~190
-   caracteres. Sin recorte, seis parrafos identicos se comian la pantalla entera y
-   tapaban las cuatro lineas que SI tienen boton. Se recorta a tres renglones y se
-   despliega al tocar: recortar no es esconder si se puede abrir, y el dato sigue
-   entero en la fila. */
-.pd-exc-det.cortada{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
+/* ⚠️ MEDIDO: las notas de migración del 8-sep traen ~190 caracteres. Sin recorte
+   una sola fila se comía la pantalla y tapaba a las otras. DOS renglones, y se
+   despliega al tocar: recortar no es esconder si se puede abrir. */
+.pd-exc-det.cortada{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   overflow:hidden;cursor:pointer}
-/* El correo NO se parte: `word-break:break-word` del contenedor lo cortaba en
-   "andrea@truefoodcr.co / m", que se lee como un dato roto. Elipsis. */
-.pd-exc-firma{color:var(--text-3);font-size:11px;margin-top:2px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* La píldora va arriba de todo en su renglón: es lo que dice DE QUÉ tipo es la
-   fila, y se lee antes que el producto. Las dos se encogen, nunca se parten. */
-.pd-exc-tipo{margin-bottom:5px}
-/* ⚠️ MEDIDO A 375px: `.dp-nm-pill` es `display:flex` porque en el alisto ocupa
-   una columna entera y ahi eso esta bien. Reusada aca se estiraba a TODO el ancho
-   y quedaba una barra gris enorme, cuatro veces mas pesada que la pildora ambar de
-   al lado — dos cosas que valen lo mismo pintadas con pesos distintos. Se corrige
-   el display, que es lo unico que cambia de contexto; el color y la forma se
-   respetan tal cual. */
-.pd-exc-tipo .dp-nm-pill{display:inline-flex}
-.pd-exc-acc{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:5px}
-/* "Agregar nota" es un enlace, no un botón: la nota es OPCIONAL y un segundo
-   botón al lado de "Visto" haría parecer que hay dos caminos. Hay uno. */
-.pd-exc-mas{background:none;border:none;color:var(--text-3);font:inherit;font-size:11px;
-  padding:0;cursor:pointer;text-decoration:underline}
+/* La acción: el enlace primero y el botón después, contra el borde. "Nota" es un
+   enlace y no un botón porque la nota es OPCIONAL — dos botones harían parecer
+   que hay dos caminos, y hay uno. */
+.pd-exc-acc{flex:none;display:flex;align-items:center;gap:10px}
+.pd-exc-mas{background:none;border:none;color:var(--text-3);font:inherit;font-size:11.5px;
+  padding:0;cursor:pointer;text-decoration:underline;white-space:nowrap}
 .pd-exc-mas:hover{color:var(--text-2)}
+.pd-exc-mas.on{color:var(--text-2)}
 .pd-exc-nn{width:100%;box-sizing:border-box;background:var(--field);border:1px solid var(--border-strong);
-  border-radius:8px;color:var(--text);font:inherit;font-size:16px;padding:8px 10px;margin:6px 0 8px;resize:vertical}
+  border-radius:8px;color:var(--text);font:inherit;font-size:16px;padding:8px 10px;margin:0 0 9px;resize:vertical}
 @media(max-width:700px){
   .rp-prods{grid-template-columns:repeat(2,1fr)}
   .rp-prod{padding:16px 6px;font-size:14px}
@@ -13335,10 +13359,11 @@ function pdExcHTML(){
   // El contador cuenta LO QUE SE DIBUJA, por la misma razón.
   const total=orden.reduce(function(a,id){ return a+porPed[id].length; },0);
 
+  // Sin párrafo explicativo (decisión de Andrea, 16-sep): la tarjeta se explica
+  // sola. El título dice qué es, la marca de cada fila dice qué pasó y el botón
+  // dice qué hacer. Un párrafo que repite eso es el que nadie lee.
   let h='<div class="card rp-z"><div class="card-title">Por resolver'
-    +' <span class="pd-cnt on">'+total+'</span></div>'
-    +'<div class="rp-nota" style="margin:-4px 0 10px">Líneas marcadas «no se entrega» que ninguna socia miró todavía. '
-    +'«Visto» no autoriza ni deshace nada —el pan ya salió o ya no salió—: deja escrito que alguien las miró.</div>';
+    +' <span class="pd-cnt on">'+total+'</span></div>';
 
   peds.forEach(function(p){
     const ls=porPed[p.pedido_id]||[];
@@ -13359,23 +13384,25 @@ function pdExcHTML(){
       // pantalla no empiece a dibujar filas sin botón en silencio.
       if(l.tipo!=='no_se_entrega') return;
       const lid=l.alisto_linea_id;
-      h+='<div class="pd-exc-lin"><div class="pd-exc-c">'
-        // La píldora del alisto, TAL CUAL. Se queda aunque ahora todas las filas
-        // sean del mismo tipo: es la marca que la socia ya leyó en la pantalla de
-        // alisto, y reusarla es lo que hace que las dos pantallas hablen igual.
-        +'<div class="pd-exc-tipo"><span class="dp-nm-pill">no se entrega</span></div>'
+      // ⚠️ LA MARCA VA AL LADO DEL PRODUCTO, no arriba en su propio renglón, y
+      // usa `.cl-badge-b` —el chip neutro del sistema de diseño: 9,5px, versalitas,
+      // contorno gris— en vez de `.dp-nm-pill`. La píldora del alisto es un bloque
+      // sólido porque allá ES la noticia de la tarjeta; acá todas las filas son lo
+      // mismo, así que repetirla cuatro veces en bloque era una columna de barras
+      // grises compitiendo con los nombres. `cl-` está en los diez prefijos que el
+      // barrido del 15-sep declaró sistema de diseño compartido (pendiente 23):
+      // reusarlo es lo correcto, escribir un doceavo chip gris es lo que se
+      // desincroniza.
+      // SIN CORREO (decisión de Andrea, 16-sep): en esta lista siempre es Daniel o
+      // una socia. Quién firmó sigue entero en la tabla y se ve en el Historial.
+      h+='<div class="pd-exc-lin">'
         +'<div class="pd-exc-prod"><b>'+esc(_lotNom(l.producto_id))+'</b> · '
-        +esc(_lotUds(l.cant_uds, l.producto_id))+'</div>'
+        +'<span class="pd-exc-cant">'+esc(_lotUds(l.cant_uds, l.producto_id))+'</span>'
+        +'<span class="cl-badge-b">no se entrega</span></div>'
         +'<div class="pd-exc-det'+(l.nota?' cortada':'')+'"'
         +(l.nota?' onclick="this.classList.toggle(\'cortada\')"':'')
         +'><b>'+esc(_pdExcMot(l.tipo,l.motivo))+'</b>'
         +(l.nota?(' · <span class="pd-exc-nota">'+esc(l.nota)+'</span>'):'')
-        +'</div>'
-        // ⚠️ LA FIRMA VA FUERA DEL DIV RECORTADO, y esto se midió: metida adentro, el
-        // `-webkit-line-clamp` de la nota se la comía junto con el resto del cuarto
-        // renglón y las seis filas del 8-sep quedaban SIN FIRMA en pantalla. Quién
-        // registró la excepción es justamente lo que la socia viene a mirar.
-        +'<div class="pd-exc-firma">'+esc(l.registrada_por||'—')+'</div>'
         +'</div>';
 
       // TODAS las filas de esta tarjeta tienen botón, y eso no es casualidad: es
@@ -13385,11 +13412,14 @@ function pdExcHTML(){
       // rama tiene a qué colgarse. Mientras la lista y la acción salgan del mismo
       // criterio, no puede volver a aparecer una fila que no se pueda tocar.
       const ocupada=(_pdExcGuardando===lid);
+      // "Nota" NO desaparece al abrirse: es el mismo enlace que abre y cierra. Antes
+      // se escondía mientras el campo estaba abierto y no quedaba forma de cerrarlo
+      // sin guardar.
       h+='<div class="pd-exc-acc">'
+        +'<button class="pd-exc-mas'+(_pdExcAbierta===lid?' on':'')
+        +'" onclick="pdExcNota('+lid+')">Nota</button>'
         +'<button class="btn btn-sm pd-acc"'+(ocupada?' disabled':'')
         +' onclick="pdVisto('+lid+')">'+(ocupada?'Guardando…':'Visto')+'</button>'
-        +(_pdExcAbierta===lid?''
-          :'<button class="pd-exc-mas" onclick="pdExcNota('+lid+')">Agregar nota</button>')
         +'</div></div>';
       if(_pdExcAbierta===lid){
         // La nota es OPCIONAL —la base ya no la exige— así que el campo no bloquea
