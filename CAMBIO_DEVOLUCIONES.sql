@@ -440,6 +440,39 @@ comment on table ent_odoo_pendiente is
   'tipo = nota_credito (nace de una devolucion) | traslado_interno (nace de una entrega '
   'sin factura). NO escribe en Odoo. Hecho se marca insertando en ent_odoo_hecho.';
 
+
+-- ── LA PRUEBA DE QUE ESTO CORRIO · ADENTRO DE LA TRANSACCION ────────────
+-- ⚠️ ESPERADO: **2 · 1 · 3**. Una fila, tres numeros.
+--
+-- POR QUE EXISTE, medido el 16-sep: el primer intento de pegar este bloque
+-- devolvio "Success. No rows returned" y NO APLICO NADA — ni una columna, ni el
+-- check, ni una tabla. Un "Success" del editor no prueba que el DDL entro, y
+-- sobre ese Success se llego a escribir en el header y en la bitacora que el
+-- cambio estaba aplicado. Durante unos minutos los dos decian algo falso.
+--
+-- Con esta consulta eso no puede volver a pasar en silencio:
+--   · si el editor muestra la fila con 2 · 1 · 3 -> corrio hasta el final;
+--   · si vuelve a decir "Success. No rows returned" -> NI SIQUIERA LLEGO ACA,
+--     y se sabe en el momento en vez de dos pasos despues.
+--
+-- ⚠️ VA ADENTRO DEL begin/commit A PROPOSITO. Afuera mediria otra cosa: que el
+-- cambio quedo. Aca mide que la transaccion llego al final, que es la pregunta
+-- que el "Success" dejo sin contestar. Las dos hacen falta — V1/V3/V5/V6 siguen
+-- corriendose DESPUES.
+--
+-- ⚠️ Y SI DA OTROS NUMEROS, no hay que limpiar nada: la transaccion todavia no
+-- commiteo. Un `rollback;` a mano, o cerrar la pestaña, y la base queda intacta.
+select (select count(*) from information_schema.columns
+         where table_name = 'ent_devolucion'
+           and column_name in ('pedido_id','causa'))              as columnas_nuevas,
+       (select count(*) from pg_constraint
+         where conname = 'ent_devolucion_causa_ok')               as check_nuevo,
+       (select count(*) from pg_class c
+          join pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = 'public'
+           and c.relname in ('ent_odoo_pendiente','ent_odoo_pendiente_linea',
+                             'ent_odoo_hecho'))                   as tablas_nuevas;
+
 commit;
 
 
