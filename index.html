@@ -8709,7 +8709,8 @@ function _rpReset(todo){
   // el filtro viejo de saldo<=0 — ver el comentario de `rpLotesHtml`.
   _rp={fecha:fecha, fechaDia:_despHoy(), cliente:null, tipo:null, motivo:null,
        destinatario:'', lineas:[],
-       cur:{pid:null, cant:'', pres:'uds', lotes:{}, indet:null, indetAbierto:false}};
+       cur:{pid:null, cant:'', pres:'uds', lotes:{}, indet:null, indetAbierto:false,
+            indetSel:'', indetNota:''}};
 }
 // ── LOS MOTIVOS DE UNA SALIDA SIN FACTURA ───────────────────────────────
 // Lista cerrada, sin texto libre: el motivo es EL DATO —dentro de seis meses lo
@@ -10256,7 +10257,8 @@ function boAbrirManual(ref){
   irAReporte();                                 // esto ya pone la fecha de HOY
   if(m){
     _rp.lineas=m.lineas||[];
-    _rp.cur=m.cur||{pid:null,cant:'',pres:'uds',lotes:{},indet:null,indetAbierto:false};
+    _rp.cur=m.cur||{pid:null,cant:'',pres:'uds',lotes:{},indet:null,indetAbierto:false,
+                    indetSel:'',indetNota:''};
     // Un selector de motivos a medio abrir no es estado que valga la pena
     // resucitar; el motivo YA elegido (`cur.indet`) si, y viene en `m.cur`.
     _rp.cur.indetAbierto=false;
@@ -10856,38 +10858,82 @@ function despRenderHojaMotivo(){
 // (Las seis filas del 8-sep llegaron por otro camino —se escribieron con texto
 // libre y se corrigieron despues via ent_alisto_lote_correccion—, asi que NO son
 // el molde: ese es el camino de arreglar lo ya escrito, no el de escribirlo bien.)
+// ⚠️ ESTA ES LA LISTA QUE SE OFRECE, NO LA QUE ACEPTA LA BASE. Son dos cosas
+// distintas y tienen que serlo:
+//   · la base sigue aceptando los CUATRO valores viejos. 'chofer_no_reporto' esta
+//     EN USO —la correccion #1 del 8-sep, sobre ent_alisto_lote 184, la entrega de
+//     Automercado— y sacarlo del CHECK dejaria esa fila invalida. Un valor que ya
+//     se escribio no se puede desescribir cambiando la regla.
+//   · la pantalla ofrece TRES. 'caja_sin_sticker' y 'chofer_no_reporto' salen de
+//     la vista porque en la practica se elegian por descarte y no aportaban nada
+//     que 'no_se_anoto' o una nota no digan mejor.
+// Sacar de la vista ≠ sacar de la base. Confundirlas es como se rompe el historial.
+//
+// EL ORDEN ES EL DE USO, no el alfabetico ni el de nacimiento: 'no_se_anoto' es el
+// de las 2 filas que existen hoy (235 y 236) y de 4 de las 6 correcciones del
+// 8-sep. El mas probable va primero, que es donde cae el pulgar.
+//
+// ⚠️ 'otro' EXIGE EL SQL PEGADO. El CHECK ent_alisto_lote_motivo_ok todavia no lo
+// acepta, y la columna nota_indeterminado todavia no existe: hasta que se pegue
+// `CAMBIO_MOTIVOS_INDET.sql`, elegir "Otro" hace que el insert falle entero.
+// NO PUBLICAR esta version antes de aplicarlo — es el incidente del 17-ago.
 const ENT_INDET_MOTIVOS=[
-  {v:'sticker_caido',    t:'Se cayó el sticker'},
-  {v:'caja_sin_sticker', t:'La caja vino sin sticker'},
-  {v:'chofer_no_reporto',t:'El chofer no reportó los lotes'},
-  {v:'no_se_anoto',      t:'No se anotó al momento'}
+  {v:'no_se_anoto',   t:'No se anotó al momento'},
+  {v:'sticker_caido', t:'Se cayó el sticker'},
+  {v:'otro',          t:'Otro',
+   s:'Cualquier otra razón. Pide una nota, porque "otro" sin explicar no dice nada.'}
 ];
-let _despIDLinea=null, _despIDSlot=0, _despIDMotivo='';
+// El minimo de la nota de 'otro'. LO EXIGE LA BASE, igual que ENT_NM_NOTA_MIN, y
+// es el MISMO numero a proposito: dos minimos distintos para el mismo tipo de
+// campo es una segunda regla que se desincroniza. Ver el 15-sep, cuando el de
+// "no se entrega" bajo de 10 a 6 porque "consigna" (8) no pasaba.
+const ENT_INDET_NOTA_MIN=6;
+let _despIDLinea=null, _despIDSlot=0, _despIDMotivo='', _despIDNota='';
 function despIndetAbrir(i,j){
   const f=_despFacAbierta(); if(!f) return;
-  _despIDLinea=i; _despIDSlot=j; _despIDMotivo='';
+  _despIDLinea=i; _despIDSlot=j; _despIDMotivo=''; _despIDNota='';
   _despQuien();
   despRender();
 }
 function despIndetCerrar(){ _despIDLinea=null; despRender(); }
 function despIndetSetMotivo(m){ _despIDMotivo=m; despRender(); }
+function despIndetSetNota(v){
+  _despIDNota=v;                      // NO se re-renderiza: perderia el cursor
+  const b=document.getElementById('idOk'); if(b) b.disabled=!_despIndetLista();
+}
+function _despIndetLista(){
+  if(!_despIDMotivo) return false;
+  if(_despIDMotivo!=='otro') return true;
+  return String(_despIDNota||'').trim().length>=ENT_INDET_NOTA_MIN;
+}
 async function despIndetConfirmar(){
-  const f=_despFacAbierta(); if(!f || _despIDLinea==null || !_despIDMotivo) return;
+  const f=_despFacAbierta(); if(!f || _despIDLinea==null || !_despIndetLista()) return;
   const i=_despIDLinea, j=_despIDSlot, e=_despEst(f,i);
   const quien=await _despQuien();
   e.lotes[j]=Object.assign({}, e.lotes[j], {
     lote: ENT_LOTE_INDET,
-    indet: {motivo:_despIDMotivo, por:(quien||'desconocido'), en:new Date().toISOString()}
+    // La nota SOLO viaja con 'otro'. Guardarla en los otros dos motivos dejaria
+    // un texto suelto que nadie escribio a proposito.
+    indet: {motivo:_despIDMotivo, nota:(_despIDMotivo==='otro'?_despIDNota.trim():null),
+            por:(quien||'desconocido'), en:new Date().toISOString()}
   });
   if(!e.partido) e.lotes[0].cant=e.cant;
   _despIDLinea=null;
   boGuardarFactura(false);
   despRender();
 }
-function _despIndetTxt(v){
-  const m=ENT_INDET_MOTIVOS.find(function(x){ return x.v===v; });
-  return m?m.t:(v||'—');
-}
+// ⚠️ LOS CUATRO VALORES VIEJOS SIGUEN VIVOS EN LA BASE aunque la pantalla ofrezca
+// tres. Esta tabla es solo para LEER: sin ella, una fila con 'chofer_no_reporto'
+// —la correccion #1 del 8-sep— se mostraria con el valor crudo en vez del texto.
+// Si se borra de aca, el historial empieza a hablar en nombres de columna.
+const ENT_INDET_TXT={
+  no_se_anoto:       'No se anotó al momento',
+  sticker_caido:     'Se cayó el sticker',
+  otro:              'Otro',
+  caja_sin_sticker:  'La caja vino sin sticker',      // ya no se ofrece
+  chofer_no_reporto: 'El chofer no reportó los lotes' // ya no se ofrece · en uso
+};
+function _despIndetTxt(v){ return ENT_INDET_TXT[v] || (v||'—'); }
 function despRenderHojaIndet(){
   if(_despIDLinea==null) return '';
   const f=_despFacAbierta(); if(!f) return '';
@@ -10898,17 +10944,22 @@ function despRenderHojaIndet(){
     cuerpo+='<label class="nm-op'+(sel?' sel':'')+'">'
       +'<input type="radio" name="idMotivo"'+(sel?' checked':'')
       +' onchange="despIndetSetMotivo(\''+m.v+'\')">'
-      +'<span><span class="nm-op-t">'+esc(m.t)+'</span></span></label>';
+      +'<span><span class="nm-op-t">'+esc(m.t)+'</span>'
+      +(m.s?('<span class="nm-op-s">'+esc(m.s)+'</span>'):'')+'</span></label>';
   });
-  cuerpo+='</div>'
-    +'<div class="de-nota">Esto dice que el producto SÍ salió del congelador y que no '
+  cuerpo+='</div>';
+  if(_despIDMotivo==='otro')
+    cuerpo+='<textarea class="nm-nota" id="idNota" placeholder="Qué pasó"'
+      +' oninput="despIndetSetNota(this.value)">'+esc(_despIDNota)+'</textarea>';
+  cuerpo+='<div class="de-nota">Esto dice que el producto SÍ salió del congelador y que no '
     +'se pudo identificar de qué lote. Resta del saldo igual, sin poder imputarse. '
     +'Una socia lo resuelve después.</div>';
   return _despDialogoHTML({
     cliente: esc(L.producto),
     sub: 'no sé de qué lote salió',
-    cuerpo: cuerpo, listo: !!_despIDMotivo, ocupado:false,
-    cerrar: 'despIndetCerrar()', ok: 'despIndetConfirmar()', okTxt: 'Registrar'});
+    cuerpo: cuerpo, listo: _despIndetLista(), ocupado:false,
+    cerrar: 'despIndetCerrar()', ok: 'despIndetConfirmar()', okTxt: 'Registrar',
+    okId: 'idOk'});
 }
 function _despMotivoTxt(v){
   const m=ENT_NM_MOTIVOS.find(function(x){ return x.v===v; });
@@ -11113,6 +11164,10 @@ async function despConfirmar(entregar){
             fl.motivo_indeterminado=x.indet.motivo;
             fl.indeterminado_por=x.indet.por;
             fl.indeterminado_en=x.indet.en;
+            // La nota SOLO con 'otro'. El CHECK la exige ahi y la prohibe en los
+            // otros dos: una nota colgada de 'no se anoto' es texto que nadie
+            // escribio para eso.
+            if(x.indet.motivo==='otro') fl.nota_indeterminado=x.indet.nota;
           }
           return fl; });
       if(lotes.length){ const {error:e5}=await c.from('ent_alisto_lote').insert(lotes); if(e5) throw e5; }
@@ -12390,22 +12445,36 @@ function rpIndetHtml(){
     // LOS MISMOS CUATRO MOTIVOS QUE EL CAMINO CON FACTURA, de la misma constante.
     // La lista la exige la base (`ent_alisto_lote_motivo_ok`); una segunda copia
     // acá sería una que se desincroniza el día que la lista cambie.
+    // ⚠️ DOS CAMINOS SEGUN EL MOTIVO. Los dos primeros se confirman de un toque
+    // —era el gesto de antes y no se le cobra el cambio a quien ya lo tiene—; en
+    // 'otro' el toque solo lo SELECCIONA y aparece la nota, porque sin ella la
+    // base rechaza la fila y "otro" no dice nada de todos modos.
+    const pend=cur.indetSel||'';
     let c='<div class="rp-indet"><div class="rp-sec-t">No sé de qué lote salió</div>'
       +'<div class="nm-grupo">';
     ENT_INDET_MOTIVOS.forEach(function(m){
-      c+='<label class="nm-op"><input type="radio" name="rpIdMot" '
-        +'onchange="rpIndetElegir(\''+m.v+'\')">'
-        +'<span><span class="nm-op-t">'+esc(m.t)+'</span></span></label>'; });
-    return c+'</div>'
+      const sel=(pend===m.v);
+      c+='<label class="nm-op'+(sel?' sel':'')+'"><input type="radio" name="rpIdMot"'
+        +(sel?' checked':'')+' onchange="rpIndetElegir(\''+m.v+'\')">'
+        +'<span><span class="nm-op-t">'+esc(m.t)+'</span>'
+        +(m.s?('<span class="nm-op-s">'+esc(m.s)+'</span>'):'')+'</span></label>'; });
+    c+='</div>';
+    if(pend==='otro')
+      c+='<textarea class="nm-nota" id="rpIdNota" placeholder="Qué pasó"'
+        +' oninput="rpIndetSetNota(this.value)">'+esc(cur.indetNota||'')+'</textarea>'
+        +'<div><button class="btn btn-sm" id="rpIdOk"'+(_rpIndetLista()?'':' disabled')
+        +' onclick="rpIndetConfirmar()">Registrar</button></div>';
+    return c
       +'<div class="rp-nota">Esto dice que el producto SÍ salió del congelador y que no '
       +'se pudo identificar de qué lote. Resta del saldo igual, sin poder imputarse. '
       +'Una socia lo resuelve después.</div>'
-      +'<button class="rp-ceros" onclick="_rp.cur.indetAbierto=false;rpRender()">cancelar</button>'
+      +'<button class="rp-ceros" onclick="rpIndetQuitar()">cancelar</button>'
       +'</div>';
   }
   return '<div class="rp-indet on">'
     +'<div class="dp-ind-av"><span class="dp-ind-pill">salió sin lote</span>'
-    +'<span class="dp-ind-mot">'+esc(_despIndetTxt((cur.indet&&cur.indet.motivo)||''))+'</span></div>'
+    +'<span class="dp-ind-mot">'+esc(_despIndetTxt((cur.indet&&cur.indet.motivo)||'')
+      +((cur.indet&&cur.indet.nota)?(' — '+cur.indet.nota):''))+'</span></div>'
     +'<div class="rp-lote on" style="margin-top:8px">'
     +'<button class="rp-lotebtn" onclick="rpIndetQuitar()">'
     +'<span class="rp-lote-n">'+esc(ENT_LOTE_INDET)+'</span>'
@@ -12415,15 +12484,35 @@ function rpIndetHtml(){
     +'oninput="_rp.cur.lotes[\''+ENT_LOTE_INDET+'\']=this.value;rpValidarLotes();boGuardarManual(true)">'
     +'</div></div>';
 }
-function rpIndetAbrir(){ _rp.cur.indetAbierto=true;
+function rpIndetAbrir(){ _rp.cur.indetAbierto=true; _rp.cur.indetSel=''; _rp.cur.indetNota='';
   _despQuien();                      // se pide ya, para que este cuando elija
   rpRender(); }
-async function rpIndetElegir(m){
-  const cur=_rp.cur, quien=await _despQuien();
+function _rpIndetLista(){
+  const cur=_rp.cur;
+  if(!cur.indetSel) return false;
+  if(cur.indetSel!=='otro') return true;
+  return String(cur.indetNota||'').trim().length>=ENT_INDET_NOTA_MIN;
+}
+function rpIndetSetNota(v){
+  _rp.cur.indetNota=v;                // NO se re-renderiza: perderia el cursor
+  const b=document.getElementById('rpIdOk'); if(b) b.disabled=!_rpIndetLista();
+}
+function rpIndetElegir(m){
+  _rp.cur.indetSel=m;
+  // Los dos motivos cerrados se confirman solos; 'otro' espera la nota.
+  if(m!=='otro') return rpIndetConfirmar();
+  rpRender();
+}
+async function rpIndetConfirmar(){
+  const cur=_rp.cur;
+  if(!_rpIndetLista()) return;
+  const quien=await _despQuien();
   // EL MOTIVO Y EL CENTINELA NACEN JUNTOS, en el mismo gesto. Es lo que evita el
   // estado intermedio "centinela sin motivo" que el 8-sep hubo que corregir a
-  // mano en seis filas.
-  cur.indet={motivo:m, por:(quien||'desconocido'), en:new Date().toISOString()};
+  // mano en seis filas. La nota viaja en el mismo paquete, y SOLO con 'otro'.
+  cur.indet={motivo:cur.indetSel,
+             nota:(cur.indetSel==='otro'?String(cur.indetNota||'').trim():null),
+             por:(quien||'desconocido'), en:new Date().toISOString()};
   cur.indetAbierto=false;
   // al elegirlo se llena con lo que FALTA, igual que `rpToggleLote`
   const total=+cur.cant||0;
@@ -12435,7 +12524,7 @@ async function rpIndetElegir(m){
 function rpIndetQuitar(){
   const cur=_rp.cur;
   delete cur.lotes[ENT_LOTE_INDET];
-  cur.indet=null; cur.indetAbierto=false;
+  cur.indet=null; cur.indetAbierto=false; cur.indetSel=''; cur.indetNota='';
   boGuardarManual(false);
   rpRender();
 }
@@ -12513,7 +12602,8 @@ function rpAgregarLinea(){
     if(cn===ENT_LOTE_INDET && cur.indet) o.indet=cur.indet;
     return o; });
   _rp.lineas.push({producto_id:cur.pid, presentacion:cur.pres, cant_present:+cur.cant, cant_uds:uds, lotes:lotes});
-  _rp.cur={pid:null, cant:'', pres:cur.pres, lotes:{}, indet:null, indetAbierto:false};   // conserva la presentación: cliente y fecha ya viven arriba
+  _rp.cur={pid:null, cant:'', pres:cur.pres, lotes:{}, indet:null, indetAbierto:false,
+           indetSel:'', indetNota:''};   // conserva la presentación: cliente y fecha ya viven arriba
   boGuardarManual(false);
   rpRender();
 }
@@ -12526,7 +12616,8 @@ function rpEditarLinea(i){
   const lotes={}; let ind=null;
   l.lotes.forEach(function(x){ lotes[x.lote]=x.cant_present; if(x.indet) ind=x.indet; });
   _rp.cur={pid:l.producto_id, cant:String(l.cant_present), pres:l.presentacion,
-           lotes:lotes, indet:ind, indetAbierto:false};
+           lotes:lotes, indet:ind, indetAbierto:false,
+           indetSel:(ind?ind.motivo:''), indetNota:(ind&&ind.nota)||''};
   boGuardarManual(false);
   rpRender();
 }
@@ -12591,6 +12682,7 @@ async function rpGuardar(){
           fl.motivo_indeterminado=x.indet.motivo;
           fl.indeterminado_por=x.indet.por;
           fl.indeterminado_en=x.indet.en;
+          if(x.indet.motivo==='otro') fl.nota_indeterminado=x.indet.nota;
         }
         return fl; }));
       if(e5) throw e5;
