@@ -578,86 +578,278 @@ por qué es indepurable — y desde el 27-ago no hay Excel contra el cual notarl
 
 ## 12 · ABIERTO · La pantalla de DEVOLUCIONES (Entrega 2)
 
-**Estado**: el primer caso real (Mentha, 28-ago) se resuelve **a mano con SQL**
-(`PEGADO_28AGO_DEVOLUCION_MENTHA.sql`, gitignored). Esto es la especificación
-para que el segundo no requiera SQL.
+**Estado**: **nunca se registró una devolución en el sistema.** `ent_devolucion`
+está vacía — 0 filas, 0 anuladas, medido el 16-sep-2026.
+
+⚠️ **Y eso es lo correcto, no un olvido.** Esta línea decía hasta hoy que el
+primer caso real (Mentha, 28-ago) *"se resolvió a mano con SQL"*. **Es falso**, y
+el error venía del §12 original. Lo que la bitácora del 27-ago decidió, textual,
+fue que Daniel recibiera la devolución (6 Blanco `208` + 6 Semillas `209`) y
+**contara después**, para que el ancla nueva ya la incluyera y
+`PEGADO_28AGO_DEVOLUCION_MENTHA.sql` **«NO se corre»** — el SQL era el plan B por
+si Lusof llegaba tarde. El pan volvió, el conteo físico lo absorbió, y el archivo
+nunca se pegó. **El saldo no está corto.**
+
+Esto es la especificación para el primer caso que se registre de verdad.
+
+> ⚠️ **REESCRITO EL 16-sep-2026.** La versión anterior de este §12 se escribió el
+> 27-ago, y entraba por el **despacho en el Historial**, con **motivo de texto
+> libre** y un tope que **avisaba** por lote. Andrea decidió el flujo nuevo el
+> 16-sep. Lo que cambió, lo que se conservó, y por qué, está al pie en «Qué decía
+> antes». **Se conserva el aviso en vez del bloqueo**, y eso no es un descuido:
+> ver el punto 5.
 
 ### Qué la hace distinta de todo lo demás del módulo
 
-Todo lo que existe hoy en Entregas **resta** del congelador. Esta es la única
+Todo lo que existe hoy en Entregas **resta** del congelador. Ésta es la única
 pantalla que **suma**. Eso cambia dos cosas: no hay bloqueo por saldo (nunca vas
 a "no tener suficiente" para recibir algo), y el error grave no es quedarse
-corto sino **contar de más** — que es exactamente lo que casi pasa acá.
+corto sino **contar de más** — que es exactamente lo que casi pasa el 26-ago.
 
 ### Desde dónde se registra
 
-**Desde el despacho, en el Historial.** El caso real llega como *"lo del 26-ago
-vuelve"*, no como *"entraron 6 unidades de Blanco"*. Abrís el despacho y el pie
-gana un control **"Registrar devolución"**.
+**Es una pestaña de Entregas, y la registra Daniel.** No es solo-socias: quien
+recibe el producto en la planta es quien tiene que poder anotarlo.
 
-Entrar por el despacho resuelve solo el problema difícil: **las líneas y los
-lotes vienen ya cargados del alisto vigente**, con sus cantidades y sus unidades.
-Nadie escribe un lote a mano, y por lo tanto nadie escribe el lote de otro
-despacho. Es la red de diseño contra el error del 26-ago.
+El flujo:
 
-⚠️ **La red importa más que la comodidad.** Semillas `209 / 1-27` está en el
-despacho 11 (6 u, se quedó el cliente) y en el 20 (6 u, vuelve). Una pantalla que
-pidiera "producto + lote + cantidad" en campos libres deja pasar "12" sin
-pestañear. Una que parte del despacho, no.
+1. **Elegir cliente.**
+2. **Sus últimas 3 entregas registradas**, la más nueva primero. Un "+" abre la
+   lista completa.
+   ⚠️ **El rótulo dice "entregas registradas", no "facturas", y es literal.** La
+   lista sale de `v_ent_pedido_estado`, o sea de lo que pasó por Truefie. Una
+   factura de Odoo anterior al módulo, o despachada por fuera, **no tiene alisto
+   y por lo tanto no tiene lotes**: no se puede ofrecer, porque no hay contra qué
+   devolver. Prometer "tus últimas 3 facturas" y mostrar otra cosa es peor que
+   nombrarlo bien.
+3. **Elegir entrega → los productos de esa entrega.**
+4. **Por producto: LOTE y CANTIDAD devuelta.**
+5. **Causa, lista cerrada**: `producto_equivocado` / `otro` + nota.
+6. Se registra y **SUMA al inventario, en el momento**.
 
-Hace falta **también** una entrada suelta —`ent_devolucion` es suelta a
-propósito: *"una devolucion llega por telefono o en el camion de vuelta"*— pero
-va **segunda**, y con el lote elegido de una lista, nunca escrito.
+**La red de diseño se conserva entera.** El argumento de la versión vieja era que
+entrar por el despacho hace que *"las líneas y los lotes vengan ya cargados del
+alisto vigente"*, y que nadie escriba un lote a mano. Eso sigue siendo cierto por
+el camino nuevo: entrega → pedido → alisto → lotes. **Lo que cambió es la
+navegación, no la fuente del dato.** Semillas `209 / 1-27` está en el despacho 11
+y en el 20; una pantalla de campos libres deja pasar "12" sin pestañear, y ésta
+no tiene campos libres de lote.
 
-### El gesto
+### Las reglas
 
-1. Se abre con **todas las líneas del despacho marcadas y en su cantidad total**:
-   el caso normal es que vuelva todo (es lo que pasó acá). Devolver parcial es
-   desmarcar o bajar el número, no llenar un formulario en blanco.
-2. **Cantidad por lote, no por línea.** La unidad es la del alisto, y la línea
-   avisa si se pide más de lo que salió en ese lote de ese despacho — *avisa*,
-   no bloquea: puede volver producto de una entrega anterior en el mismo camión.
-3. **Fecha del movimiento, editable, con el mismo control que la salida**
-   (`de-fecha`, `min`/`max`, 16 px). El día por defecto es hoy. **Y el texto tiene
-   que decir que se registra cuando el producto LLEGA, no cuando avisan que va a
-   volver** — es la lección del 26-ago escrita en la pantalla.
-4. **Motivo obligatorio**, texto libre. "El cliente no lo recibió, Lusof lo
-   devolvió a la planta" no entra en ninguna lista cerrada.
-5. **La pregunta que decide todo, explícita: ¿vuelve al congelador?** Sí → se
-   registra. No → **no se registra nada** y la pantalla lo dice: lo que se bota no
-   se registra (decisión de Andrea, `ENTREGAS_DEVOLUCIONES.sql` §alcance). No hay
-   ruta de desecho y no se construye una.
-6. Antes de confirmar, en letras: **"esto SUMA al congelador"**, con el saldo del
-   lote antes y después. Es la simetría de "no registra una entrega nueva" del
-   diálogo de Entregar, y es lo que hace el gesto seguro.
+### 🔴 LA UNIDAD EN QUE SE ESCRIBE CAMBIÓ (17-sep-2026)
+
+> **Antes decía**: *"la devolución va en la MISMA unidad en que salió la entrega —
+> el uom congelado de `ent_pedido_linea`. Si salió en Paquete de 4, vuelve en
+> Paquete de 4."* **Esa regla era de Andrea y ella misma la revirtió**, el mismo
+> día, después de medir. Queda escrito para que no se vuelva a discutir.
+
+**Ahora la unidad de entrada es la de MANEJO del producto:**
+
+| producto | se escribe en |
+|---|---|
+| Pan Francés, Buns, Pizza | **paquete** |
+| Pan Blanco, Semillas, Galletas | **unidad** |
+
+**El porqué.** La unidad de la entrega es un dato de **facturación** — cómo se le
+vendió a Automercado. La devolución es un **hecho físico**: lo que Daniel tiene
+enfrente son paquetes. Son cosas distintas y no tienen por qué compartir unidad.
+
+**Y el caso que lo prueba, medido.** El pedido 55 (Automercado, factura …3516)
+salió en `Caja (Frances)`, que son **24 unidades**. Si vuelven **tres paquetes**,
+eso son **0,125 cajas** — imposible de escribir. Con la unidad clavada a la de la
+entrega, esa devolución **no se puede registrar**.
+
+**El factor congelado NO se tiró**, y ahí está el matiz: la **nota de crédito**
+tiene que espejar la **factura**, así que sus líneas van en la unidad de la
+entrega, convertidas con ese factor. Cada tabla en la unidad de su pregunta:
+
+```
+vuelven 3 paquetes de Pan Francés, de una entrega facturada en Caja de 24
+  ent_devolucion_linea    → 3 Paquete de 4 · cant_uds 12      (lo físico)
+  ent_odoo_pendiente_linea → 0,5 Caja (Frances) · cant_uds 12  (lo que va a la NC)
+```
+
+⚠️ **Y el aviso de exceso se compara en UNIDADES INDIVIDUALES**, no en la unidad
+de entrada. Es la única medida que no depende de qué unidad use cada lado: si
+salieron 15 cajas (360 u) y vuelven 100 paquetes (400 u), **avisa** — aunque los
+dos números, 15 y 100, no se parezcan en nada.
+
+**Lo que se dejó de mostrar**: el `= N u` al lado de la cantidad. Para Francés,
+Buns y Pizza eso son unidades sueltas, que es la unidad que nadie usa: *"48 u"*
+son 12 paquetes y se lee 4× mal. Es la regla de la unidad de venta, aplicada.
+
+- ⚠️ **El lote NO es "lo disponible hoy"**: son los lotes que SALIERON en esa
+  entrega. Solo pueden devolver lo que se les entregó. **Si un lote de esa
+  entrega ya se agotó, aparece igual** — se devuelve contra lo que salió, no
+  contra lo que queda.
+- ⚠️ **El selector filtra por la FORMA del lote, no por una lista de valores**
+  (17-sep). Se ofrece únicamente lo que pasa `^\d{1,3} / \d{1,2}-\d{2}$`, que es
+  **la misma expresión** del check de `ent_devolucion_linea.lote`.
+  **Medido el 17-sep**: además del centinela `'NO DETERMINADO'` hay **seis** filas
+  en `ent_alisto_lote` con `Sin lote` / `sin lote`, en los pedidos **48, 55 y 56**
+  — y el 55 es justo la entrega de Automercado que Andrea estaba usando. Con el
+  filtro viejo (excluir solo el centinela) esos lotes se ofrecían y el insert
+  fallaba contra el check.
+  **Una lista de valores conocidos solo cubre los que ya aparecieron; la forma
+  cubre los que todavía no.**
+- 🔴 **AVISA, NO FRENA, y el porqué es toda la regla.** Si se devuelve más de lo
+  que salió en esa entrega, la línea **entra y queda marcada**.
+
+  Andrea pidió "frena" el 16-sep y lo revirtió el mismo día. La razón: **puede
+  volver producto de una entrega anterior en el mismo camión**. Con "frena", ese
+  producto no se puede registrar por ninguna pantalla — y entonces vuelve al
+  congelador **sin que el sistema lo sepa**. Un saldo que no cuadra y lo dice es
+  mejor que producto real invisible. Es el mismo criterio que
+  `ent_factura_decision`: *"filtrar no puede ser una puerta de una sola
+  dirección"*.
+
+  La marca **no es una columna que escriba la app**: sale de una vista que compara
+  lo devuelto contra lo que salió por (pedido, producto, lote). Un flag que
+  escribe el cliente es un flag que puede mentir; una vista derivada, no.
+- **NO junta dos entregas.** Son dos devoluciones separadas. Lo hace cumplir
+  `pedido_id`, que es de la cabecera: una devolución tiene UN pedido.
+- **Producto DAÑADO no se registra acá.** La devolución siempre suma al
+  inventario; si no suma, no es devolución. No hay ruta de desecho y no se
+  construye una (`ENTREGAS_DEVOLUCIONES.sql` §alcance).
+- **"Deshacer" mientras no se cierre**, igual que en el alisto.
+- **NO necesita visto de socia.**
+- **SÍ va al Historial**: es un movimiento de producto y BRC tiene que poder
+  rastrearlo. Cuelga del despacho, que es lo que `pedido_id` permite.
+- **Fecha del movimiento, editable**, con el mismo control que la salida
+  (`de-fecha`, `min`/`max`, 16 px). El día por defecto es hoy. **Y el texto tiene
+  que decir que se registra cuando el producto LLEGA, no cuando avisan que va a
+  volver** — es la lección del 26-ago, escrita en la pantalla.
+- Antes de confirmar, en letras: **"esto SUMA al congelador"**, con el saldo del
+  lote antes y después.
+
+### ⚠️ La trampa del factor
+
+Escrita a mano entraría **4× corta en Francés y Buns, y 2× en Pizza**. No hay que
+escribir ninguna conversión: **`_entColgarDetalle` ya devuelve el `uom_factor`
+congelado** de `ent_pedido_linea`, junto con las líneas y sus lotes — la unidad
+tal como la pidió el cliente, guardada en el momento. Es exactamente lo que
+`ent_devolucion_linea` quiere guardar (`uom_id`, `uom_nombre`, `cant_uom`,
+`uom_factor`), y no toca Odoo.
+
+Hay **tres** conversiones en `index.html` (`NIV_INFO.presDiv` vía `rpUdsDe`,
+`INV_TERM.presDiv` vía `_lotUds`, y el factor de Odoo vía `uomFactores`). Para
+este flujo no se usa ninguna: se usa el factor congelado de la entrega.
 
 ### Qué se muestra después
 
 - **En el Historial, colgando del despacho**: *"devuelto el 28-ago · 6 u Blanco
   208 / 1-27 · 6 u Semillas 209 / 1-27"*. El despacho **no cambia de estado** —
   salió, y eso sigue siendo cierto. La devolución es un hecho que se le agrega.
+  ⚠️ El Historial corta en 300 y no lo dice (§16, abierto). Esto lo hereda.
 - **En Inventario (M7)**: cuando un lote tiene devoluciones, poder ver de dónde
   salió ese saldo. Sin esto, un lote que sube sin producción se lee como un error.
-- **En Pendientes**: nada. Una devolución registrada no es un problema.
+- **En Pendientes**: la alerta de la NC (ver abajo). La devolución en sí no es un
+  problema y no se lista.
+
+### La alerta de la NC
+
+Al registrar, queda pendiente para las socias: *"hay que hacer la NC y
+re-facturar por la cantidad real"*. Guarda **exactamente lo que va a ir a Odoo**:
+cliente, factura original, productos, cantidades, lotes. La NC ya armada, no un
+recordatorio suelto.
+
+Va en la misma pareja de tablas que la alerta del traslado interno, con un
+`tipo`. Las cuatro automatizaciones pendientes de Odoo —traslado interno, NC,
+validación de entregas, orden de fabricación— entran por la misma puerta: cuando
+se abra el carril de escritura, automatizar tiene que ser **conectar un botón a
+datos que ya están**, no salir a reconstruirlos.
 
 ### Lo que YA está y no hay que construir
 
-- Esquema completo, con RLS select+insert y sin update/delete
-  (`ENTREGAS_DEVOLUCIONES.sql`).
+- Esquema de devoluciones, con RLS select+insert y sin update/delete
+  (`ENTREGAS_DEVOLUCIONES.sql`), **aplicado**.
+- La **cuarta punta** en el saldo (`ent_devuelto_desde_ancla` leída por
+  `_rpCalcularPuntas`), desde b48. §11, cerrado.
 - Anulación: `ent_anulacion` ya acepta `entidad = 'devolucion'`, y
   `ent_devolucion_vigente` ya la respeta. Corregir es anular e insertar.
-- El check del lote canónico en la propia columna (`^\d{1,3} / \d{1,2}-\d{2}$`),
-  que es la red contra el `"183 - 12/26"` del 18-ago.
+- El check del lote canónico en la propia columna, que es la red contra el
+  `"183 - 12/26"` del 18-ago.
 - La unidad independiente de cómo salió (se vendió 1 caja, devuelven 1 unidad):
   la línea guarda su `uom_id` y su `uom_factor` congelados.
+- **El camino de datos completo, todo Supabase**: `cliente_id` →
+  `v_ent_pedido_estado` (trae `factura_id`, `alisto_id`) → `_entColgarDetalle` →
+  líneas con sus lotes y el factor congelado.
+- **Que una devolución REABRA un lote en cero**: trazado en el código, pendiente
+  de verificar en vivo. La cadena es `ent_devuelto_desde_ancla` →
+  `_rpCalcularPuntas` suma a `s[k]` → la clave aparece en `entLotesUnion` (que une
+  los lotes de Odoo con las claves del mapa de saldos) → pasa `entLotesSelector` y
+  `entLotesDisponibles` por `saldo > 0`. Vale también para un lote fuera de la
+  ventana de producción de Odoo.
 
 ### Lo que hay que construir, en orden
 
-1. **§11 primero** — la cuarta punta en `rpCalcSaldos()`. Sin eso la pantalla
-   registra algo que no se ve, que es peor que no tenerla.
-2. El diálogo desde el Historial, reusando `_despDialogoHTML`.
+1. **El esquema** (`CAMBIO_DEVOLUCIONES.sql`): `pedido_id` y `causa` en
+   `ent_devolucion`, la vista del exceso, y la pareja de tablas de pendientes de
+   Odoo.
+2. La pestaña y su flujo de cinco pasos.
 3. El renglón de devoluciones en el detalle del Historial.
-4. La entrada suelta (sin despacho), después y con lote de lista.
+4. Las dos alertas en Pendientes, al lado de «Por resolver».
+
+### Qué decía antes, y por qué cambió
+
+| | Antes (27-ago) | Ahora (16-sep) |
+|---|---|---|
+| Entrada | desde el despacho, en el Historial | pestaña propia: cliente → entrega |
+| Causa | texto libre obligatorio | lista cerrada + nota |
+| Tope | avisa por lote | **avisa** (se conserva), y queda marcado |
+| Fecha | editable, con el texto del 26-ago | **igual, se conserva** |
+| Ligada a factura | **no**, suelta a propósito | **sí**, `pedido_id` NOT NULL |
+
+- **La entrada** cambió porque el flujo nuevo arranca por el cliente, no por "lo
+  del 26-ago vuelve". La red que justificaba el camino viejo —lotes precargados,
+  ningún campo libre— se conserva entera.
+- **La causa** pasó a lista cerrada porque un campo libre no se puede sumar. El
+  caso que motivaba el texto libre —*"el cliente no lo recibió, Lusof lo devolvió
+  a la planta"*— cae en `otro` + nota y funciona.
+- **El tope NO cambió**: Andrea pidió "frena" y lo revirtió el mismo día, con el
+  argumento de arriba. Queda escrito para que no se vuelva a discutir.
+- **La ligadura a factura** revierte la decisión de
+  `ENTREGAS_DEVOLUCIONES.sql` —*"Suelta: NO se liga a factura... esperar a saber
+  contra qué factura fue es esperar a nunca"*—. Sigue siendo un buen argumento
+  para una devolución que llega por teléfono; **deja de aplicar cuando el flujo
+  ARRANCA por la entrega**: nunca se está en el caso de no saberla.
+
+### 🔴 La entrada suelta queda CERRADA, por decisión
+
+Decidido por Andrea el **16-sep-2026**. `ent_devolucion.pedido_id` es **NOT
+NULL**: no existe la devolución sin entrega. Queda escrito acá con el argumento
+completo para que **no se vuelva a discutir**.
+
+**Por qué ahora y no en cualquier momento.** Se midió con §0: la tabla tiene
+**cero filas**. Los costos no son simétricos:
+
+| | hoy (0 filas) | después, con filas |
+|---|---|---|
+| nullable → NOT NULL | gratis | scan completo, **y falla con una sola fila suelta** |
+| NOT NULL → nullable | — | `alter column drop not null`, instantáneo |
+
+Y hay un cierre que endurece la asimetría: **si alguna vez se escribiera una
+devolución suelta, el NOT NULL dejaría de estar disponible para siempre.** No se
+puede rellenar un `pedido_id` que no existe, y el módulo **no tiene grant de
+DELETE en ninguna tabla**. Quedaría convivir con la columna floja.
+
+**Por qué no se pierde nada.** El flujo arranca por cliente y entregas, así que
+**incluso una devolución avisada por teléfono va a tener su pedido** — solo que
+elegido después, cuando el producto llega. Que es además el momento correcto
+según el criterio del 26-ago: se registra cuando LLEGA, no cuando avisan.
+
+**Lo que se cierra de paso, y no es menor.** La rama `pedido_id is null or (...)`
+del CHECK era un **escape alcanzable desde la app**, no teórico: una fila sin
+pedido no pasaba por ninguna validación de causa, y la RLS de `ent_devolucion` es
+`with check (true)` para cualquier autenticado. Y en `v_ent_devolucion_exceso`, el
+filtro `where dv.pedido_id is not null` hacía que una devolución suelta fuera
+**invisible** para el control del exceso.
+
+⚠️ **Si algún día se quiere reabrir**, es una sola sentencia
+(`alter table ent_devolucion alter column pedido_id drop not null`) **más** volver
+a poner las dos cosas de arriba: la rama del CHECK y el filtro de la vista. Las
+tres van juntas o el escape vuelve sin que nadie lo decida.
 
 ---
 
@@ -1292,3 +1484,87 @@ definir qué significa exactamente *"absorbida por un ancla"*:
 **Por qué no urge.** Nadie está esperando, no hay plata en juego y el saldo ya es
 correcto. Lo único que costaba era ensuciar una lista de trabajo, y eso se
 resolvió sacándolas de la pantalla.
+
+---
+
+## 25 · 🟠 ABIERTO · La causa debería ir POR LÍNEA, no en la cabecera
+
+Decidido por Andrea el 17-sep-2026, y **aplazado por ella el mismo día**. Todo lo
+de abajo está medido contra producción.
+
+### Qué se quiere
+
+Que la causa se elija **junto al lote y la cantidad**, en la misma vista, y que
+"Agregar a la devolución" se lleve las tres. Dos razones:
+
+- **Hoy, si vuelven dos productos por motivos distintos, hay que registrar dos
+  devoluciones.** Una sola visita del camión se parte en dos registros por un
+  detalle de esquema.
+- La causa deja de ser una sección suelta al pie que se pierde de vista.
+
+### 🔴 Por qué se aplazó, y no es el esquema
+
+**La pantalla todavía no guardó una sola fila.** `ent_devolucion` tiene cero
+registros. Desarmar el motor de saldos para acomodar una función que nunca
+escribió nada es el orden al revés: primero se prueba que el camino completo
+funciona, después se lo mejora.
+
+Y el riesgo no es simétrico: **si la cuarta punta vuelve mal, el saldo se rompe en
+silencio** — el modo de falla más caro de este sistema, y el único que nadie nota
+hasta que alguien cuenta el congelador.
+
+⚠️ **Y sigue siendo el momento barato.** Con cero filas, mover las columnas es
+gratis; con filas escritas deja de serlo. Eso no cambia mañana ni la semana que
+viene: cambia el día que se registre la primera devolución de verdad.
+
+### Lo medido: qué hay que tocar
+
+`causa` y `nota` viven en **`ent_devolucion`** (la cabecera).
+`ent_devolucion_linea` no tiene ninguna de las dos.
+
+| objeto | lee `causa`? | qué le pasa |
+|---|---|---|
+| `ent_devolucion_causa_ok` | — | se dropea de la cabecera y **se rehace sobre la línea** |
+| `ent_devolucion_vigente` | 🔴 **sí, la lista explícita** | **no compila** sin la columna |
+| `v_ent_devolucion_exceso` | no | ✓ no se rompe |
+| `ent_devuelto_desde_ancla` | no | ✓ no se rompe |
+| `dvLeer()` en `index.html` | sí, en su `.select()` | hay que actualizarlo |
+
+### 🔴 La secuencia obligada, y por qué es más grande de lo que parece
+
+**`create or replace view` NO permite quitar columnas de una vista** — solo
+agregarlas al final. Así que `ent_devolucion_vigente` hay que **dropearla y
+recrearla**. Y de ella cuelgan dos vistas, una de las cuales es la cuarta punta
+del saldo:
+
+```
+1. drop view ent_devuelto_desde_ancla     ← LA CUARTA PUNTA DEL SALDO
+2. drop view v_ent_devolucion_exceso
+3. drop view ent_devolucion_vigente
+4. alter table  · causa y nota A LA LÍNEA
+                · causa y nota FUERA de la cabecera
+                · el CHECK, rehecho sobre la línea
+5. recrear las tres vistas, en orden inverso y EXACTAS
+```
+
+O sea: **para mover dos columnas hay que desarmar y rearmar el motor de saldos.**
+
+### Cómo hacerlo cuando se retome
+
+- **Capturar las tres definiciones con `pg_get_viewdef` ANTES de dropear nada**, y
+  recrearlas desde esa captura — no reescribirlas de memoria. Es lo que salvó al
+  §D del 15-sep.
+- **Todo en UNA transacción.** Postgres hace DDL transaccional: si algo revienta
+  en el paso 5, los drops del 1 al 3 se deshacen solos.
+- **Un `select` dentro de la transacción, antes del `commit`**, que demuestre que
+  las tres vistas existen y que la cuarta punta devuelve **exactamente los mismos
+  números** que antes. Sin eso, un "Success" no prueba nada — la lección del
+  17-sep.
+- El CHECK nuevo conserva los `coalesce`: sin ellos, `causa = null` hace NULL a la
+  conjunción y Postgres deja pasar la fila.
+
+### Qué NO hay que hacer
+
+**Dejar `causa`/`nota` en la cabecera Y agregarlas a la línea.** Evita el drop en
+cascada, pero deja el mismo dato en dos lugares — que es exactamente lo que este
+repo paga caro. Se descartó el 17-sep, por eso.

@@ -215,3 +215,108 @@ distingue "legible" de "la RLS filtró todo" cuando la tabla puede estar vacía.
 - Y dejar escrito en la salida **cuántos objetos se vieron por cada camino**.
   Como en el punto ciego 1: si el contador no se mueve cuando se agrega una
   escritura nueva, el chequeo está mirando para otro lado.
+
+
+---
+
+## O2 · 🟠 ABIERTO · Un Buns facturado en "Caja" de 6 cuando la caja de Buns son 24
+
+Encontrado el 17-sep-2026 midiendo los factores de unidad para Devoluciones.
+**El dato malo está en ODOO, no en Truefie** — Truefie lo copió fielmente.
+
+### La fila
+
+| | |
+|---|---|
+| pedido | **67** |
+| factura | `00100001010000003534` |
+| cliente | Arrendadora Bm Pz Sociedad |
+| fecha | 2026-09-14 |
+| producto | **503 · Buns** |
+| unidad | `uom_id 46` · **"Caja"** · factor 1/6 → **6 unidades** |
+| cantidad | 1 caja = 6 unidades |
+
+### Por qué está mal
+
+Buns se factura normalmente en **`Caja (Hamburguesa)` (uom 42) = 24 unidades**, o
+en `Paquete de 4` (uom 37). La unidad `Caja` (uom 46) es la de **Pan Blanco y Pan
+Semillas**, que sí traen 6 por caja.
+
+Medido sobre `ent_pedido_linea`: Buns aparece con **tres** unidades distintas —
+`Paquete de 4` (30 líneas), `Caja (Hamburguesa)` (11) y **`Caja` (1 sola línea,
+ésta)**. Las otras dos son correctas.
+
+### Qué corregir, y dónde
+
+**En Odoo**, en la factura `…3534`: la línea de Buns debería ir en
+`Caja (Hamburguesa)` (1 caja = 24 u) o en `Paquete de 4`. Como está, esa entrega
+dice que salieron **6 unidades** de Buns cuando es probable que hayan salido
+**24** — hay que confirmarlo contra lo que realmente se despachó antes de tocar
+nada.
+
+⚠️ **No se corrige desde Truefie.** `ent_pedido_linea` copia la unidad de la
+factura en el momento del despacho, a propósito: es el dato tal como se facturó.
+Cambiarlo acá dejaría a Truefie diciendo una cosa y a Odoo otra.
+
+### Qué NO rompe
+
+- El **saldo por lote** usa `cant_uds` (6), que es lo que Truefie registró como
+  salido. Si de verdad salieron 24, el saldo de ese lote está **18 unidades alto**.
+- **Devoluciones** no se ve afectada desde el 17-sep: la unidad de entrada pasó a
+  ser la de manejo del producto, así que un Buns que vuelve se escribe en paquetes
+  sin importar cómo se facturó (ver `ENTREGAS_PENDIENTES` §12).
+
+---
+
+## S1 · 🟠 ABIERTO · Datos de clientes en el repo PÚBLICO — el repaso sigue sin hacerse
+
+Anotado el 17-sep-2026 al chequear secretos para b61. **No es exposición nueva**,
+pero la lista crece build a build y nadie la ha revisado entera.
+
+### El repo es público y sirve GitHub Pages
+
+`TrueFood1/Conciliacion` es público. `BITACORA.md` está gitignored **precisamente
+por esto** — su encabezado lo dice: *"el repo es público y esto lleva razones
+sociales de clientes"*. Pero esa decisión se tomó para la bitácora y **nunca se
+extendió al resto de los archivos versionados**.
+
+### Lo medido el 17-sep
+
+| qué | dónde | ¿nuevo? |
+|---|---|---|
+| `andrea@truefoodcr.com` | `index.html` (4 veces en `main`) + `ANULAR_DEVOLUCION.sql` | no |
+| consecutivos de factura `001000010100000…` | `CORRECCION_B56_PEDIDO44.sql`, `ENTREGAS_EXCEPCIONES_LINEA.sql` (en `main`) y ahora **`PENDIENTES.md` §O2** | el de O2 sí |
+| razones sociales | `ENTREGAS_PENDIENTES.md` (Automercado, Green Center, Mentha…), y §O2 agrega *Arrendadora Bm Pz Sociedad* | se suman |
+
+**El correo no es el problema**: la regla del repo ya lo resuelve —los
+`@truefoodcr.com` van en claro porque son direcciones de empresa, y los
+personales van por huella (`SALUDO_HUELLAS`)—. Está aplicada y es consistente.
+
+**Lo que no tiene regla es el resto**: número de factura + razón social + fecha +
+qué se le vendió. Eso, junto, es información comercial de un tercero.
+
+### Por qué no bloqueó b61
+
+Porque **no es una puerta nueva**: cada cosa que se agregó es de la misma clase
+que lo que ya está publicado desde hace semanas. Bloquear el build por un
+consecutivo más, dejando los que ya están, no protege nada — solo da la sensación
+de haber hecho algo.
+
+⚠️ Y ése es justamente el riesgo de este pendiente: **cada build individual
+siempre va a parecer "una más"**, y así es como la lista crece sin que ninguna
+decisión la autorice.
+
+### Qué hay que hacer cuando se retome
+
+1. **Barrer los archivos versionados** buscando consecutivos, razones sociales y
+   cédulas. No solo `.md`: los `.sql` de corrección y verificación llevan casos
+   reales con nombre y número.
+2. **Decidir la regla**, que hoy no existe:
+   - ¿los ejemplos de un pendiente van con el cliente real, o anonimizados?
+   - ¿los `.sql` de corrección —que necesitan el id real para correrse— van al
+     repo, o al lado de la bitácora, gitignored?
+3. **Aplicarla hacia atrás**, sabiendo que reescribir la historia de git es otra
+   conversación: lo que ya se publicó siguió publicado aunque se borre el archivo.
+4. **Y dejarla en `CLAUDE.md`**, junto a la de credenciales, para que el chequeo
+   de secretos del cierre técnico tenga contra qué medir. Hoy ese paso busca
+   claves y tokens, no datos de clientes.

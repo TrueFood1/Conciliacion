@@ -174,6 +174,61 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
   Para confirmar que un objeto existe de verdad: sondeo REST directo con la anon
   key (devuelve `PGRST205` si falta). Para confirmar `security_invoker`, hace
   falta SQL — la anon key no puede leer `pg_class.reloptions`.
+- 🔴 **TODO PEGADO TERMINA CON UN `select` QUE DEMUESTRE QUE ENTRÓ, ADENTRO DE
+  LA TRANSACCIÓN Y JUSTO ANTES DEL `commit`.** Un "Success" del editor **no es
+  evidencia de nada**.
+
+  **Medido el 16-sep-2026**, y costó una vuelta entera: se pegó
+  `CAMBIO_DEVOLUCIONES.sql` (§A+§B+§C, transacción única), el editor de Supabase
+  contestó **`Success. No rows returned`**, y el diagnóstico posterior con
+  `pg_lector` dio **cero**: ni las columnas, ni el CHECK, ni la vista, ni las tres
+  tablas, ni una política. Nada aplicado y —esto sí salió bien— **nada a medias**,
+  porque la transacción era una sola.
+
+  Peor todavía: sobre ese "Success" se escribió en el header del `.sql` y en la
+  bitácora que el cambio **estaba aplicado**. Durante unos minutos los dos
+  afirmaban algo falso. Es el error del 15-sep con `CAMBIO_AUTORIZACION.sql`
+  **en la dirección contraria** (allá el header decía `NO SE CORRIO` y estaba
+  pegado), así que la regla vale en las dos:
+
+  > El header de un `.sql` y la bitácora se tocan **DESPUÉS** de la verificación,
+  > nunca sobre lo que alguien anunció que iba a hacer.
+
+  **La forma**: un `select` de contadores con los números esperados escritos al
+  lado. Si el editor muestra la fila, corrió; si vuelve a decir "Success. No rows
+  returned", ni siquiera llegó hasta ahí — y se sabe **en el momento**, no dos
+  pasos después.
+
+  ```sql
+  select (select count(*) from information_schema.columns
+           where table_name='X' and column_name in ('a','b')) as columnas_nuevas,
+         (select count(*) from pg_constraint where conname='X_ok') as check_nuevo;
+  -- ESPERADO: 2 · 1
+  ```
+
+  ⚠️ **No reemplaza a las verificaciones de después** (`V1`, `V3`, …). Esto prueba
+  que la transacción llegó al final; aquéllas prueban que dejó lo que tenía que
+  dejar, ya fuera de la transacción. Son dos preguntas distintas.
+
+  ⚠️ **Y no se lee con la anon key.** `information_schema` y `pg_constraint` no
+  salen por REST: para verificar esto desde afuera hace falta `pg_lector.py`.
+
+  **LA MISMA REGLA VALE PARA EL PASO DE ARMAR EL PEGADO, y se pagó el mismo día.**
+  Para aislar el bloque se dio un `sed -n '141,476p'` con el número de línea
+  sacado de "el segundo `begin;`" — adivinado, sin comprobar. El archivo tiene
+  **14** `begin;`: los tres primeros son las pruebas P0 y el transaccional es el
+  **cuarto**. Se pegó **P0-a** en vez de §A+§B+§C. No se escribió nada (P0-a
+  termina en `rollback`), pero se perdió una vuelta entera.
+
+  **Nunca aislar un bloque por número de línea.** Se extrae por estructura —el
+  único `commit;`, y el último `begin;` antes de él— y se comprueba **el archivo
+  ya escrito** antes de ofrecerlo: un `begin`, un `commit`, **cero `rollback`**,
+  que empiece y termine donde debe, y que NO contenga marcas de las pruebas. Si
+  alguna falla, no se ofrece.
+
+  > El paso que nadie verifica es el que falla. Vale para el pegado, para el
+  > `sed` que lo prepara, y para el que venga después.
+
 - **Credenciales nunca por el chat** ni impresas en output: van directo a
   `conexion_prod.env`; confirmar presencia con sí/no, sin mostrar la key.
 - Explicar en español simple; reportar con evidencia (números, no adjetivos).
