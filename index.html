@@ -13188,6 +13188,9 @@ async function rpGuardar(){
     if(_rp.boRef){ const _r=_rp.boRef; _rp.boRef=null; await boCerrar('manual', _r, ped.id); }
     _rpReset(false);                       // conserva la fecha; cliente y tipo se eligen de nuevo
     rpRender(); rpCargarLotes();           // saldos frescos
+    // Y la lista de Pendientes, que acaba de ganar un traslado interno por hacer.
+    // Misma razon que en dvGuardar: `pdCargar(false)` no relee si `_pd` existe.
+    try{ _pd=null; }catch(e){}
     const m2=document.getElementById('rpSaveMsg'); if(m2&&msg.textContent) m2.textContent=msg.textContent;
   }catch(e){
     pon('var(--stop-tx)','No se pudo guardar (falló en: '+paso+'): '+((e&&e.message)||e)
@@ -13903,7 +13906,15 @@ async function dvAnular(id){
     if(error) throw error;
     _dvAnulando=0; delete _dvAnuNota[id];
     // El saldo por lote cambio: lo que Despachos y el Reporte tengan leido quedo viejo.
-    try{ _despLotes=null; _despSaldo=null; _rpLotes=null; _rpSaldo=null; }catch(e){}
+    // ⚠️ `_pd` TAMBIEN, Y ESTA ES LA QUE FALTABA (17-sep). `pdCargar(false)` sale
+    // por el camino corto si `_pd` ya existe —`if(_pd && !force) return`— y
+    // `irAPendientes()` lo llama con false. Asi que quien hubiera abierto
+    // Pendientes ANTES en la misma sesion volvia a ver la foto vieja: la NC recien
+    // creada no aparecia, y no habia ningun error porque no habia ningun fallo.
+    // Medido el 17-sep: la fila estaba en la base (ent_odoo_pendiente id 4) y la
+    // pantalla no la mostraba. Invalidar el saldo y no la lista de pendientes es
+    // acordarse de la mitad.
+    try{ _despLotes=null; _despSaldo=null; _rpLotes=null; _rpSaldo=null; _pd=null; }catch(e){}
     await dvCargar(true);
   }catch(e){
     // ⚠️ NO SE TRAGA EL ERROR. Es la leccion del guardado que fallo en silencio el
@@ -14448,7 +14459,15 @@ async function dvGuardar(){
 
     pon('var(--good,#3E9E62)','✓ Registrada. Suma al congelador y quedó la NC pendiente.');
     // El saldo por lote cambio: lo que Despachos tenga leido quedo viejo.
-    try{ _despLotes=null; _despSaldo=null; _rpLotes=null; _rpSaldo=null; }catch(e){}
+    // ⚠️ `_pd` TAMBIEN, Y ESTA ES LA QUE FALTABA (17-sep). `pdCargar(false)` sale
+    // por el camino corto si `_pd` ya existe —`if(_pd && !force) return`— y
+    // `irAPendientes()` lo llama con false. Asi que quien hubiera abierto
+    // Pendientes ANTES en la misma sesion volvia a ver la foto vieja: la NC recien
+    // creada no aparecia, y no habia ningun error porque no habia ningun fallo.
+    // Medido el 17-sep: la fila estaba en la base (ent_odoo_pendiente id 4) y la
+    // pantalla no la mostraba. Invalidar el saldo y no la lista de pendientes es
+    // acordarse de la mitad.
+    try{ _despLotes=null; _despSaldo=null; _rpLotes=null; _rpSaldo=null; _pd=null; }catch(e){}
     setTimeout(function(){ dvCargar(true); }, 1200);
   }catch(e){
     const det=(e&&(e.message||e.msg))||String(e);
