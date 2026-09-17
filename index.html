@@ -12987,7 +12987,16 @@ function rpValidarLotes(){
 }
 function rpAgregarLinea(){
   const cur=_rp.cur, msg=document.getElementById('rpLineaMsg');
-  const pon=function(t){ if(msg) msg.textContent=t; };
+  // ⚠️ SIN `if(msg)` MUDO (17-sep). Estaba escrito `if(msg) msg.textContent=t`, o
+  // sea que si ese nodo no estaba, el MOTIVO por el que la linea no se agrega se
+  // perdia y el boton parecia no hacer nada. Es la misma forma que se llevo el
+  // error de `dvGuardar` el 17-sep — una guarda que protege contra un nodo
+  // ausente terminando por proteger contra que la persona se entere.
+  // Si no hay donde escribirlo, se grita: peor que un cartel feo es ninguno.
+  const pon=function(t){
+    if(msg){ msg.textContent=t; return; }
+    if(t){ try{ console.error('[Truefie] rpAgregarLinea:',t); }catch(e){} alert(t); }
+  };
   if(!cur.pid){ pon('Falta el producto.'); return; }
   if(!(+cur.cant>0)){ pon('Falta la cantidad.'); return; }
   if(!rpValidarLotes()){ pon(''); return; }
@@ -13796,7 +13805,7 @@ async function dvLeer(){
 }
 function _dvNueva(){
   return {cliente:null, entrega:null, pid:null, lotes:{}, lineas:[],
-          causa:'', nota:'', fecha:_despHoy(), editando:-1};
+          causa:'', nota:'', causaEditar:false, fecha:_despHoy(), editando:-1};
 }
 function dvNueva(){ _dv.n=_dvNueva(); _dv.modo='nueva'; _dvVerTodas=false; dvRender(); }
 function dvVolver(){ _dv.modo='lista'; _dv.n=null; dvRender(); }
@@ -13927,19 +13936,41 @@ function dvFormHTML(){
     h+='</div>';
   }
 
-  // ── 4 · CAUSA · el bloque "Motivo" de sin-factura, con dos opciones ───
+  // ── 4 · CAUSA ────────────────────────────────────────────────────────
+  // ⚠️ LA SECCION PESA MIENTRAS FALTA Y SE ACHICA CUANDO ESTA (17-sep). El
+  // problema no era el tamaño del boton: era que la causa es LO UNICO que falta
+  // para poder guardar y la seccion no lo mostraba — lo unico que la señalaba era
+  // el aviso ambar de abajo. Y encima los chips se leian como chips de PRODUCTO,
+  // por tener la misma forma y estar en el mismo lugar visual que "¿Qué volvió?".
+  // Tres cosas resueltas de una:
+  //   · que se vea que falta: ocupa espacio y lleva `rp-falta`, el renglon que el
+  //     modulo ya usa para "sin esto no se puede guardar".
+  //   · que no se confunda con los productos: una vez contestada deja de ser un
+  //     chip y pasa a ser un RENGLON, como `rp-clisel` con el cliente elegido.
+  //   · que baje de peso: contestada, ocupa una linea y el resumen de abajo queda
+  //     como lo unico grande de la pantalla.
   if(N.lineas.length){
-    h+='<div class="rp-sec"><div class="rp-sec-t">Causa</div><div class="rp-mot">'
-      +DV_CAUSAS.map(function(m){ return '<button class="'+(N.causa===m.v?'on':'')+'" '
-        +'onclick="dvCausa(\''+m.v+'\')">'+esc(m.t)+'</button>'; }).join('')+'</div>'
-      +(!N.causa?'<div class="rp-nota rp-falta">Sin causa no se puede guardar.</div>':'')
-      +(N.causa==='otro'
-        ? ('<textarea class="dv-nota-in" rows="2" placeholder="Qué pasó (mínimo '+DV_NOTA_MIN
-           +' caracteres)" oninput="dvNota(this.value)">'+esc(N.nota)+'</textarea>'
-           +(String(N.nota||'').trim().length<DV_NOTA_MIN
-             ? '<div class="rp-nota rp-falta">La nota tiene que decir algo: mínimo '+DV_NOTA_MIN+' caracteres.</div>':''))
-        : '')
-      +'</div>';
+    const lista=!N.causa || N.causaEditar;
+    const m=DV_CAUSAS.find(function(x){ return x.v===N.causa; });
+    h+='<div class="rp-sec"><div class="rp-sec-t">Causa</div>';
+    if(!lista){
+      h+='<div class="rp-clisel"><span>'+esc(m?m.t:N.causa)
+        +(N.nota?(' · '+esc(N.nota)):'')+'</span>'
+        +'<button onclick="dvCausaEditar()" title="Cambiar">✎</button></div>';
+    }else{
+      h+='<div class="rp-mot">'
+        +DV_CAUSAS.map(function(x){ return '<button class="'+(N.causa===x.v?'on':'')+'" '
+          +'onclick="dvCausa(\''+x.v+'\')">'+esc(x.t)+'</button>'; }).join('')+'</div>'
+        +(!N.causa?'<div class="rp-nota rp-falta">Sin causa no se puede guardar.</div>':'')
+        +(N.causa==='otro'
+          ? ('<textarea class="dv-nota-in" rows="2" placeholder="Qué pasó (mínimo '+DV_NOTA_MIN
+             +' caracteres)" oninput="dvNota(this.value)">'+esc(N.nota)+'</textarea>'
+             +(String(N.nota||'').trim().length<DV_NOTA_MIN
+               ? '<div class="rp-nota rp-falta">La nota tiene que decir algo: mínimo '+DV_NOTA_MIN+' caracteres.</div>'
+               : '<div style="margin-top:8px"><button class="btn btn-sm" onclick="dvCausaListo()">Listo</button></div>'))
+          : '');
+    }
+    h+='</div>';
   }
 
   // ── PIE · la fecha y el boton, igual que en sin-factura ───────────────
@@ -14128,8 +14159,16 @@ function dvQuitarLinea(){
   const N=_dv.n; if(N.editando<0) return;
   N.lineas.splice(N.editando,1); N.pid=null; N.lotes={}; N.editando=-1; dvRender();
 }
-function dvCausa(v){ _dv.n.causa=v; if(v!=='otro') _dv.n.nota=''; dvRender();
-  if(v==='otro'){ const t=document.querySelector('#dvBody .dv-nota-in'); if(t) t.focus(); } }
+function dvCausa(v){
+  const N=_dv.n; N.causa=v; if(v!=='otro') N.nota='';
+  // Una causa cerrada se contesta y la seccion se cierra sola. 'otro' espera la
+  // nota — si se cerrara ya, no habria donde escribirla.
+  N.causaEditar=(v==='otro');
+  dvRender();
+  if(v==='otro'){ const t=document.querySelector('#dvBody .dv-nota-in'); if(t) t.focus(); }
+}
+function dvCausaEditar(){ _dv.n.causaEditar=true; dvRender(); }
+function dvCausaListo(){ if(dvCausaLista()){ _dv.n.causaEditar=false; dvRender(); } }
 function dvNota(v){ _dv.n.nota=v;                // NO re-renderiza: perderia el cursor
   const b=document.getElementById('dvSave'); if(b) b.disabled=!dvListo(); }
 function dvFecha(v){ _dv.n.fecha=v; dvRender(); }
@@ -14143,17 +14182,12 @@ function dvListo(){ const N=_dv&&_dv.n;
   return !!(N && N.entrega && N.lineas.length && dvCausaLista() && _despFechaOK(N.fecha)); }
 function dvFueraHTML(){
   const f=_dv.fuera; if(!f.manual && !f.sinCliente) return '';
-  // ⚠️ SE DICE QUE FALTA Y POR QUE. Una entrega ausente sin explicacion se lee como
-  // que el sistema la perdio, y el proximo paso de quien la busca es escribir el
-  // lote a mano en otro lado — que es justo lo que esta pantalla evita.
-  const p=[];
-  if(f.manual) p.push('<b>'+f.manual+'</b> sin factura');
-  if(f.sinCliente) p.push('<b>'+f.sinCliente+'</b> sin cliente (regalías, consumo interno)');
-  return '<div class="dv-nota" style="margin-top:10px">No aparecen acá '+p.join(' y ')
-    +'. Las de <b>sin factura</b> no guardaron la unidad de cada línea, así que una '
-    +'devolución de Francés, Buns o Pizza entraría 4× o 2× corta; desde hoy sí la '
-    +'guardan y las nuevas van a aparecer. Las <b>sin cliente</b> todavía no se pueden '
-    +'buscar por cliente. Si algo de eso vuelve, avisá — se registra aparte.</div>';
+  // ⚠️ UNA LINEA, Y DICE QUE HACER (17-sep). Antes eran cinco renglones
+  // explicando POR QUE faltaban —que las manuales no guardaron la unidad, que sin
+  // factor entraria 4x corta—, o sea contando como esta construido el sistema en
+  // una pantalla de trabajo. A Daniel eso no le sirve: lo unico que necesita
+  // saber es que hacer si no encuentra la entrega. El porque vive en §12.
+  return '<div class="dv-nota">¿No aparece la entrega? Avisá.</div>';
 }
 
 // ── LA CONFIRMACION · lo que va a pasar, en letras, ANTES de que pase ───
@@ -14163,18 +14197,23 @@ function dvConfirmarHTML(){
   const N=_dv.n;
   const que=N.lineas.map(function(l){ return _dvNum(l.total_uom)+' '+l.uom_nombre
     +' de '+_lotNom(l.producto_id); }).join(' · ');
+  // ⚠️ LO QUE SE SACO DE ACA (17-sep) Y POR QUE:
+  //   · el aviso de la nota de credito. NO ES ASUNTO DE DANIEL: el registra lo que
+  //     volvio, y la NC la hacen las socias. Se sigue guardando igual en
+  //     ent_odoo_pendiente; donde tiene que aparecer es en Pendientes, que es
+  //     donde las socias la van a ver.
+  //   · "para corregirla hay que anularla y registrarla de nuevo". Es verdad y le
+  //     sirve, pero NO AHORA: todavia no hizo nada que corregir, y compite con lo
+  //     unico que tiene que leer antes de guardar. Vuelve el dia que exista la
+  //     accion de editar una devolucion ya registrada, y ahi mismo.
+  // Queda SOLO el resumen: que vuelve, de que entrega y cuando.
   let h='<div class="dv-conf"><div class="dv-conf-t">Esto SUMA al congelador</div>'
     +'Vuelve <b>'+esc(que)+'</b> de la entrega <b>'+esc(_entFacRotulo(N.entrega))
     +'</b> de <b>'+esc(N.cliente.nombre)+'</b>, llegado el <b>'
-    +esc(N.fecha===_despHoy()?'hoy':N.fecha)+'</b>.'
-    +'<div style="margin-top:7px">Y queda pendiente para las socias: <b>hacer la nota de '
-    +'crédito en Odoo y re-facturar por la cantidad real.</b> Se guarda armada —cliente, '
-    +'factura, productos, cantidades y lotes—, no como recordatorio.</div>'
-    // ⚠️ SE DICE QUE NO SE EDITA. Corregir es anular y registrar de nuevo: es el
-    // unico camino que deja rastro de las dos versiones, y el modulo entero es
-    // append-only (no hay grant de UPDATE ni de DELETE en ninguna tabla).
-    +'<div style="margin-top:7px;color:var(--text-3)">Para corregirla después hay que '
-    +'anularla y registrarla de nuevo — no se edita.</div></div>';
+    +esc(N.fecha===_despHoy()?'hoy':N.fecha)+'</b>.</div>';
+  // El bloque del error, vacio hasta que haga falta. Va ARRIBA del boton para que
+  // quede entre lo que se leyo y lo que se toca — ver `_dvErrMostrar`.
+  h+='<div id="dvErr" class="hidden"></div>';
   h+='<div class="dv-acc">'
     +'<button id="dvSave" class="btn btn-ent" '+(dvListo()&&!_dvGuardando?'':'disabled')
     +' onclick="dvGuardar()">'+(_dvGuardando?'Registrando…':'Registrar la devolución')+'</button>'
@@ -14193,11 +14232,54 @@ function dvConfirmarHTML(){
 // mirando la devolucion. Al reves habria una NC pendiente por producto que nunca
 // volvio, que es peor. El paso donde fallo va en el mensaje: sin eso, "no se pudo"
 // no dice que quedo escrito.
+// ⚠️ TRES SILENCIOS TAPADOS (17-sep), y los tres eran mios.
+// El 17-sep Andrea guardo una devolucion, la lista dijo "todavia no hay
+// devoluciones" y en la base habia CERO filas: el guardado fallo y no aviso.
+// Medido despues: la RLS permite el insert, no hay triggers, los constraints no
+// lo rechazan y la cache de PostgREST esta fresca — o sea que el servidor estaba
+// limpio y el error se perdio del lado de la pantalla. Habia tres formas:
+//   1. `if(_dvGuardando || !dvListo()) return;` — un return MUDO. Si no estaba
+//      lista, el boton no hacia absolutamente nada. (La guarda de re-entrada SI
+//      se queda: esa es legitima y tiene que ser silenciosa.)
+//   2. `pon` guardado por `if(msg)`: sin ese nodo se tragaba TODO, el error
+//      incluido. Misma forma que tenia `rpAgregarLinea`, de donde salio.
+//   3. El error vivia en un <span> chico al final de un formulario largo, sin
+//      llevar la pantalla hasta el, y se iba al navegar.
+// Un guardado que falla en silencio es peor que uno que no existe: Daniel pierde
+// trabajo sin enterarse.
+function _dvErrMostrar(txt){
+  // El error va a un bloque `s-err` ARRIBA del boton, se desplaza hasta el, y se
+  // queda hasta que se toque algo. Nunca mas un <span> que nadie ve.
+  const caja=document.getElementById('dvErr');
+  if(caja){ caja.className='status s-err'; caja.innerHTML=txt;
+    try{ caja.scrollIntoView({block:'center', behavior:'smooth'}); }catch(e){}
+    return; }
+  // Sin donde escribirlo se GRITA. La alternativa es lo que acaba de pasar.
+  try{ console.error('[Truefie] Devoluciones:', txt); }catch(e){}
+  alert(String(txt).replace(/<[^>]+>/g,''));
+}
 async function dvGuardar(){
-  if(_dvGuardando || !dvListo()) return;
-  const N=_dv.n, msg=document.getElementById('dvMsg'), btn=document.getElementById('dvSave');
-  const pon=function(c,t){ if(msg){ msg.style.color=c; msg.innerHTML=t; } };
-  const c=sbClient(); if(!c){ pon('var(--stop-tx)','No hay sesión de Supabase.'); return; }
+  if(_dvGuardando) return;                 // re-entrada: silenciosa a proposito
+  if(!dvListo()){
+    // ⚠️ YA NO SE VA MUDO: dice QUE falta. El boton deberia estar deshabilitado,
+    // asi que si se llega aca es que algo quedo desincronizado — y eso hay que
+    // verlo, no taparlo.
+    const N=_dv&&_dv.n, f=[];
+    if(!N||!N.entrega) f.push('elegir la entrega');
+    else if(!N.lineas.length) f.push('agregar al menos una línea');
+    if(N && !dvCausaLista()) f.push(N.causa==='otro'?('escribir la nota (mínimo '+DV_NOTA_MIN+' caracteres)'):'elegir la causa');
+    if(N && !_despFechaOK(N.fecha)) f.push('corregir el día que llegó');
+    _dvErrMostrar('No se puede registrar todavía: falta '+esc(f.join(' · ')||'algo')+'.');
+    return;
+  }
+  const N=_dv.n, btn=document.getElementById('dvSave');
+  const pon=function(c,t){
+    const msg=document.getElementById('dvMsg');   // se busca AL USARLO, no antes
+    if(msg){ msg.style.color=c; msg.innerHTML=t; return; }
+    try{ console.error('[Truefie] Devoluciones:', String(t).replace(/<[^>]+>/g,'')); }catch(e){}
+  };
+  const caja=document.getElementById('dvErr'); if(caja){ caja.className='hidden'; caja.innerHTML=''; }
+  const c=sbClient(); if(!c){ _dvErrMostrar('No hay sesión de Supabase — no se guardó nada.'); return; }
   _dvGuardando=true; if(btn) btn.disabled=true; pon('var(--busy)','Registrando…');
   let paso='la devolución';
   try{
@@ -14245,7 +14327,22 @@ async function dvGuardar(){
     try{ _despLotes=null; _despSaldo=null; _rpLotes=null; _rpSaldo=null; }catch(e){}
     setTimeout(function(){ dvCargar(true); }, 1200);
   }catch(e){
-    pon('var(--stop-tx)','No se pudo registrar '+esc(paso)+': '+esc((e&&e.message)||e));
+    const det=(e&&(e.message||e.msg))||String(e);
+    const cod=(e&&(e.code||e.status))?(' ['+(e.code||e.status)+']'):'';
+    // ⚠️ EL RASTRO, CON EL PASO Y EL PAYLOAD. Sin esto, "no se pudo" no dice que
+    // quedo escrito ni con que datos fallo, y la proxima vez hay que adivinar
+    // otra vez. Va a la consola porque es donde sobrevive a que nadie mire.
+    try{ console.error('[Truefie] Devoluciones · FALLO en:', paso, '·', cod, det,
+      '· payload:', JSON.stringify({fecha:N.fecha, cliente_id:N.cliente&&N.cliente.id,
+        pedido_id:N.entrega&&N.entrega.pedido_id, causa:N.causa,
+        lineas:N.lineas.map(function(l){ return {p:l.producto_id, uom:l.uom_nombre,
+          f:l.lotes.map(function(x){ return x.lote+'='+x.cant_uom+'→'+x.cant_uds; })}; })}),
+      '· error completo:', e); }catch(_){}
+    _dvErrMostrar('<strong>No se registró la devolución.</strong> Falló en '+esc(paso)
+      +':<br>'+esc(det)+esc(cod)
+      +'<br><span style="font-size:11.5px">Nada de lo que escribiste se perdió: corregí y '
+      +'volvé a tocar «Registrar». Si vuelve a pasar, mandame este texto.</span>');
+    pon('var(--stop-tx)','No se registró — mirá el aviso de arriba.');
   }finally{ _dvGuardando=false; const b=document.getElementById('dvSave'); if(b) b.disabled=!dvListo(); }
 }
 // ════════════════════════════════════════════════════════════════════════
