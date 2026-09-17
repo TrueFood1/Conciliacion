@@ -1,0 +1,46 @@
+-- ════════════════════════════════════════════════════════════════════
+-- PRUEBA D9 · CARRIL B · ent_anulacion: "solo socias" no esta en la base
+--
+-- ⚠️ ESTE ARCHIVO NO SE PEGA EN EL EDITOR DE SQL. Es la ENTRADA de
+--    pg_pruebas.py, que le pone el sobre y la identidad.
+--
+-- NO ES UNA PRUEBA EXTRAIDA: se escribio el 17-sep-2026, a partir de un
+-- hallazgo medido contra produccion ese mismo dia.
+--
+-- EL HALLAZGO
+--   La pantalla de Devoluciones (b61) dice que anular es SOLO SOCIAS. En
+--   la base, medido: la politica `ent_anulacion_ins` es
+--     for insert to authenticated with check (TRUE)
+--   la tabla NO tiene ningun trigger (0), y `authenticated` tiene el
+--   grant de INSERT. O sea que cualquier usuario logueado pasa. Lo unico
+--   que detiene a Daniel es que la interfaz no le muestra el boton.
+--   Es la misma forma que el `with check (true)` no protege de nada.
+--
+-- 🔴 ESTA PRUEBA NO ESTA ESCRITA PARA PASAR. Esta escrita para MEDIR, y
+--    el valor esperado depende de una decision que todavia no se tomo:
+--
+--    · HOY, con la politica como esta:
+--        el insert ENTRA. Eso CONFIRMA el hueco. No es un error de la
+--        prueba: es el estado real de la base.
+--    · SI ANDREA DECIDE CERRAR LA POLITICA (a `with check
+--      (acceso_es_socia())`, como `ent_odoo_hecho_ins`):
+--        el insert tiene que dar ERROR 42501,
+--        "new row violates row-level security policy".
+--
+--    Cuando el resultado cambie de uno a otro, no es que la prueba se
+--    rompio: es que la decision se tomo. Anotar cual de los dos mundos
+--    rige el dia que se corra.
+--
+-- ⚠️ IDENTIDAD: esta prueba corre con el usuario de prueba, perfil
+--    'equipo'. Con una socia NO prueba nada, porque una socia pasa en
+--    los dos mundos. Si B0 no dio 1, esta prueba no significa nada.
+--
+-- El `entidad_id` 999999 no existe y no hace falta que exista: la tabla
+-- no tiene clave foranea hacia la devolucion (medido: los unicos
+-- constraints son la PK y el check de `entidad`). Si algun dia se le
+-- agrega la FK, esta prueba va a empezar a fallar por OTRO motivo — y
+-- ese es justo el caso que hay que poder distinguir.
+-- ════════════════════════════════════════════════════════════════════
+insert into ent_anulacion (entidad, entidad_id, motivo, creado_por)
+values ('devolucion', 999999, 'prueba-d9 H3', 'prueba-d9');
+select 'D9: el insert ENTRO — hoy la politica NO protege' as resultado;
