@@ -13924,10 +13924,12 @@ function dvFormHTML(){
       h+='<table class="cl-tbl"><tr><th>Producto</th><th>Cantidad</th><th>Lotes</th><th></th></tr>';
       N.lineas.forEach(function(l,i){
         const lots=l.lotes.map(function(x){ return esc(x.lote)
-          +(l.lotes.length>1?(' ('+_dvNum(x.cant_uom)+')'):''); }).join(' · ');
+          +(l.lotes.length>1?(' ('+_dvNum(x.cant_man)+')'):''); }).join(' · ');
+        // ⚠️ SIN "= N u". Para Frances/Buns/Pizza esas son unidades SUELTAS, que es
+        // la unidad que nadie usa: "48 u" son 12 paquetes y se lee 4x mal. La
+        // cantidad se dice en la unidad de manejo y punto.
         h+='<tr><td>'+esc(_lotNom(l.producto_id))+'</td>'
-          +'<td>'+_dvNum(l.total_uom)+' '+esc(l.uom_nombre)
-          +' <span class="muted">= '+_dvNum(l.total_uds)+' u</span></td>'
+          +'<td>'+_dvNum(l.total_man)+' '+esc(l.man_nombre)+'</td>'
           +'<td style="font-size:11.5px;color:var(--text-2)">'+lots+'</td>'
           +'<td style="text-align:right"><button class="btn btn-sm" onclick="dvEditar('+i+')">✎</button></td></tr>';
       });
@@ -14005,16 +14007,22 @@ function dvFormHTML(){
 function dvLotesHTML(){
   const N=_dv.n, pid=N.pid;
   const lts=dvLotesDe(pid);
-  if(!lts.length) return '<div class="cl-none">Este producto no tiene lotes en esta entrega.</div>';
+  if(!lts.length) return '<div class="cl-none">Este producto no tiene lotes identificados '
+    +'en esta entrega, así que no hay contra qué devolver.</div>';
+  const M=_dvManejo(pid);
   let h='<div class="rp-cond"><table class="cl-tbl">'
     +'<tr><th>Lote</th><th>Salieron</th><th>Volvió</th></tr>';
-  let totUom=0, hayExceso=false;
+  let totMan=0, hayExceso=false;
   lts.forEach(function(L){
     const v=N.lotes[L.lote];
-    const puesto=+v||0; totUom+=puesto;
-    const exc=puesto>L.salioUom+0.0001; if(exc) hayExceso=true;
+    const puesto=+v||0; totMan+=puesto;
+    // ⚠️ EL EXCESO SE COMPARA EN UNIDADES INDIVIDUALES, no en la unidad en que se
+    // escribe. Es la unica medida que no depende de que unidad use cada lado: si
+    // salieron 15 cajas (360 u) y vuelven 100 paquetes (400 u), eso avisa aunque
+    // los dos numeros —15 y 100— no se parezcan en nada.
+    const exc=(puesto*M.div) > (L.salioUds+0.0001); if(exc) hayExceso=true;
     h+='<tr><td class="cl-lote">'+esc(L.lote)+'</td>'
-      +'<td class="dv-salio">'+esc(_dvNum(L.salioUom))+' '+esc(L.uom)+'</td>'
+      +'<td class="dv-salio">'+esc(_dvNum(L.salioMan))+' '+esc(M.nombre)+'</td>'
       +'<td><input class="cl-in" type="number" min="0" step="any" inputmode="decimal" '
       +'value="'+esc(v==null?'':v)+'" oninput="dvLote(\''+esc(L.lote).replace(/'/g,"&#39;")
       +'\',this.value)"'+(exc?' style="border-color:var(--warn)"':'')+'></td></tr>';
@@ -14022,16 +14030,15 @@ function dvLotesHTML(){
   h+='</table>';
   // ⚠️ AVISA, NO FRENA, y por eso es AMBAR y no rojo. Puede volver producto de una
   // entrega anterior en el mismo camion; si se bloqueara, ese producto vuelve al
-  // congelador sin que el sistema lo sepa, y un saldo invisible es peor que uno que
-  // no cuadra y lo dice. El rojo en este modulo significa "lo que hay puesto no
-  // sirve" — esto si sirve.
+  // congelador sin que el sistema lo sepa. El rojo en este modulo significa "lo que
+  // hay puesto no sirve" — esto si sirve.
   if(hayExceso) h+='<div class="dv-exceso">Vuelve más de lo que salió en esta entrega. '
     +'<b>Se registra igual</b> y queda marcado: puede ser producto de una entrega anterior '
     +'en el mismo camión.</div>';
   const I=NIV_INFO[pid]||{nom:pid};
-  h+='<div class="cl-pie">'+esc(I.nom)+' · vuelve hasta ahora <strong>'+_dvNum(totUom)+' '
-    +esc(lts[0].uom)+'</strong></div>';
-  h+='<div style="margin-top:14px"><button class="btn" '+(totUom>0?'':'disabled')
+  h+='<div class="cl-pie">'+esc(I.nom)+' · vuelve hasta ahora <strong>'+_dvNum(totMan)+' '
+    +esc(M.nombre)+'</strong></div>';
+  h+='<div style="margin-top:14px"><button class="btn" '+(totMan>0?'':'disabled')
     +' onclick="dvAgregarLinea()">'+(N.editando>=0?'Guardar el cambio':'Agregar a esta devolución')
     +'</button>'
     +(N.editando>=0?' <button class="btn btn-sm" onclick="dvQuitarLinea()">Quitar la línea</button>':'')
@@ -14041,15 +14048,27 @@ function dvLotesHTML(){
 // Los lotes de ESE producto en ESA entrega, con cuanto salio en la unidad de la
 // entrega. El centinela no entra (decision de Andrea): no se puede devolver a un
 // lote que nadie sabe cual es.
+// ⚠️ EL FILTRO DE LOTES ES LA FORMA, NO UNA LISTA DE VALORES CONOCIDOS (17-sep).
+// Antes se excluia solo `NO DETERMINADO` y se ofrecian lotes que la base RECHAZA:
+// medido, hay SEIS filas con `Sin lote`/`sin lote` en los pedidos 48, 55 y 56 —y
+// el 55 es justo la entrega de Automercado que Andrea estaba usando—. Elegir uno
+// hacia fallar el insert contra `ent_devolucion_linea_lote_check`.
+// Se pregunta por lo que la base ACEPTA, con su MISMA expresion. Una lista de
+// valores conocidos solo cubre los que ya aparecieron; la forma cubre los que
+// todavia no.
+const DV_LOTE_OK=/^\d{1,3} \/ \d{1,2}-\d{2}$/;
 function dvLotesDe(pid){
-  const N=_dv.n, out=[];
+  const N=_dv.n, out=[], M=_dvManejo(pid);
   (N.entrega.lineas||[]).forEach(function(l){
     if(+l.producto_id!==+pid) return;
-    const fac=_dvFactor(l), uom=_dvUom(l);
+    const facCong=_dvFactorCong(l), uomFac=_dvUom(l);
     (l.lotes||[]).forEach(function(lt){
-      if(lt.lote===ENT_LOTE_INDET) return;
-      out.push({lote:lt.lote, salioUds:+lt.cant_uds||0,
-                salioUom:(+lt.cant_uds||0)*fac, fac:fac, uom:uom});
+      if(!DV_LOTE_OK.test(String(lt.lote||''))) return;
+      const uds=+lt.cant_uds||0;
+      out.push({lote:lt.lote, salioUds:uds,
+                salioMan:uds/M.div,            // en unidad de MANEJO, que es como se escribe
+                man:M.nombre, div:M.div,
+                facCong:facCong, uomFac:uomFac});
     });
   });
   return out;
@@ -14057,19 +14076,37 @@ function dvLotesDe(pid){
 function dvProductosDeLaEntrega(){
   const vis={}, out=[];
   (_dv.n.entrega.lineas||[]).forEach(function(l){
-    const tiene=(l.lotes||[]).some(function(x){ return x.lote!==ENT_LOTE_INDET; });
+    const tiene=(l.lotes||[]).some(function(x){ return DV_LOTE_OK.test(String(x.lote||'')); });
     if(tiene && !vis[l.producto_id]){ vis[l.producto_id]=1; out.push(+l.producto_id); }
   });
   return out;
 }
-// ⚠️ EL FACTOR SALE DE `ent_pedido_linea`, CONGELADO EN ESA ENTREGA. No se usa
-// ninguna de las tres conversiones del archivo (NIV_INFO via rpUdsDe, INV_TERM via
-// _lotUds, ni el factor de Odoo via uomFactores): esta es la de ESTA entrega, y
-// las otras pudieron cambiar desde entonces.
-//   cant_uds = cant_uom / uom_factor     (convencion de Odoo: qty_ref = qty/factor)
-// Un paquete de 4 da factor 0.25, y 6 paq -> 24 uds. A mano entraria 4x corto.
-function _dvFactor(l){ const f=+l.uom_factor; return (f>0)?f:1; }
-function _dvUom(l){ return l.uom_nombre || 'Unidades'; }
+// ── LA UNIDAD EN QUE SE ESCRIBE (17-sep) ────────────────────────────────
+// ⚠️ SE ESCRIBE EN LA UNIDAD DE MANEJO DEL PRODUCTO, no en la de la entrega.
+// Decision de Andrea despues de medirlo, y revierte la regla que ella misma habia
+// dado ("si salio en Paquete de 4, vuelve en Paquete de 4").
+//
+// EL PORQUE: la unidad de la entrega es un dato de FACTURACION —como se le vendio
+// a Automercado— y la devolucion es un HECHO FISICO: lo que Daniel tiene enfrente
+// son paquetes. Son cosas distintas y no tienen por que compartir unidad.
+// Y el caso que lo prueba: el pedido 55 salio en `Caja (Frances)` (24 uds). Si
+// vuelven TRES PAQUETES, eso son 0,125 cajas — imposible de escribir. Con la
+// unidad clavada a la de la entrega, esa devolucion no se puede registrar.
+//
+//   Frances, Buns, Pizza -> paquete        Blanco, Semillas, Galletas -> unidad
+//   cant_uds = lo escrito x presDiv
+//
+// ⚠️ EL FACTOR CONGELADO NO SE TIRA: es lo que la NOTA DE CREDITO necesita. La NC
+// tiene que espejar la FACTURA, asi que sus lineas van en la unidad de la entrega
+// —`cant_uds x uom_factor`— mientras la devolucion guarda lo fisico. Cada tabla en
+// la unidad de su pregunta.
+function _dvManejo(pid){
+  const I=NIV_INFO[pid]||{presDiv:1,presLbl:'uds'};
+  const d=(+I.presDiv>0)?+I.presDiv:1;
+  return {div:d, nombre:(d>1?('Paquete de '+d):'Unidades')};
+}
+function _dvFactorCong(l){ const f=+l.uom_factor; return (f>0)?f:1; }   // el de la FACTURA
+function _dvUom(l){ return l.uom_nombre || 'Unidades'; }                 // el nombre de la FACTURA
 function _dvNum(n){ return (Math.round((Number(n)||0)*1000)/1000)
   .toLocaleString('es-CR',{minimumFractionDigits:0, maximumFractionDigits:3}); }
 
@@ -14115,7 +14152,7 @@ function dvProd(pid){
   else { N.pid=pid; N.lotes={}; N.editando=-1;
     // si ese producto ya esta cargado, se abre con lo que tenia
     const i=N.lineas.findIndex(function(l){ return +l.producto_id===+pid; });
-    if(i>=0){ N.editando=i; N.lineas[i].lotes.forEach(function(x){ N.lotes[x.lote]=x.cant_uom; }); }
+    if(i>=0){ N.editando=i; N.lineas[i].lotes.forEach(function(x){ N.lotes[x.lote]=x.cant_man; }); }
   }
   dvRender();
 }
@@ -14130,29 +14167,33 @@ function dvLote(lote,v){
 }
 function dvAgregarLinea(){
   const N=_dv.n, pid=N.pid; if(!pid) return;
-  const lts=dvLotesDe(pid), puestos=[];
-  let totUom=0, totUds=0, uom='';
+  const lts=dvLotesDe(pid), puestos=[]; const M=_dvManejo(pid);
+  let totMan=0, totUds=0;
   lts.forEach(function(L){
     const v=+N.lotes[L.lote]||0; if(v<=0) return;
-    uom=L.uom; totUom+=v; totUds+=v/L.fac;
-    puestos.push({lote:L.lote, cant_uom:v, cant_uds:v/L.fac, uom_factor:L.fac, uom_nombre:L.uom});
+    const uds=v*M.div;                       // manejo -> unidades individuales
+    totMan+=v; totUds+=uds;
+    puestos.push({lote:L.lote,
+                  cant_man:v, cant_uds:uds,           // lo FISICO
+                  man_nombre:M.nombre, man_div:M.div,
+                  uom_nombre:L.uomFac, uom_factor:L.facCong});  // lo de la FACTURA, para la NC
   });
   if(!puestos.length) return;
-  const linea={producto_id:pid, lotes:puestos, total_uom:totUom, total_uds:totUds, uom_nombre:uom};
+  const linea={producto_id:pid, lotes:puestos, total_man:totMan, total_uds:totUds,
+               man_nombre:M.nombre};
   if(N.editando>=0) N.lineas[N.editando]=linea; else N.lineas.push(linea);
   N.pid=null; N.lotes={}; N.editando=-1;
   dvRender();
   // ⚠️ SE DESPLAZA A DONDE FUE A PARAR. La relacion entre el boton y la seccion se
   // DEMUESTRA —tocás y ves la linea aparecer alla— en vez de explicarse con un
-  // cartel. Es la primera vez que alguien usa esta pantalla; en "Sin factura" el
-  // paso ya se conoce. `block:'nearest'` para que no salte si ya estaba a la vista.
+  // cartel. `block:'nearest'` para que no salte si ya estaba a la vista.
   try{ const el=document.getElementById('dvCargadas');
        if(el) el.scrollIntoView({block:'nearest', behavior:'smooth'}); }catch(e){}
 }
 function dvEditar(i){
   const N=_dv.n, l=N.lineas[i]; if(!l) return;
   N.pid=+l.producto_id; N.editando=i; N.lotes={};
-  l.lotes.forEach(function(x){ N.lotes[x.lote]=x.cant_uom; });
+  l.lotes.forEach(function(x){ N.lotes[x.lote]=x.cant_man; });
   dvRender();
 }
 function dvQuitarLinea(){
@@ -14195,7 +14236,7 @@ function dvFueraHTML(){
 // pantalla SUMA, y sumar de mas es el error grave de este modulo.
 function dvConfirmarHTML(){
   const N=_dv.n;
-  const que=N.lineas.map(function(l){ return _dvNum(l.total_uom)+' '+l.uom_nombre
+  const que=N.lineas.map(function(l){ return _dvNum(l.total_man)+' '+l.man_nombre
     +' de '+_lotNom(l.producto_id); }).join(' · ');
   // ⚠️ LO QUE SE SACO DE ACA (17-sep) Y POR QUE:
   //   · el aviso de la nota de credito. NO ES ASUNTO DE DANIEL: el registra lo que
@@ -14285,11 +14326,25 @@ async function dvGuardar(){
   try{
     const {data:{user}}=await c.auth.getUser();
     const email=(user&&user.email)||'desconocido';
-    const filas=[];
+    // ⚠️ DOS UNIDADES, UNA POR TABLA, Y CADA UNA CONTESTA SU PREGUNTA.
+    //   · `ent_devolucion_linea` guarda LO FISICO: lo que Daniel conto, en la
+    //     unidad de manejo, y su `cant_uds` en unidades individuales — que es lo
+    //     unico que suma al saldo.
+    //   · `ent_odoo_pendiente_linea` (la NC) guarda lo de la FACTURA: la nota de
+    //     credito tiene que espejar como se facturo, asi que va en la unidad de la
+    //     entrega, convertida con el factor CONGELADO. Por eso ese factor no se
+    //     tiro cuando la entrada paso a la unidad de manejo.
+    // Ejemplo real (pedido 55, Frances, factura en Caja de 24): vuelven 3 paquetes
+    // -> devolucion 3 paq / 12 uds · NC 12 x (1/24) = 0,5 cajas.
+    const filas=[], filasNC=[];
     N.lineas.forEach(function(l){ l.lotes.forEach(function(x){
       filas.push({producto_id:+l.producto_id, lote:x.lote, cant_uds:x.cant_uds,
-                  uom_id:0, uom_nombre:x.uom_nombre, cant_uom:x.cant_uom,
-                  uom_factor:x.uom_factor}); }); });
+                  uom_id:0, uom_nombre:x.man_nombre, cant_uom:x.cant_man,
+                  uom_factor:(x.man_div>0?(1/x.man_div):1)});
+      filasNC.push({producto_id:+l.producto_id, lote:x.lote, cant_uds:x.cant_uds,
+                  uom_id:0, uom_nombre:x.uom_nombre,
+                  cant_uom:x.cant_uds*(+x.uom_factor||1), uom_factor:(+x.uom_factor||1)});
+    }); });
     if(!filas.length) throw new Error('no hay ninguna línea cargada');
 
     // 1 · la cabecera. `fecha` es el dia que LLEGO; `recibido_en` lo pone la base
@@ -14319,7 +14374,7 @@ async function dvGuardar(){
       creado_por:email}).select('id').single();
     if(e3) throw e3;
     const {error:e4}=await c.from('ent_odoo_pendiente_linea').insert(
-      filas.map(function(x){ return Object.assign({pendiente_id:pen.id},x); }));
+      filasNC.map(function(x){ return Object.assign({pendiente_id:pen.id},x); }));
     if(e4) throw e4;
 
     pon('var(--good,#3E9E62)','✓ Registrada. Suma al congelador y quedó la NC pendiente.');
@@ -14335,8 +14390,8 @@ async function dvGuardar(){
     try{ console.error('[Truefie] Devoluciones · FALLO en:', paso, '·', cod, det,
       '· payload:', JSON.stringify({fecha:N.fecha, cliente_id:N.cliente&&N.cliente.id,
         pedido_id:N.entrega&&N.entrega.pedido_id, causa:N.causa,
-        lineas:N.lineas.map(function(l){ return {p:l.producto_id, uom:l.uom_nombre,
-          f:l.lotes.map(function(x){ return x.lote+'='+x.cant_uom+'→'+x.cant_uds; })}; })}),
+        lineas:N.lineas.map(function(l){ return {p:l.producto_id, man:l.man_nombre,
+          f:l.lotes.map(function(x){ return x.lote+'='+x.cant_man+'→'+x.cant_uds+'u'; })}; })}),
       '· error completo:', e); }catch(_){}
     _dvErrMostrar('<strong>No se registró la devolución.</strong> Falló en '+esc(paso)
       +':<br>'+esc(det)+esc(cod)

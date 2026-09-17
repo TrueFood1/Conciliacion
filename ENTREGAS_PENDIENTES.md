@@ -637,15 +637,62 @@ no tiene campos libres de lote.
 
 ### Las reglas
 
+### 🔴 LA UNIDAD EN QUE SE ESCRIBE CAMBIÓ (17-sep-2026)
+
+> **Antes decía**: *"la devolución va en la MISMA unidad en que salió la entrega —
+> el uom congelado de `ent_pedido_linea`. Si salió en Paquete de 4, vuelve en
+> Paquete de 4."* **Esa regla era de Andrea y ella misma la revirtió**, el mismo
+> día, después de medir. Queda escrito para que no se vuelva a discutir.
+
+**Ahora la unidad de entrada es la de MANEJO del producto:**
+
+| producto | se escribe en |
+|---|---|
+| Pan Francés, Buns, Pizza | **paquete** |
+| Pan Blanco, Semillas, Galletas | **unidad** |
+
+**El porqué.** La unidad de la entrega es un dato de **facturación** — cómo se le
+vendió a Automercado. La devolución es un **hecho físico**: lo que Daniel tiene
+enfrente son paquetes. Son cosas distintas y no tienen por qué compartir unidad.
+
+**Y el caso que lo prueba, medido.** El pedido 55 (Automercado, factura …3516)
+salió en `Caja (Frances)`, que son **24 unidades**. Si vuelven **tres paquetes**,
+eso son **0,125 cajas** — imposible de escribir. Con la unidad clavada a la de la
+entrega, esa devolución **no se puede registrar**.
+
+**El factor congelado NO se tiró**, y ahí está el matiz: la **nota de crédito**
+tiene que espejar la **factura**, así que sus líneas van en la unidad de la
+entrega, convertidas con ese factor. Cada tabla en la unidad de su pregunta:
+
+```
+vuelven 3 paquetes de Pan Francés, de una entrega facturada en Caja de 24
+  ent_devolucion_linea    → 3 Paquete de 4 · cant_uds 12      (lo físico)
+  ent_odoo_pendiente_linea → 0,5 Caja (Frances) · cant_uds 12  (lo que va a la NC)
+```
+
+⚠️ **Y el aviso de exceso se compara en UNIDADES INDIVIDUALES**, no en la unidad
+de entrada. Es la única medida que no depende de qué unidad use cada lado: si
+salieron 15 cajas (360 u) y vuelven 100 paquetes (400 u), **avisa** — aunque los
+dos números, 15 y 100, no se parezcan en nada.
+
+**Lo que se dejó de mostrar**: el `= N u` al lado de la cantidad. Para Francés,
+Buns y Pizza eso son unidades sueltas, que es la unidad que nadie usa: *"48 u"*
+son 12 paquetes y se lee 4× mal. Es la regla de la unidad de venta, aplicada.
+
 - ⚠️ **El lote NO es "lo disponible hoy"**: son los lotes que SALIERON en esa
   entrega. Solo pueden devolver lo que se les entregó. **Si un lote de esa
   entrega ya se agotó, aparece igual** — se devuelve contra lo que salió, no
   contra lo que queda.
-- ⚠️ **El centinela `'NO DETERMINADO'` NO se ofrece** (decisión de Andrea,
-  16-sep). No se puede devolver a un lote que nadie sabe cuál es. La base ya lo
-  rechaza —`ent_devolucion_linea.lote` tiene el check de forma canónica
-  `^\d{1,3} / \d{1,2}-\d{2}$`— pero eso hace fallar el insert entero: **la
-  pantalla no tiene que ofrecerlo**, que es distinto de que la base lo atrape.
+- ⚠️ **El selector filtra por la FORMA del lote, no por una lista de valores**
+  (17-sep). Se ofrece únicamente lo que pasa `^\d{1,3} / \d{1,2}-\d{2}$`, que es
+  **la misma expresión** del check de `ent_devolucion_linea.lote`.
+  **Medido el 17-sep**: además del centinela `'NO DETERMINADO'` hay **seis** filas
+  en `ent_alisto_lote` con `Sin lote` / `sin lote`, en los pedidos **48, 55 y 56**
+  — y el 55 es justo la entrega de Automercado que Andrea estaba usando. Con el
+  filtro viejo (excluir solo el centinela) esos lotes se ofrecían y el insert
+  fallaba contra el check.
+  **Una lista de valores conocidos solo cubre los que ya aparecieron; la forma
+  cubre los que todavía no.**
 - 🔴 **AVISA, NO FRENA, y el porqué es toda la regla.** Si se devuelve más de lo
   que salió en esa entrega, la línea **entra y queda marcada**.
 

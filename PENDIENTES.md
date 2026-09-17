@@ -215,3 +215,53 @@ distingue "legible" de "la RLS filtró todo" cuando la tabla puede estar vacía.
 - Y dejar escrito en la salida **cuántos objetos se vieron por cada camino**.
   Como en el punto ciego 1: si el contador no se mueve cuando se agrega una
   escritura nueva, el chequeo está mirando para otro lado.
+
+
+---
+
+## O2 · 🟠 ABIERTO · Un Buns facturado en "Caja" de 6 cuando la caja de Buns son 24
+
+Encontrado el 17-sep-2026 midiendo los factores de unidad para Devoluciones.
+**El dato malo está en ODOO, no en Truefie** — Truefie lo copió fielmente.
+
+### La fila
+
+| | |
+|---|---|
+| pedido | **67** |
+| factura | `00100001010000003534` |
+| cliente | Arrendadora Bm Pz Sociedad |
+| fecha | 2026-09-14 |
+| producto | **503 · Buns** |
+| unidad | `uom_id 46` · **"Caja"** · factor 1/6 → **6 unidades** |
+| cantidad | 1 caja = 6 unidades |
+
+### Por qué está mal
+
+Buns se factura normalmente en **`Caja (Hamburguesa)` (uom 42) = 24 unidades**, o
+en `Paquete de 4` (uom 37). La unidad `Caja` (uom 46) es la de **Pan Blanco y Pan
+Semillas**, que sí traen 6 por caja.
+
+Medido sobre `ent_pedido_linea`: Buns aparece con **tres** unidades distintas —
+`Paquete de 4` (30 líneas), `Caja (Hamburguesa)` (11) y **`Caja` (1 sola línea,
+ésta)**. Las otras dos son correctas.
+
+### Qué corregir, y dónde
+
+**En Odoo**, en la factura `…3534`: la línea de Buns debería ir en
+`Caja (Hamburguesa)` (1 caja = 24 u) o en `Paquete de 4`. Como está, esa entrega
+dice que salieron **6 unidades** de Buns cuando es probable que hayan salido
+**24** — hay que confirmarlo contra lo que realmente se despachó antes de tocar
+nada.
+
+⚠️ **No se corrige desde Truefie.** `ent_pedido_linea` copia la unidad de la
+factura en el momento del despacho, a propósito: es el dato tal como se facturó.
+Cambiarlo acá dejaría a Truefie diciendo una cosa y a Odoo otra.
+
+### Qué NO rompe
+
+- El **saldo por lote** usa `cant_uds` (6), que es lo que Truefie registró como
+  salido. Si de verdad salieron 24, el saldo de ese lote está **18 unidades alto**.
+- **Devoluciones** no se ve afectada desde el 17-sep: la unidad de entrada pasó a
+  ser la de manejo del producto, así que un Buns que vuelve se escribe en paquetes
+  sin importar cómo se facturó (ver `ENTREGAS_PENDIENTES` §12).
