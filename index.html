@@ -13241,8 +13241,8 @@ let _pdDecidiendo=0;        // factura_id que se está guardando ahora mismo
 // seguir explicando qué se estaba mirando.
 //   'revisado'  → la miré, está bien apartada. Sale de las dos listas.
 //   'despachar' → el filtro se equivocó. Va a "Por preparar".
-// ⚠️ "Revisado" y NO "Validado": en esta misma pantalla "Ya validé" significa
-// validar la entrega en Odoo. Dos palabras distintas para dos cosas distintas.
+// ⚠️ "Revisado" y NO "Validado": en esta misma pantalla, validar es lo que se le
+// hace a una ENTREGA en Odoo. Dos palabras distintas para dos cosas distintas.
 async function pdDecidir(facturaId, facturaNombre, decision){
   if(_pdDecidiendo) return;
   const f=(_despSinDesp||[]).find(function(x){ return x.factura_id===facturaId; });
@@ -13589,7 +13589,7 @@ function pdRender(){
     'Daniel registró la salida; falta que las socias digan qué fue. El pendiente es un estado con nombre, no un hueco.',
     _pd.l3, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdClasifUI('+it.id+')">Clasificar</button>'; });
   // El rótulo NO dice "sin validar en Odoo": la lista no sabe nada de Odoo. Lo que
-  // sabe es que nadie tocó el botón "Ya validé" — la marca a mano. Decir "sin validar
+  // sabe es que nadie tocó el botón de cerrarla — la marca a mano. Decir "sin validar
   // en Odoo" prometía un dato que Truefie no lee, y una fila podía estar validada en
   // Odoo y seguir apareciendo acá. "Sin marcar como validado" es lo que de verdad mide.
   // SIN PÁRRAFO (16-sep, decisión de Andrea). El que había —"Andrea valida la
@@ -13600,8 +13600,23 @@ function pdRender(){
   // «Por resolver», que quedó con el título y el contador solos.
   // (El razonamiento de por qué el TÍTULO está redactado así se conserva arriba:
   // eso sí sigue siendo útil para quien lea el código.)
+  // ⚠️ EL BOTON DICE «Hecho», EN LAS TRES TARJETAS QUE CIERRAN ALGO DE ODOO
+  // (17-sep). Antes esta decia "Ya validé" y la cola de Odoo "Ya lo hice en Odoo":
+  // dos rotulos parecidos pero distintos, en tarjetas vecinas, para la MISMA idea
+  // —"ya lo hice alla, sacalo de mi lista"—.
+  // NO se unificaron en "Validado", que era la otra opcion, porque esa palabra es
+  // de UNA de las acciones: en Odoo se valida un traslado, pero una nota de credito
+  // se CREA y se re-factura. Importar el verbo de una accion a la otra es como se
+  // termina sin saber que significa cada cosa.
+  // «Hecho» es cierto para las tres y ademas NOMBRA LA FILA QUE ESCRIBE
+  // (`ent_odoo_hecho`), igual que «Visto» nombra la suya en «Por resolver». Quedan
+  // dos palabras con dos significados limpios: Visto = alguien lo miro ·
+  // Hecho = alguien lo hizo en Odoo.
+  // EL PRECIO, dicho: esta tarjeta perdio el eco entre su titulo ("sin marcar como
+  // validado") y su boton. Se acepto a conciencia — el titulo sigue diciendo que
+  // falta y el boton queda como la accion de cerrar.
   h+=secc('Entregado en Truefie, sin marcar como validado', '',
-    _pd.l1, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdValidar('+it.id+')">Ya validé</button>'; });
+    _pd.l1, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdValidar('+it.id+')">Hecho</button>'; });
   h+=secc('Salida de venta, sin factura vinculada',
     'Solo salidas de tipo venta: una regalía sin factura no es un pendiente, es lo correcto.',
     _pd.l2, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdVincular('+it.id+','+it.cliente_id+')">Vincular</button>'; });
@@ -13652,8 +13667,8 @@ function pdRender(){
         // DOS BOTONES, y el orden dice cuál es el normal: "Revisado" es lo que
         // pasa casi siempre —el filtro acertó— y va primero. "Despachar igual"
         // es la excepción y va sin relleno, a la derecha.
-        // ⚠️ "Revisado" y NO "Validado": en esta MISMA pantalla "Ya validé"
-        // significa validar la entrega en Odoo, que es otra cosa.
+        // ⚠️ "Revisado" y NO "Validado": en esta MISMA pantalla, validar es lo
+        // que se le hace a una ENTREGA en Odoo, que es otra cosa.
         +'<div class="pd-decs">'
         +'<button class="btn btn-sm"'+(ocupada?' disabled':'')
         +' onclick="pdDecidir('+arg+",'revisado')\">"+(ocupada?'Guardando…':'Revisado')+'</button>'
@@ -14749,7 +14764,7 @@ function pdOdooHTML(){
         // titulo de la tarjeta ya dice que esto es una COLA de cosas por hacer
         // alla, y el parrafo de arriba ya dice que Truefie no escribe en Odoo.
         // Mismo criterio que «Por resolver» y que "sin marcar como validado".
-        +' onclick="pdOdooHecho('+x.id+')">'+(ocupada?'Guardando…':'Ya lo hice en Odoo')+'</button>'
+        +' onclick="pdOdooHecho('+x.id+')">'+(ocupada?'Guardando…':'Hecho')+'</button>'
         +'</div></div>';
     });
     h+='</div>';
