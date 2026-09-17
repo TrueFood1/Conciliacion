@@ -3087,6 +3087,22 @@ body.es-socia .face-pend{display:block}
 .bo-cu{font-size:12px;color:var(--text-2);white-space:nowrap}
 .bo-f2{display:block;font-size:12px;color:var(--text-2);margin-top:2px}
 .bo-pie{font-size:11.5px;color:var(--text-2);line-height:1.45;margin-top:2px}
+/* ── Descartar un borrador (17-sep) ──────────────────────────────────────
+   VA FUERA de `.bo-fila`, que es un <button> entero: un boton adentro de otro es
+   HTML invalido y el navegador lo saca del contenedor — la tarjeta dejaria de
+   abrirse. Es la misma razon por la que `.pdf-b` es un <span role=button>.
+   DOS BOTONES, no un toque directo: descartar es trabajo de alguien aunque sea
+   poco. Mismo patron que "Facturas sin despacho", y sin modal — el modulo no usa. */
+.bo-desc{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:0 0 9px;margin-top:-4px}
+.bo-desc-l{background:none;border:none;color:var(--text-3);font:inherit;font-size:11.5px;
+  padding:0;cursor:pointer;text-decoration:underline}
+.bo-desc-l:hover{color:var(--text-2)}
+/* ⚠️ MEDIDO a 375px: con el campo y los dos botones en la misma fila, "Cancelar"
+   caia solo a un TERCER renglon y la confirmacion se leia como tres cosas sueltas.
+   El campo toma su propia fila (`flex:1 1 100%`) y los dos botones quedan juntos
+   abajo, que es como se leen: una decision de dos. */
+.bo-desc-n{flex:1 1 100%;background:var(--field);border:1px solid var(--border-strong);
+  border-radius:8px;color:var(--text);font:inherit;font-size:16px;padding:7px 9px}
 .dp-fecha{margin-right:auto}
 .de-btns{display:flex;gap:8px;margin-left:auto}
 /* Mismo lima y mismo borde derivado que el resto del módulo — un solo tono, sin
@@ -4471,7 +4487,7 @@ function accesoModDeVista(v){
 // ANTE LA DUDA, NO: si falla la lectura o no hay sesión, devuelve false. Es la
 // misma regla que el default de ACCESO_USUARIOS —"ver de menos, no de más"— y acá
 // además es gratis, porque el trigger igual rechazaría el insert.
-let _socia=null, _sociaProm=null;
+let _socia=null, _sociaProm=null, _miEmail='';
 async function accesoSocia(){
   if(_socia!==null) return _socia;
   if(!_sociaProm) _sociaProm=(async function(){
@@ -4489,6 +4505,10 @@ async function accesoSocia(){
     }catch(e){ return false; }
   })();
   _socia=await _sociaProm;
+  // El correo de la sesion queda cacheado de paso: lo usa `boPuedeDescartar` para
+  // saber si un borrador es tuyo, y no hay por que volver a preguntarlo.
+  try{ const {data}=await sbClient().auth.getUser();
+       _miEmail=((data&&data.user&&data.user.email)||'').trim().toLowerCase(); }catch(e){}
   // Las seis barras de Entregas son HTML estático —`_modShow` solo prende y apaga
   // vistas, no las vuelve a dibujar—, así que pintar UNA vez alcanza para las seis.
   document.body.classList.toggle('es-socia', _socia);
@@ -10445,13 +10465,106 @@ function boTiraHTML(){
       +'<span class="bo-f2">'+n+(n===1?' lote anotado':' lotes anotados')+esc(fac)
       // Recién tocado y todavía sin confirmar de la nube, `creado_por` puede venir
       // vacío. "lo dejó " a secas se lee como un dato roto; "vos" es la verdad.
-      +' · lo dejó '+esc((b.creado_por||'').split('@')[0]||'vos')+'</span></button>';
+      +' · lo dejó '+esc((b.creado_por||'').split('@')[0]||'vos')+'</span></button>'
+      +boDescartarHTML(b);
   }).join('');
   return '<div class="bo-tira"><div class="bo-cab">Sin cerrar'
     +'<span id="boEstado" class="bo-estado"></span></div>'+filas
+    // ⚠️ "Nada se descontó" ES CIERTO Y AHORA ESTA MEDIDO (17-sep). La frase venia
+    // afirmandose desde que existe la tira, sin que nadie la hubiera comprobado.
+    // Verificado por dos caminos independientes contra la base de produccion:
+    //   · se barrieron las definiciones de TODAS las vistas buscando "borrador": la
+    //     unica que lo nombra es `ent_alisto_borrador_vigente`, o sea la suya. Lo
+    //     que resta sale de ent_salido_del_congelador_desde_ancla <- ent_alisto_vigente
+    //     <- ent_alisto, y esa cadena NO toca esta tabla.
+    //   · de 243 filas, las unicas con `pedido_id` no nulo son las 28 `cerrado`: un
+    //     borrador se liga a un pedido AL CERRARSE, que es cuando nacen las filas
+    //     reales del alisto.
+    // Por eso descartar es seguro, y por eso el boton no pregunta por el inventario.
     +'<div class="bo-pie">Lo anotado está guardado. Nada se descontó del inventario todavía: '
     +'eso pasa cuando se cierra la entrega.</div></div>';
 }
+// ── DESCARTAR UN BORRADOR (17-sep-2026) ─────────────────────────────────
+// El problema: algo empezado que no se puede terminar ni sacar. Daniel dejo uno
+// abierto por error el 16-sep y quedo ahi. Con la pantalla en uso diario va a
+// pasar mas seguido.
+//
+// APPEND-ONLY: descartar NO borra nada. Escribe una fila que dice que se
+// descarto, y `ent_alisto_borrador_vigente` (distinct on origen,ref) hace que esa
+// sea la que manda. El rastro queda entero. El estado 'descartado' ya existia —
+// hay uno del 7-sep con nota 'limpieza-pruebas'.
+//
+// 🔴 EL PERMISO DE ABAJO NO IMPIDE ABSOLUTAMENTE NADA. Es un FILTRO DE ACCIDENTE,
+// no un candado, y quien lea este `if` no tiene que creer que protege:
+//   · la RLS de ent_alisto_borrador es `INSERT with check (true)` y
+//     `SELECT using (true)` — CERO comprobacion de dueño. Cualquier sesion
+//     autenticada puede insertar un 'descartado' para el borrador de cualquiera.
+//   · los grants estan abiertos: `anon` y `authenticated` con DELETE incluido
+//     (la deuda del §6 de ENTREGAS_EXCEPCIONES_LINEA.sql).
+// O sea que esto evita el toque equivocado de un compañero, y nada mas. La
+// version de verdad —una politica que exija ser el dueño o socia— queda ANOTADA
+// COMO PENDIENTE, y es una sesion de permisos, no un anexo de esto.
+// Es la misma trampa que las pruebas que no prueban: un control que parece
+// proteger y no protege es peor que no tenerlo, porque nadie vuelve a mirarlo.
+function boPuedeDescartar(b){
+  if(!_miEmail) return true;         // todavia no se sabe quien sos: no se esconde
+  if(_socia===true) return true;     // una socia puede sacar el de cualquiera
+  return String(b.creado_por||'').trim().toLowerCase()===_miEmail;
+}
+let _boDescartando='';               // clave del borrador con la confirmacion abierta
+let _boDescNota={};                  // nota tipeada, mientras no se guarde
+function boDescartarHTML(b){
+  if(!boPuedeDescartar(b)) return '';
+  const k=_boK(b.origen,b.ref);
+  const arg="'"+String(b.origen).replace(/'/g,"&#39;")+"','"+String(b.ref).replace(/'/g,"&#39;")+"'";
+  if(_boDescartando!==k)
+    return '<div class="bo-desc"><button class="bo-desc-l" onclick="boDescartarUI('+arg+')">Descartar</button></div>';
+  // La nota es OPCIONAL: descartar es casi siempre "me equivoque", y pedir una
+  // explicacion obligatoria para eso es friccion. Si hay algo que decir, se dice.
+  return '<div class="bo-desc">'
+    +'<input class="bo-desc-n" maxlength="120" placeholder="Por qué (opcional)" '
+    +'value="'+esc(_boDescNota[k]||'')+'" oninput="_boDescNota[\''+k+'\']=this.value">'
+    +'<button class="btn btn-sm" onclick="boDescartar('+arg+')">Descartar</button>'
+    +'<button class="btn btn-sm" onclick="boDescartarUI(null)">Cancelar</button>'
+    +'</div>';
+}
+function boDescartarUI(origen, ref){
+  _boDescartando = (origen==null) ? '' : _boK(origen,ref);
+  try{ despRender(); }catch(e){}
+}
+// ⚠️ NO SE REUSA `_boSubir`, Y NO ES POR CAPRICHO. Esa funcion arranca con
+// `const r=_boLee()[...]; if(!r && estado!=='cerrado') return;` — o sea que exige
+// la copia LOCAL del borrador y, si no esta, SE VA EN SILENCIO sin insertar nada.
+// El caso principal de este boton es justamente ese: Andrea descartando desde su
+// sesion un borrador que Daniel dejo en OTRO aparato, donde la copia local no
+// existe. Reusarla habria dado un boton que no hace nada y no dice nada.
+// Los `datos` salen de la fila de la NUBE (`_boAbiertos`), que es la que se ve.
+async function boDescartar(origen, ref){
+  const c=sbClient(); if(!c){ alert('No hay sesión de Supabase.'); return; }
+  const k=_boK(origen,ref);
+  const b=(_boAbiertos||[]).find(function(x){ return _boK(x.origen,x.ref)===k; });
+  if(!b) return;
+  const nota=String(_boDescNota[k]||'').trim();
+  try{
+    const {data:{user}}=await c.auth.getUser();
+    const {error}=await c.from('ent_alisto_borrador').insert({
+      origen:b.origen, ref:String(b.ref), estado:'descartado', pedido_id:null,
+      datos:b.datos||{}, dispositivo:_boAparato(), nota:(nota||null),
+      creado_por:(user&&user.email)||'desconocido'});
+    if(error) throw error;
+    // y se limpia la copia local, si la hay: un borrador descartado que sigue
+    // apareciendo en ESTE aparato seria el mismo problema una capa mas abajo.
+    try{ const d=_boLee(); delete d[k]; _boEscribe(d); }catch(e){}
+    _boDescartando=''; delete _boDescNota[k];
+    _boErr='';
+    await boCargarAbiertos();
+  }catch(e){
+    _boErr='no pude descartar: '+((e&&e.message)||e);
+    try{ _boPintar(); }catch(_){}
+    alert('No se pudo descartar: '+((e&&e.message)||e));
+  }
+}
+
 // ── EL CAMINO MANUAL (Reporte de despacho, sin factura) ─────────────────
 // Acá NO hay factura de Odoo, así que la `ref` es un uuid que se genera al
 // primer toque y vive en `_rp`. Es la única parte del diseño donde la identidad
@@ -13543,17 +13656,34 @@ function pdRender(){
 // bloqueo por saldo —nunca vas a "no tener suficiente" para recibir algo— y el
 // error grave no es quedarse corto sino CONTAR DE MAS.
 //
-// LA REGISTRA DANIEL. Es quien recibe el producto en la planta, asi que la
-// pestaña NO es solo-socias. El visto de socia no hace falta: una devolucion no
-// es una excepcion que alguien tenga que mirar, es un hecho fisico.
+// ⚠️ LA FORMA ES LA DE "ENTREGAS SIN FACTURA", A PROPOSITO. Decision de Andrea,
+// textual: "el mismo concepto de crear una entrega, todo igual, pero en vez de
+// restar suma. Para los empleados tiene que ser igual de intuitivo." Daniel ya
+// sabe usar esa pantalla y no tiene que aprender una segunda forma de hacer lo
+// mismo al reves. Mismas secciones, mismo orden, mismos rotulos:
+//   1 a quien / de que        2 que sale / que volvio      3 lo cargado
+//   4 el motivo / la causa    pie: la fecha + guardar
+//
+// DONDE SE LLAMA DISTINTO ES PORQUE SIGNIFICA DISTINTO, y son dos:
+//   · "Presentacion" (dos botones: uds / cajas) -> "Unidad", un ROTULO. Alla la
+//     unidad se elige; aca es un HECHO: la de esa entrega, congelada en
+//     `uom_factor`. Dejarla como botones obligaria a convertir con NIV_INFO para
+//     una de las dos opciones, que es la trampa del factor otra vez.
+//   · "Dia de la salida" -> "Dia que llego". Es otro momento, y el texto del
+//     26-ago va ahi: se registra cuando el producto LLEGA, no cuando avisan.
+//
+// ⚠️ SE CUENTA POR LOTE Y EL TOTAL SE CALCULA — no se escribe un total y se
+// reparte. Decision de Andrea, y el argumento es el gesto: en una entrega Daniel
+// declara lo que saca y el total lo sabe primero; en una devolucion llegaron
+// cajas y las cuenta, asi que el total no existe hasta sumar. Es EXACTAMENTE como
+// funciona el CONTEO (`_clUds` por lote, total al pie), que es el gesto que mas
+// hace. Y de paso hace imposible el descuadre de escribir 10 y repartir 8.
 //
 // ⚠️ EL LOTE NO SE ESCRIBE NUNCA. Sale de los lotes que SALIERON en esa entrega
-// (pedido -> alisto -> ent_alisto_lote). Es la red de diseño contra el error del
-// 26-ago: Semillas 209/1-27 esta en el despacho 11 y en el 20, y una pantalla de
-// campos libres deja pasar "12" sin pestañear. Esta no tiene campos libres de lote.
-//
-// ⚠️ Y NO ES "LO DISPONIBLE HOY". Un lote de esa entrega que ya se agoto aparece
-// igual: se devuelve contra lo que SALIO, no contra lo que queda.
+// (pedido -> alisto -> ent_alisto_lote). Es la red contra el error del 26-ago:
+// Semillas 209/1-27 esta en el despacho 11 y en el 20, y una pantalla de campos
+// libres deja pasar "12" sin pestañear. Y no es "lo disponible hoy": un lote de
+// esa entrega que ya se agoto aparece igual — se devuelve contra lo que SALIO.
 const DV_CAUSAS=[{v:'producto_equivocado', t:'Producto equivocado'},
                  {v:'otro',                t:'Otro'}];
 const DV_NOTA_MIN=6;      // el MISMO numero que ENT_NM_NOTA_MIN y ENT_INDET_NOTA_MIN
@@ -13568,299 +13698,414 @@ async function dvCargar(force){
   const st=document.getElementById('dvStatus');
   if(_dv && !force){ dvRender(); return; }
   st.className='status s-info'; st.classList.remove('hidden');
-  st.innerHTML='<span class="spin"></span>Leyendo las entregas registradas…';
+  st.innerHTML='<span class="spin"></span>Leyendo devoluciones y entregas…';
   try{ _dv=await dvLeer(); _dvErr=''; st.classList.add('hidden'); }
   catch(e){ _dvErr=(e&&e.message)||String(e); _dv=null;
-    st.className='status s-err';
-    st.innerHTML='No pude leer las entregas: '+esc(_dvErr); }
+    st.className='status s-err'; st.innerHTML='No pude leer: '+esc(_dvErr); }
   dvRender();
 }
 
-// ⚠️ DE DONDE SALE LA LISTA, Y QUE QUEDA AFUERA A PROPOSITO.
+// ⚠️ DE DONDE SALEN LAS ENTREGAS, Y QUE QUEDA AFUERA A PROPOSITO.
 // `v_ent_pedido_estado`, o sea lo que paso por Truefie — NO las facturas de Odoo.
 // Una factura anterior al modulo, o despachada por fuera, no tiene alisto y por lo
 // tanto NO TIENE LOTES: no hay contra que devolver. Por eso el rotulo dice
 // "entregas registradas" y no "facturas".
-//
-// DOS FILTROS MAS, los dos con su razon y los dos DICHOS EN PANTALLA:
-//   · `origen = 'factura'`. Las manuales no tienen `uom_factor` en
-//     ent_pedido_linea — medido el 16-sep: 49 de 49 lineas sin factor eran
-//     manuales— y sin factor una devolucion de Frances/Buns/Pizza entraria 4x o 2x
-//     corta EN SILENCIO. `rpGuardar` ya lo escribe de hoy en adelante, asi que esto
-//     se destraba solo para las nuevas. Las 49 viejas no se arreglan.
-//   · `cliente_id not null`. El flujo arranca por cliente y hay 10 entregas que no
-//     tienen (regalias, consumo interno, degustaciones: tienen DESTINATARIO).
-// Las dos exclusiones se cuentan y se muestran. Una entrega que falta sin
-// explicacion se lee como que el sistema la perdio.
+// DOS FILTROS MAS, los dos DICHOS EN PANTALLA (ver dvFueraHTML):
+//   · `origen='factura'`: las manuales no tienen `uom_factor` (medido el 16-sep:
+//     49 de 49 lineas sin factor eran manuales) y sin factor una devolucion de
+//     Frances/Buns/Pizza entraria 4x o 2x corta EN SILENCIO. `rpGuardar` ya lo
+//     escribe desde hoy, asi que las nuevas se destraban solas.
+//   · `cliente_id not null`: el flujo arranca por cliente y hay 10 entregas que no
+//     tienen (regalias, consumo interno: tienen DESTINATARIO).
 async function dvLeer(){
   const c=sbClient(); if(!c) throw new Error('sin sesión de Supabase');
-  const {data:peds,error:e1}=await c.from('v_ent_pedido_estado')
-    .select('pedido_id,fecha_despacho,factura_id,factura_nombre,cliente_id,cliente_nombre,'
-           +'origen,motivo,alisto_id,preparado_en,estado,fecha_ab_re_04')
-    .order('fecha_ab_re_04',{ascending:false}).limit(300);
-  if(e1) throw e1;
-  const todas=peds||[];
-  const sirven=todas.filter(function(p){ return p.origen==='factura' && p.cliente_id!=null; });
-  return {peds:sirven,
+  const [pe,de]=await Promise.all([
+    c.from('v_ent_pedido_estado')
+     .select('pedido_id,fecha_despacho,factura_id,factura_nombre,cliente_id,cliente_nombre,'
+            +'origen,motivo,alisto_id,preparado_en,estado,fecha_ab_re_04')
+     .order('fecha_ab_re_04',{ascending:false}).limit(300),
+    c.from('ent_devolucion_vigente')
+     .select('devolucion_id,fecha,recibido_en,cliente_id,cliente_nombre,pedido_id,causa,nota,creado_por')
+     .order('recibido_en',{ascending:false}).limit(100) ]);
+  if(pe.error) throw pe.error;
+  if(de.error) throw de.error;
+  const todas=pe.data||[];
+  const devs=de.data||[];
+  // Las lineas de las devoluciones ya registradas, para la lista de entrada.
+  let lins=[];
+  if(devs.length){
+    const {data:dl}=await c.from('ent_devolucion_linea')
+      .select('devolucion_id,producto_id,lote,cant_uds,cant_uom,uom_nombre')
+      .in('devolucion_id', devs.map(function(d){ return d.devolucion_id; }));
+    lins=dl||[];
+  }
+  const porDev={};
+  lins.forEach(function(l){ (porDev[l.devolucion_id]=porDev[l.devolucion_id]||[]).push(l); });
+  devs.forEach(function(d){ d.lineas=porDev[d.devolucion_id]||[]; });
+  return {peds:todas.filter(function(p){ return p.origen==='factura' && p.cliente_id!=null; }),
+          devs:devs,
           fuera:{manual:todas.filter(function(p){ return p.origen!=='factura'; }).length,
                  sinCliente:todas.filter(function(p){ return p.origen==='factura' && p.cliente_id==null; }).length},
-          paso:1, cliente:null, entrega:null, cant:{}, causa:'', nota:'',
-          fecha:_despHoy()};
+          modo:'lista', n:null};
+}
+function _dvNueva(){
+  return {cliente:null, entrega:null, pid:null, lotes:{}, lineas:[],
+          causa:'', nota:'', fecha:_despHoy(), editando:-1};
+}
+function dvNueva(){ _dv.n=_dvNueva(); _dv.modo='nueva'; _dvVerTodas=false; dvRender(); }
+function dvVolver(){ _dv.modo='lista'; _dv.n=null; dvRender(); }
+
+// ════════════════════════════════════════════════════════════════════════
+// LA ENTRADA · la lista de lo registrado + el boton para crear una
+// ════════════════════════════════════════════════════════════════════════
+// La fila es la del HISTORIAL (`bs-fila`), que es la que Daniel ya lee. "Sin
+// factura" no tiene lista —entra directo al formulario— asi que esta mitad se
+// toma prestada de la otra pantalla, no se inventa.
+function dvRender(){
+  const b=document.getElementById('dvBody'); if(!b || !_dv) return;
+  b.innerHTML = (_dv.modo==='nueva') ? dvFormHTML() : dvListaHTML();
+}
+function dvListaHTML(){
+  let h='<div style="margin-bottom:14px"><button class="btn btn-ent" onclick="dvNueva()">'
+    +'Registrar una devolución</button></div>';
+  const D=_dv.devs||[];
+  if(!D.length) return h+'<div class="cl-none">Todavía no hay devoluciones registradas.</div>';
+  h+='<div class="bs-lista">';
+  D.forEach(function(d){
+    const cau=(DV_CAUSAS.find(function(x){ return x.v===d.causa; })||{}).t||d.causa||'—';
+    const tot={};
+    (d.lineas||[]).forEach(function(l){ const n=_lotNom(l.producto_id);
+      tot[n]=tot[n]||{u:0,uom:l.uom_nombre||'u'}; tot[n].u+=(+l.cant_uom||0); });
+    const que=Object.keys(tot).map(function(n){ return _dvNum(tot[n].u)+' '+tot[n].uom+' de '+n; }).join(' · ');
+    h+='<div class="bs-fila" style="cursor:default">'
+      +'<div class="bs-f1"><span class="bs-cli">'+esc(d.cliente_nombre||'—')+'</span>'
+      +'<span class="bs-fec">'+esc(_despDia(d.fecha))+'</span></div>'
+      +'<div class="bs-f2"><span class="bs-sub">'+esc(que||'sin líneas')+'</span></div>'
+      +'<div class="bs-f2"><span class="bs-sub">'+esc(cau)
+      +(d.nota?(' · '+esc(d.nota)):'')+'</span>'
+      +'<span class="bs-fac">#'+d.pedido_id+'</span></div>'
+      +'</div>';
+  });
+  return h+'</div>';
 }
 
-// ── LOS SEIS PASOS ──────────────────────────────────────────────────────
-// Uno visible a la vez, y cada uno se cierra al subir. No es estetica: impide
-// contestar "cuanto volvio" sin haber contestado "de que entrega", que es la
-// forma en que una devolucion termina colgada del pedido equivocado.
-function dvRender(){
-  const b=document.getElementById('dvBody'); if(!b) return;
-  if(!_dv){ b.innerHTML=''; return; }
-  const P=_dv;
-  let h='';
+// ════════════════════════════════════════════════════════════════════════
+// EL FORMULARIO · la forma de "Entregas sin factura", seccion por seccion
+// ════════════════════════════════════════════════════════════════════════
+function dvFormHTML(){
+  const N=_dv.n; let h='';
+  h+='<button class="rp-ceros" onclick="dvVolver()">← volver a la lista</button>';
 
-  // 1 · CLIENTE
-  const clientes={};
-  P.peds.forEach(function(p){
-    const k=p.cliente_id;
-    if(!clientes[k]) clientes[k]={id:p.cliente_id, nombre:p.cliente_nombre, n:0, ultima:p.fecha_ab_re_04};
-    clientes[k].n++;
-  });
-  const cls=Object.values(clientes).sort(function(a,z){ return String(z.ultima||'').localeCompare(String(a.ultima||'')); });
-  h+=dvPaso(1,'Cliente', P.cliente?P.cliente.nombre:'', function(){
-    if(!cls.length) return '<div class="cl-none">No hay entregas registradas para devolver.</div>';
-    return cls.map(function(x){
-      return '<button class="dv-op" onclick="dvCliente('+x.id+',\''+esc(x.nombre).replace(/'/g,"&#39;")+'\')">'
-        +esc(x.nombre)+'<span class="dv-op-sub">'+x.n+(x.n===1?' entrega registrada':' entregas registradas')+'</span></button>';
-    }).join('')+dvFueraHTML();
-  });
-
-  // 2 · ENTREGA · las ultimas 3, y un "+" para todas
-  h+=dvPaso(2,'Entrega', P.entrega?(_entFacRotulo(P.entrega)+' · '+_despDia(P.entrega.fecha_despacho)):'', function(){
-    if(!P.cliente) return '';
-    const suyas=P.peds.filter(function(p){ return p.cliente_id===P.cliente.id; });
+  // ── 1 · DE QUE ENTREGA ────────────────────────────────────────────────
+  // Ocupa el lugar de "Tipo de salida" + "Cliente". Es obligatoria ANTES de poder
+  // cargar nada: `ent_devolucion.pedido_id` es NOT NULL, y ademas es la entrega la
+  // que define que lotes existen. En "sin factura" se pueden cargar lineas antes
+  // de elegir cliente; aca no, y es la unica diferencia de orden.
+  h+='<div class="rp-sec"><div class="rp-sec-t">De qué entrega</div>';
+  if(!N.cliente){
+    const cl={};
+    _dv.peds.forEach(function(p){ const k=p.cliente_id;
+      if(!cl[k]) cl[k]={id:p.cliente_id, nombre:p.cliente_nombre, n:0, ult:p.fecha_ab_re_04};
+      cl[k].n++; });
+    const cls=Object.values(cl).sort(function(a,z){ return String(z.ult||'').localeCompare(String(a.ult||'')); });
+    h+= cls.length
+      ? cls.map(function(x){ return '<button class="dv-op" onclick="dvCliente('+x.id+',\''
+          +esc(x.nombre).replace(/'/g,"&#39;")+'\')">'+esc(x.nombre)
+          +'<span class="dv-op-sub">'+x.n+(x.n===1?' entrega registrada':' entregas registradas')
+          +'</span></button>'; }).join('')
+      : '<div class="cl-none">No hay entregas registradas para devolver.</div>';
+    h+=dvFueraHTML();
+  }else if(!N.entrega){
+    h+='<div class="rp-clisel"><span>'+esc(N.cliente.nombre)+'</span>'
+      +'<button onclick="dvCliente(null)" title="Cambiar">×</button></div>';
+    const suyas=_dv.peds.filter(function(p){ return p.cliente_id===N.cliente.id; });
     const ver=_dvVerTodas?suyas:suyas.slice(0,3);
-    let x=ver.map(function(p){
+    h+='<div style="margin-top:9px">'+ver.map(function(p){
       return '<button class="dv-op" onclick="dvEntrega('+p.pedido_id+')">'
         +esc(_entFacRotulo(p))+'<span class="dv-op-sub">'+esc(_despDia(p.fecha_despacho))
-        +' · #'+p.pedido_id+' · '+esc(p.estado)+'</span></button>';
-    }).join('');
-    if(suyas.length>3) x+='<button class="dv-mas" onclick="_dvVerTodas=!_dvVerTodas;dvRender()">'
+        +' · #'+p.pedido_id+' · '+esc(p.estado)+'</span></button>'; }).join('');
+    if(suyas.length>3) h+='<button class="dv-mas" onclick="_dvVerTodas=!_dvVerTodas;dvRender()">'
       +(_dvVerTodas?'ver solo las 3 últimas':('ver las '+suyas.length+' entregas'))+'</button>';
-    return x;
-  }, !P.cliente);
+    h+='</div>';
+  }else{
+    h+='<div class="rp-clisel"><span>'+esc(N.cliente.nombre)+' · '+esc(_entFacRotulo(N.entrega))
+      +' · '+esc(_despDia(N.entrega.fecha_despacho))+'</span>'
+      +'<button onclick="dvEntrega(null)" title="Cambiar">×</button></div>';
+  }
+  h+='</div>';
 
-  // 3+4 · PRODUCTOS Y CANTIDADES · un solo paso, porque son el mismo gesto
-  h+=dvPaso(3,'Qué volvió', dvResumenCant(), function(){ return dvLineasHTML(); }, !P.entrega);
+  // ── 2 · QUE VOLVIO ────────────────────────────────────────────────────
+  if(N.entrega){
+    h+='<div class="rp-sec"><div class="rp-sec-t">Qué volvió</div>';
+    if(!N.entrega.lineas) h+='<div class="cl-none">Leyendo la entrega…</div>';
+    else{
+      // ⚠️ LOS CHIPS SON LOS PRODUCTOS DE ESA ENTREGA, no los seis fijos. En "sin
+      // factura" se ofrecen los seis porque puede salir cualquiera; aca solo se
+      // puede devolver lo que salio. Un chip de Galletas en una entrega sin
+      // Galletas no tendria un solo lote que ofrecer: un boton que no hace nada.
+      const prods=dvProductosDeLaEntrega();
+      if(!prods.length) h+='<div class="cl-none">Esta entrega no tiene lotes identificados, '
+        +'así que no hay contra qué devolver.</div>';
+      else{
+        h+='<div class="rp-chips">'+prods.map(function(pid){
+          const I=NIV_INFO[pid]||{nom:pid};
+          return '<button class="rp-chip'+(N.pid===pid?' on':'')+'" style="--pc:'+RP_COLOR[pid]+'" '
+            +'onclick="dvProd('+pid+')"><span class="rp-pt"></span>'
+            +esc(I.nom.replace(/^Pan (de )?/,''))+'</button>'; }).join('')+'</div>';
+        if(N.pid) h+=dvLotesHTML();
+      }
+    }
+    h+='</div>';
+  }
 
-  // 5 · CAUSA
-  h+=dvPaso(4,'Causa', dvCausaTxt(), function(){
-    let x=DV_CAUSAS.map(function(m){
-      return '<button class="dv-op" onclick="dvCausa(\''+m.v+'\')">'+esc(m.t)+'</button>'; }).join('');
-    if(P.causa==='otro') x+='<textarea class="dv-nota-in" rows="2" placeholder="Qué pasó '
-      +'(mínimo '+DV_NOTA_MIN+' caracteres)" oninput="dvNota(this.value)">'+esc(P.nota)+'</textarea>';
-    return x;
-  }, !dvHayCant());
+  // ── 3 · EN ESTA DEVOLUCION ────────────────────────────────────────────
+  if(N.entrega){
+    h+='<div class="rp-sec"><div class="rp-sec-t">En esta devolución</div>';
+    if(!N.lineas.length) h+='<div class="cl-none">Todavía no hay líneas.</div>';
+    else{
+      h+='<table class="cl-tbl"><tr><th>Producto</th><th>Cantidad</th><th>Lotes</th><th></th></tr>';
+      N.lineas.forEach(function(l,i){
+        const lots=l.lotes.map(function(x){ return esc(x.lote)
+          +(l.lotes.length>1?(' ('+_dvNum(x.cant_uom)+')'):''); }).join(' · ');
+        h+='<tr><td>'+esc(_lotNom(l.producto_id))+'</td>'
+          +'<td>'+_dvNum(l.total_uom)+' '+esc(l.uom_nombre)
+          +' <span class="muted">= '+_dvNum(l.total_uds)+' u</span></td>'
+          +'<td style="font-size:11.5px;color:var(--text-2)">'+lots+'</td>'
+          +'<td style="text-align:right"><button class="btn btn-sm" onclick="dvEditar('+i+')">✎</button></td></tr>';
+      });
+      h+='</table>';
+    }
+    h+='</div>';
+  }
 
-  // 6 · FECHA · con el texto del 26-ago
-  h+=dvPaso(5,'Cuándo llegó', P.fecha===_despHoy()?'hoy':esc(P.fecha), function(){
-    return '<div class="dv-nota"><b>Se registra el día que el producto LLEGA</b>, no el día que '
-      +'avisan que va a volver. Si el pan todavía no está en el congelador, no se registra: '
-      +'es la lección del 26-ago.</div>'
-      +'<div class="de-fecha"><span class="de-fecha-l">Llegó el</span>'
-      +'<input type="date" class="de-fecha-in" value="'+esc(P.fecha)+'" '
-      +'min="'+esc(_despFechaMin())+'" max="'+esc(_despHoy())+'" onchange="dvFecha(this.value)"></div>';
-  }, !dvCausaLista());
+  // ── 4 · CAUSA · el bloque "Motivo" de sin-factura, con dos opciones ───
+  if(N.lineas.length){
+    h+='<div class="rp-sec"><div class="rp-sec-t">Causa</div><div class="rp-mot">'
+      +DV_CAUSAS.map(function(m){ return '<button class="'+(N.causa===m.v?'on':'')+'" '
+        +'onclick="dvCausa(\''+m.v+'\')">'+esc(m.t)+'</button>'; }).join('')+'</div>'
+      +(!N.causa?'<div class="rp-nota rp-falta">Sin causa no se puede guardar.</div>':'')
+      +(N.causa==='otro'
+        ? ('<textarea class="dv-nota-in" rows="2" placeholder="Qué pasó (mínimo '+DV_NOTA_MIN
+           +' caracteres)" oninput="dvNota(this.value)">'+esc(N.nota)+'</textarea>'
+           +(String(N.nota||'').trim().length<DV_NOTA_MIN
+             ? '<div class="rp-nota rp-falta">La nota tiene que decir algo: mínimo '+DV_NOTA_MIN+' caracteres.</div>':''))
+        : '')
+      +'</div>';
+  }
 
-  // 6 · CONFIRMAR
-  h+=dvConfirmarHTML();
-  b.innerHTML=h;
+  // ── PIE · la fecha y el boton, igual que en sin-factura ───────────────
+  if(N.lineas.length){
+    const hoy=_despHoy(), vieja=(N.fecha!==hoy);
+    h+='<div class="rp-sec">'
+      // El texto del 26-ago, EN LA PANTALLA. No es una nota de diseño: es la
+      // leccion de aquel dia dicha donde se toma la decision.
+      +'<div class="dv-nota"><b>Se registra el día que el producto LLEGA</b>, no el día '
+      +'que avisan que va a volver. Si el pan todavía no está en el congelador, no se registra.</div>'
+      +'<div class="rp-pie"><span class="rp-pie-l">Día que llegó</span>'
+      +'<input type="date" class="de-fecha-in" value="'+esc(N.fecha)+'" '
+      +'min="'+esc(_despFechaMin())+'" max="'+esc(hoy)+'" onchange="dvFecha(this.value)">'
+      +(vieja?('<span class="rp-nota" style="color:var(--warn)">no es hoy ('
+        +esc(_despDiaFrase(N.fecha))+')</span>'):'')
+      +'</div>';
+    h+=dvConfirmarHTML();
+    h+='</div>';
+  }
+  return h;
 }
 
-// El armazon de un paso. `listo` lo pinta cerrado con su respuesta a la vista.
-function dvPaso(n, pregunta, respuesta, cuerpo, bloqueado){
-  const abierto=(_dv.paso===n);
-  const listo=!!respuesta && !abierto;
-  return '<div class="dv-paso'+(abierto?' on':'')+(listo?' listo':'')+'">'
-    +'<button class="dv-cab" '+(bloqueado?'disabled':('onclick="dvIr('+n+')"'))+'>'
-    +'<span class="dv-n">'+n+'</span><span class="dv-q">'+esc(pregunta)+'</span>'
-    +'<span class="dv-r">'+(respuesta||'')+'</span></button>'
-    +(abierto?('<div class="dv-cuerpo">'+cuerpo()+'</div>'):'')
-    +'</div>';
+// ── LOS LOTES DEL PRODUCTO ABIERTO ──────────────────────────────────────
+// ⚠️ ESTA ES LA TABLA DEL CONTEO, no la de "sin factura". Se cuenta POR LOTE y el
+// total va al pie — `cl-tbl` + `cl-lote` + `cl-in` + `cl-pie`, las mismas clases.
+// Decision de Andrea: en una devolucion llegaron cajas y se cuentan, asi que el
+// total no existe hasta sumar. Es el gesto que Daniel mas hace.
+//
+// ⚠️ "salieron N" ES EL DATO QUE DECIDE y va pegado al lote: es contra eso que se
+// compara lo que vuelve. No es el saldo de hoy — un lote de esta entrega que ya se
+// agoto aparece igual, con su "salieron".
+function dvLotesHTML(){
+  const N=_dv.n, pid=N.pid;
+  const lts=dvLotesDe(pid);
+  if(!lts.length) return '<div class="cl-none">Este producto no tiene lotes en esta entrega.</div>';
+  let h='<div class="rp-cond"><table class="cl-tbl">'
+    +'<tr><th>Lote</th><th>Salieron</th><th>Volvió</th></tr>';
+  let totUom=0, hayExceso=false;
+  lts.forEach(function(L){
+    const v=N.lotes[L.lote];
+    const puesto=+v||0; totUom+=puesto;
+    const exc=puesto>L.salioUom+0.0001; if(exc) hayExceso=true;
+    h+='<tr><td class="cl-lote">'+esc(L.lote)+'</td>'
+      +'<td class="dv-salio">'+esc(_dvNum(L.salioUom))+' '+esc(L.uom)+'</td>'
+      +'<td><input class="cl-in" type="number" min="0" step="any" inputmode="decimal" '
+      +'value="'+esc(v==null?'':v)+'" oninput="dvLote(\''+esc(L.lote).replace(/'/g,"&#39;")
+      +'\',this.value)"'+(exc?' style="border-color:var(--warn)"':'')+'></td></tr>';
+  });
+  h+='</table>';
+  // ⚠️ AVISA, NO FRENA, y por eso es AMBAR y no rojo. Puede volver producto de una
+  // entrega anterior en el mismo camion; si se bloqueara, ese producto vuelve al
+  // congelador sin que el sistema lo sepa, y un saldo invisible es peor que uno que
+  // no cuadra y lo dice. El rojo en este modulo significa "lo que hay puesto no
+  // sirve" — esto si sirve.
+  if(hayExceso) h+='<div class="dv-exceso">Vuelve más de lo que salió en esta entrega. '
+    +'<b>Se registra igual</b> y queda marcado: puede ser producto de una entrega anterior '
+    +'en el mismo camión.</div>';
+  const I=NIV_INFO[pid]||{nom:pid};
+  h+='<div class="cl-pie">'+esc(I.nom)+' · vuelve hasta ahora <strong>'+_dvNum(totUom)+' '
+    +esc(lts[0].uom)+'</strong></div>';
+  h+='<div style="margin-top:14px"><button class="btn" '+(totUom>0?'':'disabled')
+    +' onclick="dvAgregarLinea()">'+(N.editando>=0?'Guardar el cambio':'Agregar a la devolución')
+    +'</button>'
+    +(N.editando>=0?' <button class="btn btn-sm" onclick="dvQuitarLinea()">Quitar la línea</button>':'')
+    +'</div></div>';
+  return h;
 }
-function dvIr(n){ if(_dv) { _dv.paso=n; dvRender(); } }
-function dvFueraHTML(){
-  const f=_dv.fuera; if(!f.manual && !f.sinCliente) return '';
-  // ⚠️ SE DICE QUE FALTA Y POR QUE. Una entrega ausente sin explicacion se lee
-  // como que el sistema la perdio, y el proximo paso de quien la busca es
-  // escribir el lote a mano en otro lado.
-  // ⚠️ SOLO SE EXPLICA LO QUE DE VERDAD FALTA. La primera version nombraba las dos
-  // categorias siempre, asi que con cero entregas sin cliente igual decia "las sin
-  // cliente no se pueden buscar todavia" — un aviso sobre algo que no existe manda
-  // a buscar un problema que no esta.
-  const p=[], porque=[];
-  if(f.manual){ p.push('<b>'+f.manual+'</b> sin factura');
-    porque.push('Las de <b>sin factura</b> no guardaron la unidad de cada línea, así que una '
-      +'devolución de Francés, Buns o Pizza entraría 4× o 2× corta; desde hoy sí la guardan, '
-      +'y las nuevas van a aparecer.'); }
-  if(f.sinCliente){ p.push('<b>'+f.sinCliente+'</b> sin cliente (regalías, consumo interno)');
-    porque.push('Las <b>sin cliente</b> tienen destinatario y no cliente, así que todavía no se '
-      +'pueden buscar por acá.'); }
-  return '<div class="dv-nota" style="margin-top:10px">No '+(p.length>1?'aparecen':'aparece')
-    +' acá '+p.join(' y ')+'. '+porque.join(' ')
-    +' Si algo de eso vuelve, avisá — se registra aparte.</div>';
-}
-
-// ── LAS LINEAS · producto, lote, lo que salio, y lo que vuelve ──────────
-// ⚠️ LA CONVERSION SALE DEL `uom_factor` CONGELADO de ent_pedido_linea, que es la
-// unidad tal como la pidio el cliente, guardada en el momento de la entrega. NO se
-// usa ninguna de las tres conversiones del archivo (NIV_INFO.presDiv via rpUdsDe,
-// INV_TERM.presDiv via _lotUds, ni el factor de Odoo via uomFactores): esta es la
-// que corresponde a ESTA entrega, y las otras podrian haber cambiado desde entonces.
-//   cant_uds = cant_uom / uom_factor      (convencion de Odoo: qty_ref = qty/factor)
-// Un paquete de 4 da factor 0.25, y 6 paq -> 24 uds. Escrito a mano entraria 4x corto.
-function _dvFactor(l){ const f=+l.uom_factor; return (f>0)?f:1; }
-function _dvUom(l){ return l.uom_nombre || 'Unidades'; }
-function dvLineasHTML(){
-  const P=_dv; if(!P.entrega || !P.entrega.lineas) return '<div class="cl-none">Leyendo la entrega…</div>';
-  let h='', hayAlgo=false;
-  P.entrega.lineas.forEach(function(l){
+// Los lotes de ESE producto en ESA entrega, con cuanto salio en la unidad de la
+// entrega. El centinela no entra (decision de Andrea): no se puede devolver a un
+// lote que nadie sabe cual es.
+function dvLotesDe(pid){
+  const N=_dv.n, out=[];
+  (N.entrega.lineas||[]).forEach(function(l){
+    if(+l.producto_id!==+pid) return;
+    const fac=_dvFactor(l), uom=_dvUom(l);
     (l.lotes||[]).forEach(function(lt){
-      // ⚠️ EL CENTINELA NO SE OFRECE (decision de Andrea, 16-sep). No se puede
-      // devolver a un lote que nadie sabe cual es. La base ademas lo rechazaria
-      // —ent_devolucion_linea.lote tiene el check de forma canonica— pero eso
-      // haria fallar el insert entero: mejor no ofrecerlo.
       if(lt.lote===ENT_LOTE_INDET) return;
-      hayAlgo=true;
-      const k=l.producto_id+'|'+lt.lote;
-      const fac=_dvFactor(l);
-      const salioUom=(+lt.cant_uds||0)*fac;          // de unidades a la unidad de la entrega
-      const puesto=P.cant[k];
-      const exceso=(+puesto||0)>salioUom;
-      h+='<div class="dv-lin" data-salio="'+salioUom+'" data-uom="'+esc(_dvUom(l))+'">'
-        +'<div class="dv-prod"><b>'+esc(_lotNom(l.producto_id))+'</b> · '
-        +'<span class="dv-lote">'+esc(lt.lote)+'</span></div>'
-        +'<div class="dv-salio">salieron '+esc(_dvNum(salioUom))+' '+esc(_dvUom(l))+'</div>'
-        +'<input type="number" class="dv-in" min="0" step="any" inputmode="decimal" '
-        +'placeholder="0" value="'+esc(puesto==null?'':puesto)+'" '
-        // `oninput` actualiza SOLO lo que cambia; `onchange` (al salir del campo)
-        // si re-dibuja. Ver dvCant.
-        +'oninput="dvCant(\''+k+'\',this.value,this)" onchange="dvRender()">'
-        +(exceso?('<div class="dv-exceso">Vuelven más de '+esc(_dvNum(salioUom))+' '+esc(_dvUom(l))
-          +' que salieron en esta entrega. <b>Se registra igual</b> y queda marcado: '
-          +'puede ser producto de una entrega anterior en el mismo camión.</div>'):'')
-        +'</div>';
+      out.push({lote:lt.lote, salioUds:+lt.cant_uds||0,
+                salioUom:(+lt.cant_uds||0)*fac, fac:fac, uom:uom});
     });
   });
-  if(!hayAlgo) return '<div class="cl-none">Esta entrega no tiene lotes identificados, '
-    +'así que no hay contra qué devolver.</div>';
-  return h+'<div class="dv-pie">Va a SUMAR al congelador:<strong>'+esc(dvTotalTxt())+'</strong></div>';
+  return out;
 }
+function dvProductosDeLaEntrega(){
+  const vis={}, out=[];
+  (_dv.n.entrega.lineas||[]).forEach(function(l){
+    const tiene=(l.lotes||[]).some(function(x){ return x.lote!==ENT_LOTE_INDET; });
+    if(tiene && !vis[l.producto_id]){ vis[l.producto_id]=1; out.push(+l.producto_id); }
+  });
+  return out;
+}
+// ⚠️ EL FACTOR SALE DE `ent_pedido_linea`, CONGELADO EN ESA ENTREGA. No se usa
+// ninguna de las tres conversiones del archivo (NIV_INFO via rpUdsDe, INV_TERM via
+// _lotUds, ni el factor de Odoo via uomFactores): esta es la de ESTA entrega, y
+// las otras pudieron cambiar desde entonces.
+//   cant_uds = cant_uom / uom_factor     (convencion de Odoo: qty_ref = qty/factor)
+// Un paquete de 4 da factor 0.25, y 6 paq -> 24 uds. A mano entraria 4x corto.
+function _dvFactor(l){ const f=+l.uom_factor; return (f>0)?f:1; }
+function _dvUom(l){ return l.uom_nombre || 'Unidades'; }
 function _dvNum(n){ return (Math.round((Number(n)||0)*1000)/1000)
   .toLocaleString('es-CR',{minimumFractionDigits:0, maximumFractionDigits:3}); }
-// ⚠️ NO RE-DIBUJA MIENTRAS SE ESCRIBE, y esto se midio. La primera version
-// llamaba a `dvRender()` en cada tecla y despues devolvia el foco con
-// `setSelectionRange` — que en un `input type="number"` **tira excepcion**:
-// "The input element's type ('number') does not support selection". O sea un
-// error por cada tecla. Y aun sin eso, re-dibujar la pantalla entera en cada
-// pulsacion es lo que el resto del archivo ya evita a proposito (ver
-// `rpIndetSetNota`: "NO se re-renderiza: perderia el cursor").
-//
-// Se actualiza a mano SOLO lo que depende del numero: el aviso de exceso de ESA
-// fila y el total del pie. El re-dibujo completo queda para `onchange`, o sea
-// cuando se sale del campo y el valor ya esta decidido.
-function dvCant(k,v,el){
-  if(v==='' || v==null) delete _dv.cant[k]; else _dv.cant[k]=v;
-  try{
-    const fila=el&&el.closest('.dv-lin');
-    if(fila){
-      const salio=+fila.getAttribute('data-salio')||0;
-      const uom=fila.getAttribute('data-uom')||'';
-      let av=fila.querySelector('.dv-exceso');
-      if((+v||0)>salio){
-        if(!av){ av=document.createElement('div'); av.className='dv-exceso'; fila.appendChild(av); }
-        av.innerHTML='Vuelven más de '+esc(_dvNum(salio))+' '+esc(uom)
-          +' que salieron en esta entrega. <b>Se registra igual</b> y queda marcado: '
-          +'puede ser producto de una entrega anterior en el mismo camión.';
-      }else if(av){ av.remove(); }
-    }
-    const pie=document.querySelector('#dvBody .dv-pie');
-    if(pie) pie.innerHTML='Va a SUMAR al congelador:<strong>'+esc(dvTotalTxt())+'</strong>';
-    const btn=document.getElementById('dvSave'); if(btn) btn.disabled=!dvListo()||_dvGuardando;
-  }catch(e){}
-}
-function dvHayCant(){ return Object.values((_dv&&_dv.cant)||{}).some(function(v){ return (+v||0)>0; }); }
-function dvResumenCant(){
-  if(!dvHayCant()) return '';
-  const n=Object.values(_dv.cant).filter(function(v){ return (+v||0)>0; }).length;
-  return n+(n===1?' lote':' lotes');
-}
-function dvTotalTxt(){
-  // El total se dice POR PRODUCTO y en la unidad de la entrega, nunca en unidades
-  // sueltas sumadas de productos distintos — eso no significa nada.
-  const P=_dv, por={};
-  (P.entrega.lineas||[]).forEach(function(l){
-    (l.lotes||[]).forEach(function(lt){
-      const k=l.producto_id+'|'+lt.lote, v=+P.cant[k]||0; if(!v) return;
-      const n=_lotNom(l.producto_id);
-      por[n]=por[n]||{u:0, uom:_dvUom(l)}; por[n].u+=v; });
-  });
-  const ps=Object.keys(por);
-  if(!ps.length) return ' nada todavía';
-  return ' '+ps.map(function(n){ return _dvNum(por[n].u)+' '+por[n].uom+' de '+n; }).join(' · ');
-}
-function dvCausa(v){ _dv.causa=v; if(v!=='otro') _dv.nota=''; dvRender();
-  if(v==='otro'){ const t=document.querySelector('#dvBody .dv-nota-in'); if(t) t.focus(); } }
-function dvNota(v){ _dv.nota=v;                 // NO re-renderiza: perderia el cursor
-  const b=document.getElementById('dvSave'); if(b) b.disabled=!dvListo(); }
-function dvCausaTxt(){ if(!_dv.causa) return '';
-  const m=DV_CAUSAS.find(function(x){ return x.v===_dv.causa; });
-  return esc((m?m.t:_dv.causa)+(_dv.nota?(' · '+_dv.nota):'')); }
-function dvCausaLista(){
-  if(!_dv.causa) return false;
-  if(_dv.causa!=='otro') return true;
-  return String(_dv.nota||'').trim().length>=DV_NOTA_MIN;
-}
-function dvFecha(v){ _dv.fecha=v; dvRender(); }
-function dvListo(){ return dvHayCant() && dvCausaLista() && _despFechaOK(_dv.fecha) && !!_dv.entrega; }
 
+// ── LOS GESTOS ──────────────────────────────────────────────────────────
+function dvCliente(id,nombre){
+  const N=_dv.n;
+  if(id==null){ N.cliente=null; N.entrega=null; N.pid=null; N.lotes={}; N.lineas=[]; }
+  else N.cliente={id:id,nombre:nombre};
+  _dvVerTodas=false; dvRender();
+}
 async function dvEntrega(pid){
-  const P=_dv;
-  P.entrega=P.peds.find(function(p){ return p.pedido_id===pid; })||null;
-  P.cant={}; P.paso=3; dvRender();
+  const N=_dv.n;
+  if(pid==null){ N.entrega=null; N.pid=null; N.lotes={}; N.lineas=[]; dvRender(); return; }
+  N.entrega=_dv.peds.find(function(p){ return p.pedido_id===pid; })||null;
+  N.pid=null; N.lotes={}; N.lineas=[]; N.editando=-1; dvRender();
   try{
-    const c=sbClient();
-    // ⚠️ SE REUSA `_entColgarDetalle`, la MISMA funcion que usan el Historial y el
-    // dialogo de Entregar. Trae las lineas con sus lotes Y el uom_factor congelado
-    // de ent_pedido_linea. Una segunda implementacion seria la que se desincroniza.
-    await _entColgarDetalle(c,[P.entrega]);
+    // ⚠️ SE REUSA `_entColgarDetalle`, la MISMA funcion del Historial y del dialogo
+    // de Entregar. Trae las lineas con sus lotes Y el uom_factor congelado. Una
+    // segunda implementacion seria la que se desincroniza.
+    await _entColgarDetalle(sbClient(),[N.entrega]);
   }catch(e){ _dvErr=(e&&e.message)||String(e); }
   dvRender();
 }
-function dvCliente(id,nombre){ _dv.cliente={id:id,nombre:nombre}; _dv.entrega=null; _dv.cant={};
-  _dvVerTodas=false; _dv.paso=2; dvRender(); }
+function dvProd(pid){
+  const N=_dv.n;
+  if(N.pid===pid && N.editando<0){ N.pid=null; N.lotes={}; }
+  else { N.pid=pid; N.lotes={}; N.editando=-1;
+    // si ese producto ya esta cargado, se abre con lo que tenia
+    const i=N.lineas.findIndex(function(l){ return +l.producto_id===+pid; });
+    if(i>=0){ N.editando=i; N.lineas[i].lotes.forEach(function(x){ N.lotes[x.lote]=x.cant_uom; }); }
+  }
+  dvRender();
+}
+function dvLote(lote,v){
+  const N=_dv.n;
+  if(v==='' || v==null) delete N.lotes[lote]; else N.lotes[lote]=v;
+  dvRender();
+  // el foco vuelve al mismo campo: re-renderizar lo pierde
+  const els=document.querySelectorAll('#dvBody .cl-in');
+  for(const e of els){ if((e.getAttribute('oninput')||'').indexOf("'"+lote+"'")>=0){
+    e.focus(); try{ e.setSelectionRange(e.value.length,e.value.length); }catch(_){} break; } }
+}
+function dvAgregarLinea(){
+  const N=_dv.n, pid=N.pid; if(!pid) return;
+  const lts=dvLotesDe(pid), puestos=[];
+  let totUom=0, totUds=0, uom='';
+  lts.forEach(function(L){
+    const v=+N.lotes[L.lote]||0; if(v<=0) return;
+    uom=L.uom; totUom+=v; totUds+=v/L.fac;
+    puestos.push({lote:L.lote, cant_uom:v, cant_uds:v/L.fac, uom_factor:L.fac, uom_nombre:L.uom});
+  });
+  if(!puestos.length) return;
+  const linea={producto_id:pid, lotes:puestos, total_uom:totUom, total_uds:totUds, uom_nombre:uom};
+  if(N.editando>=0) N.lineas[N.editando]=linea; else N.lineas.push(linea);
+  N.pid=null; N.lotes={}; N.editando=-1;
+  dvRender();
+}
+function dvEditar(i){
+  const N=_dv.n, l=N.lineas[i]; if(!l) return;
+  N.pid=+l.producto_id; N.editando=i; N.lotes={};
+  l.lotes.forEach(function(x){ N.lotes[x.lote]=x.cant_uom; });
+  dvRender();
+}
+function dvQuitarLinea(){
+  const N=_dv.n; if(N.editando<0) return;
+  N.lineas.splice(N.editando,1); N.pid=null; N.lotes={}; N.editando=-1; dvRender();
+}
+function dvCausa(v){ _dv.n.causa=v; if(v!=='otro') _dv.n.nota=''; dvRender();
+  if(v==='otro'){ const t=document.querySelector('#dvBody .dv-nota-in'); if(t) t.focus(); } }
+function dvNota(v){ _dv.n.nota=v;                // NO re-renderiza: perderia el cursor
+  const b=document.getElementById('dvSave'); if(b) b.disabled=!dvListo(); }
+function dvFecha(v){ _dv.n.fecha=v; dvRender(); }
+function dvCausaLista(){
+  const N=_dv.n;
+  if(!N.causa) return false;
+  if(N.causa!=='otro') return true;
+  return String(N.nota||'').trim().length>=DV_NOTA_MIN;
+}
+function dvListo(){ const N=_dv&&_dv.n;
+  return !!(N && N.entrega && N.lineas.length && dvCausaLista() && _despFechaOK(N.fecha)); }
+function dvFueraHTML(){
+  const f=_dv.fuera; if(!f.manual && !f.sinCliente) return '';
+  // ⚠️ SE DICE QUE FALTA Y POR QUE. Una entrega ausente sin explicacion se lee como
+  // que el sistema la perdio, y el proximo paso de quien la busca es escribir el
+  // lote a mano en otro lado — que es justo lo que esta pantalla evita.
+  const p=[];
+  if(f.manual) p.push('<b>'+f.manual+'</b> sin factura');
+  if(f.sinCliente) p.push('<b>'+f.sinCliente+'</b> sin cliente (regalías, consumo interno)');
+  return '<div class="dv-nota" style="margin-top:10px">No aparecen acá '+p.join(' y ')
+    +'. Las de <b>sin factura</b> no guardaron la unidad de cada línea, así que una '
+    +'devolución de Francés, Buns o Pizza entraría 4× o 2× corta; desde hoy sí la '
+    +'guardan y las nuevas van a aparecer. Las <b>sin cliente</b> todavía no se pueden '
+    +'buscar por cliente. Si algo de eso vuelve, avisá — se registra aparte.</div>';
+}
 
 // ── LA CONFIRMACION · lo que va a pasar, en letras, ANTES de que pase ───
-// Es la simetria de "no registra una entrega nueva" del dialogo de Entregar, y es
-// lo que hace el gesto seguro: esta pantalla SUMA, y sumar de mas es el error
-// grave de este modulo.
+// Es la simetria de "no registra una entrega nueva" del dialogo de Entregar: esta
+// pantalla SUMA, y sumar de mas es el error grave de este modulo.
 function dvConfirmarHTML(){
-  const P=_dv;
-  if(!P.entrega) return '';
-  const puede=dvListo();
+  const N=_dv.n;
+  const que=N.lineas.map(function(l){ return _dvNum(l.total_uom)+' '+l.uom_nombre
+    +' de '+_lotNom(l.producto_id); }).join(' · ');
   let h='<div class="dv-conf"><div class="dv-conf-t">Esto SUMA al congelador</div>'
-    +'Vuelve <b>'+esc(dvTotalTxt().trim())+'</b>'
-    +' de la entrega <b>'+esc(_entFacRotulo(P.entrega))+'</b> de <b>'+esc(P.cliente.nombre)+'</b>'
-    +', llegado <b>'+esc(P.fecha===_despHoy()?'hoy':('el '+P.fecha))+'</b>.'
-    +'<div style="margin-top:7px">Y queda pendiente para las socias: <b>hacer la nota de crédito '
-    +'en Odoo y re-facturar por la cantidad real.</b> Se guarda armada — cliente, factura, '
-    +'productos, cantidades y lotes— no como recordatorio.</div>';
-  // ⚠️ SE DICE QUE NO SE PUEDE DESHACER SOLO. Corregir es anular el registro y
-  // volver a hacerlo: es el unico camino que deja rastro de las dos versiones, y
-  // el modulo entero es append-only (no hay grant de UPDATE ni de DELETE).
-  h+='<div style="margin-top:7px;color:var(--text-3)">Para corregirla después hay que '
+    +'Vuelve <b>'+esc(que)+'</b> de la entrega <b>'+esc(_entFacRotulo(N.entrega))
+    +'</b> de <b>'+esc(N.cliente.nombre)+'</b>, llegado el <b>'
+    +esc(N.fecha===_despHoy()?'hoy':N.fecha)+'</b>.'
+    +'<div style="margin-top:7px">Y queda pendiente para las socias: <b>hacer la nota de '
+    +'crédito en Odoo y re-facturar por la cantidad real.</b> Se guarda armada —cliente, '
+    +'factura, productos, cantidades y lotes—, no como recordatorio.</div>'
+    // ⚠️ SE DICE QUE NO SE EDITA. Corregir es anular y registrar de nuevo: es el
+    // unico camino que deja rastro de las dos versiones, y el modulo entero es
+    // append-only (no hay grant de UPDATE ni de DELETE en ninguna tabla).
+    +'<div style="margin-top:7px;color:var(--text-3)">Para corregirla después hay que '
     +'anularla y registrarla de nuevo — no se edita.</div></div>';
   h+='<div class="dv-acc">'
-    +'<button id="dvSave" class="btn btn-ent" '+(puede&&!_dvGuardando?'':'disabled')
+    +'<button id="dvSave" class="btn btn-ent" '+(dvListo()&&!_dvGuardando?'':'disabled')
     +' onclick="dvGuardar()">'+(_dvGuardando?'Registrando…':'Registrar la devolución')+'</button>'
     +'<span id="dvMsg" class="dv-msg"></span></div>';
   return h;
@@ -13873,13 +14118,13 @@ function dvConfirmarHTML(){
 //   2 ent_devolucion_linea  · ACA empieza a sumar al saldo.
 //   3 ent_odoo_pendiente    · la alerta de la NC.
 //   4 ent_odoo_pendiente_linea
-// Si se corta despues del 2, el saldo queda bien y falta la alerta — se puede
-// reconstruir mirando la devolucion. Si se cortara al reves, habria una NC
-// pendiente por producto que nunca volvio, que es peor.
-// El paso donde fallo va en el mensaje: sin eso, "no se pudo" no dice que quedo.
+// Cortado despues del 2, el saldo queda bien y falta la alerta — reconstruible
+// mirando la devolucion. Al reves habria una NC pendiente por producto que nunca
+// volvio, que es peor. El paso donde fallo va en el mensaje: sin eso, "no se pudo"
+// no dice que quedo escrito.
 async function dvGuardar(){
   if(_dvGuardando || !dvListo()) return;
-  const P=_dv, msg=document.getElementById('dvMsg'), btn=document.getElementById('dvSave');
+  const N=_dv.n, msg=document.getElementById('dvMsg'), btn=document.getElementById('dvSave');
   const pon=function(c,t){ if(msg){ msg.style.color=c; msg.innerHTML=t; } };
   const c=sbClient(); if(!c){ pon('var(--stop-tx)','No hay sesión de Supabase.'); return; }
   _dvGuardando=true; if(btn) btn.disabled=true; pon('var(--busy)','Registrando…');
@@ -13887,65 +14132,51 @@ async function dvGuardar(){
   try{
     const {data:{user}}=await c.auth.getUser();
     const email=(user&&user.email)||'desconocido';
-    // Las lineas, con su factor congelado. Se arman ANTES del insert de la
-    // cabecera: si algo esta mal formado, no se escribe ni la cabecera.
-    const lineas=[];
-    (P.entrega.lineas||[]).forEach(function(l){
-      (l.lotes||[]).forEach(function(lt){
-        if(lt.lote===ENT_LOTE_INDET) return;
-        const k=l.producto_id+'|'+lt.lote, uom=+P.cant[k]||0;
-        if(uom<=0) return;
-        const fac=_dvFactor(l);
-        lineas.push({producto_id:l.producto_id, lote:lt.lote,
-                     cant_uds:uom/fac,              // la conversion, con EL factor de esta entrega
-                     uom_id:l.uom_id||0, uom_nombre:_dvUom(l),
-                     cant_uom:uom, uom_factor:fac});
-      });
-    });
-    if(!lineas.length) throw new Error('no hay ninguna cantidad cargada');
+    const filas=[];
+    N.lineas.forEach(function(l){ l.lotes.forEach(function(x){
+      filas.push({producto_id:+l.producto_id, lote:x.lote, cant_uds:x.cant_uds,
+                  uom_id:0, uom_nombre:x.uom_nombre, cant_uom:x.cant_uom,
+                  uom_factor:x.uom_factor}); }); });
+    if(!filas.length) throw new Error('no hay ninguna línea cargada');
 
     // 1 · la cabecera. `fecha` es el dia que LLEGO; `recibido_en` lo pone la base
-    // con now(), y es lo que se compara contra el corte del ancla. Son dos tiempos
+    // con now(), y es lo que se compara contra el corte del ancla. Dos tiempos
     // distintos a proposito (ver ENTREGAS_DEVOLUCIONES.sql).
     const {data:dev,error:e1}=await c.from('ent_devolucion').insert({
-      fecha:P.fecha, cliente_id:P.cliente.id, cliente_nombre:P.cliente.nombre,
-      pedido_id:P.entrega.pedido_id, causa:P.causa,
-      nota:(P.causa==='otro'?String(P.nota||'').trim():null),
+      fecha:N.fecha, cliente_id:N.cliente.id, cliente_nombre:N.cliente.nombre,
+      pedido_id:N.entrega.pedido_id, causa:N.causa,
+      nota:(N.causa==='otro'?String(N.nota||'').trim():null),
       creado_por:email}).select('id').single();
     if(e1) throw e1;
 
     paso='las líneas (la devolución YA quedó registrada, sin líneas)';
     const {error:e2}=await c.from('ent_devolucion_linea').insert(
-      lineas.map(function(x){ return Object.assign({devolucion_id:dev.id}, x); }));
+      filas.map(function(x){ return Object.assign({devolucion_id:dev.id}, x); }));
     if(e2) throw e2;
 
-    // 3 · LA ALERTA DE LA NC, con el payload COMPLETO de lo que va a ir a Odoo.
-    // No es un recordatorio: es la nota de credito ya armada. Cuando se abra el
+    // 3 · LA ALERTA DE LA NC, con el payload COMPLETO de lo que va a ir a Odoo. No
+    // es un recordatorio: es la nota de credito ya armada. El dia que se abra el
     // carril de escritura, automatizar tiene que ser conectar un boton a datos que
     // YA estan, no salir a reconstruirlos.
     paso='la alerta de la nota de crédito (la devolución ya suma al inventario)';
     const {data:pen,error:e3}=await c.from('ent_odoo_pendiente').insert({
-      tipo:'nota_credito', pedido_id:P.entrega.pedido_id, devolucion_id:dev.id,
-      fecha:P.fecha, cliente_id:P.cliente.id, cliente_nombre:P.cliente.nombre,
-      factura_id:P.entrega.factura_id, factura_nombre:P.entrega.factura_nombre,
+      tipo:'nota_credito', pedido_id:N.entrega.pedido_id, devolucion_id:dev.id,
+      fecha:N.fecha, cliente_id:N.cliente.id, cliente_nombre:N.cliente.nombre,
+      factura_id:N.entrega.factura_id, factura_nombre:N.entrega.factura_nombre,
       creado_por:email}).select('id').single();
     if(e3) throw e3;
     const {error:e4}=await c.from('ent_odoo_pendiente_linea').insert(
-      lineas.map(function(x){ return {pendiente_id:pen.id, producto_id:x.producto_id,
-        lote:x.lote, cant_uds:x.cant_uds, uom_id:x.uom_id, uom_nombre:x.uom_nombre,
-        cant_uom:x.cant_uom, uom_factor:x.uom_factor}; }));
+      filas.map(function(x){ return Object.assign({pendiente_id:pen.id},x); }));
     if(e4) throw e4;
 
     pon('var(--good,#3E9E62)','✓ Registrada. Suma al congelador y quedó la NC pendiente.');
-    _dv=null; _dvVerTodas=false;
     // El saldo por lote cambio: lo que Despachos tenga leido quedo viejo.
-    try{ _despLotes=null; _despSaldo=null; }catch(e){}
+    try{ _despLotes=null; _despSaldo=null; _rpLotes=null; _rpSaldo=null; }catch(e){}
     setTimeout(function(){ dvCargar(true); }, 1200);
   }catch(e){
     pon('var(--stop-tx)','No se pudo registrar '+esc(paso)+': '+esc((e&&e.message)||e));
   }finally{ _dvGuardando=false; const b=document.getElementById('dvSave'); if(b) b.disabled=!dvListo(); }
 }
-
 // ════════════════════════════════════════════════════════════════════════
 // «POR RESOLVER» · LAS EXCEPCIONES ABIERTAS · SOLO SOCIAS (16-sep-2026)
 // ════════════════════════════════════════════════════════════════════════
