@@ -1484,3 +1484,87 @@ definir qué significa exactamente *"absorbida por un ancla"*:
 **Por qué no urge.** Nadie está esperando, no hay plata en juego y el saldo ya es
 correcto. Lo único que costaba era ensuciar una lista de trabajo, y eso se
 resolvió sacándolas de la pantalla.
+
+---
+
+## 25 · 🟠 ABIERTO · La causa debería ir POR LÍNEA, no en la cabecera
+
+Decidido por Andrea el 17-sep-2026, y **aplazado por ella el mismo día**. Todo lo
+de abajo está medido contra producción.
+
+### Qué se quiere
+
+Que la causa se elija **junto al lote y la cantidad**, en la misma vista, y que
+"Agregar a la devolución" se lleve las tres. Dos razones:
+
+- **Hoy, si vuelven dos productos por motivos distintos, hay que registrar dos
+  devoluciones.** Una sola visita del camión se parte en dos registros por un
+  detalle de esquema.
+- La causa deja de ser una sección suelta al pie que se pierde de vista.
+
+### 🔴 Por qué se aplazó, y no es el esquema
+
+**La pantalla todavía no guardó una sola fila.** `ent_devolucion` tiene cero
+registros. Desarmar el motor de saldos para acomodar una función que nunca
+escribió nada es el orden al revés: primero se prueba que el camino completo
+funciona, después se lo mejora.
+
+Y el riesgo no es simétrico: **si la cuarta punta vuelve mal, el saldo se rompe en
+silencio** — el modo de falla más caro de este sistema, y el único que nadie nota
+hasta que alguien cuenta el congelador.
+
+⚠️ **Y sigue siendo el momento barato.** Con cero filas, mover las columnas es
+gratis; con filas escritas deja de serlo. Eso no cambia mañana ni la semana que
+viene: cambia el día que se registre la primera devolución de verdad.
+
+### Lo medido: qué hay que tocar
+
+`causa` y `nota` viven en **`ent_devolucion`** (la cabecera).
+`ent_devolucion_linea` no tiene ninguna de las dos.
+
+| objeto | lee `causa`? | qué le pasa |
+|---|---|---|
+| `ent_devolucion_causa_ok` | — | se dropea de la cabecera y **se rehace sobre la línea** |
+| `ent_devolucion_vigente` | 🔴 **sí, la lista explícita** | **no compila** sin la columna |
+| `v_ent_devolucion_exceso` | no | ✓ no se rompe |
+| `ent_devuelto_desde_ancla` | no | ✓ no se rompe |
+| `dvLeer()` en `index.html` | sí, en su `.select()` | hay que actualizarlo |
+
+### 🔴 La secuencia obligada, y por qué es más grande de lo que parece
+
+**`create or replace view` NO permite quitar columnas de una vista** — solo
+agregarlas al final. Así que `ent_devolucion_vigente` hay que **dropearla y
+recrearla**. Y de ella cuelgan dos vistas, una de las cuales es la cuarta punta
+del saldo:
+
+```
+1. drop view ent_devuelto_desde_ancla     ← LA CUARTA PUNTA DEL SALDO
+2. drop view v_ent_devolucion_exceso
+3. drop view ent_devolucion_vigente
+4. alter table  · causa y nota A LA LÍNEA
+                · causa y nota FUERA de la cabecera
+                · el CHECK, rehecho sobre la línea
+5. recrear las tres vistas, en orden inverso y EXACTAS
+```
+
+O sea: **para mover dos columnas hay que desarmar y rearmar el motor de saldos.**
+
+### Cómo hacerlo cuando se retome
+
+- **Capturar las tres definiciones con `pg_get_viewdef` ANTES de dropear nada**, y
+  recrearlas desde esa captura — no reescribirlas de memoria. Es lo que salvó al
+  §D del 15-sep.
+- **Todo en UNA transacción.** Postgres hace DDL transaccional: si algo revienta
+  en el paso 5, los drops del 1 al 3 se deshacen solos.
+- **Un `select` dentro de la transacción, antes del `commit`**, que demuestre que
+  las tres vistas existen y que la cuarta punta devuelve **exactamente los mismos
+  números** que antes. Sin eso, un "Success" no prueba nada — la lección del
+  17-sep.
+- El CHECK nuevo conserva los `coalesce`: sin ellos, `causa = null` hace NULL a la
+  conjunción y Postgres deja pasar la fila.
+
+### Qué NO hay que hacer
+
+**Dejar `causa`/`nota` en la cabecera Y agregarlas a la línea.** Evita el drop en
+cascada, pero deja el mismo dato en dos lugares — que es exactamente lo que este
+repo paga caro. Se descartó el 17-sep, por eso.

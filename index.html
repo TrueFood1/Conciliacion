@@ -2774,6 +2774,18 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .dv-conf-t{font-size:13.5px;font-weight:600;color:var(--text);margin-bottom:7px}
 .dv-acc{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:12px}
 .dv-msg{font-size:11.5px;line-height:1.5}
+/* ── Anular una devolución registrada (17-sep) ────────────────────────────
+   VA FUERA de la fila, igual que `.bo-desc`: la fila no es un <button> acá, pero
+   el patrón es el mismo y conviene que se vea igual. Dos botones, sin modal. */
+.dv-anu{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:8px 0 0}
+.dv-anu-l{background:none;border:none;color:var(--text-3);font:inherit;font-size:11.5px;
+  padding:0;cursor:pointer;text-decoration:underline}
+.dv-anu-l:hover{color:var(--text-2)}
+.dv-anu-n{flex:1 1 100%;background:var(--field);border:1px solid var(--border-strong);
+  border-radius:8px;color:var(--text);font:inherit;font-size:16px;padding:7px 9px}
+/* ⚠️ EL AVISO DE LA NC VA EN AMBAR Y NO SE PUEDE SALTEAR: es lo que la pantalla
+   tiene que DECIR en vez de que alguien lo descubra. Ver el comentario de dvAnular. */
+.dv-anu-av{flex:1 1 100%;font-size:11.5px;color:var(--warn);line-height:1.45}
 /* ── La pestaña «Pendientes», solo para socias (16-sep) ───────────────────
    `display:none` y no `opacity`/`visibility`: para Daniel no tiene que quedar NI
    EL HUECO donde iría — un espacio vacío en una barra de cuatro se lee como que
@@ -13823,9 +13835,82 @@ function dvListaHTML(){
       +'<div class="bs-f2"><span class="bs-sub">'+esc(cau)
       +(d.nota?(' · '+esc(d.nota)):'')+'</span>'
       +'<span class="bs-fac">#'+d.pedido_id+'</span></div>'
+      +dvAnularHTML(d)
       +'</div>';
   });
   return h+'</div>';
+}
+
+// ── ANULAR UNA DEVOLUCION REGISTRADA (17-sep-2026) ──────────────────────
+// El hueco de siempre: algo que se registra y no se puede deshacer deja a alguien
+// trabado. Mismo patron que el borrador de Daniel y que Green Center. Hasta hoy
+// solo se podia por SQL (ver ANULAR_DEVOLUCION.sql).
+//
+// NO BORRA NADA: escribe una fila en `ent_anulacion`. La devolucion sigue entera
+// con sus lineas; deja de contar porque `ent_devolucion_vigente` la filtra.
+//
+// LA CADENA, VERIFICADA CONTRA PRODUCCION EL 17-sep Y NO SUPUESTA:
+//   ent_anulacion            acepta 'alisto' | 'salida' | 'devolucion' (del CHECK)
+//   ent_devolucion_vigente   filtra `not exists (... entidad='devolucion' ...)`
+//   ent_devuelto_desde_ancla hace JOIN a esa vista   <- LA CUARTA PUNTA DEL SALDO
+//   v_ent_devolucion_exceso  sale de esa misma vista
+// O sea que al anular el saldo por lote vuelve SOLO y la marca de exceso
+// desaparece SOLA. Por eso esto no toca el esquema.
+//
+// 🔴 EL PERMISO NO IMPIDE NADA. `dvPuedeAnular` es un FILTRO DE ACCIDENTE, no un
+// candado, exactamente igual que `boPuedeDescartar`: la RLS de `ent_anulacion` es
+// `INSERT to authenticated with check (true)` —CERO comprobacion de socia— asi
+// que cualquier sesion autenticada puede anular la devolucion de cualquiera.
+// Esto evita el toque equivocado de un compañero y NADA MAS. Que nadie lea este
+// `if` y crea que protege. La politica de verdad queda como pendiente.
+function dvPuedeAnular(){
+  if(_socia===null) return false;   // todavia no se sabe: NO se ofrece (de menos, nunca de mas)
+  return _socia===true;
+}
+let _dvAnulando=0, _dvAnuNota={};
+function dvAnularHTML(d){
+  // ⚠️ SOLO SOCIAS, y la razon no es jerarquica: una devolucion YA MOVIO
+  // INVENTARIO. No es lo mismo que el "Deshacer" de antes de guardar, ni que
+  // descartar un borrador que nunca sumo nada.
+  if(!dvPuedeAnular()) return '';
+  const id=d.devolucion_id;
+  if(_dvAnulando!==id)
+    return '<div class="dv-anu"><button class="dv-anu-l" onclick="dvAnularUI('+id+')">Anular</button></div>';
+  return '<div class="dv-anu">'
+    // ⚠️ LA PANTALLA DICE QUE LA NC NO SE DESHACE. `ent_odoo_pendiente` NO cuelga
+    // de `ent_devolucion_vigente`, asi que su fila sigue en la cola de las socias.
+    // Es correcto —la NC puede haberse emitido ya en Odoo, y anular acá no la
+    // borra de alla— pero tiene que DECIRSE, no que alguien lo descubra dos
+    // semanas despues mirando Pendientes.
+    +'<div class="dv-anu-av">El inventario vuelve solo. <b>La nota de crédito NO se '
+    +'deshace</b>: su pendiente sigue en la lista de las socias, porque puede haberse '
+    +'emitido ya en Odoo.</div>'
+    +'<input class="dv-anu-n" maxlength="140" placeholder="Por qué se anula (opcional)" '
+    +'value="'+esc(_dvAnuNota[id]||'')+'" oninput="_dvAnuNota['+id+']=this.value">'
+    +'<button class="btn btn-sm" onclick="dvAnular('+id+')">Anular</button>'
+    +'<button class="btn btn-sm" onclick="dvAnularUI(0)">Cancelar</button>'
+    +'</div>';
+}
+function dvAnularUI(id){ _dvAnulando=id||0; dvRender(); }
+async function dvAnular(id){
+  const c=sbClient(); if(!c){ alert('No hay sesión de Supabase.'); return; }
+  const nota=String(_dvAnuNota[id]||'').trim();
+  try{
+    const {data:{user}}=await c.auth.getUser();
+    const {error}=await c.from('ent_anulacion').insert({
+      entidad:'devolucion', entidad_id:id, motivo:(nota||null),
+      creado_por:(user&&user.email)||'desconocido'});
+    if(error) throw error;
+    _dvAnulando=0; delete _dvAnuNota[id];
+    // El saldo por lote cambio: lo que Despachos y el Reporte tengan leido quedo viejo.
+    try{ _despLotes=null; _despSaldo=null; _rpLotes=null; _rpSaldo=null; }catch(e){}
+    await dvCargar(true);
+  }catch(e){
+    // ⚠️ NO SE TRAGA EL ERROR. Es la leccion del guardado que fallo en silencio el
+    // 17-sep: si no se pudo anular, la persona tiene que enterarse EN EL MOMENTO.
+    try{ console.error('[Truefie] Devoluciones · no pude anular', id, e); }catch(_){}
+    alert('No se pudo anular: '+((e&&e.message)||e)+'\n\nNo se cambió nada.');
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════
