@@ -50,8 +50,8 @@
 --
 -- QUE NECESITA ANDREA ANTES DE PEGAR — DOS COSAS, ninguna va en este archivo
 --   porque el repo es PUBLICO:
---     1. El CORREO del usuario de prueba          -> §5
---     2. La CLAVE del rol                         -> §4
+--     1. La CLAVE del rol                         -> §4
+--     2. El CORREO del usuario de prueba          -> §6
 --   ⚠️ La clave va a quedar escrita en el editor de SQL. NO guardes el snippet
 --      con la clave adentro: borra el texto despues de correrlo. Y la clave va
 --      despues a `herramientas/conexion_db.env` (gitignored), nunca al repo,
