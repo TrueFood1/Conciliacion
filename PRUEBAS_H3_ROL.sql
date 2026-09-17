@@ -2,10 +2,33 @@
 -- H3 · EL ROL QUE CORRE LAS PRUEBAS, Y EL USUARIO DE PRUEBA
 -- PROPUESTA 17-sep-2026.
 --
--- ⚠️ NO PEGADO TODAVIA. Este encabezado NO se toca hasta DESPUES de correrlo
---    y de haber mirado la verificacion del §7. Es la regla del 16-sep: sobre
---    un "Success" sin verificar se escribio que algo estaba aplicado y durante
+-- ✅ APLICADO Y VERIFICADO EL 17-sep-2026. Este encabezado se toca DESPUES de
+--    mirar los numeros, no antes — la regla del 16-sep, cuando sobre un
+--    "Success" sin verificar se escribio que algo estaba aplicado y durante
 --    unos minutos el archivo y la bitacora afirmaban las dos algo falso.
+--
+--    LA EVIDENCIA. Andrea reporto cinco de los siete valores del control; los
+--    SIETE se volvieron a medir aparte con `pg_lector.py` —solo lectura— para
+--    no escribir "verificado" sobre un dato que nadie miro:
+--
+--      rol 1 · miembro_de_authenticated 1 · tablas (INSERT) 10
+--      vistas_y_tablas_select 14 · acceso_total 6
+--      puede_entrar t · saltea_rls t
+--
+--    Y los atributos, medidos: rolsuper f · rolcreatedb f · rolcreaterole f ·
+--    rolconfig {statement_timeout=15s, idle_in_transaction_session_timeout=30s,
+--    search_path=public,extensions}.
+--    Sobrantes (UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER): **0**.
+--    Usuario de prueba: nombre PRUEBAS-H3 · perfil **equipo** · activo t ·
+--    sin `CAMBIAR-` suelto.
+--
+--    ⚠️ `miembro_de_authenticated 1` y `vistas_y_tablas_select 14` son los dos
+--       que no venian en el reporte. El primero NO es cosmetico: sin esa
+--       membresia el carril B daria "permission denied to set role" y ninguna
+--       prueba de permiso existiria.
+--
+--    LA CLAVE quedo en `herramientas/conexion_db.env` (gitignored) como
+--    `PRUEBAS_ROL_PASSWORD`. El archivo tiene 2 lineas: esa y la de la base.
 --
 -- QUE ES ESTO
 --   El piso de `pg_pruebas.py` (pendiente H3). Crea UN rol de base de datos y
