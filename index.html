@@ -2477,10 +2477,24 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* Los cuatro motivos. Mismo tratamiento que .rp-tipo —es la misma clase de
    elección— pero envuelven, porque "Consumo interno" no entra en un cuarto de
    pantalla de teléfono. */
+/* ── LOS MOTIVOS · el ancho depende de CUANTOS son (17-sep) ──────────────
+   `min-width:calc(50% - 4px)` estaba pensado para los CINCO motivos de "Sin
+   factura": arma una grilla de dos columnas y ahi es lo correcto. Con DOS
+   opciones —la causa de Devoluciones— cada boton se comia media pantalla y
+   competia con el resumen de abajo, que es lo que hay que leer antes de guardar.
+   ⚠️ NO SE CREA UNA VARIANTE. Una segunda clase para "lo mismo pero chico" es
+   una que se desincroniza — es el problema del prefijo `rp-` que costo 33 dias de
+   avisos mudos. La regla se hace CONSCIENTE DE LA CANTIDAD y sirve para las dos.
+   COMO: `button:first-child:nth-last-child(-n+2)` matchea al primer boton SOLO
+   cuando esta entre los ultimos dos, o sea cuando hay 2 o menos; el `~ button`
+   alcanza al segundo. Con cinco no matchea nada y la grilla queda como estaba.
+   Es una "quantity query" de CSS puro: sin `:has()`, sin JS, sin clase extra. */
 .rp-mot{display:flex;gap:8px;flex-wrap:wrap}
 .rp-mot button{flex:1 1 auto;min-width:calc(50% - 4px);background:var(--sunken);
   border:1px solid var(--border-strong);border-radius:8px;color:var(--text-3);
   font:inherit;font-size:13.5px;padding:10px 8px;cursor:pointer}
+.rp-mot button:first-child:nth-last-child(-n+2),
+.rp-mot button:first-child:nth-last-child(-n+2) ~ button{flex:0 1 auto;min-width:0;padding:10px 16px}
 .rp-mot button.on{border-color:var(--ent-line);color:var(--text);background:var(--ent-wash)}
 /* 16px es piso de plataforma, no preferencia: Safari de iOS hace zoom al enfocar
    un campo con letra menor y no vuelve. `.cl-in` lo pisa por especificidad. */
@@ -12509,6 +12523,33 @@ function bsDetalle(p){
 }
 
 // ── La hoja de clientes: frecuentes primero (facturas de los últimos 90 días) ──
+// ── EL BUSCADOR DE CLIENTES, PARAMETRIZADO (17-sep) ─────────────────────
+// Lo abren DOS pantallas con listas distintas: el Reporte (clientes de Odoo,
+// `res.partner` con customer_rank>0, ordenados por frecuencia de factura) y
+// Devoluciones (solo los clientes que TIENEN entregas registradas).
+//
+// ⚠️ UN SOLO BUSCADOR, NO DOS. La alternativa era un `dvAbrirClientes` que llenara
+// el mismo `#rpLista` por su cuenta: dos funciones escribiendo en el mismo lugar
+// es exactamente el patron que el 15-sep dejo el filtro de disponibilidad en UNA
+// de las dos pantallas que eligen lote. El contexto dice quien pregunto; el
+// filtrado y el dibujo son uno.
+//
+// ⚠️ Y LA LISTA DE ODOO NO SIRVE PARA DEVOLUCIONES. Ofreceria clientes sin una
+// sola entrega registrada: los elegis y caes en una lista vacia — el mismo
+// callejon sin salida que ya se evito con las entregas manuales.
+let _sheetCtx=null;      // {lista:[{id,nombre,f}], elegir:fn, placeholder}
+function _sheetAbrir(ctx){
+  _sheetCtx=ctx;
+  document.getElementById('rpSheet').classList.remove('hidden');
+  const b=document.getElementById('rpBuscar');
+  if(b){ b.value=''; b.placeholder=ctx.placeholder||'Buscar cliente…'; }
+  rpFiltrarClientes();
+  if(b) b.focus();
+}
+function _sheetElegir(id,nombre){
+  const f=_sheetCtx&&_sheetCtx.elegir; rpCerrarClientes();
+  if(f) f(id,nombre);
+}
 async function rpAbrirClientes(){
   document.getElementById('rpSheet').classList.remove('hidden');
   const b=document.getElementById('rpBuscar'); if(b){ b.value=''; }
@@ -12521,29 +12562,34 @@ async function rpAbrirClientes(){
       const freq={}; mv.forEach(function(m){ if(m.partner_id) freq[m.partner_id[0]]=(freq[m.partner_id[0]]||0)+1; });
       const ps=await odooCall('res.partner','search_read',[[['customer_rank','>',0]]],
         {fields:['id','name'],limit:2000,order:'name'});
-      _rpClientes=ps.map(function(p){ return {id:p.id,nombre:p.name,f:freq[p.id]||0}; })
-        .sort(function(a,z){ return z.f-a.f || a.nombre.localeCompare(z.nombre,'es'); });
+      // `f` ya viene ROTULADO por la fuente: la lista del sheet es generica y el
+      // rotulo no — "5 desp." acá, "5 entregas" en Devoluciones. `n` queda para
+      // ordenar. Antes el sufijo estaba escrito en el dibujo, o sea en el lugar
+      // que las dos fuentes comparten.
+      _rpClientes=ps.map(function(p){ const n=freq[p.id]||0;
+        return {id:p.id, nombre:p.name, n:n, f:(n?(n+' desp.'):'')}; })
+        .sort(function(a,z){ return z.n-a.n || a.nombre.localeCompare(z.nombre,'es'); });
     }catch(e){
       document.getElementById('rpLista').innerHTML=
         '<div class="cl-none">No pude leer los clientes de Odoo: '+esc((e&&e.message)||e)+'</div>';
       return;
     }
   }
-  rpFiltrarClientes();
-  if(b) b.focus();
+  _sheetAbrir({lista:_rpClientes, elegir:rpElegirCliente, placeholder:'Buscar cliente…'});
 }
 function rpCerrarClientes(){ document.getElementById('rpSheet').classList.add('hidden'); }
 function rpFiltrarClientes(){
-  const el=document.getElementById('rpLista'); if(!el||!_rpClientes) return;
+  const el=document.getElementById('rpLista'); if(!el) return;
+  const L=(_sheetCtx&&_sheetCtx.lista)||null; if(!L) return;
   const q=(document.getElementById('rpBuscar').value||'').trim().toLowerCase();
-  const ls=_rpClientes.filter(function(c){ return !q || c.nombre.toLowerCase().indexOf(q)>=0; }).slice(0,60);
+  const ls=L.filter(function(c){ return !q || c.nombre.toLowerCase().indexOf(q)>=0; }).slice(0,60);
   el.innerHTML = ls.length
-    ? ls.map(function(c){ return '<button class="rp-cli" onclick="rpElegirCliente('+c.id+',\''
+    ? ls.map(function(c){ return '<button class="rp-cli" onclick="_sheetElegir('+c.id+',\''
         +esc(c.nombre).replace(/'/g,'&#39;')+'\')">'+esc(c.nombre)
-        +(c.f?('<span class="rp-clif">'+c.f+' desp.</span>'):'')+'</button>'; }).join('')
+        +(c.f?('<span class="rp-clif">'+esc(c.f)+'</span>'):'')+'</button>'; }).join('')
     : '<div class="cl-none">Ningún cliente matchea. Se elige de la lista — no se escribe libre.</div>';
 }
-function rpElegirCliente(id,nombre){ _rp.cliente={id:id,nombre:nombre}; rpCerrarClientes(); rpRender(); }
+function rpElegirCliente(id,nombre){ _rp.cliente={id:id,nombre:nombre}; rpRender(); }
 
 // ── Render de la pantalla completa ──────────────────────────────────────
 // ════════════════════════════════════════════════════════════════════════
@@ -13803,16 +13849,11 @@ function dvFormHTML(){
   // de elegir cliente; aca no, y es la unica diferencia de orden.
   h+='<div class="rp-sec"><div class="rp-sec-t">De qué entrega</div>';
   if(!N.cliente){
-    const cl={};
-    _dv.peds.forEach(function(p){ const k=p.cliente_id;
-      if(!cl[k]) cl[k]={id:p.cliente_id, nombre:p.cliente_nombre, n:0, ult:p.fecha_ab_re_04};
-      cl[k].n++; });
-    const cls=Object.values(cl).sort(function(a,z){ return String(z.ult||'').localeCompare(String(a.ult||'')); });
-    h+= cls.length
-      ? cls.map(function(x){ return '<button class="dv-op" onclick="dvCliente('+x.id+',\''
-          +esc(x.nombre).replace(/'/g,"&#39;")+'\')">'+esc(x.nombre)
-          +'<span class="dv-op-sub">'+x.n+(x.n===1?' entrega registrada':' entregas registradas')
-          +'</span></button>'; }).join('')
+    // ⚠️ BUSCADOR, NO LISTA (decision de Andrea, 17-sep). Es el mismo control que
+    // ya usa "Sin factura": con decenas de clientes, una lista larga se recorre y
+    // un buscador se escribe. Se reusa el sheet, no se copia.
+    h+= _dv.peds.length
+      ? '<button class="rp-clivacio" onclick="dvAbrirClientes()">Elegir de la lista…</button>'
       : '<div class="cl-none">No hay entregas registradas para devolver.</div>';
     h+=dvFueraHTML();
   }else if(!N.entrega){
@@ -13860,7 +13901,15 @@ function dvFormHTML(){
 
   // ── 3 · EN ESTA DEVOLUCION ────────────────────────────────────────────
   if(N.entrega){
-    h+='<div class="rp-sec"><div class="rp-sec-t">En esta devolución</div>';
+    // ⚠️ EL TITULO LLEVA EL CONTADOR, Y EL BOTON DE ARRIBA DICE "Agregar a ESTA
+    // devolución": el eco es literal a proposito. Andrea dudo de si tocar el boton
+    // —no quedaba claro que llenara esta seccion— y en "Sin factura" ese paso
+    // Daniel ya lo conoce, pero aca es nuevo. Las tres señales (el eco del rotulo,
+    // el contador, y el desplazamiento de `dvAgregarLinea`) muestran la relacion
+    // en vez de explicarla: ninguna agrega un renglon de texto, que es el estandar
+    // del modulo.
+    h+='<div class="rp-sec" id="dvCargadas"><div class="rp-sec-t">En esta devolución'
+      +(N.lineas.length?(' · '+N.lineas.length):'')+'</div>';
     if(!N.lineas.length) h+='<div class="cl-none">Todavía no hay líneas.</div>';
     else{
       h+='<table class="cl-tbl"><tr><th>Producto</th><th>Cantidad</th><th>Lotes</th><th></th></tr>';
@@ -13952,7 +14001,7 @@ function dvLotesHTML(){
   h+='<div class="cl-pie">'+esc(I.nom)+' · vuelve hasta ahora <strong>'+_dvNum(totUom)+' '
     +esc(lts[0].uom)+'</strong></div>';
   h+='<div style="margin-top:14px"><button class="btn" '+(totUom>0?'':'disabled')
-    +' onclick="dvAgregarLinea()">'+(N.editando>=0?'Guardar el cambio':'Agregar a la devolución')
+    +' onclick="dvAgregarLinea()">'+(N.editando>=0?'Guardar el cambio':'Agregar a esta devolución')
     +'</button>'
     +(N.editando>=0?' <button class="btn btn-sm" onclick="dvQuitarLinea()">Quitar la línea</button>':'')
     +'</div></div>';
@@ -13994,6 +14043,22 @@ function _dvNum(n){ return (Math.round((Number(n)||0)*1000)/1000)
   .toLocaleString('es-CR',{minimumFractionDigits:0, maximumFractionDigits:3}); }
 
 // ── LOS GESTOS ──────────────────────────────────────────────────────────
+// Devoluciones abre EL MISMO buscador, con la lista de clientes que TIENEN
+// entregas registradas — no la de Odoo, que ofreceria callejones sin salida.
+function dvAbrirClientes(){
+  const cl={};
+  _dv.peds.forEach(function(p){ const k=p.cliente_id;
+    if(!cl[k]) cl[k]={id:p.cliente_id, nombre:p.cliente_nombre, n:0, ult:p.fecha_ab_re_04};
+    cl[k].n++; });
+  const lista=Object.values(cl)
+    .map(function(x){ return {id:x.id, nombre:x.nombre, n:x.n, ult:x.ult,
+      f:x.n+(x.n===1?' entrega':' entregas')}; })
+    // El mismo criterio que el de Odoo: primero quien mas aparece, y a igualdad
+    // por nombre. Aca "mas aparece" son entregas registradas, no facturas.
+    .sort(function(a,z){ return z.n-a.n || a.nombre.localeCompare(z.nombre,'es'); });
+  _sheetAbrir({lista:lista, elegir:function(id,nombre){ dvCliente(id,nombre); },
+               placeholder:'Buscar cliente con entregas…'});
+}
 function dvCliente(id,nombre){
   const N=_dv.n;
   if(id==null){ N.cliente=null; N.entrega=null; N.pid=null; N.lotes={}; N.lineas=[]; }
@@ -14046,6 +14111,12 @@ function dvAgregarLinea(){
   if(N.editando>=0) N.lineas[N.editando]=linea; else N.lineas.push(linea);
   N.pid=null; N.lotes={}; N.editando=-1;
   dvRender();
+  // ⚠️ SE DESPLAZA A DONDE FUE A PARAR. La relacion entre el boton y la seccion se
+  // DEMUESTRA —tocás y ves la linea aparecer alla— en vez de explicarse con un
+  // cartel. Es la primera vez que alguien usa esta pantalla; en "Sin factura" el
+  // paso ya se conoce. `block:'nearest'` para que no salte si ya estaba a la vista.
+  try{ const el=document.getElementById('dvCargadas');
+       if(el) el.scrollIntoView({block:'nearest', behavior:'smooth'}); }catch(e){}
 }
 function dvEditar(i){
   const N=_dv.n, l=N.lineas[i]; if(!l) return;
