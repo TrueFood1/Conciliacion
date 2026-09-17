@@ -13821,7 +13821,11 @@ function dvRender(){
   b.innerHTML = (_dv.modo==='nueva') ? dvFormHTML() : dvListaHTML();
 }
 function dvListaHTML(){
-  let h='<div style="margin-bottom:14px"><button class="btn btn-ent" onclick="dvNueva()">'
+  // ⚠️ `btn-amarillo`, NO `btn-ent`. Esa segunda clase NO EXISTE en la hoja: me la
+  // invente, y sin CSS los dos botones caian al `.btn` gris de contorno — por eso
+  // se veian apagados. La accion principal de este modulo es lima rellena, y la que
+  // usa "Sin factura" para su "Guardar despacho" es `btn-amarillo`.
+  let h='<div style="margin-bottom:14px"><button class="btn btn-amarillo" onclick="dvNueva()">'
     +'Registrar una devolución</button></div>';
   const D=_dv.devs||[];
   if(!D.length) return h+'<div class="cl-none">Todavía no hay devoluciones registradas.</div>';
@@ -13979,10 +13983,10 @@ function dvFormHTML(){
   if(N.lineas.length){
     const hoy=_despHoy(), vieja=(N.fecha!==hoy);
     h+='<div class="rp-sec">'
-      // El texto del 26-ago, EN LA PANTALLA. No es una nota de diseño: es la
-      // leccion de aquel dia dicha donde se toma la decision.
-      +'<div class="dv-nota"><b>Se registra el día que el producto LLEGA</b>, no el día '
-      +'que avisan que va a volver. Si el pan todavía no está en el congelador, no se registra.</div>'
+      // ⚠️ SIN EL PARRAFO DEL 26-ago (17-sep). Decia "se registra el dia que el
+      // producto LLEGA, no el dia que avisan…" — tres renglones para explicar lo
+      // que el ROTULO ya dice en dos palabras: "Día que llegó". La leccion del
+      // 26-ago se conserva donde importa: en el nombre del campo, y en §12.
       +'<div class="rp-pie"><span class="rp-pie-l">Día que llegó</span>'
       +'<input type="date" class="de-fecha-in" value="'+esc(N.fecha)+'" '
       +'min="'+esc(_despFechaMin())+'" max="'+esc(hoy)+'" onchange="dvFecha(this.value)">'
@@ -14256,7 +14260,7 @@ function dvConfirmarHTML(){
   // quede entre lo que se leyo y lo que se toca — ver `_dvErrMostrar`.
   h+='<div id="dvErr" class="hidden"></div>';
   h+='<div class="dv-acc">'
-    +'<button id="dvSave" class="btn btn-ent" '+(dvListo()&&!_dvGuardando?'':'disabled')
+    +'<button id="dvSave" class="btn btn-amarillo" '+(dvListo()&&!_dvGuardando?'':'disabled')
     +' onclick="dvGuardar()">'+(_dvGuardando?'Registrando…':'Registrar la devolución')+'</button>'
     +'<span id="dvMsg" class="dv-msg"></span></div>';
   return h;
