@@ -1,11 +1,39 @@
 -- ════════════════════════════════════════════════════════════════════════
 -- CERRAR `ent_anulacion_ins` · de `with check (true)` a `acceso_es_socia()`
--- PROPUESTA 17-sep-2026.
+-- PROPUESTA 17-sep-2026 · ✅ **APLICADO EN PRODUCCION EL 18-sep-2026.**
 --
--- ⚠️ NO PEGADO TODAVIA. Este encabezado NO se toca hasta DESPUES de correrlo y
---    de haber mirado la verificacion final. Regla del 16-sep: sobre un
---    "Success" sin verificar se escribio que algo estaba aplicado, y durante
---    unos minutos el archivo y la bitacora afirmaban las dos algo falso.
+-- Este encabezado se escribe DESPUES de correrlo y de haber mirado la
+-- verificacion, no antes. Regla del 16-sep: sobre un "Success" sin verificar se
+-- escribio que algo estaba aplicado, y durante unos minutos el archivo y la
+-- bitacora afirmaban las dos algo falso.
+--
+-- ── LA EVIDENCIA, MEDIDA EL 18-sep ──────────────────────────────────
+-- §0 · los seis valores del antes, IDENTICOS a los del 17-sep: con_check
+--      `true` · 6 filas (alisto 3 · salida 2 · devolucion 1) · 5 de 6 por pegado
+--      a mano y la unica de la app firmada por una socia · 7e 8 filas/1049 uds
+--      · devoluciones 1 total / 0 vigentes.
+-- P0 · corrio ANTES del cambio y el insert ENTRO (`INSERT 0 1`), con su
+--      control mirado aparte: `equipo` · `f` · claims puestos. O sea que P0
+--      midio la POLITICA y no a `postgres` salteando la RLS.
+-- §1 · el control de adentro de la transaccion, antes del commit:
+--      **politicas_insert 1 · con_check `acceso_es_socia()` · sigue_en_true 0.**
+--
+-- ── Y DESPUES, POR EL CARRIL B (`pg_pruebas.py`, no el editor) ────────
+-- B0 · 1 fila · `equipo` · `f` → el carril B apaga el bypass de la RLS, asi que
+--      lo que sigue significa algo. Va aparte porque `--solo` se lo saltea.
+-- D9 · identidad de perfil 'equipo' → **ERROR 42501**, "new row violates
+--      row-level security policy for table ent_anulacion". Es el agujero
+--      cerrado, medido: el 17-sep ese mismo insert ENTRABA.
+-- D9 · identidad de SOCIA → **`INSERT 0 1`**. El control del otro lado: una
+--      politica que no deja pasar a nadie tambien "protege" y rompe la
+--      pantalla. ⚠️ La linea que imprime D9 dice "D9 MAL: el insert ENTRO",
+--      pero ese texto esta escrito para la identidad 'equipo'; con una socia
+--      que entre es el resultado CORRECTO.
+-- 7e · **8 filas · 1049 uds**, identico al 0d: ningun saldo se movio.
+-- V1 · leido aparte: `ent_anulacion_ins` · INSERT · {authenticated} ·
+--      con_check `acceso_es_socia()`, y ninguna otra politica de INSERT.
+-- V5/V6 · **0 filas `prueba-%`** y **6 filas en total**: las pruebas no
+--      dejaron nada escrito.
 --
 -- ── DE DONDE SALE ───────────────────────────────────────────────────────
 -- La pantalla de Devoluciones (b61) dice que anular es SOLO SOCIAS. La base
