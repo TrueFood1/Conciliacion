@@ -310,6 +310,24 @@ def sobre_abrir(carril, email, plan_b):
 # ══════════════════════════════════════════════════════════════════════════
 # IMPRIMIR · crudo. Sin marcadores, sin verdictos.
 # ══════════════════════════════════════════════════════════════════════════
+def _celda(txt, ancho):
+    """Encaja `txt` en `ancho`, y si tuvo que cortar LO DICE con un `…`.
+
+    🔴 CORTAR ESTA BIEN; CORTAR EN SILENCIO NO. Hasta el 18-sep esto cortaba
+    con `[:ancho]` y no avisaba, asi que un valor largo salia mutilado y se
+    leia como si fuera entero — una celda que dice menos de lo que hay y no
+    lo declara. Es la misma familia que el cartel de D9 que decia lo contrario
+    del resultado: la salida tiene que poder desconfiarse sola.
+    El `…` es el unico aviso que cabe adentro de la celda; el valor completo
+    se pide con una consulta mas angosta.
+    """
+    if len(txt) <= ancho:
+        return txt.ljust(ancho)
+    if ancho <= 1:
+        return "…"[:ancho]
+    return txt[:ancho - 1] + "…"
+
+
 def _tabla(cols, filas):
     if not cols:
         return ["(sin columnas)"]
@@ -318,11 +336,11 @@ def _tabla(cols, filas):
         for i, v in enumerate(f):
             anchos[i] = max(anchos[i], len("NULL" if v is None else str(v)))
     anchos = [min(a, 60) for a in anchos]
-    out = ["  " + " | ".join(c.ljust(anchos[i])[:anchos[i]] for i, c in enumerate(cols)),
+    out = ["  " + " | ".join(_celda(c, anchos[i]) for i, c in enumerate(cols)),
            "  " + "-+-".join("-" * a for a in anchos)]
     for f in filas:
         out.append("  " + " | ".join(
-            ("NULL" if v is None else str(v)).ljust(anchos[i])[:anchos[i]]
+            _celda("NULL" if v is None else str(v), anchos[i])
             for i, v in enumerate(f)))
     out.append("  (%d fila%s)" % (len(filas), "" if len(filas) == 1 else "s"))
     return out

@@ -54,6 +54,7 @@ def main():
     L = io.open(src, encoding="utf-8").read().split("\n")
 
     fallas = 0
+    total = extraidos = nuevas = 0
     print("%-14s %-7s %-26s %s" % ("ARCHIVO", "CARRIL", "CUERPO vs ORIGINAL", "PALABRAS PROHIBIDAS"))
     print("-" * 82)
     for f in sorted(glob.glob(os.path.join(aqui, "*.sql"))):
@@ -62,13 +63,16 @@ def main():
         m = re.search(r"-- PRUEBA (\S+) · CARRIL (\w)", txt)
         car = m.group(2) if m else "?"
 
+        total += 1
         if n in ORIG:
+            extraidos += 1
             a, b = ORIG[n]
             cuerpo = "\n".join(L[a:b - 1])          # lo que hay ENTRE begin; y rollback;
             ok = txt.endswith(cuerpo + "\n")        # el archivo TERMINA en el cuerpo, intacto
             ver = "✓ identico, byte a byte" if ok else "✗ DIFIERE DEL ORIGINAL"
             if not ok: fallas += 1
         else:
+            nuevas += 1
             cuerpo = txt.split(CIERRE)[-1]
             ver = "— nueva, no extraida"
 
@@ -80,7 +84,19 @@ def main():
     print()
     if fallas:
         print("🔴 %d FALLA(S). No correr nada hasta entender por que." % fallas); return 1
-    print("✅ 12 archivos · 10 extraidos verificados contra el original · 2 nuevas · 0 fallas")
+    # 🔴 EL RESUMEN SE CUENTA, NO SE ESCRIBE. Hasta el 18-sep esta linea era
+    # texto fijo ("12 archivos · 10 extraidos · 2 nuevas · 0 fallas"). Coincidia
+    # con la tabla de arriba, asi que no mentia — pero era un numero escrito a
+    # mano en el script que existe justamente para no confiar en numeros
+    # escritos a mano. El dia que se agregue una prueba, el texto fijo sigue
+    # diciendo 12 y nadie se entera.
+    print("✅ %d archivo%s · %d extraido%s verificado%s contra el original · "
+          "%d nueva%s · %d falla%s"
+          % (total,     "" if total == 1 else "s",
+             extraidos, "" if extraidos == 1 else "s",
+             "" if extraidos == 1 else "s",
+             nuevas,    "" if nuevas == 1 else "s",
+             fallas,    "" if fallas == 1 else "s"))
     return 0
 
 
