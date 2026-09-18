@@ -37,7 +37,23 @@ y nadie se entera.
 | `d6.sql` | A | extraída | **error** `ent_odoo_pendiente_forma_ok` |
 | `d7.sql` | A | extraída | control, **pasa**, 1 fila |
 | `d8.sql` | B | extraída | ⚠️ **dos identidades**, ver el archivo |
-| `d9_anulacion.sql` | B | **nueva** | mide el hueco de `ent_anulacion_ins` |
+| `d9_anulacion.sql` | B | **nueva** | 🔴 **invertida el 17-sep**: ahora espera **42501** |
+
+## ⚠️ D9 va atada a un pegado
+
+`d9_anulacion.sql` **se invirtió el 17-sep** junto con
+`CAMBIO_ANULACION_SOCIAS.sql`. Hasta ese pegado el insert entraba y eso era lo
+correcto de medir; ahora tiene que dar **42501**.
+
+**Si D9 "falla" —si el insert entra— no está mal la prueba: falta el pegado.**
+Mirá la política antes de tocar el archivo:
+
+```sql
+select policyname, with_check from pg_policies
+ where tablename = 'ent_anulacion' and cmd = 'INSERT';
+```
+
+Tiene que decir `acceso_es_socia()`. Si dice `true`, el cambio no se aplicó.
 
 ## Dos cosas contadas, no supuestas
 

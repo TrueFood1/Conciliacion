@@ -7,29 +7,41 @@
 -- NO ES UNA PRUEBA EXTRAIDA: se escribio el 17-sep-2026, a partir de un
 -- hallazgo medido contra produccion ese mismo dia.
 --
--- EL HALLAZGO
---   La pantalla de Devoluciones (b61) dice que anular es SOLO SOCIAS. En
---   la base, medido: la politica `ent_anulacion_ins` es
+-- 🔴 ESTA PRUEBA SE INVIRTIO EL 17-sep-2026, JUNTO CON
+--    `CAMBIO_ANULACION_SOCIAS.sql`. Hasta ese pegado el insert ENTRABA, y eso
+--    era lo correcto de medir: confirmaba el hueco. Ahora tiene que dar ERROR.
+--
+--    ⚠️ SI ESTA PRUEBA "FALLA" —o sea, si el insert ENTRA— NO ESTA MAL LA
+--    PRUEBA: significa que `CAMBIO_ANULACION_SOCIAS.sql` todavia no se pego, o
+--    se pego a medias. Mirá la politica ANTES de tocar este archivo:
+--        select policyname, with_check from pg_policies
+--         where tablename = 'ent_anulacion' and cmd = 'INSERT';
+--    Tiene que decir `acceso_es_socia()`. Si dice `true`, falta el pegado.
+--
+--    Se deja escrito el cambio de direccion, y no se reescribe en silencio,
+--    porque una prueba que quedo midiendo lo contrario de lo que se construyo
+--    es el modo de falla del 15-sep (P0-a "fallando" por la escalera rota) y
+--    el de la 7a del 14-ago: da el resultado de otra cosa y nadie lo nota. Es
+--    el mismo tratamiento que lleva D4, invertida el 16-sep.
+--
+-- EL HALLAZGO QUE LA ORIGINO, y por que valia la pena
+--   La pantalla de Devoluciones (b61) decia que anular era SOLO SOCIAS. La
+--   base decia otra cosa: `ent_anulacion_ins` era
 --     for insert to authenticated with check (TRUE)
---   la tabla NO tiene ningun trigger (0), y `authenticated` tiene el
---   grant de INSERT. O sea que cualquier usuario logueado pasa. Lo unico
---   que detiene a Daniel es que la interfaz no le muestra el boton.
---   Es la misma forma que el `with check (true)` no protege de nada.
+--   la tabla NO tiene ningun trigger (0), y `authenticated` tiene el grant de
+--   INSERT. O sea que cualquier usuario logueado pasaba; lo unico que detenia
+--   a Daniel era que la interfaz no le mostraba el boton.
+--   No se leyo de un catalogo: se MIDIO con esta misma prueba, por el carril
+--   B, el 17-sep — y el insert entro.
 --
--- 🔴 ESTA PRUEBA NO ESTA ESCRITA PARA PASAR. Esta escrita para MEDIR, y
---    el valor esperado depende de una decision que todavia no se tomo:
+-- ESPERADO AHORA:  **ERROR 42501**
+--   "new row violates row-level security policy for table ent_anulacion"
 --
---    · HOY, con la politica como esta:
---        el insert ENTRA. Eso CONFIRMA el hueco. No es un error de la
---        prueba: es el estado real de la base.
---    · SI ANDREA DECIDE CERRAR LA POLITICA (a `with check
---      (acceso_es_socia())`, como `ent_odoo_hecho_ins`):
---        el insert tiene que dar ERROR 42501,
---        "new row violates row-level security policy".
---
---    Cuando el resultado cambie de uno a otro, no es que la prueba se
---    rompio: es que la decision se tomo. Anotar cual de los dos mundos
---    rige el dia que se corra.
+-- ⚠️ Y LO QUE EL CAMBIO NO HIZO: cerro la puerta de la APP, no la del editor.
+--    El SQL Editor entra como `postgres` y saltea la RLS, asi que un pegado a
+--    mano sigue pudiendo anular. Esta bien que asi sea — quien tiene el editor
+--    ya puede todo. Pero que nadie lea esta prueba en verde como "ahora solo
+--    las socias pueden anular, punto".
 --
 -- ⚠️ IDENTIDAD: esta prueba corre con el usuario de prueba, perfil
 --    'equipo'. Con una socia NO prueba nada, porque una socia pasa en
@@ -43,4 +55,4 @@
 -- ════════════════════════════════════════════════════════════════════
 insert into ent_anulacion (entidad, entidad_id, motivo, creado_por)
 values ('devolucion', 999999, 'prueba-d9 H3', 'prueba-d9');
-select 'D9: el insert ENTRO — hoy la politica NO protege' as resultado;
+select 'D9 MAL: el insert ENTRO — la politica NO quedo cerrada' as resultado;
