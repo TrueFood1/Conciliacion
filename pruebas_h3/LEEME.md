@@ -37,16 +37,20 @@ y nadie se entera.
 | `d6.sql` | A | extraída | **error** `ent_odoo_pendiente_forma_ok` |
 | `d7.sql` | A | extraída | control, **pasa**, 1 fila |
 | `d8.sql` | B | extraída | ⚠️ **dos identidades**, ver el archivo |
-| `d9_anulacion.sql` | B | **nueva** | 🔴 **invertida el 17-sep**: ahora espera **42501** |
+| `d9_anulacion.sql` | B | **nueva** | 🔴 **invertida el 17-sep**: con `equipo` espera **42501**, con socia **`INSERT 0 1`** — lo dice sola |
 
-## ⚠️ D9 va atada a un pegado
+## ⚠️ D9 va atada a un pegado — y el pegado ya se hizo
 
 `d9_anulacion.sql` **se invirtió el 17-sep** junto con
 `CAMBIO_ANULACION_SOCIAS.sql`. Hasta ese pegado el insert entraba y eso era lo
 correcto de medir; ahora tiene que dar **42501**.
 
-**Si D9 "falla" —si el insert entra— no está mal la prueba: falta el pegado.**
-Mirá la política antes de tocar el archivo:
+✅ **El pegado se aplicó en producción el 18-sep-2026**, y D9 se corrió con las
+dos identidades ese mismo día: `equipo` → **42501**, socia → **`INSERT 0 1`**.
+
+**Si D9 "falla" —si el insert entra corriendo como `equipo`— no está mal la
+prueba: falta el pegado, o se deshizo.** Mirá la política antes de tocar el
+archivo:
 
 ```sql
 select policyname, with_check from pg_policies
@@ -61,6 +65,12 @@ Tiene que decir `acceso_es_socia()`. Si dice `true`, el cambio no se aplicó.
 (D0–D8) y es correcto como nombre, pero **D3-bis es un bloque aparte**: medido,
 hay 10 pares `begin`/`rollback` en la sección de pruebas del original. Quien
 cuente nueve archivos y encuentre diez no se equivocó.
+
+**D9 también se corre con dos identidades**, y desde el 18-sep la salida lo
+dice sola: el primer select imprime con qué perfil corrió y qué tiene que pasar
+en ese caso, y el último lee el resultado según esa misma identidad. Antes el
+cartel final estaba escrito para `equipo` y decía **"D9 MAL"** sobre el
+resultado correcto cuando corría como socia.
 
 **D8 mide dos cosas a la vez** y hay que correrla con dos identidades: con el
 usuario de prueba (`equipo`) tiene que dar **error 42501**, y con una socia
