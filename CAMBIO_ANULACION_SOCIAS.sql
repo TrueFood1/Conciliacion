@@ -76,8 +76,8 @@ select entidad, count(*) as cuantas,
 -- 0c · QUIEN LAS ESCRIBIO. Es lo que decide si el cambio rompe algo.
 --      MEDIDO el 17-sep: CINCO de las seis las escribio un pegado a mano
 --      (`correccion-sql…`, que no es una sesion y entra como postgres); la
---      unica que entro por la app la firmo andrea@truefoodcr.com, perfil
---      'socias'. O sea: **nadie sin perfil de socia escribio nunca una
+--      unica que entro por la app la firmo una SOCIA (el correo no se escribe
+--      aca: el repo es publico; sale del 0c cuando se corre). O sea: **nadie sin perfil de socia escribio nunca una
 --      anulacion por la aplicacion**, y este cambio no rompe nada existente.
 select a.creado_por, count(*) as cuantas,
        coalesce(v.perfil, '— no esta en acceso_usuario') as perfil
