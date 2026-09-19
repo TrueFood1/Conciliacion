@@ -1450,6 +1450,79 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #panel,#invPanel{background:var(--surface)!important;border-left-color:var(--border)!important}
 /* login coherente */
 .login-os{color:var(--text-2)}.login-foot{color:var(--text-3)}
+
+/* ══════════════════════════════════════════════════════════════════════
+   TICKETS · REPORTAR (b62, 19-sep-2026). Solo reportar: ticket + contexto.
+   La FOTO no entra en esta pasada — seria la primera subida a Storage de
+   toda la app (medido: cero `.upload(` y cero `createSignedUrl`), y el §5
+   del esquema esta escrito para que "sin foto" sea un estado legitimo.
+   ⚠️ NO USA `m3sub`: esa clase tiene 36 usos y esta anotada para desarmar
+   (hace de subtitulo de encabezado Y de nota). Todo lo de aca lleva `tk-`.
+
+   ── LOS Z-INDEX, Y POR QUE ESTOS ──────────────────────────────────────
+   Lo que ya vive fijo:  #appHeader 110 · #entMas/#finMas 130 · #rpSheet 140
+     · #tkBtn   150 — ENCIMA de los modales de pantalla completa. No es
+       capricho: el esquema guarda `sobre` = "el modal que habia encima", y
+       esa columna solo se puede llenar si se puede reportar CON el modal
+       abierto. Debajo de 140, `sobre` seria siempre null y la columna
+       sobraria.
+     · #tkSheet 160 — encima del boton, que es lo unico que tiene que tapar.
+   ⚠️ LA EXCEPCION, decidida a mano: con #entMas o #finMas ABIERTOS el boton
+      SE ESCONDE. Esos dos son `left:0;right:0;bottom:0` — ocupan el pie
+      entero, justo donde vive el boton, y el circulo caeria encima de sus
+      propios items. Son menues que la persona acaba de abrir a proposito:
+      taparlos con un boton flotante es peor que perder ese momento para
+      reportar. Lo apaga `_tkSync()` mirando la clase `hidden` de los dos.
+   ⚠️ Y SOBRE EL #rpSheet: el boton QUEDA encima de su ultima fila. Es el
+      precio de poder reportar desde un modal. HAY QUE MIRARLO EN EL APARATO
+      —la regla del §11— antes de darlo por bueno.
+   ══════════════════════════════════════════════════════════════════════ */
+#tkBtn{position:fixed;z-index:150;right:16px;
+  bottom:calc(16px + env(safe-area-inset-bottom));
+  width:46px;height:46px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--surface);color:var(--text-2);
+  border:1px solid var(--border-strong);
+  box-shadow:0 4px 14px rgba(0,0,0,.28);
+  font:inherit;font-size:19px;line-height:1;cursor:pointer;padding:0}
+#tkBtn:active{transform:scale(.94)}
+#tkBtn.hidden{display:none}
+
+#tkSheet{position:fixed;inset:0;z-index:160;background:var(--scrim);
+  display:flex;align-items:flex-end;justify-content:center}
+#tkSheet.hidden{display:none}
+.tk-in{width:100%;max-width:560px;background:var(--surface);
+  border-radius:16px 16px 0 0;border-top:.5px solid var(--border-strong);
+  padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+  max-height:92vh;overflow-y:auto;overscroll-behavior:contain}
+@media(min-width:700px){
+  #tkSheet{align-items:center}
+  .tk-in{border-radius:16px;border:1px solid var(--border-strong)}
+}
+.tk-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
+.tk-t{font-size:15px;font-weight:600}
+.tk-x{background:none;border:none;color:var(--text-3);font:inherit;font-size:20px;cursor:pointer;padding:2px 6px}
+/* El subtitulo propio de tickets. NO es `m3sub`. */
+.tk-sub{font-size:12px;color:var(--text-3);margin-bottom:12px}
+.tk-lbl{font-size:12px;color:var(--text-2);margin:12px 0 6px}
+#tkTexto{width:100%;box-sizing:border-box;background:var(--field);
+  border:1px solid var(--border-strong);border-radius:9px;color:var(--text);
+  font:inherit;font-size:16px;padding:11px 12px;min-height:88px;resize:vertical}
+.tk-tipos{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tk-tipo{background:var(--field);border:1px solid var(--border);border-radius:9px;
+  color:var(--text);font:inherit;font-size:13px;padding:11px 10px;cursor:pointer;text-align:left}
+.tk-tipo.on{border-color:var(--mod,var(--accent));color:var(--text);font-weight:600}
+.tk-ctx{font-size:11px;color:var(--text-3);margin-top:14px;line-height:1.5;
+  word-break:break-word}
+.tk-enviar{width:100%;margin-top:14px;background:var(--field);
+  border:1px solid var(--border-strong);border-radius:9px;color:var(--text);
+  font:inherit;font-size:15px;font-weight:600;padding:13px;cursor:pointer}
+.tk-enviar[disabled]{opacity:.45;cursor:default}
+/* El resultado NUNCA se calla: ni el bueno ni el malo. Es la leccion del
+   guardado que fallaba en silencio en Devoluciones (17-sep). */
+.tk-msg{font-size:13px;margin-top:12px;padding:10px;border-radius:9px;display:none}
+.tk-msg.ok{display:block;background:var(--green-l,#123);color:var(--green-d,#7d7)}
+.tk-msg.mal{display:block;background:#3a1b1b;color:#ffb4b4;white-space:pre-wrap}
 </style>
 </head>
 <body>
@@ -19882,6 +19955,257 @@ function exportPendientes(){
 
 // Sello de versión visible en el pie del lobby (única fuente: const BUILD)
 try{ document.getElementById('homeBuild').textContent = BUILD; }catch(e){}
+</script>
+<!-- ══════════════════════════════════════════════════════════════════════
+     TICKETS · REPORTAR · b62 (19-sep-2026)
+     Escribe en `ticket` y nada mas. El estado, el triaje y el detalle son
+     otras tablas y otras pantallas: esta es la puerta de ENTRADA.
+     ══════════════════════════════════════════════════════════════════════ -->
+<button id="tkBtn" class="hidden" onclick="tkAbrir()" title="Reportar algo"
+        aria-label="Reportar algo">✱</button>
+
+<div id="tkSheet" class="hidden" onclick="if(event.target===this) tkCerrar()">
+  <div class="tk-in">
+    <div class="tk-top">
+      <div class="tk-t">Reportar algo</div>
+      <button class="tk-x" onclick="tkCerrar()" aria-label="Cerrar">×</button>
+    </div>
+    <div class="tk-sub">Contá qué pasa. Lo demás lo guarda el sistema solo.</div>
+
+    <div class="tk-lbl">¿Qué pasa?</div>
+    <textarea id="tkTexto" rows="4" oninput="tkValidar()"
+      placeholder="Lo que viste. Con cinco letras alcanza."></textarea>
+
+    <div class="tk-lbl">¿Qué es?</div>
+    <div class="tk-tipos" id="tkTipos">
+      <button type="button" class="tk-tipo on" data-tipo="no_funciona"
+              onclick="tkTipo(this)">Algo no funciona</button>
+      <button type="button" class="tk-tipo" data-tipo="duda"
+              onclick="tkTipo(this)">Tengo una duda</button>
+      <button type="button" class="tk-tipo" data-tipo="idea"
+              onclick="tkTipo(this)">Se me ocurrió algo</button>
+      <button type="button" class="tk-tipo" data-tipo="encargo"
+              onclick="tkTipo(this)">Encargo</button>
+    </div>
+
+    <!-- Se MUESTRA lo que se manda. Capturarlo en silencio y no decirlo es
+         pedirle a alguien que confie a ciegas en lo que sube de su aparato. -->
+    <div class="tk-ctx" id="tkCtx"></div>
+
+    <button class="tk-enviar" id="tkEnviar" disabled onclick="tkEnviar()">Enviar</button>
+    <div class="tk-msg" id="tkMsg"></div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   DONDE ESTOY · el contexto que el §1 del esquema captura sin que nadie
+   escriba. Tiene que andar desde TODA pantalla, incluida una con modal
+   encima — por eso `sobre` no se lee de una lista escrita a mano.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* La vista visible. Se prefiere `_MOD_VIEWS` —la lista que usa `_modShow`,
+   o sea la MISMA fuente que decide que se ve— y solo si no existiera se cae
+   a barrer el DOM. Preguntarle a otra fuente seria inventar una segunda
+   verdad sobre "donde estoy". */
+function _tkVista(){
+  try{
+    if(typeof _MOD_VIEWS!=='undefined' && _MOD_VIEWS && _MOD_VIEWS.length){
+      for(var i=0;i<_MOD_VIEWS.length;i++){
+        var el=document.getElementById(_MOD_VIEWS[i]);
+        if(el && !el.classList.contains('hidden')) return _MOD_VIEWS[i];
+      }
+    }
+  }catch(e){}
+  var lob=document.getElementById('vLobby');
+  if(lob && !lob.classList.contains('hidden')) return 'vLobby';
+  var todas=document.querySelectorAll('div[id^="v"]');
+  for(var j=0;j<todas.length;j++){
+    if(!todas[j].classList.contains('hidden') && todas[j].offsetParent!==null
+       && /^v[A-Z]/.test(todas[j].id)) return todas[j].id;
+  }
+  return null;
+}
+
+/* La miga, como TEXTO — 'Entregas · Sin factura'. El esquema guarda `vista` y
+   `miga` las dos a proposito: `vista` dice `vReporte`, que no le dice nada a
+   nadie; `miga` dice lo que la persona estaba leyendo, y no sirve para buscar
+   en el codigo. Cada una contesta una pregunta distinta. */
+function _tkMiga(){
+  var c=document.querySelector('#appHeader .crumbs');
+  if(!c || c.offsetParent===null) return null;
+  var t=(c.textContent||'').replace(/\s+/g,' ').trim().replace(/\s*\/\s*/g,' · ');
+  return t || null;
+}
+
+/* EL MODAL DE ENCIMA. No se lee de una lista de ids escrita a mano: una lista
+   asi se queda vieja en el primer modal nuevo y nadie se entera, porque el
+   sintoma es una columna en null — que es indistinguible de "no habia modal".
+   Se mira el DOM: de todo lo que este FIJO y VISIBLE, el de z-index mas alto,
+   sacando lo nuestro y el encabezado. */
+function _tkSobre(){
+  var mejor=null, mejorZ=-1;
+  var fijos=document.querySelectorAll('div,section,aside');
+  for(var i=0;i<fijos.length;i++){
+    var el=fijos[i];
+    if(el.id==='tkSheet'||el.id==='appHeader') continue;
+    if(el.offsetParent===null && el.id!=='tkSheet'){
+      var cs0=getComputedStyle(el);
+      if(cs0.display==='none'||cs0.visibility==='hidden') continue;
+    }
+    var cs=getComputedStyle(el);
+    if(cs.position!=='fixed') continue;
+    if(cs.display==='none'||cs.visibility==='hidden'||cs.opacity==='0') continue;
+    if(el.getBoundingClientRect().height<8) continue;
+    var z=parseInt(cs.zIndex,10); if(isNaN(z)) z=0;
+    if(z>mejorZ){ mejorZ=z; mejor=el; }
+  }
+  if(!mejor) return null;
+  return mejor.id || ('.'+(mejor.className||'').split(' ').filter(Boolean)[0]) || null;
+}
+
+function tkDondeEstoy(){
+  var d={};
+  try{ d.vista=_tkVista(); }catch(e){ d.vista=null; }
+  try{ d.miga=_tkMiga(); }catch(e){ d.miga=null; }
+  try{ d.modulo=document.body.getAttribute('data-mod')||null; }catch(e){ d.modulo=null; }
+  try{ d.sobre=_tkSobre(); }catch(e){ d.sobre=null; }
+  try{ d.agente=navigator.userAgent||null; }catch(e){ d.agente=null; }
+  /* Desde el icono de iOS, o desde Safari. Importa porque el icono retiene la
+     version vieja dias — medido el 8-sep con el pedido 46. */
+  try{
+    d.standalone = (window.navigator.standalone===true) ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || false;
+  }catch(e){ d.standalone=null; }
+  try{ d.viewport=window.innerWidth+'x'+window.innerHeight+' @'+(window.devicePixelRatio||1); }
+  catch(e){ d.viewport=null; }
+  /* La zona del APARATO. `creado_en` es timestamptz y pierde la zona de quien
+     reporto; el dia que un iPad tenga la zona mal —que es la clase de bug que
+     un ticket vendria a reportar— este es el dato que lo probaria. */
+  try{ d.tz_offset_min = -(new Date()).getTimezoneOffset(); }catch(e){ d.tz_offset_min=null; }
+  try{ d.tz_nombre = Intl.DateTimeFormat().resolvedOptions().timeZone||null; }
+  catch(e){ d.tz_nombre=null; }
+  /* `build` solo no alcanza: un sello puede ser el de main o el de una rama sin
+     publicar. `doc_modificado` es la fecha del archivo QUE EL APARATO TIENE
+     CARGADO, y es lo unico que distingue dos builds con el mismo sello. */
+  try{ d.build = (typeof BUILD!=='undefined' && BUILD) ? BUILD : 'sin sello'; }
+  catch(e){ d.build='sin sello'; }
+  try{ d.doc_modificado = document.lastModified||null; }catch(e){ d.doc_modificado=null; }
+  return d;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   EL BOTON · cuando se ve y cuando no
+   ══════════════════════════════════════════════════════════════════════ */
+var _TK_TIPO='no_funciona';
+
+function _tkVisible(el){ return el && !el.classList.contains('hidden'); }
+
+function _tkSync(){
+  var b=document.getElementById('tkBtn'); if(!b) return;
+  /* 1. Sin sesion no hay a quien firmarle el ticket: el trigger del §1 exige
+        que `creado_por` sea el correo de la sesion. En login no va. */
+  var enLogin = _tkVisible(document.getElementById('vLogin')) ||
+                _tkVisible(document.getElementById('vAuth'));
+  /* 2. Con el panel del "+" abierto el boton se esconde: #entMas y #finMas son
+        left:0;right:0;bottom:0 y el circulo caeria sobre sus propios items. */
+  var panel = _tkVisible(document.getElementById('entMas')) ||
+              _tkVisible(document.getElementById('finMas'));
+  b.classList.toggle('hidden', !!(enLogin || panel));
+}
+
+/* Se vigila el DOM en vez de tocar las funciones que abren esos paneles: asi
+   esto no se cuelga de codigo ajeno, y si manana aparece otro panel con la
+   misma forma alcanza con sumarlo a `_tkSync`. */
+(function _tkVigilar(){
+  try{
+    var obs=new MutationObserver(_tkSync);
+    obs.observe(document.body,{attributes:true,attributeFilter:['class'],subtree:true});
+    window.addEventListener('resize',_tkSync);
+    _tkSync();
+    setInterval(_tkSync,1500);   // red: por si algo cambia sin tocar `class`
+  }catch(e){}
+})();
+
+/* ══════════════════════════════════════════════════════════════════════
+   LA HOJA
+   ══════════════════════════════════════════════════════════════════════ */
+function tkAbrir(){
+  var ctx=tkDondeEstoy();
+  var partes=[];
+  if(ctx.miga) partes.push(ctx.miga);
+  else if(ctx.vista) partes.push(ctx.vista);
+  if(ctx.sobre) partes.push('con «'+ctx.sobre+'» encima');
+  partes.push(ctx.build);
+  if(ctx.viewport) partes.push(ctx.viewport);
+  document.getElementById('tkCtx').textContent =
+    'Se manda también: ' + partes.join(' · ') + '.';
+  document.getElementById('tkMsg').className='tk-msg';
+  document.getElementById('tkSheet').classList.remove('hidden');
+  tkValidar();
+  try{ document.getElementById('tkTexto').focus(); }catch(e){}
+}
+
+function tkCerrar(){ document.getElementById('tkSheet').classList.add('hidden'); }
+
+function tkTipo(btn){
+  _TK_TIPO=btn.getAttribute('data-tipo');
+  var t=document.querySelectorAll('#tkTipos .tk-tipo');
+  for(var i=0;i<t.length;i++) t[i].classList.toggle('on', t[i]===btn);
+}
+
+/* El minimo de 5 es el MISMO que el CHECK de la base (`ticket_descripcion_ok`).
+   Si un dia cambia alla, cambia aca: dos minimos distintos dan un boton que
+   deja mandar algo que la base rechaza. */
+function tkValidar(){
+  var txt=(document.getElementById('tkTexto').value||'').trim();
+  document.getElementById('tkEnviar').disabled = txt.length<5;
+}
+
+async function tkEnviar(){
+  var btn=document.getElementById('tkEnviar');
+  var msg=document.getElementById('tkMsg');
+  var txt=(document.getElementById('tkTexto').value||'').trim();
+  btn.disabled=true; btn.textContent='Enviando…';
+  msg.className='tk-msg';
+  try{
+    var c=sbClient();
+    if(!c) throw new Error('no hay cliente de Supabase en esta pantalla');
+    var u=await c.auth.getUser();
+    var correo=((u&&u.data&&u.data.user&&u.data.user.email)||'').trim();
+    if(!correo) throw new Error('no hay sesión abierta. El ticket tiene que ir firmado.');
+
+    var ctx=tkDondeEstoy();
+    var fila={
+      descripcion:txt, tipo:_TK_TIPO,
+      build:ctx.build, doc_modificado:ctx.doc_modificado,
+      vista:ctx.vista, miga:ctx.miga, modulo:ctx.modulo, sobre:ctx.sobre,
+      agente:ctx.agente, standalone:ctx.standalone, viewport:ctx.viewport,
+      tz_offset_min:ctx.tz_offset_min, tz_nombre:ctx.tz_nombre,
+      creado_por:correo
+    };
+    /* `.select('id')` no es decoracion: sin el, un insert que la RLS rechaza
+       puede volver sin error y el reporte se pierde EN SILENCIO. Es la forma
+       exacta del bug de Devoluciones del 17-sep. Si no vuelve un id, fallo. */
+    var r=await c.from('ticket').insert(fila).select('id');
+    if(r.error) throw r.error;
+    if(!r.data || !r.data.length) throw new Error('la base no devolvió el ticket. No se guardó.');
+
+    msg.className='tk-msg ok';
+    msg.textContent='Listo. Quedó como T-'+String(r.data[0].id).padStart(4,'0')+
+                    '. Andrea lo va a ver en su cola.';
+    document.getElementById('tkTexto').value='';
+    btn.textContent='Enviar';
+    setTimeout(tkCerrar, 1800);
+  }catch(e){
+    /* El error se MUESTRA, entero. Un "no se pudo" sin el motivo obliga a
+       reportar el reportador. */
+    msg.className='tk-msg mal';
+    msg.textContent='No se guardó.\n'+((e&&(e.message||e.hint||e.details))||e||'motivo desconocido');
+    btn.textContent='Enviar';
+  }
+  tkValidar();
+}
 </script>
 </body>
 </html>
