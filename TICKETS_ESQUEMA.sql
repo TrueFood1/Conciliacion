@@ -2,10 +2,41 @@
 -- TICKETS · la ENTRADA de Daniel y la SALIDA de trabajo, en la misma tabla
 -- PROPUESTA. NO PEGAR. Andrea aprueba antes.
 --
--- ⚠️ REESCRITO ENTERO EL 17-sep-2026, por tercera vez en el dia. Las dos
---    versiones anteriores (10-sep y la de esta misma tarde) siguen vivas en
---    git. Este encabezado NO dice "aplicado" hasta DESPUES de pegar y de haber
+-- ⚠️ ESTA ES LA TERCERA VERSION. Hubo tres, y confundirlas es facil porque
+--    las tres se llaman igual. CUAL ES CUAL, por si alguien abre la que no es:
+--
+--      51e6bbf · 10-sep 13:41 · la PRIMERA. Sesion de diseño en seco, junto
+--                               con las excepciones de linea y el exportador.
+--                               NO tiene los 8 estados ni las dependencias.
+--      7d9698a · 17-sep 17:25 · la SEGUNDA. Primera reescritura con las
+--                               decisiones del 17-sep.
+--      aa3b3de · 17-sep 18:12 · LA BUENA hasta el 19-sep: el esquema entero
+--                               con el backlog adentro.
+--      (esta)  · 19-sep       · la misma, partida en transacciones y con §0.
+--
+--    COMO SE RECONOCE ESTA SIN MIRAR EL SHA: tiene `-- 0 · EL TERRENO` abajo
+--    de este encabezado, y cada seccion que escribe abre con `begin;`. Si el
+--    archivo que estas leyendo no tiene eso, es una version vieja.
+--
+--    Este encabezado NO dice "aplicado" hasta DESPUES de pegar y de haber
 --    mirado la verificacion del §10 — la regla del 16-sep.
+--
+-- ── COMO SE PEGA · UNA TRANSACCION POR SECCION ──────────────────────────
+--    Cada seccion que escribe va de `begin;` a `commit;` y lleva su select de
+--    control ADENTRO, antes del commit. O se ven esos valores, o no hubo
+--    cambio: si el control no sale, el `commit` no llego y la seccion entera
+--    se deshizo sola.
+--    ⚠️ ANTES ESTE ARCHIVO NO ABRIA NINGUNA TRANSACCION, a proposito, y se
+--       apoyaba en la verificacion del §10 despues de pegar todo. El problema
+--       de eso: si una seccion aplicaba a medias, se descubria en el §10 con
+--       las otras ya pegadas, y ahi no hay vuelta atras limpia. Ahora cada
+--       seccion es todo-o-nada. Cambiado el 19-sep.
+--    SON DIEZ las que escriben: §1 §2 §3 §4 §5 §6 §7 §8 §9 §12.
+--    §10 es solo lectura; §11 y §13 son texto y no se pegan.
+--    🔴 EL ORDEN NO ES SUGERENCIA: §2-§5 tienen FK a `ticket`, §6 lee las
+--       cinco tablas, §7 lee `v_ticket`, y el §8 le da grant a las vistas del
+--       §6 y §7. Pegar salteado hace fallar la transaccion — que es lo que
+--       tiene que pasar, pero avisa tarde.
 --
 -- ── LAS DOS MITADES, Y POR QUE SON LA MISMA TABLA ───────────────────────
 --   ENTRADA · Daniel encuentra algo y lo reporta desde la pantalla. Escribe
@@ -63,7 +94,36 @@
 --   Es la leccion del 17-sep con `ent_anulacion_ins`, que decia
 --   `with check (true)` mientras la pantalla decia "solo socias".
 --
+-- ── 🟢 ENSAYADO EN SECO EL 19-sep · CORRIO ENTERO, NO SE APLICO ─────────
+--    Las diez secciones se mandaron A LA BASE DE PRODUCCION, EN ORDEN, dentro
+--    de UNA transaccion que termino en `rollback`. Es el mismo mecanismo que
+--    `pg_pruebas.py` usa a diario. Despues del rollback: **0 tablas `ticket%`**.
+--    Esto prueba dos cosas que "estar escrito" no prueba: que el SQL PARSEA y
+--    CORRE, y que cada select de control devuelve lo que su ESPERADO dice.
+--    Lo medido, bloque por bloque:
+--      §1  tabla 1 · indices 4 · triggers 1 · rls t · sobrantes 0
+--      §2  tabla 1 · indices 3 · triggers 1 · rls t · sobrantes 0
+--      §3  tabla 1 · indices 2 · triggers 1 · rls t · sobrantes 0
+--      §4  tabla 1 · indices 2 · triggers 1 · rls t · sobrantes 0
+--      §5  tabla 1 · indices 3 · triggers 0 · rls t · sobrantes 0
+--      §6  vistas 7 · con_invoker 7 · sin_invoker 0
+--      §7  vistas 8 · con_invoker 8 · export 1
+--      §8  politicas 10 · tres_de_socias 3 · con_rls 5 · sobrantes 0 ·
+--          reportar_abierto 1 · insert_en_true_no_previstos 0
+--      §9  bucket_privado 1 · publico f · politicas 2 · segmento 12
+--      §12 tabla 1 · indices 3 · rls t · politicas 2 · vista 1 · sobrantes 0
+--
+--    🔴 Y EL ENSAYO SIRVIO PARA ALGO: el control del §8 estaba mal escrito.
+--    Pedia "cero politicas de INSERT en `true`" y la respuesta correcta es
+--    UNA —`ticket_ins`, a proposito—. Un control que da alarma sobre una
+--    decision tomada se apaga a la semana. Se partio en dos columnas: ver el
+--    §8. El archivo no estaba mal; el control si.
+--
+--    ⚠️ ENSAYADO NO ES APLICADO. En la base no hay una sola tabla de esto.
+--
 -- ── EL TERRENO, MEDIDO EL 17-sep (no citado) ────────────────────────────
+--   ⚠️ ESTO ES UNA FOTO VIEJA Y SE DEJA COMO REGISTRO. Para correr HOY estan
+--      las mismas mediciones convertidas en consultas, abajo, en el §0.
 --   · `index.html` sigue en CERO `.upload(` y CERO `createSignedUrl` en b61.
 --   · Los buckets `justificantes` y `aguinaldos` EXISTEN y son PRIVADOS.
 --   · Cero tablas `ticket*` en la base: esto nunca se pego.
@@ -72,11 +132,88 @@
 
 
 -- ════════════════════════════════════════════════════════════════════════
+-- 0 · EL TERRENO · SOLO LECTURA. Correr ENTERO antes de pegar nada.
+-- ════════════════════════════════════════════════════════════════════════
+-- Las cuatro mediciones del encabezado, convertidas en consultas. El
+-- encabezado trae los numeros del 17-sep COPIADOS; esto los vuelve a medir.
+-- Un "terreno" citado de hace dos dias no es una medicion: es una cita.
+--
+-- ⚠️ NO ESCRIBE NADA. Se puede correr mil veces.
+-- 🔴 SI 0a NO DA CERO, PARAR. Quiere decir que esto ya se pego alguna vez, y
+--    entonces las secciones de abajo no son "crear": son "modificar sobre algo
+--    que ya existe y que nadie miro". Es otro trabajo.
+--
+-- MEDIDO EL 19-sep-2026 al escribir este §0 — o sea que estos son los valores
+-- que tienen que salir hoy, salvo que algo haya cambiado en el medio:
+
+-- 0a · QUE HAY YA DE TICKETS. Es la unica que puede frenar todo.
+--      MEDIDO 19-sep: 0 · 0 · 0
+select
+  (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname='public' and c.relkind='r' and c.relname like 'ticket%')  as tablas_ticket,
+  (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname='public' and c.relkind='r' and c.relname='build_publicado') as build_publicado,
+  (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname='public' and c.relkind='v' and c.relname like 'v_ticket%') as vistas_ticket;
+
+-- 0b · LOS BUCKETS QUE YA EXISTEN, y si son privados. El §9 crea 'tickets';
+--      los otros dos son el precedente de que privado es lo normal acá.
+--      MEDIDO 19-sep: aguinaldos f · justificantes f · (no hay 'tickets')
+select id, public, file_size_limit
+  from storage.buckets
+ order by id;
+
+-- 0c · DE QUE DEPENDE ESTE ARCHIVO Y NO CREA. Si alguna da `f`, la seccion
+--      que la usa va a fallar — y es mejor saberlo antes que a mitad.
+--      `acceso_es_socia()` la usan las politicas de §8, §9 y §12; los guardias
+--      de §2, §3 y §4 leen `acceso_usuario` directo; el §9 usa foldername.
+--      MEDIDO 19-sep: t · t · t · 2 socias activas
+select to_regprocedure('public.acceso_es_socia()') is not null as existe_acceso_es_socia,
+       to_regclass('public.acceso_usuario')        is not null as existe_acceso_usuario,
+       to_regprocedure('storage.foldername(text)') is not null as existe_foldername,
+       (select count(*) from acceso_usuario
+         where perfil='socias' and activo)                     as socias_activas;
+
+-- 0d · 🔴 LA QUE NO ESTABA EN EL ENCABEZADO, Y ES LA QUE MAS IMPORTA.
+--      Los privilegios por defecto de `public`. Medido el 19-sep:
+--        anon=arwdDxtm · authenticated=arwdDxtm
+--      Esas ocho letras son TODO: a insert · r select · w update · d delete ·
+--      D truncate · x references · t trigger · m maintain. O sea que **toda
+--      tabla nueva nace abierta de par en par para `anon`**, y la RLS NO viene
+--      encendida.
+--      Por eso cada seccion que crea una tabla enciende la RLS y revoca ahi
+--      mismo, adentro de su transaccion, en vez de esperar al §8.
+--      ESPERADO: las ocho filas de siempre. Si aparecieran MENOS, alguien
+--      cambio los defaults y hay que releer el §8 antes de pegarlo.
+select unnest(defaclacl)::text as privilegio_por_defecto
+  from pg_default_acl d
+  join pg_namespace n on n.oid = d.defaclnamespace
+ where n.nspname='public' and d.defaclobjtype='r'
+ order by 1;
+
+-- 0e · EL LADO DEL REPO · esto NO es SQL. Son las dos mediciones del
+--      encabezado que viven en `index.html`, y se corren en la terminal:
+--
+--        grep -c '\.upload(' index.html          # esperado 0 en b61
+--        grep -c 'createSignedUrl' index.html    # esperado 0 en b61
+--        grep -n "const BUILD" index.html        # esperado: el sello vigente
+--
+--      Importan porque el §9 da por sentado que **hoy no hay una sola subida
+--      de archivos en toda la app**: si apareciera una, no es que este archivo
+--      este mal, es que el terreno cambio y hay que releer el §9 con eso a la
+--      vista.
+--      MEDIDO el 19-sep sobre la rama `tickets`: los valores quedan en la
+--      bitacora del dia, no acá — este archivo no es el lugar donde se guarda
+--      una medicion del repo.
+
+
+-- ════════════════════════════════════════════════════════════════════════
 -- 1 · EL TICKET · lo que se escribe una vez y no se toca mas
 -- ════════════════════════════════════════════════════════════════════════
 -- Append-only. El ticket no cambia NUNCA. Lo que cambia son sus eventos:
 -- estado (§2), triaje (§3), detalle (§4) y foto (§5). Cualquier cosa que
 -- alguien pueda querer corregir despues va en un evento, no acá.
+begin;
 create table if not exists ticket (
   id           bigint generated always as identity primary key,
 
@@ -174,6 +311,38 @@ drop trigger if exists ticket_firma_trg on ticket;
 create trigger ticket_firma_trg before insert on ticket
   for each row execute function ticket_firma_guard();
 
+-- ── EL CANDADO, ADENTRO DE LA MISMA TRANSACCION ─────────────────────
+-- 🔴 MEDIDO EL 19-sep, y por esto estas tres lineas estan ACA y no solo en
+--    el §8: los privilegios por defecto de `public` le dan a `anon` y a
+--    `authenticated` **arwdDxtm** —o sea TODO, insert/select/update/delete/
+--    truncate— sobre cualquier tabla nueva, y la RLS NO viene encendida.
+--    Con el arreglo solo en el §8, la tabla queda abierta a `anon` desde que
+--    se pega esta seccion hasta que se llegue al §8. Pegando por secciones,
+--    esa ventana dura lo que tarde la persona.
+--    Van tambien en el §8, que sigue siendo el lugar donde se lee el cuadro
+--    completo. Las dos veces son idempotentes: no se saco nada de su sitio.
+alter table ticket enable row level security;
+revoke all on ticket from anon;
+revoke update, delete, truncate on ticket from authenticated;
+
+-- ── EL CONTROL · ADENTRO Y ANTES DEL COMMIT ─────────────────────────
+-- O se ven estos valores, o esto no llego. "Success. No rows returned" no
+-- prueba nada: un tramo de puro comentario devuelve exactamente eso.
+-- ESPERADO: tabla 1 · indices 4 · triggers 1 · rls t · sobrantes 0
+select
+  (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname='public' and c.relkind='r' and c.relname='ticket')        as tabla,
+  (select count(*) from pg_indexes
+    where schemaname='public' and tablename='ticket')                          as indices,
+  (select count(*) from pg_trigger
+    where tgrelid = 'public.ticket'::regclass and not tgisinternal)            as triggers,
+  (select relrowsecurity from pg_class where oid = 'public.ticket'::regclass)  as rls,
+  (select count(*) from information_schema.role_table_grants
+    where table_schema='public' and table_name='ticket'
+      and grantee in ('anon','authenticated')
+      and privilege_type in ('UPDATE','DELETE','TRUNCATE'))                 as sobrantes;
+commit;
+
 
 -- ════════════════════════════════════════════════════════════════════════
 -- 2 · EL CICLO DE VIDA · eventos, no una columna
@@ -195,6 +364,7 @@ create trigger ticket_firma_trg before insert on ticket
 -- regla escrita adentro de la regla misma.
 -- Y de paso, el contador de "Sin triar" ES la cola de Andrea: lo que llego y
 -- nadie miro todavia.
+begin;
 create table if not exists ticket_estado (
   id          bigint generated always as identity primary key,
   ticket_id   bigint not null references ticket(id),
@@ -322,6 +492,38 @@ drop trigger if exists ticket_estado_guard_trg on ticket_estado;
 create trigger ticket_estado_guard_trg before insert on ticket_estado
   for each row execute function ticket_estado_guard();
 
+-- ── EL CANDADO, ADENTRO DE LA MISMA TRANSACCION ─────────────────────
+-- 🔴 MEDIDO EL 19-sep, y por esto estas tres lineas estan ACA y no solo en
+--    el §8: los privilegios por defecto de `public` le dan a `anon` y a
+--    `authenticated` **arwdDxtm** —o sea TODO, insert/select/update/delete/
+--    truncate— sobre cualquier tabla nueva, y la RLS NO viene encendida.
+--    Con el arreglo solo en el §8, la tabla queda abierta a `anon` desde que
+--    se pega esta seccion hasta que se llegue al §8. Pegando por secciones,
+--    esa ventana dura lo que tarde la persona.
+--    Van tambien en el §8, que sigue siendo el lugar donde se lee el cuadro
+--    completo. Las dos veces son idempotentes: no se saco nada de su sitio.
+alter table ticket_estado enable row level security;
+revoke all on ticket_estado from anon;
+revoke update, delete, truncate on ticket_estado from authenticated;
+
+-- ── EL CONTROL · ADENTRO Y ANTES DEL COMMIT ─────────────────────────
+-- O se ven estos valores, o esto no llego. "Success. No rows returned" no
+-- prueba nada: un tramo de puro comentario devuelve exactamente eso.
+-- ESPERADO: tabla 1 · indices 3 · triggers 1 · rls t · sobrantes 0
+select
+  (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname='public' and c.relkind='r' and c.relname='ticket_estado')        as tabla,
+  (select count(*) from pg_indexes
+    where schemaname='public' and tablename='ticket_estado')                          as indices,
+  (select count(*) from pg_trigger
+    where tgrelid = 'public.ticket_estado'::regclass and not tgisinternal)            as triggers,
+  (select relrowsecurity from pg_class where oid = 'public.ticket_estado'::regclass)  as rls,
+  (select count(*) from information_schema.role_table_grants
+    where table_schema='public' and table_name='ticket_estado'
+      and grantee in ('anon','authenticated')
+      and privilege_type in ('UPDATE','DELETE','TRUNCATE'))                 as sobrantes;
+commit;
+
 
 -- ════════════════════════════════════════════════════════════════════════
 -- 3 · EL TRIAJE · lo que Andrea decide cuando lo mira
@@ -334,6 +536,7 @@ create trigger ticket_estado_guard_trg before insert on ticket_estado
 --      dejaria de ser append-only.
 -- Van las cuatro decisiones juntas porque se toman en el mismo momento: Andrea
 -- abre el ticket, lo entiende, y decide las cuatro de una sentada.
+begin;
 create table if not exists ticket_marca (
   id               bigint generated always as identity primary key,
   ticket_id        bigint not null references ticket(id),
@@ -411,6 +614,38 @@ drop trigger if exists ticket_marca_guard_trg on ticket_marca;
 create trigger ticket_marca_guard_trg before insert on ticket_marca
   for each row execute function ticket_marca_guard();
 
+-- ── EL CANDADO, ADENTRO DE LA MISMA TRANSACCION ─────────────────────
+-- 🔴 MEDIDO EL 19-sep, y por esto estas tres lineas estan ACA y no solo en
+--    el §8: los privilegios por defecto de `public` le dan a `anon` y a
+--    `authenticated` **arwdDxtm** —o sea TODO, insert/select/update/delete/
+--    truncate— sobre cualquier tabla nueva, y la RLS NO viene encendida.
+--    Con el arreglo solo en el §8, la tabla queda abierta a `anon` desde que
+--    se pega esta seccion hasta que se llegue al §8. Pegando por secciones,
+--    esa ventana dura lo que tarde la persona.
+--    Van tambien en el §8, que sigue siendo el lugar donde se lee el cuadro
+--    completo. Las dos veces son idempotentes: no se saco nada de su sitio.
+alter table ticket_marca enable row level security;
+revoke all on ticket_marca from anon;
+revoke update, delete, truncate on ticket_marca from authenticated;
+
+-- ── EL CONTROL · ADENTRO Y ANTES DEL COMMIT ─────────────────────────
+-- O se ven estos valores, o esto no llego. "Success. No rows returned" no
+-- prueba nada: un tramo de puro comentario devuelve exactamente eso.
+-- ESPERADO: tabla 1 · indices 2 · triggers 1 · rls t · sobrantes 0
+select
+  (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname='public' and c.relkind='r' and c.relname='ticket_marca')        as tabla,
+  (select count(*) from pg_indexes
+    where schemaname='public' and tablename='ticket_marca')                          as indices,
+  (select count(*) from pg_trigger
+    where tgrelid = 'public.ticket_marca'::regclass and not tgisinternal)            as triggers,
+  (select relrowsecurity from pg_class where oid = 'public.ticket_marca'::regclass)  as rls,
+  (select count(*) from information_schema.role_table_grants
+    where table_schema='public' and table_name='ticket_marca'
+      and grantee in ('anon','authenticated')
+      and privilege_type in ('UPDATE','DELETE','TRUNCATE'))                 as sobrantes;
+commit;
+
 
 -- ════════════════════════════════════════════════════════════════════════
 -- 4 · LA ESTRUCTURA · qué se espera, criterio de terminado, cierres, anuncios
@@ -430,6 +665,7 @@ create trigger ticket_marca_guard_trg before insert on ticket_marca
 -- esta listo, y por eso se discute AL FINAL, que es el peor momento: el
 -- trabajo ya se hizo y discutir el criterio se siente como mover el arco.
 -- Escrito antes, "En validación" deja de ser una opinion.
+begin;
 create table if not exists ticket_detalle (
   id          bigint generated always as identity primary key,
   ticket_id   bigint not null references ticket(id),
@@ -501,6 +737,38 @@ drop trigger if exists ticket_detalle_guard_trg on ticket_detalle;
 create trigger ticket_detalle_guard_trg before insert on ticket_detalle
   for each row execute function ticket_detalle_guard();
 
+-- ── EL CANDADO, ADENTRO DE LA MISMA TRANSACCION ─────────────────────
+-- 🔴 MEDIDO EL 19-sep, y por esto estas tres lineas estan ACA y no solo en
+--    el §8: los privilegios por defecto de `public` le dan a `anon` y a
+--    `authenticated` **arwdDxtm** —o sea TODO, insert/select/update/delete/
+--    truncate— sobre cualquier tabla nueva, y la RLS NO viene encendida.
+--    Con el arreglo solo en el §8, la tabla queda abierta a `anon` desde que
+--    se pega esta seccion hasta que se llegue al §8. Pegando por secciones,
+--    esa ventana dura lo que tarde la persona.
+--    Van tambien en el §8, que sigue siendo el lugar donde se lee el cuadro
+--    completo. Las dos veces son idempotentes: no se saco nada de su sitio.
+alter table ticket_detalle enable row level security;
+revoke all on ticket_detalle from anon;
+revoke update, delete, truncate on ticket_detalle from authenticated;
+
+-- ── EL CONTROL · ADENTRO Y ANTES DEL COMMIT ─────────────────────────
+-- O se ven estos valores, o esto no llego. "Success. No rows returned" no
+-- prueba nada: un tramo de puro comentario devuelve exactamente eso.
+-- ESPERADO: tabla 1 · indices 2 · triggers 1 · rls t · sobrantes 0
+select
+  (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname='public' and c.relkind='r' and c.relname='ticket_detalle')        as tabla,
+  (select count(*) from pg_indexes
+    where schemaname='public' and tablename='ticket_detalle')                          as indices,
+  (select count(*) from pg_trigger
+    where tgrelid = 'public.ticket_detalle'::regclass and not tgisinternal)            as triggers,
+  (select relrowsecurity from pg_class where oid = 'public.ticket_detalle'::regclass)  as rls,
+  (select count(*) from information_schema.role_table_grants
+    where table_schema='public' and table_name='ticket_detalle'
+      and grantee in ('anon','authenticated')
+      and privilege_type in ('UPDATE','DELETE','TRUNCATE'))                 as sobrantes;
+commit;
+
 
 -- ════════════════════════════════════════════════════════════════════════
 -- 5 · LA FOTO · una fila por INTENTO, no una fila por archivo
@@ -520,6 +788,7 @@ create trigger ticket_detalle_guard_trg before insert on ticket_detalle
 -- subir, mientras la red todavia funciona —lo sabemos porque el ticket acaba
 -- de entrar—. Si se escribiera despues, registrar el fallo necesitaria red
 -- para registrar que no habia red.
+begin;
 create table if not exists ticket_foto (
   id          bigint generated always as identity primary key,
   ticket_id   bigint not null references ticket(id),
@@ -544,6 +813,41 @@ create index if not exists ticket_foto_idx on ticket_foto (ticket_id, creado_en)
 create unique index if not exists ticket_foto_ruta_uq
   on ticket_foto (ruta) where ruta is not null;
 
+-- ── EL CANDADO, ADENTRO DE LA MISMA TRANSACCION ─────────────────────
+-- 🔴 MEDIDO EL 19-sep, y por esto estas tres lineas estan ACA y no solo en
+--    el §8: los privilegios por defecto de `public` le dan a `anon` y a
+--    `authenticated` **arwdDxtm** —o sea TODO, insert/select/update/delete/
+--    truncate— sobre cualquier tabla nueva, y la RLS NO viene encendida.
+--    Con el arreglo solo en el §8, la tabla queda abierta a `anon` desde que
+--    se pega esta seccion hasta que se llegue al §8. Pegando por secciones,
+--    esa ventana dura lo que tarde la persona.
+--    Van tambien en el §8, que sigue siendo el lugar donde se lee el cuadro
+--    completo. Las dos veces son idempotentes: no se saco nada de su sitio.
+alter table ticket_foto enable row level security;
+revoke all on ticket_foto from anon;
+revoke update, delete, truncate on ticket_foto from authenticated;
+
+-- ── EL CONTROL · ADENTRO Y ANTES DEL COMMIT ─────────────────────────
+-- O se ven estos valores, o esto no llego. "Success. No rows returned" no
+-- prueba nada: un tramo de puro comentario devuelve exactamente eso.
+-- ESPERADO: tabla 1 · indices 3 · triggers 0 · rls t · sobrantes 0
+select
+  (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname='public' and c.relkind='r' and c.relname='ticket_foto')        as tabla,
+  (select count(*) from pg_indexes
+    where schemaname='public' and tablename='ticket_foto')                          as indices,
+  (select count(*) from pg_trigger
+    where tgrelid = 'public.ticket_foto'::regclass and not tgisinternal)            as triggers,
+  (select relrowsecurity from pg_class where oid = 'public.ticket_foto'::regclass)  as rls,
+  (select count(*) from information_schema.role_table_grants
+    where table_schema='public' and table_name='ticket_foto'
+      and grantee in ('anon','authenticated')
+      and privilege_type in ('UPDATE','DELETE','TRUNCATE'))                 as sobrantes;
+
+-- ⚠️ triggers 0 NO es un olvido: `ticket_foto` no lleva guardia. Las otras
+--    cuatro si. Si alguna vez sale 1 acá, alguien agrego algo sin decirlo.
+commit;
+
 
 -- ════════════════════════════════════════════════════════════════════════
 -- 6 · LAS VISTAS
@@ -551,6 +855,7 @@ create unique index if not exists ticket_foto_ruta_uq
 -- security_invoker en TODAS: es la regla del modulo desde la fuga del 24-ago,
 -- cuando `v_acceso_usuario` le devolvia cinco correos a la anon key.
 
+begin;
 create or replace view v_ticket_foto with (security_invoker = true) as
   select f.ticket_id,
          case
@@ -692,6 +997,23 @@ create or replace view v_ticket_bloqueos with (security_invoker = true) as
     left join v_ticket b on b.id = v.bloquea_ticket_id
    where v.estado = 'bloqueado';
 
+-- ── EL CONTROL · ADENTRO Y ANTES DEL COMMIT ─────────────────────────
+-- ESPERADO: vistas 7 · con_invoker 7 · sin_invoker 0
+-- Una sola vista sin `security_invoker` es la fuga del 24-ago otra vez, y por
+-- eso se cuentan las dos columnas: "7 vistas" solo no distingue 7 buenas de
+-- 6 buenas y una abierta.
+select count(*) as vistas,
+       count(*) filter (where (select option_value
+                                 from pg_options_to_table(c.reloptions)
+                                where option_name='security_invoker') = 'true') as con_invoker,
+       count(*) filter (where (select option_value
+                                 from pg_options_to_table(c.reloptions)
+                                where option_name='security_invoker') is distinct from 'true')
+                                                                                as sin_invoker
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname='public' and c.relkind='v' and c.relname like 'v_ticket%';
+commit;
+
 
 -- ════════════════════════════════════════════════════════════════════════
 -- 7 · LA SALIDA AL REPO · un archivo por ticket
@@ -708,6 +1030,7 @@ create or replace view v_ticket_bloqueos with (security_invoker = true) as
 -- POR QUE UNA VISTA Y NO UN CAMPO: el contenido se DERIVA del ticket y sus
 -- eventos. Guardarlo seria una copia que se desincroniza al primer cierre
 -- nuevo, y despues nadie sabe cual de las dos manda.
+begin;
 create or replace view v_ticket_export with (security_invoker = true) as
   select t.id,
          'tickets/T-' || lpad(t.id::text, 4, '0') || '.md'          as archivo,
@@ -798,10 +1121,25 @@ create or replace view v_ticket_export with (security_invoker = true) as
          )                                                          as contenido
     from v_ticket t;
 
+-- ── EL CONTROL · ADENTRO Y ANTES DEL COMMIT ─────────────────────────
+-- ESPERADO: vistas 8 · con_invoker 8 · export 1
+-- Son 8 y no 1 a proposito: `v_ticket_export` LEE de `v_ticket`, asi que si
+-- el §6 no estaba, esta transaccion ya habria fallado. El 8 lo confirma.
+select (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relkind='v' and c.relname like 'v_ticket%') as vistas,
+       (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relkind='v' and c.relname like 'v_ticket%'
+           and (select option_value from pg_options_to_table(c.reloptions)
+                 where option_name='security_invoker') = 'true')                    as con_invoker,
+       (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+         where n.nspname='public' and c.relname='v_ticket_export')                  as export;
+commit;
+
 
 -- ════════════════════════════════════════════════════════════════════════
 -- 8 · RLS · acá es donde las garantias son garantias
 -- ════════════════════════════════════════════════════════════════════════
+begin;
 alter table ticket         enable row level security;
 alter table ticket_estado  enable row level security;
 alter table ticket_marca   enable row level security;
@@ -898,6 +1236,48 @@ grant select on v_ticket, v_ticket_foto, v_ticket_desbloqueo, v_ticket_disponibl
                 v_ticket_para_andrea, v_ticket_conteo, v_ticket_bloqueos,
                 v_ticket_export to authenticated;
 
+-- ── EL CONTROL · ADENTRO Y ANTES DEL COMMIT ─────────────────────────
+-- ESPERADO: politicas 10 · tres_de_socias 3 · con_rls 5 · sobrantes 0 ·
+--           reportar_abierto 1 · insert_en_true_no_previstos 0
+--
+-- ⚠️ LAS DOS ULTIMAS COLUMNAS SON LA MISMA PREGUNTA PARTIDA EN DOS, Y HAY QUE
+--    LEERLAS JUNTAS. Medido el 19-sep en el ensayo en seco: contar "politicas
+--    de INSERT en `true`" a secas da **1**, y ese 1 es legitimo —`ticket_ins`
+--    esta en `true` A PROPOSITO, porque reportar es de todos y la firma la ata
+--    el trigger del §1—. Pero un contador que dice 1 no distingue esa decision
+--    del agujero de `ent_anulacion_ins`, que era exactamente un INSERT en
+--    `true`. Un numero que no distingue la decision del agujero no sirve de
+--    alarma.
+--    Por eso: `reportar_abierto` AFIRMA que la decision sigue en pie (si
+--    alguien la "arregla" a `acceso_es_socia()`, Daniel deja de poder reportar
+--    y esto lo cuenta), y `insert_en_true_no_previstos` es la alarma de
+--    verdad: cualquier OTRA politica de INSERT en `true`.
+--    Las de SELECT no se cuentan: las cinco dicen `using (true)` porque todo
+--    el equipo ve todos los tickets, decision ratificada el 17-sep.
+select
+  (select count(*) from pg_policies
+    where schemaname='public' and tablename like 'ticket%')                  as politicas,
+  (select count(*) from pg_policies
+    where schemaname='public'
+      and policyname in ('ticket_estado_ins','ticket_marca_ins','ticket_detalle_ins')
+      and with_check = 'acceso_es_socia()')                                  as tres_de_socias,
+  (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='public' and c.relrowsecurity
+      and c.relname in ('ticket','ticket_estado','ticket_marca',
+                        'ticket_detalle','ticket_foto'))                     as con_rls,
+  (select count(*) from information_schema.role_table_grants
+    where table_schema='public' and table_name like 'ticket%'
+      and grantee in ('anon','authenticated')
+      and privilege_type in ('UPDATE','DELETE','TRUNCATE'))                  as sobrantes,
+  (select count(*) from pg_policies
+    where schemaname='public' and policyname='ticket_ins'
+      and cmd='INSERT' and with_check = 'true')                              as reportar_abierto,
+  (select count(*) from pg_policies
+    where schemaname='public' and tablename like 'ticket%'
+      and cmd='INSERT' and with_check = 'true'
+      and policyname <> 'ticket_ins')                       as insert_en_true_no_previstos;
+commit;
+
 
 -- ════════════════════════════════════════════════════════════════════════
 -- 9 · EL BUCKET · privado, y la parte que hay que mirar dos veces
@@ -921,6 +1301,7 @@ grant select on v_ticket, v_ticket_foto, v_ticket_desbloqueo, v_ticket_disponibl
 --    medicion en el iPad. Por eso HEIC se queda permitido: si la conversion
 --    falla, se sube el original y se guarda el mime real, en vez de perder la
 --    foto por una suposicion.
+begin;
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'tickets', 'tickets',
@@ -978,6 +1359,20 @@ create policy tickets_sel on storage.objects
   for select to authenticated
   using (bucket_id = 'tickets'
          and (acceso_es_socia() or ticket_es_mio(name)));
+
+-- ── EL CONTROL · ADENTRO Y ANTES DEL COMMIT ─────────────────────────
+-- ESPERADO: bucket_privado 1 · politicas 2 · segmento 12 · publico f
+-- `segmento` es la trampa escrita arriba: si la politica mirara el segmento
+-- equivocado no daria error, daria una politica que no protege EN SILENCIO.
+-- Acá se ejercita la funcion de verdad, no se lee el catalogo.
+select
+  (select count(*) from storage.buckets
+    where id='tickets' and public = false)                    as bucket_privado,
+  (select public from storage.buckets where id='tickets')     as publico,
+  (select count(*) from pg_policies
+    where tablename='objects' and policyname like 'tickets%') as politicas,
+  ticket_de_ruta('12/ab.png')                                 as segmento;
+commit;
 
 -- Sin update ni delete: append-only. Una foto que no sirve se reemplaza
 -- subiendo otra, no borrando la primera.
@@ -1121,6 +1516,7 @@ select ticket_de_ruta('12/ab.png') as debe_dar_12;
 --    primer build publicado después fue b62". Eso es una PISTA, y la pantalla
 --    tiene que decirlo con esas palabras — nunca en el mismo renglon ni con la
 --    misma tipografia que el dato registrado.
+begin;
 create table if not exists build_publicado (
   id           bigint generated always as identity primary key,
   sello        text        not null,   -- la constante BUILD: 'v 17 sep 2026 · b61'
@@ -1199,6 +1595,25 @@ create or replace view v_ticket_historial with (security_invoker = true) as
    order by ticket_id, orden, cuando;
 
 grant select on v_ticket_historial to authenticated;
+
+-- ── EL CONTROL · ADENTRO Y ANTES DEL COMMIT ─────────────────────────
+-- ESPERADO: tabla 1 · indices 3 · rls t · politicas 2 · vista 1 · sobrantes 0
+select
+  (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='public' and c.relkind='r' and c.relname='build_publicado')   as tabla,
+  (select count(*) from pg_indexes
+    where schemaname='public' and tablename='build_publicado')                    as indices,
+  (select relrowsecurity from pg_class
+    where oid='public.build_publicado'::regclass)                                 as rls,
+  (select count(*) from pg_policies
+    where schemaname='public' and tablename='build_publicado')                    as politicas,
+  (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='public' and c.relname='v_ticket_historial')                  as vista,
+  (select count(*) from information_schema.role_table_grants
+    where table_schema='public' and table_name='build_publicado'
+      and grantee in ('anon','authenticated')
+      and privilege_type in ('UPDATE','DELETE','TRUNCATE'))                       as sobrantes;
+commit;
 
 -- ── LA PANTALLA ─────────────────────────────────────────────────────────
 -- El estandar de tarjetas que se limpio estos dias: titulo, datos, y nada de
