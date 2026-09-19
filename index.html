@@ -1588,6 +1588,50 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    lista vacia. Son dos cosas distintas y la pantalla tiene que decir cual. */
 .tkl-roto{font-size:13px;color:#ffb4b4;background:#3a1b1b;border-radius:9px;
   padding:11px 12px;white-space:pre-wrap;margin-bottom:12px}
+
+/* ── REVISAR · el formulario de la socia ──────────────────────────────
+   En pantalla se llama REVISAR. En la base sigue siendo `ticket_marca` y el
+   estado `sin_triar` — ver el comentario de `tkContar()`. */
+.tkl-rev{margin-top:9px;background:var(--field);border:1px solid var(--border-strong);
+  border-radius:8px;color:var(--text);font:inherit;font-size:12px;padding:6px 11px;cursor:pointer}
+#tkRev{position:fixed;inset:0;z-index:160;background:var(--scrim);
+  display:flex;align-items:flex-end;justify-content:center}
+#tkRev.hidden{display:none}
+@media(min-width:700px){ #tkRev{align-items:center} }
+.tkr-in{width:100%;max-width:560px;background:var(--surface);
+  border-radius:16px 16px 0 0;border-top:.5px solid var(--border-strong);
+  padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+  max-height:92vh;overflow-y:auto;overscroll-behavior:contain}
+@media(min-width:700px){ .tkr-in{border-radius:16px;border:1px solid var(--border-strong)} }
+.tkr-q{font-size:13px;color:var(--text-2);margin:14px 0 6px}
+.tkr-op{display:flex;gap:8px;flex-wrap:wrap}
+.tkr-b{background:var(--field);border:1px solid var(--border);border-radius:9px;
+  color:var(--text);font:inherit;font-size:13px;padding:9px 13px;cursor:pointer}
+.tkr-b.on{border-color:var(--mod,#C964CF);font-weight:600}
+.tkr-t{width:100%;box-sizing:border-box;background:var(--field);
+  border:1px solid var(--border-strong);border-radius:9px;color:var(--text);
+  font:inherit;font-size:16px;padding:10px 12px;min-height:66px;resize:vertical}
+/* La conclusion es DERIVADA de las dos primeras respuestas y se muestra en
+   vivo. No se guarda: `agente_puede` es una columna calculada de la vista.
+   Guardar una conclusion al lado de sus premisas es pedir que algun dia se
+   contradigan. */
+.tkr-deriv{font-size:12px;margin-top:8px;padding:9px 11px;border-radius:9px;
+  background:var(--field);color:var(--text-2)}
+.tkr-cuenta{font-size:11px;color:var(--text-3);margin-top:5px}
+.tkr-cuenta.falta{color:#ffb4b4}
+.tkr-msg{font-size:13px;margin-top:12px;padding:10px;border-radius:9px;display:none;white-space:pre-wrap}
+.tkr-msg.ok{display:block;background:#12301c;color:#8ede9f}
+.tkr-msg.mal{display:block;background:#3a1b1b;color:#ffb4b4}
+/* 🔴 EL AVISO DE MITAD DE CAMINO. Son DOS inserts en DOS tablas y PostgREST
+   no da transaccion: si la marca entra y el estado no, el ticket queda
+   revisado a medias. No se puede evitar desde el navegador, pero SI se puede
+   decir con exactitud cual de las dos entro — que es la diferencia entre un
+   dato raro y un misterio. */
+.tkr-msg.medio{display:block;background:#3a2d12;color:#ffd48a}
+.tkr-guardar{width:100%;margin-top:16px;background:var(--field);
+  border:1px solid var(--border-strong);border-radius:9px;color:var(--text);
+  font:inherit;font-size:15px;font-weight:600;padding:13px;cursor:pointer}
+.tkr-guardar[disabled]{opacity:.45;cursor:default}
 </style>
 </head>
 <body>
@@ -2332,6 +2376,67 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <div id="vTickets" class="hidden">
   <div id="tklRoto" class="tkl-roto" style="display:none"></div>
   <div id="tklCuerpo"><div class="tkl-vacio">Cargando tickets…</div></div>
+</div>
+
+
+<!-- REVISAR · solo socias. El esquema lo llama triaje; la pantalla, revisar. -->
+<div id="tkRev" class="hidden" onclick="if(event.target===this) tkRevCerrar()">
+  <div class="tkr-in">
+    <div class="tk-top">
+      <div class="tk-t" id="tkRevT">Revisar</div>
+      <button class="tk-x" onclick="tkRevCerrar()" aria-label="Cerrar">×</button>
+    </div>
+    <div class="tk-sub" id="tkRevQue"></div>
+
+    <div class="tkr-q">¿El arreglo toca números? <span style="color:var(--text-3)">(un cálculo, un saldo, un costo)</span></div>
+    <div class="tkr-op" id="tkrNum">
+      <button type="button" class="tkr-b" data-v="1" onclick="tkRevOp(this,'num')">Sí</button>
+      <button type="button" class="tkr-b" data-v="0" onclick="tkRevOp(this,'num')">No</button>
+    </div>
+
+    <div class="tkr-q">¿Escribe en la base? <span style="color:var(--text-3)">(Supabase u Odoo)</span></div>
+    <div class="tkr-op" id="tkrEsc">
+      <button type="button" class="tkr-b" data-v="1" onclick="tkRevOp(this,'esc')">Sí</button>
+      <button type="button" class="tkr-b" data-v="0" onclick="tkRevOp(this,'esc')">No</button>
+    </div>
+    <div class="tkr-deriv" id="tkrDeriv">Contestá las dos de arriba y acá aparece qué significan.</div>
+
+    <div class="tkr-q">Prioridad</div>
+    <div class="tkr-op" id="tkrPri">
+      <button type="button" class="tkr-b" data-v="alta" onclick="tkRevOp(this,'pri')">Alta</button>
+      <button type="button" class="tkr-b" data-v="media" onclick="tkRevOp(this,'pri')">Media</button>
+      <button type="button" class="tkr-b" data-v="baja" onclick="tkRevOp(this,'pri')">Baja</button>
+    </div>
+
+    <div class="tkr-q">¿Frena una entrega?</div>
+    <div class="tkr-op" id="tkrEnt">
+      <button type="button" class="tkr-b" data-v="1" onclick="tkRevOp(this,'ent')">Sí</button>
+      <button type="button" class="tkr-b on" data-v="0" onclick="tkRevOp(this,'ent')">No</button>
+    </div>
+
+    <div class="tkr-q">¿Por qué? <span style="color:var(--text-3)">(queda escrito en el ticket)</span></div>
+    <textarea id="tkrRazon" class="tkr-t" oninput="tkRevValidar()"
+      placeholder="Una línea alcanza. Sin esto, revisar es mover una ficha."></textarea>
+    <div class="tkr-cuenta" id="tkrRazonN"></div>
+
+    <div class="tkr-q">¿Y ahora dónde queda?</div>
+    <div class="tkr-op" id="tkrEst">
+      <button type="button" class="tkr-b" data-v="disponible" onclick="tkRevOp(this,'est')">Disponible</button>
+      <button type="button" class="tkr-b" data-v="bloqueado" onclick="tkRevOp(this,'est')">Bloqueado</button>
+      <button type="button" class="tkr-b" data-v="pospuesto" onclick="tkRevOp(this,'est')">Pospuesto</button>
+      <button type="button" class="tkr-b" data-v="descartado" onclick="tkRevOp(this,'est')">Descartado</button>
+      <button type="button" class="tkr-b" data-v="cerrado" onclick="tkRevOp(this,'est')">Cerrado</button>
+    </div>
+
+    <div id="tkrExtra" style="display:none">
+      <div class="tkr-q" id="tkrExtraQ"></div>
+      <textarea id="tkrNota" class="tkr-t" oninput="tkRevValidar()"></textarea>
+      <div class="tkr-cuenta" id="tkrNotaN"></div>
+    </div>
+
+    <button class="tkr-guardar" id="tkrGuardar" disabled onclick="tkRevGuardar()">Guardar</button>
+    <div class="tkr-msg" id="tkrMsg"></div>
+  </div>
 </div>
 
 <div id="vCobros" class="hidden">
@@ -20342,6 +20447,14 @@ function _tkMotivo(err){
   if(!partes.length && err.status) partes.push('HTTP '+err.status);
   return partes.length ? partes.join(' · ') : 'la base rechazó la consulta y no dijo por qué';
 }
+/* ⚠️ LA PALABRA DE PANTALLA NO ES LA DE LA BASE, Y ES A PROPOSITO.
+   En pantalla se dice REVISAR / SIN REVISAR. En la base el estado se sigue
+   llamando 'sin_triar' y la tabla `ticket_marca` no cambia: cambiar el
+   esquema por una palabra de pantalla es otro pegado y no lo vale.
+   Decision de Andrea, 19-sep: "triar" no se entiende — si a ella no le
+   suena, a Daniel menos.
+   La traduccion vive en UN solo lugar, `TK_ESTADOS`, para que no haya dos
+   listas de nombres que se puedan separar. */
 async function tkContar(){
   var e=document.getElementById('tkLobbyEstado'); if(!e) return;
   e.className='tk-chip-e cargando'; e.textContent='contando…';
@@ -20352,9 +20465,9 @@ async function tkContar(){
     if(r.error) throw r.error;
     var n=r.count;
     if(n===null||n===undefined) throw new Error('la base no devolvió el conteo');
-    if(n===0){ e.className='tk-chip-e vacio'; e.textContent='nada sin triar'; }
+    if(n===0){ e.className='tk-chip-e vacio'; e.textContent='nada sin revisar'; }
     else{ e.className='tk-chip-e dato';
-          e.textContent=n+(n===1?' sin triar':' sin triar'); }
+          e.textContent=n+' sin revisar'; }
   }catch(err){
     e.className='tk-chip-e roto';
     e.textContent='no se pudo contar';
@@ -20368,7 +20481,157 @@ function irATickets(){
   tkListar();
 }
 
-var TK_ESTADOS={sin_triar:'Sin triar',disponible:'Disponible',bloqueado:'Bloqueado',
+/* ══════════════════════════════════════════════════════════════════════
+   REVISAR · el formulario de la socia (b62, 19-sep)
+   En pantalla: REVISAR. En la base: `ticket_marca` + `ticket_estado`, y el
+   estado sigue llamandose 'sin_triar'. La palabra cambio, el esquema no.
+
+   🔴 LOS MINIMOS SON LOS DE LA BASE, COPIADOS A MANO Y ROTULADOS:
+     razon  >= 12  → `ticket_marca_razon_ok`
+     espera >= 8   → `ticket_estado_bloqueo_ok`
+     nota   >= 20  → `ticket_estado_nota_ok`  (en_validacion/descartado/pospuesto)
+   Si alguno cambia en el SQL, cambia aca. Dos minimos distintos dan un boton
+   que deja mandar algo que la base rechaza — y el usuario se come un error
+   que la pantalla podria haberle evitado.
+   ══════════════════════════════════════════════════════════════════════ */
+var TKR={id:null, num:null, esc:null, pri:null, ent:0, est:null};
+var _TK_FILAS={};
+
+function tkRevAbrir(id){
+  var f=_TK_FILAS[id]||{};
+  var texto=String(f.descripcion||'').slice(0,90);
+  TKR={id:id, num:null, esc:null, pri:null, ent:0, est:null};
+  document.getElementById('tkRevT').textContent='Revisar T-'+String(id).padStart(4,'0');
+  document.getElementById('tkRevQue').textContent=texto||'';
+  ['tkrNum','tkrEsc','tkrPri','tkrEst'].forEach(function(g){
+    var b=document.querySelectorAll('#'+g+' .tkr-b');
+    for(var i=0;i<b.length;i++) b[i].classList.remove('on');
+  });
+  var ent=document.querySelectorAll('#tkrEnt .tkr-b');
+  for(var i=0;i<ent.length;i++) ent[i].classList.toggle('on', ent[i].getAttribute('data-v')==='0');
+  document.getElementById('tkrRazon').value='';
+  document.getElementById('tkrNota').value='';
+  document.getElementById('tkrMsg').className='tkr-msg';
+  document.getElementById('tkrGuardar').textContent='Guardar';
+  document.getElementById('tkRev').classList.remove('hidden');
+  tkRevPintarDeriv(); tkRevValidar();
+}
+function tkRevCerrar(){ document.getElementById('tkRev').classList.add('hidden'); }
+
+function tkRevOp(btn, campo){
+  var grupo=btn.parentNode, b=grupo.querySelectorAll('.tkr-b');
+  for(var i=0;i<b.length;i++) b[i].classList.toggle('on', b[i]===btn);
+  var v=btn.getAttribute('data-v');
+  TKR[campo] = (campo==='pri'||campo==='est') ? v : (v==='1'?1:0);
+  if(campo==='num'||campo==='esc') tkRevPintarDeriv();
+  if(campo==='est') tkRevExtra();
+  tkRevValidar();
+}
+
+/* La conclusion se MUESTRA y no se guarda: en la base `agente_puede` es una
+   columna derivada de la vista. Que la socia la vea mientras decide es lo que
+   hace que las dos preguntas tengan sentido — si no, son dos casillas sueltas. */
+function tkRevPintarDeriv(){
+  var d=document.getElementById('tkrDeriv');
+  if(TKR.num===null||TKR.esc===null){
+    d.textContent='Contestá las dos de arriba y acá aparece qué significan.'; return;
+  }
+  d.textContent = (!TKR.num && !TKR.esc)
+    ? '➡️ Un agente puede tomarlo.'
+    : '➡️ Un agente NO lo toma. Lo hace una persona.';
+}
+
+/* Los dos casos en que la base pide algo MAS, con su minimo y su porque. */
+function tkRevExtra(){
+  var caja=document.getElementById('tkrExtra'), q=document.getElementById('tkrExtraQ');
+  if(TKR.est==='bloqueado'){
+    caja.style.display=''; q.innerHTML='¿Qué está esperando? <span style="color:var(--text-3)">(mínimo 8 caracteres)</span>';
+    document.getElementById('tkrNota').placeholder='Qué tiene que pasar para destrabarlo.';
+  }else if(TKR.est==='pospuesto'||TKR.est==='descartado'){
+    caja.style.display=''; q.innerHTML='¿Por qué '+(TKR.est==='pospuesto'?'se pospone':'se descarta')+
+      '? <span style="color:var(--text-3)">(mínimo 20 caracteres)</span>';
+    document.getElementById('tkrNota').placeholder='Dentro de seis meses nadie se va a acordar. Escribilo.';
+  }else{ caja.style.display='none'; }
+}
+
+function _tkrLargo(el, min, cont){
+  var n=(el.value||'').trim().length;
+  var c=document.getElementById(cont);
+  if(!min){ c.textContent=''; return true; }
+  var ok=n>=min;
+  c.className='tkr-cuenta'+(ok?'':' falta');
+  c.textContent = ok ? (n+' caracteres') : ('faltan '+(min-n)+' — la base pide '+min);
+  return ok;
+}
+
+function tkRevValidar(){
+  var okRazon=_tkrLargo(document.getElementById('tkrRazon'),12,'tkrRazonN');
+  var minNota = TKR.est==='bloqueado' ? 8 : ((TKR.est==='pospuesto'||TKR.est==='descartado') ? 20 : 0);
+  var okNota=_tkrLargo(document.getElementById('tkrNota'),minNota,'tkrNotaN');
+  var listo = TKR.num!==null && TKR.esc!==null && TKR.pri && TKR.est && okRazon && okNota;
+  document.getElementById('tkrGuardar').disabled=!listo;
+}
+
+async function tkRevGuardar(){
+  var b=document.getElementById('tkrGuardar'), m=document.getElementById('tkrMsg');
+  b.disabled=true; b.textContent='Guardando…'; m.className='tkr-msg';
+  var marcaOk=false;
+  try{
+    var c=sbClient(); if(!c) throw new Error('no hay cliente de Supabase');
+    var u=await c.auth.getUser();
+    var correo=((u&&u.data&&u.data.user&&u.data.user.email)||'').trim();
+    if(!correo) throw new Error('no hay sesión abierta. Revisar va firmado.');
+    var razon=(document.getElementById('tkrRazon').value||'').trim();
+    var nota=(document.getElementById('tkrNota').value||'').trim();
+
+    /* ── 1 · LA MARCA ─────────────────────────────────────────────── */
+    var r1=await c.from('ticket_marca').insert({
+      ticket_id:TKR.id, toca_numeros:!!TKR.num, escribe_en_base:!!TKR.esc,
+      prioridad:TKR.pri, bloquea_entrega:!!TKR.ent, razon:razon, creado_por:correo
+    }).select('id');
+    if(r1.error) throw r1.error;
+    if(!r1.data||!r1.data.length) throw new Error('la base no devolvió la marca. No se guardó.');
+    marcaOk=true;
+
+    /* ── 2 · EL ESTADO ────────────────────────────────────────────────
+       Van SEPARADOS porque son dos tablas y PostgREST no da transaccion.
+       Si esto falla, la marca YA entro: se dice con todas las letras cual
+       de las dos quedo, en vez de un "no se pudo" que deja a alguien
+       adivinando si tiene que volver a cargar todo. */
+    var fila={ticket_id:TKR.id, estado:TKR.est, creado_por:correo,
+              build_al_marcar:(typeof BUILD!=='undefined'?BUILD:null)};
+    if(TKR.est==='bloqueado') fila.espera=nota;
+    else if(nota) fila.nota=nota;
+    var r2=await c.from('ticket_estado').insert(fila).select('id');
+    if(r2.error) throw r2.error;
+    if(!r2.data||!r2.data.length) throw new Error('la base no devolvió el estado.');
+
+    m.className='tkr-msg ok';
+    m.textContent='Listo. T-'+String(TKR.id).padStart(4,'0')+' quedó como '+
+      (TK_ESTADOS[TKR.est]||TKR.est)+'.';
+    b.textContent='Guardar';
+    setTimeout(function(){ tkRevCerrar(); tkListar(); tkContar(); }, 1200);
+  }catch(e){
+    if(marcaOk){
+      m.className='tkr-msg medio';
+      m.textContent='A MEDIO CAMINO: la revisión SÍ se guardó, el estado NO.\n'+
+        _tkMotivo(e)+'\n\nEl ticket sigue Sin revisar hasta que el estado entre. '+
+        /* Volver a guardar escribe una marca NUEVA, no corrige la anterior:
+           `ticket_marca` es append-only y manda la ultima fila. No es un
+           problema —es el diseño— pero decirle a alguien "elegí solo el
+           estado" seria mentirle: el formulario no deja guardar a medias. */
+        'Volvé a abrirlo y guardá de nuevo, con todo: la revisión se escribe otra vez '+
+        '(la última es la que vale) y el estado se vuelve a intentar.';
+    }else{
+      m.className='tkr-msg mal';
+      m.textContent='No se guardó nada.\n'+_tkMotivo(e);
+    }
+    b.textContent='Guardar';
+  }
+  tkRevValidar();
+}
+
+var TK_ESTADOS={sin_triar:'Sin revisar',disponible:'Disponible',bloqueado:'Bloqueado',
   en_curso:'En curso',en_validacion:'En validación',cerrado:'Cerrado',
   pospuesto:'Pospuesto',descartado:'Descartado'};
 var TK_TIPOS={no_funciona:'Algo no funciona',duda:'Tengo una duda',
@@ -20401,6 +20664,9 @@ async function tkListar(){
       .order('creado_en',{ascending:false});
     if(r.error) throw r.error;
     var filas=r.data||[];
+    /* Las filas quedan a mano para que el formulario pueda mostrar de que
+       ticket se trata sin volver a preguntarle a la base. */
+    _TK_FILAS={}; filas.forEach(function(f){ _TK_FILAS[f.id]=f; });
     if(!filas.length){
       cuerpo.innerHTML='<div class="tkl-vacio">No hay tickets todavía. '+
         'El botón ✱ de abajo a la derecha es el que los crea.</div>';
@@ -20437,25 +20703,23 @@ async function tkListar(){
           '</div>'+
           '<div class="tkl-txt">'+_tkEsc(f.descripcion)+'</div>'+
           '<div class="tkl-pie">'+pie.join(' · ')+'</div>'+
+          /* El boton de revisar SOLO para socias. No es proteccion —eso lo
+             hacen el trigger y la RLS, medidos el 19-sep— es no ofrecerle a
+             alguien un boton que le va a rebotar. */
+          /* Solo el id en el onclick. El texto NO se interpola: con
+             JSON.stringify adentro de un atributo entre comillas dobles, las
+             comillas del JSON parten el atributo y el boton deja de llamar a
+             nada. Medido el 19-sep — el boton se dibujaba y no abria nada.
+             El texto sale de `_TK_FILAS`, que es la misma respuesta que se
+             acaba de pintar. */
+          (socia ? '<button class="tkl-rev" onclick="tkRevAbrir('+f.id+')">Revisar</button>' : '')+
         '</div>';
       });
       html+='</div>';
     });
-    /* ⚠️ LAS DOS CARAS, Y LO QUE HOY LAS SEPARA — QUE ES NADA.
-       La lista es la misma para socias y para el equipo, porque la unica
-       diferencia acordada son LAS ACCIONES DE TRIAJE, y esas no estan en
-       esta pasada: triar es un formulario de cinco campos (toca_numeros,
-       escribe_en_base, prioridad, bloquea_entrega y una razon de 12
-       caracteres minimo) mas el cambio de estado con sus propias reglas de
-       nota. Es una pieza aparte, y ademas no se puede probar de punta a
-       punta sin una sesion de socia.
-       Se deja `socia` calculado y este cartel escrito para que la diferencia
-       se vea cuando exista, en vez de que alguien lea "las dos caras son
-       iguales" y crea que asi se diseño. */
-    if(socia){
-      html+='<div class="tkl-vacio">Triar todavía no se hace desde acá. '+
-            'Es la próxima pasada.</div>';
-    }
+    /* LAS DOS CARAS. Todo el equipo ve la misma lista —decision del 17-sep,
+       escrita en la RLS— y lo unico que las separa es el boton "Revisar", que
+       aparece solo para socias. */
     cuerpo.innerHTML=html;
   }catch(err){
     /* Lista vacia y lista que no se pudo leer son DOS COSAS, y la pantalla
