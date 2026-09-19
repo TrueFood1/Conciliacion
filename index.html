@@ -1524,30 +1524,51 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .tk-msg.ok{display:block;background:var(--green-l,#123);color:var(--green-d,#7d7)}
 .tk-msg.mal{display:block;background:#3a1b1b;color:#ffb4b4;white-space:pre-wrap}
 
-/* ── TICKETS · EL RENGLON DEL LOBBY Y LA LISTA (b62) ──────────────────
-   NO es una septima tarjeta. La grilla es `repeat(6,1fr)` y ya tiene seis;
-   en telefono son dos columnas con `order` escrito a mano (ops 1 · ent 2 ·
-   per 3 · fin 4) porque Conciliacion y Ventas se ocultan ahi. Una tarjeta
-   mas rompe las dos cosas — y ademas obligaria a declarar un MODULO: color
-   propio, entrada en ACCESO_VISTAS y en el map de accesoPintarLobby, y
-   meter 'tickets' en ACCESO_DEFAULT.
-   Esto no es un modulo: es LA COLA. Va como renglon de ancho completo
-   debajo de los modulos. */
-.tk-lobby{display:flex;align-items:center;justify-content:space-between;gap:12px;
-  width:100%;max-width:760px;margin:14px auto 0;padding:12px 14px;
-  background:transparent;border:1px solid var(--border);border-radius:10px;
-  cursor:pointer;text-align:left;font:inherit;color:inherit}
-.tk-lobby:active{opacity:.7}
-.tk-lobby-n{font-size:13px;font-weight:600;color:#F5F4F0}
-/* LOS TRES ESTADOS DEL CONTADOR, cada uno con su color y su texto. El `0`
+/* ── TICKETS · EL CHIP DEL LOBBY Y LA LISTA (b62) ─────────────────────
+   NO es una septima tarjeta: la grilla es `repeat(6,1fr)` y ya tiene seis, y
+   en telefono son dos columnas con `order` escrito a mano. Una tarjeta mas
+   rompe las dos cosas, y obligaria a declarar un MODULO (color propio,
+   ACCESO_VISTAS, ACCESO_DEFAULT). Tickets no es un modulo: es la cola.
+   Y TAMPOCO es el renglon de ancho completo que tuvo primero: pesaba mas que
+   las tarjetas de modulo para decir dos palabras.
+   VA ARRIBA, debajo de "conectado a Odoo · datos en vivo", porque esa zona ya
+   es la del ESTADO —cuantos tickets esperan es el mismo tipo de dato que si
+   hay conexion—. Y NO junto al boton ✱ de abajo: reportar y ver son dos cosas
+   distintas y compartir esquina las mezcla.
+
+   ⚠️ LA RESERVA DE LA ESQUINA. `#btnSalir` es fixed arriba a la derecha. El
+   lobby ya le reserva su lugar: 84px de `margin-right` en escritorio y, en
+   telefono, `.home-hdr{padding-right:78px}` — los mismos 78px que se
+   revisaron el 17-sep con el encabezado de Sin factura. La reserva pasa al
+   CONTENEDOR nuevo para que valga para las dos lineas, no solo para la de la
+   conexion. Aca no hay miga: la miga vive en `#appHeader`, que es otra
+   pantalla. */
+.home-hdr-right{margin-left:auto;margin-right:84px;min-width:0;
+  display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+/* La reserva la lleva el contenedor: si se quedara en `.home-live`, el chip
+   de abajo no la heredaria y se metria bajo "Salir". */
+.home-live{margin-left:0;margin-right:0}
+@media(max-width:700px){ .home-hdr-right{margin-right:0} }
+
+/* El area TOCABLE es mas alta que el texto a proposito: el chip se ve chico
+   —11px, como la linea de la conexion— pero se toca con el pulgar. Medido el
+   19-sep: con el padding de antes el alto era 18px, y un blanco de 18px en un
+   telefono se falla. El `margin` negativo devuelve el aire para que el chip
+   siga pareciendo chico y no empuje la linea de arriba. */
+.tk-chip{display:inline-flex;align-items:center;gap:6px;
+  background:transparent;border:none;padding:7px 0 7px 8px;margin:-5px 0;
+  font:inherit;cursor:pointer;color:inherit;max-width:100%}
+.tk-chip:active{opacity:.6}
+.tk-chip-n{font-size:11px;color:#7E7C76;letter-spacing:.3px}
+/* LOS CUATRO ESTADOS DEL CONTADOR, cada uno con su color y su texto. El `0`
    por defecto no existe a proposito: un 0 mientras se cuenta es
-   indistinguible de "no hay nada que triar", y esa confusion es la familia
-   de los tres bugs del 18-sep. */
-.tk-lobby-e{font-size:12px}
-.tk-lobby-e.cargando{color:var(--text-3);font-style:italic}
-.tk-lobby-e.dato{color:#C964CF;font-weight:600}
-.tk-lobby-e.vacio{color:var(--text-3)}
-.tk-lobby-e.roto{color:#ffb4b4}
+   indistinguible de "no hay nada que triar", y esa confusion es la familia de
+   los tres bugs del 18-sep. */
+.tk-chip-e{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tk-chip-e.cargando{color:#6E6C68;font-style:italic}
+.tk-chip-e.dato{color:#C964CF;font-weight:600}
+.tk-chip-e.vacio{color:#6E6C68}
+.tk-chip-e.roto{color:#ffb4b4}
 
 /* ── LA LISTA ── */
 .tkl-vacio{color:var(--text-3);font-size:13px;padding:18px 2px}
@@ -1634,7 +1655,18 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <div class="home-hdr">
       <img src="Logo_Sec_Color.png" alt="Truefie" class="home-hdr-logo">
       <span class="home-hdr-name">Truefie</span>
-      <div class="home-live"><span class="live-dot-home"></span><span class="t">conectado a Odoo · datos en vivo</span></div>
+      <!-- La columna derecha del encabezado del lobby: el estado de la conexion
+           y, DEBAJO, la cola de tickets. Las dos son el mismo tipo de dato
+           —como esta el sistema ahora mismo— y por eso viven juntas. El boton
+           ✱ de reportar se queda abajo a la derecha: reportar y ver son dos
+           cosas, y juntarlas en la misma esquina las confunde. -->
+      <div class="home-hdr-right">
+        <div class="home-live"><span class="live-dot-home"></span><span class="t">conectado a Odoo · datos en vivo</span></div>
+        <button class="tk-chip" id="tkLobby" onclick="irATickets()">
+          <span class="tk-chip-n">Tickets</span>
+          <span class="tk-chip-e cargando" id="tkLobbyEstado">contando…</span>
+        </button>
+      </div>
     </div>
     <div class="home-center">
     <div class="home-hi" id="homeHi">Hola.</div>
@@ -1688,13 +1720,6 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
          sacarla que nada vivía solo acá — los tres contadores y las filas salían
          de pdLeer(), la misma función que alimenta Pendientes. -->
     </div><!-- /home-bottom -->
-
-    <!-- TICKETS · la cola. Renglon, no tarjeta: ver el CSS de .tk-lobby. -->
-    <button class="tk-lobby" id="tkLobby" onclick="irATickets()">
-      <span class="tk-lobby-n">Tickets</span>
-      <span class="tk-lobby-e cargando" id="tkLobbyEstado">contando…</span>
-    </button>
-
     <div class="home-build" id="homeBuild"></div>
   </div>
 </div>
@@ -20319,7 +20344,7 @@ function _tkMotivo(err){
 }
 async function tkContar(){
   var e=document.getElementById('tkLobbyEstado'); if(!e) return;
-  e.className='tk-lobby-e cargando'; e.textContent='contando…';
+  e.className='tk-chip-e cargando'; e.textContent='contando…';
   try{
     var c=sbClient(); if(!c) throw new Error('sin cliente');
     var r=await c.from('v_ticket').select('id',{count:'exact',head:true})
@@ -20327,11 +20352,11 @@ async function tkContar(){
     if(r.error) throw r.error;
     var n=r.count;
     if(n===null||n===undefined) throw new Error('la base no devolvió el conteo');
-    if(n===0){ e.className='tk-lobby-e vacio'; e.textContent='nada sin triar'; }
-    else{ e.className='tk-lobby-e dato';
+    if(n===0){ e.className='tk-chip-e vacio'; e.textContent='nada sin triar'; }
+    else{ e.className='tk-chip-e dato';
           e.textContent=n+(n===1?' sin triar':' sin triar'); }
   }catch(err){
-    e.className='tk-lobby-e roto';
+    e.className='tk-chip-e roto';
     e.textContent='no se pudo contar';
     try{ console.error('[Truefie] contador de tickets:', err); }catch(x){}
   }
