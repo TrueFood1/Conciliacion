@@ -2,6 +2,49 @@
 -- TICKETS · la ENTRADA de Daniel y la SALIDA de trabajo, en la misma tabla
 -- PROPUESTA. NO PEGAR. Andrea aprueba antes.
 --
+-- ✅ **APLICADO EN PRODUCCION EL 19-sep-2026.** Las diez transacciones, en
+--    orden, cada una con su control mirado antes de seguir a la siguiente.
+--    Lo que contesto cada control, medido:
+--      §1  tabla 1 · indices 4 · triggers 1 · rls t · sobrantes 0
+--      §2  tabla 1 · indices 3 · triggers 1 · rls t · sobrantes 0
+--      §3  tabla 1 · indices 2 · triggers 1 · rls t · sobrantes 0
+--      §4  tabla 1 · indices 2 · triggers 1 · rls t · sobrantes 0
+--      §5  tabla 1 · indices 3 · triggers 0 · rls t · sobrantes 0
+--      §6  vistas 7 · con_invoker 7 · sin_invoker 0 · anon_en_vistas 0
+--      §7  vistas 8 · con_invoker 8 · export 1 · anon_en_vistas 0
+--      §8  politicas 10 · tres_de_socias 3 · con_rls 5 · sobrantes 0 ·
+--          reportar_abierto 1 · insert_en_true_no_previstos 0
+--      §9  bucket_privado 1 · publico false · politicas 2 · segmento 12
+--      §12 tabla 1 · indices 3 · rls t · politicas 2 · vista 1 · sobrantes 0 ·
+--          vistas 9 · anon_en_vistas 0
+--
+--    Y EL §10 DESPUES, sobre el cuadro completo: V1 tablas 6 · V2 las NUEVE
+--    vistas con `security_invoker` en true · V3 las tres politicas diciendo
+--    `acceso_es_socia()` · V4 CERO filas de update/delete/truncate · V5 el
+--    bucket `tickets` privado con sus cinco MIME · V6 dos politicas de Storage
+--    · V7 el segmento en 12.
+--
+-- 🔴 V8 · Y LO QUE EL §10 NO PODIA PROBAR, PROBADO APARTE EL 19-sep.
+--    El §10 corre como `postgres`, que saltea la RLS: dice que la politica
+--    EXISTE, no que FUNCIONE. Se ejercitaron por el carril B —identidad puesta
+--    con `set_config`, transacciones que terminan en rollback—:
+--      · como perfil 'equipo': REPORTAR un ticket **ENTRA** (asi tiene que
+--        ser); mover el estado, triar y definir criterio **REBOTAN**.
+--      · como SOCIA: mover el estado y triar **ENTRAN**. El control del otro
+--        lado: una politica que no deja pasar a nadie tambien "protege".
+--      · 0 filas en `ticket` al terminar. Nada quedo escrito.
+--
+--    ⚠️ Y UN HALLAZGO DEL ORDEN DE POSTGRES, que cambia como leer el V3:
+--    los tres rechazos vinieron con **P0001** —la excepcion del TRIGGER— y no
+--    con 42501 —la RLS—. En un INSERT, el trigger BEFORE ROW corre ANTES de
+--    que se evalue el `with check`: el guardia llega primero y la politica
+--    nunca llega a hablar. O sea que por el camino normal las tres politicas
+--    del V3 **no se ejercitan nunca**.
+--    Se comprobo que igual son una segunda linea real: apagando el guardia
+--    dentro de una transaccion con rollback, las tres dan **42501 ·
+--    ExecWithCheckOptions**. La proteccion es de dos capas, y las dos
+--    responden. Sin esta prueba, "V3 en verde" habria sido un catalogo leido.
+--
 -- ⚠️ ESTA ES LA TERCERA VERSION. Hubo tres, y confundirlas es facil porque
 --    las tres se llaman igual. CUAL ES CUAL, por si alguien abre la que no es:
 --
@@ -119,7 +162,8 @@
 --    decision tomada se apaga a la semana. Se partio en dos columnas: ver el
 --    §8. El archivo no estaba mal; el control si.
 --
---    ⚠️ ENSAYADO NO ES APLICADO. En la base no hay una sola tabla de esto.
+--    (El ensayo fue ANTES de aplicar. Lo aplicado esta arriba, con su propia
+--     evidencia.)
 --
 -- ── EL TERRENO, MEDIDO EL 17-sep (no citado) ────────────────────────────
 --   ⚠️ ESTO ES UNA FOTO VIEJA Y SE DEJA COMO REGISTRO. Para correr HOY estan
@@ -997,21 +1041,47 @@ create or replace view v_ticket_bloqueos with (security_invoker = true) as
     left join v_ticket b on b.id = v.bloquea_ticket_id
    where v.estado = 'bloqueado';
 
+-- ── EL CANDADO DE LAS VISTAS ────────────────────────────────────────
+-- 🔴 MEDIDO EL 19-sep: los privilegios por defecto de `public` NO son solo de
+--    las tablas — las VISTAS tambien nacen con `anon=arwdDxtm`. Se comprobo
+--    contra dos que ya existen: `ent_devolucion_vigente` conserva `anon`, y
+--    `v_acceso_usuario` NO lo tiene, porque se lo revocaron despues de la fuga
+--    del 24-ago. Este es el mismo trato.
+--    ⚠️ Hoy `security_invoker` ya contiene esto: `anon` leyendo una vista choca
+--    contra las tablas de abajo, donde no tiene nada y la RLS esta encendida.
+--    O sea que esto NO tapa un agujero abierto: saca la dependencia de que las
+--    ocho vistas conserven la opcion. Queda a un `security_invoker` de
+--    distancia de ser el 24-ago otra vez, y esa distancia no hace falta.
+revoke all on v_ticket, v_ticket_foto, v_ticket_desbloqueo, v_ticket_disponible,
+            v_ticket_para_andrea, v_ticket_conteo, v_ticket_bloqueos from anon;
+
 -- ── EL CONTROL · ADENTRO Y ANTES DEL COMMIT ─────────────────────────
--- ESPERADO: vistas 7 · con_invoker 7 · sin_invoker 0
+-- ESPERADO: vistas 7 · con_invoker 7 · sin_invoker 0 · anon_en_vistas 0
 -- Una sola vista sin `security_invoker` es la fuga del 24-ago otra vez, y por
 -- eso se cuentan las dos columnas: "7 vistas" solo no distingue 7 buenas de
 -- 6 buenas y una abierta.
-select count(*) as vistas,
-       count(*) filter (where (select option_value
-                                 from pg_options_to_table(c.reloptions)
-                                where option_name='security_invoker') = 'true') as con_invoker,
-       count(*) filter (where (select option_value
-                                 from pg_options_to_table(c.reloptions)
-                                where option_name='security_invoker') is distinct from 'true')
-                                                                                as sin_invoker
-  from pg_class c join pg_namespace n on n.oid = c.relnamespace
- where n.nspname='public' and c.relkind='v' and c.relname like 'v_ticket%';
+-- ⚠️ VA TODO EN UN SOLO SELECT, UNA SOLA FILA, A PROPOSITO: el editor de SQL
+--    muestra UNA grilla — la de la ultima sentencia. Dos selects seguidos
+--    significan perder el primero, que es como se perdio el control de P0 el
+--    18-sep. `anon_en_vistas` mide que ninguna vista le deje nada a `anon`;
+--    medido el 19-sep, una vista recien creada le deja OCHO, y despues del
+--    revoke queda en 0 — o sea que este contador distingue de verdad.
+select
+  (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname='public' and c.relkind='v' and c.relname like 'v_ticket%') as vistas,
+  (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname='public' and c.relkind='v' and c.relname like 'v_ticket%'
+      and (select option_value from pg_options_to_table(c.reloptions)
+            where option_name='security_invoker') = 'true')                    as con_invoker,
+  (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname='public' and c.relkind='v' and c.relname like 'v_ticket%'
+      and (select option_value from pg_options_to_table(c.reloptions)
+            where option_name='security_invoker') is distinct from 'true')     as sin_invoker,
+  (select count(*) from pg_class c
+     join pg_namespace n on n.oid = c.relnamespace
+     left join lateral aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) a on true
+    where n.nspname='public' and c.relkind='v' and c.relname like 'v_ticket%'
+      and a.grantee = 'anon'::regrole)                                         as anon_en_vistas;
 commit;
 
 
@@ -1121,8 +1191,11 @@ create or replace view v_ticket_export with (security_invoker = true) as
          )                                                          as contenido
     from v_ticket t;
 
+-- Mismo candado que el §6: la vista nueva tambien nace con `anon=arwdDxtm`.
+revoke all on v_ticket_export from anon;
+
 -- ── EL CONTROL · ADENTRO Y ANTES DEL COMMIT ─────────────────────────
--- ESPERADO: vistas 8 · con_invoker 8 · export 1
+-- ESPERADO: vistas 8 · con_invoker 8 · export 1 · anon_en_vistas 0
 -- Son 8 y no 1 a proposito: `v_ticket_export` LEE de `v_ticket`, asi que si
 -- el §6 no estaba, esta transaccion ya habria fallado. El 8 lo confirma.
 select (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
@@ -1132,7 +1205,13 @@ select (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamesp
            and (select option_value from pg_options_to_table(c.reloptions)
                  where option_name='security_invoker') = 'true')                    as con_invoker,
        (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
-         where n.nspname='public' and c.relname='v_ticket_export')                  as export;
+         where n.nspname='public' and c.relname='v_ticket_export')                  as export,
+       (select count(*)
+          from pg_class c
+          join pg_namespace n on n.oid = c.relnamespace
+          left join lateral aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) a on true
+         where n.nspname='public' and c.relkind='v' and c.relname like 'v_ticket%'
+           and a.grantee = 'anon'::regrole)                                         as anon_en_vistas;
 commit;
 
 
@@ -1596,8 +1675,15 @@ create or replace view v_ticket_historial with (security_invoker = true) as
 
 grant select on v_ticket_historial to authenticated;
 
+-- Mismo candado que el §6 y el §7: esta es la NOVENA vista `v_ticket%` y nace
+-- con `anon=arwdDxtm` como todas. El revoke del §6 no la alcanza porque
+-- todavia no existia cuando aquel corrio.
+revoke all on v_ticket_historial from anon;
+
 -- ── EL CONTROL · ADENTRO Y ANTES DEL COMMIT ─────────────────────────
--- ESPERADO: tabla 1 · indices 3 · rls t · politicas 2 · vista 1 · sobrantes 0
+-- ESPERADO: tabla 1 · indices 3 · rls t · politicas 2 · vista 1 · sobrantes 0 ·
+--           vistas 9 · anon_en_vistas 0
+-- `vistas 9` cierra la cuenta: 7 del §6 + el export del §7 + el historial.
 select
   (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
     where n.nspname='public' and c.relkind='r' and c.relname='build_publicado')   as tabla,
@@ -1612,7 +1698,14 @@ select
   (select count(*) from information_schema.role_table_grants
     where table_schema='public' and table_name='build_publicado'
       and grantee in ('anon','authenticated')
-      and privilege_type in ('UPDATE','DELETE','TRUNCATE'))                       as sobrantes;
+      and privilege_type in ('UPDATE','DELETE','TRUNCATE'))                       as sobrantes,
+  (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='public' and c.relkind='v' and c.relname like 'v_ticket%')    as vistas,
+  (select count(*) from pg_class c
+     join pg_namespace n on n.oid = c.relnamespace
+     left join lateral aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) a on true
+    where n.nspname='public' and c.relkind='v' and c.relname like 'v_ticket%'
+      and a.grantee = 'anon'::regrole)                                            as anon_en_vistas;
 commit;
 
 -- ── LA PANTALLA ─────────────────────────────────────────────────────────
@@ -1633,6 +1726,27 @@ commit;
 -- ════════════════════════════════════════════════════════════════════════
 -- 13 · LA MIGRACION · UNA sola, desde los dos archivos
 -- ════════════════════════════════════════════════════════════════════════
+-- 🔴 DECISION DEL 19-sep · EL ORDEN ES: ESQUEMA → PANTALLA → MIGRACION.
+--    LA MIGRACION NO VA ANTES QUE LA PANTALLA, y no es una preferencia: es lo
+--    que los guardias permiten. Desde el SQL Editor, de un ticket migrado se
+--    puede escribir el TICKET y nada mas —
+--      · el TRIAJE (§3) rebota siempre: el guardia aborta sin sesion;
+--      · el ESTADO (§2) solo acepta `en_curso`/`en_validacion`, y el mapeo de
+--        mas abajo necesita `disponible`, `bloqueado`, `pospuesto`, `cerrado`;
+--      · el DETALLE clase 'espera' (§4) rebota: desde el editor solo entran
+--        'cierre' y 'anuncio'.
+--    🔴 ESO ULTIMO CONTRADICE LO QUE ESTE MISMO §13 DICE MAS ABAJO ("su fila
+--    de `ticket_detalle` clase 'espera' con el § de donde salio"). Las dos
+--    lineas no pueden ser verdad a la vez. Se deja la contradiccion A LA
+--    VISTA en vez de borrarla, porque borrarla esconderia la decision que
+--    falta tomar.
+--    Migrar antes de la pantalla dejaria los 28 en una tabla que nadie puede
+--    tocar: sin estado, sin triaje y sin el § de donde salieron.
+--    ⚠️ Y que quede dicho: los tres guardias SE PUEDEN pasar con un
+--    `set_config` de los claims usando el correo de una socia. No son candado,
+--    son convencion. Pero eso seria firmar 28 juicios con el nombre de alguien
+--    que no los tomo, que es justo lo que los guardias desalientan.
+--
 -- ⚠️ DECISION DEL 17-sep: **LA MIGRACION T1–T7 DEL 10-sep SE TIRA.** No se
 --    perdio nada; esta en git. Se tira porque se SUPERPONIA con los archivos:
 --      · T4 decia "Detalle completo en ENTREGAS_PENDIENTES.md §13";
