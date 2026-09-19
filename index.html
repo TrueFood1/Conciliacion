@@ -1523,6 +1523,50 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .tk-msg{font-size:13px;margin-top:12px;padding:10px;border-radius:9px;display:none}
 .tk-msg.ok{display:block;background:var(--green-l,#123);color:var(--green-d,#7d7)}
 .tk-msg.mal{display:block;background:#3a1b1b;color:#ffb4b4;white-space:pre-wrap}
+
+/* ── TICKETS · EL RENGLON DEL LOBBY Y LA LISTA (b62) ──────────────────
+   NO es una septima tarjeta. La grilla es `repeat(6,1fr)` y ya tiene seis;
+   en telefono son dos columnas con `order` escrito a mano (ops 1 · ent 2 ·
+   per 3 · fin 4) porque Conciliacion y Ventas se ocultan ahi. Una tarjeta
+   mas rompe las dos cosas — y ademas obligaria a declarar un MODULO: color
+   propio, entrada en ACCESO_VISTAS y en el map de accesoPintarLobby, y
+   meter 'tickets' en ACCESO_DEFAULT.
+   Esto no es un modulo: es LA COLA. Va como renglon de ancho completo
+   debajo de los modulos. */
+.tk-lobby{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  width:100%;max-width:760px;margin:14px auto 0;padding:12px 14px;
+  background:transparent;border:1px solid var(--border);border-radius:10px;
+  cursor:pointer;text-align:left;font:inherit;color:inherit}
+.tk-lobby:active{opacity:.7}
+.tk-lobby-n{font-size:13px;font-weight:600;color:#F5F4F0}
+/* LOS TRES ESTADOS DEL CONTADOR, cada uno con su color y su texto. El `0`
+   por defecto no existe a proposito: un 0 mientras se cuenta es
+   indistinguible de "no hay nada que triar", y esa confusion es la familia
+   de los tres bugs del 18-sep. */
+.tk-lobby-e{font-size:12px}
+.tk-lobby-e.cargando{color:var(--text-3);font-style:italic}
+.tk-lobby-e.dato{color:#C964CF;font-weight:600}
+.tk-lobby-e.vacio{color:var(--text-3)}
+.tk-lobby-e.roto{color:#ffb4b4}
+
+/* ── LA LISTA ── */
+.tkl-vacio{color:var(--text-3);font-size:13px;padding:18px 2px}
+.tkl-grupo{margin-bottom:22px}
+.tkl-grupo-t{font-size:12px;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--text-3);margin-bottom:8px;display:flex;gap:8px;align-items:baseline}
+.tkl-grupo-n{font-size:11px;color:var(--text-3);font-weight:400;text-transform:none;letter-spacing:0}
+.tkl-item{border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:8px}
+.tkl-l1{display:flex;gap:9px;align-items:baseline;flex-wrap:wrap;margin-bottom:5px}
+.tkl-id{font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.tkl-est{font-size:11px;padding:1px 7px;border-radius:99px;border:1px solid var(--border-strong);color:var(--text-2)}
+.tkl-est.sin_triar{border-color:#C964CF;color:#C964CF}
+.tkl-tipo{font-size:11px;color:var(--text-3)}
+.tkl-txt{font-size:14px;color:var(--text);line-height:1.45}
+.tkl-pie{font-size:11px;color:var(--text-3);margin-top:6px;line-height:1.5;word-break:break-word}
+/* El aviso de "esto no se pudo leer" NUNCA se calla y nunca se disfraza de
+   lista vacia. Son dos cosas distintas y la pantalla tiene que decir cual. */
+.tkl-roto{font-size:13px;color:#ffb4b4;background:#3a1b1b;border-radius:9px;
+  padding:11px 12px;white-space:pre-wrap;margin-bottom:12px}
 </style>
 </head>
 <body>
@@ -1644,6 +1688,13 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
          sacarla que nada vivía solo acá — los tres contadores y las filas salían
          de pdLeer(), la misma función que alimenta Pendientes. -->
     </div><!-- /home-bottom -->
+
+    <!-- TICKETS · la cola. Renglon, no tarjeta: ver el CSS de .tk-lobby. -->
+    <button class="tk-lobby" id="tkLobby" onclick="irATickets()">
+      <span class="tk-lobby-n">Tickets</span>
+      <span class="tk-lobby-e cargando" id="tkLobbyEstado">contando…</span>
+    </button>
+
     <div class="home-build" id="homeBuild"></div>
   </div>
 </div>
@@ -2248,6 +2299,16 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 </div>
 
 <!-- COBROS Y PAGOS (módulo Finanzas) — SOLO LECTURA. Cartera con saldo pendiente. -->
+<!-- ══════════════════════════════════════════════════════════════════
+     TICKETS · VER. Solo lectura: agrupa por modulo y muestra lo que se
+     reporto. Las ACCIONES DE TRIAJE no estan en esta pasada — ver el
+     comentario de `tkListar()`.
+     ══════════════════════════════════════════════════════════════════ -->
+<div id="vTickets" class="hidden">
+  <div id="tklRoto" class="tkl-roto" style="display:none"></div>
+  <div id="tklCuerpo"><div class="tkl-vacio">Cargando tickets…</div></div>
+</div>
+
 <div id="vCobros" class="hidden">
   <div class="faces">
     <button class="face" onclick="irAResultados()">Resultados</button>
@@ -4625,6 +4686,11 @@ function accesoPintarLobby(){
     wrap.classList.toggle('solo', vis===1);
     wrap.classList.toggle('duo',  vis===2);
   }
+  // El contador de la cola se vuelve a pedir cada vez que se pinta el lobby:
+  // al entrar y al volver de un módulo. Asi el numero no queda viejo despues
+  // de triar algo. `tkContar` se define mas abajo en el archivo — para cuando
+  // esto corre ya esta.
+  try{ tkContar(); }catch(e){}
 }
 async function setSaludo(){
   const el=document.getElementById('homeHi'); if(!el) return;
@@ -20201,10 +20267,180 @@ async function tkEnviar(){
     /* El error se MUESTRA, entero. Un "no se pudo" sin el motivo obliga a
        reportar el reportador. */
     msg.className='tk-msg mal';
-    msg.textContent='No se guardó.\n'+((e&&(e.message||e.hint||e.details))||e||'motivo desconocido');
+    msg.textContent='No se guardó.\n'+_tkMotivo(e);
     btn.textContent='Enviar';
   }
   tkValidar();
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   TICKETS · VER · b62 (19-sep-2026)
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* `vTickets` se suma a mano a `_MOD_VIEWS` y NO entra en `ACCESO_VISTAS`.
+   Las dos cosas a proposito:
+     · en `_MOD_VIEWS` porque `_modShow` solo prende y apaga lo que esta en
+       esa lista — sin esto apagaria todo y no encenderia nada, que es
+       exactamente la pantalla en blanco de b32;
+     · FUERA de `ACCESO_VISTAS` porque esa lista es de MODULOS, y tickets no
+       es un modulo. `accesoModDeVista` devuelve null para lo que no esta, y
+       null significa acceso libre. Es lo que se quiere: la cola la ve todo
+       el equipo, decision ratificada el 17-sep y escrita en la RLS
+       (`ticket_sel` es `using (true)`). */
+try{ if(_MOD_VIEWS.indexOf('vTickets')<0) _MOD_VIEWS.push('vTickets'); }catch(e){}
+
+/* ── EL CONTADOR DEL LOBBY · TRES ESTADOS, Y NINGUNO ES UN 0 POR DEFECTO ──
+   cargando · el numero · "no se pudo contar".
+   🔴 El 0 solo se muestra cuando la base CONTESTO cero. Un 0 mientras carga,
+   o un 0 cuando la consulta fallo, es indistinguible de "no hay nada que
+   triar" — y alguien dejaria de mirar una cola que en realidad esta llena.
+   Es la familia de los tres bugs del 18-sep: un cartel que no distingue.
+
+   ⚠️ Y SE CUENTA SOBRE `v_ticket`, NO sumando `v_ticket_conteo`. El agujero
+   que evita: un ticket reportado DESDE EL LOBBY no tiene modulo, y la vista
+   de conteo lo agrupa como 'sin_modulo'. Sumar filas de esa vista obliga a
+   acordarse de incluir ese grupo, y el dia que alguien filtre por modulos
+   conocidos esos tickets desaparecen del contador sin que nadie lo note.
+   Contando la fuente, no se pueden perder. */
+/* Un "no se pudo" SIN MOTIVO obliga a reportar el reportador. Postgrest a
+   veces vuelve con `message` vacio (medido el 19-sep: el 401 de `anon` llega
+   asi), y entonces el cartel quedaba solo con el titulo. Se arma el motivo
+   con lo que haya, en orden, y si no hay NADA se dice eso mismo — que es un
+   dato, no un silencio. */
+function _tkMotivo(err){
+  if(!err) return 'sin motivo en la respuesta';
+  var partes=[];
+  ['message','hint','details','code'].forEach(function(k){
+    var v=err[k]; if(v!==undefined && v!==null && String(v).trim()!=='') partes.push(String(v).trim());
+  });
+  if(!partes.length && typeof err==='string' && err.trim()) partes.push(err.trim());
+  if(!partes.length && err.status) partes.push('HTTP '+err.status);
+  return partes.length ? partes.join(' · ') : 'la base rechazó la consulta y no dijo por qué';
+}
+async function tkContar(){
+  var e=document.getElementById('tkLobbyEstado'); if(!e) return;
+  e.className='tk-lobby-e cargando'; e.textContent='contando…';
+  try{
+    var c=sbClient(); if(!c) throw new Error('sin cliente');
+    var r=await c.from('v_ticket').select('id',{count:'exact',head:true})
+                 .eq('estado','sin_triar');
+    if(r.error) throw r.error;
+    var n=r.count;
+    if(n===null||n===undefined) throw new Error('la base no devolvió el conteo');
+    if(n===0){ e.className='tk-lobby-e vacio'; e.textContent='nada sin triar'; }
+    else{ e.className='tk-lobby-e dato';
+          e.textContent=n+(n===1?' sin triar':' sin triar'); }
+  }catch(err){
+    e.className='tk-lobby-e roto';
+    e.textContent='no se pudo contar';
+    try{ console.error('[Truefie] contador de tickets:', err); }catch(x){}
+  }
+}
+
+function irATickets(){
+  _modShow('vTickets');
+  crumbSet('Tickets','La cola');
+  tkListar();
+}
+
+var TK_ESTADOS={sin_triar:'Sin triar',disponible:'Disponible',bloqueado:'Bloqueado',
+  en_curso:'En curso',en_validacion:'En validación',cerrado:'Cerrado',
+  pospuesto:'Pospuesto',descartado:'Descartado'};
+var TK_TIPOS={no_funciona:'Algo no funciona',duda:'Tengo una duda',
+  idea:'Se me ocurrió algo',encargo:'Encargo'};
+/* El orden de los modulos es el del lobby, y 'sin_modulo' va al FINAL con
+   nombre propio: son los que se reportaron desde el lobby, donde no hay
+   modulo que capturar. Que tengan grupo propio es lo contrario de que
+   desaparezcan. */
+var TK_ORDEN=['entregas','operaciones','finanzas','personal','conciliacion','sin_modulo'];
+var TK_MODNOM={entregas:'Entregas',operaciones:'Operaciones',finanzas:'Finanzas',
+  personal:'Personal',conciliacion:'Conciliación',sin_modulo:'Sin módulo · desde el lobby'};
+
+function _tkEsc(t){ var d=document.createElement('div'); d.textContent=(t==null?'':String(t)); return d.innerHTML; }
+
+async function tkListar(){
+  var roto=document.getElementById('tklRoto');
+  var cuerpo=document.getElementById('tklCuerpo');
+  roto.style.display='none'; roto.textContent='';
+  cuerpo.innerHTML='<div class="tkl-vacio">Cargando tickets…</div>';
+  var socia=false;
+  try{ socia=await accesoSocia(); }catch(e){}
+  try{
+    var c=sbClient(); if(!c) throw new Error('sin cliente de Supabase');
+    /* TODO EL EQUIPO VE TODOS. No se filtra por autor: la decision del 17-sep
+       es que un ticket no tiene nada privado y el duplicado si cuesta. La RLS
+       dice lo mismo (`ticket_sel` en `using (true)`), asi que filtrar aca
+       seria que la pantalla contradiga a la base. */
+    var r=await c.from('v_ticket')
+      .select('id,tipo,estado,descripcion,modulo,miga,vista,build,creado_por,creado_en,agente,viewport')
+      .order('creado_en',{ascending:false});
+    if(r.error) throw r.error;
+    var filas=r.data||[];
+    if(!filas.length){
+      cuerpo.innerHTML='<div class="tkl-vacio">No hay tickets todavía. '+
+        'El botón ✱ de abajo a la derecha es el que los crea.</div>';
+      return;
+    }
+    var porMod={};
+    filas.forEach(function(f){
+      var m=f.modulo||'sin_modulo';
+      (porMod[m]=porMod[m]||[]).push(f);
+    });
+    /* Los modulos que no esten en TK_ORDEN se agregan igual, al final: una
+       lista de nombres escrita a mano se queda vieja, y el sintoma seria un
+       grupo entero invisible. */
+    var claves=TK_ORDEN.filter(function(m){ return porMod[m]; })
+      .concat(Object.keys(porMod).filter(function(m){ return TK_ORDEN.indexOf(m)<0; }));
+    var html='';
+    claves.forEach(function(m){
+      var g=porMod[m];
+      html+='<div class="tkl-grupo"><div class="tkl-grupo-t">'+
+        _tkEsc(TK_MODNOM[m]||m)+
+        '<span class="tkl-grupo-n">'+g.length+(g.length===1?' ticket':' tickets')+'</span></div>';
+      g.forEach(function(f){
+        var pie=[];
+        if(f.miga) pie.push(_tkEsc(f.miga));
+        else if(f.vista) pie.push(_tkEsc(f.vista));
+        pie.push(_tkEsc(f.build||'sin sello'));
+        pie.push(_tkEsc((f.creado_por||'').split('@')[0]));
+        pie.push(_tkEsc(String(f.creado_en||'').slice(0,16).replace('T',' ')));
+        html+='<div class="tkl-item">'+
+          '<div class="tkl-l1">'+
+            '<span class="tkl-id">T-'+String(f.id).padStart(4,'0')+'</span>'+
+            '<span class="tkl-est '+_tkEsc(f.estado)+'">'+_tkEsc(TK_ESTADOS[f.estado]||f.estado)+'</span>'+
+            '<span class="tkl-tipo">'+_tkEsc(TK_TIPOS[f.tipo]||f.tipo)+'</span>'+
+          '</div>'+
+          '<div class="tkl-txt">'+_tkEsc(f.descripcion)+'</div>'+
+          '<div class="tkl-pie">'+pie.join(' · ')+'</div>'+
+        '</div>';
+      });
+      html+='</div>';
+    });
+    /* ⚠️ LAS DOS CARAS, Y LO QUE HOY LAS SEPARA — QUE ES NADA.
+       La lista es la misma para socias y para el equipo, porque la unica
+       diferencia acordada son LAS ACCIONES DE TRIAJE, y esas no estan en
+       esta pasada: triar es un formulario de cinco campos (toca_numeros,
+       escribe_en_base, prioridad, bloquea_entrega y una razon de 12
+       caracteres minimo) mas el cambio de estado con sus propias reglas de
+       nota. Es una pieza aparte, y ademas no se puede probar de punta a
+       punta sin una sesion de socia.
+       Se deja `socia` calculado y este cartel escrito para que la diferencia
+       se vea cuando exista, en vez de que alguien lea "las dos caras son
+       iguales" y crea que asi se diseño. */
+    if(socia){
+      html+='<div class="tkl-vacio">Triar todavía no se hace desde acá. '+
+            'Es la próxima pasada.</div>';
+    }
+    cuerpo.innerHTML=html;
+  }catch(err){
+    /* Lista vacia y lista que no se pudo leer son DOS COSAS, y la pantalla
+       tiene que decir cual. Confundirlas es como se pierde una cola entera
+       sin que nadie se entere. */
+    cuerpo.innerHTML='';
+    roto.style.display='';
+    roto.textContent='No se pudieron leer los tickets.\n'+_tkMotivo(err);
+    try{ console.error('[Truefie] lista de tickets:', err); }catch(x){}
+  }
 }
 </script>
 </body>
