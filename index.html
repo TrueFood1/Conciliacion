@@ -1589,6 +1589,39 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .tkl-roto{font-size:13px;color:#ffb4b4;background:#3a1b1b;border-radius:9px;
   padding:11px 12px;white-space:pre-wrap;margin-bottom:12px}
 
+
+/* ── TICKETS · CERRAR · POSPONER · DESCARTAR ──────────────────────────
+   Los TRES que siguen siendo de las socias, tambien en la base: el guardia
+   del §2 los rechaza sin sesion a proposito. Cerrar es decir "esto ya esta",
+   y eso no lo decide quien hizo el trabajo.
+   ⚠️ NO es el formulario que se saco el 19-sep. Aquel le preguntaba a Andrea
+   "¿toca numeros?" —un diagnostico que solo se saca leyendo el codigo—. Esto
+   es lo contrario: son las tres cosas que ella YA decide. */
+.tkl-acc{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap}
+.tkl-a{background:var(--field);border:1px solid var(--border-strong);border-radius:8px;
+  color:var(--text-2);font:inherit;font-size:12px;padding:6px 11px;cursor:pointer}
+.tkl-a:active{opacity:.6}
+#tkEst{position:fixed;inset:0;z-index:160;background:var(--scrim);
+  display:flex;align-items:flex-end;justify-content:center}
+#tkEst.hidden{display:none}
+@media(min-width:700px){ #tkEst{align-items:center} }
+.tke-in{width:100%;max-width:520px;background:var(--surface);
+  border-radius:16px 16px 0 0;border-top:.5px solid var(--border-strong);
+  padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+  max-height:92vh;overflow-y:auto;overscroll-behavior:contain}
+@media(min-width:700px){ .tke-in{border-radius:16px;border:1px solid var(--border-strong)} }
+.tke-t{width:100%;box-sizing:border-box;background:var(--field);
+  border:1px solid var(--border-strong);border-radius:9px;color:var(--text);
+  font:inherit;font-size:16px;padding:10px 12px;min-height:74px;resize:vertical}
+.tke-n{font-size:11px;color:var(--text-3);margin-top:5px}
+.tke-n.falta{color:#ffb4b4}
+.tke-ok{width:100%;margin-top:14px;background:var(--field);border:1px solid var(--border-strong);
+  border-radius:9px;color:var(--text);font:inherit;font-size:15px;font-weight:600;
+  padding:13px;cursor:pointer}
+.tke-ok[disabled]{opacity:.45;cursor:default}
+.tke-msg{font-size:13px;margin-top:12px;padding:10px;border-radius:9px;display:none;white-space:pre-wrap}
+.tke-msg.ok{display:block;background:#12301c;color:#8ede9f}
+.tke-msg.mal{display:block;background:#3a1b1b;color:#ffb4b4}
 </style>
 </head>
 <body>
@@ -2335,6 +2368,24 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   <div id="tklCuerpo"><div class="tkl-vacio">Cargando tickets…</div></div>
 </div>
 
+
+
+<!-- CERRAR · POSPONER · DESCARTAR · solo socias. Un solo camino para los
+     tres: cambia el titulo, si la nota es obligatoria y su minimo. -->
+<div id="tkEst" class="hidden" onclick="if(event.target===this) tkEstCerrar()">
+  <div class="tke-in">
+    <div class="tk-top">
+      <div class="tk-t" id="tkEstT">—</div>
+      <button class="tk-x" onclick="tkEstCerrar()" aria-label="Cerrar">×</button>
+    </div>
+    <div class="tk-sub" id="tkEstQue"></div>
+    <div class="tkr-q" id="tkEstQ" style="font-size:13px;color:var(--text-2);margin:12px 0 6px"></div>
+    <textarea id="tkEstNota" class="tke-t" oninput="tkEstValidar()"></textarea>
+    <div class="tke-n" id="tkEstN"></div>
+    <button class="tke-ok" id="tkEstOk" onclick="tkEstGuardar()">Confirmar</button>
+    <div class="tke-msg" id="tkEstMsg"></div>
+  </div>
+</div>
 
 <div id="vCobros" class="hidden">
   <div class="faces">
@@ -20378,6 +20429,89 @@ function irATickets(){
   tkListar();
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   CERRAR · POSPONER · DESCARTAR · b62 (19-sep-2026)
+   Los tres estados que NO se abren a CC: el guardia del §2 los rechaza sin
+   sesion a proposito, y la RLS exige `acceso_es_socia()`. Esta pantalla es
+   el UNICO camino que existe para ponerlos — medido el 19-sep:
+   `ticket_estado` no se escribia desde ninguna linea de `index.html`, asi
+   que sin esto un ticket llegaba a "En validacion" y no salia nunca.
+
+   🔴 EL MINIMO DE 20 ES EL DE LA BASE (`ticket_estado_nota_ok`), copiado y
+   rotulado. Vale para 'pospuesto' y 'descartado'; 'cerrado' no lo pide.
+   Si cambia alla, cambia aca: dos minimos distintos dan un boton que deja
+   mandar algo que la base rechaza.
+   ══════════════════════════════════════════════════════════════════════ */
+var TKE={id:null, estado:null, min:0};
+var TKE_CONF={
+  cerrado:   {t:'Cerrar',    q:'¿Algo que dejar escrito? <span style="color:var(--text-3)">(opcional)</span>',
+              ph:'Qué se hizo, o por qué ya no hace falta.', min:0},
+  pospuesto: {t:'Posponer',  q:'¿Por qué se pospone? <span style="color:var(--text-3)">(mínimo 20)</span>',
+              ph:'Y qué tendría que pasar para retomarlo.', min:20},
+  descartado:{t:'Descartar', q:'¿Por qué se descarta? <span style="color:var(--text-3)">(mínimo 20)</span>',
+              ph:'Dentro de seis meses nadie se va a acordar. Escribilo.', min:20}
+};
+
+function tkEstAbrir(id, estado){
+  var c=TKE_CONF[estado]; if(!c) return;
+  TKE={id:id, estado:estado, min:c.min};
+  var f=_TK_FILAS[id]||{};
+  document.getElementById('tkEstT').textContent=c.t+' T-'+String(id).padStart(4,'0');
+  document.getElementById('tkEstQue').textContent=String(f.descripcion||'').slice(0,90);
+  document.getElementById('tkEstQ').innerHTML=c.q;
+  var t=document.getElementById('tkEstNota');
+  t.value=''; t.placeholder=c.ph;
+  document.getElementById('tkEstMsg').className='tke-msg';
+  document.getElementById('tkEstOk').textContent='Confirmar';
+  document.getElementById('tkEst').classList.remove('hidden');
+  tkEstValidar();
+}
+function tkEstCerrar(){ document.getElementById('tkEst').classList.add('hidden'); }
+
+function tkEstValidar(){
+  var n=(document.getElementById('tkEstNota').value||'').trim().length;
+  var c=document.getElementById('tkEstN');
+  if(!TKE.min){ c.className='tke-n'; c.textContent = n ? (n+' caracteres') : 'Se puede dejar vacío.'; }
+  else if(n>=TKE.min){ c.className='tke-n'; c.textContent=n+' caracteres'; }
+  else { c.className='tke-n falta'; c.textContent='faltan '+(TKE.min-n)+' — la base pide '+TKE.min; }
+  document.getElementById('tkEstOk').disabled = TKE.min>0 && n<TKE.min;
+}
+
+async function tkEstGuardar(){
+  var b=document.getElementById('tkEstOk'), m=document.getElementById('tkEstMsg');
+  b.disabled=true; b.textContent='Guardando…'; m.className='tke-msg';
+  try{
+    var c=sbClient(); if(!c) throw new Error('no hay cliente de Supabase');
+    var u=await c.auth.getUser();
+    var correo=((u&&u.data&&u.data.user&&u.data.user.email)||'').trim();
+    if(!correo) throw new Error('no hay sesión abierta. Esto va firmado.');
+    var nota=(document.getElementById('tkEstNota').value||'').trim();
+    var fila={ticket_id:TKE.id, estado:TKE.estado, creado_por:correo,
+              build_al_marcar:(typeof BUILD!=='undefined'?BUILD:null)};
+    /* La nota SOLO va si hay algo escrito. Mandar '' en 'cerrado' guardaria
+       una nota vacia que despues se lee como "no dijo nada", cuando en
+       realidad nunca se pregunto. */
+    if(nota) fila.nota=nota;
+    /* `.select('id')` no es decoracion: sin el, un insert que la RLS rechaza
+       puede volver sin error y el cambio se pierde EN SILENCIO. */
+    var r=await c.from('ticket_estado').insert(fila).select('id');
+    if(r.error) throw r.error;
+    if(!r.data||!r.data.length) throw new Error('la base no devolvió el cambio. No se guardó.');
+    m.className='tke-msg ok';
+    m.textContent='T-'+String(TKE.id).padStart(4,'0')+' quedó como '+
+      (TK_ESTADOS[TKE.estado]||TKE.estado)+'.';
+    b.textContent='Confirmar';
+    setTimeout(function(){ tkEstCerrar(); tkListar(); tkContar(); }, 1100);
+  }catch(e){
+    m.className='tke-msg mal';
+    m.textContent='No se guardó.\n'+_tkMotivo(e);
+    b.textContent='Confirmar';
+  }
+  tkEstValidar();
+}
+
+var _TK_FILAS={};
+
 var TK_ESTADOS={sin_triar:'Sin revisar',disponible:'Disponible',bloqueado:'Bloqueado',
   en_curso:'En curso',en_validacion:'En validación',cerrado:'Cerrado',
   pospuesto:'Pospuesto',descartado:'Descartado'};
@@ -20398,6 +20532,11 @@ async function tkListar(){
   var cuerpo=document.getElementById('tklCuerpo');
   roto.style.display='none'; roto.textContent='';
   cuerpo.innerHTML='<div class="tkl-vacio">Cargando tickets…</div>';
+  /* Se pregunta donde manda: la MISMA funcion que decide si se dibuja una
+     pestaña. Y no es proteccion —eso lo hacen el guardia del §2 y la RLS,
+     los dos medidos— es no ofrecerle a alguien un boton que le va a rebotar. */
+  var socia=false;
+  try{ socia=await accesoSocia(); }catch(e){}
   try{
     var c=sbClient(); if(!c) throw new Error('sin cliente de Supabase');
     /* TODO EL EQUIPO VE TODOS. No se filtra por autor: la decision del 17-sep
@@ -20409,6 +20548,9 @@ async function tkListar(){
       .order('creado_en',{ascending:false});
     if(r.error) throw r.error;
     var filas=r.data||[];
+    /* Las filas quedan a mano para que la hoja pueda decir de que ticket se
+       trata sin volver a preguntarle a la base. */
+    _TK_FILAS={}; filas.forEach(function(f){ _TK_FILAS[f.id]=f; });
     if(!filas.length){
       cuerpo.innerHTML='<div class="tkl-vacio">No hay tickets todavía. '+
         'El botón ✱ de abajo a la derecha es el que los crea.</div>';
@@ -20445,9 +20587,18 @@ async function tkListar(){
           '</div>'+
           '<div class="tkl-txt">'+_tkEsc(f.descripcion)+'</div>'+
           '<div class="tkl-pie">'+pie.join(' · ')+'</div>'+
-          /* El boton de revisar SOLO para socias. No es proteccion —eso lo
-             hacen el trigger y la RLS, medidos el 19-sep— es no ofrecerle a
-             alguien un boton que le va a rebotar. */
+          /* LOS TRES BOTONES · solo socias, y solo mientras el ticket siga
+             abierto. No es proteccion —eso lo hacen el guardia del §2 y la
+             RLS, los dos medidos— es no ofrecerle a alguien un boton que le
+             va a rebotar. Y ofrecer "Cerrar" sobre algo ya cerrado seria un
+             boton que no hace nada util. */
+          ((socia && ['cerrado','pospuesto','descartado'].indexOf(f.estado)<0)
+            ? '<div class="tkl-acc">'+
+                '<button class="tkl-a" onclick="tkEstAbrir('+f.id+',&quot;cerrado&quot;)">Cerrar</button>'+
+                '<button class="tkl-a" onclick="tkEstAbrir('+f.id+',&quot;pospuesto&quot;)">Posponer</button>'+
+                '<button class="tkl-a" onclick="tkEstAbrir('+f.id+',&quot;descartado&quot;)">Descartar</button>'+
+              '</div>'
+            : '')+
         '</div>';
       });
       html+='</div>';
