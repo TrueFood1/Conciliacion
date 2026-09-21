@@ -3743,6 +3743,29 @@ body.es-socia .face-pend{display:block}
    de ser legible de un vistazo, que es todo lo que esta pantalla ofrece. */
 .bs-det .bs-lote{color:var(--text-2);white-space:nowrap}
 .bs-meta{font-size:11.5px;color:var(--text-3);margin-top:9px;line-height:1.6}
+/* ── «Sale otro día» · deshacer una entrega (b63) ──────────────────────
+   Prefijo `bs-` y NO `dv-`, aunque el bloque de Devoluciones se vea igual.
+   Reusar `.dv-anu*` acá sería exactamente el pendiente §23 —el prefijo `rp-`
+   que hoy comparten dos módulos— empezando de nuevo: el día que Devoluciones
+   quiera cambiar su bloque, lo cambiaría también en el Historial sin saberlo.
+   Los valores se copian a mano a propósito; lo que no se comparte es el nombre. */
+.bs-anu{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:10px 0 2px;
+        border-top:1px solid var(--border);margin-top:10px}
+.bs-anu-l{background:none;border:none;color:var(--text-3);font:inherit;font-size:11.5px;
+          text-decoration:underline;cursor:pointer;padding:0}
+.bs-anu-l:hover{color:var(--text-2)}
+.bs-anu-l:disabled{opacity:.5;cursor:default;text-decoration:none}
+.bs-anu-n{flex:1 1 100%;background:var(--field);border:1px solid var(--border-strong);
+          border-radius:8px;padding:7px 10px;font:inherit;font-size:12.5px;color:var(--text)}
+.bs-anu-n:disabled{opacity:.6}
+/* El aviso va en ámbar, que en este sistema es el color que AVISA — no en lima,
+   que es el de acción. Ver el estándar visual: "lima y ámbar conviven". */
+.bs-anu-av{flex:1 1 100%;font-size:11.5px;color:var(--warn);line-height:1.45}
+/* Vacío no ocupa: sin texto no hay renglón, así el bloque no "salta" al abrirse. */
+.bs-anu-msg{flex:1 1 100%;font-size:11.5px;line-height:1.45;color:var(--text-3)}
+.bs-anu-msg:empty{display:none}
+.bs-anu-msg.mal{color:#ffb4b4;background:#3a1b1b;border-radius:8px;padding:8px 10px;
+                white-space:pre-wrap}
 /* chip de capacidad por personas (marca manual de la semana) */
 #vResumen .rz-chip,#vPlan .rz-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text-2);background:var(--surface-2);border:.5px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;white-space:nowrap}
 #vResumen .rz-chip:hover,#vPlan .rz-chip:hover{border-color:#3A3A42}
@@ -4248,7 +4271,7 @@ body.es-socia .face-pend{display:block}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 19 sep 2026 · b62';
+const BUILD = 'v 21 sep 2026 · b63';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -12604,6 +12627,34 @@ async function bsLeer(){
       P.forEach(function(x){ x.destinatario=D[x.pedido_id]||''; });
     }
   }catch(e){}
+
+  // ── LAS DEVOLUCIONES VIGENTES · insumo del guarda de «Sale otro día» ───
+  // 🔴 ESTA LECTURA FALLA CERRADO, al revés que la del destinatario de arriba.
+  // Aquélla es adorno: si no llega, se pierde el "para X" y la fila sigue. Ésta
+  // decide si se OFRECE un botón que escribe en producción y no se puede
+  // deshacer. Si no se pudo leer, `devs_ok` queda en false y `bsPuedeDeshacer`
+  // devuelve false: de menos, nunca de más — el mismo criterio que
+  // `dvPuedeAnular` con `_socia===null`.
+  // Por qué importa: medido el 21-sep en rollback, si se anula la salida de un
+  // pedido que YA tiene devolución vigente, los números no se rompen (sigue
+  // descontando 480 y sumando los 24 devueltos) pero el pedido vuelve a la
+  // bandeja como "preparado, sin salir" CON una devolución colgando de esa
+  // entrega. Una entrega que nunca salió no puede tener devolución.
+  let devsOK=false; const conDev={};
+  try{
+    const ids=P.map(function(x){ return x.pedido_id; }).filter(Boolean);
+    if(ids.length){
+      const {data:dv,error:eDv}=await c.from('ent_devolucion_vigente')
+        .select('devolucion_id,pedido_id').in('pedido_id',ids);
+      if(eDv) throw eDv;
+      (dv||[]).forEach(function(x){ conDev[x.pedido_id]=true; });
+    }
+    devsOK=true;
+  }catch(e){
+    try{ console.error('[Truefie] Historial · no pude leer las devoluciones vigentes', e); }catch(_){}
+  }
+  P.forEach(function(x){ x.devs_ok=devsOK; x.tiene_devolucion=!!conDev[x.pedido_id]; });
+
   return await _entColgarDetalle(c, P);
 }
 
@@ -12738,8 +12789,142 @@ function bsDetalle(p){
                   : ' · sin salida registrada')
     +' · '+esc(p.factura_nombre?('factura '+_despFacCorta(p.factura_nombre)):'sin factura')
     +(p.motivo&&p.motivo!=='venta'?' · '+esc((ENT_MOTIVO_N[p.motivo]||p.motivo).toLowerCase()):'')
-    +'</div></div>';
+    +'</div>'
+    + bsDeshacerHTML(p)
+    +'</div>';
   return h;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   «SALE OTRO DÍA» · deshacer una entrega que no salió · b63 (21-sep-2026)
+   Caso (a) del §7 de ENTREGAS_PENDIENTES. Anula SOLO la salida: el pedido
+   vuelve a "preparado" y el producto SIGUE APARTADO en el congelador.
+
+   POR QUÉ ACÁ Y NO EN DESPACHOS. Un pedido entregado no tiene tarjeta en la
+   bandeja —sólo un contador "Registrados hoy" que trae justamente acá—, así
+   que el Historial es la única pantalla con una ficha por pedido entregado.
+   Y el pie de esa ficha ya dice "salió <cuándo>": el lugar donde una socia
+   lee que salió es el lugar donde tiene que poder decir que no salió.
+
+   EL CASO QUE LO PIDIÓ: el pedido 135 del 21-sep (Super Mercado B M Limitada).
+   Daniel lo marcó entregado, el cliente movió la entrega a la semana
+   siguiente, y hubo que resolverlo con SQL a mano.
+
+   🔴 EL SALDO NO SE MUEVE, Y ESO ESTÁ BIEN. Se descuenta al PREPARAR:
+   `ent_salido_del_congelador_desde_ancla` engancha la salida con LEFT JOIN y
+   filtra por `coalesce(sv.salida_en, av.preparado_en) > ancla.corte`. Anulada
+   la salida, el coalesce cae al alisto y el descuento se sostiene solo. Las
+   unidades siguen apartadas para ese cliente: no están disponibles, están
+   comprometidas. Devolverlas al saldo sería decir que están libres.
+   Medido en rollback el 21-sep: 480 antes, 480 después, estado a "preparado".
+   ══════════════════════════════════════════════════════════════════════ */
+let _bsDes=0, _bsDesNota={}, _bsDesGuardando=0;
+
+/* Los cinco guardas. Cuatro salen del dato y uno del perfil; ninguno está
+   supuesto — los cuatro del dato se midieron contra producción el 21-sep.
+   ⚠️ El de la RLS NO está acá: `ent_anulacion_ins` exige `acceso_es_socia()`
+   y eso es lo que protege de verdad (medido por carril B: 42501 como equipo).
+   Esta función evita OFRECER un botón que la base va a rechazar — es lo mismo
+   que `dvPuedeAnular`, con la diferencia de que hoy aquél ya tiene la RLS
+   detrás y no está solo. */
+function bsPuedeDeshacer(p){
+  if(_socia!==true)           return false;  // null = todavía no se sabe: no se ofrece
+  if(!p || p.estado!=='entregado') return false;
+  if(!p.salida_id)            return false;  // sin salida vigente no hay nada que anular
+  if(!p.alisto_id)            return false;  // `v_ent_pedido_estado` hace join interno
+                                             // al alisto vigente, así que esto no
+                                             // debería pasar — se comprueba igual
+  if(!p.devs_ok)              return false;  // no se pudieron leer las devoluciones
+  if(p.tiene_devolucion)      return false;  // ver el comentario de `bsLeer`
+  return true;
+}
+
+function bsDeshacerHTML(p){
+  if(!bsPuedeDeshacer(p)) return '';
+  const id=p.pedido_id;
+  if(_bsDes!==id)
+    return '<div class="bs-anu"><button class="bs-anu-l" onclick="bsDeshacerUI('+id+')">'
+      +'Sale otro día — deshacer la entrega</button></div>';
+  const g=(_bsDesGuardando===id);
+  return '<div class="bs-anu">'
+    /* El aviso, en el idioma de quien lo lee. Tres frases cortas y ninguna
+       nombra una tabla: lo que cambia, lo que NO cambia, y que no hay vuelta. */
+    +'<div class="bs-anu-av">El pedido vuelve a preparado. El producto sigue '
+    +'apartado en el congelador. <b>Esto no se puede deshacer.</b></div>'
+    +'<input class="bs-anu-n" maxlength="140" placeholder="Por qué (opcional)" '
+    +'value="'+esc(_bsDesNota[id]||'')+'" '+(g?'disabled ':'')
+    +'oninput="_bsDesNota['+id+']=this.value">'
+    +'<button class="btn btn-sm" '+(g?'disabled ':'')+'onclick="bsDeshacer('+id+')">'
+    +(g?'Deshaciendo…':'Deshacer la entrega')+'</button>'
+    +'<button class="bs-anu-l" '+(g?'disabled ':'')+'onclick="bsDeshacerUI(0)">Cancelar</button>'
+    +'<div id="bsAnuMsg'+id+'" class="bs-anu-msg"></div>'
+    +'</div>';
+}
+
+function bsDeshacerUI(id){ _bsDes=id||0; bsFiltrar(); }
+
+async function bsDeshacer(id){
+  /* ⚠️ SIN `if(msg)` MUDO. Si el nodo del mensaje no está —la lista se
+     repinta y el pedido podría haberse cerrado— el motivo NO se pierde: se
+     grita. Es la lección del 17-sep, la misma que arregló `rpAgregarLinea`:
+     una guarda que protege contra un nodo ausente termina protegiendo contra
+     que la persona se entere. */
+  const pon=function(t,mal){
+    const msg=document.getElementById('bsAnuMsg'+id);   // se busca AL USARLO
+    if(msg){ msg.textContent=t; msg.className='bs-anu-msg'+(mal?' mal':''); return; }
+    if(t){ try{ console.error('[Truefie] Historial · deshacer entrega:',t); }catch(e){} alert(t); }
+  };
+  if(_bsDesGuardando) return;
+  const c=sbClient(); if(!c){ pon('No hay sesión de Supabase — no se cambió nada.',true); return; }
+
+  /* Se vuelve a mirar el pedido EN LA LISTA justo antes de escribir. Entre que
+     se abrió la ficha y se tocó el botón pudo entrar una devolución, o la
+     salida pudo anularse desde otra sesión. Barato y cierra la ventana. */
+  const p=(_bs||[]).filter(function(x){ return x.pedido_id===id; })[0];
+  if(!bsPuedeDeshacer(p)){
+    pon('Este pedido ya no se puede deshacer — refrescá el historial.',true);
+    return;
+  }
+  const salidaId=p.salida_id;
+  const nota=String(_bsDesNota[id]||'').trim();
+
+  _bsDesGuardando=id; bsFiltrar(); pon('Deshaciendo…');
+  try{
+    const {data:{user}}=await c.auth.getUser();
+    const email=(user&&user.email)||'';
+    if(!email) throw new Error('no hay sesión abierta. La anulación tiene que ir firmada.');
+
+    /* `.select('id')` no es decoración: sin él, un insert que la RLS rechaza
+       puede volver sin error y la anulación se pierde EN SILENCIO. Es la forma
+       exacta del bug de Devoluciones del 17-sep. Si no vuelve un id, falló. */
+    const {data,error}=await c.from('ent_anulacion').insert({
+      entidad:'salida', entidad_id:salidaId,
+      motivo:(nota||null), creado_por:email}).select('id');
+    if(error) throw error;
+    if(!data || !data.length) throw new Error('la base no devolvió la anulación. No se guardó.');
+
+    _bsDes=0; delete _bsDesNota[id]; _bsDesGuardando=0;
+
+    /* ── QUE SE ENTERE TODO EL QUE MUESTRA ESTE PEDIDO ──────────────────
+       Es el bug de la semana, y acá muerde en CINCO lugares:
+         · `_bs`         el historial mismo — el pedido pasa a "preparado";
+         · `_despEstado` la bandeja — el pedido VUELVE a "por entregar", que
+                         es el punto entero de este botón;
+         · `_despLotes` / `_despSaldo` y `_rpLotes` / `_rpSaldo`, porque aunque
+           el saldo por lote NO cambie, la foto que tienen leída incluye el
+           estado del pedido y quedó vieja;
+         · `_pd`, la de Pendientes, que es JUSTO la que se olvidó el 17-sep:
+           `pdCargar(false)` sale por el camino corto si `_pd` ya existe.
+       Invalidar el saldo y no la lista de pendientes es acordarse de la mitad. */
+    try{ _despLotes=null; _despSaldo=null; _rpLotes=null; _rpSaldo=null; _pd=null; }catch(e){}
+    try{ await despCargarEstado(); }catch(e){}   // la verdad la dice la vista
+    await bsCargar(true);                        // releer, no parchear en memoria
+  }catch(e){
+    _bsDesGuardando=0;
+    try{ console.error('[Truefie] Historial · no pude deshacer la entrega', id, e); }catch(_){}
+    bsFiltrar();
+    pon('No se pudo deshacer: '+((e&&e.message)||e)+'. No se cambió nada.', true);
+  }
 }
 
 // ── La hoja de clientes: frecuentes primero (facturas de los últimos 90 días) ──
