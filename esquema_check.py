@@ -70,7 +70,21 @@ DEUDA = {
 # Un objeto sensible con otro nombre y sin anotar se escapa de las dos: si nace uno,
 # va a la lista. Es la parte que sigue dependiendo de alguien.
 SENSIBLE_PREFIJOS = ('rrhh_', 'v_rrhh_')
-SENSIBLE_LISTA    = {'acceso_usuario', 'v_acceso_usuario'}
+# Desde el 21-sep-2026 se suman las tres de TICKETS. No es que guarden salarios:
+# `ticket.creado_por` es el CORREO de quien reportó, `v_ticket` expone además
+# `estado_por`, y la descripción la escribe una persona contando lo que le pasó.
+# Eso es dato de persona con el mismo criterio que el de arriba.
+# Se anotan acá porque sin la anotación salían como `?` —"sin permiso para la
+# anon key, ¿le falta grant o le sobra RLS?"— TODOS LOS DÍAS. Y ese rechazo es
+# el resultado CORRECTO: las tres se cerraron a propósito el 19-sep. Una alarma
+# que suena siempre cuando todo está bien se termina apagando, y ese día no va a
+# sonar la que importa. Anotadas, el mismo rechazo se lee como `✓ cerrado`.
+# ⚠️ `ticket_marca`, `ticket_detalle` y `ticket_foto` NO están acá porque hoy
+# `index.html` no las consulta, y este chequeo solo mira lo que el código llama.
+# El día que una pantalla las use van a aparecer como `?` — y ahí van a la lista,
+# no al olvido.
+SENSIBLE_LISTA    = {'acceso_usuario', 'v_acceso_usuario',
+                     'ticket', 'ticket_estado', 'v_ticket'}
 def es_sensible(t):
     return t in SENSIBLE_LISTA or t.startswith(SENSIBLE_PREFIJOS)
 
