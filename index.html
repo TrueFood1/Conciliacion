@@ -1509,6 +1509,22 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   border:1px solid var(--border-strong);border-radius:9px;color:var(--text);
   font:inherit;font-size:16px;padding:11px 12px;min-height:88px;resize:vertical}
 .tk-tipos{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+/* ── El ámbito (b65). Dos posiciones, no cuatro: no es una categoría más,
+   es de quién es el asunto. Por eso va separado de los tipos y con un
+   renglón de aire, en vez de ser un quinto botón de la misma grilla. */
+/* El separador de las dos mitades. Más liviano que un título de grupo: el
+   grupo dice QUÉ, la mitad dice DE QUIÉN, y jerarquizarla de más haría que la
+   lista pareciera dos pantallas. */
+.tkl-mitad{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+           color:var(--text-3);margin:18px 0 8px;padding-bottom:5px;
+           border-bottom:1px solid var(--border)}
+.tkl-mitad:first-child{margin-top:0}
+.tk-ambito{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.tk-amb{background:var(--surface-2);border:1px solid var(--border);border-radius:9px;
+        padding:9px 10px;font:inherit;font-size:13px;color:var(--text-2);cursor:pointer}
+.tk-amb:hover{border-color:var(--border-strong)}
+.tk-amb.on{background:var(--ent-fill,#E9FE60);border-color:var(--ent-fill,#E9FE60);
+           color:var(--ent-fill-tx,#1A1A1A);font-weight:600}
 .tk-tipo{background:var(--field);border:1px solid var(--border);border-radius:9px;
   color:var(--text);font:inherit;font-size:13px;padding:11px 10px;cursor:pointer;text-align:left}
 .tk-tipo.on{border-color:var(--mod,var(--accent));color:var(--text);font-weight:600}
@@ -4271,7 +4287,7 @@ body.es-socia .face-pend{display:block}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 21 sep 2026 · b64';
+const BUILD = 'v 21 sep 2026 · b65';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -20342,6 +20358,28 @@ try{ document.getElementById('homeBuild').textContent = BUILD; }catch(e){}
       placeholder="Lo que viste. Con cinco letras alcanza."></textarea>
 
     <div class="tk-lbl">¿Qué es?</div>
+    <!-- ── EL ÁMBITO · b65 (21-sep-2026) ──────────────────────────────────
+         Va ARRIBA de todo, antes del tipo y del texto, porque cambia qué
+         significan los dos: "Algo no funciona" en Truefie es un bug; en un
+         trámite de PROCOMER es otra cosa.
+
+         UN CONTROL, DOS MODOS — no un segundo ✱ en el lobby. Dos botones
+         para la misma acción se desincronizan: es el pendiente §23 (el
+         prefijo `rp-` compartido) y es el bug del guión de las regalías,
+         que se arregló en Pendientes y siguió roto en el Historial seis
+         días.
+
+         EL VALOR INICIAL SALE DEL CONTEXTO que la app ya tiene: adentro de
+         un módulo arranca en "De Truefie"; en el lobby, donde `data-mod`
+         está vacío, arranca en "Pendiente mío". Un toque lo cambia SIEMPRE
+         — un trámite se te puede ocurrir mirando Entregas, y obligarte a
+         salir al lobby para anotarlo sería una trampa. -->
+    <div class="tk-ambito" id="tkAmbito">
+      <button type="button" class="tk-amb" data-ambito="truefie"
+              onclick="tkAmbito(this)">De Truefie</button>
+      <button type="button" class="tk-amb" data-ambito="propio"
+              onclick="tkAmbito(this)">Pendiente mío</button>
+    </div>
     <div class="tk-tipos" id="tkTipos">
       <button type="button" class="tk-tipo on" data-tipo="no_funciona"
               onclick="tkTipo(this)">Algo no funciona</button>
@@ -20463,6 +20501,38 @@ function tkDondeEstoy(){
    EL BOTON · cuando se ve y cuando no
    ══════════════════════════════════════════════════════════════════════ */
 var _TK_TIPO='no_funciona';
+/* `null` = todavía no se decidió. `tkAbrir()` lo resuelve desde `data-mod`
+   cada vez que se abre la hoja — no una sola vez al cargar, porque entre
+   una apertura y otra te podés haber movido de pantalla. */
+var _TK_AMBITO=null;
+function tkAmbito(btn){
+  _TK_AMBITO=btn.getAttribute('data-ambito');
+  var t=document.querySelectorAll('#tkAmbito .tk-amb');
+  for(var i=0;i<t.length;i++) t[i].classList.toggle('on', t[i]===btn);
+  tkPintarCtx();
+}
+/* El contexto que se manda CAMBIA con el ámbito, así que el cartel de
+   "Se manda también:" tiene que repintarse cuando se toca el interruptor.
+   Si no, dice que manda la miga de una pantalla que ya no va a viajar. */
+function tkPintarCtx(){
+  var ctx=tkDondeEstoy(), partes=[];
+  if(_TK_AMBITO==='propio'){
+    /* 🔴 SIN CONTEXTO DE PANTALLA. Guardar "estabas en vDespachos" en un
+       trámite de PROCOMER es ruido que después alguien aprende a ignorar.
+       Lo que SÍ se guarda —build, agente, viewport— no dice de qué se
+       trata el pendiente: dice desde dónde lo escribiste, y eso sirve. */
+    partes.push('sin la pantalla — es un pendiente tuyo');
+    partes.push(ctx.build);
+  }else{
+    if(ctx.miga) partes.push(ctx.miga);
+    else if(ctx.vista) partes.push(ctx.vista);
+    if(ctx.sobre) partes.push('con «'+ctx.sobre+'» encima');
+    partes.push(ctx.build);
+    if(ctx.viewport) partes.push(ctx.viewport);
+  }
+  var el=document.getElementById('tkCtx');
+  if(el) el.textContent='Se manda también: ' + partes.join(' · ') + '.';
+}
 
 function _tkVisible(el){ return el && !el.classList.contains('hidden'); }
 
@@ -20496,15 +20566,15 @@ function _tkSync(){
    LA HOJA
    ══════════════════════════════════════════════════════════════════════ */
 function tkAbrir(){
+  /* EL ÁMBITO SE RESUELVE ACÁ, en cada apertura, y no una vez al cargar:
+     entre que abriste la hoja la última vez y ahora te pudiste haber movido
+     de pantalla. `data-mod` con valor = estás adentro de un módulo. */
   var ctx=tkDondeEstoy();
-  var partes=[];
-  if(ctx.miga) partes.push(ctx.miga);
-  else if(ctx.vista) partes.push(ctx.vista);
-  if(ctx.sobre) partes.push('con «'+ctx.sobre+'» encima');
-  partes.push(ctx.build);
-  if(ctx.viewport) partes.push(ctx.viewport);
-  document.getElementById('tkCtx').textContent =
-    'Se manda también: ' + partes.join(' · ') + '.';
+  _TK_AMBITO = ctx.modulo ? 'truefie' : 'propio';
+  var ab=document.querySelectorAll('#tkAmbito .tk-amb');
+  for(var i=0;i<ab.length;i++)
+    ab[i].classList.toggle('on', ab[i].getAttribute('data-ambito')===_TK_AMBITO);
+  tkPintarCtx();
   document.getElementById('tkMsg').className='tk-msg';
   document.getElementById('tkSheet').classList.remove('hidden');
   tkValidar();
@@ -20541,10 +20611,19 @@ async function tkEnviar(){
     if(!correo) throw new Error('no hay sesión abierta. El ticket tiene que ir firmado.');
 
     var ctx=tkDondeEstoy();
+    var propio = (_TK_AMBITO==='propio');
     var fila={
-      descripcion:txt, tipo:_TK_TIPO,
+      descripcion:txt, tipo:_TK_TIPO, ambito:(_TK_AMBITO||'truefie'),
       build:ctx.build, doc_modificado:ctx.doc_modificado,
-      vista:ctx.vista, miga:ctx.miga, modulo:ctx.modulo, sobre:ctx.sobre,
+      /* 🔴 UN PENDIENTE PROPIO NO LLEVA PANTALLA. `vista`, `miga`, `modulo`
+         y `sobre` van null: son el "dónde estabas", y un trámite de PROCOMER
+         no pasa en una pantalla. Guardarlo sería ruido que después hay que
+         aprender a ignorar — y además `modulo` es lo que agrupa la lista, así
+         que un propio con módulo aparecería en la mitad equivocada. */
+      vista:(propio?null:ctx.vista), miga:(propio?null:ctx.miga),
+      modulo:(propio?null:ctx.modulo), sobre:(propio?null:ctx.sobre),
+      /* Esto SÍ se guarda en los dos casos: no dice de qué se trata el
+         pendiente, dice desde dónde lo escribiste. */
       agente:ctx.agente, standalone:ctx.standalone, viewport:ctx.viewport,
       tz_offset_min:ctx.tz_offset_min, tz_nombre:ctx.tz_nombre,
       creado_por:correo
@@ -20744,9 +20823,54 @@ var TK_TIPOS={no_funciona:'Algo no funciona',duda:'Tengo una duda',
    desaparezcan. */
 var TK_ORDEN=['entregas','operaciones','finanzas','personal','conciliacion','sin_modulo'];
 var TK_MODNOM={entregas:'Entregas',operaciones:'Operaciones',finanzas:'Finanzas',
-  personal:'Personal',conciliacion:'Conciliación',sin_modulo:'Sin módulo · desde el lobby'};
+  personal:'Personal',conciliacion:'Conciliación',sin_modulo:'Sin módulo'};
+/* ⚠️ `ventas` NO está, y no es un olvido. Medido el 21-sep: `ACCESO_VISTAS`
+   tiene CINCO módulos y Ventas no es uno — es una tarjeta del lobby sin
+   vistas. Ningún ticket puede nacer con `modulo='ventas'`, así que el grupo
+   sería un renglón vacío que nadie puede llenar. Entra el día que Ventas
+   tenga pantallas. (Decisión de Andrea, 21-sep.)
+   Y si algún día apareciera un módulo nuevo, la lista de abajo lo agrega al
+   final sola: `claves` concatena lo que no esté en TK_ORDEN. */
 
 function _tkEsc(t){ var d=document.createElement('div'); d.textContent=(t==null?'':String(t)); return d.innerHTML; }
+
+/* ── EL ÍTEM, EN UNA SOLA FUNCIÓN · b65 ────────────────────────────────
+   Lo usan LAS DOS mitades. Estaba escrito adentro del `forEach` de los
+   grupos de Truefie; al aparecer "Mis pendientes" había que copiarlo, y una
+   regla de presentación escrita dos veces se desincroniza — la segunda copia
+   nunca recibe el arreglo de la primera. Es el bug del guión de las regalías
+   (b41 lo arregló en Pendientes y siguió roto en el Historial seis días) y es
+   la regla del CLAUDE.md. Por eso se extrae ANTES de necesitar la copia. */
+function tklItem(f, socia){
+var pie=[];
+    if(f.miga) pie.push(_tkEsc(f.miga));
+    else if(f.vista) pie.push(_tkEsc(f.vista));
+    pie.push(_tkEsc(f.build||'sin sello'));
+    pie.push(_tkEsc((f.creado_por||'').split('@')[0]));
+    pie.push(_tkEsc(String(f.creado_en||'').slice(0,16).replace('T',' ')));
+    var html='<div class="tkl-item">'+
+      '<div class="tkl-l1">'+
+        '<span class="tkl-id">T-'+String(f.id).padStart(4,'0')+'</span>'+
+        '<span class="tkl-est '+_tkEsc(f.estado)+'">'+_tkEsc(TK_ESTADOS[f.estado]||f.estado)+'</span>'+
+        '<span class="tkl-tipo">'+_tkEsc(TK_TIPOS[f.tipo]||f.tipo)+'</span>'+
+      '</div>'+
+      '<div class="tkl-txt">'+_tkEsc(f.descripcion)+'</div>'+
+      '<div class="tkl-pie">'+pie.join(' · ')+'</div>'+
+      /* LOS TRES BOTONES · solo socias, y solo mientras el ticket siga
+         abierto. No es proteccion —eso lo hacen el guardia del §2 y la
+         RLS, los dos medidos— es no ofrecerle a alguien un boton que le
+         va a rebotar. Y ofrecer "Cerrar" sobre algo ya cerrado seria un
+         boton que no hace nada util. */
+      ((socia && ['cerrado','pospuesto','descartado'].indexOf(f.estado)<0)
+        ? '<div class="tkl-acc">'+
+            '<button class="tkl-a" onclick="tkEstAbrir('+f.id+',&quot;cerrado&quot;)">Cerrar</button>'+
+            '<button class="tkl-a" onclick="tkEstAbrir('+f.id+',&quot;pospuesto&quot;)">Posponer</button>'+
+            '<button class="tkl-a" onclick="tkEstAbrir('+f.id+',&quot;descartado&quot;)">Descartar</button>'+
+          '</div>'
+        : '')+
+    '</div>';
+  return html;
+}
 
 async function tkListar(){
   var roto=document.getElementById('tklRoto');
@@ -20764,8 +20888,15 @@ async function tkListar(){
        es que un ticket no tiene nada privado y el duplicado si cuesta. La RLS
        dice lo mismo (`ticket_sel` en `using (true)`), asi que filtrar aca
        seria que la pantalla contradiga a la base. */
+    /* ⚠️ `ambito` VA EN EL SELECT, y no alcanza con que exista en la vista.
+       Es la lección de b63: el guarda de «Sale otro día» pedía `p.salida_id`,
+       el select no lo traía, y el botón no se dibujó NUNCA para nadie. Acá el
+       síntoma habría sido peor porque es silencioso: sin `ambito`, un
+       pendiente propio cae en "Sin módulo" y se mezcla con los de Truefie —
+       exactamente lo que esta pantalla vino a separar. Cazado el 21-sep por
+       la prueba con lectura real, ANTES de publicar. */
     var r=await c.from('v_ticket')
-      .select('id,tipo,estado,descripcion,modulo,miga,vista,build,creado_por,creado_en,agente,viewport')
+      .select('id,tipo,estado,descripcion,ambito,modulo,miga,vista,build,creado_por,creado_en,agente,viewport')
       .order('creado_en',{ascending:false});
     if(r.error) throw r.error;
     var filas=r.data||[];
@@ -20777,8 +20908,22 @@ async function tkListar(){
         'El botón ✱ de abajo a la derecha es el que los crea.</div>';
       return;
     }
-    var porMod={};
+    /* ── LAS DOS MITADES · b65 (21-sep-2026) ──────────────────────────
+       🔴 "Sin módulo" y "Mis pendientes" NO se pueden mezclar, y no es
+       estético: son cosas distintas. "Sin módulo" es *de Truefie, pero no
+       sé de qué parte* — algo que reportaste desde el lobby. "Mis
+       pendientes" es *esto no es Truefie*: un trámite, el empaque, el sitio.
+       Por eso el corte de arriba es por `ambito` y el de adentro por
+       `modulo`, que son dos ejes y no uno.
+       ⚠️ `ambito` puede venir `undefined` si esta pantalla queda servida
+       contra una base sin la columna: se cae a 'truefie', que es el default
+       de la base. De menos, nunca de más. */
+    var porAmbito={truefie:[], propio:[]};
     filas.forEach(function(f){
+      (porAmbito[f.ambito==='propio'?'propio':'truefie']).push(f);
+    });
+    var porMod={};
+    porAmbito.truefie.forEach(function(f){
       var m=f.modulo||'sin_modulo';
       (porMod[m]=porMod[m]||[]).push(f);
     });
@@ -20788,40 +20933,18 @@ async function tkListar(){
     var claves=TK_ORDEN.filter(function(m){ return porMod[m]; })
       .concat(Object.keys(porMod).filter(function(m){ return TK_ORDEN.indexOf(m)<0; }));
     var html='';
+    /* El encabezado de la mitad de Truefie solo aparece si hay ALGO en la
+       otra. Con una sola mitad, dos títulos de sección para una lista corta
+       pesan más de lo que ordenan — es la misma razón por la que Tickets no
+       es una séptima tarjeta del lobby. */
+    if(porAmbito.propio.length && claves.length)
+      html+='<div class="tkl-mitad">Truefie</div>';
     claves.forEach(function(m){
       var g=porMod[m];
       html+='<div class="tkl-grupo"><div class="tkl-grupo-t">'+
         _tkEsc(TK_MODNOM[m]||m)+
         '<span class="tkl-grupo-n">'+g.length+(g.length===1?' ticket':' tickets')+'</span></div>';
-      g.forEach(function(f){
-        var pie=[];
-        if(f.miga) pie.push(_tkEsc(f.miga));
-        else if(f.vista) pie.push(_tkEsc(f.vista));
-        pie.push(_tkEsc(f.build||'sin sello'));
-        pie.push(_tkEsc((f.creado_por||'').split('@')[0]));
-        pie.push(_tkEsc(String(f.creado_en||'').slice(0,16).replace('T',' ')));
-        html+='<div class="tkl-item">'+
-          '<div class="tkl-l1">'+
-            '<span class="tkl-id">T-'+String(f.id).padStart(4,'0')+'</span>'+
-            '<span class="tkl-est '+_tkEsc(f.estado)+'">'+_tkEsc(TK_ESTADOS[f.estado]||f.estado)+'</span>'+
-            '<span class="tkl-tipo">'+_tkEsc(TK_TIPOS[f.tipo]||f.tipo)+'</span>'+
-          '</div>'+
-          '<div class="tkl-txt">'+_tkEsc(f.descripcion)+'</div>'+
-          '<div class="tkl-pie">'+pie.join(' · ')+'</div>'+
-          /* LOS TRES BOTONES · solo socias, y solo mientras el ticket siga
-             abierto. No es proteccion —eso lo hacen el guardia del §2 y la
-             RLS, los dos medidos— es no ofrecerle a alguien un boton que le
-             va a rebotar. Y ofrecer "Cerrar" sobre algo ya cerrado seria un
-             boton que no hace nada util. */
-          ((socia && ['cerrado','pospuesto','descartado'].indexOf(f.estado)<0)
-            ? '<div class="tkl-acc">'+
-                '<button class="tkl-a" onclick="tkEstAbrir('+f.id+',&quot;cerrado&quot;)">Cerrar</button>'+
-                '<button class="tkl-a" onclick="tkEstAbrir('+f.id+',&quot;pospuesto&quot;)">Posponer</button>'+
-                '<button class="tkl-a" onclick="tkEstAbrir('+f.id+',&quot;descartado&quot;)">Descartar</button>'+
-              '</div>'
-            : '')+
-        '</div>';
-      });
+      g.forEach(function(f){ html+=tklItem(f, socia); });
       html+='</div>';
     });
     /* UNA SOLA LISTA, IGUAL PARA TODOS. No hay cara de socia y cara de
@@ -20831,6 +20954,18 @@ async function tkListar(){
        escribe CC. Un formulario que le preguntara a ella "¿toca numeros?" le
        estaria pidiendo un diagnostico que solo se saca leyendo el codigo.
        Hubo uno y se saco entero por eso mismo. */
+    /* ── MIS PENDIENTES · la otra mitad ────────────────────────────────
+       Va ABAJO y no arriba: la cola de Truefie es la que CC toma, y es la
+       que se mira todos los días. Los propios se miran cuando toca. */
+    if(porAmbito.propio.length){
+      html+='<div class="tkl-mitad">Mis pendientes</div>';
+      html+='<div class="tkl-grupo"><div class="tkl-grupo-t">'+
+        'No es de Truefie'+
+        '<span class="tkl-grupo-n">'+porAmbito.propio.length+
+        (porAmbito.propio.length===1?' pendiente':' pendientes')+'</span></div>';
+      porAmbito.propio.forEach(function(f){ html+=tklItem(f, socia); });
+      html+='</div>';
+    }
     cuerpo.innerHTML=html;
   }catch(err){
     /* Lista vacia y lista que no se pudo leer son DOS COSAS, y la pantalla
