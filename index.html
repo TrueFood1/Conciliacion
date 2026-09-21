@@ -14299,12 +14299,27 @@ function dvListaHTML(){
 // O sea que al anular el saldo por lote vuelve SOLO y la marca de exceso
 // desaparece SOLA. Por eso esto no toca el esquema.
 //
-// 🔴 EL PERMISO NO IMPIDE NADA. `dvPuedeAnular` es un FILTRO DE ACCIDENTE, no un
-// candado, exactamente igual que `boPuedeDescartar`: la RLS de `ent_anulacion` es
-// `INSERT to authenticated with check (true)` —CERO comprobacion de socia— asi
-// que cualquier sesion autenticada puede anular la devolucion de cualquiera.
-// Esto evita el toque equivocado de un compañero y NADA MAS. Que nadie lea este
-// `if` y crea que protege. La politica de verdad queda como pendiente.
+// ✅ EL PERMISO SI IMPIDE, DESDE EL 18-sep-2026. Hasta esa fecha la RLS de
+// `ent_anulacion` era `INSERT to authenticated with check (true)` —cero
+// comprobacion de socia— y este `if` era lo UNICO que separaba a un compañero
+// de anular la devolucion de cualquiera. Eso se cerro con
+// `CAMBIO_ANULACION_SOCIAS.sql`: hoy la politica es
+//     ent_anulacion_ins · INSERT · with check (acceso_es_socia())
+// Medido por el carril B de `pg_pruebas.py` (D9): con identidad de perfil
+// 'equipo' el insert da **42501**, y con identidad de socia ENTRA — las dos
+// mitades, porque una politica que no deja pasar a nadie tambien "protege" y
+// rompe la pantalla. Reverificado contra produccion el 21-sep.
+//
+// O sea que `dvPuedeAnular` paso de ser el candado a ser lo que tiene que ser:
+// no ofrecer un boton que la base va a rechazar. Los dos hacen falta y ninguno
+// sobra — sin el `if`, un compañero ve el boton y se come un error crudo.
+//
+// ⚠️ DOS COSAS QUE SIGUEN SIENDO CIERTAS Y CONVIENE NO OLVIDAR:
+//   · el SQL Editor entra como `postgres` y saltea la RLS de largo. Eso no es
+//     un hueco de la app: es lo que es un superusuario.
+//   · `ent_anulacion` tiene CERO triggers (medido el 21-sep), asi que nadie
+//     verifica que `creado_por` sea quien dice ser. La firma sirve para LEER
+//     el historial, no para impedir nada.
 function dvPuedeAnular(){
   if(_socia===null) return false;   // todavia no se sabe: NO se ofrece (de menos, nunca de mas)
   return _socia===true;
