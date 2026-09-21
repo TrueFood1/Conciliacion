@@ -4271,7 +4271,7 @@ body.es-socia .face-pend{display:block}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 21 sep 2026 · b63';
+const BUILD = 'v 21 sep 2026 · b64';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -12609,8 +12609,18 @@ async function _entColgarDetalle(c, P){
 async function bsLeer(){
   const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
   const {data:peds,error:e1}=await c.from('v_ent_pedido_estado')
+    /* ⚠️ `salida_id` NO ES DECORATIVO, y faltaba: b63 salió sin él y el botón
+       «Sale otro día» no se dibujó NUNCA, para nadie. `bsPuedeDeshacer` exige
+       `p.salida_id` y `bsDeshacer` lo manda como `entidad_id` — con el campo
+       ausente el guarda rebotaba todas las filas y, si no hubiera rebotado,
+       habría intentado anular `undefined`.
+       Medido el 21-sep contra producción: los pedidos 132 y 133 tienen salida
+       77 y 78 en la base, y llegaban al navegador sin ellas.
+       🔴 La regla que deja: los campos que un GUARDA lee tienen que estar en
+       este select. No alcanza con que existan en la vista. */
     .select('pedido_id,fecha_despacho,factura_id,factura_nombre,cliente_nombre,origen,motivo,'
-           +'alisto_id,responsable,preparado_en,salida_en,salida_registrada_en,estado,fecha_ab_re_04')
+           +'alisto_id,responsable,preparado_en,salida_id,salida_en,salida_registrada_en,'
+           +'estado,fecha_ab_re_04')
     .order('fecha_ab_re_04',{ascending:false}).limit(300);
   if(e1) throw e1;
   const P=peds||[];
