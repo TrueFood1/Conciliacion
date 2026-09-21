@@ -1,0 +1,32 @@
+-- ════════════════════════════════════════════════════════════════════
+-- PRUEBA B0 · CARRIL B · ⚠️ VA PRIMERA Y ES OBLIGATORIA
+--
+-- ⚠️ ESTE ARCHIVO NO SE PEGA EN EL EDITOR DE SQL. Es la ENTRADA de
+--    pg_pruebas.py, que le pone el sobre (begin / rollback) y la
+--    identidad. Por eso no lleva begin, ni rollback, ni un solo `set`.
+--
+-- NO ES UNA PRUEBA EXTRAIDA: se escribio el 17-sep-2026 para H3.
+--
+-- QUE PRUEBA: que el CARRIL B EXISTA. O sea, que despues de que la
+-- herramienta haga `set local role authenticated`, la RLS se aplique de
+-- verdad y el rol deje de saltearla.
+--
+-- 🔴 POR QUE VA PRIMERA. Si el carril B no apagara el bypass, TODAS las
+-- pruebas de permiso pasarian en verde sin ejercitar una sola politica.
+-- Es exactamente el fracaso de D8 del 16-sep —el SQL Editor entra como
+-- `postgres`, saltea la RLS, y D8 paso sin tocar `acceso_es_socia()`—
+-- mudado al lugar nuevo. Si esta prueba no da lo esperado, el carril B
+-- no existe y HAY QUE PARAR: ninguna prueba B posterior significa nada.
+--
+-- ESPERADO, con la identidad del usuario de prueba (perfil 'equipo'):
+--   filas_visibles   = 1      ← solo su propia fila
+--   perfil_que_dice  = equipo ← el claim llego y la cadena lo leyo
+--   es_socia         = f      ← y NO es socia
+--
+-- ⚠️ SI filas_visibles DA 6, EL CARRIL B NO EXISTE. Seis es lo que ve el
+--    carril A: medido el 17-sep-2026, `acceso_usuario` tiene 5 filas
+--    (3 equipo + 2 socias) y el usuario de prueba suma la sexta. Ver 6
+--    significa que se esta corriendo con el bypass puesto.
+-- ════════════════════════════════════════════════════════════════════
+select count(*) as filas_visibles from acceso_usuario;
+select acceso_perfil() as perfil_que_dice, acceso_es_socia() as es_socia;
