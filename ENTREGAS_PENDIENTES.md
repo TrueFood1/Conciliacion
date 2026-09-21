@@ -261,11 +261,18 @@ anular es **insertar** `(entidad, entidad_id, motivo, creado_por)`, con
 `entidad in ('alisto','salida')`. `ent_alisto_vigente` y `ent_salida_vigente` ya
 la respetan. Falta **solo la pantalla**.
 
-⚠️ **Y hay que anular el ALISTO, no solo la salida.** El saldo se descuenta al
-PREPARAR: `ent_salido_del_congelador_desde_ancla` suma desde `ent_alisto_lote`
+⚠️ **A veces hay que anular el ALISTO, no solo la salida.** El saldo se descuenta
+al PREPARAR: `ent_salido_del_congelador_desde_ancla` suma desde `ent_alisto_lote`
 pasando por `ent_alisto_vigente`. Anular solo la salida devuelve el pedido a
-"Preparado" y deja el saldo igual de mal. Son dos gestos distintos y la pantalla
+"Preparado" y **deja el saldo igual**. Son dos gestos distintos y la pantalla
 tiene que distinguirlos:
+
+> 📌 **Corregido el 21-sep-2026.** Acá decía que anular solo la salida "deja el
+> saldo igual de mal". **No es "mal": depende de por qué se deshace.** Si el
+> pedido sale otro día, el producto sigue apartado para ese cliente y el saldo
+> TIENE que quedar descontado — devolverlo al inventario disponible sería
+> mentir. "Mal" es solo cuando el pedido no va a salir. Ver la forma definida
+> al final de este §7.
 
 - **"No salió, pero sigue preparado"** → anular la salida. El pedido vuelve a la
   bandeja. El saldo NO cambia (el producto sigue fuera del congelador).
@@ -302,6 +309,110 @@ re-registrando el alisto a mano. Un botón de anular sin deshacer es una trampa;
 declara MUERTA: no tiene grant de UPDATE, así que nadie puede ponerla en true
 nunca. Con la tabla cruda, un despacho anulado seguía saliendo en Pendientes para
 siempre. Pasó a `ent_alisto_vigente`, que es la que refleja `ent_anulacion`.
+
+---
+
+### 🔴 LA FORMA DEFINIDA (21-sep-2026) · el botón «Deshacer entrega», solo socias
+
+El caso que lo cerró: el **pedido 135** (Super Mercado B M Limitada, 21-sep).
+Daniel lo marcó entregado, pero el cliente movió la entrega a la semana
+siguiente y el pan sigue en el congelador. Se resolvió con SQL a mano
+(`PEGADO_ANULAR_SALIDA_80.sql`) — la tercera vez que hace falta una sesión de
+SQL para algo que es un botón.
+
+**Un solo botón, «Deshacer entrega», y DOS salidas.** La pregunta que separa las
+dos no es técnica: es *¿el producto sigue apartado para este cliente?*
+
+**(a) «Sale otro día»** — anula **solo la salida**. Motivo **opcional**.
+El pedido vuelve a "preparado" y el inventario sigue apartado.
+
+**(b) «No va a salir»** — anula la salida **y** el alisto. Motivo
+**obligatorio**. El inventario vuelve a estar disponible, y queda una **NC
+pendiente** en la cola de Odoo, igual que las devoluciones: cliente, factura,
+productos, cantidades y lotes.
+
+#### Lo medido en rollback contra producción, 21-sep (nada aplicado)
+
+Sobre el pedido 135 / alisto 91 / salida 80 / lote `237 / 2-27`:
+
+| Qué se anula | saldo del lote | estado del pedido | salida vigente |
+|---|---|---|---|
+| nada (hoy) | 480 | entregado | 1 |
+| **solo la salida** → (a) | **480** (sin cambio) | **preparado** | 0 |
+| solo el alisto | **432** (vuelve) | *desaparece* | **1 ← colgada** |
+| **las dos** → (b) | **432** (vuelve) | *desaparece* | 0 |
+
+Tres cosas que salen de esa tabla y que hay que respetar al construirlo:
+
+1. **🔴 EL ORDEN ES: SALIDA PRIMERO, ALISTO DESPUÉS.** No es indiferente. Si se
+   anula el alisto primero y el segundo insert falla, queda una **salida
+   vigente colgando de un alisto anulado** (medido: `ent_salida_vigente` la
+   sigue mostrando, porque solo filtra por `entidad='salida'` y nunca mira si
+   el alisto sigue vigo). Al revés, el estado intermedio **es exactamente la
+   salida (a)**, que es un estado legítimo. Ningún paso intermedio miente.
+
+2. **Mejor todavía: las dos filas en UN solo insert.** PostgREST acepta
+   `.insert([{…},{…}])` y eso es un único INSERT, atómico. Así no hay estado
+   intermedio en absoluto. El orden del punto 1 queda como la red por si algún
+   día se parten.
+
+3. **El saldo lo devuelve el ALISTO, no la salida.** En (b) la anulación de la
+   salida no suma nada al inventario — está ahí para que no quede colgada. Si
+   alguien "optimiza" quitándola, rompe el punto 1.
+
+#### 🔴 EL AGUJERO DE (b), MEDIDO: el pedido cancelado NO SE VE EN NINGÚN LADO
+
+Después de anular las dos, se preguntó por las siete puertas por las que la app
+podría mostrar el pedido 135. **Las siete dan cero**:
+
+```
+v_ent_pedido_estado 0 · sin_verificar 0 · sin_factura 0 · sin_clasificar 0
+excepciones 0 · cola_odoo 0 · (la fila cruda de ent_pedido sigue: 1)
+```
+
+`v_ent_pedido_estado` hace **join interno** a `ent_alisto_vigente`, así que un
+pedido sin alisto vigente se cae de la vista — y con ella se caen la bandeja, el
+historial (`bsLeer`) y Devoluciones (`dvLeer`), que las tres leen de ahí. **El
+motivo que la socia escribió queda solo en `ent_anulacion`, que ninguna pantalla
+lee para `alisto`/`salida`.**
+
+O sea: hoy (b) haría desaparecer el pedido sin dejar rastro visible, y el motivo
+obligatorio que se le pidió a la socia no lo leería nunca nadie. **Eso hay que
+construirlo junto con (b), no después.** Lo que falta decidir es dónde: una
+pestaña de cancelados, o una fila tachada en el historial con su motivo. La
+segunda parece mejor — "anular no es esconder" ya está escrito arriba en este
+mismo §7 — pero obliga a sacar el join interno de `v_ent_pedido_estado`, que es
+de lo que cuelgan los saldos. No es un cambio chico.
+
+#### La NC de (b): copiar el flujo de devoluciones, con su advertencia
+
+No hay trigger: la NC la escribe **la app**, en dos tablas
+(`ent_odoo_pendiente` cabecera + `ent_odoo_pendiente_linea` con producto, lote,
+`cant_uds`, uom y factor), exactamente como en `dvRegistrar`. Y hereda su
+trampa, que ya está resuelta ahí y hay que copiar también:
+
+- **La NC no se deshace.** `ent_odoo_pendiente` no cuelga de ninguna vista
+  vigente, así que su fila sigue en la cola aunque después se revierta. La
+  pantalla de Devoluciones lo **dice en voz alta** antes de confirmar; la de
+  (b) tiene que decirlo igual.
+- **Invalidar `_pd` además del saldo.** Es el bug del 17-sep: `pdCargar(false)`
+  sale por el camino corto y quien hubiera abierto Pendientes antes en la misma
+  sesión no ve la NC nueva, sin ningún error.
+
+#### ⚠️ Y sigue en pie el §8
+
+Este botón **no tiene deshacer**. `ent_anulacion` es de una sola dirección, y el
+primer caso real de anulación (el despacho 11) resultó ser un error de
+diagnóstico. Con (a) el daño es chico —se re-registra la salida— pero con (b)
+hay que re-registrar alisto, líneas y lotes. **§8 sigue yendo antes o junto.**
+
+#### El permiso ya está, y es real
+
+`ent_anulacion_ins` es `with check (acceso_es_socia())` desde el 18-sep, medido
+por el carril B: 42501 como 'equipo', entra como socia. O sea que el "solo
+socias" del botón no depende del `if` de la pantalla. Lo que **no** protege
+nada: `ent_anulacion` no tiene triggers, así que `creado_por` no lo verifica
+nadie, y el SQL Editor saltea la RLS de largo.
 
 ---
 
@@ -1568,3 +1679,70 @@ O sea: **para mover dos columnas hay que desarmar y rearmar el motor de saldos.*
 **Dejar `causa`/`nota` en la cabecera Y agregarlas a la línea.** Evita el drop en
 cascada, pero deja el mismo dato en dos lugares — que es exactamente lo que este
 repo paga caro. Se descartó el 17-sep, por eso.
+
+---
+
+## 26 · 🟠 ABIERTO · Una línea que no sale, en un pedido YA entregado
+
+**Anotado el 21-sep-2026, sin diseñar.** Sale de mirar el §7: ahí se definió qué
+hacer cuando se cae el pedido **entero** —«Deshacer entrega», con sus dos
+salidas— y quedó a la vista que el caso de **una sola línea** no tiene camino.
+
+**El caso.** El pedido ya está entregado y después se sabe que de las cinco
+líneas una no salió: faltó producto, se rompió la caja, el cliente la rechazó en
+la puerta. Hoy las dos únicas herramientas son de grano grueso:
+
+- `no_se_entrega` en `ent_alisto_linea` (con `motivo_no_entrega`,
+  `cant_no_entregada`) se decide **al preparar**, antes de que la salida exista;
+- «Deshacer entrega» del §7 se lleva el pedido **completo**.
+
+Deshacer todo para arreglar una línea obliga a rehacer las otras cuatro, y
+además pasa por el §8, que no tiene vuelta atrás.
+
+**Lo que hay que decidir** (nada de esto está resuelto):
+- si es una corrección de la línea o un evento nuevo, append-only, como todo lo
+  demás del módulo;
+- qué pasa con el saldo de ESE lote, y solo de ese;
+- si dispara NC por la diferencia, o nota de débito, o nada;
+- y cómo se lee después en el historial, que es donde el §7 ya descubrió que no
+  hay dónde mostrar lo cancelado.
+
+**Ojo:** esto se parece a una devolución pero **no lo es**. En la devolución el
+producto volvió al congelador y hay que sumarlo; acá nunca salió. Si se modela
+como devolución, el inventario cierra pero la trazabilidad miente.
+
+---
+
+## 27 · 🟠 ABIERTO · Conteo con pedidos preparados y sin salir: esas cajas no se cuentan
+
+**Anotado el 21-sep-2026, sin diseñar.** Lo destapa el §7: con «Sale otro día»
+un pedido puede quedar **preparado y sin salir durante una semana**, y eso antes
+casi no pasaba porque preparar y entregar eran el mismo gesto.
+
+**El problema.** El saldo se descuenta al **PREPARAR**
+(`ent_salido_del_congelador_desde_ancla` suma desde `ent_alisto_lote` por
+`ent_alisto_vigente`). O sea que la herramienta ya da esas cajas por salidas.
+Pero **físicamente siguen en el congelador**, apartadas. Si Daniel hace un
+conteo esa semana y las cuenta, el físico le va a dar de más contra la
+herramienta — por la cantidad exacta que está apartada. Y si no las cuenta, tiene
+que **saber** que no debe, y hoy nada se lo dice.
+
+Las dos salidas del error son igual de malas: contar de más y "corregir" el
+ancla borra la diferencia real; o no contarlas por costumbre y que un día haya
+una diferencia de verdad escondida ahí.
+
+**Lo que hay que decidir** (nada de esto está resuelto):
+- si la pantalla de conteo **avisa** qué hay preparado y sin salir al momento
+  del conteo, y con qué lotes y cantidades;
+- si esas cajas se cuentan aparte, en su propio renglón, en vez de sumarse o
+  restarse al bulto;
+- o si el ancla las absorbe sola, como se está pensando para las "sin lote" del
+  §24.
+
+**El dato ya existe y no hay que salir a buscarlo**: son los pedidos en estado
+`preparado` de `v_ent_pedido_estado`, con sus líneas y lotes en
+`ent_alisto_lote`. Lo que falta es la decisión, no la consulta.
+
+⚠️ Y conviene medirlo antes de elegir: hasta hoy (21-sep) `v_ent_pedido_estado`
+tiene **0 pedidos en "preparado"**, porque preparar y entregar salían juntos. El
+§7 es lo que va a hacer que ese número deje de ser cero.
