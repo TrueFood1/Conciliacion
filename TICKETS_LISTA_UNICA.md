@@ -282,3 +282,32 @@ Los pasos 1 y 2 pueden ir en el mismo pegado. El 3 es una publicación. El 4 y e
 5 son pegados de datos, y van después de que la pantalla exista — migrar antes
 dejaría los tickets en una tabla que nadie puede mirar, que es el argumento que
 el §13 ya usó para no migrar el 19-sep.
+
+
+---
+
+## 5-bis · La lista de "Mis pendientes" a cargar
+
+**Confirmada por Andrea el 21-sep-2026. NO cargada** — la columna `ambito` ya
+está aplicada, pero la pantalla (b65) todavía no se publicó, y el §13 dice que
+migrar antes de que exista la pantalla deja los tickets en una tabla que nadie
+puede mirar.
+
+| # | pendiente | tipo | estado inicial |
+|---|---|---|---|
+| 1 | BRCGS: logo oficial del paquete de marca | encargo | disponible |
+| 2 | BRCGS: número de certificado y vencimiento (para `REGISTRO_TÉCNICO`) | encargo | disponible |
+| 3 | GS1: convención del código de caja de Pizza | duda | disponible |
+| 4 | Caja de Buns: al reimprimir, que diga "Buns" | encargo | **pospuesto** |
+| 5 | Bolsa de polipropileno de Pizza (Aida María) | encargo | disponible |
+| 6 | Página web: el argumento de los 5 ppm | encargo | disponible |
+| 7 | Página web: la pista para hacer scroll en la portada | encargo | disponible |
+
+⚠️ **El 4 nace `pospuesto`, no `disponible`**, y con su razón escrita: se
+reactiva cuando se mande a hacer la próxima tanda de cajas. Es justo la
+distinción que el §13 defiende entre *pospuesto* (vuelve) y *descartado* (no
+vuelve) — y un pendiente que nace pospuesto necesita que la razón diga **qué lo
+despierta**, si no es indistinguible de uno olvidado.
+
+Todos van con `ambito='propio'`, `modulo=null`, sin contexto de pantalla,
+`build='migrado · sin build'` y `creado_por='ticket-sql · migracion propios'`.
