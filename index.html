@@ -1609,6 +1609,15 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .tkl-tipo{font-size:11px;color:var(--text-3)}
 .tkl-txt{font-size:14px;color:var(--text);line-height:1.45}
 .tkl-pie{font-size:11px;color:var(--text-3);margin-top:6px;line-height:1.5;word-break:break-word}
+/* El renglón de la espera. Va pegado al texto del ticket y ANTES del pie:
+   el pie es procedencia (pantalla, sello, quién, cuándo) y esto es estado —
+   mezclarlos haría que se lea como un dato más de cuándo se reportó.
+   La barra de la izquierda y no un chip: un chip más en una tarjeta que ya
+   tiene tres compite con el estado, y acá el estado es el que manda. */
+.tkl-espera{font-size:12px;color:var(--text-2);margin-top:7px;line-height:1.45;
+  padding-left:9px;border-left:2px solid var(--border-strong);word-break:break-word}
+.tkl-espera-t{color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;
+  font-size:10px;margin-right:7px}
 /* El aviso de "esto no se pudo leer" NUNCA se calla y nunca se disfraza de
    lista vacia. Son dos cosas distintas y la pantalla tiene que decir cual. */
 .tkl-roto{font-size:13px;color:#ffb4b4;background:#3a1b1b;border-radius:9px;
@@ -20964,6 +20973,9 @@ function _tkEstadoConocido(e){
   return TK_ABIERTOS.indexOf(e)>=0 || TK_CERRADOS.indexOf(e)>=0;
 }
 
+/* "  " no es una espera. Un `trim` en un solo lugar, para que el renglón no
+   se dibuje vacío si alguien guarda espacios. */
+function _tkTxt(t){ return String(t==null?'':t).trim(); }
 function _tkEsc(t){ var d=document.createElement('div'); d.textContent=(t==null?'':String(t)); return d.innerHTML; }
 
 /* ── EL ÍTEM, EN UNA SOLA FUNCIÓN · b65 ────────────────────────────────
@@ -20987,6 +20999,27 @@ var pie=[];
         '<span class="tkl-tipo">'+_tkEsc(TK_TIPOS[f.tipo]||f.tipo)+'</span>'+
       '</div>'+
       '<div class="tkl-txt">'+_tkEsc(f.descripcion)+'</div>'+
+      /* ── QUÉ SE ESPERA · solo en los bloqueados ────────────────────────
+         Un ticket bloqueado que no dice esperando QUÉ cuenta la mitad de lo
+         que sabe: el chip gris avisa que nadie lo está tocando, y calla la
+         única cosa que permite destrabarlo. La espera ya se escribe —la
+         base la EXIGE para poder poner `bloqueado` (`ticket_estado_bloqueo_ok`
+         pide `espera` de 8 caracteres o más, o un ticket que bloquee)— así
+         que el dato existía y no se estaba mostrando.
+         DOS FORMAS, porque la base admite dos: un texto libre, o el id de
+         otro ticket. Se dibuja la que haya, y el ticket que bloquea primero:
+         es más concreto que cualquier frase.
+         ⚠️ `espera` y `bloquea_ticket_id` HAY QUE PEDIRLOS EN EL `.select()`.
+         Es la lección de b63 otra vez: que la columna exista en `v_ticket` no
+         alcanza, y el síntoma sería un renglón que no aparece nunca. */
+      ((f.estado==='bloqueado' && (f.bloquea_ticket_id || _tkTxt(f.espera)))
+        ? '<div class="tkl-espera">'+
+            '<span class="tkl-espera-t">Esperando</span>'+
+            _tkEsc(f.bloquea_ticket_id
+                    ? ('el T-'+String(f.bloquea_ticket_id).padStart(4,'0'))
+                    : f.espera)+
+          '</div>'
+        : '')+
       '<div class="tkl-pie">'+pie.join(' · ')+'</div>'+
       /* LOS TRES BOTONES · solo socias, y solo mientras el ticket siga
          abierto. No es proteccion —eso lo hacen el guardia del §2 y la
@@ -21177,7 +21210,7 @@ async function tkListar(){
        exactamente lo que esta pantalla vino a separar. Cazado el 21-sep por
        la prueba con lectura real, ANTES de publicar. */
     var r=await c.from('v_ticket')
-      .select('id,tipo,estado,descripcion,ambito,modulo,miga,vista,build,creado_por,creado_en,agente,viewport')
+      .select('id,tipo,estado,descripcion,ambito,modulo,miga,vista,build,creado_por,creado_en,agente,viewport,espera,bloquea_ticket_id')
       .order('creado_en',{ascending:false});
     if(r.error) throw r.error;
     var filas=r.data||[];
