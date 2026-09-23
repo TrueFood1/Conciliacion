@@ -20908,13 +20908,15 @@ var TK_TABS=[
   {k:'operaciones',  n:'Operaciones',    ac:'#D4537E'},
   {k:'entregas',     n:'Entregas',       ac:'#E9FE60'},
   {k:'conciliacion', n:'Conciliación',   ac:'#84BD00'},
-  /* SIEMPRE VISIBLE, aunque no tenga ni un ticket (Andrea, 23-sep). Es la
-     única con `siempre`: las demás aparecen cuando tienen algo. Un "Sin
-     módulo" que desaparece al quedar en cero deja de recordar que ese
-     balde existe, y lo que cae ahí es justamente lo que nadie clasificó. */
-  {k:'sin_modulo',   n:'Sin módulo',     ac:null, siempre:true},
+  {k:'sin_modulo',   n:'Sin módulo',     ac:null},
   {k:'__propio',     n:'Mis pendientes', ac:null}
 ];
+/* ⚠️ LAS SEIS SE DIBUJAN SIEMPRE, aunque estén en cero (Andrea, 23-sep).
+   La primera versión las escondía al quedar vacías y dejaba a "Sin módulo"
+   como excepción; con los datos del 23-sep eso borraba Conciliación y Mis
+   pendientes de la tira. Andrea pidió que las seis estén fijas, y es mejor:
+   una tira que cambia de largo según el día no se aprende de memoria, y el
+   cero también es información —"acá no hay nada"— que un hueco no da. */
 /* `__propio` lleva dos guiones bajos adelante a propósito: NO es un valor de
    `modulo`, es el otro eje (`ambito`). Que no se pueda confundir con una
    clave de módulo real ni por descuido ni por un `modulo` nuevo que algún
@@ -20922,12 +20924,45 @@ var TK_TABS=[
    es *de Truefie, pero no sé de qué parte*; "Mis pendientes" es *esto no es
    Truefie*. */
 var TK_MODNOM={}; TK_TABS.forEach(function(t){ TK_MODNOM[t.k]=t.n; });
-/* Los tres estados que cierran un ticket, EN UN SOLO LUGAR. Los usaban ya
-   `tklItem` (para no ofrecer botones que rebotan) y ahora los contadores
-   (para contar abiertos). Escritos dos veces, el día que entre un cuarto
-   estado final el contador diría que hay trabajo abierto que no existe. */
+/* ── LOS OCHO ESTADOS, CLASIFICADOS UNO POR UNO · 23-sep-2026 ─────────
+   El contador cuenta lo NO RESUELTO (Andrea, 23-sep). Para que eso sea
+   verificable hay que poder decir dónde cae CADA valor posible, así que
+   acá está la lista entera y de dónde sale cada parte:
+
+     · siete salen del CHECK `ticket_estado_ok` de la base, leído el
+       23-sep:  disponible · bloqueado · en_curso · en_validacion ·
+                cerrado · pospuesto · descartado
+     · el octavo, `sin_triar`, NO está en ese CHECK y no es un olvido: es
+       el `COALESCE(e.estado,'sin_triar')` de `v_ticket`, o sea el valor de
+       un ticket que todavía no tiene ni una fila en `ticket_estado`. Se
+       cuenta igual —es lo más abierto que hay— pero conviene saber que no
+       vive en la misma tabla que los otros siete.
+
+   🔴 `en_curso` NO ESTABA EN LA LISTA QUE PIDIÓ ANDREA. Nombró cuatro
+   abiertos (sin revisar, disponible, bloqueado, en validación) y tres
+   cerrados, y son siete de ocho. `en_curso` quedó sin clasificar. Va con
+   los abiertos, que es lo único que puede ser: un ticket EN CURSO es
+   trabajo sin terminar, y dejarlo afuera diría que no hay nada que hacer
+   justo mientras alguien lo está haciendo. Queda anotado por si Andrea
+   quiere lo contrario.
+
+   🔴 Y LA REGLA SE ESCRIBE POR LA LISTA CORTA, A PROPÓSITO. Abierto =
+   NO está entre los tres que cierran. Escrita al revés —enumerar los
+   cinco abiertos— un estado nuevo que alguien agregue mañana al CHECK
+   caería afuera del contador sin que nadie lo note, y el síntoma sería
+   trabajo pendiente que no se cuenta: invisible, que es el peor de los
+   dos errores. Así, un estado nuevo cuenta como abierto hasta que alguien
+   decida lo contrario, y eso SE VE. */
 var TK_CERRADOS=['cerrado','pospuesto','descartado'];
+var TK_ABIERTOS=['sin_triar','disponible','bloqueado','en_curso','en_validacion'];
 function _tkAbierto(f){ return TK_CERRADOS.indexOf(f.estado)<0; }
+/* El control de que la clasificación siga siendo completa. No decide nada
+   —`_tkAbierto` ya decidió— pero avisa si aparece un estado que ninguna de
+   las dos listas nombra, que es exactamente el caso que este bloque vino a
+   hacer imposible de pasar por alto. */
+function _tkEstadoConocido(e){
+  return TK_ABIERTOS.indexOf(e)>=0 || TK_CERRADOS.indexOf(e)>=0;
+}
 
 function _tkEsc(t){ var d=document.createElement('div'); d.textContent=(t==null?'':String(t)); return d.innerHTML; }
 
@@ -21007,9 +21042,13 @@ function _tkTabsVisibles(){
   var vis=[], fijas={};
   TK_TABS.forEach(function(t){ fijas[t.k]=1; });
   /* Los módulos con tickets que no tienen pestaña fija (hoy: `personal`).
-     Entran ANTES de "Sin módulo" para no romper el cierre de la tira: los
-     dos últimos son los dos baldes, y un módulo real no va después de
-     ellos. */
+     Esta parte NO cambia con el ajuste de arriba, y la diferencia importa:
+     las seis fijas se dibujan SIEMPRE porque Andrea las nombró; un módulo
+     que nadie nombró se dibuja SOLO si tiene algo. Fijarlo también sería
+     inventar una pestaña que no se pidió; esconderlo cuando tiene tickets
+     sería perderlos. Entran ANTES de "Sin módulo" para no romper el cierre
+     de la tira: los dos últimos son los dos baldes, y un módulo real no va
+     después de ellos. */
   var extra=Object.keys(_TK_BUCKETS).filter(function(k){
     return !fijas[k] && (_TK_BUCKETS[k]||[]).length;
   }).sort();
@@ -21017,7 +21056,7 @@ function _tkTabsVisibles(){
     if(t.k==='sin_modulo') extra.forEach(function(k){
       vis.push({k:k, n:(TK_MODNOM[k]||k), ac:null});
     });
-    if(t.siempre || (_TK_BUCKETS[t.k]||[]).length) vis.push(t);
+    vis.push(t);
   });
   return vis;
 }
@@ -21145,6 +21184,14 @@ async function tkListar(){
     /* Las filas quedan a mano para que la hoja pueda decir de que ticket se
        trata sin volver a preguntarle a la base. */
     _TK_FILAS={}; filas.forEach(function(f){ _TK_FILAS[f.id]=f; });
+    /* ⚠️ ¿Algún estado que las dos listas no nombren? Ver `_tkEstadoConocido`.
+       Se cuenta como abierto (es lo que hace `_tkAbierto`), pero no en
+       silencio: el día que entre un estado nuevo, acá se ve. */
+    var _raros={};
+    filas.forEach(function(f){ if(!_tkEstadoConocido(f.estado)) _raros[f.estado]=1; });
+    if(Object.keys(_raros).length) try{ console.error('[Truefie] tickets: estado(s) sin '+
+      'clasificar en TK_ABIERTOS/TK_CERRADOS: '+Object.keys(_raros).join(', ')+
+      '. Se cuentan como abiertos.'); }catch(x){}
 
     /* ── EL REPARTO · los dos ejes de b65, ahora en un solo paso ───────
        El corte de arriba sigue siendo por `ambito` y el de adentro por
