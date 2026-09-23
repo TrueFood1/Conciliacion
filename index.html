@@ -3819,6 +3819,10 @@ body.es-socia .face-pend{display:block}
    de ser legible de un vistazo, que es todo lo que esta pantalla ofrece. */
 .bs-det .bs-lote{color:var(--text-2);white-space:nowrap}
 .bs-meta{font-size:11.5px;color:var(--text-3);margin-top:9px;line-height:1.6}
+/* La corrección NO va en gris de nota al pie: es parte de lo que el papel cuenta.
+   Ámbar del módulo, con una barra a la izquierda para que se lea como un renglón
+   aparte y no como la continuación de la meta. */
+.bs-corr{color:#8a5a12;border-left:3px solid #e0a82e;padding-left:8px;margin-top:6px}
 /* ── «Sale otro día» · deshacer una entrega (b63) ──────────────────────
    Prefijo `bs-` y NO `dv-`, aunque el bloque de Devoluciones se vea igual.
    Reusar `.dv-anu*` acá sería exactamente el pendiente §23 —el prefijo `rp-`
@@ -4347,7 +4351,13 @@ body.es-socia .face-pend{display:block}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-const BUILD = 'v 21 sep 2026 · b65';
+// b66 sale ENCIMA de b65, en ese orden y el mismo día (23-sep-2026, decisión
+// de Andrea). El aviso que estaba acá decía "b65 está construido y sin
+// publicar — si esa rama NO sale primero, este número hay que bajarlo": la
+// condición se cumplió, b65 se publicó primero, y el aviso se va con ella.
+// Un comentario que describe una situación que ya se resolvió es un
+// comentario que miente en la próxima lectura.
+const BUILD = 'v 22 sep 2026 · b66';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -4753,6 +4763,29 @@ async function authEntrar(){
 const SALUDO_NOMBRES={'andrea@truefoodcr.com':'Andrea', 'lorena@truefoodcr.com':'Lorena'};
 const SALUDO_HUELLAS={'gyfj9w':'Daniel'};
 function _saludoHuella(s){ let h=5381; for(let i=0;i<s.length;i++){ h=((h*33)^s.charCodeAt(i))>>>0; } return h.toString(36); }
+// El nombre de pila de quien firmó algo. UNA sola definición: el saludo del lobby
+// y el Historial preguntan lo mismo y tienen que contestar lo mismo. Devuelve
+// null si no se le conoce nombre — quien llama decide qué poner en su lugar,
+// porque "—" sirve en una tabla y no sirve en un saludo.
+// El correo de Daniel NO está escrito acá: entra por huella, porque el repo es
+// público (misma razón que SALUDO_HUELLAS).
+function _quienNombre(email){
+  const e=String(email||'').trim().toLowerCase();
+  if(!e) return null;
+  return SALUDO_NOMBRES[e] || SALUDO_HUELLAS[_saludoHuella(e)] || null;
+}
+// Una firma de correccion no es un correo pelado: es
+// `correccion-sql - alisto 67 - andrea@truefoodcr.com`. Se saca el ÚLTIMO correo
+// que aparezca y se le pregunta el nombre a `_quienNombre`. Si no hay correo o no
+// se le conoce nombre, se devuelve lo que vino, recortado — decir la firma cruda
+// es peor que nada, pero inventar un nombre es mucho peor que decirla cruda.
+function _quienFirma(txt){
+  const t=String(txt||'').trim();
+  if(!t) return '—';
+  const m=t.match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi);
+  const correo=m&&m[m.length-1];
+  return (correo && _quienNombre(correo)) || correo || (t.length>28?(t.slice(0,28)+'…'):t);
+}
 
 // ════════════════════════════════════════════════════════════════════════
 // ACCESO POR USUARIO — ⚠️ ESTO ES COSMÉTICO, NO ES SEGURIDAD ⚠️
@@ -4883,7 +4916,7 @@ function accesoPintarLobby(){
 async function setSaludo(){
   const el=document.getElementById('homeHi'); if(!el) return;
   let email=''; try{ const {data}=await sbClient().auth.getUser(); email=((data&&data.user&&data.user.email)||'').trim().toLowerCase(); }catch(e){}
-  const nom=SALUDO_NOMBRES[email] || (email ? SALUDO_HUELLAS[_saludoHuella(email)] : null);
+  const nom=_quienNombre(email);   // la MISMA definición que usa el Historial
   el.textContent=nom ? ('Hola '+nom+'.') : 'Hola.';
 }
 async function authLogout(){ try{ await sbClient().auth.signOut(); }catch(e){} location.reload(); }
@@ -12591,6 +12624,64 @@ async function bsCargar(force){
   }
   _bsCargando=false;
   bsRender();
+  // ── LA FACTURA VIGENTE, EN SEGUNDO PLANO (22-sep-2026) ────────────────
+  // NO se espera: el Historial abre con lo de Supabase y punto. Esto va después,
+  // y si Odoo no contesta la pantalla queda exactamente como antes. Es la misma
+  // regla de b53 con el refresco de facturas — un proxy dormido no puede tapar
+  // nada, solo tardar.
+  bsEnriquecerFacturas();
+}
+
+// ── QUE FACTURA MANDA HOY ───────────────────────────────────────────────
+// Una factura revertida por nota de crédito y re-emitida deja al Historial
+// mostrando la muerta: el pedido 67 decía "factura 3534" cuando la que vale es la
+// 3546. Se deriva de Odoo y no a mano:
+//   · `reversal_move_id` no vacío  → esta factura fue revertida
+//   · la que la reemplaza          → misma `invoice_origin` (el pedido de venta),
+//                                    posted, out_invoice, sin revertir, la más nueva
+// `invoice_origin` es el pedido de venta, que es lo que de verdad ata las dos
+// facturas: la NC y la re-emisión cuelgan del mismo S0xxxx.
+let _bsFacEnriquecido=0;
+async function bsEnriquecerFacturas(){
+  const P=_bs||[]; if(!P.length) return;
+  const ids=[];
+  P.forEach(function(p){ if(p.factura_id && ids.indexOf(p.factura_id)<0) ids.push(p.factura_id); });
+  if(!ids.length) return;
+  try{
+    const mv=await odooCall('account.move','read',[ids],
+      {fields:['id','name','invoice_origin','reversal_move_id'],context:{lang:'es_CR'}});
+    const revertidas=mv.filter(function(m){ return (m.reversal_move_id||[]).length; });
+    if(!revertidas.length) return;
+    const origenes=[];
+    revertidas.forEach(function(m){ if(m.invoice_origin && origenes.indexOf(m.invoice_origin)<0)
+      origenes.push(m.invoice_origin); });
+    if(!origenes.length) return;
+    const cand=await odooCall('account.move','search_read',
+      [[['move_type','=','out_invoice'],['state','=','posted'],['invoice_origin','in',origenes]]],
+      {fields:['id','name','invoice_origin','reversal_move_id'],limit:200,
+       order:'id desc',context:{lang:'es_CR'}});
+    // La vigente de cada origen: la más nueva que NO esté revertida.
+    const vigente={};
+    cand.forEach(function(m){
+      if((m.reversal_move_id||[]).length) return;             // esta también murió
+      if(!vigente[m.invoice_origin]) vigente[m.invoice_origin]=m;   // order id desc: la 1ª es la más nueva
+    });
+    const porId={}; revertidas.forEach(function(m){ porId[m.id]=m; });
+    let n=0;
+    P.forEach(function(p){
+      const vieja=porId[p.factura_id]; if(!vieja) return;
+      const v=vigente[vieja.invoice_origin];
+      if(!v || v.id===vieja.id) return;
+      p.fac_vigente={nombre:v.name, reemplaza:vieja.name, factura_id:v.id};
+      n++;
+    });
+    if(n){ _bsFacEnriquecido=Date.now(); bsRender(); }
+  }catch(e){
+    // En silencio NO: queda en consola. Pero la pantalla no se toca — lo que hay
+    // sigue sirviendo, solo que sin el "(reemplaza a …)".
+    try{ console.warn('[Truefie] no pude leer de Odoo qué factura está vigente:',
+      (e&&e.message)||e); }catch(_){}
+  }
 }
 
 // Cuatro consultas y el armado en el navegador. Se filtra ACÁ y no en Supabase
@@ -12639,14 +12730,91 @@ function _entFacRotulo(o){
   return 'sin factura';
 }
 
+// ── LA UNIDAD QUE LEE UNA PERSONA (22-sep-2026) ─────────────────────────
+// Daniel y Andrea cuentan en CAJAS y PAQUETES. Nadie cuenta 24 buns sueltos:
+// cuenta una caja de seis paquetes. Hasta b64 el Historial mostraba la unidad de
+// la FACTURA (`uom_nombre` + `uom_factor`), y esa es la que eligió quien facturó
+// —justo lo que salió mal en la 3534, que decía "1 Caja" queriendo decir 24 y
+// significando 6. Mostrar el envase del PRODUCTO es inmune a ese error: la caja
+// de buns trae 24 aunque la factura diga otra cosa.
+//
+// Sale de NIV_INFO, la misma tabla que usan Conteo, Inventario y Producción:
+//   `presDiv` = unidades por paquete · `cajaU` = unidades por caja
+//   Francés [453] y Buns [503]  paq de 4  · caja de 24  →  6 paq/caja
+//   Pizza [472]                 paq de 2  · caja de 12  →  6 paq/caja
+//   Blanco [451] / Semillas [452]  unidad · caja de 6   →  6 uds/caja
+//   Galletas [519]                 pote   · caja de 12  → 12 potes/caja
+//
+// Entra SIEMPRE en unidades individuales (`cant_uds`, que es lo que guardan
+// `ent_alisto_linea` y `ent_alisto_lote`, y lo que suma el saldo por lote).
+// Sale en la unidad que se dice en voz alta.
+function _entPresN(x){ return _rzN(x, (Math.abs(x%1)<1e-9)?0:1); }
+function _entPres(pid, uds){
+  const I=NIV_INFO[pid];
+  const div=(I&&+I.presDiv)||1, cajaU=(I&&+I.cajaU)||0;
+  const lbl=(I&&I.presLbl==='paq')?'paq.':'uds';
+  const vu=(+uds||0)/div;                  // en unidad de venta: paquetes o unidades
+  const porCaja=div>0?(cajaU/div):0;       // cuántas de esas entran en una caja
+  if(porCaja>1){
+    const cj=Math.floor(vu/porCaja+1e-9), resto=vu-cj*porCaja;
+    if(cj>=1 && Math.abs(resto)<1e-9)
+      return _entPresN(cj)+(cj===1?' Caja':' Cajas')+' ('+_entPresN(vu)+' '+lbl+')';
+    if(cj>=1)
+      return _entPresN(cj)+(cj===1?' Caja':' Cajas')+' + '+_entPresN(resto)+' '+lbl;
+  }
+  return _entPresN(vu)+' '+lbl;
+}
+// EL CAMBIO SE DICE EN UNA SOLA UNIDAD, sin agrupar en cajas. "1,5 paq. → 1 Caja
+// (6 paq.)" obliga a hacer la cuenta para ver de cuánto fue el salto; "1,5 → 6 paq."
+// se lee de un vistazo. Una comparación pide los dos lados en la misma regla.
+function _entPresPlano(pid, uds){
+  const I=NIV_INFO[pid];
+  const div=(I&&+I.presDiv)||1;
+  const lbl=(I&&I.presLbl==='paq')?'paq.':'uds';
+  return _entPresN((+uds||0)/div)+' '+lbl;
+}
+function _entPresCambio(pid, antes, despues){
+  const a=_entPresPlano(pid, antes), b=_entPresPlano(pid, despues);
+  const suf=b.match(/ (paq\.|uds)$/);
+  // La unidad es la misma de los dos lados (es el mismo producto): decirla una vez.
+  if(suf && a.endsWith(suf[0])) return a.slice(0, -suf[0].length)+' → '+b;
+  return a+' → '+b;
+}
+
 async function _entColgarDetalle(c, P){
   P=P||[]; if(!P.length) return P;
   const alis=P.map(function(p){ return p.alisto_id; }).filter(Boolean);
   const pids=P.map(function(p){ return p.pedido_id; }).filter(Boolean);
   if(!alis.length) return P;
 
+  // ── LOS ALISTOS ANULADOS TAMBIEN (22-sep-2026) ────────────────────────
+  // Hasta b64 acá solo entraba el alisto VIGENTE, y por eso un pedido corregido
+  // mostraba la hora del pegado con la cara de ser la hora en que Daniel preparó.
+  // `v_ent_pedido_estado` expone el vigente y nada más —está bien, es su trabajo—,
+  // así que quién preparó de verdad hay que ir a buscarlo a `ent_alisto`.
+  // Se leen TODOS los alistos de estos pedidos, no solo el vigente: el original
+  // es el más viejo, y sus líneas son el "antes" de la corrección.
+  // Si esta lectura falla NO se cae el Historial: se pierde la línea de
+  // corrección, no la fila. Un pedido sin corregir no nota la diferencia.
+  let ALI=[], ANU=[];
+  try{
+    const {data:aa}=await c.from('ent_alisto')
+      .select('id,pedido_id,responsable,creado_en,creado_por,anulado').in('pedido_id',pids);
+    ALI=aa||[];
+    const ids=ALI.map(function(a){ return a.id; });
+    if(ids.length){
+      const {data:an}=await c.from('ent_anulacion')
+        .select('entidad,entidad_id,creado_por,creado_en,motivo')
+        .eq('entidad','alisto').in('entidad_id',ids);
+      ANU=an||[];
+    }
+  }catch(e){ ALI=[]; ANU=[]; }
+
+  // Las líneas: las del vigente para MOSTRAR, las de los anulados para el "antes".
+  const alisTodos=ALI.length ? ALI.map(function(a){ return a.id; })
+                             : alis.slice();
   const {data:lins,error:e2}=await c.from('ent_alisto_linea')
-    .select('id,alisto_id,producto_id,cant_uds,cant_uom').in('alisto_id',alis);
+    .select('id,alisto_id,producto_id,cant_uds,cant_uom').in('alisto_id',alisTodos);
   if(e2) throw e2;
   const L=lins||[];
 
@@ -12671,6 +12839,12 @@ async function _entColgarDetalle(c, P){
     l.lotes=(porLinea[l.id]||[]).sort(function(a,z){ return (a.orden||0)-(z.orden||0); });
     (porAlisto[l.alisto_id]=porAlisto[l.alisto_id]||[]).push(l);
   });
+  // ── QUIEN PREPARO DE VERDAD, Y QUE SE CORRIGIO ────────────────────────
+  const anuladoPor={};
+  ANU.forEach(function(x){ anuladoPor[x.entidad_id]=x; });
+  const alisDePedido={};
+  ALI.forEach(function(a){ (alisDePedido[a.pedido_id]=alisDePedido[a.pedido_id]||[]).push(a); });
+
   P.forEach(function(p){
     p.lineas=(porAlisto[p.alisto_id]||[]).map(function(l){
       const u=uom[p.pedido_id+'|'+l.producto_id]||{};
@@ -12678,6 +12852,41 @@ async function _entColgarDetalle(c, P){
               lotes:l.lotes, uom_id:u.uom_id||0, uom_nombre:u.uom_nombre||'', uom_factor:u.uom_factor||null,
               presentacion:u.presentacion||''};
     });
+
+    // El ORIGINAL es el alisto MAS VIEJO del pedido. En un pedido sin corregir es
+    // el mismo vigente y nada cambia en pantalla; en uno corregido es el que trae
+    // a la persona y la fecha de verdad.
+    const todos=(alisDePedido[p.pedido_id]||[]).slice()
+      .sort(function(a,z){ return String(a.creado_en).localeCompare(String(z.creado_en)); });
+    if(!todos.length) return;
+    const orig=todos[0];
+    p.preparo_responsable=orig.responsable||p.responsable||'';
+    p.preparo_en=orig.creado_en||p.preparado_en;
+
+    // Hay correccion solo si el vigente NO es el original y el original esta anulado.
+    // Las dos condiciones: un pedido puede tener un alisto viejo anulado y que el
+    // vigente sea otro por otra razon, y entonces esto no es "una correccion".
+    if(String(orig.id)===String(p.alisto_id)) return;
+    const an=anuladoPor[orig.id];
+    if(!an && !orig.anulado) return;
+
+    const sumar=function(aid){
+      const m={};
+      (porAlisto[aid]||[]).forEach(function(l){
+        m[l.producto_id]=(m[l.producto_id]||0)+(+l.cant_uds||0); });
+      return m;
+    };
+    const antes=sumar(orig.id), despues=sumar(p.alisto_id);
+    const pidsCambio=Object.keys(despues).concat(Object.keys(antes))
+      .filter(function(v,i,a){ return a.indexOf(v)===i; })
+      .filter(function(k){ return (antes[k]||0)!==(despues[k]||0); });
+    p.correccion={
+      por: (an&&an.creado_por) || todos[todos.length-1].creado_por || '',
+      en:  (an&&an.creado_en)  || todos[todos.length-1].creado_en  || '',
+      motivo: (an&&an.motivo)||'',
+      cambios: pidsCambio.map(function(k){
+        return {producto_id:+k, antes:(antes[k]||0), despues:(despues[k]||0)}; })
+    };
   });
   return P;
 }
@@ -12849,36 +13058,78 @@ function bsDetalle(p){
     +'<th class="r">Cantidad</th><th>Lote</th>'
     +'<th class="r">Cant. lote</th></tr></thead><tbody>';
   (p.lineas||[]).forEach(function(l){
-    // Con unidad de factura se muestra TODO en esa unidad (es lo que pidió el
-    // cliente y lo que Daniel cuenta). Sin ella —los registros manuales viejos—
-    // se muestra en unidades individuales y se dice que son uds: convertir sin
-    // el factor guardado sería inventarlo.
-    const f=l.uom_factor||null;
-    const uni=l.uom_nombre||'uds';
-    const tot=(f!=null && l.cant_uom!=null) ? l.cant_uom : l.cant_uds;
+    // La cantidad se dice en el ENVASE DEL PRODUCTO, no en la unidad de la
+    // factura. Ver `_entPres`: la 3534 probó que quien factura puede elegir mal
+    // la UoM, y entonces el Historial repetía el error con cara de dato. La caja
+    // de buns trae 24 aunque la factura diga otra cosa.
     const lts=l.lotes||[];
     const cab='<td>'+esc(_bsProd(l.producto_id))+'</td>'
-             +'<td class="n">'+_rzN(tot)+' <span class="bs-uni">'+esc(uni)+'</span></td>';
+             +'<td class="n">'+esc(_entPres(l.producto_id, l.cant_uds))+'</td>';
     if(!lts.length){
       h+='<tr>'+cab+'<td class="bs-lote">sin lote</td><td class="n">—</td></tr>';
       return;
     }
     lts.forEach(function(x,k){
-      const cl=(f!=null)?(+x.cant_uds||0)*f:(+x.cant_uds||0);
       h+='<tr>'+(k===0?cab:'<td></td><td></td>')
-        +'<td class="bs-lote">'+esc(x.lote)+'</td><td class="n">'+_rzN(cl)+'</td></tr>';
+        +'<td class="bs-lote">'+esc(x.lote)+'</td>'
+        +'<td class="n">'+esc(_entPres(l.producto_id, x.cant_uds))+'</td></tr>';
     });
   });
+  // QUIEN PREPARO Y CUANDO: del alisto ORIGINAL, con la fecha entera. Antes salían
+  // `p.responsable` y `p.preparado_en`, que son los del alisto VIGENTE — en un
+  // pedido corregido eso muestra la hora del pegado y se la atribuye a Daniel.
+  // Y `_despCuando` dice "hoy 15:26", que en una corrección es justo la fecha que
+  // no hay que mostrar: acá va la fecha completa, siempre.
+  const quienPrep=_quienNombre(p.preparo_responsable||p.responsable)
+                 ||(p.preparo_responsable||p.responsable||'—');
   h+='</tbody></table><div class="bs-meta">'
-    +'Preparó '+esc(p.responsable||'—')+' · preparado '+esc(_despCuando(p.preparado_en))
+    +'Preparó '+esc(quienPrep)+' · preparado '+esc(_entFechaLarga(p.preparo_en||p.preparado_en))
     +(p.salida_en ? ' · salió '+esc(_despCuandoSalida(p.salida_en, p.salida_registrada_en))
                   : ' · sin salida registrada')
-    +' · '+esc(p.factura_nombre?('factura '+_despFacCorta(p.factura_nombre)):'sin factura')
+    +' · '+esc(_bsFacturaLbl(p))
     +(p.motivo&&p.motivo!=='venta'?' · '+esc((ENT_MOTIVO_N[p.motivo]||p.motivo).toLowerCase()):'')
     +'</div>'
+    + bsCorreccionHTML(p)
     + bsDeshacerHTML(p)
     +'</div>';
   return h;
+}
+
+// LA CORRECCION, en su propio renglón y con el mismo peso que el resto: no es una
+// nota al pie ni un asterisco. Si alguien cambió lo que este papel dice, el papel
+// lo cuenta. En un pedido sin corregir devuelve '' y no se ve nada.
+function bsCorreccionHTML(p){
+  const c=p&&p.correccion; if(!c) return '';
+  const qué=(c.cambios||[]).map(function(x){
+    return _bsProd(x.producto_id)+' '+_entPresCambio(x.producto_id, x.antes, x.despues); });
+  return '<div class="bs-meta bs-corr">Corregido por '+esc(_quienFirma(c.por))
+    +' · '+esc(_entFechaLarga(c.en))
+    +(qué.length?(' · '+esc(qué.join(' · '))):'')
+    +'</div>';
+}
+
+// La factura que MANDA hoy, y la que reemplazó. `p.fac_vigente` lo cuelga
+// `bsEnriquecerFacturas` leyendo Odoo en segundo plano; mientras no haya llegado
+// —o si Odoo no contesta— se dice lo mismo que se decía antes. El Historial no
+// espera a Odoo para abrir, y eso no se negocia (es de b53).
+function _bsFacturaLbl(p){
+  if(!p.factura_nombre) return 'sin factura';
+  const v=p.fac_vigente;
+  if(v && v.nombre && v.reemplaza)
+    return 'factura '+_despFacCorta(v.nombre)+' (reemplaza a '+_despFacCorta(v.reemplaza)+')';
+  return 'factura '+_despFacCorta(p.factura_nombre);
+}
+
+// Fecha COMPLETA y sin relativos: "14 sep 2026, 09:12". `_despCuando` está pensado
+// para la bandeja del día ("hoy 15:26") y ahí sirve; en el AB-RE-04 un "hoy" es una
+// fecha que se pierde apenas pasa la medianoche.
+const _ENT_MES_AB=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function _entFechaLarga(iso){
+  if(!iso) return '—';
+  const d=new Date(iso); if(isNaN(d.getTime())) return String(iso);
+  const z=function(n){ return (n<10?'0':'')+n; };
+  return d.getDate()+' '+_ENT_MES_AB[d.getMonth()]+' '+d.getFullYear()
+        +', '+z(d.getHours())+':'+z(d.getMinutes());
 }
 
 /* ══════════════════════════════════════════════════════════════════════
