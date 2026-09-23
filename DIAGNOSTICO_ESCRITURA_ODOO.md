@@ -290,3 +290,51 @@ condiciona qué se ve después.
 **Recomendación: abrirlos por separado y en orden.** Primero el caso 1, que es
 `write` acotado a salidas y no crea nada; después, con esa experiencia encima,
 decidir el `create`.
+
+---
+
+# 🔴 REGLA NUEVA (23-sep-2026) · un pedido DESCUADRADO no se valida automático
+
+**Desde el ticket 29, lo preparado puede NO coincidir con lo facturado.** Hasta
+hoy era imposible: al preparar, una línea de un solo lote no tenía campo de
+cantidad —la cantidad era la de la factura— y una línea partida exigía que la
+suma diera exacto o el botón no se prendía. Al abrirse "Corregir preparación",
+esa garantía desaparece.
+
+**Eso rompe el supuesto sobre el que está escrito el CASO 1 de este documento**,
+que dice, textual:
+
+> *"Los movimientos ya vienen con la cantidad puesta por la reserva
+> (`quantity == product_uom_qty`), con `picked = False`. **No hay backorder
+> posible porque no hay diferencia entre pedido y reservado**."*
+
+Esa frase es lo que hacía de "validar" un botón sin decisiones. Con un pedido
+descuadrado deja de ser cierta: Truefie sabría que salieron 3 paquetes y el
+`stock.picking` de Odoo seguiría reservando 4.
+
+**Qué pasaría si se valida igual.** `button_validate()` movería las 4 —más de lo
+que salió del congelador— y, como la categoría `Producto terminado - Venta` está
+en `real_time` / `average`, **generaría además el asiento contable por esas 4**.
+El error no se quedaría en stock: llegaría a contabilidad.
+
+## La regla
+
+**Un pedido cuyo alisto vigente no calce con su factura NO se valida
+automáticamente en Odoo.** El carril de escritura tiene que mirar el descuadre
+—ya está calculado en `_entColgarDetalle`, cuelga de cada pedido como
+`p.descuadre`— y apartarlo.
+
+**Qué hacer con los apartados se decide al construir ese carril, no ahora.** Hay
+al menos dos caminos y ninguno es obviamente el bueno:
+
+- **ajustar la cantidad del movimiento antes de validar**, que hace aparecer la
+  decisión de backorder que este documento da por inexistente — y hay que
+  decidir si el backorder se crea o se cancela;
+- **no validar y mandarlo a mano**, que es más lento pero no inventa nada.
+
+Lo que no se puede es validar y ya.
+
+⚠️ **Y ojo con el orden**: la factura no se toca acá. Si el faltante se resuelve
+con nota de crédito, la NC cambia lo facturado y entonces el descuadre puede
+desaparecer solo. Validar antes de que eso se decida es validar contra un
+documento que está por cambiar.

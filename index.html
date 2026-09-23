@@ -3886,6 +3886,15 @@ body.es-socia .face-pend{display:block}
   color:var(--text-2);font:inherit;font-size:13px;padding:10px 14px;cursor:pointer}
 .dp-corr:active{opacity:.6}
 .dp-corr:disabled{opacity:.45;cursor:default}
+/* El cartel del descuadre. Ámbar: el pedido está bien registrado y alguien
+   decidió que saliera así — lo que hay que saber es que no calza con lo
+   facturado. El rojo de este módulo es para la excepción pendiente. */
+.ent-desc{background:#2b2418;border:1px solid #6b5a2e;border-radius:9px;
+  padding:9px 11px;margin:8px 0;font-size:12.5px;color:#e8c96a;line-height:1.45}
+.ent-desc-t{font-weight:600;margin-bottom:5px}
+.ent-desc-f{display:flex;justify-content:space-between;gap:10px;padding:2px 0}
+.ent-desc-x{margin-top:6px;color:#c9b284;font-size:11.5px}
+.ent-desc-min{padding:6px 9px;margin:6px 0 0;font-size:11.5px}
 /* La cinta que dice que esto NO es preparar por primera vez. Sin esto, la
    pantalla de corregir es indistinguible de la de preparar, y el error de
    pegarle "Preparar y entregar" a una corrección seria caro. */
@@ -10449,6 +10458,7 @@ function despRender(){
           +(res?(' · '+esc(res)):'')
           +(r.factura_nombre?(' · factura '+esc(_despFacCorta(r.factura_nombre))):'')+'</div>'
           +etiqueta
+          +_entDescuadreHTML(r,'chico')      // ticket 29
           +'<div class="dp-acc">'+btn
           +entPdfBtn(r.factura_id, r.factura_nombre, r.cliente_nombre, 'grande')
           +'</div>'
@@ -11707,9 +11717,16 @@ async function _despCorrTicket(f, faltan, motivo, nota, quien){
     return '· '+_despNomProd(x.pid)+': la factura dice '+_lotUds(x.fac,x.pid)
       +', salieron '+_lotUds(x.puse,x.pid);
   }).join('\n');
+  /* 🔴 LA LINEA QUE CONVIERTE EL AVISO EN UNA TAREA. Sin esto el ticket
+     informa un descuadre y nadie sabe que hay que HACER — y lo que hay que
+     hacer es de plata: Cobros lee `account.move` de Odoo y no consulta nada
+     de entregas, asi que le cobra al cliente la factura ENTERA aunque hayan
+     salido tres de cuatro paquetes. Medido el 23-sep. */
   const txt='La preparación no calza con la factura.\n'
     +'Factura '+(f.factura||'—')+' · pedido '+_despCorr.pedido_id
-    +' · cliente '+(f.cliente||'—')+'\n'+det+'\nMotivo: '+rot+(nota?(' — '+nota):'');
+    +' · cliente '+(f.cliente||'—')+'\n'+det+'\nMotivo: '+rot+(nota?(' — '+nota):'')
+    +'\n\nHay que emitir nota de crédito o corregir la factura por la diferencia: '
+    +'el cobro sale de la factura, no de lo que salió del congelador.';
   const {error}=await c.from('ticket').insert({
     descripcion:txt, tipo:'encargo', modulo:'finanzas', ambito:'truefie',
     build:(typeof BUILD!=='undefined'?BUILD:'sin sello'),
@@ -12465,7 +12482,10 @@ function despRenderDialogoEntrega(){
   const lineas=r.lineas||null;
   const listo=!!(lineas && lineas.length) && !_despDetErr;
 
-  let cuerpo='';
+  /* TICKET 29 · lo PRIMERO del dialogo, arriba del detalle: quien va a
+     confirmar la entrega tiene que enterarse ANTES de tocar el boton, no
+     despues. */
+  let cuerpo=_entDescuadreHTML(r);
   if(_despDetErr){
     cuerpo='<div class="de-mal">No pude leer el detalle de este pedido: '+esc(_despDetErr)
       +'<br>No se puede confirmar la salida sin verlo. Recargá la pantalla.</div>';
@@ -13329,12 +13349,34 @@ async function _entColgarDetalle(c, P){
   }
   // La UNIDAD y su factor viven en la línea del PEDIDO, no en la del alisto:
   // es la unidad tal como la pidió el cliente, que es la que va al AB-RE-04.
+  /* ⚠️ `cant_uds` SE SUMA ACA Y NO EN UNA LECTURA APARTE (ticket 29). Es lo
+     que la FACTURA decia, capturado al preparar, y es la otra mitad de la
+     comparacion "salio lo que se facturo". Leer `ent_pedido_linea` dos veces
+     —una para la unidad y otra para la cantidad— es el modo de falla de
+     siempre: dos consultas a la misma tabla que un dia devuelven cosas
+     distintas. Sale de Supabase y no de Odoo porque la bandeja no espera a
+     Odoo (regla de b53) y el dato ya esta guardado desde el primer dia. */
   const {data:pl,error:e4}=await c.from('ent_pedido_linea')
-    .select('pedido_id,producto_id,uom_id,uom_nombre,uom_factor,presentacion').in('pedido_id',pids);
+    .select('pedido_id,producto_id,uom_id,uom_nombre,uom_factor,presentacion,cant_uds').in('pedido_id',pids);
   if(e4) throw e4;
   const uom={};
   (pl||[]).forEach(function(r){ uom[r.pedido_id+'|'+r.producto_id]=r; });
 
+  /* ── EL DESCUADRE, POR PEDIDO (ticket 29) ────────────────────────────
+     Desde que se puede corregir una preparacion, lo que sale del congelador
+     PUEDE no ser lo que dice la factura — antes era imposible. Se cuelga acá,
+     en `_entColgarDetalle`, porque de esta funcion cuelgan LAS TRES pantallas
+     que tienen que decirlo: la bandeja, el dialogo de Entregar y el Historial.
+     Calculado tres veces se desincroniza; calculado una, no puede.
+     🔴 LA CUENTA VA EN UNIDADES INDIVIDUALES (`cant_uds` de los dos lados) y
+     el CARTEL en unidad de venta: comparar en paquetes mezclaria un Frances de
+     3 paq con uno de 12 u, y mostrarlo en unidades sueltas es el error del
+     lote 191. Quien dibuja usa `_lotUds`. */
+  const facPorPed={};
+  (pl||[]).forEach(function(r){
+    const k=r.pedido_id+'|'+r.producto_id;
+    facPorPed[k]=(facPorPed[k]||0)+(+r.cant_uds||0);
+  });
   const porLinea={};
   LT.forEach(function(x){ (porLinea[x.linea_id]=porLinea[x.linea_id]||[]).push(x); });
   const porAlisto={};
@@ -13391,7 +13433,60 @@ async function _entColgarDetalle(c, P){
         return {producto_id:+k, antes:(antes[k]||0), despues:(despues[k]||0)}; })
     };
   });
+  /* ── Y EL DESCUADRE CONTRA LA FACTURA, para todos (ticket 29) ────────
+     Va en su propio recorrido y no adentro del de arriba a proposito: aquel
+     solo entra en los pedidos CORREGIDOS, y un descuadre tambien puede venir
+     de una preparacion que ya nacio distinta. */
+  P.forEach(function(p){
+    const salio={};
+    (porAlisto[p.alisto_id]||[]).forEach(function(l){
+      salio[+l.producto_id]=(salio[+l.producto_id]||0)+(+l.cant_uds||0); });
+    const pids2={};
+    Object.keys(facPorPed).forEach(function(k){
+      const i=k.indexOf('|');
+      if(+k.slice(0,i)===+p.pedido_id) pids2[+k.slice(i+1)]=facPorPed[k];
+    });
+    Object.keys(salio).forEach(function(k){ if(!(k in pids2)) pids2[k]=0; });
+    const d=[];
+    Object.keys(pids2).forEach(function(k){
+      const pid=+k, fac=+pids2[k]||0, sale=+salio[pid]||0;
+      if(Math.abs(fac-sale)>1e-9) d.push({producto_id:pid, factura:fac, salio:sale});
+    });
+    p.descuadre = d.length ? d : null;
+  });
   return P;
+}
+
+/* ── EL CARTEL DEL DESCUADRE · uno solo para las tres pantallas ─────────
+   Ambar y no rojo: el pedido esta BIEN registrado —alguien decidio que saliera
+   asi y dejo el motivo—, lo que hay que saber es que no calza con lo facturado.
+   Rojo es excepcion pendiente; esto es un hecho que hay que ver.
+   `tam` cambia el cuerpo, no el mensaje: 'chico' para la tarjeta de la bandeja,
+   entero para el dialogo de Entregar y el Historial. */
+/* ⚠️ UNA FACTURA SERVIDA DE MENOS SIGUE SALIENDO DE "Por preparar", y es
+   una decision, no un descuido (Andrea, 23-sep). `v_ent_factura_despachada`
+   da por despachada una factura con solo existir un alisto vigente, sin mirar
+   cantidades, y NO se cambia: el pedido ya se preparo y se va a entregar: no
+   es trabajo pendiente del congelador, que es lo que esa lista muestra.
+   EL SEGUIMIENTO DEL FALTANTE VIVE EN EL TICKET DE FINANZAS, que nombra la
+   factura y dice que hay que emitir nota de credito o corregirla. Si el
+   faltante se quedara ademas en "Por preparar", Daniel lo veria todos los dias
+   como si tuviera que sacar algo — y no tiene nada que sacar. */
+function _entDescuadreHTML(p, tam){
+  const d=p&&p.descuadre; if(!d||!d.length) return '';
+  if(tam==='chico')
+    return '<div class="ent-desc ent-desc-min">no calza con la factura · '
+      +d.length+(d.length===1?' producto':' productos')+'</div>';
+  const filas=d.map(function(x){
+    return '<div class="ent-desc-f"><span>'+esc(_despNomProd(x.producto_id))+'</span>'
+      +'<span>factura <b>'+esc(_lotUds(x.factura,x.producto_id))+'</b>'
+      +' · sale <b>'+esc(_lotUds(x.salio,x.producto_id))+'</b></span></div>';
+  }).join('');
+  return '<div class="ent-desc"><div class="ent-desc-t">No calza con la factura</div>'
+    +filas
+    +'<div class="ent-desc-x">El cobro sale de la factura, no de lo que salió del '
+    +'congelador. Hay un ticket en Finanzas para emitir la nota de crédito o '
+    +'corregirla.</div></div>';
 }
 
 async function bsLeer(){
@@ -13593,6 +13688,7 @@ function bsDetalle(p){
     +(p.motivo&&p.motivo!=='venta'?' · '+esc((ENT_MOTIVO_N[p.motivo]||p.motivo).toLowerCase()):'')
     +'</div>'
     + bsCorreccionHTML(p)
+    + _entDescuadreHTML(p)            // ticket 29
     + bsDeshacerHTML(p)
     +'</div>';
   return h;
