@@ -42,6 +42,33 @@ Este checklist se corre al final de **toda sesión donde se tocó código**, sin
    toca la red. Sintaxis OK ≠ la página carga, y la página carga ≠ las tablas
    existen. Son tres chequeos distintos y hacen falta los tres.
 
+8. **Respaldar lo que git NO respalda.** `BITACORA.md`, los `PEGADO_*.sql` y los
+   `CAMBIO_*.sql` que todavía no entraron a una rama están **gitignored** —el repo
+   es público y llevan razones sociales, montos y SQL de producción—, así que un
+   `push` no los salva. Van al repo **privado** `TrueFood1/respaldo-truefie`, en
+   `trabajo/`:
+
+   ```bash
+   cd respaldo-truefie && git pull --ff-only
+   cp ../Conciliacion/PEGADO_*.sql trabajo/pegados/
+   cp ../Conciliacion/BITACORA.md trabajo/
+   git add trabajo && git commit -m "Respaldo del trabajo local: <fecha>" && git push
+   ```
+
+   ⚠️ **Antes de copiar, comparar contra los `.env`.** Ningún archivo puede llevar
+   adentro una clave, API key o cadena de conexión. Privado no quiere decir que dé
+   lo mismo: una credencial en un repo sobrevive a su propia rotación. Los
+   identificadores (correos, nombre de la base) sí pueden ir.
+
+   ⚠️ **Este paso existe por un agujero real, encontrado el 22-sep-2026.** Se
+   midió `git ls-tree origin/main` del repo de respaldo: 20 archivos, 16 dumps y
+   4 del propio repo. **Ni un `PEGADO_*.sql`, ni `BITACORA.md`.** El respaldo
+   diario es un `pg_dump` que corre en un runner de GitHub, y ese runner no tiene
+   forma de ver la Mac de Andrea — nunca pudo haber copiado un archivo local.
+   Peor: la skill `/retomar` afirmaba que la bitácora se respaldaba ahí. Era
+   falso, y se creyó durante semanas. La base sí estaba cubierta; el trabajo del
+   día, no.
+
 7. **¿Publicar?** Solo si Andrea lo dice explícito → `merge dev → main` + push. Si no, `main` se queda sirviendo la versión publicada vieja.
 
 ## Contexto de ramas
