@@ -1634,15 +1634,51 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    acertarle a las seis. Acá la regla está una vez y lo único que cambia
    por pestaña es el valor, que lo pone el JS desde TK_TABS — la misma
    tabla que decide el orden y el nombre. Un solo lugar. */
-.tkl-tabs{display:flex;gap:2px;overflow-x:auto;margin:0 0 16px;
-  border-bottom:1px solid var(--border);
+/* ── EL ARRASTRE DE LA TIRA, EN TRES REGLAS · 23-sep-2026 ─────────────
+   Andrea: al arrastrar las pestañas con el dedo, la tira "flota" en vez de
+   deslizarse solo hacia los lados. Medido en emulación táctil a 375, sobre
+   lo que está publicado (b66), y son TRES causas distintas — por eso el
+   arreglo son tres líneas y no una:
+
+   1 · SE MOVÍA TAMBIÉN EN VERTICAL. `overflow-x:auto` sin decir nada del
+       eje Y no lo deja quieto: la regla de CSS es que si un eje deja de ser
+       `visible`, el otro pasa de `visible` a `auto` SOLO. Medido:
+       `overflow-y` computaba `auto`, y `scrollHeight` 32 contra
+       `clientHeight` 31 — un píxel de juego, suficiente para que la tira
+       cabecee mientras se la arrastra. Ese píxel lo ponía el
+       `margin-bottom:-1px` de `.tkl-tab` (el que monta el subrayado sobre
+       la línea de abajo), así que la salida NO es recortar con
+       `overflow-y:hidden`: eso cortaría 1px del subrayado de 2px de la
+       pestaña activa. Se saca la causa — el margen negativo se va y la
+       línea de abajo pasa a pintarse con `box-shadow: inset`, que no ocupa
+       lugar ni participa del scroll. Sin sobrante vertical, no hay nada que
+       recortar; el `overflow-y:hidden` queda igual, como declaración de que
+       esto es UNA fila y para que no vuelva a entrar por la ventana.
+
+   2 · ARRASTRABA LA PÁGINA. Con `touch-action:auto` (lo medido) el
+       navegador acepta las dos direcciones desde un dedo que empezó en la
+       tira, así que un arrastre en diagonal movía la tira Y la página.
+       `pan-x` le dice que desde acá solo se panea en horizontal.
+       ⚠️ EL PRECIO, dicho: un deslizamiento VERTICAL que empiece sobre la
+       tira ya no scrollea la página. Son 31px de alto; se acepta porque es
+       exactamente lo que se pidió ("sin arrastrar la página").
+
+   3 · EL REBOTE SE CONTAGIABA. `overscroll-behavior` computaba `auto`: al
+       llegar al final de la tira el gesto seguía de largo hacia el
+       documento, que es el rebote de iOS. `contain` lo corta en la tira.
+       En horizontal además tapa el gesto de "atrás" del borde. */
+.tkl-tabs{display:flex;gap:2px;margin:0 0 16px;
+  overflow-x:auto; overflow-y:hidden;
+  overscroll-behavior-x:contain; overscroll-behavior-y:none;
+  touch-action:pan-x;
+  box-shadow:inset 0 -1px 0 var(--border);
   scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .tkl-tabs::-webkit-scrollbar{display:none}
 .tkl-tabs.hidden{display:none}
 .tkl-tab{flex:0 0 auto;background:none;border:none;border-bottom:2px solid transparent;
   color:var(--text-3);font:inherit;font-size:13px;line-height:1;
   padding:9px 12px 8px;cursor:pointer;white-space:nowrap;
-  display:flex;align-items:center;gap:6px;margin-bottom:-1px}
+  display:flex;align-items:center;gap:6px}
 .tkl-tab:hover{color:var(--text-2)}
 .tkl-tab.on{color:var(--tkac,var(--text));border-bottom-color:var(--tkac,var(--text));
   font-weight:600}
@@ -4351,13 +4387,13 @@ body.es-socia .face-pend{display:block}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-// b66 sale ENCIMA de b65, en ese orden y el mismo día (23-sep-2026, decisión
-// de Andrea). El aviso que estaba acá decía "b65 está construido y sin
-// publicar — si esa rama NO sale primero, este número hay que bajarlo": la
-// condición se cumplió, b65 se publicó primero, y el aviso se va con ella.
-// Un comentario que describe una situación que ya se resolvió es un
-// comentario que miente en la próxima lectura.
-const BUILD = 'v 22 sep 2026 · b66';
+// b67 · el arreglo de la tira de pestañas, encima de b66. Tercera publicación
+// del 23-sep (b65, b66 y esta), y sale antes que las dos ramas que estaban
+// construidas: el vigía —que quedaba bloqueado por `esquema_check` hasta que
+// se pegara su esquema— y la merma. Con este orden, esas dos pasan a ser b68
+// y b69; el número se asigna al publicar y no al construir, que es por lo que
+// dos ramas llegaron a reclamar el mismo b67 hasta hoy.
+const BUILD = 'v 23 sep 2026 · b67';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -21171,12 +21207,18 @@ var TK_TABS=[
   {k:'sin_modulo',   n:'Sin módulo',     ac:null},
   {k:'__propio',     n:'Mis pendientes', ac:null}
 ];
-/* ⚠️ LAS SEIS SE DIBUJAN SIEMPRE, aunque estén en cero (Andrea, 23-sep).
-   La primera versión las escondía al quedar vacías y dejaba a "Sin módulo"
-   como excepción; con los datos del 23-sep eso borraba Conciliación y Mis
-   pendientes de la tira. Andrea pidió que las seis estén fijas, y es mejor:
-   una tira que cambia de largo según el día no se aprende de memoria, y el
-   cero también es información —"acá no hay nada"— que un hueco no da. */
+/* ⚠️ UNA PESTAÑA SE DIBUJA SI TIENE AL MENOS UN TICKET, y si no, no. Vale
+   para las seis, sin excepciones — "Sin módulo" y "Mis pendientes" incluidas
+   (Andrea, 23-sep, después de verlas en producción).
+   Esta regla ya estuvo y se cambió por "las seis siempre" el mismo día; con
+   los tickets que hay, aquello dibujaba dos pestañas permanentemente en cero
+   que no llevan a ninguna parte. Queda escrito que fue de ida y de vuelta
+   para que no parezca un descuido la próxima vez que alguien lo lea.
+   EL CONTADOR NO CAMBIA: sigue contando solo lo no resuelto. O sea que una
+   pestaña puede verse con 0 —tiene tickets, todos cerrados— y eso es
+   correcto: el 0 dice "no queda nada que hacer acá", no "acá no hay nada".
+   Esconderla en ese caso dejaría sus cerrados sin ninguna pantalla desde la
+   cual llegar a ellos. */
 /* `__propio` lleva dos guiones bajos adelante a propósito: NO es un valor de
    `modulo`, es el otro eje (`ambito`). Que no se pueda confundir con una
    clave de módulo real ni por descuido ni por un `modulo` nuevo que algún
@@ -21184,6 +21226,13 @@ var TK_TABS=[
    es *de Truefie, pero no sé de qué parte*; "Mis pendientes" es *esto no es
    Truefie*. */
 var TK_MODNOM={}; TK_TABS.forEach(function(t){ TK_MODNOM[t.k]=t.n; });
+/* Nombres de los módulos que NO tienen pestaña fija. Hasta b66 la pestaña de
+   un módulo así salía con la clave cruda —"personal" en minúscula, al lado de
+   "Finanzas" y "Operaciones"— porque `TK_MODNOM` se derivaba solo de
+   `TK_TABS`, y en b65 se perdió el nombre que la tabla vieja sí tenía. Se ve
+   en cuanto aparece un ticket de Personal, que es exactamente el caso que
+   `_tkTabsVisibles` está construido para no dejar caer. */
+TK_MODNOM.personal = TK_MODNOM.personal || 'Personal';
 /* ── LOS OCHO ESTADOS, CLASIFICADOS UNO POR UNO · 23-sep-2026 ─────────
    El contador cuenta lo NO RESUELTO (Andrea, 23-sep). Para que eso sea
    verificable hay que poder decir dónde cae CADA valor posible, así que
@@ -21340,7 +21389,7 @@ function _tkTabsVisibles(){
     if(t.k==='sin_modulo') extra.forEach(function(k){
       vis.push({k:k, n:(TK_MODNOM[k]||k), ac:null});
     });
-    vis.push(t);
+    if((_TK_BUCKETS[t.k]||[]).length) vis.push(t);
   });
   return vis;
 }
