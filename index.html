@@ -6764,6 +6764,141 @@ const NIV_INFO={
 // El porqué del 0,5: el lunes en la mañana las socias miden lo que falta para ESE día más toda la
 // producción de la semana, y del lunes siguiente miden solo la mitad — porque esa mañana vuelven
 // y miden la otra mitad. El ciclo se traslapa a propósito; la ventana tiene que traslaparse igual.
+// ════════════════════════════════════════════════════════════════════════
+// DETECCIÓN DE UNIDAD EQUIVOCADA EN FACTURAS (22-sep-2026)
+// ════════════════════════════════════════════════════════════════════════
+// EL CASO: la 3534 facturó Buns con `[46] Caja` (6 u) donde iba
+// `[42] Caja (Buns)` (24 u). Salió una caja física de 24 y se cobraron 6.
+// El barrido de 2026 encontró cuatro así — 3385, 3504, 3534 y 3544, ₡70.520 —
+// y el primero es de enero: el problema tiene ocho meses y se detectaba a mano.
+//
+// LA CAUSA es una trampa en el dato, no un descuido: en `uom.uom` conviven dos
+// unidades llamadas "Caja" (la genérica de 6 y la de Buns de 24) y quien factura
+// elige de una lista donde se ven iguales. Andrea renombró `[42]` el 22-sep, así
+// que hoy la lista ya no engaña — pero renombrar no revisa lo que se factura
+// mañana, y el que factura puede seguir eligiendo la genérica.
+//
+// ⚠️ SIEMPRE POR ID, NUNCA POR NOMBRE. Es la regla de `CLAUDE.md`, y acá es
+// literal: la lista de abajo son ids de uom.uom. Un renombre en Odoo no puede
+// romper esto, que es precisamente lo que pasó con la detección a ojo.
+//
+// ── LA LISTA, MEDIDA Y NO SUPUESTA ──────────────────────────────────────
+// Sale del barrido de las 512 facturas NO revertidas de 2026 (1.311 líneas de
+// los seis terminados). Cada producto usó EXACTAMENTE dos unidades legítimas,
+// y las tres líneas que caen fuera son las tres que hay que cazar:
+//
+//   Blanco [451]    [1] Unidades 249 líneas · [46] Caja 129
+//   Semillas [452]  [46] Caja 106 · [1] Unidades 99
+//   Francés [453]   [37] Paquete de 4 148 · [44] Caja (Frances) 113
+//   Buns [503]      [37] Paquete de 4 215 · [42] Caja (Buns) 105 · [46] Caja 2 ←
+//   Pizza [472]     [49] Caja (Pizza) 63 · [38] Paquete de 2 56 · [46] Caja 1 ←
+//   Galletas [519]  [1] Unidades 25 · [51] Caja (Galletas) 0 (nunca se usó)
+//
+// `[51] Caja (Galletas)` queda permitida aunque no se haya usado todavía:
+// existe, es la correcta para el producto, y dejarla fuera sería fabricar una
+// alarma el día que alguien la use bien.
+const UOM_OK = {
+  451: [1, 46],        // Pan Blanco   · unidad · caja de 6
+  452: [1, 46],        // Pan Semillas · unidad · caja de 6
+  519: [1, 51],        // Galletas     · pote   · caja de 12
+  503: [37, 42],       // Buns         · paq de 4 · caja de 24
+  453: [37, 44],       // Pan Francés  · paq de 4 · caja de 24
+  472: [38, 49],       // Pizza        · paq de 2 · caja de 12
+};
+
+// ── EL ESCAPE, Y POR QUÉ NO ES UN AGUJERO ───────────────────────────────
+// 🔴 La lista sola daría un FALSO POSITIVO en la 3547, que emitimos nosotros el
+// 22-sep para corregir la 3544: dice `4 × Caja [46]` = 24 u, con el precio de la
+// tarifa y el total exacto. Está BIEN facturada; solo está dicha en otra unidad.
+// Odoo no dejó ponerle `[42]` porque `product_uom_readonly` es true en un pedido
+// confirmado (medido), así que esa forma va a repetirse cada vez que se corrija
+// una factura vieja.
+//
+// La diferencia entre la 3504 y la 3547, que es la que importa:
+//   3504 · 1 × Caja[46] =  6 u  →  la caja de Buns trae 24: seis unidades NO son
+//                                  un empaque, son una caja mal contada
+//   3547 · 4 × Caja[46] = 24 u  →  exactamente una caja, dicha en sextos
+// O sea: fuera de la lista se avisa, SALVO que el total dé un número entero de
+// cajas del producto. Eso no tapa ningún error de los cuatro (6 de 24 no es
+// entero, 6 de 12 tampoco) y no inventa alarmas sobre las correcciones.
+function _uomCajaU(pid){ const I=NIV_INFO[pid]; return (I&&+I.cajaU)||0; }
+
+// ── EL BARRIDO DE FACTURAS ──────────────────────────────────────────────
+// Lee Odoo y devuelve una entrada POR FACTURA (no por línea): una factura con
+// dos líneas mal es UN problema, no dos. Solo `out_invoice` `posted` y SIN
+// revertir — una factura anulada por nota de crédito ya no cobra nada, y avisar
+// sobre ella sería ruido sobre un documento muerto.
+//
+// El factor sale de `uomFactores` por id, la misma caché compartida del resto
+// del archivo. Si una uom no estuviera en la caché su factor caería a 1 y la
+// cuenta de unidades saldría mal, así que se siembra ANTES con los ids que de
+// verdad aparecen en las líneas — no con una lista escrita a mano.
+async function uomBarrerFacturas(desdeYmd, hastaYmd){
+  const mv = await odooCall('account.move','search_read',
+    [[['move_type','=','out_invoice'],['state','=','posted'],
+      ['invoice_date','>=',desdeYmd],['invoice_date','<=',hastaYmd]]],
+    {fields:['id','name','invoice_date','partner_id','reversal_move_id'],
+     limit:2000, order:'invoice_date, id', context:{lang:'es_CR'}});
+  const vivas = {};
+  mv.forEach(function(m){ if(!(m.reversal_move_id||[]).length) vivas[m.id]=m; });
+  const ids = Object.keys(vivas).map(Number);
+  if(!ids.length) return [];
+  const ls = await odooCall('account.move.line','search_read',
+    [[['move_id','in',ids],['display_type','=','product'],['product_id','in',ENT_PROD]]],
+    {fields:['move_id','product_id','quantity','product_uom_id','price_subtotal'],
+     limit:20000, context:{lang:'es_CR'}});
+  if(!ls.length) return [];
+  await uomFactores(ls.map(function(l){ return l.product_uom_id && l.product_uom_id[0]; }));
+  const porFac = {};
+  ls.forEach(function(l){
+    const pid=l.product_id[0], uid=(l.product_uom_id&&l.product_uom_id[0])||1;
+    const uds=(l.quantity||0)/(uomFac(uid)||1);
+    const mal=uomLineaMal(pid, uid, uds);
+    if(!mal) return;
+    const m=vivas[l.move_id[0]];
+    (porFac[m.id]=porFac[m.id]||{factura_id:m.id, factura:m.name, fecha:m.invoice_date,
+      cliente:(m.partner_id&&m.partner_id[1])||'—', lineas:[]}).lineas.push(mal);
+  });
+  return Object.keys(porFac).map(function(k){ return porFac[k]; })
+    .sort(function(a,z){ return String(a.fecha).localeCompare(String(z.fecha)); });
+}
+
+// ── EL TEXTO DEL AVISO ──────────────────────────────────────────────────
+// "Factura 3548 · Buns en Caja (6 u) · le corresponde Caja (Buns) o Paquete de 4"
+// El nombre de la unidad se muestra para que se lea, pero NADA se decide con él:
+// la decisión ya la tomó `uomLineaMal` por id. Si `_despUom` no tiene el nombre
+// —porque no se cargó— se dice el id, que es feo pero verdadero.
+function _uomNombreDe(uid){
+  const u=(typeof _despUom!=='undefined' && _despUom) ? _despUom[uid] : null;
+  return (u&&u.name) || ('uom '+uid);
+}
+function uomTextoAviso(f){
+  const partes=(f.lineas||[]).map(function(l){
+    const I=NIV_INFO[l.producto_id]||{nom:'id '+l.producto_id};
+    const usa=_uomNombreDe(l.uom_id);
+    // cuántas unidades trae la uom que se usó: 1/factor. Se dice sin decimales
+    // cuando es entero, que es siempre en las uom de esta categoría.
+    const porUom=1/(uomFac(l.uom_id)||1);
+    const cuantas=_rzN(porUom, (Math.abs(porUom%1)<1e-9)?0:1);
+    const deben=l.esperadas.map(_uomNombreDe).join(' o ');
+    return I.nom+' en '+usa+' ('+cuantas+' u) · le corresponde '+deben;
+  });
+  return 'Factura '+_despFacCorta(f.factura)+' · '+partes.join(' · ');
+}
+
+
+// Revisa UNA línea. Devuelve null si está bien, o el motivo si no.
+// `uds` = unidades individuales de la línea (cantidad ÷ factor de la uom).
+function uomLineaMal(pid, uomId, uds){
+  const ok = UOM_OK[pid];
+  if(!ok) return null;                       // producto que no controlamos
+  if(ok.indexOf(+uomId) >= 0) return null;   // unidad permitida
+  const cajaU = _uomCajaU(pid);
+  if(cajaU > 0 && uds > 0 && Math.abs(uds % cajaU) < 1e-9)
+    return null;                             // cajas enteras dichas en otra unidad
+  return {producto_id:pid, uom_id:+uomId, uds:uds, esperadas:ok.slice()};
+}
+
 const NIV_CFG_DEF={ritmoVentana:6, colchon:3, colchonTemporada:4, horizonte:6, medirLunesFrac:0.5};
 const _rzN=(n,d=0)=>(Number(n)||0).toLocaleString('es-CR',{minimumFractionDigits:d,maximumFractionDigits:d});
 // ── CAPACIDAD por Nº de personas (batches/día). Adelanto del futuro módulo RRHH. ──
