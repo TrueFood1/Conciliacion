@@ -16,14 +16,19 @@ from odoo_read import call
 
 ENT_PROD=[451,452,453,503,472,519]
 DESDE, HASTA = "2026-01-01", "2026-12-31"
-# Las NC que se emitieron el 22-sep-2026. Para la foto "antes" se ignoran, o sea
-# que la 3534 y la 3544 vuelven a estar vivas, que es como estaban ese dia.
-NC_DE_HOY = [41766, 41775]
+# Lo que nacio el 22-sep-2026. La foto "antes" lo saca todo, para que sea de
+# verdad el 21 por la noche:
+#   · las dos NC  -> la 3534 y la 3544 vuelven a estar vivas
+#   · las dos facturas de reemplazo -> todavia no existian
+# Sin sacar los reemplazos, la 3547 quedaria en la foto sin la factura muerta de
+# la que cuelga, y el detector la marcaria por una razon que ese dia no existia.
+NC_DE_HOY   = [41766, 41775]
+NACIO_HOY   = [41767, 41777]   # 3546 y 3547
 
 mv = call("account.move","search_read",
     [["move_type","=","out_invoice"],["state","=","posted"],
      ["invoice_date",">=",DESDE],["invoice_date","<=",HASTA]],
-    fields=["id","name","move_type","state","invoice_date","partner_id","reversal_move_id"],
+    fields=["id","name","move_type","state","invoice_date","partner_id","invoice_origin","reversal_move_id"],
     limit=2000, order="invoice_date, id", context={"lang":"es_CR"})
 ls = call("account.move.line","search_read",
     [["move_id","in",[m["id"] for m in mv]],["display_type","=","product"],
@@ -33,15 +38,16 @@ ls = call("account.move.line","search_read",
 uoms = call("uom.uom","search_read",[["category_id","=",1]],
     fields=["id","name","factor"], context={"lang":"es_CR","active_test":False})
 
-def foto(quitar_nc):
+def foto(quitar_nc, quitar_facturas=()):
     out=[]
     for m in mv:
+        if m["id"] in quitar_facturas: continue
         rm=[x for x in (m["reversal_move_id"] or []) if x not in quitar_nc]
         out.append({**m, "reversal_move_id": rm})
     return out
 
 datos = {"uoms":uoms, "lineas":ls,
-         "hoy": foto([]), "antes": foto(NC_DE_HOY)}
+         "hoy": foto([]), "antes": foto(NC_DE_HOY, set(NACIO_HOY))}
 d=os.path.dirname(os.path.abspath(__file__))
 io.open(os.path.join(d,"datos.json"),"w",encoding="utf-8").write(
     json.dumps(datos, ensure_ascii=False, indent=1, default=str))

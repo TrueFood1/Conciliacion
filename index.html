@@ -1586,6 +1586,11 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .tkl-pie{font-size:11px;color:var(--text-3);margin-top:6px;line-height:1.5;word-break:break-word}
 /* El aviso de "esto no se pudo leer" NUNCA se calla y nunca se disfraza de
    lista vacia. Son dos cosas distintas y la pantalla tiene que decir cual. */
+.tkl-vigia{font-size:12px;color:var(--text-3);padding:8px 12px;border-bottom:1px solid var(--border)}
+/* Rojo cuando hace más de un día que no corre. No es decoración: mientras el
+   renglón esté gris, "no hay avisos" quiere decir que se revisó y no había
+   nada. En rojo quiere decir que nadie revisó, que es lo contrario. */
+.tkl-vigia.tkl-vigia-mal{color:#8a3b12;font-weight:600}
 .tkl-roto{font-size:13px;color:#ffb4b4;background:#3a1b1b;border-radius:9px;
   padding:11px 12px;white-space:pre-wrap;margin-bottom:12px}
 
@@ -2376,6 +2381,8 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
      ══════════════════════════════════════════════════════════════════ -->
 <div id="vTickets" class="hidden">
   <div id="tklRoto" class="tkl-roto" style="display:none"></div>
+  <!-- El vigía de la revisión diaria de unidades. Vacío hasta que haya corrida. -->
+  <div id="tklVigia" class="tkl-vigia" style="display:none"></div>
   <div id="tklCuerpo"><div class="tkl-vacio">Cargando tickets…</div></div>
 </div>
 
@@ -6806,39 +6813,76 @@ const UOM_OK = {
   472: [38, 49],       // Pizza        · paq de 2 · caja de 12
 };
 
-// ── EL ESCAPE, Y POR QUÉ NO ES UN AGUJERO ───────────────────────────────
-// 🔴 La lista sola daría un FALSO POSITIVO en la 3547, que emitimos nosotros el
-// 22-sep para corregir la 3544: dice `4 × Caja [46]` = 24 u, con el precio de la
-// tarifa y el total exacto. Está BIEN facturada; solo está dicha en otra unidad.
+// ── EL ESCAPE · DOS CONDICIONES, NO UNA (decidido por Andrea el 22-sep) ──
+// 🔴 La lista sola daría un FALSO POSITIVO en la 3547, que emitimos nosotros para
+// corregir la 3544: dice `4 × Caja [46]` = 24 u, a tarifa y con el total exacto.
 // Odoo no dejó ponerle `[42]` porque `product_uom_readonly` es true en un pedido
-// confirmado (medido), así que esa forma va a repetirse cada vez que se corrija
-// una factura vieja.
+// confirmado (medido), así que esa forma se repite en CADA corrección.
 //
-// La diferencia entre la 3504 y la 3547, que es la que importa:
-//   3504 · 1 × Caja[46] =  6 u  →  la caja de Buns trae 24: seis unidades NO son
-//                                  un empaque, son una caja mal contada
-//   3547 · 4 × Caja[46] = 24 u  →  exactamente una caja, dicha en sextos
-// O sea: fuera de la lista se avisa, SALVO que el total dé un número entero de
-// cajas del producto. Eso no tapa ningún error de los cuatro (6 de 24 no es
-// entero, 6 de 12 tampoco) y no inventa alarmas sobre las correcciones.
+// ⚠️ PERO "da cajas enteras" NO ALCANZA COMO EXCUSA, y por eso se pidió la
+// segunda condición. Una factura nueva con `2 × Caja[46]` de Pizza también da 12
+// unidades justas —una caja entera— y ahí NO hay nada que perdonar: es
+// exactamente el error de la 3385 con otra cantidad. Perdonar por la cantidad
+// sola abriría la puerta que este detector existe para cerrar.
+//
+// Una línea fuera de la lista se calla SOLO si se cumplen LAS DOS:
+//   a) la factura REEMPLAZA a una revertida por NC del mismo pedido de venta
+//      (mismo `invoice_origin`, y la anterior con `reversal_move_id`), y
+//   b) el total en unidades de esa línea da un número entero de cajas.
+// Cualquier otra factura con la unidad fuera de la lista avisa SIEMPRE.
+//
+// La (a) es la que hace la diferencia: una corrección no se inventa sola, cuelga
+// de una factura muerta. Una venta nueva no tiene de qué colgar.
 function _uomCajaU(pid){ const I=NIV_INFO[pid]; return (I&&+I.cajaU)||0; }
+function _uomCajasEnteras(pid, uds){
+  const c=_uomCajaU(pid);
+  return c>0 && uds>0 && Math.abs(uds % c) < 1e-9;
+}
+// ¿Esta factura reemplaza a una revertida del mismo pedido de venta?
+// `hermanas` son las facturas que comparten `invoice_origin`, revertidas o no.
+// Sin `invoice_origin` la respuesta es NO y no hay vuelta: una factura suelta
+// —como la 3504, que no cuelga de ningún S0xxxx— nunca puede excusarse.
+function uomEsReemplazo(fac, hermanas){
+  if(!fac || !fac.invoice_origin) return false;
+  return (hermanas||[]).some(function(g){
+    return g.id !== fac.id && (g.reversal_move_id||[]).length > 0;
+  });
+}
+// Revisa UNA línea contra la lista. Devuelve null si la unidad está permitida,
+// o el motivo si no. El perdón NO se decide acá: acá no se sabe de qué factura
+// viene la línea, y el perdón depende de la factura. Lo aplica el barrido.
+function uomLineaMal(pid, uomId, uds){
+  const ok = UOM_OK[pid];
+  if(!ok) return null;                       // producto que no controlamos
+  if(ok.indexOf(+uomId) >= 0) return null;   // unidad permitida
+  return {producto_id:pid, uom_id:+uomId, uds:uds, esperadas:ok.slice()};
+}
 
 // ── EL BARRIDO DE FACTURAS ──────────────────────────────────────────────
-// Lee Odoo y devuelve una entrada POR FACTURA (no por línea): una factura con
-// dos líneas mal es UN problema, no dos. Solo `out_invoice` `posted` y SIN
-// revertir — una factura anulada por nota de crédito ya no cobra nada, y avisar
-// sobre ella sería ruido sobre un documento muerto.
+// Devuelve una entrada POR FACTURA (no por línea): una factura con dos líneas
+// mal es UN problema, no dos. Solo `out_invoice` `posted` y SIN revertir — una
+// factura anulada por nota de crédito ya no cobra nada, y avisar sobre ella
+// sería ruido sobre un documento muerto.
 //
-// El factor sale de `uomFactores` por id, la misma caché compartida del resto
-// del archivo. Si una uom no estuviera en la caché su factor caería a 1 y la
-// cuenta de unidades saldría mal, así que se siembra ANTES con los ids que de
-// verdad aparecen en las líneas — no con una lista escrita a mano.
+// ⚠️ LAS REVERTIDAS SÍ SE LEEN, aunque no se avisen: son las que hacen que una
+// corrección se reconozca como corrección. Si solo se leyeran las vivas, la
+// 3547 no tendría de qué colgar y se marcaría como error.
+//
+// El factor sale de `uomFactores` por id, la caché compartida del archivo, y se
+// siembra con los ids que de verdad aparecen en las líneas — no con una lista
+// escrita a mano. Si una uom faltara, su factor caería a 1 y la cuenta de
+// unidades saldría mal en silencio.
 async function uomBarrerFacturas(desdeYmd, hastaYmd){
   const mv = await odooCall('account.move','search_read',
     [[['move_type','=','out_invoice'],['state','=','posted'],
       ['invoice_date','>=',desdeYmd],['invoice_date','<=',hastaYmd]]],
-    {fields:['id','name','invoice_date','partner_id','reversal_move_id'],
+    {fields:['id','name','invoice_date','partner_id','invoice_origin','reversal_move_id'],
      limit:2000, order:'invoice_date, id', context:{lang:'es_CR'}});
+  if(!mv.length) return [];
+  // Por pedido de venta, para poder preguntar "¿esta reemplaza a una muerta?".
+  const porOrigen = {};
+  mv.forEach(function(m){ if(m.invoice_origin)
+    (porOrigen[m.invoice_origin]=porOrigen[m.invoice_origin]||[]).push(m); });
   const vivas = {};
   mv.forEach(function(m){ if(!(m.reversal_move_id||[]).length) vivas[m.id]=m; });
   const ids = Object.keys(vivas).map(Number);
@@ -6849,6 +6893,9 @@ async function uomBarrerFacturas(desdeYmd, hastaYmd){
      limit:20000, context:{lang:'es_CR'}});
   if(!ls.length) return [];
   await uomFactores(ls.map(function(l){ return l.product_uom_id && l.product_uom_id[0]; }));
+  const esReemp = {};
+  ids.forEach(function(i){
+    esReemp[i] = uomEsReemplazo(vivas[i], porOrigen[vivas[i].invoice_origin]); });
   const porFac = {};
   ls.forEach(function(l){
     const pid=l.product_id[0], uid=(l.product_uom_id&&l.product_uom_id[0])||1;
@@ -6856,6 +6903,8 @@ async function uomBarrerFacturas(desdeYmd, hastaYmd){
     const mal=uomLineaMal(pid, uid, uds);
     if(!mal) return;
     const m=vivas[l.move_id[0]];
+    // EL PERDÓN, con las dos condiciones. Si falta cualquiera, se avisa.
+    if(esReemp[m.id] && _uomCajasEnteras(pid, uds)) return;
     (porFac[m.id]=porFac[m.id]||{factura_id:m.id, factura:m.name, fecha:m.invoice_date,
       cliente:(m.partner_id&&m.partner_id[1])||'—', lineas:[]}).lineas.push(mal);
   });
@@ -20883,7 +20932,50 @@ var TK_MODNOM={entregas:'Entregas',operaciones:'Operaciones',finanzas:'Finanzas'
 
 function _tkEsc(t){ var d=document.createElement('div'); d.textContent=(t==null?'':String(t)); return d.innerHTML; }
 
+// ── EL VIGÍA DE LA REVISIÓN DIARIA (22-sep-2026) ───────────────────────
+// La revisión de unidades corre sola, todos los días, fuera de la app. Este
+// renglón es la ÚNICA ventana que tiene Andrea para saber si de verdad corrió.
+//
+// 🔴 Por qué hace falta: sin él, "no hay tickets nuevos" es ambiguo — puede
+// significar "se revisó y todo está bien" o "hace cinco días que no revisa
+// nadie". Son estados opuestos y se ven igual. Es el mismo agujero que obligó
+// a poner el Paso 0 del /retomar para el respaldo.
+//
+// Más de un día sin corrida → rojo. Un día justo es normal: corre a las 7:00 y
+// alguien puede mirar a las 6:00 del día siguiente.
+async function tkVigia(){
+  var el=document.getElementById('tklVigia'); if(!el) return;
+  try{
+    var c=sbClient(); if(!c) return;
+    var r=await c.from('v_revision_unidades_ultima')
+      .select('corrida_en,facturas_revisadas,avisos_creados');
+    if(r.error) throw r.error;
+    var f=(r.data||[])[0];
+    if(!f){
+      el.style.display='block'; el.className='tkl-vigia tkl-vigia-mal';
+      el.textContent='La revisión de facturas todavía no corrió ni una vez.';
+      return;
+    }
+    var horas=(Date.now()-Date.parse(f.corrida_en))/3600000;
+    var d=new Date(f.corrida_en);
+    var z=function(x){ return (x<10?'0':'')+x; };
+    el.style.display='block';
+    el.className='tkl-vigia'+(horas>24?' tkl-vigia-mal':'');
+    el.textContent='Última revisión: '+_despDia(String(f.corrida_en).slice(0,10))
+      +' '+z(d.getHours())+':'+z(d.getMinutes())
+      +' · '+f.facturas_revisadas+' facturas'
+      +' · '+(f.avisos_creados ? (f.avisos_creados+' aviso'+(f.avisos_creados>1?'s':'')) : 'sin avisos')
+      +(horas>24 ? ('  ⚠️ hace '+Math.floor(horas/24)+' día(s) que no corre') : '');
+  }catch(e){
+    // Si la tabla no existe todavía (el pegado sin aplicar) o falla la lectura,
+    // el renglón NO se muestra. Un vigía que miente es peor que no tener vigía.
+    el.style.display='none';
+    try{ console.warn('[Truefie] no pude leer la última revisión:', (e&&e.message)||e); }catch(_){}
+  }
+}
+
 async function tkListar(){
+  tkVigia();                      // no se espera: la lista no depende de esto
   var roto=document.getElementById('tklRoto');
   var cuerpo=document.getElementById('tklCuerpo');
   roto.style.display='none'; roto.textContent='';

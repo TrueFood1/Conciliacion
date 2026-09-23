@@ -37,7 +37,7 @@ def constante(nombre):
         j += 1
     return None
 
-FUNCS = ["_uomCajaU","uomLineaMal","uomBarrerFacturas","_uomNombreDe","uomTextoAviso",
+FUNCS = ["_uomCajaU","_uomCajasEnteras","uomEsReemplazo","uomLineaMal","uomBarrerFacturas","_uomNombreDe","uomTextoAviso",
          "uomFactores","uomFac","_despFacCorta","esc"]
 CONSTS= ["NIV_INFO","UOM_OK","ENT_PROD","_rzN","_uomFac"]
 

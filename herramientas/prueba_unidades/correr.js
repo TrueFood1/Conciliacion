@@ -40,8 +40,34 @@ function odooCall(modelo, metodo, args, kw){
 }
 var _despUom={}; DATOS.uoms.forEach(function(u){ _despUom[u.id]=u; });
 
+// ── CASOS INVENTADOS, CON FILAS REALES ──────────────────────────────────
+// No son fixtures escritos a mano: se clona una factura REAL de produccion y se
+// le cambia la unidad. Todo lo demas —cliente, fechas, forma de los campos— es
+// el dato de verdad. Es la unica forma de probar un caso que todavia no pasó.
+//
+// Los dos prueban lo MISMO y por eso van los dos: que "dar cajas enteras" no
+// alcanza para callar el aviso si la factura no es un reemplazo.
+function inventar(nombre, base_id, producto, uom_id, cantidad){
+  var base = DATOS.hoy.filter(function(m){ return m.id===base_id; })[0];
+  if(!base) throw new Error('no esta la factura base '+base_id);
+  var nid = 900000 + DATOS.hoy.length + Math.floor(Math.random()*1000);
+  DATOS.hoy.push({ id:nid, name:'001000010100000'+nombre, move_type:'out_invoice',
+    state:'posted', invoice_date:'2026-09-23', partner_id:base.partner_id,
+    invoice_origin:'S09'+nombre, reversal_move_id:[] });
+  DATOS.lineas.push({ move_id:[nid,'001000010100000'+nombre], product_id:producto,
+    quantity:cantidad, product_uom_id:uom_id, price_subtotal:0 });
+  return nombre;
+}
+// Pizza 2 x Caja[46] = 12 u = UNA caja entera de Pizza, pero factura nueva.
+inventar('09991', 41473, [472,'Pizza Crust'], [46,'Caja'], 2);
+// Buns 4 x Caja[46] = 24 u = UNA caja entera de Buns, pero factura nueva.
+// Es la MISMA forma que la 3547, que si se perdona: lo unico que cambia es que
+// esta no reemplaza a ninguna revertida.
+inventar('09992', 41473, [503,'Buns'], [46,'Caja'], 4);
+
 // ── LO QUE SE ESPERA ────────────────────────────────────────────────────
-var DEBE_MARCAR    = { hoy:['3385','3504'], antes:['3385','3504','3534','3544'] };
+var DEBE_MARCAR    = { hoy:['3385','3504','9991','9992'],
+                       antes:['3385','3504','3534','3544'] };
 var NO_DEBE_MARCAR = ['3546','3547','3507','3130','3424','3543','3545'];
 
 (async function(){
@@ -63,6 +89,7 @@ var NO_DEBE_MARCAR = ['3546','3547','3507','3130','3424','3543','3545'];
       L.push((p?'  ✓ ':'  ✗ ')+'marca la '+n);
     });
     NO_DEBE_MARCAR.forEach(function(n){
+      if(FOTO==='antes' && (n==='3546'||n==='3547')) return;   // ese dia no existian
       var p = marcadas.indexOf(n)<0; p?ok++:mal++;
       L.push((p?'  ✓ ':'  ✗ ')+'NO marca la '+n);
     });
