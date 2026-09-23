@@ -1477,8 +1477,17 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
       precio de poder reportar desde un modal. HAY QUE MIRARLO EN EL APARATO
       —la regla del §11— antes de darlo por bueno.
    ══════════════════════════════════════════════════════════════════════ */
+/* ⚠️ EL PISO DE 28px ES DEL TICKET 19 (Andrea, 21-sep): "en todas las
+   pantallas el ✱ de los tickets está muy pegado abajo". Antes era
+   `calc(16px + env(...))`, y ese `env` vale CERO en iPad y en el navegador
+   de escritorio — o sea que en las pantallas sin barra de gestos el botón
+   quedaba literalmente a 16px del borde del vidrio. Con `max()` hay dos
+   reglas y gana la que más levanta: un piso propio de 28px, y el área
+   segura cuando es más grande (iPhone con barra de gestos: 34px de inset
+   → 50px). No se suma el piso al inset: en el iPhone eso lo dejaría
+   flotando demasiado alto. */
 #tkBtn{position:fixed;z-index:150;right:16px;
-  bottom:calc(16px + env(safe-area-inset-bottom));
+  bottom:max(28px, calc(16px + env(safe-area-inset-bottom)));
   width:46px;height:46px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
   background:var(--surface);color:var(--text-2);
@@ -1604,6 +1613,42 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    lista vacia. Son dos cosas distintas y la pantalla tiene que decir cual. */
 .tkl-roto{font-size:13px;color:#ffb4b4;background:#3a1b1b;border-radius:9px;
   padding:11px 12px;white-space:pre-wrap;margin-bottom:12px}
+
+/* ── LAS PESTAÑAS · b68 (23-sep-2026) ─────────────────────────────────
+   Reemplazan a los grupos apilados de b65. Con seis grupos uno debajo del
+   otro, el último pedía scroll y Finanzas —que es el que se mira todos los
+   días— quedaba al fondo. Una pestaña por módulo, en el orden de Andrea.
+
+   ⚠️ EL ACENTO VA EN UNA VARIABLE (`--tkac`) Y NO EN UNA CLASE POR MÓDULO.
+   Seis clases con el mismo cuerpo y un color distinto es la misma regla
+   escrita seis veces: el día que cambie el grosor del subrayado hay que
+   acertarle a las seis. Acá la regla está una vez y lo único que cambia
+   por pestaña es el valor, que lo pone el JS desde TK_TABS — la misma
+   tabla que decide el orden y el nombre. Un solo lugar. */
+.tkl-tabs{display:flex;gap:2px;overflow-x:auto;margin:0 0 16px;
+  border-bottom:1px solid var(--border);
+  scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tkl-tabs::-webkit-scrollbar{display:none}
+.tkl-tabs.hidden{display:none}
+.tkl-tab{flex:0 0 auto;background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--text-3);font:inherit;font-size:13px;line-height:1;
+  padding:9px 12px 8px;cursor:pointer;white-space:nowrap;
+  display:flex;align-items:center;gap:6px;margin-bottom:-1px}
+.tkl-tab:hover{color:var(--text-2)}
+.tkl-tab.on{color:var(--tkac,var(--text));border-bottom-color:var(--tkac,var(--text));
+  font-weight:600}
+/* El contador es un dato, no un adorno: va en tabular-nums para que no
+   baile el ancho de la pestaña al pasar de 9 a 10, que con la tira
+   desplazable se nota como un salto. */
+.tkl-tab-n{font-size:11px;font-variant-numeric:tabular-nums;
+  color:var(--text-3);background:var(--field);border-radius:99px;
+  padding:1px 6px;min-width:8px;text-align:center}
+.tkl-tab.on .tkl-tab-n{color:var(--tkac,var(--text));background:transparent;
+  border:1px solid currentColor;padding:0 5px}
+/* "contando…" mientras las consultas de conteo vuelven. NO se dibuja un 0
+   provisional: un cero que después cambia a 4 es peor que no decir nada,
+   porque el primero se lee como un hecho. */
+.tkl-tab-n.cargando{color:var(--text-3);opacity:.55}
 
 
 /* ── TICKETS · CERRAR · POSPONER · DESCARTAR ──────────────────────────
@@ -2392,6 +2437,12 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
      ══════════════════════════════════════════════════════════════════ -->
 <div id="vTickets" class="hidden">
   <div id="tklRoto" class="tkl-roto" style="display:none"></div>
+  <!-- La tira de pestañas. Vive FUERA de #tklCuerpo porque el cuerpo se
+       reescribe entero al cambiar de pestaña y la tira no: si estuviera
+       adentro, cada toque redibujaría los botones y se perdería el scroll
+       horizontal de la tira justo cuando hace falta (seis pestañas no
+       entran en un teléfono). -->
+  <div id="tklTabs" class="tkl-tabs hidden" role="tablist"></div>
   <div id="tklCuerpo"><div class="tkl-vacio">Cargando tickets…</div></div>
 </div>
 
@@ -20723,7 +20774,18 @@ async function tkContar(){
   }
 }
 
+/* ⚠️ EL MÓDULO SE CAPTURA ANTES DE `_modShow`, Y ES TODO EL PUNTO.
+   `_modShow` pone `data-mod` con el módulo de la vista que abre, y vTickets
+   no tiene módulo: escribe ''. Leerlo después de llamarla da siempre vacío
+   y la regla 1 de `_tkTabInicial` no se cumpliría NUNCA — y no se notaría,
+   porque la regla 2 igual enciende una pestaña razonable. Es la clase de
+   bug que se ve solo si se sabe qué mirar. Por eso la línea va primero.
+   Hoy el único camino a Tickets es el chip del lobby (donde `data-mod` es
+   ''), así que en la práctica manda la regla 2; la 1 queda lista para el
+   día que se entre desde adentro de un módulo, que es cuando sirve. */
 function irATickets(){
+  try{ _TK_MOD_ORIGEN=document.body.getAttribute('data-mod')||null; }
+  catch(e){ _TK_MOD_ORIGEN=null; }
   _modShow('vTickets');
   crumbSet('Tickets','La cola');
   tkListar();
@@ -20817,20 +20879,55 @@ var TK_ESTADOS={sin_triar:'Sin revisar',disponible:'Disponible',bloqueado:'Bloqu
   pospuesto:'Pospuesto',descartado:'Descartado'};
 var TK_TIPOS={no_funciona:'Algo no funciona',duda:'Tengo una duda',
   idea:'Se me ocurrió algo',encargo:'Encargo'};
-/* El orden de los modulos es el del lobby, y 'sin_modulo' va al FINAL con
-   nombre propio: son los que se reportaron desde el lobby, donde no hay
-   modulo que capturar. Que tengan grupo propio es lo contrario de que
-   desaparezcan. */
-var TK_ORDEN=['entregas','operaciones','finanzas','personal','conciliacion','sin_modulo'];
-var TK_MODNOM={entregas:'Entregas',operaciones:'Operaciones',finanzas:'Finanzas',
-  personal:'Personal',conciliacion:'Conciliación',sin_modulo:'Sin módulo'};
-/* ⚠️ `ventas` NO está, y no es un olvido. Medido el 21-sep: `ACCESO_VISTAS`
-   tiene CINCO módulos y Ventas no es uno — es una tarjeta del lobby sin
-   vistas. Ningún ticket puede nacer con `modulo='ventas'`, así que el grupo
-   sería un renglón vacío que nadie puede llenar. Entra el día que Ventas
-   tenga pantallas. (Decisión de Andrea, 21-sep.)
-   Y si algún día apareciera un módulo nuevo, la lista de abajo lo agrega al
-   final sola: `claves` concatena lo que no esté en TK_ORDEN. */
+/* ── LAS PESTAÑAS · UNA SOLA TABLA · b68 (23-sep-2026) ─────────────────
+   Orden, nombre y color de acento salen de acá y de ningún otro lado. En
+   b65 el orden vivía en `TK_ORDEN` y el nombre en `TK_MODNOM`, dos listas
+   paralelas indexadas por la misma clave: agregar un módulo era acordarse
+   de tocar las dos. Ahora es una fila.
+
+   EL ORDEN LO PIDIÓ ANDREA (23-sep) y no es el del lobby: Finanzas primero
+   porque es el que se mira todos los días.
+
+   ⚠️ `ventas` NO está, y sigue sin ser un olvido. Medido el 21-sep:
+   `ACCESO_VISTAS` tiene CINCO módulos y Ventas no es uno — es una tarjeta
+   del lobby sin vistas, así que ningún ticket puede nacer con
+   `modulo='ventas'` y la pestaña sería un renglón que nadie puede llenar.
+
+   ⚠️ `personal` TAMPOCO ESTÁ EN LA LISTA, PERO SÍ EXISTE — y esa es la
+   diferencia con Ventas. `ACCESO_VISTAS.personal` tiene `vVacaciones`, o
+   sea que un ticket SÍ puede nacer con `modulo='personal'`. Andrea no lo
+   nombró en el orden del 23-sep; borrarlo sin más haría desaparecer esos
+   tickets de la pantalla, en silencio, que es exactamente el modo de falla
+   que el grupo de "Sin módulo" vino a evitar. Por eso no se pone una
+   pestaña fija —no se inventa lo que no se pidió— pero `_tkTabsVisibles`
+   agrega sola, ANTES de "Sin módulo", cualquier módulo que tenga tickets y
+   no tenga pestaña. Si algún día hay uno de Personal, aparece su pestaña;
+   si no hay ninguno, no se ve nada. Lo mismo vale para un módulo futuro. */
+var TK_TABS=[
+  {k:'finanzas',     n:'Finanzas',       ac:'#378ADD'},
+  {k:'operaciones',  n:'Operaciones',    ac:'#D4537E'},
+  {k:'entregas',     n:'Entregas',       ac:'#E9FE60'},
+  {k:'conciliacion', n:'Conciliación',   ac:'#84BD00'},
+  /* SIEMPRE VISIBLE, aunque no tenga ni un ticket (Andrea, 23-sep). Es la
+     única con `siempre`: las demás aparecen cuando tienen algo. Un "Sin
+     módulo" que desaparece al quedar en cero deja de recordar que ese
+     balde existe, y lo que cae ahí es justamente lo que nadie clasificó. */
+  {k:'sin_modulo',   n:'Sin módulo',     ac:null, siempre:true},
+  {k:'__propio',     n:'Mis pendientes', ac:null}
+];
+/* `__propio` lleva dos guiones bajos adelante a propósito: NO es un valor de
+   `modulo`, es el otro eje (`ambito`). Que no se pueda confundir con una
+   clave de módulo real ni por descuido ni por un `modulo` nuevo que algún
+   día se llame así. La distinción es la de b65 y sigue en pie: "Sin módulo"
+   es *de Truefie, pero no sé de qué parte*; "Mis pendientes" es *esto no es
+   Truefie*. */
+var TK_MODNOM={}; TK_TABS.forEach(function(t){ TK_MODNOM[t.k]=t.n; });
+/* Los tres estados que cierran un ticket, EN UN SOLO LUGAR. Los usaban ya
+   `tklItem` (para no ofrecer botones que rebotan) y ahora los contadores
+   (para contar abiertos). Escritos dos veces, el día que entre un cuarto
+   estado final el contador diría que hay trabajo abierto que no existe. */
+var TK_CERRADOS=['cerrado','pospuesto','descartado'];
+function _tkAbierto(f){ return TK_CERRADOS.indexOf(f.estado)<0; }
 
 function _tkEsc(t){ var d=document.createElement('div'); d.textContent=(t==null?'':String(t)); return d.innerHTML; }
 
@@ -20861,7 +20958,7 @@ var pie=[];
          RLS, los dos medidos— es no ofrecerle a alguien un boton que le
          va a rebotar. Y ofrecer "Cerrar" sobre algo ya cerrado seria un
          boton que no hace nada util. */
-      ((socia && ['cerrado','pospuesto','descartado'].indexOf(f.estado)<0)
+      ((socia && _tkAbierto(f))
         ? '<div class="tkl-acc">'+
             '<button class="tkl-a" onclick="tkEstAbrir('+f.id+',&quot;cerrado&quot;)">Cerrar</button>'+
             '<button class="tkl-a" onclick="tkEstAbrir('+f.id+',&quot;pospuesto&quot;)">Posponer</button>'+
@@ -20872,16 +20969,161 @@ var pie=[];
   return html;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   LA LISTA, EN PESTAÑAS · b68 (23-sep-2026)
+
+   TRES PASOS, y en este orden a propósito:
+     1. se leen las filas (una sola vez);
+     2. se decide QUÉ pestañas existen, mirando las filas;
+     3. se le pregunta a la BASE cuántos abiertos tiene cada una.
+
+   🔴 EL PASO 3 NO SALE DEL PASO 1, Y ESA ES LA REGLA DEL 19-SEP.
+   Sería gratis contar `_TK_BUCKETS[k].length` — las filas ya están en
+   memoria y el número daría igual HOY. Da igual hoy porque la lectura trae
+   todo; el día que traiga menos (un `limit`, una página, un filtro nuevo,
+   la RLS recortando) el contador seguiría cuadrando con lo dibujado y
+   seguiría estando mal, porque los dos números saldrían del mismo lado. Un
+   contador que se calcula de lo que ya se ve no verifica nada: es el mismo
+   dato con otra cara. Por eso cada pestaña pregunta con `count:'exact',
+   head:true`, que es la forma que ya usa `tkContar()` para el chip del
+   lobby, y si los dos números NO coinciden se dice en consola.
+   ══════════════════════════════════════════════════════════════════════ */
+var _TK_TAB=null;        /* la pestaña activa */
+var _TK_CUENTA={};       /* clave -> abiertos SEGÚN LA BASE (null = todavía no) */
+var _TK_BUCKETS={};      /* clave -> filas, para dibujar sin volver a leer */
+var _TK_VIS=[];          /* las pestañas que se dibujan, ya ordenadas */
+var _TK_SOCIA=false;
+/* El módulo desde el que se abrió Tickets. Lo captura `irATickets()` ANTES
+   de `_modShow`, porque `_modShow` pisa `data-mod` con el de vTickets (que
+   es vacío) y para cuando `tkListar` corre ya no queda de dónde sacarlo. */
+var _TK_MOD_ORIGEN=null;
+
+/* Qué pestañas se dibujan. Una pestaña se ve si tiene ALGÚN ticket, abierto
+   o cerrado — no si tiene abiertos. Si se ocultara al llegar a cero
+   abiertos, los cerrados de ese módulo quedarían sin ninguna pantalla desde
+   la cual llegar a ellos: invisibles, no archivados. El contador de arriba
+   cuenta abiertos; la pestaña existe mientras haya historia. */
+function _tkTabsVisibles(){
+  var vis=[], fijas={};
+  TK_TABS.forEach(function(t){ fijas[t.k]=1; });
+  /* Los módulos con tickets que no tienen pestaña fija (hoy: `personal`).
+     Entran ANTES de "Sin módulo" para no romper el cierre de la tira: los
+     dos últimos son los dos baldes, y un módulo real no va después de
+     ellos. */
+  var extra=Object.keys(_TK_BUCKETS).filter(function(k){
+    return !fijas[k] && (_TK_BUCKETS[k]||[]).length;
+  }).sort();
+  TK_TABS.forEach(function(t){
+    if(t.k==='sin_modulo') extra.forEach(function(k){
+      vis.push({k:k, n:(TK_MODNOM[k]||k), ac:null});
+    });
+    if(t.siempre || (_TK_BUCKETS[t.k]||[]).length) vis.push(t);
+  });
+  return vis;
+}
+
+/* El conteo de UNA pestaña, contra `v_ticket`. Devuelve el número o null si
+   no se pudo: null se dibuja como "—", nunca como 0. Un cero inventado por
+   un error de red se lee como "acá no hay nada que hacer". */
+async function _tkContarTab(c, t){
+  var q=c.from('v_ticket').select('id',{count:'exact',head:true})
+         .not('estado','in','('+TK_CERRADOS.join(',')+')');
+  if(t.k==='__propio') q=q.eq('ambito','propio');
+  else{
+    /* `neq` y no `eq('truefie')`: es el mismo criterio defensivo que usa el
+       reparto de abajo (`ambito==='propio' ? propio : truefie`). Un ámbito
+       nuevo que algún día se agregue cae del lado de Truefie y se ve, en vez
+       de desaparecer de las dos mitades. */
+    q=q.neq('ambito','propio');
+    q=(t.k==='sin_modulo') ? q.is('modulo',null) : q.eq('modulo',t.k);
+  }
+  var r=await q;
+  if(r.error) throw r.error;
+  return (r.count===null||r.count===undefined) ? null : r.count;
+}
+
+function _tkTabsHtml(){
+  var h='';
+  _TK_VIS.forEach(function(t){
+    var n=_TK_CUENTA[t.k];
+    var num=(n===undefined) ? '<span class="tkl-tab-n cargando">·</span>'
+          : (n===null)      ? '<span class="tkl-tab-n">—</span>'
+                            : '<span class="tkl-tab-n">'+n+'</span>';
+    h+='<button class="tkl-tab'+(t.k===_TK_TAB?' on':'')+'" role="tab"'+
+       ' aria-selected="'+(t.k===_TK_TAB?'true':'false')+'"'+
+       (t.ac?(' style="--tkac:'+t.ac+'"'):'')+
+       ' onclick="tkTab(&quot;'+t.k+'&quot;)">'+
+       _tkEsc(t.n)+num+'</button>';
+  });
+  return h;
+}
+
+/* Dibuja SOLO el cuerpo de la pestaña activa. No hay títulos de grupo: el
+   nombre del grupo ya está arriba, en la pestaña encendida, y repetirlo
+   debajo es decir dos veces lo mismo en dos renglones seguidos. */
+function _tkCuerpoHtml(){
+  var g=_TK_BUCKETS[_TK_TAB]||[];
+  if(!g.length){
+    return '<div class="tkl-vacio">'+
+      (_TK_TAB==='__propio'
+        ? 'No tenés pendientes propios anotados.'
+        : (_TK_TAB==='sin_modulo'
+            ? 'Nada sin módulo. Los tickets que se reportan desde el lobby caen acá.'
+            : 'No hay tickets de '+_tkEsc(TK_MODNOM[_TK_TAB]||_TK_TAB)+'.'))+
+      '</div>';
+  }
+  var h='';
+  g.forEach(function(f){ h+=tklItem(f, _TK_SOCIA); });
+  return h;
+}
+
+function _tkPintar(){
+  var tabs=document.getElementById('tklTabs');
+  var cuerpo=document.getElementById('tklCuerpo');
+  if(tabs){ tabs.innerHTML=_tkTabsHtml(); tabs.classList.toggle('hidden', !_TK_VIS.length); }
+  if(cuerpo) cuerpo.innerHTML=_TK_TAB ? _tkCuerpoHtml() : '';
+}
+
+/* Cambiar de pestaña NO vuelve a la base. Las filas ya están y los
+   contadores también: ir a buscarlas otra vez haría que la pantalla
+   parpadee y que el número pueda cambiar entre dos toques sin que haya
+   pasado nada. Para refrescar de verdad está volver a entrar a Tickets. */
+function tkTab(k){
+  if(!_TK_BUCKETS.hasOwnProperty(k)) return;
+  _TK_TAB=k; _tkPintar();
+  var t=document.querySelector('.tkl-tab.on');
+  if(t && t.scrollIntoView) try{ t.scrollIntoView({block:'nearest',inline:'nearest'}); }catch(e){}
+}
+
+/* La pestaña con la que se abre. Tres reglas, en orden (Andrea, 23-sep):
+     1. la del módulo desde donde se abrió Tickets, si esa pestaña se dibuja;
+     2. si no, la primera con tickets ABIERTOS — y "abiertos" lo dice el
+        contador de la base, no las filas;
+     3. si no hay ninguna con abiertos, la primera que haya.
+   La 3 existe porque la 2 puede no dar nada: con todo cerrado no hay
+   "primera con abiertos", y una pantalla sin pestaña encendida no muestra
+   ni la lista de lo cerrado. */
+function _tkTabInicial(){
+  var k=_TK_MOD_ORIGEN;
+  if(k && _TK_VIS.some(function(t){ return t.k===k; })) return k;
+  var conAbiertos=_TK_VIS.filter(function(t){ return _TK_CUENTA[t.k]>0; })[0];
+  if(conAbiertos) return conAbiertos.k;
+  return _TK_VIS.length ? _TK_VIS[0].k : null;
+}
+
 async function tkListar(){
   var roto=document.getElementById('tklRoto');
   var cuerpo=document.getElementById('tklCuerpo');
+  var tabs=document.getElementById('tklTabs');
   roto.style.display='none'; roto.textContent='';
+  if(tabs){ tabs.innerHTML=''; tabs.classList.add('hidden'); }
   cuerpo.innerHTML='<div class="tkl-vacio">Cargando tickets…</div>';
+  _TK_TAB=null; _TK_CUENTA={}; _TK_BUCKETS={}; _TK_VIS=[];
   /* Se pregunta donde manda: la MISMA funcion que decide si se dibuja una
      pestaña. Y no es proteccion —eso lo hacen el guardia del §2 y la RLS,
      los dos medidos— es no ofrecerle a alguien un boton que le va a rebotar. */
-  var socia=false;
-  try{ socia=await accesoSocia(); }catch(e){}
+  _TK_SOCIA=false;
+  try{ _TK_SOCIA=await accesoSocia(); }catch(e){}
   try{
     var c=sbClient(); if(!c) throw new Error('sin cliente de Supabase');
     /* TODO EL EQUIPO VE TODOS. No se filtra por autor: la decision del 17-sep
@@ -20903,74 +21145,72 @@ async function tkListar(){
     /* Las filas quedan a mano para que la hoja pueda decir de que ticket se
        trata sin volver a preguntarle a la base. */
     _TK_FILAS={}; filas.forEach(function(f){ _TK_FILAS[f.id]=f; });
+
+    /* ── EL REPARTO · los dos ejes de b65, ahora en un solo paso ───────
+       El corte de arriba sigue siendo por `ambito` y el de adentro por
+       `modulo`. Lo que cambió es que ya no son dos mitades apiladas sino
+       dos clases de pestaña: `__propio` de un lado, los módulos del otro.
+       ⚠️ `ambito` puede venir `undefined` si esta pantalla queda servida
+       contra una base sin la columna: se cae a 'truefie', que es el default
+       de la base. De menos, nunca de más. */
+    TK_TABS.forEach(function(t){ _TK_BUCKETS[t.k]=[]; });
+    filas.forEach(function(f){
+      if(f.ambito==='propio'){ _TK_BUCKETS.__propio.push(f); return; }
+      var m=f.modulo||'sin_modulo';
+      (_TK_BUCKETS[m]=_TK_BUCKETS[m]||[]).push(f);
+    });
+    _TK_VIS=_tkTabsVisibles();
+
+    /* Si ya se sabe con cuál abrir (se entró desde un módulo), se enciende
+       YA y la lista se ve sin esperar a los contadores. Los números entran
+       después, en su lugar. Si no se sabe, hay que esperarlos: la regla 2
+       los necesita. */
+    if(_TK_MOD_ORIGEN && _TK_VIS.some(function(t){ return t.k===_TK_MOD_ORIGEN; }))
+      _TK_TAB=_TK_MOD_ORIGEN;
+    _tkPintar();
+
+    /* ── LOS CONTADORES, CONTRA LA FUENTE ─────────────────────────────
+       En paralelo: son seis consultas `head:true` (sin filas, solo el
+       número) y encadenarlas sumaría seis idas y vueltas por nada.
+       Cada una se cae sola: una pestaña que no pudo contar dibuja "—" y
+       las otras cinco siguen mostrando su número. */
+    await Promise.all(_TK_VIS.map(async function(t){
+      try{ _TK_CUENTA[t.k]=await _tkContarTab(c, t); }
+      catch(e){
+        _TK_CUENTA[t.k]=null;
+        try{ console.error('[Truefie] contador de la pestaña '+t.k+':', e); }catch(x){}
+      }
+    }));
+    if(!_TK_TAB) _TK_TAB=_tkTabInicial();
+    _tkPintar();
+
+    /* ⚠️ EL CONTROL QUE HACE QUE LA REGLA SIRVA. Contar contra la fuente no
+       vale nada si nadie compara los dos números: se comparan acá, pestaña
+       por pestaña, contra los abiertos que SÍ se trajeron. Si no coinciden,
+       la lectura de arriba está trayendo menos de lo que hay —paginación,
+       RLS, un filtro— y la pantalla está mintiendo por omisión aunque el
+       contador esté bien. No se dibuja nada: se dice en consola, que es
+       donde se mira cuando algo no cuadra. */
+    _TK_VIS.forEach(function(t){
+      var n=_TK_CUENTA[t.k];
+      if(n===null||n===undefined) return;
+      var vistos=(_TK_BUCKETS[t.k]||[]).filter(_tkAbierto).length;
+      if(n!==vistos) try{ console.error('[Truefie] tickets: la pestaña '+t.k+
+        ' dice '+n+' abiertos en la base y se trajeron '+vistos+
+        '. La lista está incompleta.'); }catch(x){}
+    });
+
     if(!filas.length){
+      if(tabs) tabs.classList.add('hidden');
       cuerpo.innerHTML='<div class="tkl-vacio">No hay tickets todavía. '+
         'El botón ✱ de abajo a la derecha es el que los crea.</div>';
       return;
     }
-    /* ── LAS DOS MITADES · b65 (21-sep-2026) ──────────────────────────
-       🔴 "Sin módulo" y "Mis pendientes" NO se pueden mezclar, y no es
-       estético: son cosas distintas. "Sin módulo" es *de Truefie, pero no
-       sé de qué parte* — algo que reportaste desde el lobby. "Mis
-       pendientes" es *esto no es Truefie*: un trámite, el empaque, el sitio.
-       Por eso el corte de arriba es por `ambito` y el de adentro por
-       `modulo`, que son dos ejes y no uno.
-       ⚠️ `ambito` puede venir `undefined` si esta pantalla queda servida
-       contra una base sin la columna: se cae a 'truefie', que es el default
-       de la base. De menos, nunca de más. */
-    var porAmbito={truefie:[], propio:[]};
-    filas.forEach(function(f){
-      (porAmbito[f.ambito==='propio'?'propio':'truefie']).push(f);
-    });
-    var porMod={};
-    porAmbito.truefie.forEach(function(f){
-      var m=f.modulo||'sin_modulo';
-      (porMod[m]=porMod[m]||[]).push(f);
-    });
-    /* Los modulos que no esten en TK_ORDEN se agregan igual, al final: una
-       lista de nombres escrita a mano se queda vieja, y el sintoma seria un
-       grupo entero invisible. */
-    var claves=TK_ORDEN.filter(function(m){ return porMod[m]; })
-      .concat(Object.keys(porMod).filter(function(m){ return TK_ORDEN.indexOf(m)<0; }));
-    var html='';
-    /* El encabezado de la mitad de Truefie solo aparece si hay ALGO en la
-       otra. Con una sola mitad, dos títulos de sección para una lista corta
-       pesan más de lo que ordenan — es la misma razón por la que Tickets no
-       es una séptima tarjeta del lobby. */
-    if(porAmbito.propio.length && claves.length)
-      html+='<div class="tkl-mitad">Truefie</div>';
-    claves.forEach(function(m){
-      var g=porMod[m];
-      html+='<div class="tkl-grupo"><div class="tkl-grupo-t">'+
-        _tkEsc(TK_MODNOM[m]||m)+
-        '<span class="tkl-grupo-n">'+g.length+(g.length===1?' ticket':' tickets')+'</span></div>';
-      g.forEach(function(f){ html+=tklItem(f, socia); });
-      html+='</div>';
-    });
-    /* UNA SOLA LISTA, IGUAL PARA TODOS. No hay cara de socia y cara de
-       equipo, y no es un pendiente: es el diseño acordado el 19-sep.
-       Andrea mira la lista agrupada por modulo y le dice a CC cuales revisar;
-       la investigacion —que es abrir el codigo— y lo que sale de ella la
-       escribe CC. Un formulario que le preguntara a ella "¿toca numeros?" le
-       estaria pidiendo un diagnostico que solo se saca leyendo el codigo.
-       Hubo uno y se saco entero por eso mismo. */
-    /* ── MIS PENDIENTES · la otra mitad ────────────────────────────────
-       Va ABAJO y no arriba: la cola de Truefie es la que CC toma, y es la
-       que se mira todos los días. Los propios se miran cuando toca. */
-    if(porAmbito.propio.length){
-      html+='<div class="tkl-mitad">Mis pendientes</div>';
-      html+='<div class="tkl-grupo"><div class="tkl-grupo-t">'+
-        'No es de Truefie'+
-        '<span class="tkl-grupo-n">'+porAmbito.propio.length+
-        (porAmbito.propio.length===1?' pendiente':' pendientes')+'</span></div>';
-      porAmbito.propio.forEach(function(f){ html+=tklItem(f, socia); });
-      html+='</div>';
-    }
-    cuerpo.innerHTML=html;
   }catch(err){
     /* Lista vacia y lista que no se pudo leer son DOS COSAS, y la pantalla
        tiene que decir cual. Confundirlas es como se pierde una cola entera
        sin que nadie se entere. */
+    if(tabs){ tabs.innerHTML=''; tabs.classList.add('hidden'); }
     cuerpo.innerHTML='';
     roto.style.display='';
     roto.textContent='No se pudieron leer los tickets.\n'+_tkMotivo(err);
