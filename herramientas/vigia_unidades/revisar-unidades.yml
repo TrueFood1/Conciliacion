@@ -1,0 +1,58 @@
+# ─────────────────────────────────────────────────────────────────────────
+#  REVISION DIARIA DE UNIDADES EN FACTURAS
+#
+#  ⛔ ESTE ARCHIVO VA EN EL REPO PRIVADO TrueFood1/respaldo-truefie.
+#  Aca, en Conciliacion (publico), esta solo como PLANTILLA para copiar.
+#  Ningun secret vive en este archivo: los tres salen de la configuracion del
+#  repo privado. Si algun dia hay que tocar uno, se toca alla.
+#
+#  Por que en el repo privado y no aca: necesita una credencial de ESCRITURA a
+#  la base. La misma razon por la que el respaldo diario vive alla.
+# ─────────────────────────────────────────────────────────────────────────
+name: Revision de unidades
+
+on:
+  schedule:
+    # 13:07 UTC = 07:07 en Costa Rica (UTC-6, sin horario de verano).
+    # A las y 07 y no en punto: GitHub avisa que los jobs de la hora exacta se
+    # retrasan o se descartan cuando hay carga. Es la misma razon por la que el
+    # respaldo corre a las y 17.
+    - cron: '7 13 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: revision-unidades
+  cancel-in-progress: false
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    steps:
+      # El codigo de la revision vive en el repo PUBLICO: la regla tiene que ser
+      # la MISMA que usa la app, y la app es index.html. Se lee de ahi, no se
+      # copia — dos copias de la tabla coinciden hasta que alguien toca una.
+      - name: Traer el codigo de Truefie
+        uses: actions/checkout@v4
+        with:
+          repository: TrueFood1/Conciliacion
+          ref: main
+          path: truefie
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar el cliente de Postgres
+        run: pip install --quiet 'psycopg[binary]'
+
+      - name: Revisar
+        env:
+          ODOO_URL:          ${{ secrets.ODOO_URL }}
+          ODOO_DB:           ${{ secrets.ODOO_DB }}
+          ODOO_LECTOR_USER:  ${{ secrets.ODOO_LECTOR_USER }}
+          ODOO_LECTOR_APIKEY: ${{ secrets.ODOO_LECTOR_APIKEY }}
+          VIGIA_DB_URL:      ${{ secrets.VIGIA_DB_URL }}
+        run: |
+          set -euo pipefail
+          python3 truefie/herramientas/vigia_unidades/revisar_unidades.py \
+            --index truefie/index.html --dias 30
