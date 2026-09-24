@@ -3,10 +3,27 @@
 -- y sumarle `disponible` y `bloqueado` a los que el §2 ya acepta.
 -- PROPUESTA 19-sep-2026.
 --
--- ⚠️ NO PEGADO TODAVIA. Este encabezado NO dice "aplicado" hasta DESPUES de
---    correrlo y de haber mirado la verificacion del §2. Regla del 16-sep:
---    sobre un "Success" sin verificar se escribio que algo estaba aplicado, y
---    durante unos minutos el archivo y la bitacora afirmaban las dos algo falso.
+-- ✅ APLICADO el 21-sep-2026, por Andrea. La fila de control dio los seis
+--    cambios esperados y ninguno de los que no tenian que moverse:
+--      m_cc        f -> t        la marca acepta la firma cc-sql
+--      m_triar     t -> f        y dejo de decir "triar"
+--      m_huella    71be7b58 -> 5d77e077
+--      lista_vieja t -> f  ·  lista_nueva f -> t
+--      e_huella    a63086f5 -> 124d637a
+--      trg 1 y 1 · marcas 0 · estados 0 · tickets 3   (sin moverse)
+--
+--    VERIFICADO DESDE AFUERA con pg_lector, y no por propiedades sueltas: se
+--    comparo el md5 del CUERPO ENTERO de las dos funciones vivas contra el que
+--    dice este archivo. **Identico en las dos.** Un largo y un par de booleanos
+--    pueden coincidir por casualidad; el cuerpo entero no.
+--
+--    Y EJERCITADO POR LOS DOS CARRILES contra el estado definitivo, en rollback:
+--      A · cc-sql pone 'disponible' y una marca   -> LOS DOS ENTRARON
+--      A · cc-sql intenta 'cerrado'               -> P0001, es de las socias
+--      B · equipo intenta 'disponible' (la app)   -> P0001, es de un perfil socias
+--      B · socia  pone 'cerrado'    (la app)      -> ENTRA
+--    O sea: se le abrio la puerta a CC sin abrirsela al equipo, y las socias
+--    siguen pudiendo cerrar.
 --
 -- ── DE DONDE SALE ───────────────────────────────────────────────────────
 -- La pantalla de tickets tuvo, el 19-sep, un formulario que le preguntaba a
@@ -79,6 +96,27 @@
 -- El estado sigue llamandose 'sin_triar' y la tabla `ticket_marca`: cambiar
 -- eso es otro pegado y no lo vale.
 -- ════════════════════════════════════════════════════════════════════════
+--
+-- ⚠️ CAMBIO DE FORMA, 21-sep-2026 (no de contenido). El archivo tenia los dos
+--    `create or replace` en DOS transacciones separadas, cada una con un
+--    `select` de control que IMPRIMIA pero no FRENABA. Ahora van en UNA sola
+--    transaccion con un `raise exception`: o entran los dos o no entra
+--    ninguno, y si el control no da lo esperado el `commit` no llega a correr.
+--    Es el patron de los pegados del 21-sep. Las reglas NO cambiaron: CC
+--    escribe la marca y puede poner `disponible` y `bloqueado`; `cerrado`,
+--    `pospuesto` y `descartado` siguen siendo solo de las socias.
+--
+-- ── RE-ENSAYADO EN ROLLBACK CONTRA PRODUCCION, 21-sep ───────────────────
+--   N1 · los dos guardias + candado      -> "CANDADO OK: cc-sql si · triar no
+--                                            · lista nueva si · lista vieja no
+--                                            · triggers 1 y 1"
+--   N2 · solo uno de los dos guardias    -> P0001, "no tiene la lista nueva"
+--   N3 · cc-sql pone 'disponible' y una marca -> LOS DOS ENTRARON
+--   N4 · cc-sql intenta 'cerrado'        -> P0001, "Cerrar, posponer y
+--                                            descartar es de las socias"
+--   El terreno del §0 se volvio a medir hoy: identico al 19-sep salvo
+--   `tickets`, que paso de 2 a 3 (T-0019, reportado hoy desde b63).
+-- ════════════════════════════════════════════════════════════════════════
 
 
 -- ════════════════════════════════════════════════════════════════════════
@@ -127,10 +165,15 @@ select (select count(*) from pg_trigger
          where tgrelid='public.ticket_estado'::regclass and not tgisinternal) as trg_estado;
 
 
+
 -- ════════════════════════════════════════════════════════════════════════
--- §1 · EL GUARDIA DE LA MARCA · abrirlo a `cc-sql`
+-- §1 · EL CAMBIO · los dos guardias, en UNA transaccion, con candado
+--
+-- Correr ESTO ENTERO, de una. Trae el candado y el commit adentro.
+--
+-- ⚠️ SI EL CANDADO SALTA, LA TRANSACCION QUEDA ABIERTA Y ABORTADA: nada se
+--    aplico, pero hay que cerrarla con `rollback;`.
 -- ════════════════════════════════════════════════════════════════════════
--- ⚠️ SELECCIONA DESDE `begin;` HASTA `commit;` Y NADA MAS.
 begin;
 
 create or replace function ticket_marca_guard()
@@ -178,27 +221,6 @@ begin
   return new;
 end
 $guard$;
-
--- ── EL CONTROL · ADENTRO Y ANTES DEL COMMIT ─────────────────────────
--- O se ven estos valores, o esto no llego. "Success. No rows returned" no
--- prueba nada: un tramo de puro comentario devuelve exactamente eso.
--- ESPERADO: funcion 1 · acepta_cc_sql t · dice_triar f · trigger 1
-select
-  (select count(*) from pg_proc where proname='ticket_marca_guard')          as funcion,
-  (select position('cc-sql' in prosrc) > 0
-     from pg_proc where proname='ticket_marca_guard')                        as acepta_cc_sql,
-  (select position('triar' in prosrc) > 0
-     from pg_proc where proname='ticket_marca_guard')                        as dice_triar,
-  (select count(*) from pg_trigger
-    where tgrelid='public.ticket_marca'::regclass and not tgisinternal)      as trigger;
-
-commit;
-
-
--- ════════════════════════════════════════════════════════════════════════
--- §2 · EL GUARDIA DEL ESTADO · sumarle `disponible` y `bloqueado`
--- ════════════════════════════════════════════════════════════════════════
-begin;
 
 create or replace function ticket_estado_guard()
 returns trigger language plpgsql as $guard$
@@ -253,58 +275,90 @@ begin
 end
 $guard$;
 
--- ── EL CONTROL · ADENTRO Y ANTES DEL COMMIT ─────────────────────────
--- ESPERADO: funcion 1 · lista_nueva t · lista_vieja f · trigger 1
--- ⚠️ Se mira LA LISTA ENTERA, textual, y no si aparece la palabra
---    'disponible': esa palabra ya estaba en el mensaje de error de antes. Un
---    contador que se conforma con la palabra habria dado verde sin el cambio.
-select
-  (select count(*) from pg_proc where proname='ticket_estado_guard')         as funcion,
-  (select position('not in (''en_curso'',''en_validacion'',''disponible'',''bloqueado'')'
-            in prosrc) > 0
-     from pg_proc where proname='ticket_estado_guard')                       as lista_nueva,
-  (select position('not in (''en_curso'',''en_validacion'')' in prosrc) > 0
-     from pg_proc where proname='ticket_estado_guard')                       as lista_vieja,
-  (select count(*) from pg_trigger
-    where tgrelid='public.ticket_estado'::regclass and not tgisinternal)     as trigger;
+-- ── EL CANDADO · adentro de la misma transaccion ────────────────────────
+-- Los `select` de control del archivo original IMPRIMEN pero no FRENAN. Esto
+-- frena: si cualquiera de los cuatro no da lo esperado, levanta excepcion y
+-- el `commit` no llega a correr.
+do $candado$
+declare
+  m_cc boolean; m_triar boolean; e_nueva boolean; e_vieja boolean;
+  trg_m int; trg_e int;
+begin
+  select position('cc-sql' in prosrc) > 0, position('triar' in prosrc) > 0
+    into m_cc, m_triar from pg_proc where proname='ticket_marca_guard';
+
+  select position('not in (''en_curso'',''en_validacion'',''disponible'',''bloqueado'')' in prosrc) > 0,
+         position('not in (''en_curso'',''en_validacion'')' in prosrc) > 0
+    into e_nueva, e_vieja from pg_proc where proname='ticket_estado_guard';
+
+  select count(*) into trg_m from pg_trigger
+   where tgrelid='public.ticket_marca'::regclass  and not tgisinternal;
+  select count(*) into trg_e from pg_trigger
+   where tgrelid='public.ticket_estado'::regclass and not tgisinternal;
+
+  if not m_cc then
+    raise exception 'CANDADO: ticket_marca_guard NO acepta la firma cc-sql. NO SE APLICO NADA.';
+  end if;
+  if m_triar then
+    raise exception 'CANDADO: ticket_marca_guard TODAVIA dice "triar" en sus mensajes. NO SE APLICO NADA.';
+  end if;
+  -- ⚠️ Se mira LA LISTA ENTERA, textual, no si aparece la palabra 'disponible':
+  --    esa palabra YA estaba en el mensaje de error viejo. Un control que se
+  --    conforma con la palabra daria verde sin el cambio.
+  if not e_nueva then
+    raise exception 'CANDADO: ticket_estado_guard no tiene la lista nueva de cuatro estados. NO SE APLICO NADA.';
+  end if;
+  if e_vieja then
+    raise exception 'CANDADO: ticket_estado_guard TODAVIA tiene la lista vieja de dos. NO SE APLICO NADA.';
+  end if;
+  if trg_m <> 1 or trg_e <> 1 then
+    raise exception 'CANDADO: los triggers no sobrevivieron (marca=% estado=%, esperado 1 y 1). NO SE APLICO NADA.', trg_m, trg_e;
+  end if;
+
+  raise notice 'CANDADO OK: cc-sql si · triar no · lista nueva si · lista vieja no · triggers 1 y 1';
+end
+$candado$;
 
 commit;
 
 
 -- ════════════════════════════════════════════════════════════════════════
--- §3 · DESPUES · VERIFICAR. Solo lectura.
+-- ESTA ES LA TABLA QUE VAS A VER. Ya con el commit hecho.
+--
+-- El SQL Editor muestra SOLO el resultado de la ULTIMA sentencia, por eso el
+-- control va DESPUES del commit: asi se ve, y ademas lee lo que quedo firme.
+-- Tiene LA MISMA FORMA que la fila del §0, para poder poner las dos al lado.
+--
+-- ── ESPERADO · lo que TIENE que haber cambiado ──────────────────────────
+--            §0 (antes)        §1 (despues)
+--   m_cc         f        ->        t      la marca ya acepta la firma cc-sql
+--   m_triar      t        ->        f      y dejo de decir "triar"
+--   m_huella  71be7b58    ->    (otra)     la funcion cambio de verdad
+--   lista_vieja  t        ->        f      se fue la lista de dos estados
+--   lista_nueva  -        ->        t      esta la de cuatro
+--   e_huella  a63086f5    ->    (otra)
+--
+-- ── Y lo que NO tiene que haberse movido ────────────────────────────────
+--   trg_marca 1 · trg_estado 1   los triggers sobrevivieron
+--   marcas 0 · estados 0         no se escribio ni una fila de datos
+--   tickets 3                    igual que antes
+--
+-- 🔴 Si `m_cc` sigue en `f` o `lista_vieja` sigue en `t`, el cambio NO entro
+--    — y el candado tendria que haberlo frenado antes. Avisame.
 -- ════════════════════════════════════════════════════════════════════════
-
--- V1 · Las dos funciones, y que ninguna diga ya "triar".
---      ESPERADO: las dos con dice_triar en `f`.
-select proname, length(prosrc) as largo,
-       (position('triar' in prosrc) > 0) as dice_triar,
-       (position('cc-sql' in prosrc) > 0) as acepta_cc
-  from pg_proc
- where proname in ('ticket_marca_guard','ticket_estado_guard')
- order by proname;
-
--- V2 · Los dos triggers, intactos. ESPERADO: 1 y 1.
-select (select count(*) from pg_trigger
-         where tgrelid='public.ticket_marca'::regclass  and not tgisinternal) as trg_marca,
-       (select count(*) from pg_trigger
-         where tgrelid='public.ticket_estado'::regclass and not tgisinternal) as trg_estado;
-
--- V3 · La RLS de la APP, que NO se toco. ESPERADO: las dos en
---      `acceso_es_socia()`. Si alguna dijera `true`, algo mas se movio.
-select tablename, policyname, cmd, with_check
-  from pg_policies
- where schemaname='public' and policyname in ('ticket_marca_ins','ticket_estado_ins')
- order by policyname;
-
--- V4 · 🔴 LO QUE ESTE ARCHIVO NO PUEDE PROBAR SOLO.
---      Todo lo de arriba lee el CATALOGO: dice que la funcion cambio, no que
---      el guardia deje pasar lo que tiene que dejar y rechace lo que no. Eso
---      se ejercita con `pg_pruebas.py`, carril B, y hay que correrlo:
---        · firma `cc-sql…` sin sesion → la marca ENTRA
---        · firma cualquier otra sin sesion → REBOTA
---        · sin sesion, estado 'disponible' y 'bloqueado' → ENTRAN
---        · sin sesion, estado 'cerrado' → REBOTA (es de las socias)
---        · con sesion de socia, todo sigue como antes
---      Sin esa corrida, "V1 en verde" es un catalogo leido — el error del
---      16-sep.
+select
+  (select length(prosrc)                 from pg_proc where proname='ticket_marca_guard')   as m_largo,
+  (select position('cc-sql' in prosrc)>0 from pg_proc where proname='ticket_marca_guard')   as m_cc,
+  (select position('triar'  in prosrc)>0 from pg_proc where proname='ticket_marca_guard')   as m_triar,
+  (select left(md5(prosrc),8)            from pg_proc where proname='ticket_marca_guard')   as m_huella,
+  (select length(prosrc)                 from pg_proc where proname='ticket_estado_guard')  as e_largo,
+  (select left(md5(prosrc),8)            from pg_proc where proname='ticket_estado_guard')  as e_huella,
+  (select position('not in (''en_curso'',''en_validacion'')' in prosrc)>0
+     from pg_proc where proname='ticket_estado_guard')                                      as lista_vieja,
+  (select position('not in (''en_curso'',''en_validacion'',''disponible'',''bloqueado'')' in prosrc)>0
+     from pg_proc where proname='ticket_estado_guard')                                      as lista_nueva,
+  (select count(*) from ticket)        as tickets,
+  (select count(*) from ticket_marca)  as marcas,
+  (select count(*) from ticket_estado) as estados,
+  (select count(*) from pg_trigger where tgrelid='public.ticket_marca'::regclass  and not tgisinternal) as trg_marca,
+  (select count(*) from pg_trigger where tgrelid='public.ticket_estado'::regclass and not tgisinternal) as trg_estado;
