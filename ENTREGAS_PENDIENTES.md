@@ -1746,3 +1746,58 @@ una diferencia de verdad escondida ahí.
 ⚠️ Y conviene medirlo antes de elegir: hasta hoy (21-sep) `v_ent_pedido_estado`
 tiene **0 pedidos en "preparado"**, porque preparar y entregar salían juntos. El
 §7 es lo que va a hacer que ese número deje de ser cero.
+
+## 28 · 🟠 ABIERTO · Dos controles que van CON el vigía, no antes
+
+Los dos salieron de casos reales del 23-sep-2026 y los dos son del mismo tipo:
+un número que estaba mal **y nada avisaba**. Andrea decidió no construirlos
+todavía: van cuando se monte `PEGADO_VIGIA_UNIDADES.sql`, que hoy sigue sin
+aplicar y que ya trae la tabla de bitácora (`revision_unidades`), el rol
+(`truefie_vigia`) y la tarea diaria. Colgarlos de ahí es una corrida más y una
+fila más; construirlos aparte sería un segundo vigía con su propio rol, su
+propia tabla y su propia tarea, para preguntas que caben en la misma pasada.
+
+### 28.a · Desechos sin orden (era el "B3")
+
+**Qué revisa:** `stock.scrap` en `done`, de los seis terminados, con
+`production_id` vacío. Un ticket por cada uno.
+
+**Por qué:** el 23-sep, SP/00365 (1 u de Pan Blanco) se registró desde
+"Desechos → Nuevo" en la lista en vez de desde adentro de la orden. Odoo dejó
+`production_id` vacío y puso `WH/MO/01415` en `origin`, que es un `char` libre.
+El motor —que solo miraba `production_id`— no pudo saber de qué lote era y la
+unidad quedó en "merma sin lote identificado": descontada del producto, de
+ningún lote.
+
+**⚠️ NO es lo mismo que el respaldo por `origin`**, que ya está construido en
+la rama `merma-origen-y-frontera`. Ese respaldo RESUELVE el caso cuando el
+`origin` está bien escrito y calza con una orden `done` del mismo producto.
+Este control es para el residuo: un `origin` con un dedazo, uno vacío, o uno
+que apunta a una orden fuera de la ventana de tres meses. En esos casos el
+respaldo no matchea —a propósito, falla del lado seguro— y el desecho vuelve a
+quedar sin lote, otra vez en silencio. El control es lo que le saca el silencio.
+
+**Medido el 23-sep:** de los 103 desechos `done` de terminado de 2026, 99
+traen `production_id` y 4 no. De esos 4, solo 2 traen `origin`.
+
+### 28.b · Un lote del ancla no puede tener más de lo que se produjo
+
+**Qué revisa:** para cada lote contado en un ancla y producido DESPUÉS del
+ancla anterior, que `contado ≤ producido − salidas registradas en ese tramo`.
+Es una desigualdad dura: esos lotes tienen la ecuación cerrada, sin historia
+previa que los explique.
+
+**Por qué:** es el caso del ticket 30. El ancla del 10-sep le atribuye a
+Semillas `245 / 6-27` **114 u de un lote que en total se produjo 84** (una sola
+orden, WH/MO/01437, sin salidas antes del corte). Las mismas 30 u —5 cajas
+exactas— le faltaban a `247 / 6-27`, que se produjo 42 y aparece con 12. Cinco
+cajas anotadas en el renglón de al lado. El error entró el 10-sep y se
+descubrió el 23, trece días después, porque alguien fue a buscar un lote que el
+sistema daba por agotado.
+
+**Este control lo habría cazado el mismo día del conteo**, que es cuando las
+cajas todavía están donde se las dejó y alguien se acuerda.
+
+**⚠️ Sólo aplica a los lotes producidos después del ancla anterior.** Un lote
+viejo arrastra historia que el tramo no ve, y compararlo así daría falsos
+positivos.

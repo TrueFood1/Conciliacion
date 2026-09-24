@@ -3805,6 +3805,12 @@ body.es-socia .face-pend{display:block}
 .el-des-i{white-space:nowrap}
 .el-des-r{color:var(--text-3);opacity:.72;margin-right:4px;font-family:var(--font)}
 .el-des-s{opacity:.35}
+/* La procedencia del respaldo por «origen». Va en la misma línea del
+   desglose pero en ámbar, que en este módulo significa "esto es correcto y
+   además hay que saberlo" — no rojo, que es excepción pendiente. Ocupa toda
+   la fila para no quedar suelto entre dos términos con los que no se suma. */
+.el-des-org{flex-basis:100%;color:#C9A227;margin-top:2px}
+.el-des-org .el-des-r{color:#C9A227;opacity:.8}
 /* ── Las dos mermas que no bajan de ningún lote ──
    Deliberadamente DISTINTAS entre sí, no dos variantes del mismo cartel: son dos
    problemas diferentes. La "sin lote" es un hecho cerrado (nunca se va a poder
@@ -4394,16 +4400,10 @@ body.es-socia .face-pend{display:block}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-// ⚠️ EL NÚMERO SE ASIGNA AL PUBLICAR, NO AL CONSTRUIR, y este sello es la
-// prueba. Esta rama se construyó el 22-sep reclamando b67; el 23-sep salieron
-// b65, b66 y b67 antes que ella —el arreglo de la tira de pestañas se publicó
-// primero porque acá `esquema_check` bloqueaba hasta que se pegara el esquema
-// del vigía— y hubo que bajarla a b68. Es la segunda vez que este número se
-// mueve. Mientras una rama no salga, su número es una intención, no un hecho.
-//
-// La FECHA es la de construcción, no la de publicación: es la convención de la
-// casa (b65 dice 21-sep y b66 dice 22-sep, y las dos se publicaron el 23).
-const BUILD = 'v 22 sep 2026 · b68';
+// b69 · la merma: `origin` como respaldo de `production_id`, y la frontera del
+// día real. Se construyó sobre b64 y sale después de b68; el número se asigna
+// al publicar, no al construir.
+const BUILD = 'v 23 sep 2026 · b69';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -8433,6 +8433,38 @@ function _entCanon(txt){
 // verificarExclusionesMO() pueda confirmar contra Odoo que la orden sigue siendo la que
 // se excluyó. Si algo no calza, NO se excluye y se marca rota: preferimos un lote
 // inflado y visible a una resta silenciosa contra la orden equivocada.
+// ── LA FRONTERA DE LA MERMA DUDOSA (23-sep-2026, Andrea) ────────────────
+// Hermana de ENT_VIDA_MESES: una regla que cambió, con las dos épocas
+// conviviendo, y la frontera nombrada en un solo lugar en vez de repartida
+// por el motor.
+//
+// QUÉ ES LA MERMA DUDOSA, EN UNA LÍNEA. Un desecho tecleado DESPUÉS del
+// corte del conteo, de un lote producido ANTES, no se puede restar: el pan
+// estaba en el congelador cuando Daniel contó, y Odoo NO guarda cuándo se
+// botó de verdad — `date_done` es la fecha de TECLEO (medido sobre los 97
+// scraps de 2026: `date_done − create_date` va de 0 a 2 segundos). Sin esa
+// fecha no se sabe si el conteo físico ya lo excluyó, y restarlo podría
+// descontarlo dos veces.
+//
+// QUÉ CAMBIÓ. Desde el 23-sep-2026 la práctica es otra: Daniel pide
+// autorización y Andrea registra el desecho EL MISMO DÍA. Con eso la fecha
+// de tecleo PASA A SER la fecha real, y la premisa de la regla deja de
+// valer — hacia adelante.
+//
+// ⚠️ LA FRONTERA ES UNA FECHA Y NO UN INTERRUPTOR, y es todo el punto. Un
+// booleano "ya no hay dudosas" barrería también a los desechos viejos, que
+// se tecleron bajo la práctica vieja y de los que se sigue sin saber nada.
+// El caso concreto que esto protege es SP/00362 (Semillas, lote 252 / 6-27,
+// 1 u, tecleado el 11-sep): queda en dudosa, como estaba, y lo resuelve el
+// próximo conteo. Decisión de Andrea, 23-sep.
+//
+// ⚠️ Y ES 00:00 HORA DE COSTA RICA, ESCRITA CON SU HUSO. Costa Rica es
+// UTC−6 todo el año (no hay horario de verano), así que el `-06:00` es
+// constante y no hay que volver a mirarlo en marzo. Escribirla sin huso la
+// habría parseado como UTC y la frontera habría caído seis horas antes —
+// el error del 19-ago, que en esta misma función ya se pagó una vez.
+const ENT_MERMA_DIA_REAL = Date.parse('2026-09-23T00:00:00-06:00');
+
 const ENT_MO_EXCLUIDAS = {
   // Conteo de Daniel del viernes 14-ago-2026, corte 16:00 CR. Esta orden se registró a
   // las 16:06 —seis minutos después— pero el pan ya estaba hecho y contado: el conteo
@@ -8624,7 +8656,7 @@ async function entLeerCrudo(desdeYmd){
 async function entLeerMerma(desdeYmd){
   const sc=await odooCall('stock.scrap','search_read',
     [[['state','=','done'],['product_id','in',ENT_PROD],['date_done','>=',desdeYmd]]],
-    {fields:['id','name','date_done','product_id','scrap_qty','product_uom_id','production_id'],
+    {fields:['id','name','date_done','product_id','scrap_qty','product_uom_id','production_id','origin'],
      limit:5000, order:'date_done'});
   const out=[];
   for(const s of sc){
@@ -8633,9 +8665,14 @@ async function entLeerMerma(desdeYmd){
     // SP/00278 en `Paquete de 4` [37] y SP/00283 en `Paquete de 2` [38]. Sumados
     // crudos entrarían 4× y 2× cortos.
     const fac=await uomFactor(s.product_uom_id&&s.product_uom_id[0]);
+    // ⚠️ `origin` VIAJA CRUDO Y NO SE INTERPRETA ACA. Es un `char` libre que
+    // escribe una persona; quien decide si sirve es `_rpCalcularPuntas`, que
+    // es donde estan las ordenes contra las cuales verificarlo. Leerlo acá y
+    // resolverlo allá mantiene UN solo lugar que decide.
     out.push({scrap:s.name, scrapId:s.id, producto:s.product_id[0],
               uds:(s.scrap_qty||0)/(fac||1), scrapUtc:s.date_done,
-              ordenId:(s.production_id&&s.production_id[0])||null});
+              ordenId:(s.production_id&&s.production_id[0])||null,
+              origin:(s.origin||null)});
   }
   return out;
 }
@@ -9605,7 +9642,7 @@ async function _rpCalcularPuntas(g){
   // Desglose por lote. Se llena en paralelo con `s` — mismo recorrido, mismos
   // números: el detalle no puede contradecir al saldo porque sale del mismo paso.
   const det={}, D=function(k){ return det[k]=det[k]||
-    {ancla:0, produccion:0, salidas:0, devoluciones:0, merma:0}; };
+    {ancla:0, produccion:0, salidas:0, devoluciones:0, merma:0, mermaPorOrigen:0}; };
   const {data:lin}=await c.from('ent_conteo_linea').select('producto_id,lote,uds').eq('conteo_id',A.id);
   (lin||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote;
     s[k]=(s[k]||0)+(+r.uds||0); D(k).ancla+=(+r.uds||0); });
@@ -9669,13 +9706,21 @@ async function _rpCalcularPuntas(g){
   // `tracking = none`, así que `lot_id` viene vacío en los 97 scraps de 2026
   // (medido). Se indexa `ordenId → lote` desde lo que `_entAgrupar` YA resolvió:
   // el resolvedor MO→lote es UNO y es el de la producción. Acá no se parsea chatter.
-  const moLote={};
+  // DOS INDICES SOBRE LA MISMA LISTA, no dos listas: por id de orden (el
+  // camino de siempre) y por NOMBRE de orden (el respaldo por `origin`).
+  // Salen del mismo recorrido para que no puedan discrepar.
+  // Estar en este indice YA GARANTIZA dos de las tres condiciones del
+  // respaldo: `entLeerCrudo` filtra por `state='done'`, asi que todo lo que
+  // esta aca es una orden done; y esta dentro de la ventana de 3 meses.
+  const moLote={}, moPorNombre={};
   Object.values((g&&g.lotes)||{}).forEach(function(L){
     (L.ordenes||[]).forEach(function(rec){
-      moLote[rec.ordenId]={key:(+L.producto)+'|'+L.canon, producto:+L.producto,
-                           canon:L.canon, prodUtc:rec.prodUtc}; }); });
+      const e={ordenId:rec.ordenId, key:(+L.producto)+'|'+L.canon, producto:+L.producto,
+               canon:L.canon, prodUtc:rec.prodUtc};
+      moLote[rec.ordenId]=e;
+      if(rec.orden) moPorNombre[String(rec.orden).trim()]=e; }); });
 
-  const mermaSinLote={}, mermaDudosa={}, mermaSinLoteDet=[], mermaDudosaDet=[];
+  const mermaSinLote={}, mermaDudosa={}, mermaSinLoteDet=[], mermaDudosaDet=[], mermaPorOrigenDet=[];
   let merma=[];
   try{
     // Solo hace falta desde el corte: lo anterior ya está absorbido por el conteo
@@ -9692,33 +9737,78 @@ async function _rpCalcularPuntas(g){
     // MISMA función de tiempo que la producción (`_odooMs`): comparar el corte con
     // dos parsers distintos es el error del 19-ago esperando a repetirse.
     if(!(_odooMs(m.scrapUtc)>corteMs)) return;        // ya está en el físico del ancla
-    // Si la producción de esa orden no se sumó, su merma tampoco se resta. Restarla
-    // dejaría el lote corto por partida doble.
-    if(m.ordenId && ENT_MO_EXCLUIDAS[m.ordenId]) return;
-    const L=m.ordenId ? moLote[m.ordenId] : null;
+
+    // ── DE QUÉ ORDEN ES · `production_id` primero, `origin` de respaldo ──
+    // EL CASO, medido el 23-sep: SP/00365 (1 u de Pan Blanco) salió con
+    // `production_id` VACÍO y con `WH/MO/01415` escrito en `origin`. La
+    // diferencia es por dónde se creó el desecho — desde adentro de la orden
+    // llena `production_id`; desde "Desechos → Nuevo" en la lista, no. El
+    // dato estaba, en el campo que este motor no miraba.
+    //
+    // 🔴 `production_id` GANA SIEMPRE. El respaldo entra SOLO si viene vacío,
+    // nunca a corregirlo ni a competirle: es una relación de verdad contra un
+    // texto que escribe una persona, y dos caminos a la misma respuesta sin
+    // un orden escrito es como se llega a que discrepen en silencio.
+    //
+    // 🔴 Y ENTRA CON LAS TRES CONDICIONES JUNTAS (Andrea, 23-sep): que
+    // `production_id` esté vacío, que `origin` sea EXACTAMENTE el nombre de
+    // una orden `done`, y que el producto de esa orden sea el del desecho.
+    // Las dos primeras las garantiza estar en `moPorNombre` (ver arriba); la
+    // tercera se compara acá. Un `origin` con un dedazo no matchea con nada y
+    // el desecho cae en "sin lote", que es exactamente lo de hoy: el respaldo
+    // solo puede MEJORAR el resultado, nunca empeorarlo.
+    let L = m.ordenId ? moLote[m.ordenId] : null;
+    let porOrigen = false;
+    if(!L && !m.ordenId && m.origin){
+      const cand = moPorNombre[String(m.origin).trim()];
+      if(cand && +cand.producto === +m.producto){ L = cand; porOrigen = true; }
+    }
+    // La exclusión se pregunta por la orden EFECTIVA, no por `production_id`.
+    // Antes daba igual porque solo había un camino; con el respaldo, mirar el
+    // campo crudo dejaría pasar la merma de una orden excluida cuya producción
+    // no se sumó, y el lote quedaría corto por partida doble. Ese es el motivo
+    // del chequeo, y no cambió: cambió de dónde sale el id.
+    const ordenEfectiva = L ? L.ordenId : m.ordenId;
+    if(ordenEfectiva && ENT_MO_EXCLUIDAS[ordenEfectiva]) return;
+
     if(!L){
       // NO SE SABE DE CUÁL LOTE ES. Sin MO —o con una MO fuera de la ventana de
-      // lotes activos— no hay lote al cual restarle. No se ignora ni se resta del
-      // total sin decirlo: se muestra en su propia línea.
+      // lotes activos, o con un `origin` que no resuelve— no hay lote al cual
+      // restarle. No se ignora ni se resta del total sin decirlo: se muestra en
+      // su propia línea.
       mermaSinLote[m.producto]=(mermaSinLote[m.producto]||0)+m.uds;
       mermaSinLoteDet.push(m); return;
     }
-    if(!(_odooMs(L.prodUtc)>corteMs)){
-      // NO SE SABE SI YA ESTÁ DESCONTADA. El lote se produjo ANTES del conteo, así
-      // que su pan estaba en el congelador cuando Daniel contó; el scrap se registró
-      // DESPUÉS. Como `date_done` es la fecha de tecleo y no la del desecho (medido),
-      // no se puede saber si el pan ya faltaba en esa foto. Restarlo podría
-      // descontarlo dos veces; ignorarlo podría dejar el lote inflado. Se muestra y
-      // lo decide una persona.
+
+    // ── ¿DUDOSA? · y la frontera del 23-sep ──────────────────────────────
+    // La regla vieja, intacta, para todo lo tecleado ANTES de la frontera: un
+    // desecho registrado después del corte, de un lote producido antes, no se
+    // puede restar (el porqué, entero, en `ENT_MERMA_DIA_REAL`).
+    // Desde la frontera la fecha de tecleo ES la del desecho, así que la
+    // pregunta ya no aplica y se resta derecho, aunque la orden sea anterior
+    // al corte — que es justamente el caso que la práctica nueva resuelve.
+    const diaReal = _odooMs(m.scrapUtc) >= ENT_MERMA_DIA_REAL;
+    if(!diaReal && !(_odooMs(L.prodUtc)>corteMs)){
       mermaDudosa[m.producto]=(mermaDudosa[m.producto]||0)+m.uds;
       mermaDudosaDet.push(Object.assign({lote:L.canon}, m)); return;
     }
+
     s[L.key]=(s[L.key]||0)-m.uds; D(L.key).merma+=m.uds;
+    // LO RESUELTO POR RESPALDO QUEDA ANOTADO. Un número que salió de un texto
+    // libre no puede ser indistinguible de uno que salió de una relación: si
+    // el lote baja 1 u, tiene que poder verse POR QUÉ bajó y de dónde salió el
+    // vínculo. Se dibuja en la línea del lote (ver `_lotDesglose`) y el detalle
+    // queda en el objeto para poder auditarlo entero.
+    if(porOrigen){
+      D(L.key).mermaPorOrigen+=m.uds;
+      mermaPorOrigenDet.push(Object.assign({lote:L.canon, ordenId:L.ordenId}, m));
+    }
   });
 
   return {saldo:s, detalle:det, corteMs:corteMs,
           mermaSinLote:mermaSinLote, mermaDudosa:mermaDudosa,
-          mermaSinLoteDet:mermaSinLoteDet, mermaDudosaDet:mermaDudosaDet};
+          mermaSinLoteDet:mermaSinLoteDet, mermaDudosaDet:mermaDudosaDet,
+          mermaPorOrigenDet:mermaPorOrigenDet};
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -12672,6 +12762,14 @@ function _lotDesglose(pid, lote){
   add('salidas', d.salidas, '−');
   add('devoluciones', d.devoluciones, '+');
   add('merma', d.merma, '−');
+  // ⚠️ DE DÓNDE SALIÓ EL VÍNCULO, cuando no salió de `production_id`. Va
+  // pegado a la merma y no como término aparte porque NO es otra resta: son
+  // las mismas unidades, dichas con su procedencia. Sin esto, un lote que
+  // baja por un texto libre se lee igual que uno que baja por una relación
+  // de Odoo, y no habría cómo auditar el respaldo sin abrir la consola.
+  if(d.mermaPorOrigen) partes.push('<span class="el-des-i el-des-org">'
+    +'<span class="el-des-r">de esa merma, por «origen»</span>'
+    +esc(_lotUds(d.mermaPorOrigen,pid))+'</span>');
   if(partes.length<2) return '';        // con un solo término no hay nada que desglosar
   return '<div class="el-des">'+partes.join('<span class="el-des-s">·</span>')+'</div>';
 }
