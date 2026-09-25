@@ -4475,15 +4475,12 @@ body.es-socia .face-pend{display:block}
 
 <script>
 // Sello de versión — actualizar en cada cierre técnico de sesión (ver CIERRE_TECNICO.md)
-// b70 · corregir un pedido ya preparado, y la PRIMERA vez que la app llama un
-// RPC (`ent_corregir_alisto`). ⚠️ `esquema_check.py` NO ve los RPC: su única
-// fuente son las lecturas de tabla, que saca con un grep — y ojo: escribir ese
-// grep textual en un comentario le inventa una dependencia que no existe, que es
-// justo lo que pasó al estampar este build. Antes de publicar se verificó a mano que
-// la función existe, que sus cinco argumentos se llaman igual que los que manda
-// la app, que `authenticated` puede ejecutarla y que PostgREST la tiene en su
-// caché (con la anon key contesta 42501, no PGRST202).
-const BUILD = 'v 23 sep 2026 · b70';
+// b71 · Tickets: la nota al descartar o posponer es OPCIONAL (Andrea, 24-sep).
+// Sale sola y antes que la corrección de lote (que será b72). La base se aflojó
+// primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
+// solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
+// orden que evita un botón que deja mandar algo que la base rechaza.
+const BUILD = 'v 24 sep 2026 · b71';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -21948,19 +21945,27 @@ function irATickets(){
    `ticket_estado` no se escribia desde ninguna linea de `index.html`, asi
    que sin esto un ticket llegaba a "En validacion" y no salia nunca.
 
-   🔴 EL MINIMO DE 20 ES EL DE LA BASE (`ticket_estado_nota_ok`), copiado y
-   rotulado. Vale para 'pospuesto' y 'descartado'; 'cerrado' no lo pide.
-   Si cambia alla, cambia aca: dos minimos distintos dan un boton que deja
-   mandar algo que la base rechaza.
+   LA NOTA ES OPCIONAL EN LOS TRES (Andrea, 24-sep-2026): no tiene que
+   justificar por qué descarta o pospone. Hasta b70 'pospuesto' y
+   'descartado' pedían 20 caracteres, copiados del CHECK de la base
+   (`ticket_estado_nota_ok`). El CHECK se afloja en el mismo cambio
+   (`PEGADO_NOTA_OPCIONAL.sql`): hoy solo lo sigue pidiendo para
+   'en_validacion', que esta pantalla no pone.
+   🔴 EL ORDEN IMPORTA: la base primero, esta pantalla después. Al revés, el
+   botón deja mandar sin nota algo que la base todavía rechaza.
+   `min` queda en la tabla por si algún estado vuelve a pedir nota; si
+   vuelve, el número es el de la base, copiado y rotulado.
+   'bloqueado' no pasa por acá: sigue exigiendo qué se espera
+   (`ticket_estado_bloqueo_ok`).
    ══════════════════════════════════════════════════════════════════════ */
 var TKE={id:null, estado:null, min:0};
 var TKE_CONF={
   cerrado:   {t:'Cerrar',    q:'¿Algo que dejar escrito? <span style="color:var(--text-3)">(opcional)</span>',
               ph:'Qué se hizo, o por qué ya no hace falta.', min:0},
-  pospuesto: {t:'Posponer',  q:'¿Por qué se pospone? <span style="color:var(--text-3)">(mínimo 20)</span>',
-              ph:'Y qué tendría que pasar para retomarlo.', min:20},
-  descartado:{t:'Descartar', q:'¿Por qué se descarta? <span style="color:var(--text-3)">(mínimo 20)</span>',
-              ph:'Dentro de seis meses nadie se va a acordar. Escribilo.', min:20}
+  pospuesto: {t:'Posponer',  q:'¿Algo que dejar escrito? <span style="color:var(--text-3)">(opcional)</span>',
+              ph:'Qué tendría que pasar para retomarlo.', min:0},
+  descartado:{t:'Descartar', q:'¿Algo que dejar escrito? <span style="color:var(--text-3)">(opcional)</span>',
+              ph:'Por qué ya no hace falta.', min:0}
 };
 
 function tkEstAbrir(id, estado){
