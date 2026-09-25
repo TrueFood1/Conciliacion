@@ -3811,6 +3811,17 @@ body.es-socia .face-pend{display:block}
    la fila para no quedar suelto entre dos términos con los que no se suma. */
 .el-des-org{flex-basis:100%;color:#C9A227;margin-top:2px}
 .el-des-org .el-des-r{color:#C9A227;opacity:.8}
+/* ── Corrección de conteo (b72) ──
+   La marca va en gris: una corrección hecha y verificada es un hecho, no una
+   alerta. Pasa a ámbar SOLO cuando el destino no se pudo verificar contra los
+   lotes leídos de Odoo, que es lo que hay que mirar. Cada corrección ocupa su
+   propio renglón debajo del desglose: dice de dónde vino el número. */
+.el-cor-tag{font-family:var(--font);font-size:10.5px;color:var(--text-3);
+  border:.5px solid var(--border);border-radius:4px;padding:0 5px;margin-left:7px}
+.el-cor-tag.sv{color:var(--warn);border-color:rgba(233,162,59,.45)}
+.el-des-cor{flex-basis:100%;white-space:normal;font-family:var(--font);color:var(--text-2);margin-top:2px}
+.el-des-cor .el-des-m{color:var(--text-3)}
+.el-des-cor.sv{color:var(--warn)}
 /* ── Las dos mermas que no bajan de ningún lote ──
    Deliberadamente DISTINTAS entre sí, no dos variantes del mismo cartel: son dos
    problemas diferentes. La "sin lote" es un hecho cerrado (nunca se va a poder
@@ -9722,10 +9733,51 @@ async function _rpCalcularPuntas(g){
   // Desglose por lote. Se llena en paralelo con `s` — mismo recorrido, mismos
   // números: el detalle no puede contradecir al saldo porque sale del mismo paso.
   const det={}, D=function(k){ return det[k]=det[k]||
-    {ancla:0, produccion:0, salidas:0, devoluciones:0, merma:0, mermaPorOrigen:0}; };
+    {ancla:0, correccion:0, produccion:0, salidas:0, devoluciones:0, merma:0, mermaPorOrigen:0,
+     cors:[]}; };
   const {data:lin}=await c.from('ent_conteo_linea').select('producto_id,lote,uds').eq('conteo_id',A.id);
-  (lin||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote;
+  const enAncla={};
+  (lin||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote; enAncla[k]=1;
     s[k]=(s[k]||0)+(+r.uds||0); D(k).ancla+=(+r.uds||0); });
+
+  // ── LA SEXTA PUNTA (b72) — las CORRECCIONES del conteo ─────────────────
+  // `disponible = ancla + correcciones + producción − salidas + devoluciones − merma`.
+  // Una corrección MUEVE unidades de un lote a otro del mismo producto sobre
+  // ESTA ancla (ticket 30, opción B de Andrea, 24-sep): la foto del conteo no
+  // se toca, la corrección se suma encima con su propio rastro. El total del
+  // producto no cambia — lo que sale del origen entra al destino, en el mismo
+  // paso. Van atadas al ancla (`conteo_id`): con un conteo nuevo dejan de
+  // aplicar solas, porque la foto nueva ya es la verdad.
+  //
+  // 🔴 CAPA 3 DEL DESTINO. La base NO ve Odoo: si el lote destino no está en
+  // el ancla, exige la HUELLA de su orden (id, nombre, producto) pero no puede
+  // saber si es verdadera. Acá sí: las órdenes ya están leídas en `g`, así que
+  // verificarla no cuesta ni una lectura. Si no calza, la corrección se APLICA
+  // IGUAL —no aplicarla dejaría el saldo mal en silencio— y el lote sale
+  // marcado "destino sin verificar". El hueco que queda, aceptado por Andrea
+  // el 24-sep: un lote más viejo que la ventana de 3 meses no está en `g` y
+  // no tiene contra qué compararse — sale marcado igual, por no poder decirlo.
+  //
+  // El error se DICE, como el de las devoluciones: si esta lectura falla, los
+  // lotes corregidos quedan repartidos como en la foto vieja (uno alto, otro
+  // bajo) y el total cuadra — o sea que nada lo delata. Por eso además de la
+  // consola vuelve en `correccionesErr` y la pantalla lo muestra.
+  const {data:cor,error:eCor}=await c.from('ent_conteo_correccion_vigente')
+    .select('id,producto_id,lote_origen,lote_destino,uds,contado_por,contado_en,motivo,'
+           +'destino_orden_id,destino_orden,destino_producto_id,autorizado_por,creado_en')
+    .eq('conteo_id',A.id).order('creado_en',{ascending:true});
+  if(eCor){ try{ console.error('[Truefie] no pude leer las correcciones del conteo ('
+    +((eCor&&eCor.message)||eCor)+'): los lotes corregidos quedan repartidos como en la foto '
+    +'del conteo, sin la corrección.'); }catch(_){} }
+  const correcciones=[];
+  (cor||[]).forEach(function(r){
+    const u=+r.uds||0, pid=+r.producto_id;
+    const ko=pid+'|'+r.lote_origen, kd=pid+'|'+r.lote_destino;
+    const x=Object.assign({verif:_corVerificar(r, g, enAncla)}, r);
+    s[ko]=(s[ko]||0)-u; D(ko).correccion-=u; D(ko).cors.push({lado:'origen', c:x});
+    s[kd]=(s[kd]||0)+u; D(kd).correccion+=u; D(kd).cors.push({lado:'destino', c:x});
+    correcciones.push(x);
+  });
   const corteMs=Date.parse(A.corte);
   // ⚠️ LA EXCLUSIÓN VA ACÁ Y SOLO ACÁ. En el SALDO, no en la lista de lotes: la orden
   // excluida sigue existiendo y su lote tiene que seguir apareciendo en el selector con
@@ -9886,6 +9938,8 @@ async function _rpCalcularPuntas(g){
   });
 
   return {saldo:s, detalle:det, corteMs:corteMs,
+          correcciones:correcciones,
+          correccionesErr:eCor ? ((eCor&&eCor.message)||String(eCor)) : '',
           mermaSinLote:mermaSinLote, mermaDudosa:mermaDudosa,
           mermaSinLoteDet:mermaSinLoteDet, mermaDudosaDet:mermaDudosaDet,
           mermaPorOrigenDet:mermaPorOrigenDet};
@@ -13240,6 +13294,69 @@ function _lotNom(pid){ const t=(typeof INV_TERM!=='undefined')
 // botó— y meterlas juntas hace que el número de salidas mienta sobre lo despachado.
 // Los términos en cero no se dibujan: un lote que nunca tuvo merma no tiene por qué
 // mostrar "merma 0", y el renglón se lee de un vistazo con guantes.
+// ── CORRECCIONES DEL CONTEO (b72) · verificación y texto, UNA vez cada uno ──
+// La capa 3 del destino (ver la sexta punta en `_rpCalcularPuntas`):
+//   'ancla'         el destino está en el conteo del ancla — no hace falta más;
+//   'odoo'          no está en el ancla, y su huella calza con una orden leída;
+//   'sin_verificar' ni una cosa ni la otra: se aplicó, pero hay que mirarlo.
+// La huella calza si la orden (id Y nombre) está entre las del MISMO lote y
+// producto. Un id que exista en otro lote no cuenta: la huella dice de qué
+// lote es, y eso es lo que se verifica.
+function _corVerificar(r, g, enAncla){
+  const pid=+r.producto_id, k=pid+'|'+r.lote_destino;
+  if(enAncla && enAncla[k]) return 'ancla';
+  if(r.destino_orden_id==null) return 'sin_verificar';
+  let ok=false;
+  Object.values((g&&g.lotes)||{}).forEach(function(L){
+    if(+L.producto!==pid || L.canon!==r.lote_destino) return;
+    (L.ordenes||[]).forEach(function(o){
+      if(+o.ordenId===+r.destino_orden_id
+         && String(o.orden||'').trim()===String(r.destino_orden||'').trim()) ok=true; });
+  });
+  return ok ? 'odoo' : 'sin_verificar';
+}
+// "5 cajas" · "1 caja + 2 u" · "3 paq". En la unidad de venta, como se cuenta
+// en el congelador — nunca en unidades sueltas de Francés, Buns o Pizza.
+function _corCant(uds, pid){
+  const t=(typeof INV_TERM!=='undefined') ? INV_TERM.find(function(x){ return x.id===pid; }) : null;
+  const f=t&&t.factor;
+  if(!f || uds<f) return _lotUds(uds, pid);
+  const cj=Math.floor(uds/f), r=Math.round((uds-cj*f)*1000)/1000;
+  return _rzN(cj)+(cj===1?' caja':' cajas')+(r?(' + '+_lotUds(r,pid)):'');
+}
+function _corFecha(ymd){
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd||''));
+  if(!m) return String(ymd||'');
+  return (+m[3])+'-'+['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][+m[2]-1];
+}
+// La firma es un correo (sale de la sesión); en pantalla va el nombre.
+function _corNombre(correo){
+  const s=String(correo||'').split('@')[0];
+  return s ? s.charAt(0).toUpperCase()+s.slice(1) : '';
+}
+// EL renglón de una corrección, visto desde uno de sus dos lotes:
+//   destino  "24-sep: +5 cajas desde 245 · contó Daniel · autorizó Andrea «motivo»"
+//   origen   "24-sep: −5 cajas hacia 247 · contó Daniel · autorizó Andrea «motivo»"
+// Es la ÚNICA función que dibuja una corrección. Si mañana se muestra en otra
+// pantalla (Historial, Conteo), se llama ésta — no se copia.
+function _corLinea(it, pid){
+  const x=it.c, dest=(it.lado==='destino');
+  const otro=String(dest ? x.lote_origen : x.lote_destino).split(' / ')[0];
+  const sv=(x.verif==='sin_verificar');
+  return '<span class="el-des-i el-des-cor'+(sv?' sv':'')+'">'
+    +esc(_corFecha(x.contado_en)+': '+(dest?'+':'−')+_corCant(+x.uds,pid)
+         +(dest?' desde ':' hacia ')+otro
+         +' · contó '+x.contado_por+' · autorizó '+_corNombre(x.autorizado_por)
+         +(sv?' · destino sin verificar':''))
+    +' <span class="el-des-m">'+esc('«'+x.motivo+'»')+'</span></span>';
+}
+function _corMarca(d){
+  const cs=(d&&d.cors)||[];
+  if(!cs.length) return '';
+  const sv=cs.some(function(it){ return it.c.verif==='sin_verificar'; });
+  return '<span class="el-cor-tag'+(sv?' sv':'')+'">'+(sv?'corregido · sin verificar':'corregido')+'</span>';
+}
+
 function _lotDesglose(pid, lote){
   const d=_lotPuntas && _lotPuntas.detalle && _lotPuntas.detalle[pid+'|'+lote];
   if(!d) return '';
@@ -13250,6 +13367,9 @@ function _lotDesglose(pid, lote){
       +(signo||'')+esc(_lotUds(v,pid))+'</span>');
   };
   add('ancla', d.ancla);
+  // La corrección va justo después del ancla porque ES parte del ancla: dice
+  // cuánto de lo contado era en realidad de otro lote. Puede ser + o −.
+  if(d.correccion) add('corrección', Math.abs(d.correccion), d.correccion>0?'+':'−');
   add('producción', d.produccion, '+');
   add('salidas', d.salidas, '−');
   add('devoluciones', d.devoluciones, '+');
@@ -13262,8 +13382,12 @@ function _lotDesglose(pid, lote){
   if(d.mermaPorOrigen) partes.push('<span class="el-des-i el-des-org">'
     +'<span class="el-des-r">de esa merma, por «origen»</span>'
     +esc(_lotUds(d.mermaPorOrigen,pid))+'</span>');
-  if(partes.length<2) return '';        // con un solo término no hay nada que desglosar
-  return '<div class="el-des">'+partes.join('<span class="el-des-s">·</span>')+'</div>';
+  // Las correcciones se dibujan SIEMPRE que haya, aunque el desglose tenga un
+  // solo término: un lote que existe solo por una corrección (destino fuera
+  // del ancla) tiene que decir de dónde salió su número.
+  const cors=(d.cors||[]).map(function(it){ return _corLinea(it,pid); }).join('');
+  if(partes.length<2 && !cors) return '';   // con un solo término no hay nada que desglosar
+  return '<div class="el-des">'+partes.join('<span class="el-des-s">·</span>')+cors+'</div>';
 }
 // ── LAS SALIDAS SIN LOTE IMPUTADO (b56) ─────────────────────────────────
 // Producto que SALIÓ del congelador sin que se supiera de qué lote. El total del
@@ -13339,6 +13463,14 @@ function lotRender(){
   const ids=(typeof INV_TERM!=='undefined') ? INV_TERM.map(function(t){ return t.id; })
                                             : Object.keys(porProd).map(Number);
   let h='';
+  // Si no se pudieron leer las correcciones del conteo, el total de cada
+  // producto cuadra igual y ningún número lo delata: hay que decirlo arriba.
+  if(_lotPuntas && _lotPuntas.correccionesErr)
+    h+='<div class="el-merma el-merma-dud">'
+      +'<span class="el-merma-t">No pude leer las correcciones del conteo</span>'
+      +'<span class="el-merma-n"></span>'
+      +'<span class="el-merma-x">Los lotes corregidos se ven como en la foto del conteo, '
+      +'sin la corrección. ('+esc(_lotPuntas.correccionesErr)+')</span></div>';
   ids.forEach(function(pid){
     // ── EL BALDE SALE DE LA LISTA DE LOTES (b56) ──────────────────────
     // 'NO DETERMINADO' es una clave del saldo como cualquier otra, así que la unión
@@ -13370,7 +13502,8 @@ function lotRender(){
       // que no hace nada es peor que no tenerlo.
       h+='<div class="el-lote'+(cero?' cero':'')+(neg?' neg':'')+'"'
         +' data-producto="'+pid+'" data-lote="'+esc(x.lote)+'">'
-        +'<span class="el-lote-n">'+esc(x.lote)+'</span>'
+        +'<span class="el-lote-n">'+esc(x.lote)
+        +_corMarca(_lotPuntas && _lotPuntas.detalle && _lotPuntas.detalle[pid+'|'+x.lote])+'</span>'
         +'<span class="el-lote-c">'+esc(cj)
         // Las unidades al lado SOLO si dicen algo distinto: "4 u   4 u" es ruido.
         +(cj!==u?('<span class="el-lote-u">'+esc(u)+'</span>'):'')+'</span></div>'
