@@ -1,5 +1,10 @@
 # Diagnóstico · las dos primeras escrituras en Odoo
 
+> ⚠️ **ACTUALIZADO EL 27-SEP-2026 en `DIAGNOSTICO_ESCRITURA_ODOO_27SEP.md`.** Lo de
+> abajo es la foto del 25-ago y varios números cambiaron (la cola de salidas sin
+> validar bajó de 9 a 1, el carril de escritura de `dev` no funcionaría, las
+> brechas 3385/3504 no son como estaban descritas). Leer primero el del 27-sep.
+
 **25-ago-2026. Solo diagnóstico: no se escribió nada en Odoo, no se tocó el
 proxy, no se cambió ningún permiso.** Todas las lecturas salieron por
 `odoo_read.py` (allowlist de solo lectura) contra `truefood.odoo.com`.
