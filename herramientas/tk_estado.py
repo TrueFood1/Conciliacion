@@ -21,6 +21,7 @@ QUE PUEDE Y QUE NO (lo hace cumplir la BASE, no este archivo)
 COMO SE USA
     python3 herramientas/tk_estado.py ver 115
     python3 herramientas/tk_estado.py mover 116 en_curso --seco
+    python3 herramientas/tk_estado.py anunciar 15 --texto "hallazgo…" [--seco]
     python3 herramientas/tk_estado.py cerrar 116 \\
         --evidencia "Resuelto en b72 (65ac781): el 247 ya aparece en Despachos" \\
         --build b72 [--cierre "texto del detalle de cierre"] [--seco]
@@ -184,6 +185,26 @@ def mover(db, t, estado, nota=None, build=None, cierre=None, seco=True):
     return True
 
 
+def anunciar(db, t, texto, seco=True):
+    """Un detalle 'anuncio' (un hallazgo, un dato que se suma). La base solo le
+    deja a truefie_cc escribir 'cierre' o 'anuncio'."""
+    sql = ("begin;\n"
+           "insert into ticket_detalle (ticket_id, clase, texto, creado_por) "
+           "values (%d, 'anuncio', %s, %s);\n%s" % (t, lit(texto), lit(FIRMA), "rollback;" if seco else "commit;"))
+    try:
+        db._crudo(sql)
+    except RuntimeError as e:
+        try:
+            db._crudo("rollback;")
+        except Exception:
+            pass
+        print("RECHAZADO por la base: %s" % e)
+        return False
+    print("✓ %s" % ("SECO: la base lo acepto y se deshizo. No quedo nada."
+                   if seco else "GUARDADO (anuncio)."))
+    return True
+
+
 def main():
     a = sys.argv[1:]
     if not a or a[0] in ("-h", "--help"):
@@ -217,6 +238,12 @@ def main():
                          % ", ".join(e for e in ESTADOS if e != "cerrado"))
             if ver(db, t) is None: return
             mover(db, t, a[2], nota=opt("--nota"), seco=seco); return
+        if cmd == "anunciar":
+            tx = opt("--texto")
+            if not tx or len(tx.strip()) < 10:
+                sys.exit("--texto es obligatorio (10 caracteres o mas)")
+            if ver(db, t) is None: return
+            anunciar(db, t, tx, seco=seco); return
         if cmd == "cerrar":
             ev = opt("--evidencia")
             if not ev or "\n" in ev or not EVIDENCIA.search(ev):
