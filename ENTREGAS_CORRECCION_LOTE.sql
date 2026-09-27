@@ -1,6 +1,19 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- ENTREGAS_CORRECCION_LOTE.sql  ·  24-sep-2026  ·  SIN APLICAR
+-- ENTREGAS_CORRECCION_LOTE.sql  ·  24-sep-2026  ·  ✅ APLICADO el 27-sep (verificado)
 -- Correcciones de conteo por lote (opcion B de Andrea, ticket 30) · Paso A
+--
+-- ✅ APLICADO. Andrea lo pego el 27-sep-2026, despues del ensayo rehecho
+--   (34/34, con el `ok` comparando el motivo de cada rechazo). La prueba de
+--   adentro de la transaccion devolvio 3 · 3 · 2 · 4 · 0 · 0 · 0 · t.
+--   Verificado DESPUES, desde afuera, con pg_lector:
+--     · las tres relaciones y la funcion existen; la vista con
+--       {security_invoker=true}; RLS prendido en las dos tablas;
+--     · el cuerpo de las tres funciones en la base es IGUAL al de este archivo;
+--     · los dos triggers, habilitados; las cuatro politicas (ins = socias);
+--     · authenticated: INSERT,SELECT en las tablas y SELECT en la vista;
+--       anon: ningun permiso en tablas ni EXECUTE en funciones;
+--     · 0 correcciones; 245 / 6-27 = 114 · 78 · saldo 36, 247 / 6-27 =
+--       12 · 12 · saldo 0; Semillas: ancla 381, saldo 205.
 --
 -- QUE ES
 --   Una correccion MUEVE una cantidad de un lote a otro DEL MISMO PRODUCTO,
