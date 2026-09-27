@@ -1,6 +1,14 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- TICKETS_CC.sql  ·  27-sep-2026  ·  SIN APLICAR
+-- TICKETS_CC.sql  ·  27-sep-2026  ·  ✅ APLICADO el 27-sep (verificado)
 -- Que CC cierre tickets de Truefie solo, con rastro (opcion A de Andrea)
+--
+-- ✅ APLICADO despues del ensayo (38/38 con ok = true). La prueba de adentro
+--   devolvio t · f · f · 2 · 4 · 2 · 2 · t · t. Verificado DESPUES con
+--   pg_lector: truefie_cc login, noinherit, nobypassrls, no es miembro de
+--   nada; permisos ticket SELECT · ticket_estado INSERT+SELECT ·
+--   ticket_detalle INSERT; 4 politicas; EXECUTE solo en sus 2 guardias; el
+--   md5 de los dos guardias vivos es el del bloque de este archivo
+--   (21f275c8… y 67d47f5f…). La clave va aparte (§CLAVE).
 --
 -- CAMBIA LA REGLA DEL 19-SEP ("cerrar es siempre de Andrea"). Desde este
 -- pegado, CC puede cerrar un ticket de Truefie que resolvio, con evidencia.
