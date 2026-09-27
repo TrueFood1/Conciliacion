@@ -1618,6 +1618,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   padding-left:9px;border-left:2px solid var(--border-strong);word-break:break-word}
 .tkl-espera-t{color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;
   font-size:10px;margin-right:7px}
+.tkl-nota{color:var(--text-3);margin-top:2px}
 /* El aviso de "esto no se pudo leer" NUNCA se calla y nunca se disfraza de
    lista vacia. Son dos cosas distintas y la pantalla tiene que decir cual. */
 .tkl-vigia{font-size:12px;color:var(--text-3);padding:8px 12px;border-bottom:1px solid var(--border)}
@@ -22098,7 +22099,13 @@ var TKE_CONF={
   pospuesto: {t:'Posponer',  q:'¿Algo que dejar escrito? <span style="color:var(--text-3)">(opcional)</span>',
               ph:'Qué tendría que pasar para retomarlo.', min:0},
   descartado:{t:'Descartar', q:'¿Algo que dejar escrito? <span style="color:var(--text-3)">(opcional)</span>',
-              ph:'Por qué ya no hace falta.', min:0}
+              ph:'Por qué ya no hace falta.', min:0},
+  /* REABRIR · 27-sep-2026. Desde que CC cierra tickets solo (TICKETS_CC.sql),
+     Andrea tiene que poder deshacer un cierre desde acá. Reabrir es insertar
+     `disponible`: el guardia deja a una socia poner cualquier estado, así que
+     la base no cambia. Lo que faltaba era el botón. */
+  disponible:{t:'Reabrir',   q:'¿Algo que dejar escrito? <span style="color:var(--text-3)">(opcional)</span>',
+              ph:'Por qué vuelve a abrirse.', min:0}
 };
 
 function tkEstAbrir(id, estado){
@@ -22267,6 +22274,14 @@ function _tkEstadoConocido(e){
 /* "  " no es una espera. Un `trim` en un solo lugar, para que el renglón no
    se dibuje vacío si alguien guarda espacios. */
 function _tkTxt(t){ return String(t==null?'':t).trim(); }
+/* La firma de un estado, para leer: 'cc-truefie' y 'cc-sql…' son CC; un
+   correo se lee por lo de antes de la arroba, con mayúscula. */
+function _tkQuien(firma){
+  var s=String(firma||'').trim();
+  if(/^cc-/i.test(s)) return 'CC';
+  s=s.split('@')[0];
+  return s ? s.charAt(0).toUpperCase()+s.slice(1) : '';
+}
 function _tkEsc(t){ var d=document.createElement('div'); d.textContent=(t==null?'':String(t)); return d.innerHTML; }
 
 /* ── EL ÍTEM, EN UNA SOLA FUNCIÓN · b65 ────────────────────────────────
@@ -22311,6 +22326,20 @@ var pie=[];
                     : f.espera)+
           '</div>'
         : '')+
+      /* ── QUIÉN LO CERRÓ · 27-sep-2026 ─────────────────────────────────
+         Desde TICKETS_CC.sql un ticket lo puede cerrar CC (firma
+         'cc-truefie'), y tiene que verse quién: "Cerrado por CC · b72" no
+         es lo mismo que "Cerrado por Andrea". Mismo renglón que la espera:
+         es estado, no procedencia. La nota va abajo porque ahí vive la
+         evidencia del cierre. `estado_por`, `build_arreglo` y `ultima_nota`
+         VAN EN EL SELECT (la lección de b63). */
+      ((!_tkAbierto(f) && f.estado_por)
+        ? '<div class="tkl-espera">'+
+            '<span class="tkl-espera-t">'+_tkEsc((TK_ESTADOS[f.estado]||f.estado)+' por')+'</span>'+
+            _tkEsc(_tkQuien(f.estado_por)+(f.build_arreglo?(' · '+f.build_arreglo):''))+
+            (_tkTxt(f.ultima_nota)?('<div class="tkl-nota">'+_tkEsc(f.ultima_nota)+'</div>'):'')+
+          '</div>'
+        : '')+
       '<div class="tkl-pie">'+pie.join(' · ')+'</div>'+
       /* LOS TRES BOTONES · solo socias, y solo mientras el ticket siga
          abierto. No es proteccion —eso lo hacen el guardia del §2 y la
@@ -22322,6 +22351,13 @@ var pie=[];
             '<button class="tkl-a" onclick="tkEstAbrir('+f.id+',&quot;cerrado&quot;)">Cerrar</button>'+
             '<button class="tkl-a" onclick="tkEstAbrir('+f.id+',&quot;pospuesto&quot;)">Posponer</button>'+
             '<button class="tkl-a" onclick="tkEstAbrir('+f.id+',&quot;descartado&quot;)">Descartar</button>'+
+          '</div>'
+        : '')+
+      /* REABRIR · solo socias, y solo sobre lo cerrado, pospuesto o
+         descartado. Es el único camino para deshacer un cierre de CC. */
+      ((socia && !_tkAbierto(f))
+        ? '<div class="tkl-acc">'+
+            '<button class="tkl-a" onclick="tkEstAbrir('+f.id+',&quot;disponible&quot;)">Reabrir</button>'+
           '</div>'
         : '')+
     '</div>';
@@ -22544,7 +22580,7 @@ async function tkListar(){
        exactamente lo que esta pantalla vino a separar. Cazado el 21-sep por
        la prueba con lectura real, ANTES de publicar. */
     var r=await c.from('v_ticket')
-      .select('id,tipo,estado,descripcion,ambito,modulo,miga,vista,build,creado_por,creado_en,agente,viewport,espera,bloquea_ticket_id')
+      .select('id,tipo,estado,descripcion,ambito,modulo,miga,vista,build,creado_por,creado_en,agente,viewport,espera,bloquea_ticket_id,estado_por,build_arreglo,ultima_nota')
       .order('creado_en',{ascending:false});
     if(r.error) throw r.error;
     var filas=r.data||[];
