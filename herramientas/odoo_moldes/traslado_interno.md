@@ -111,7 +111,14 @@ c) **El usuario automático solo puede CREAR contactos**, nunca editarlos ni
   él sigue siendo válido. Se pasa en el mismo `create`, así que no choca con (c):
   no hace falta editarlo después. Para la sugerencia de (a), Truefie busca
   incluyendo archivados (`active_test: false`) y así reusa los que creó antes.
-  **Pendiente de decisión de Andrea:** archivado sí o no.
+
+### ✅ DECIDIDO por Andrea (27-sep-2026)
+
+Los contactos que crea Truefie **nacen ARCHIVADOS (`active = false`) y con la
+etiqueta «Creado por Truefie»**, las dos cosas en el mismo `create`: nunca se
+editan después. Truefie **sugiere buscando también entre los archivados**, así
+que un destinatario que ya se creó una vez se reusa y no se duplica.
+Antes de construir: crear la etiqueta a mano en Odoo (hoy no existe).
 - No se pudo medir con el usuario de lectura: la acción del menú Clientes
   (`ir.actions.act_window`, acceso denegado) ni los permisos de creación.
 
