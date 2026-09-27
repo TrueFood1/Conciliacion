@@ -1,6 +1,14 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- ENTREGAS_VISTAS_INVOKER.sql  ·  27-sep-2026  ·  SIN APLICAR
+-- ENTREGAS_VISTAS_INVOKER.sql  ·  27-sep-2026  ·  ✅ APLICADO el 27-sep (verificado)
 -- Cerrar la fuga de `ent_alisto_lote_efectivo` (y de `v_ent_indeterminado_pendiente`)
+--
+-- ✅ APLICADO el 27-sep-2026, despues del ensayo (33/33 con ok = true: socia,
+--   equipo y postgres con las mismas filas y el mismo md5 en las seis vistas).
+--   La prueba de adentro devolvio 2 · 0 · 2 · 49 · 299 · 8.
+--   Verificado DESPUES, desde afuera: pg_lector ve {security_invoker=true} en
+--   las dos, anon sin privilegios, authenticated con SELECT, 49/49 vistas de
+--   public con security_invoker. Por REST con la llave publica:
+--   ent_alisto_lote_efectivo paso de 206 */299 a 401 · 42501 · permission denied.
 --
 -- EL HALLAZGO (medido el 27-sep, inventario tecnico)
 --   Las dos vistas nacieron el 8-sep SIN `security_invoker`, o sea que corren
