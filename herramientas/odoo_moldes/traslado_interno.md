@@ -78,3 +78,48 @@ No leerlo.
 5. Antes de crear: buscar si ya existe un picking con ese `origin` (idempotencia).
 6. Un traslado por pedido. El 27-sep `WH/INT/00144` juntó los pedidos 143 y 144
    en uno solo: a mano se puede, pero rompe el emparejamiento uno a uno.
+
+## El contacto · decisión de Andrea (27-sep-2026)
+
+**Truefie CREA el contacto en Odoo si no existe**, porque Daniel no sabe
+clasificar al destinatario. Con tres cuidados:
+
+a) **Mientras Daniel escribe, Truefie sugiere los contactos que ya existen.** Si
+   elige uno, no se crea nada. (Lectura: `res.partner` `name_search`, ya dentro
+   de `LECTURA_OK`.)
+b) **Los contactos nuevos nacen con la etiqueta «Creado por Truefie» y sin marca
+   de cliente**, para que no aparezcan al facturar.
+c) **El usuario automático solo puede CREAR contactos**, nunca editarlos ni
+   borrarlos.
+
+### Medido en solo lectura el 27-sep (uid 28)
+
+- **La etiqueta «Creado por Truefie» NO existe.** `res.partner.category` tiene
+  una sola etiqueta en toda la base, y ninguna con "truefie". Hay que crearla una
+  vez, a mano (Contactos → Configuración → Etiquetas), antes de construir.
+- **"Marca de cliente" en Odoo 17 = `customer_rank`** (entero; Odoo lo sube solo
+  cada vez que se le factura a ese contacto). Hoy: 371 contactos activos, 155 con
+  `customer_rank > 0`, 216 en 0. «Influencers» (994) está en 0.
+- ⚠️ **`customer_rank = 0` NO ALCANZA para que no aparezca al facturar.** El
+  campo cliente de la factura (`account.move.partner_id`) y del pedido de venta
+  (`sale.order.partner_id`) solo filtran por compañía (medido con `fields_get`),
+  y `name_search` en modo cliente (`res_partner_search_mode = 'customer'`, el que
+  usa ese campo) **devuelve «Influencers» escribiendo "Influ"** aunque su rank
+  sea 0. El rank solo ordena y alimenta el filtro por defecto del menú Clientes.
+- **Lo que sí lo saca de todas las listas: crearlo ARCHIVADO (`active = false`).**
+  Un contacto archivado no sale en ningún buscador, y un traslado ya creado con
+  él sigue siendo válido. Se pasa en el mismo `create`, así que no choca con (c):
+  no hace falta editarlo después. Para la sugerencia de (a), Truefie busca
+  incluyendo archivados (`active_test: false`) y así reusa los que creó antes.
+  **Pendiente de decisión de Andrea:** archivado sí o no.
+- No se pudo medir con el usuario de lectura: la acción del menú Clientes
+  (`ir.actions.act_window`, acceso denegado) ni los permisos de creación.
+
+### El permiso para (c)
+
+El usuario automático necesita `create` en `res.partner` y **nada** de `write`
+ni `unlink` sobre ese modelo. En Odoo las ACL son por modelo y por operación, así
+que se puede dar `create` sin `write`. ⚠️ Pero el grupo "Contactos / Creación" y
+los grupos de Ventas o Inventario suelen traer `write` también: hay que armar un
+grupo propio y medirlo con `check_access_rights` (como `diagnostico_permisos.py`)
+antes de encenderlo. No medido todavía: hace falta el usuario nuevo.

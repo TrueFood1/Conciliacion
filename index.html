@@ -943,6 +943,11 @@ body[data-mod="personal"] .main{
 .home-mod-dot{width:9px;height:9px;border-radius:3px;display:inline-block}
 .home-mod-name{font-size:14px;font-weight:500;margin-top:10px}
 .home-mod-state{font-size:12px;font-weight:500;margin-top:6px}
+/* El cuadre con Odoo en la tarjeta de Entregas (27-sep). Gris: existe. Ámbar:
+   vence hoy o mañana (regla 5 del lobby). Vacía no ocupa lugar. */
+.home-mod-alerta{font-size:11px;line-height:1.35;margin-top:5px;color:#9A988F}
+.home-mod-alerta.ambar{color:#E9A23B}
+.home-mod-alerta:empty{display:none}
 /* ── LOBBY DE UN SOLO MÓDULO (hoy: Daniel) ──
    Una cuadrícula de cinco con una sola tarjeta se lee como una cuadrícula ROTA: la
    tarjeta queda arrinconada arriba a la izquierda y el resto es vacío. Con un módulo
@@ -1846,6 +1851,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
         <span class="home-mod-dot" style="background:#E9FE60"></span>
         <div class="home-mod-name" style="color:#F5F4F0">Entregas</div>
         <div class="home-mod-state" style="color:#E9FE60">Abrir →</div>
+        <div class="home-mod-alerta" id="homeEntAlerta"></div>
       </div>
       <!-- PERSONAL. Es módulo, no tarjeta: ACCESOS_ESQUEMA.sql ya declara que el perfil
            `equipo` ve "Entregas · Personal · Producción". El borde #5E2610 es el naranja
@@ -2959,6 +2965,8 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .pd-quien{font-size:13.5px;color:var(--text);line-height:1.35}
 .pd-para{color:var(--text-3);font-weight:400}
 .pd-meta{font-size:11px;color:var(--text-3);margin-top:2px;font-variant-numeric:tabular-nums}
+.pd-cua{font-size:12.5px;color:var(--text-2);margin-top:3px;line-height:1.4}
+.pd-cua.ambar{color:var(--warn)}
 .pd-fila-nb{border-bottom:none;padding-bottom:0}
 /* Los dos botones de decisión, en su propio renglón y a ancho completo. Al lado
    del texto se partían; y son la acción de la fila, no un adorno al margen. */
@@ -5047,6 +5055,8 @@ function accesoPintarLobby(){
   // de triar algo. `tkContar` se define mas abajo en el archivo — para cuando
   // esto corre ya esta.
   try{ tkContar(); }catch(e){}
+  // El cuadre con Odoo (opción C, 27-sep): solo socias, con caché de 5 minutos.
+  try{ cuadreLobby(); }catch(e){}
 }
 async function setSaludo(){
   const el=document.getElementById('homeHi'); if(!el) return;
@@ -15070,7 +15080,7 @@ async function irAPendientes(){
 }
 async function pdCargar(force){
   const st=document.getElementById('pdStatus'), body=document.getElementById('pdBody');
-  if(_pd && !force){ pdRender(); return; }
+  if(_pd && !force){ pdRender(); pdCuadreCargar(false); return; }
   st.className='status s-info'; st.classList.remove('hidden');
   st.innerHTML='<span class="spin"></span>Leyendo despachos y su estado…';
   try{ _pd=await pdLeer(); _pdErr=''; st.classList.add('hidden'); }
@@ -15081,6 +15091,7 @@ async function pdCargar(force){
         ?' — probablemente falta pegar <strong>ENTREGAS_CLASIFICACION.sql</strong> en Supabase.':'');
   }
   pdRender();
+  pdCuadreCargar(!!force);   // el cuadre con Odoo llega después y repinta
 }
 async function pdLeer(){
   const c=sbClient(); if(!c) throw new Error('sin sesión de Supabase');
@@ -15355,6 +15366,7 @@ function pdRender(){
   // que es el criterio 1 del orden de esta pantalla.
   h+=pdExcHTML();
   h+=pdOdooHTML();      // las dos alertas de Odoo, al lado de «Por resolver»
+  h+=pdCuadreHTML();    // opción C · el cuadre con Odoo (27-sep)
   h+=secc('Salida sin clasificar',
     'Daniel registró la salida; falta que las socias digan qué fue. El pendiente es un estado con nombre, no un hueco.',
     _pd.l3, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdClasifUI('+it.id+')">Clasificar</button>'; });
@@ -16556,6 +16568,240 @@ function pdOdooHTML(){
   });
   return h;
 }
+// ════════════════════════════════════════════════════════════════════════
+// CUADRE CON ODOO · opción C, paso C1 (27-sep-2026)
+//
+// Truefie deja de suponer que lo que marcó está bien en Odoo y LEE el estado
+// real de la salida de cada pedido con factura. Muestra solo donde los dos
+// registros no dicen lo mismo. NO escribe en Odoo: todo sale por `odooCall`,
+// que solo deja pasar lectura (LECTURA_OK). Diseño: OPCION_C_CUADRE_ODOO.md.
+//
+// LOS CINCO CASOS, uno o varios por pedido (una sola fila por pedido):
+//   1 · preparado en Truefie y la salida ya está validada en Odoo
+//   2 · la salida está sin validar en Odoo
+//   3 · entregado en Truefie y Odoo no tiene ninguna salida hecha
+//   4 · entregado, y lo que salió en Truefie ≠ lo que Odoo descontó
+//   5 · la factura del pedido está revertida (tiene nota de crédito)
+//
+// 🔴 EL ORÁCULO: `herramientas/cuadre_odoo.py` calcula lo mismo por su cuenta,
+// en Python, sin pasar por este archivo. Esta sección tiene que dar EXACTAMENTE
+// lo que dice el oráculo. Si no, uno de los dos está mal — y no se sabe cuál
+// hasta mirarlo. Medido el 27-sep: pedidos 11 (3 y 5), 67 (5) y 135 (2).
+//
+// ⚠️ LA CADENA ES LA DE `despYaEntregado`, POR ID Y NUNCA POR TEXTO:
+// factura → account.move.line.sale_line_ids → sale.order.line.order_id →
+// sale.order.picking_ids → stock.picking (solo outgoing) → stock.move.
+// Hoy son dos lecturas de la misma cadena, y eso es exactamente lo que el
+// CLAUDE.md dice que se desincroniza. Se aceptó para el paso C1 a propósito
+// —no tocar lógica probada en el mismo cambio— y el paso C3 hace que
+// `despYaEntregado` use `entOdooSalidas`, midiendo que dé lo mismo.
+//
+// ⚠️ UNIDADES: Truefie guarda unidades sueltas (`cant_uds`); Odoo, la cantidad
+// en la UoM de CADA movimiento. Se convierte con `quantity / factor` de ESA UoM,
+// leída por id (`uomFactores`). Nunca por el nombre.
+// ════════════════════════════════════════════════════════════════════════
+const CUADRE_VIEJO_MIN  = 5;   // el lobby relee a lo sumo cada 5 min (= DESP_VIEJO_MIN)
+const CUADRE_VENCE_DIAS = 2;   // una salida sin validar "vence" 2 días después de programada
+let _cuadre=null;              // {casos:[…], err:'', en:ms}. null = todavía no se leyó
+let _cuadreProm=null;          // la lectura en curso, para no pedir dos veces a la vez
+
+// Por factura: sus salidas de venta, lo que Odoo descontó (unidades sueltas por
+// producto) y si la factura está revertida. Solo lectura.
+async function entOdooSalidas(facIds){
+  const out={};
+  const ids=[...new Set((facIds||[]).map(Number).filter(Boolean))];
+  if(!ids.length) return out;
+  const ctx={lang:'es_CR'};
+  const facs=await odooCall('account.move','read',[ids],
+    {fields:['id','name','state','payment_state','reversal_move_id'],context:ctx});
+  const lin=await odooCall('account.move.line','search_read',
+    [[['move_id','in',ids],['display_type','=','product']]],
+    {fields:['move_id','sale_line_ids'],limit:20000,context:ctx});
+  const solDeFac={}, sol=[];
+  lin.forEach(function(l){ const f=l.move_id&&l.move_id[0];
+    (l.sale_line_ids||[]).forEach(function(x){
+      (solDeFac[f]=solDeFac[f]||[]).push(x); if(sol.indexOf(x)<0) sol.push(x); }); });
+  const ord={}, soIds=[];
+  if(sol.length){
+    (await odooCall('sale.order.line','read',[sol],{fields:['id','order_id'],context:ctx}))
+      .forEach(function(r){ const o=r.order_id&&r.order_id[0]; ord[r.id]=o;
+        if(o && soIds.indexOf(o)<0) soIds.push(o); });
+  }
+  const pkDeSo={}, pkIds=[];
+  if(soIds.length){
+    (await odooCall('sale.order','read',[soIds],{fields:['id','picking_ids'],context:ctx}))
+      .forEach(function(r){ pkDeSo[r.id]=r.picking_ids||[];
+        (r.picking_ids||[]).forEach(function(p){ if(pkIds.indexOf(p)<0) pkIds.push(p); }); });
+  }
+  const PK={}; let mvs=[];
+  if(pkIds.length){
+    (await odooCall('stock.picking','read',[pkIds],
+      {fields:['id','name','state','picking_type_code','scheduled_date','date_done'],context:ctx}))
+      .forEach(function(p){ PK[p.id]=p; });
+    mvs=await odooCall('stock.move','search_read',[[['picking_id','in',pkIds]]],
+      {fields:['picking_id','product_id','quantity','product_uom','state'],limit:20000,context:ctx});
+    await uomFactores(mvs.map(function(m){ return m.product_uom&&m.product_uom[0]; }));
+  }
+  facs.forEach(function(f){
+    const sos=[]; (solDeFac[f.id]||[]).forEach(function(s){ const o=ord[s];
+      if(o && sos.indexOf(o)<0) sos.push(o); });
+    const salidas=[]; sos.forEach(function(o){ (pkDeSo[o]||[]).forEach(function(p){
+      const P=PK[p]; if(P && P.picking_type_code==='outgoing' && salidas.indexOf(P)<0) salidas.push(P); }); });
+    const hechas={}; salidas.forEach(function(p){ if(p.state==='done') hechas[p.id]=1; });
+    const desc={};
+    mvs.forEach(function(m){
+      const pid=m.picking_id&&m.picking_id[0];
+      if(!hechas[pid] || m.state!=='done') return;
+      const pr=m.product_id&&m.product_id[0];
+      desc[pr]=(desc[pr]||0)+(+m.quantity||0)/uomFac(m.product_uom&&m.product_uom[0]);
+    });
+    out[f.id]={factura:f.name, salidas:salidas, descontado:desc,
+               revertida:!!((f.reversal_move_id||[]).length) || f.payment_state==='reversed'};
+  });
+  return out;
+}
+
+// La fecha de Truefie (timestamptz) como día CR.
+function _cuaDiaTf(ts){ const ms=Date.parse(ts||''); return isNaN(ms)?'':new Date(ms-6*3600000).toISOString().slice(0,10); }
+function _cuaDia(ymd){ const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd||''));
+  return m ? ((+m[3])+'-'+PD_MES[(+m[2])-1]) : ''; }
+
+async function entCuadreLeer(){
+  const c=sbClient(); if(!c) throw new Error('sin sesión de Supabase');
+  const {data:peds,error:e1}=await c.from('v_ent_pedido_estado')
+    .select('pedido_id,estado,factura_id,factura_nombre,cliente_nombre,preparado_en,salida_en')
+    .not('factura_id','is',null).in('estado',['preparado','entregado'])
+    .gte('fecha_despacho',DESP_DESDE).limit(1000);
+  if(e1) throw e1;
+  const P=peds||[]; if(!P.length) return [];
+  const {data:av,error:e2}=await c.from('ent_alisto_vigente').select('alisto_id,pedido_id')
+    .in('pedido_id',P.map(function(p){ return p.pedido_id; }));
+  if(e2) throw e2;
+  const pedDeAl={}; (av||[]).forEach(function(a){ pedDeAl[a.alisto_id]=a.pedido_id; });
+  const salio={};
+  const alIds=Object.keys(pedDeAl).map(Number);
+  if(alIds.length){
+    const {data:al,error:e3}=await c.from('ent_alisto_linea')
+      .select('alisto_id,producto_id,cant_uds,no_se_entrega').in('alisto_id',alIds).limit(5000);
+    if(e3) throw e3;
+    (al||[]).forEach(function(l){ if(l.no_se_entrega) return;
+      const pid=pedDeAl[l.alisto_id], S=(salio[pid]=salio[pid]||{});
+      S[l.producto_id]=(S[l.producto_id]||0)+(+l.cant_uds||0); });
+  }
+  const od=await entOdooSalidas(P.map(function(p){ return p.factura_id; }));
+  const hoy=_ymd(new Date()), man=_ymd(new Date(Date.now()+86400000));
+  const casos=[];
+  P.forEach(function(p){
+    const o=od[p.factura_id]||{salidas:[],descontado:{}};
+    const hechas=o.salidas.filter(function(s){ return s.state==='done'; });
+    const abiertas=o.salidas.filter(function(s){ return s.state!=='done' && s.state!=='cancel'; });
+    const mot=[];
+    if(p.estado==='preparado' && hechas.length)
+      mot.push({caso:1, dia:_crDate(hechas[0].date_done), ambar:false,
+        txt:'Preparado en Truefie · Odoo ya validó '+hechas.map(function(s){
+          return s.name+' el '+_cuaDia(_crDate(s.date_done)); }).join(', ')});
+    abiertas.forEach(function(s){
+      const prog=_crDate(s.scheduled_date);
+      const vence=_ymd(new Date(Date.parse(prog+'T12:00:00')+CUADRE_VENCE_DIAS*86400000));
+      mot.push({caso:2, dia:prog, ambar:vence<=man,
+        txt:'Salida '+s.name+' sin validar en Odoo · programada el '+_cuaDia(prog)
+           +' · en Truefie: '+(p.estado==='entregado'?'entregado':'preparado')}); });
+    if(p.estado==='entregado' && !hechas.length && !abiertas.length)
+      mot.push({caso:3, dia:_cuaDiaTf(p.salida_en), ambar:false,
+        txt:'Entregado en Truefie · en Odoo '+(o.salidas.length
+          ? ('la salida '+o.salidas.map(function(s){ return s.name; }).join(', ')+' está cancelada')
+          : 'no hay salida')});
+    if(p.estado==='entregado' && hechas.length){
+      const t=salio[p.pedido_id]||{}, d=o.descontado||{};
+      const prods=[...new Set(Object.keys(t).concat(Object.keys(d)).map(Number))];
+      const dif=prods.filter(function(pr){ return Math.abs((t[pr]||0)-(d[pr]||0))>1e-6; });
+      if(dif.length) mot.push({caso:4, dia:_cuaDiaTf(p.salida_en), ambar:false,
+        txt:'Salió distinto: '+dif.map(function(pr){ return _despNomProd(pr)+' Truefie '
+          +_lotUds(t[pr]||0,pr)+' · Odoo '+_lotUds(d[pr]||0,pr); }).join('; ')});
+    }
+    if(o.revertida)
+      mot.push({caso:5, dia:_cuaDiaTf(p.salida_en||p.preparado_en), ambar:false,
+        txt:'La factura …'+String(p.factura_nombre||'').slice(-4)+' está revertida (tiene nota de crédito)'});
+    if(!mot.length) return;
+    const dias=mot.map(function(m){ return m.dia; }).filter(Boolean).sort();
+    casos.push({pedido:p.pedido_id, estado:p.estado, factura:p.factura_nombre,
+                cliente:p.cliente_nombre, desde:dias[0]||'', motivos:mot,
+                ambar:mot.some(function(m){ return m.ambar; })});
+  });
+  casos.sort(function(a,z){ return String(a.desde).localeCompare(String(z.desde)); });
+  return casos;
+}
+
+// Lee (o devuelve la lectura reciente). `force` salta la caché. Un error NO se
+// guarda como "0 casos": queda en `err`, y el lobby no dibuja nada mientras
+// Pendientes sí lo dice.
+async function entCuadre(force){
+  if(!force && _cuadre && !_cuadre.err && (Date.now()-_cuadre.en)<CUADRE_VIEJO_MIN*60000) return _cuadre;
+  if(_cuadreProm) return _cuadreProm;
+  _cuadreProm=(async function(){
+    try{ _cuadre={casos:await entCuadreLeer(), err:'', en:Date.now()}; }
+    catch(e){ _cuadre={casos:[], err:(e&&e.message)||String(e), en:Date.now()}; }
+    finally{ _cuadreProm=null; }
+    return _cuadre;
+  })();
+  return _cuadreProm;
+}
+
+// Pendientes: se dibuja primero sin el cuadre y se repinta cuando llega, para
+// que un proxy dormido (hasta ~40 s) no frene las otras secciones.
+async function pdCuadreCargar(force){
+  if(!(await accesoSocia())) return;
+  await entCuadre(force);
+  try{ pdRender(); }catch(e){}
+}
+
+function pdCuadreHTML(){
+  // Solo socias, con la misma pregunta que las alertas de Odoo de al lado.
+  if(!_pd || !_pd.odoo || _pd.odoo.noSocia) return '';
+  const tit='<div class="card rp-z"><div class="card-title">Cuadre con Odoo';
+  if(_cuadre===null) return tit+'</div><div class="cl-none">Leyendo Odoo…</div></div>';
+  // Si Odoo falló NO se dice "todo cuadra": no lo sabemos.
+  if(_cuadre.err) return tit+'</div><div class="cl-none dp-mal">No pude leer Odoo, así que el '
+    +'cuadre no está al día: '+esc(_cuadre.err)+'</div></div>';
+  const cs=_cuadre.casos||[];
+  if(!cs.length) return '';                  // regla 1: sin nada que hacer, no existe
+  let h=tit+' <span class="pd-cnt on">'+cs.length+'</span></div>';
+  cs.forEach(function(x){
+    h+='<div class="pd-fila"><div class="pd-fila-c">'
+      +'<div class="pd-quien">Pedido '+x.pedido+(x.cliente?(' · '+esc(x.cliente)):'')+'</div>';
+    x.motivos.forEach(function(m){
+      h+='<div class="pd-cua'+(m.ambar?' ambar':'')+'">'+esc(m.txt)+'</div>'; });
+    h+='<div class="pd-meta">…'+esc(String(x.factura||'').slice(-4))+' · desde el '+esc(_cuaDia(x.desde))+'</div>'
+      +'</div></div>';
+  });
+  return h+'</div>';
+}
+
+// ── EL CONTADOR DEL LOBBY · decisión de Andrea, 27-sep-2026 ────────────
+// 🔴 ESTO REVIERTE A CONCIENCIA LO DEL 26-AGO. Ese día se sacó la alerta de
+// Entregas del lobby ("cada módulo muestra sus alertas al entrar; repetirlas
+// afuera duplica"). El 27-sep Andrea pidió un contador del cuadre en el lobby,
+// con las cinco reglas de alerta. No se volvió atrás por olvido: es una
+// decisión nueva, y va en la tarjeta de Entregas, que es donde vive.
+//   1 · accionable: sin casos, la línea no existe.
+//   2 · con fecha: "desde" el caso más viejo.
+//   3 · se apaga sola: sale de leer Odoo, no de un gesto.
+//   4 · máximo 3: es UNA línea con un número, no una lista.
+//   5 · ámbar solo lo que vence: una salida sin validar a los 2 días de
+//       programada (hoy, mañana o ya pasada). "Preparado en Truefie y validado
+//       en Odoo" va SIEMPRE en gris (Andrea, 27-sep).
+// Solo socias. Si Odoo no contesta, el lobby no dice nada: el error se dice en
+// Pendientes, que es donde se puede leer entero.
+async function cuadreLobby(){
+  const el=document.getElementById('homeEntAlerta'); if(!el) return;
+  if(!(await accesoSocia())){ el.textContent=''; return; }
+  const q=await entCuadre(false);
+  const cs=(q&&!q.err&&q.casos)||[];
+  if(!cs.length){ el.textContent=''; el.className='home-mod-alerta'; return; }
+  el.textContent=cs.length+(cs.length===1?' pedido':' pedidos')+' por cuadrar con Odoo · desde el '+_cuaDia(cs[0].desde);
+  el.className='home-mod-alerta'+(cs.some(function(x){ return x.ambar; })?' ambar':'');
+}
+
 // "Ya lo hice" = insertar en ent_odoo_hecho. Append-only, como todo el modulo:
 // no hay grant de UPDATE, asi que un estado no se cambia, se agrega.
 async function pdOdooHecho(id){
