@@ -37,15 +37,38 @@ def fila(p, esp, obt_sql, ok_sql):
 def q(s):
     return "'" + s.replace("'", "''") + "'"
 
-def intento(p, esp, stmt):
-    """Un insert/update/delete en su propio savepoint. ENTRA o RECHAZA."""
+# Por que se rechaza. Un RECHAZA solo vale si rebota por SU razon: el 24-sep
+# la X6 esperaba "sin motivo" y rebotó por el saldo del 247, y el `ok` —que
+# solo miraba la palabra RECHAZA— la dio por buena. Ahora cada rechazo nombra
+# el SQLSTATE y un pedazo del mensaje, y el `ok` compara los dos.
+GUARDIA  = 'P0001'   # raise exception de un guardia
+CHECK    = '23514'   # check_violation: el fragmento es el nombre del CHECK
+NOT_NULL = '23502'   # not_null_violation
+PERMISO  = '42501'   # insufficient_privilege: sin grant de update/delete
+
+def intento(p, esp, stmt, motivo=None):
+    """Un insert/update/delete en su propio savepoint. ENTRA, o RECHAZA con
+    motivo = (sqlstate, fragmento del mensaje). El fragmento se busca con
+    strpos y no con like: los `_` de los nombres de CHECK son comodines."""
+    if esp == 'ENTRA':
+        assert motivo is None, p
+        P.append("""  begin
+    %s;
+    v_res := v_res || jsonb_build_object('p', %s, 'esperado', 'ENTRA', 'obtenido', 'ENTRA', 'ok', true);
+  exception when others then
+    v_res := v_res || jsonb_build_object('p', %s, 'esperado', 'ENTRA', 'obtenido', 'RECHAZA: ' || sqlstate || ' · ' || sqlerrm, 'ok', false);
+  end;""" % (stmt, q(p), q(p)))
+        return
+    assert esp == 'RECHAZA' and motivo and len(motivo) == 2, p
+    estado, frag = motivo
+    e = q('RECHAZA · %s · %s' % (estado, frag))
     P.append("""  begin
     %s;
-    v_res := v_res || jsonb_build_object('p', %s, 'esperado', %s, 'obtenido', 'ENTRA', 'ok', %s);
+    v_res := v_res || jsonb_build_object('p', %s, 'esperado', %s, 'obtenido', 'ENTRA', 'ok', false);
   exception when others then
-    v_res := v_res || jsonb_build_object('p', %s, 'esperado', %s, 'obtenido', 'RECHAZA: ' || sqlerrm, 'ok', %s);
-  end;""" % (stmt, q(p), q(esp), 'true' if esp == 'ENTRA' else 'false',
-             q(p), q(esp), 'true' if esp == 'RECHAZA' else 'false'))
+    v_res := v_res || jsonb_build_object('p', %s, 'esperado', %s, 'obtenido', 'RECHAZA: ' || sqlstate || ' · ' || sqlerrm,
+                                         'ok', sqlstate = %s and strpos(sqlerrm, %s) > 0);
+  end;""" % (stmt, q(p), e, q(p), e, q(estado), q(frag)))
 
 def com(t):
     P.append('\n  -- ' + t)
@@ -61,7 +84,10 @@ def ins(origen, destino, uds, motivo="'ensayo'", conteo='v_anc', fecha='v_hoy', 
 
 # ── A · SIN SESION ─────────────────────────────────────────────────────────
 com('── A · SIN SESION (todavia como postgres) ──')
-intento('A1 sin sesion · 245→247 30 u', 'RECHAZA', ins('245 / 6-27', '247 / 6-27', 30))
+# Cada rechazo intenta algo que, salvo por SU razon, entraria: A1 es la T1 sin
+# sesion; los de la N usan 252→244 1 u, que la N12 prueba que entra.
+intento('A1 sin sesion · 245→247 30 u', 'RECHAZA', ins('245 / 6-27', '247 / 6-27', 30),
+        (GUARDIA, 'sin sesion no se sabe quien autoriza'))
 
 # ── T · EL CASO REAL ───────────────────────────────────────────────────────
 com('── T · EL CASO REAL, como socia. De aca en adelante la RLS aplica. ──')
@@ -101,54 +127,81 @@ fila('R4 · autorizado_por sale de la sesion', 'la socia de la sesion',
 # ── N · LAS GUARDAS ────────────────────────────────────────────────────────
 com('── N · LAS GUARDAS ──')
 como('v_equipo')
-intento('N1 equipo · 252→244 1 u', 'RECHAZA', ins('252 / 6-27', '244 / 3-27', 1))
+intento('N1 equipo · 252→244 1 u', 'RECHAZA', ins('252 / 6-27', '244 / 3-27', 1),
+        (GUARDIA, 'corregir un lote del conteo es de un perfil socias'))
 como('v_socia')
-intento('N2 origen fuera del ancla (999 / 1-27)', 'RECHAZA', ins('999 / 1-27', '247 / 6-27', 1))
-intento('N3 origen = destino', 'RECHAZA', ins('252 / 6-27', '252 / 6-27', 1))
-intento('N4 cantidad 0', 'RECHAZA', ins('252 / 6-27', '244 / 3-27', 0))
-intento('N5 245 queda negativo (saldo 6, mover 7)', 'RECHAZA', ins('245 / 6-27', '247 / 6-27', 7))
-intento('N6 destino fuera del ancla SIN huella', 'RECHAZA', ins('252 / 6-27', '250 / 6-27', 6))
+intento('N2 origen fuera del ancla (999 / 1-27)', 'RECHAZA', ins('999 / 1-27', '247 / 6-27', 1),
+        (GUARDIA, 'el lote de origen 999 / 1-27 no esta en el conteo del ancla'))
+# N3, N4, N9 y N11 pasan los guardias (el 252 tiene saldo de sobra) y rebotan
+# en su CHECK. Si el 252 se quedara sin saldo rebotarian en el guardia del
+# negativo, y el `ok` lo diria.
+intento('N3 origen = destino', 'RECHAZA', ins('252 / 6-27', '252 / 6-27', 1),
+        (CHECK, 'ent_conteo_correccion_lotes_ok'))
+intento('N4 cantidad 0', 'RECHAZA', ins('252 / 6-27', '244 / 3-27', 0),
+        (CHECK, 'ent_conteo_correccion_uds_ok'))
+intento('N5 245 queda negativo (saldo 6, mover 7)', 'RECHAZA', ins('245 / 6-27', '247 / 6-27', 7),
+        (GUARDIA, 'el lote 245 / 6-27 quedaria con saldo -1'))
+intento('N6 destino fuera del ancla SIN huella', 'RECHAZA', ins('252 / 6-27', '250 / 6-27', 6),
+        (GUARDIA, 'el lote destino 250 / 6-27 no esta en el conteo del ancla: hace falta la huella'))
 intento('N7 destino fuera del ancla, huella de OTRO producto', 'RECHAZA',
         ins('252 / 6-27', '250 / 6-27', 6, extra_cols=', destino_orden_id, destino_orden, destino_producto_id',
-            extra_vals=", 99999999, 'WH/MO/ENSAYO', 451"))
+            extra_vals=", 99999999, 'WH/MO/ENSAYO', 451"),
+        (GUARDIA, 'la huella del lote destino es del producto 451'))
 intento('N8 destino fuera del ancla, huella completa', 'ENTRA',
         ins('252 / 6-27', '250 / 6-27', 6, extra_cols=', destino_orden_id, destino_orden, destino_producto_id',
             extra_vals=", 99999999, 'WH/MO/ENSAYO', 452", ret=' returning id into v_n8'))
 intento('N9 huella a medias (sin nombre de orden)', 'RECHAZA',
         ins('252 / 6-27', '250 / 6-27', 1, extra_cols=', destino_orden_id, destino_producto_id',
-            extra_vals=", 99999999, 452"))
-intento('N10 sobre un conteo que no es el ancla', 'RECHAZA', ins('252 / 6-27', '244 / 3-27', 1, conteo='v_otro'))
-intento('N11 motivo en blanco', 'RECHAZA', ins('252 / 6-27', '244 / 3-27', 1, motivo="'   '"))
-intento('N12 motivo de 1 caracter (sin minimo)', 'ENTRA', ins('252 / 6-27', '244 / 3-27', 1, motivo="'x'"))
+            extra_vals=", 99999999, 452"),
+        (CHECK, 'ent_conteo_correccion_huella_ok'))
+intento('N10 sobre un conteo que no es el ancla', 'RECHAZA', ins('252 / 6-27', '244 / 3-27', 1, conteo='v_otro'),
+        (GUARDIA, 'tiene que ser sobre el ancla vigente'))
+intento('N11 motivo en blanco', 'RECHAZA', ins('252 / 6-27', '244 / 3-27', 1, motivo="'   '"),
+        (CHECK, 'ent_conteo_correccion_motivo_ok'))
+intento('N12 motivo de 1 caracter (sin minimo)', 'ENTRA',
+        ins('252 / 6-27', '244 / 3-27', 1, motivo="'x'", ret=' returning id into v_n12'))
 intento('N13 autorizado_por de otra persona', 'RECHAZA',
-        ins('252 / 6-27', '244 / 3-27', 1, extra_cols=', autorizado_por', extra_vals=', v_equipo'))
-intento('N14 fecha del recuento mañana', 'RECHAZA', ins('252 / 6-27', '244 / 3-27', 1, fecha='v_hoy + 1'))
+        ins('252 / 6-27', '244 / 3-27', 1, extra_cols=', autorizado_por', extra_vals=', v_equipo'),
+        (GUARDIA, 'La firma no se elige'))
+intento('N14 fecha del recuento mañana', 'RECHAZA', ins('252 / 6-27', '244 / 3-27', 1, fecha='v_hoy + 1'),
+        (GUARDIA, 'la fecha del recuento'))
 intento('N15 editar una correccion (update)', 'RECHAZA',
-        "update ent_conteo_correccion set motivo = 'otro' where id = v_t1")
+        "update ent_conteo_correccion set motivo = 'otro' where id = v_t1",
+        (PERMISO, 'permission denied for table ent_conteo_correccion'))
 intento('N16 borrar una correccion (delete)', 'RECHAZA',
-        "delete from ent_conteo_correccion where id = v_t1")
+        "delete from ent_conteo_correccion where id = v_t1",
+        (PERMISO, 'permission denied for table ent_conteo_correccion'))
 
 # ── X · ANULAR ─────────────────────────────────────────────────────────────
 com('── X · ANULAR ──')
-intento('X1 socia anula la del N8 (250 no se usó)', 'ENTRA',
-        "insert into ent_conteo_correccion_anulacion (correccion_id, motivo) values (v_n8, 'ensayo')")
+ANULAR = "insert into ent_conteo_correccion_anulacion (correccion_id, motivo) values (%s, %s)"
+intento('X1 socia anula la del N8 (250 no se usó)', 'ENTRA', ANULAR % ('v_n8', "'ensayo'"))
 P.append("  select count(*) into v_x1 from ent_conteo_correccion_vigente where id = v_n8;")
 P.append("  select n.ancla_corregida into v_x2 from ent_conteo_lote_neto(v_anc, 452, '250 / 6-27') n;")
 fila('X2 · la anulada sale de la vista y el 250 vuelve a 0', '0 filas · 250 en 0',
      "v_x1 || ' filas · 250 en ' || v_x2", "v_x1 = 0 and v_x2 = 0")
-intento('X3 anularla otra vez', 'RECHAZA',
-        "insert into ent_conteo_correccion_anulacion (correccion_id, motivo) values (v_n8, 'ensayo')")
+intento('X3 anularla otra vez', 'RECHAZA', ANULAR % ('v_n8', "'ensayo'"),
+        (GUARDIA, 'ya esta anulada'))
 intento('X4 mover las 30 u del 247 al 252 (247 queda en 0)', 'ENTRA', ins('247 / 6-27', '252 / 6-27', 30))
-intento('X5 anular la T1: el 247 quedaria en −30', 'RECHAZA',
-        "insert into ent_conteo_correccion_anulacion (correccion_id, motivo) values (v_t1, 'ensayo')")
-intento('X6 anular sin motivo', 'RECHAZA',
-        "insert into ent_conteo_correccion_anulacion (correccion_id, motivo) values (v_t1, '')")
+intento('X5 anular la T1: el 247 quedaria en −30', 'RECHAZA', ANULAR % ('v_t1', "'ensayo'"),
+        (GUARDIA, 'deja el lote 247 / 6-27 en'))
+# X6 · X6b · X7 van contra la N12 (252→244, 1 u), que SI se puede anular: el
+# 244 tiene saldo y devolverle 1 u al 252 no deja nada negativo. Asi el unico
+# motivo para rebotar es el que nombra cada prueba. El 24-sep X6 iba contra la
+# T1, que la X5 acaba de probar que NO se puede anular, y rebotaba por eso.
+# X8 es la contraprueba: la MISMA anulacion, con motivo y como socia, ENTRA.
+intento('X6 anular la N12 con motivo vacio', 'RECHAZA', ANULAR % ('v_n12', "''"),
+        (CHECK, 'ent_conteo_correccion_anulacion_motivo_ok'))
+intento('X6b anular la N12 con motivo null', 'RECHAZA', ANULAR % ('v_n12', 'null'),
+        (NOT_NULL, 'column "motivo" of relation "ent_conteo_correccion_anulacion"'))
 como('v_equipo')
-intento('X7 equipo anula', 'RECHAZA',
-        "insert into ent_conteo_correccion_anulacion (correccion_id, motivo) values (v_t1, 'ensayo')")
+intento('X7 equipo anula la N12', 'RECHAZA', ANULAR % ('v_n12', "'ensayo'"),
+        (GUARDIA, 'anular una correccion de lote es de un perfil socias'))
 como('v_socia')
-intento('X8 editar una anulacion (delete)', 'RECHAZA',
-        "delete from ent_conteo_correccion_anulacion where correccion_id = v_n8")
+intento('X8 contraprueba: la socia anula la N12 con motivo', 'ENTRA', ANULAR % ('v_n12', "'ensayo'"))
+intento('X9 editar una anulacion (delete)', 'RECHAZA',
+        "delete from ent_conteo_correccion_anulacion where correccion_id = v_n8",
+        (PERMISO, 'permission denied for table ent_conteo_correccion_anulacion'))
 
 # ── P · PERMISOS DE anon ───────────────────────────────────────────────────
 com('── P · anon no toca nada ──')
@@ -165,7 +218,7 @@ n_filas = sum(1 for x in P if "jsonb_build_object('p'" in x)
 
 cuerpo = '\n'.join(P)
 out = f"""-- ═══════════════════════════════════════════════════════════════════════════
--- ENSAYO_CORRECCION_LOTE.sql  ·  24-sep-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA
+-- ENSAYO_CORRECCION_LOTE.sql  ·  24-sep-2026, rehecho el 27-sep  ·  ENSAYO EN SECO · NO ESCRIBE NADA
 -- Correcciones de conteo por lote · Paso A
 --
 -- ⚠️ ARCHIVO GENERADO. No se edita a mano: se regenera con
@@ -185,6 +238,10 @@ out = f"""-- ══════════════════════�
 -- COMO SE LEE
 --   Una tabla de {n_filas} filas, TODAS con ok = true. Si el editor dice
 --   "Success. No rows returned", no llego al final y no vale.
+--   Un RECHAZA da ok SOLO si rebota por SU razon: `esperado` dice el SQLSTATE
+--   y el pedazo de mensaje que tiene que traer, y `ok` compara los dos contra
+--   lo `obtenido`. El 24-sep bastaba con la palabra RECHAZA, y la X6 paso por
+--   la razon de al lado (el saldo del 247 y no el motivo vacio).
 --   Si T0 no da, los datos se movieron desde el 24-sep (una salida nueva de
 --   245 o 247): R1 y R2 dejan de aplicar tal cual y hay que volver a medir.
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -204,6 +261,7 @@ declare
   v_hoy    date := (now() at time zone 'America/Costa_Rica')::date;
   v_t1     bigint;
   v_n8     bigint;
+  v_n12    bigint;
   v_x1 numeric; v_x2 numeric; v_x3 numeric; v_x4 numeric;
   v_tot_a0 numeric; v_tot_s0 numeric; v_tot_a1 numeric; v_tot_s1 numeric;
   v_b      boolean;
