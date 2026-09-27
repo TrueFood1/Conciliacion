@@ -45,6 +45,9 @@ LA CLAVE — en el LLAVERO de macOS, nunca en un archivo ni en el portapapeles
     4. calcula el VERIFICADOR SCRAM (lo que Postgres guarda de una clave) y deja
        en el portapapeles UNA linea  alter role truefie_cc with password '…';
        Con el verificador no se puede entrar: la clave no sale del llavero.
+  Si el portapapeles se piso antes de pegarla:
+      python3 herramientas/tk_estado.py verificador
+  (rearma la linea desde el llavero, con sal nueva; la clave no cambia)
   Despues de que Andrea pegue esa linea:
       python3 herramientas/tk_estado.py probar
 """
@@ -86,6 +89,17 @@ def verificador_scram(clave, iteraciones=4096):
     server_key = hmac.new(salted, b"Server Key", hashlib.sha256).digest()
     b = lambda x: base64.b64encode(x).decode()
     return "SCRAM-SHA-256$%d:%s$%s:%s" % (iteraciones, b(sal), b(stored_key), b(server_key))
+
+
+def verificador_al_portapapeles():
+    """Vuelve a armar la linea `alter role` desde la clave del LLAVERO (sal
+    nueva, misma clave) y la deja en el portapapeles. Para cuando la primera se
+    perdio porque el portapapeles se piso antes de pegarla."""
+    linea = "alter role truefie_cc with password '%s';" % verificador_scram(clave_del_llavero())
+    subprocess.run(["pbcopy"], input=linea.encode("utf-8"),
+                   env=dict(os.environ, LANG="en_US.UTF-8"))
+    print("en el portapapeles: UNA linea `alter role truefie_cc with password 'SCRAM-SHA-256$4096:…'`")
+    print("Es el verificador, no la clave. Pegarla SOLA en el editor SQL y correrla.")
 
 
 def clave_nueva():
@@ -177,6 +191,8 @@ def main():
     cmd = a[0]
     if cmd == "clave-nueva":
         clave_nueva(); return
+    if cmd == "verificador":
+        verificador_al_portapapeles(); return
     def opt(nombre):
         if nombre in a:
             i = a.index(nombre)
