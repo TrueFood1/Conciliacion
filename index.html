@@ -11152,7 +11152,7 @@ function _boEventos(){
   window.addEventListener('beforeunload', salir);   // cerrar la ventana en escritorio
   document.addEventListener('visibilitychange', function(){
     if(document.visibilityState==='hidden') salir();  // cambiar de app, apagar la pantalla
-    else boReintentar();                              // al volver: lo que haya quedado colgado
+    else{ boReintentar(); boCargarAbiertos(); }       // al volver: lo colgado, y la tira de NUEVO
   });
   window.addEventListener('online', boReintentar);  // volvió la señal
 }
@@ -11190,8 +11190,39 @@ async function boCargarAbiertos(){
       .eq('estado','abierto').order('creado_en',{ascending:false}).limit(40);
     if(error) throw error;
     _boAbiertos=data||[]; _boErr='';
+    await _boSoltarCerrados(c, _boAbiertos);
   }catch(e){ _boAbiertos=[]; _boErr=(e&&e.message)||String(e); }
   try{ despRender(); }catch(e){}
+}
+// ── LA COPIA LOCAL DE UN BORRADOR QUE OTRO APARATO YA CERRÓ (28-sep-2026) ──
+// EL CASO: el borrador de la factura 3553 lo empezó Daniel en su iPad el 24-sep
+// y lo cerró Andrea desde OTRO aparato el 27-sep (pedido 146). `boCerrar` borra
+// la copia local SOLO del aparato que cierra, así que en el iPad quedó para
+// siempre — y si alguien abría esa factura ahí, `_boAplicarFactura` le volvía a
+// poner lo elegido encima de un pedido ya entregado. En la nube estaba bien.
+// Acá, cada vez que se lee la tira, se pregunta a la nube por los borradores
+// locales que YA SUBIERON y no están abiertos: si su vigente dice `cerrado` o
+// `descartado`, la copia local se suelta.
+// ⚠️ LO QUE NO SUBIÓ NO SE TOCA (`subido === false`): es trabajo de este aparato
+// que todavía no llegó a la nube, y `boReintentar` lo va a mandar. Soltarlo acá
+// sería perderlo, que es justo lo que el borrador existe para evitar.
+async function _boSoltarCerrados(c, abiertos){
+  try{
+    const d=_boLee();
+    const abiertasK={}; (abiertos||[]).forEach(function(x){ abiertasK[_boK(x.origen,x.ref)]=1; });
+    const candidatas=Object.keys(d).filter(function(k){
+      return d[k] && d[k].subido!==false && !abiertasK[k]; });
+    if(!candidatas.length) return;
+    const refs=candidatas.map(function(k){ return String(d[k].ref); });
+    const {data,error}=await c.from('ent_alisto_borrador_vigente')
+      .select('origen,ref,estado').in('ref',refs).in('estado',['cerrado','descartado']);
+    if(error || !data || !data.length) return;
+    let n=0;
+    data.forEach(function(x){ const k=_boK(x.origen,x.ref);
+      if(d[k] && d[k].subido!==false){ delete d[k]; n++; } });
+    if(n){ _boEscribe(d);
+      try{ console.log('[Truefie] borradores locales soltados (ya cerrados en la nube): '+n); }catch(_){} }
+  }catch(e){}   // si falla, queda como estaba: nunca peor que antes
 }
 
 // ── EL CAMINO CON FACTURA ───────────────────────────────────────────────
