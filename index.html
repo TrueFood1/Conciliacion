@@ -1624,6 +1624,17 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .tkl-espera-t{color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;
   font-size:10px;margin-right:7px}
 .tkl-nota{color:var(--text-3);margin-top:2px}
+/* EN PALABRAS CLARAS · b74 (29-sep-2026). Plegado por defecto: son cuatro
+   renglones por ticket y la lista tiene decenas. Cerrado muestra solo la
+   recomendación, que es lo que hace falta para decidir de un vistazo; el
+   resto se abre con un toque. Mismo tratamiento que la espera (barra a la
+   izquierda, sin color): es contenido del ticket, no un aviso. */
+.tkl-claro{font-size:12px;color:var(--text-2);margin-top:7px;line-height:1.45;
+  padding-left:9px;border-left:2px solid var(--border-strong);word-break:break-word}
+.tkl-claro summary{cursor:pointer;list-style:none;color:var(--text-2)}
+.tkl-claro summary::-webkit-details-marker{display:none}
+.tkl-claro-r{margin-top:4px}
+.tkl-claro-t{color:var(--text-3)}
 /* El aviso de "esto no se pudo leer" NUNCA se calla y nunca se disfraza de
    lista vacia. Son dos cosas distintas y la pantalla tiene que decir cual. */
 .tkl-vigia{font-size:12px;color:var(--text-3);padding:8px 12px;border-bottom:1px solid var(--border)}
@@ -4500,7 +4511,7 @@ body.es-socia .face-pend{display:block}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 27 sep 2026 · b73';
+const BUILD = 'v 29 sep 2026 · b74';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -22537,6 +22548,33 @@ function _tkEsc(t){ var d=document.createElement('div'); d.textContent=(t==null?
    nunca recibe el arreglo de la primera. Es el bug del guión de las regalías
    (b41 lo arregló en Pendientes y siguió roto en el Historial seis días) y es
    la regla del CLAUDE.md. Por eso se extrae ANTES de necesitar la copia. */
+/* ── EN PALABRAS CLARAS · b74 (29-sep-2026) ─────────────────────────────
+   Cuatro renglones fijos para Andrea (TICKETS_EXPLICACION.sql):
+     Qué es · Por qué importa · Qué haría falta · Recomendación.
+   El formato lo exige la BASE (tres CHECK), así que acá no se valida: se
+   dibuja. Si un renglón no trae el ":" del título, se muestra entero igual —
+   nunca se esconde texto por no calzar con lo esperado.
+   ⚠️ `en_claro` VA EN EL SELECT de `tkListar` (la lección de b63): que la
+   columna exista en `v_ticket` no alcanza.
+   ⚠️ ORDEN DE PUBLICACIÓN: primero el pegado, después este build. Sin la
+   columna, el select entero falla y la lista de Tickets no carga. */
+function _tkClaroHtml(t){
+  if(!_tkTxt(t)) return '';
+  var rs=String(t).split('\n').filter(function(r){ return _tkTxt(r); });
+  var reco='';
+  var cuerpo=rs.map(function(r){
+    var i=r.indexOf(': ');
+    if(i<0) return '<div class="tkl-claro-r">'+_tkEsc(r)+'</div>';
+    var tit=r.slice(0,i), resto=r.slice(i+2);
+    if(tit==='Recomendación') reco=resto;
+    return '<div class="tkl-claro-r"><span class="tkl-claro-t">'+_tkEsc(tit)+':</span> '+_tkEsc(resto)+'</div>';
+  }).join('');
+  return '<details class="tkl-claro"><summary>'+
+      '<span class="tkl-espera-t">En palabras claras</span>'+
+      _tkEsc(reco||'ver')+
+    '</summary>'+cuerpo+'</details>';
+}
+
 function tklItem(f, socia){
 var pie=[];
     if(f.miga) pie.push(_tkEsc(f.miga));
@@ -22551,6 +22589,7 @@ var pie=[];
         '<span class="tkl-tipo">'+_tkEsc(TK_TIPOS[f.tipo]||f.tipo)+'</span>'+
       '</div>'+
       '<div class="tkl-txt">'+_tkEsc(f.descripcion)+'</div>'+
+      _tkClaroHtml(f.en_claro)+
       /* ── QUÉ SE ESPERA · solo en los bloqueados ────────────────────────
          Un ticket bloqueado que no dice esperando QUÉ cuenta la mitad de lo
          que sabe: el chip gris avisa que nadie lo está tocando, y calla la
@@ -22826,7 +22865,7 @@ async function tkListar(){
        exactamente lo que esta pantalla vino a separar. Cazado el 21-sep por
        la prueba con lectura real, ANTES de publicar. */
     var r=await c.from('v_ticket')
-      .select('id,tipo,estado,descripcion,ambito,modulo,miga,vista,build,creado_por,creado_en,agente,viewport,espera,bloquea_ticket_id,estado_por,build_arreglo,ultima_nota')
+      .select('id,tipo,estado,descripcion,ambito,modulo,miga,vista,build,creado_por,creado_en,agente,viewport,espera,bloquea_ticket_id,estado_por,build_arreglo,ultima_nota,en_claro')
       .order('creado_en',{ascending:false});
     if(r.error) throw r.error;
     var filas=r.data||[];
