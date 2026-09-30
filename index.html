@@ -3978,6 +3978,25 @@ body.es-socia .face-pend{display:block}
 /* El aviso va en ámbar, que en este sistema es el color que AVISA — no en lima,
    que es el de acción. Ver el estándar visual: "lima y ámbar conviven". */
 .bs-anu-av{flex:1 1 100%;font-size:11.5px;color:var(--warn);line-height:1.45}
+/* ── «Validar en Odoo» · carril de escritura, fase 1 (30-sep) ───────────
+   Prefijo propio, por lo mismo que `bs-anu`. El botón de confirmar es el ÚNICO
+   lima de la ficha: es la acción; el aviso de al lado va en ámbar. */
+.bs-val{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:10px 0 2px;
+        border-top:1px solid var(--border);margin-top:10px}
+.bs-val-alb{flex:1 1 100%;font-size:12.5px;color:var(--text-2)}
+.bs-val-alb b{color:var(--text);font-weight:600}
+.bs-val-tb{flex:1 1 100%;width:100%;border-collapse:collapse}
+.bs-val-tb td{font-size:12.5px;padding:6px 8px 6px 0;vertical-align:top}
+.bs-val-tb td.n{text-align:right;padding-right:0;font-variant-numeric:tabular-nums;
+                color:var(--text);white-space:nowrap}
+.bs-val-x{flex:1 1 100%;font-size:11px;color:var(--text-3)}
+.bs-val-si{background:var(--ent-fill,#E9FE60);color:var(--ent-fill-tx,#2C3A00);border:none;font-weight:600}
+.bs-val-si:disabled{opacity:.6;cursor:default}
+.bs-val-apag{flex:1 1 100%;font-size:12px;color:var(--text-2);line-height:1.45}
+.bs-val-hecho{flex:1 1 100%;font-size:12px;color:var(--text);line-height:1.45}
+.bs-val-dq{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:2px 10px;font-size:11.5px;
+           color:var(--text-2);padding:4px 0}
+.bs-val-dq b{flex:1 1 100%;color:var(--text);font-weight:600}
 
 /* ══ TICKET 29 · CORREGIR UNA PREPARACIÓN ═══════════════════════════════
    El botón de la tarjeta de "Por entregar". Va al lado de "Entregar" y NO
@@ -4568,7 +4587,7 @@ body.es-socia .face-pend{display:block}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 30 sep 2026 · b76';
+const BUILD = 'v 30 sep 2026 · b76 + Validar en Odoo (validar-odoo, NO PUBLICAR)';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -4756,6 +4775,13 @@ const PROXY_URL = 'https://truefood-proxy.onrender.com/proxy';   // DEMO (proxy 
 // Para truefood.odoo.com usamos el proxy NUEVO de solo lectura. La URL/DB/usuario/
 // key viven en render; el navegador solo manda {model,method,args,kwargs} + token.
 const PROXY_LECTURA_URL   = 'https://truefood-proxy-lectura.onrender.com';
+// ── CARRIL DE ESCRITURA (fase 1, 30-sep-2026) ───────────────────────────
+// Servicio APARTE del de lectura, en el repo privado TrueFood1/truefie-escritura.
+// Hace UNA cosa: validar en Odoo la salida de un pedido entregado cuando todo
+// calza. El navegador manda {pedido_id, confirmar} y nada más: no elige modelo,
+// método ni albarán. La llave vive en Render y nunca pasa por acá. Ver
+// `bsValidarHTML`. El candado de `odooRpc` NO se toca: esto no pasa por él.
+const ESCRITURA_URL       = 'https://truefie-escritura.onrender.com';
 async function lecturaRpc(model, method, args=[], kwargs={}){
   // El proxy exige un JWT de Supabase válido (login). Lo tomamos de la sesión actual.
   let token='';
@@ -14303,6 +14329,25 @@ async function bsLeer(){
   }
   P.forEach(function(x){ x.devs_ok=devsOK; x.tiene_devolucion=!!conDev[x.pedido_id]; });
 
+  // ── EL RASTRO DE «VALIDAR EN ODOO» · `ent_odoo_validacion` (30-sep) ────
+  // Falla CERRADO, como la de devoluciones: si no se pudo leer, `val_ok` queda
+  // en false y `bsPuedeValidar` no ofrece el botón. El servidor igual lo
+  // revisaría (`ya_validado_truefie`), pero no se ofrece lo que no se sabe.
+  let valOK=false; const val={};
+  try{
+    const ids=P.map(function(x){ return x.pedido_id; }).filter(Boolean);
+    if(ids.length){
+      const {data:vs,error:eV}=await c.from('ent_odoo_validacion')
+        .select('pedido_id,picking_nombre,validado_por,validado_en').in('pedido_id',ids);
+      if(eV) throw eV;
+      (vs||[]).forEach(function(x){ val[x.pedido_id]=x; });
+    }
+    valOK=true;
+  }catch(e){
+    try{ console.error('[Truefie] Historial · no pude leer ent_odoo_validacion', e); }catch(_){}
+  }
+  P.forEach(function(x){ x.val_ok=valOK; x.odoo_val=val[x.pedido_id]||null; });
+
   return await _entColgarDetalle(c, P);
 }
 
@@ -14444,6 +14489,7 @@ function bsDetalle(p){
     +'</div>'
     + bsCorreccionHTML(p)
     + _entDescuadreHTML(p)            // ticket 29
+    + bsValidarHTML(p)                // carril de escritura, fase 1
     + bsDeshacerHTML(p)
     +'</div>';
   return h;
@@ -14527,6 +14573,9 @@ function bsPuedeDeshacer(p){
                                              // debería pasar — se comprueba igual
   if(!p.devs_ok)              return false;  // no se pudieron leer las devoluciones
   if(p.tiene_devolucion)      return false;  // ver el comentario de `bsLeer`
+  if(p.odoo_val)              return false;  // ya validada en Odoo desde Truefie:
+                                             // deshacerla acá dejaría a Truefie
+                                             // en "preparado" con Odoo en "hecho"
   return true;
 }
 
@@ -14616,6 +14665,219 @@ async function bsDeshacer(id){
     bsFiltrar();
     pon('No se pudo deshacer: '+((e&&e.message)||e)+'. No se cambió nada.', true);
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   «VALIDAR EN ODOO» · carril de escritura, fase 1 (30-sep-2026)
+   El primer botón de Truefie que ESCRIBE en Odoo, y escribe UNA cosa: valida
+   la salida (albarán) de un pedido entregado cuando las cuatro puntas calzan
+   —lo que salió en Truefie, lo facturado, lo que pide el albarán y lo
+   reservado—. Lo hace el servicio `ESCRITURA_URL`, no este archivo.
+
+   DOS PASOS, SIEMPRE: primero la vista previa (`confirmar:false`, no escribe)
+   con el albarán y las cantidades; después una confirmación que nombra el
+   albarán. El servidor vuelve a revisar TODO al confirmar: lo que se ve en la
+   previa no es lo que se valida, es lo que se revisa de nuevo.
+
+   QUIÉN: socias. Lo decide el servidor (`acceso_es_socia()` con el token de
+   quien toca) y la base (la política de `ent_odoo_validacion`); `_socia` acá
+   solo evita OFRECER un botón que igual rebotaría.
+
+   ESCRITURA APAGADA: el servicio contesta 423 con la revisión entera. Se
+   muestra como lo que es —todo calza y no se validó nada—, no como un error.
+   ══════════════════════════════════════════════════════════════════════ */
+let _bsVal={id:0, fase:'', r:null, rech:null};
+// fase: '' · 'leyendo' (pidiendo la previa) · 'previa' · 'validando' · 'hecho'
+//       · 'apagada' · 'rechazo' · 'perdida' (se cortó al confirmar: no se sabe)
+
+function bsPuedeValidar(p){
+  if(_socia!==true)                 return false;  // null = no se sabe: no se ofrece
+  if(!p || p.estado!=='entregado')  return false;
+  if(!p.factura_id)                 return false;  // sin factura no hay salida de venta
+  if(!p.val_ok)                     return false;  // no se pudo leer el rastro
+  if(p.odoo_val)                    return false;  // ya validado desde Truefie
+  return true;
+}
+
+// Cada rechazo del servidor, en el idioma de quien lo lee. El texto del
+// servidor va DEBAJO, tal cual: trae los nombres (albarán, factura) que esto no.
+const BS_VAL_MOTIVO={
+  sin_sesion:'Tu sesión venció. Volvé a entrar y probá otra vez.',
+  sin_rol:'Validar en Odoo es solo para socias.',
+  cuerpo_invalido:'Truefie armó mal el pedido. No se tocó Odoo.',
+  ruta:'El servicio no reconoce el pedido. No se tocó Odoo.',
+  pedido_inexistente:'Este pedido no existe en Truefie.',
+  no_entregado:'Este pedido no figura como entregado.',
+  sin_factura:'Este pedido no tiene factura: no hay salida de venta que validar.',
+  ya_validado_truefie:'Este pedido ya se validó desde Truefie.',
+  factura_inexistente:'La factura no existe en Odoo.',
+  factura_no_publicada:'La factura no está publicada en Odoo.',
+  factura_revertida:'La factura tiene nota de crédito. La salida no se valida desde acá.',
+  ya_validado_odoo:'La salida ya está validada en Odoo. No hay nada que hacer.',
+  sin_salida:'La factura no tiene ninguna salida pendiente en Odoo.',
+  varias_salidas:'La factura tiene más de una salida pendiente en Odoo. Hay que resolverlo allá, a mano.',
+  no_listo:'La salida en Odoo no está en «Listo»: falta reservar el producto.',
+  descuadre:'Lo que salió en Truefie no calza con Odoo. No se valida.',
+  odoo_pidio_asistente:'Odoo no validó: pidió un paso extra (¿entrega parcial?). Revisar el albarán a mano.',
+  estado_inesperado:'Odoo contestó, pero la salida no quedó validada. Revisar el albarán en Odoo.',
+  rastro_truefie:'Odoo quedó VALIDADO, pero Truefie no pudo anotarlo. Avisar: hay que registrarlo a mano.',
+  odoo_auth:'La llave de escritura no entra en Odoo. No se validó nada.',
+  odoo_error:'Odoo contestó con un error. No se validó nada.',
+  truefie_error:'Supabase no contestó bien. No se validó nada.',
+  cerca_odoo:'El servicio frenó un pedido a Odoo que no le corresponde. No se validó nada.',
+  interno:'El servicio de escritura falló. No se validó nada.'
+};
+
+function _bsValFecha(s){        // Odoo manda "2026-09-30 14:00:00" en UTC, sin zona
+  if(!s) return '';
+  return _entFechaLarga(/[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : String(s).replace(' ','T')+'Z');
+}
+function _bsValProd(l){ return (NIV_INFO[l.producto_id]||{}).nom || l.producto || ('#'+l.producto_id); }
+
+// Lo que se validaría: el albarán y, por producto, UNA cantidad —si llegó
+// hasta acá, las cuatro puntas dicen lo mismo—, en la unidad de venta.
+function _bsValPreviaHTML(r){
+  let h='<div class="bs-val-alb"><b>'+esc(r.albaran||'—')+'</b>'
+    +' · factura '+esc(_despFacCorta(r.factura))
+    +(r.albaran_fecha_prevista?(' · programado '+esc(_bsValFecha(r.albaran_fecha_prevista))):'')
+    +'</div><table class="bs-val-tb"><tbody>';
+  (r.lineas||[]).forEach(function(l){
+    h+='<tr><td>'+esc(_bsValProd(l))+'</td>'
+      +'<td class="n">'+esc(_entPres(l.producto_id, l.salio_truefie))+'</td></tr>';
+  });
+  return h+'</tbody></table>'
+    +'<div class="bs-val-x">Truefie · factura · albarán · reserva: iguales</div>';
+}
+// El descuadre, producto por producto, con las cuatro puntas en la MISMA unidad.
+// Apiladas y no en columnas: a 375 px cinco columnas no entran.
+function _bsValDescuadreHTML(d){
+  if(!Array.isArray(d)||!d.length) return '';
+  return d.map(function(l){
+    const u=function(x){ return _entPresPlano(l.producto_id, x); };
+    return '<div class="bs-val-dq"><b>'+esc(_bsValProd(l))+'</b>'
+      +'<span>Truefie '+esc(u(l.salio_truefie))+'</span>'
+      +'<span>factura '+esc(u(l.facturado))+'</span>'
+      +'<span>albarán '+esc(u(l.albaran_pide))+'</span>'
+      +'<span>reservado '+esc(u(l.reservado))+'</span></div>';
+  }).join('');
+}
+
+function bsValidarHTML(p){
+  // Ya validado desde Truefie: se dice, con albarán, quién y cuándo. Sin botón.
+  if(p && p.odoo_val){
+    const v=p.odoo_val;
+    return '<div class="bs-meta bs-val-ok">Validado en Odoo · '+esc(v.picking_nombre)
+      +' · '+esc(_quienFirma(v.validado_por))+' · '+esc(_entFechaLarga(v.validado_en))+'</div>';
+  }
+  const id=p&&p.pedido_id;
+  const S=(_bsVal.id===id)?_bsVal:null;
+  // 'hecho' y 'perdida' se muestran aunque `bsPuedeValidar` ya diga que no:
+  // después de validar, la relectura trae `odoo_val` y entra por arriba.
+  if(!S && !bsPuedeValidar(p)) return '';
+  if(!S)
+    return '<div class="bs-val"><button class="bs-anu-l" onclick="bsValidarPedir('+id+',false)">'
+      +'Validar en Odoo</button></div>';
+  let h='<div class="bs-val">';
+  if(S.fase==='leyendo')
+    h+='<div id="bsValMsg'+id+'" class="bs-anu-msg">Revisando en Odoo…</div>';
+  else if(S.fase==='previa' || S.fase==='validando'){
+    const g=(S.fase==='validando');
+    h+=_bsValPreviaHTML(S.r)
+      +'<div class="bs-anu-av">Valida la salida en Odoo. Desde Truefie <b>no se deshace</b>.</div>'
+      +'<button class="btn btn-sm bs-val-si" '+(g?'disabled ':'')+'onclick="bsValidarPedir('+id+',true)">'
+      +(g?'Validando…':('Validar '+esc(S.r.albaran)))+'</button>'
+      +'<button class="bs-anu-l" '+(g?'disabled ':'')+'onclick="bsValidarCerrar()">Cancelar</button>'
+      +'<div id="bsValMsg'+id+'" class="bs-anu-msg"></div>';
+  }
+  else if(S.fase==='apagada'){
+    h+=(S.r?_bsValPreviaHTML(S.r):'')
+      +'<div class="bs-val-apag">Todo calza, pero la escritura está apagada: no se validó nada.</div>'
+      +'<button class="bs-anu-l" onclick="bsValidarCerrar()">Cerrar</button>';
+  }
+  else if(S.fase==='hecho'){
+    h+='<div class="bs-val-hecho">Validado en Odoo · '+esc(S.r.albaran)
+      +(S.r.date_done?(' · '+esc(_bsValFecha(S.r.date_done))):'')+'</div>';
+  }
+  else if(S.fase==='perdida'){
+    h+='<div class="bs-anu-msg mal">Se cortó la comunicación después de confirmar: no sé si Odoo validó. '
+      +'Mirá el albarán en Odoo antes de volver a intentar.</div>'
+      +'<button class="bs-anu-l" onclick="bsValidarCerrar()">Cerrar</button>';
+  }
+  else {   // 'rechazo'
+    const R=S.rech||{};
+    h+='<div class="bs-anu-msg mal"><b>'+esc(BS_VAL_MOTIVO[R.motivo]||'No se pudo validar.')+'</b>'
+      +(R.texto?('\n'+esc(R.texto)):'')+'</div>'
+      +(R.motivo==='descuadre'?_bsValDescuadreHTML(R.detalle):'')
+      +'<button class="bs-anu-l" onclick="bsValidarCerrar()">Cerrar</button>';
+  }
+  return h+'</div>';
+}
+
+function bsValidarCerrar(){ _bsVal={id:0, fase:'', r:null, rech:null}; bsFiltrar(); }
+
+async function bsValidarPedir(id, confirmar){
+  if(_bsVal.fase==='leyendo' || _bsVal.fase==='validando') return;   // un pedido a la vez
+  const p=(_bs||[]).filter(function(x){ return x.pedido_id===id; })[0];
+  // Se vuelve a mirar el guarda justo antes de pedir: entre que se abrió la
+  // ficha y se tocó, el pedido pudo validarse desde otra sesión.
+  if(!bsPuedeValidar(p)){
+    _bsVal={id:id, fase:'rechazo', r:null,
+            rech:{motivo:'', texto:'Este pedido ya no se puede validar desde acá — refrescá el historial.'}};
+    bsFiltrar(); return;
+  }
+  if(confirmar && !(_bsVal.id===id && _bsVal.fase==='previa')) return;   // sin previa no hay confirmación
+  _bsVal={id:id, fase:(confirmar?'validando':'leyendo'), r:(confirmar?_bsVal.r:null), rech:null};
+  bsFiltrar();
+  // Render duerme el servicio gratis: la primera llamada puede tardar ~1 min.
+  // Se dice, para que no parezca colgado y no se toque tres veces.
+  const lento=setTimeout(function(){
+    const m=document.getElementById('bsValMsg'+id);
+    if(m && (_bsVal.fase==='leyendo'||_bsVal.fase==='validando'))
+      m.textContent=(confirmar?'Validando':'Revisando en Odoo')+'… despertando el servicio, puede tardar un minuto.';
+  }, 8000);
+  let st=0, js=null;
+  try{
+    let token='';
+    try{ const s=await sbClient().auth.getSession();
+         token=(s&&s.data&&s.data.session&&s.data.session.access_token)||''; }catch(e){}
+    const res=await fetch(ESCRITURA_URL+'/validar', {method:'POST',
+      headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
+      body:JSON.stringify(confirmar?{pedido_id:id, confirmar:true}:{pedido_id:id})});
+    st=res.status;
+    try{ js=await res.json(); }catch(e){ js=null; }
+  }catch(e){
+    clearTimeout(lento);
+    try{ console.error('[Truefie] Validar en Odoo · sin respuesta', id, e); }catch(_){}
+    // Al PREVISUALIZAR no se escribe nada, así que un corte es solo un corte.
+    // Al CONFIRMAR, el pedido pudo llegar y la respuesta perderse: no se sabe.
+    if(confirmar){ _bsVal={id:id, fase:'perdida', r:null, rech:null}; await bsCargar(true); return; }
+    _bsVal={id:id, fase:'rechazo', r:null,
+            rech:{motivo:'', texto:'No pude hablar con el servicio de escritura. No se validó nada.'}};
+    bsFiltrar(); return;
+  }
+  clearTimeout(lento);
+  if(!js || typeof js!=='object'){
+    // Una página de error de Render (502/503 mientras despliega) no es JSON.
+    if(confirmar){ _bsVal={id:id, fase:'perdida', r:null, rech:null}; await bsCargar(true); return; }
+    _bsVal={id:id, fase:'rechazo', r:null,
+            rech:{motivo:'', texto:'El servicio contestó '+st+' sin datos. No se validó nada.'}};
+    bsFiltrar(); return;
+  }
+  if(st===200 && js.ok && !confirmar){ _bsVal={id:id, fase:'previa', r:js, rech:null}; bsFiltrar(); return; }
+  if(st===200 && js.ok && js.validado){
+    _bsVal={id:id, fase:'hecho', r:js, rech:null};
+    // Quien muestra este pedido tiene que enterarse: el Historial (el rastro) y
+    // el cuadre con Odoo, que tenía leída la salida como pendiente.
+    try{ _cuadre=null; }catch(e){}
+    await bsCargar(true);
+    return;
+  }
+  if(st===423 && js.motivo==='escritura_apagada'){
+    _bsVal={id:id, fase:'apagada', r:(js.detalle&&js.detalle.albaran?js.detalle:(_bsVal.r||null)), rech:null};
+    bsFiltrar(); return;
+  }
+  _bsVal={id:id, fase:'rechazo', r:null, rech:{motivo:js.motivo||'', texto:js.texto||('HTTP '+st), detalle:js.detalle}};
+  bsFiltrar();
 }
 
 // ── La hoja de clientes: frecuentes primero (facturas de los últimos 90 días) ──
