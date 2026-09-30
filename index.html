@@ -3208,7 +3208,10 @@ body.es-socia .face-pend{display:block}
    etiquetas bajan de renglón y las columnas de captura siempre se ven. */
 .cl-lote-cod{white-space:nowrap}
 /* T-93 · libre + preparados. El desglose va bajo el código del lote, en chico. */
-.cl-intro{font-size:12.5px;color:var(--text-2);margin:0 0 10px}
+.cl-sec{margin-bottom:0}
+.cl-sec .card-title,.cl-prep .card-title{margin-bottom:2px}
+.cl-sec-sub{font-size:11.5px;color:var(--text-3);margin:0 0 10px}
+.cl-prep .card-title{margin-bottom:8px}
 .cl-desg{display:block;font-family:var(--font);font-size:10.5px;color:var(--text-3);letter-spacing:0;margin-top:2px}
 .cl-desg:empty{display:none}
 .cl-pie-tot{display:block;margin-top:3px;color:var(--text-2)}
@@ -3224,6 +3227,8 @@ body.es-socia .face-pend{display:block}
 .cl-prep-lote{font-family:var(--mono);font-size:12px;color:var(--text-2)}
 .cl-prep-chk{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:13px;color:var(--text);cursor:pointer;min-height:36px}
 .cl-prep-chk input{width:22px;height:22px;accent-color:var(--ent-line);margin:0}
+.cl-prep-falla{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--stop-tx);font-size:12.5px;line-height:1.5}
+.cl-prep-det{font-size:11px;color:var(--text-3);margin-top:4px}
 .cl-prep-alerta{border:1px solid rgba(233,162,59,.35);background:rgba(233,162,59,.07);border-radius:8px;padding:9px 12px;margin:0 0 12px;font-size:12px;color:var(--warn);line-height:1.6}
 .cl-pie{position:sticky;bottom:0;margin:10px -16px -12px;padding:10px 16px;
   background:var(--sunken);border-top:1px solid var(--border);font-size:11.5px;color:var(--text-3)}
@@ -3306,6 +3311,9 @@ body.es-socia .face-pend{display:block}
   .cl-pie{margin:8px -13px -10px;padding:9px 13px}
   .cl-form{grid-template-columns:1fr;gap:10px}
   .cl-pres{display:none}       /* la presentación se ve al abrir; en la fila colapsada estorba */
+  /* La tarjeta "En el congelador" envuelve la lista: en teléfono su margen interno
+     sale del ancho de la tabla. Medido a 375: tabla 332 contra 326 útiles. */
+  .cl-sec,.cl-prep{padding-left:10px;padding-right:10px}
   /* T-84: en teléfono cada etiqueta del lote va en su propio renglón, debajo del código. */
   .cl-tbl td.cl-lote .cl-tag{display:table;margin:3px 0 0;white-space:normal;border-radius:7px;line-height:1.35}
 }
@@ -3313,9 +3321,14 @@ body.es-socia .face-pend{display:block}
    312 contra 291 útiles dentro de la tarjeta, que corta lo que sobra. Se angostan las
    columnas de captura; la letra del input sigue en 16px (menos = zoom de iOS). */
 @media(max-width:360px){
-  .cl-tbl col.cl-cap{width:62px}
-  .cl-in{width:56px;padding:5px 4px}
-  .cl-tbl col.cl-fin{width:48px}
+  .cl-tbl col.cl-cap{width:58px}
+  .cl-in{width:52px;padding:5px 3px}
+  .cl-tbl col.cl-fin{width:44px}
+  /* y la tarjeta "En el congelador" (30-sep) come 20 px más: a 320 la tabla pasaba
+     de 280 útiles a 299. Se afinan los márgenes de la sección y del producto. */
+  .cl-sec,.cl-prep{padding-left:6px;padding-right:6px}
+  .cl-cuerpo{padding:0 9px 10px}
+  .cl-pie{margin:8px -9px -10px;padding:9px 9px}
 }
 
 /* ── DESPACHOS · el lector de facturas ──────────────────────────────────
@@ -9118,12 +9131,18 @@ async function _clLeerPrep(){
             factura:p.factura_nombre||'', items:items};
   });
 }
+// Si la lectura falla, NO SE GUARDA (decisión de Andrea, 30-sep): un conteo sin
+// saber qué está apartado puede nacer corto o largo, y no hay forma de verlo
+// después. Lo contado no se pierde (vive en _clVal) ni las marcas (_clPrepOk, por
+// pedido): se reintenta y listo.
+const CL_PREP_FALLA='No pude revisar los preparados. Revisá la señal y tocá Reintentar';
 async function _clCargarPrep(){
-  // Si falla, la lista queda VACÍA y no la vieja: lo que se guarda tiene que ser
-  // lo que la pantalla dice ("solo con lo libre"). Las marcas (_clPrepOk) quedan,
-  // por pedido, para cuando la lectura vuelva.
   try{ _clPrep=await _clLeerPrep(); _clPrepErr=''; }
   catch(e){ _clPrep=[]; _clPrepErr=(e&&e.message)||String(e); }
+}
+async function _clReintentarPrep(){
+  _clPrep=null; _clRender();
+  await _clCargarPrep(); _clRender();
 }
 // Firma de la lista, para saber al guardar si cambió mientras se contaba.
 function _clPrepFirma(L){
@@ -9163,12 +9182,11 @@ function _clPrepHTML(){
   let h='<div class="card cl-prep"><div class="card-title">Preparados sin entregar</div>';
   if(_clPrep===null) return h+'<div class="cl-none">Leyendo los preparados…</div></div>';
   if(_clPrepErr){
-    h+='<div class="valid-box" style="border-color:rgba(224,90,90,.45);background:rgba(224,90,90,.08)">'
-      +'<div style="font-weight:700;color:var(--stop-tx);font-size:12.5px">No pude leer los preparados</div>'
-      +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px">'+esc(_clPrepErr)
-      +' · el conteo se guarda solo con lo libre.</div></div>';
+    return h+'<div class="cl-prep-falla"><span>'+esc(CL_PREP_FALLA)+'</span>'
+      +'<button class="btn btn-sm" onclick="_clReintentarPrep()">Reintentar</button></div>'
+      +'<div class="cl-prep-det">'+esc(_clPrepErr)+'</div></div>';
   }
-  if(!_clPrep.length) return h+(_clPrepErr?'':'<div class="cl-none">Ninguno</div>')+'</div>';
+  if(!_clPrep.length) return h+'<div class="cl-none">Ninguno</div></div>';
   _clPrep.forEach(function(p){
     const ok=!!_clPrepOk[p.pedido_id];
     h+='<div class="cl-prep-ped'+(ok?' ok':'')+'">'
@@ -9410,13 +9428,16 @@ function _clRender(){
   // Los seis productos caben en pantalla; se abre UNO a la vez. La fila colapsada
   // contesta de un vistazo la pregunta real: ¿cuáles ya conté?
   const totales=_clTotalPorProd(), prepLote=_clPrepPorLote();
-  h+='<div class="cl-intro">Contá solo lo libre. Los preparados van abajo.</div>';
+  // DOS SECCIONES QUE SE VEN COMO DOS (30-sep): "En el congelador" y "Preparados
+  // sin entregar", cada una en su tarjeta y con el título al mismo nivel.
+  h+='<div class="card cl-sec"><div class="card-title">En el congelador</div>'
+    +'<div class="cl-sec-sub">Lo libre; los preparados van en su sección</div>';
   h+='<div class="cl-lista">';
   ENT_PROD.forEach(function(pid){
     const I=NIV_INFO[pid]||{nom:'id '+pid,cajaU:1,presDiv:1,presLbl:'uds'};
     const ls=porProd[pid]||[];
     const abierto=(_clProdAbierto===pid), t=totales[pid]||0;
-    const pres='caja de '+I.cajaU+' u'+(I.presDiv>1?(' · '+I.presLbl+' de '+I.presDiv):'');
+    const pres=_presRotulo(pid);
     h+='<div class="cl-prod'+(abierto?' on':'')+'">'
       +'<button class="cl-cab" onclick="_clAbrirProd('+pid+')">'
       +'<span class="cl-fl">'+(abierto?'▾':'▸')+'</span>'
@@ -9465,7 +9486,7 @@ function _clRender(){
     }
     h+='</div>';
   });
-  h+='</div>';
+  h+='</div></div>';   // .cl-lista · .cl-sec
 
   h+=_clPrepHTML();
 
@@ -9856,10 +9877,21 @@ async function guardarConteoLote(){
   // como libre lo que está apartado. Se muestra la lista nueva y no se guarda.
   _clGuardando=true;
   msg.style.color='var(--busy)'; msg.textContent='Revisando los preparados…';
-  const firma=_clPrepFirma(_clPrep);
-  await _clCargarPrep();
+  const firma=_clPrepErr ? null : _clPrepFirma(_clPrep);
+  let nuevo=null, falla='';
+  try{ nuevo=await _clLeerPrep(); }catch(e){ falla=(e&&e.message)||String(e); }
   _clGuardando=false;
-  if(!_clPrepErr && _clPrepFirma(_clPrep)!==firma){
+  if(falla){
+    // Se queda con la lista que ya se veía (y sus marcas): nada de lo contado se toca.
+    msg=document.getElementById('clSaveMsg');
+    if(msg){ msg.style.color='var(--stop-tx)';
+      msg.innerHTML='<span class="cl-prep-falla"><span>'+esc(CL_PREP_FALLA)+'</span>'
+        +'<button class="btn btn-sm" onclick="guardarConteoLote()">Reintentar</button></span>'; }
+    return;
+  }
+  const cambio=(firma===null) ? !!nuevo.length : (_clPrepFirma(nuevo)!==firma);
+  _clPrep=nuevo; _clPrepErr='';
+  if(cambio){
     const vivos={}; _clPrep.forEach(function(p){ vivos[p.pedido_id]=1; });
     Object.keys(_clPrepOk).forEach(function(k){ if(!vivos[k]) delete _clPrepOk[k]; });
     _clRender();
@@ -9868,15 +9900,14 @@ async function guardarConteoLote(){
       msg.textContent='La lista de preparados cambió mientras contabas. Revisala y volvé a guardar.'; }
     return;
   }
-  if(_clPrepErr){ _clRender(); msg=document.getElementById('clSaveMsg'); btn=document.getElementById('clSave'); }
+  if(firma===null){ _clRender(); msg=document.getElementById('clSaveMsg'); btn=document.getElementById('clSave'); }
   msg.textContent='';
   const lineas=_clLeer();
   if(!lineas.length){ msg.style.color='var(--warn)'; msg.textContent='No hay nada anotado todavía.'; return; }
   const sin=_clPrepSinMarcar(), np=(_clPrep||[]).length;
-  const prepTxt=_clPrepErr ? '\n\nNo pude leer los preparados: el conteo va solo con lo libre.'
-    : (np ? ('\n\nPreparados en el congelador: '+(np-sin.length)+' de '+np+'.'
+  const prepTxt=np ? ('\n\nPreparados en el congelador: '+(np-sin.length)+' de '+np+'.'
              +sin.map(function(p){ return '\nEl pedido '+p.pedido_id+' no está en el congelador: revisá si salió sin registrarse.'; }).join(''))
-          : '');
+          : '';
   if(!confirm('Guardar el conteo con '+lineas.length+' lote'+(lineas.length===1?'':'s')+'?'+prepTxt+'\n\nQueda como BORRADOR: no cambia ningún saldo hasta que lo confirmes como ancla.')) return;
   _clGuardando=true; btn.disabled=true;
   msg.style.color='var(--busy)'; msg.textContent='Guardando…';
@@ -13546,6 +13577,25 @@ function _lotNum(n){ return (Math.round((Number(n)||0)*1000)/1000)
 // ni los mueve en panes sueltos. Blanco, Semillas y Galletas sí van por unidad.
 // Sale de `presDiv` de INV_TERM — la MISMA tabla que usan Conteo e Inventario,
 // no una segunda lista que se desincronice.
+// ── EL RÓTULO DE LA CAJA, EN UN SOLO LUGAR (30-sep-2026) ────────────────
+// La caja se nombra EN UNIDAD DE VENTA: la de Francés y Buns es "caja de 6 paq ·
+// paq de 4 u", la de Pizza "caja de 6 paq · paq de 2 u", nunca "caja de 24 u".
+// Blanco y Semillas "caja de 6 u", Galletas "caja de 12 potes". Andrea lo vio
+// en b76 escrito a mano en Conteo ("caja de 24 u · paq de 4") y con otra forma
+// en Inventario ("caja de 6 paq de 4"): dos textos para la misma caja. Sale de
+// INV_TERM (factor, presDiv, uni) y de ningún otro lado; `loadcheck.py` falla si
+// vuelve a aparecer "caja de 24" o "caja de 12 u" para un producto en paquete.
+function _termDef(pid){
+  return (typeof INV_TERM!=='undefined') ? (INV_TERM.find(function(x){ return x.id===+pid; })||null) : null;
+}
+function _cajaRotulo(pid){          // "caja de 6 paq" · "caja de 6 u" · "caja de 12 potes"
+  const t=_termDef(pid); if(!t) return '';
+  return (t.presDiv>1) ? ('caja de '+(t.factor/t.presDiv)+' paq') : ('caja de '+t.factor+' '+(t.uni||'u'));
+}
+function _presRotulo(pid){          // + "· paq de 4 u" cuando hay paquete
+  const t=_termDef(pid); if(!t) return '';
+  return _cajaRotulo(pid)+((t.presDiv>1) ? (' · paq de '+t.presDiv+' u') : '');
+}
 function _lotUds(uds, pid){
   const t=(typeof INV_TERM!=='undefined') ? INV_TERM.find(function(x){ return x.id===pid; }) : null;
   const d=(t&&t.presDiv)||1;
@@ -14655,6 +14705,12 @@ function rpElegirCliente(id,nombre){ _rp.cliente={id:id,nombre:nombre}; rpRender
 // ════════════════════════════════════════════════════════════════════════
 // El rótulo de la unidad chica, por producto. "Paquetes de 4" y no "Paquetes":
 // el número es la mitad del dato, y es justo la que se olvida.
+// El nombre de la unidad "caja" que se GUARDA en una salida manual (uom_nombre).
+// Era 'Caja de '+cajaU → "Caja de 24" para Francés, y así se mostraba después en
+// Pendientes y Devoluciones. Hasta el 30-sep no había ninguna guardada.
+function _cajaNombreUom(pid){
+  const r=_cajaRotulo(pid); return r ? (r.charAt(0).toUpperCase()+r.slice(1)) : 'Caja';
+}
 function _rpPresLbl(pid){
   const I=NIV_INFO[pid]||{};
   return (I.presLbl==='paq') ? ('Paquetes de '+(I.presDiv||1)) : 'Unidades';
@@ -14728,7 +14784,9 @@ function rpRender(){
       +'<button class="'+(cur.pres==='cj'?'on':'')+'" onclick="_rp.cur.pres=\'cj\';rpRender()">Cajas</button>'
       +'</div></div>'
       +'</div>'
-      +(uds?('<div class="rp-conv">= '+_rzN(uds)+' unidad'+(uds===1?'':'es')+'</div>'):'')
+      // La conversión va en UNIDAD DE VENTA y solo con cajas: "= 96 unidades" para 4
+      // cajas de Francés era la caja dicha en unidades sueltas (30-sep).
+      +((uds && cur.pres==='cj')?('<div class="rp-conv">= '+esc(_lotUds(uds,cur.pid))+'</div>'):'')
       +rpLotesHtml()
       +'<div style="margin-top:14px"><button class="btn" onclick="rpAgregarLinea()">Agregar al despacho</button>'
       +'<span id="rpLineaMsg" class="rp-nota" style="margin-left:10px"></span></div>'
@@ -15130,7 +15188,7 @@ async function rpGuardar(){
       const porUnidad = (l.presentacion==='cj') ? (I.cajaU||1) : (I.presDiv||1);
       return {pedido_id:ped.id, producto_id:l.producto_id, cant_uds:l.cant_uds,
               presentacion:l.presentacion, cant_present:l.cant_present,
-              uom_nombre:(l.presentacion==='cj' ? ('Caja de '+(I.cajaU||1))
+              uom_nombre:(l.presentacion==='cj' ? _cajaNombreUom(l.producto_id)
                           : (porUnidad>1 ? (I.presLbl+' de '+porUnidad) : 'Unidades')),
               cant_uom:l.cant_present,
               uom_factor:(porUnidad>0 ? (1/porUnidad) : 1)}; }));
@@ -15219,7 +15277,7 @@ async function rpGuardar(){
             if(x.lote===ENT_LOTE_INDET) return;     // el centinela no va a Odoo
             filas.push({pendiente_id:pen.id, producto_id:l.producto_id, lote:x.lote,
               cant_uds:x.cant_uds, uom_id:0,
-              uom_nombre:(l.presentacion==='cj'?('Caja de '+(I.cajaU||1))
+              uom_nombre:(l.presentacion==='cj'?_cajaNombreUom(l.producto_id)
                           :(porUnidad>1?(I.presLbl+' de '+porUnidad):'Unidades')),
               cant_uom:(porUnidad>0?(x.cant_uds/porUnidad):x.cant_uds),
               uom_factor:(porUnidad>0?(1/porUnidad):1)});
@@ -18521,10 +18579,7 @@ function _cnPresMP(pe){ return pe ? (_cnPresLbl(pe)+' '+fmtN(pe.peso)+' '+pe.uni
 // lo que se cuenta. En Blanco/Semillas/Galletas no hay paquete intermedio, así que
 // la caja se sigue nombrando por sus unidades ("caja de 6", "caja de 12").
 // NO se toca el factor: esto es SOLO la etiqueta.
-function _cnPresTerm(t){
-  return (t.presDiv>1) ? ('caja de '+(t.factor/t.presDiv)+' paq de '+t.presDiv)
-                       : ('caja de '+t.factor);
-}
+function _cnPresTerm(t){ return _presRotulo(t.id); }
 function _cnDotCls(vacio, s){ return (!vacio && s && (s.cls==='cn-warn'||s.cls==='cn-bad')) ? s.cls : ''; }
 function _cnDot(pre, id, vacio, s){ return '<span class="cn-dot '+_cnDotCls(vacio,s)+'" id="cn-'+pre+'dot'+id+'"></span>'; }
 function _cnPresLbl(pe){ return pe ? (_CN_SING[pe.lab]||pe.lab) : ''; }
@@ -21546,12 +21601,12 @@ function resRenderComp(){
 // Odoo llega en uds individuales (stock.quant ÷ prodUomFactor: Francés/Buns/Pizza vienen en paquetes) → todo se
 // compara en uds individuales, sin mezclar unidades.
 const INV_TERM = [
-  {id:451, label:'Pan Blanco',      factor:6,  presDiv:1, venta:'uds'},
-  {id:452, label:'Pan de Semillas', factor:6,  presDiv:1, venta:'uds'},
+  {id:451, label:'Pan Blanco',      factor:6,  presDiv:1, venta:'uds', uni:'u'},
+  {id:452, label:'Pan de Semillas', factor:6,  presDiv:1, venta:'uds', uni:'u'},
   {id:453, label:'Pan Francés',     factor:24, presDiv:4, venta:'paq de 4'},
   {id:472, label:'Pizza Crust',     factor:12, presDiv:2, venta:'paq de 2'},
   {id:503, label:'Buns',            factor:24, presDiv:4, venta:'paq de 4'},
-  {id:519, label:'Galletas',        factor:12, presDiv:1, venta:'uds'},
+  {id:519, label:'Galletas',        factor:12, presDiv:1, venta:'uds', uni:'potes'},
 ];
 // Premezclas (producto intermedio). Odoo las lleva en Units; 1 unidad = 1 batch. Conteo directo en batches.
 // Galletas: id 517 (es_CR "Premezcla Galletas"; en_US la confunde con "Prueba Galletas" = el terminado 519).
