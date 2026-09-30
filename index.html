@@ -3200,7 +3200,13 @@ body.es-socia .face-pend{display:block}
    Va en MONO y en secundario: es un código, no una cifra — el ojo lo usa para
    ubicarse, y quien manda en la fila es el número. Mismo tratamiento que los
    códigos del resto de Truefie. */
-.cl-tbl td.cl-lote{white-space:nowrap;color:var(--text-2);font-family:var(--mono);font-size:12px;letter-spacing:-.01em}
+.cl-tbl td.cl-lote{color:var(--text-2);font-family:var(--mono);font-size:12px;letter-spacing:-.01em}
+/* T-84 (30-sep): el que no se parte es el CÓDIGO, no la celda. Con la celda entera
+   en nowrap, una etiqueta larga ("fuera de ventana · según sistema 12 paq") la
+   estiraba y empujaba Sueltas fuera de la pantalla del iPhone vertical: Daniel
+   podía contar todo como cajas sin ver que la columna existía. Ahora las
+   etiquetas bajan de renglón y las columnas de captura siempre se ven. */
+.cl-lote-cod{white-space:nowrap}
 .cl-pie{position:sticky;bottom:0;margin:10px -16px -12px;padding:10px 16px;
   background:var(--sunken);border-top:1px solid var(--border);font-size:11.5px;color:var(--text-3)}
 .cl-pie strong{color:var(--ent-line);font-size:13.5px;font-variant-numeric:tabular-nums;margin-left:3px}
@@ -3282,6 +3288,16 @@ body.es-socia .face-pend{display:block}
   .cl-pie{margin:8px -13px -10px;padding:9px 13px}
   .cl-form{grid-template-columns:1fr;gap:10px}
   .cl-pres{display:none}       /* la presentación se ve al abrir; en la fila colapsada estorba */
+  /* T-84: en teléfono cada etiqueta del lote va en su propio renglón, debajo del código. */
+  .cl-tbl td.cl-lote .cl-tag{display:table;margin:3px 0 0;white-space:normal;border-radius:7px;line-height:1.35}
+}
+/* T-84 · iPhone de 320 (SE de primera generación). Medido: lote 76 + 74 + 74 + 56 =
+   312 contra 291 útiles dentro de la tarjeta, que corta lo que sobra. Se angostan las
+   columnas de captura; la letra del input sigue en 16px (menos = zoom de iOS). */
+@media(max-width:360px){
+  .cl-tbl col.cl-cap{width:62px}
+  .cl-in{width:56px;padding:5px 4px}
+  .cl-tbl col.cl-fin{width:48px}
 }
 
 /* ── DESPACHOS · el lector de facturas ──────────────────────────────────
@@ -4521,7 +4537,7 @@ body.es-socia .face-pend{display:block}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 29 sep 2026 · b75';
+const BUILD = 'v 30 sep 2026 · b76';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -9258,7 +9274,7 @@ function _clRender(){
         // la fila tenía 4 celdas y la cabecera 3, y esa columna quedaba sin nombre.
         h+='<table class="cl-tbl">'
           +'<colgroup><col><col class="cl-cap"><col class="cl-cap"><col class="cl-fin"></colgroup>'
-          +'<tr><th>Lote</th><th class="mid">Cajas</th><th class="mid">Sueltas</th><th class="num">Unidades</th></tr>';
+          +'<tr><th>Lote</th><th class="mid">Cajas</th><th class="mid">Sueltas</th><th class="num">'+_clColVenta(pid)+'</th></tr>';
         ls.forEach(function(L){
           const id='cl_'+L.key.replace(/[^A-Za-z0-9]/g,'_');
           // value SIEMPRE desde _clVal: es lo que hace que cerrar y volver a abrir
@@ -9266,7 +9282,7 @@ function _clRender(){
           const V=_clGet(pid,L.canon);
           const u0=_clUds(pid,V.c,V.s);
           h+='<tr data-pid="'+pid+'" data-lote="'+esc(L.canon)+'">'
-            +'<td class="cl-lote">'+esc(L.canon)
+            +'<td class="cl-lote"><span class="cl-lote-cod">'+esc(L.canon)+'</span>'
               +(L.extra?' <span class="cl-tag">agregado</span>':'')
               // El saldo va en unidad de VENTA y rotulado "según sistema": es lo que
               // habría que encontrar, no lo que hay. Lo que hay lo dice el congelador.
@@ -9277,7 +9293,7 @@ function _clRender(){
               +'</td>'
             +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_c" value="'+esc(V.c)+'" oninput="_clRecalc(this)"></td>'
             +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_s" value="'+esc(V.s)+'" oninput="_clRecalc(this)"></td>'
-            +'<td class="cl-uds" id="'+id+'_u">'+(u0?_rzN(u0):'—')+'</td></tr>';
+            +'<td class="cl-uds" id="'+id+'_u">'+(u0?_clVentaN(pid,u0):'—')+'</td></tr>';
         });
         h+='</table>';
       }
@@ -9405,12 +9421,12 @@ function _clHistPintar(){
     if(_clAbierto===x.id){
       h+='<tr><td colspan="5" style="padding:2px 0 12px"><div class="cl-det">';
       if(x.nota) h+='<div class="cl-detnota">'+esc(x.nota)+'</div>';
-      h+='<table class="cl-tbl"><tr><th>Producto</th><th>Lote</th><th class="num">Cajas</th><th class="num">Sueltas</th><th class="num">Unidades</th></tr>';
+      h+='<table class="cl-tbl"><tr><th>Producto</th><th>Lote</th><th class="num">Cajas</th><th class="num">Sueltas</th><th class="num">Total</th></tr>';
       x.lineas.slice().sort(function(a,z){ return a.producto_id-z.producto_id || String(a.lote).localeCompare(String(z.lote),'es'); })
         .forEach(function(r){
           h+='<tr><td>'+esc(_clNom(r.producto_id))+'</td><td class="cl-lote">'+esc(r.lote)+'</td>'
             +'<td class="num">'+_rzN(r.cajas)+'</td><td class="num">'+_rzN(r.sueltas)+'</td>'
-            +'<td class="cl-uds">'+_rzN(r.uds)+'</td></tr>';
+            +'<td class="cl-uds">'+_clVenta(r.producto_id,r.uds)+'</td></tr>';
         });
       h+='</table>';
       if(!_clSinAncla){
@@ -9450,7 +9466,7 @@ function _clConfirmarAncla(id){
   const tot=ENT_PROD.filter(function(p){return x.tot[p];})
     .map(function(p){ const o=cs[p]||{c:0,s:0};
       return '  '+_clNom(p)+': '+_rzN(o.c)+' cajas'+(o.s?(' + '+_rzN(o.s)+' '+_clSueltaLbl(p)):'')
-             +'  ('+_rzN(x.tot[p])+' u)'; }).join('\n');
+             +'  ('+_clVenta(p,x.tot[p])+')'; }).join('\n');
   if(!confirm('Confirmar el conteo #'+id+' como ANCLA?\n\n'+tot
     +'\n\nDesde este momento todos los saldos por lote se calculan contra esta foto.')) return;
   _clAnclaInsert(id, false, 'confirmar');
@@ -9470,7 +9486,7 @@ function _clRecalc(inp){
   const V=_clGet(pid,lote);
   const u=document.getElementById(base+'_u');
   const uds=_clUds(pid, V.c, V.s);
-  if(u) u.textContent = uds ? _rzN(uds) : '—';
+  if(u) u.textContent = uds ? _clVentaN(pid,uds) : '—';
   // El pie y la cabecera se PARCHAN, no se re-renderizan: un re-render mataría el
   // foco del input y el teclado del teléfono se cerraría en cada dígito.
   const t=_clTotalPorProd(), tp=t[pid]||0;
@@ -9511,19 +9527,38 @@ function _clTotCS(pid){
 // El rótulo de la "suelta" cambia por producto: paquete en Francés/Buns/Pizza,
 // unidad en Blanco/Semillas/Galletas.
 function _clSueltaLbl(pid){ return ((NIV_INFO[pid]||{}).presLbl==='paq') ? 'paq' : 'u'; }
+// ── LO QUE SE MUESTRA, EN UNIDAD DE VENTA (T-83, 30-sep-2026) ────────────
+// Francés, Buns y Pizza se dicen en PAQUETES; Blanco, Semillas y Galletas en
+// unidades. Hasta b75 esta pantalla era la única que mostraba las `uds` crudas:
+// 1 caja de Francés decía "24" y son 6 paquetes. Lo que se GUARDA no cambia
+// —`_clUds` sigue dando unidades individuales y el motor entero depende de eso—:
+// solo se divide al mostrar, con `_lotUds`/INV_TERM, igual que Inventario y los
+// selectores (ENTREGAS_PENDIENTES §17).
+function _clPresDiv(pid){
+  const t=(typeof INV_TERM!=='undefined') ? INV_TERM.find(function(x){ return x.id===+pid; }) : null;
+  return (t&&t.presDiv)||1;
+}
+function _clVentaN(pid, uds){ return _lotNum(uds/_clPresDiv(pid)); }     // el número solo
+function _clVenta(pid, uds){ return _lotUds(uds, +pid); }                  // "80 paq" · "6 u"
+function _clColVenta(pid){ return _clPresDiv(pid)>1 ? 'Paquetes' : 'Unidades'; }
+// Cajas + lo que sobra, con lo que sobra en unidad de venta. Solo para lo que no
+// tiene conteo detrás (el stock de Odoo, una diferencia): ver _clCajas.
+function _clCjResto(pid, uds){
+  const k=_clCajas(pid,uds);
+  return (k.cajas?(_rzN(k.cajas)+' cj'):'')
+    +(k.resto?((k.cajas?' + ':'')+_clVentaN(pid,k.resto)+' '+_clSueltaLbl(pid)):'');
+}
 function _clFmtCS(pid, cajas, sueltas, uds){
   if(!cajas && !sueltas) return '—';
   const a=cajas?(_rzN(cajas)+' cj'):'';
   const b=sueltas?((a?' + ':'')+_rzN(sueltas)+' '+_clSueltaLbl(pid)):'';
-  return (a+b)+' <span class="cl-tot-u">'+_rzN(uds)+' u</span>';
+  return (a+b)+' <span class="cl-tot-u">'+_clVenta(pid,uds)+'</span>';
 }
 function _clFmtTot(pid, uds){      // compat: cuando solo se tienen unidades
   const t=_clTotCS(pid);
   if(t.uds===uds) return _clFmtCS(pid,t.cajas,t.sueltas,uds);
   if(!uds) return '—';
-  const k=_clCajas(pid,uds);
-  return (k.cajas?(_rzN(k.cajas)+' cj'):'')+(k.resto?((k.cajas?' + ':'')+_rzN(k.resto)+' u'):'')
-    +' <span class="cl-tot-u">'+_rzN(uds)+' u</span>';
+  return _clCjResto(pid,uds)+' <span class="cl-tot-u">'+_clVenta(pid,uds)+'</span>';
 }
 
 // ── STOCK DE ODOO, en unidades individuales ─────────────────────────────
@@ -9552,8 +9587,7 @@ function _clCuadre(pid, contado){
   if(!_clStock || _clStock[pid]==null || !contado) return '';
   const odoo=_clStock[pid], dif=contado-odoo;
   if(Math.abs(dif)<0.5) return '<span class="cl-cuadra">cuadra con Odoo</span>';
-  const k=_clCajas(pid,Math.abs(dif));
-  const txt=(dif>0?'+':'−')+(k.cajas?(_rzN(k.cajas)+' cj'):'')+(k.resto?((k.cajas?' + ':'')+_rzN(k.resto)+' u'):'');
+  const txt=(dif>0?'+':'−')+_clCjResto(pid,Math.abs(dif));
   return '<span class="cl-nocuadra">Odoo dice '+_clFmtTot(pid,odoo).replace(/<[^>]*>.*/,'')+'· '+txt+'</span>';
 }
 
@@ -9565,7 +9599,7 @@ function _clTotales(){
   const parts=ENT_PROD.filter(function(p){return por[p];}).map(function(p){
     const t=_clTotCS(p);
     return esc(NIV_INFO[p]?NIV_INFO[p].nom:p)+' <b>'+_rzN(t.cajas)+' cj'
-      +(t.sueltas?(' + '+_rzN(t.sueltas)+' '+_clSueltaLbl(p)):'')+'</b> ('+_rzN(t.uds)+' u)'; });
+      +(t.sueltas?(' + '+_rzN(t.sueltas)+' '+_clSueltaLbl(p)):'')+'</b> ('+_clVenta(p,t.uds)+')'; });
   el.innerHTML = parts.length ? ('Contado hasta ahora: '+parts.join(' · ')) : '';
 }
 
