@@ -3207,6 +3207,24 @@ body.es-socia .face-pend{display:block}
    podía contar todo como cajas sin ver que la columna existía. Ahora las
    etiquetas bajan de renglón y las columnas de captura siempre se ven. */
 .cl-lote-cod{white-space:nowrap}
+/* T-93 · libre + preparados. El desglose va bajo el código del lote, en chico. */
+.cl-intro{font-size:12.5px;color:var(--text-2);margin:0 0 10px}
+.cl-desg{display:block;font-family:var(--font);font-size:10.5px;color:var(--text-3);letter-spacing:0;margin-top:2px}
+.cl-desg:empty{display:none}
+.cl-pie-tot{display:block;margin-top:3px;color:var(--text-2)}
+.cl-prep{margin-top:16px}
+.cl-prep-ped{border:1px solid var(--border);border-left:3px solid var(--warn);border-radius:9px;padding:10px 12px;margin-top:8px}
+.cl-prep-ped.ok{border-left-color:var(--ent-line)}
+.cl-prep-cab{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12.5px;margin-bottom:6px}
+.cl-prep-quien{color:var(--text);font-weight:600}
+.cl-prep-num{color:var(--text-3);white-space:nowrap}
+.cl-prep-it{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;font-size:12.5px;color:var(--text-2);padding:2px 0}
+.cl-prep-prod{min-width:92px}
+.cl-prep-cant{color:var(--text);font-variant-numeric:tabular-nums}
+.cl-prep-lote{font-family:var(--mono);font-size:12px;color:var(--text-2)}
+.cl-prep-chk{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:13px;color:var(--text);cursor:pointer;min-height:36px}
+.cl-prep-chk input{width:22px;height:22px;accent-color:var(--ent-line);margin:0}
+.cl-prep-alerta{border:1px solid rgba(233,162,59,.35);background:rgba(233,162,59,.07);border-radius:8px;padding:9px 12px;margin:0 0 12px;font-size:12px;color:var(--warn);line-height:1.6}
 .cl-pie{position:sticky;bottom:0;margin:10px -16px -12px;padding:10px 16px;
   background:var(--sunken);border-top:1px solid var(--border);font-size:11.5px;color:var(--text-3)}
 .cl-pie strong{color:var(--ent-line);font-size:13.5px;font-variant-numeric:tabular-nums;margin-left:3px}
@@ -9043,6 +9061,138 @@ function _clSet(pid,lote,campo,v){
 }
 // Nombre legible de un producto por id (los buckets traen el id pelado).
 function _clNom(pid){ const I=NIV_INFO[+pid]; return I?I.nom:('producto '+pid); }
+
+// ── PREPARADOS SIN ENTREGAR (T-93, decisión de Andrea del 30-sep: opción B) ──
+// Un pedido PREPARADO ya salió del saldo —`ent_salido_del_congelador_desde_ancla`
+// descuenta al preparar— pero sus cajas siguen físicamente en el congelador,
+// apartadas. Arriba se cuenta SOLO LO LIBRE; los preparados van en su propia
+// sección, precargados, con un check "Está en el congelador". Lo que se GUARDA
+// por lote es libre + preparados marcados, porque es lo que la vista supone:
+// si el ancla nueva NO los incluyera, cuando el pedido salga la vista lo restaría
+// de nuevo (salida_en > corte) y el lote quedaría corto en silencio.
+//
+// ⚠️ EL LOTE ES EL EFECTIVO (`ent_alisto_lote_efectivo`), no el de
+// `ent_alisto_lote`: la vista que descuenta usa el efectivo, y una línea con el
+// lote corregido tiene que volver al ancla en el lote donde se la va a restar.
+// ⚠️ Y SE LEEN TODAS las filas de lote del alisto vigente, igual que la vista
+// (que no filtra `no_se_entrega`): lo que se suma tiene que ser exactamente lo que
+// se restó.
+// ⚠️ UN LOTE 'NO DETERMINADO' NO SE SUMA. La base exige motivo y firma para
+// guardar ese lote en un conteo (ent_conteo_linea_motivo_ok), y esos datos no son
+// del conteo. Se muestra y se dice; no se inventa la firma.
+//
+// El desglose (cuánto era libre y cuánto preparado) NO se guarda: el esquema no
+// tiene dónde. Queda en pantalla. Mejora futura anotada en T-93.
+let _clPrep=null, _clPrepErr='', _clPrepOk={};
+async function _clLeerPrep(){
+  const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
+  const {data:peds,error:e1}=await c.from('v_ent_pedido_estado')
+    .select('pedido_id,alisto_id,cliente_nombre,motivo,factura_nombre,preparado_en')
+    .eq('estado','preparado').order('preparado_en',{ascending:true});
+  if(e1) throw e1;
+  const P=(peds||[]).filter(function(x){ return x.alisto_id; });
+  if(!P.length) return [];
+  const {data:lin,error:e2}=await c.from('ent_alisto_linea')
+    .select('id,alisto_id,producto_id').in('alisto_id',P.map(function(x){ return x.alisto_id; }));
+  if(e2) throw e2;
+  const ids=(lin||[]).map(function(x){ return x.id; });
+  let lot=[];
+  if(ids.length){
+    const {data:lo,error:e3}=await c.from('ent_alisto_lote_efectivo')
+      .select('linea_id,lote,cant_uds').in('linea_id',ids);
+    if(e3) throw e3; lot=lo||[];
+  }
+  const linea={}; (lin||[]).forEach(function(l){ linea[l.id]=l; });
+  const porAli={};
+  lot.forEach(function(x){
+    const l=linea[x.linea_id]; if(!l) return;
+    const m=porAli[l.alisto_id]=porAli[l.alisto_id]||{};
+    const k=_clK(+l.producto_id, x.lote);
+    m[k]=m[k]||{producto_id:+l.producto_id, lote:x.lote, uds:0};
+    m[k].uds+=(+x.cant_uds||0);
+  });
+  return P.map(function(p){
+    const items=Object.values(porAli[p.alisto_id]||{})
+      .sort(function(a,z){ return a.producto_id-z.producto_id || _lotCmp(a.lote,z.lote); });
+    return {pedido_id:+p.pedido_id, alisto_id:p.alisto_id, quien:_entQuien(p).nombre,
+            factura:p.factura_nombre||'', items:items};
+  });
+}
+async function _clCargarPrep(){
+  // Si falla, la lista queda VACÍA y no la vieja: lo que se guarda tiene que ser
+  // lo que la pantalla dice ("solo con lo libre"). Las marcas (_clPrepOk) quedan,
+  // por pedido, para cuando la lectura vuelva.
+  try{ _clPrep=await _clLeerPrep(); _clPrepErr=''; }
+  catch(e){ _clPrep=[]; _clPrepErr=(e&&e.message)||String(e); }
+}
+// Firma de la lista, para saber al guardar si cambió mientras se contaba.
+function _clPrepFirma(L){
+  return (L||[]).map(function(p){ return p.pedido_id+':'+p.alisto_id; }).join(',');
+}
+// Los preparados MARCADOS, por clave 'producto|lote', en unidades individuales.
+function _clPrepPorLote(){
+  const o={};
+  (_clPrep||[]).forEach(function(p){
+    if(!_clPrepOk[p.pedido_id]) return;
+    p.items.forEach(function(it){
+      if(it.lote===ENT_LOTE_INDET) return;
+      const k=_clK(it.producto_id,it.lote); o[k]=(o[k]||0)+it.uds;
+    });
+  });
+  return o;
+}
+function _clPrepProd(pid){
+  const o=_clPrepPorLote(); let t=0;
+  Object.keys(o).forEach(function(k){ if(+k.slice(0,k.indexOf('|'))===+pid) t+=o[k]; });
+  return t;
+}
+function _clPrepSinMarcar(){
+  return (_clPrep||[]).filter(function(p){ return !_clPrepOk[p.pedido_id]; });
+}
+function _clDesg(pid, libre, prep){
+  return _clVentaN(pid,libre)+' libres + '+_clVentaN(pid,prep)+' preparados';
+}
+function _clPrepMarcar(pedidoId, on){
+  if(on) _clPrepOk[pedidoId]=true; else delete _clPrepOk[pedidoId];
+  _clRender();
+}
+// La sección de abajo. Una tarjeta por pedido: quién, número, y cada producto
+// con su cantidad en unidad de venta y su lote. Sin preparados dice "Ninguno" y
+// no pide nada.
+function _clPrepHTML(){
+  let h='<div class="card cl-prep"><div class="card-title">Preparados sin entregar</div>';
+  if(_clPrep===null) return h+'<div class="cl-none">Leyendo los preparados…</div></div>';
+  if(_clPrepErr){
+    h+='<div class="valid-box" style="border-color:rgba(224,90,90,.45);background:rgba(224,90,90,.08)">'
+      +'<div style="font-weight:700;color:var(--stop-tx);font-size:12.5px">No pude leer los preparados</div>'
+      +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px">'+esc(_clPrepErr)
+      +' · el conteo se guarda solo con lo libre.</div></div>';
+  }
+  if(!_clPrep.length) return h+(_clPrepErr?'':'<div class="cl-none">Ninguno</div>')+'</div>';
+  _clPrep.forEach(function(p){
+    const ok=!!_clPrepOk[p.pedido_id];
+    h+='<div class="cl-prep-ped'+(ok?' ok':'')+'">'
+      +'<div class="cl-prep-cab"><span class="cl-prep-quien">'+esc(p.quien)+'</span>'
+      +'<span class="cl-prep-num">Pedido '+p.pedido_id+'</span></div>';
+    if(!p.items.length) h+='<div class="cl-prep-it"><span class="cl-none">sin líneas con lote</span></div>';
+    p.items.forEach(function(it){
+      const indet=(it.lote===ENT_LOTE_INDET);
+      h+='<div class="cl-prep-it"><span class="cl-prep-prod">'+esc(_clNom(it.producto_id))+'</span>'
+        +'<span class="cl-prep-cant">'+esc(_entPres(it.producto_id,it.uds))+'</span>'
+        +'<span class="cl-lote-cod cl-prep-lote">'+esc(it.lote)+'</span>'
+        +(indet?'<span class="cl-tag cl-tag-v">sin lote · no se suma</span>':'')+'</div>';
+    });
+    h+='<label class="cl-prep-chk"><input type="checkbox"'+(ok?' checked':'')
+      +' onchange="_clPrepMarcar('+p.pedido_id+',this.checked)">Está en el congelador</label></div>';
+  });
+  return h+'</div>';
+}
+// La alerta va pegada al botón de guardar: es ahí donde se decide. No bloquea.
+function _clPrepAlertaHTML(){
+  const sin=_clPrepSinMarcar(); if(!sin.length) return '';
+  return '<div class="cl-prep-alerta">'+sin.map(function(p){
+    return 'El pedido '+p.pedido_id+' no está en el congelador: revisá si salió sin registrarse.'; }).join('<br>')+'</div>';
+}
 // ── EL AVISO DE ÓRDENES SIN LOTE LEGIBLE, COMPARTIDO ────────────────────
 // Vivía dentro del render de Conteo. Ahora lo usan DOS pantallas —Conteo e
 // Inventario— y tiene que decir lo mismo en las dos: son el mismo hecho, y dos
@@ -9157,6 +9307,13 @@ function _clLotesDe(pid, base){
     if(vistos[x]) return; vistos[x]=1;
     out.push({key:'x:'+pid+':'+x, canon:x, extra:true});
   });
+  // 5. los lotes de los PREPARADOS (T-93). Un lote apartado entero tiene saldo 0 y
+  // no entraría por (2); sin su fila, su total no se vería en ningún lado.
+  (_clPrep||[]).forEach(function(p){ p.items.forEach(function(it){
+    if(+it.producto_id!==+pid || it.lote===ENT_LOTE_INDET || vistos[it.lote]) return;
+    vistos[it.lote]=1;
+    out.push({key:'p:'+pid+':'+it.lote, canon:it.lote, prep:true});
+  }); });
   // FIFO real (vencimiento, no juliano pelado): la misma función que ordena
   // Inventario y los dos selectores. Deja los viejos arriba, que es donde sirven
   // en una pantalla cuya pregunta es "¿queda algo de esto?".
@@ -9186,6 +9343,7 @@ async function cargarConteoLote(force){
   // siempre. Es el mismo agujero que tenía el selector de Daniel, en la pantalla que
   // lo vuelve permanente. No bloquea: si no hay ancla o falla, se cuenta igual.
   try{ _clSaldo=await rpCalcSaldos(_clLotes); }catch(e){ _clSaldo=null; }
+  await _clCargarPrep();
   // El render va SIEMPRE, haya fallado la lectura o no: la pantalla tiene que poder
   // usarse a mano aunque Odoo no conteste. Y si el propio render revienta, se dice.
   try{ _clRender(); }
@@ -9251,7 +9409,8 @@ function _clRender(){
   // ── LISTA COLAPSADA: Andrea cuenta DENTRO del congelador, con frío y guantes.
   // Los seis productos caben en pantalla; se abre UNO a la vez. La fila colapsada
   // contesta de un vistazo la pregunta real: ¿cuáles ya conté?
-  const totales=_clTotalPorProd();
+  const totales=_clTotalPorProd(), prepLote=_clPrepPorLote();
+  h+='<div class="cl-intro">Contá solo lo libre. Los preparados van abajo.</div>';
   h+='<div class="cl-lista">';
   ENT_PROD.forEach(function(pid){
     const I=NIV_INFO[pid]||{nom:'id '+pid,cajaU:1,presDiv:1,presLbl:'uds'};
@@ -9263,7 +9422,7 @@ function _clRender(){
       +'<span class="cl-fl">'+(abierto?'▾':'▸')+'</span>'
       +'<span class="cl-nom">'+esc(I.nom)+'</span>'
       +'<span class="cl-pres">'+esc(pres)+'</span>'
-      +'<span class="cl-tot'+(t?' hay':'')+'">'+(t?_clFmtTot(pid,t):'—')+'</span>'
+      +'<span class="cl-tot'+(t?' hay':'')+'">'+_clFmtProd(pid)+'</span>'
       +'</button>';
     if(abierto){
       h+='<div class="cl-cuerpo">';
@@ -9280,7 +9439,7 @@ function _clRender(){
           // value SIEMPRE desde _clVal: es lo que hace que cerrar y volver a abrir
           // un producto muestre lo que ya se había contado.
           const V=_clGet(pid,L.canon);
-          const u0=_clUds(pid,V.c,V.s);
+          const u0=_clUds(pid,V.c,V.s), p0=prepLote[_clK(pid,L.canon)]||0;
           h+='<tr data-pid="'+pid+'" data-lote="'+esc(L.canon)+'">'
             +'<td class="cl-lote"><span class="cl-lote-cod">'+esc(L.canon)+'</span>'
               +(L.extra?' <span class="cl-tag">agregado</span>':'')
@@ -9290,22 +9449,25 @@ function _clRender(){
                          +esc(_lotUds(L.saldo,pid))+'</span>'):'')
               +(L.buscar?' <span class="cl-tag cl-tag-b" title="'+esc(L.razon||'')
                          +'">a buscar · el sistema no lo tiene</span>':'')
+              +'<span class="cl-desg" id="'+id+'_d">'+(p0?esc(_clDesg(pid,u0,p0)):'')+'</span>'
               +'</td>'
             +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_c" value="'+esc(V.c)+'" oninput="_clRecalc(this)"></td>'
             +'<td><input class="cl-in" type="number" min="0" step="1" inputmode="numeric" id="'+id+'_s" value="'+esc(V.s)+'" oninput="_clRecalc(this)"></td>'
-            +'<td class="cl-uds" id="'+id+'_u">'+(u0?_clVentaN(pid,u0):'—')+'</td></tr>';
+            +'<td class="cl-uds" id="'+id+'_u">'+((u0+p0)?_clVentaN(pid,u0+p0):'—')+'</td></tr>';
         });
         h+='</table>';
       }
       h+='<button class="btn btn-sm cl-add" onclick="_clAgregar('+pid+')">Agregar un lote que no está</button>'
         // El total del producto abierto viaja pegado al pie mientras se cuenta:
         // no hay que ir al final de la lista para saber cómo va.
-        +'<div class="cl-pie" id="clPie'+pid+'">'+esc(I.nom)+' · contado hasta ahora <strong>'+_clFmtTot(pid,t)+'</strong>'+_clCuadre(pid,t)+'</div>'
+        +'<div class="cl-pie" id="clPie'+pid+'">'+_clPieHTML(pid)+'</div>'
         +'</div>';
     }
     h+='</div>';
   });
   h+='</div>';
+
+  h+=_clPrepHTML();
 
   // Los casos que el extractor NO pudo resolver van a la vista, nunca escondidos (regla de la ESPEC).
   h+=_entBucketsHTML(_clLotes.buckets);
@@ -9326,6 +9488,7 @@ function _clRender(){
     +'<div class="field"><label>Nota (opcional)</label>'
     +'<input id="clNota" placeholder="lo que valga la pena recordar"></div>'
     +'</div>'
+    +_clPrepAlertaHTML()
     +'<button class="btn btn-amarillo" id="clSave" onclick="guardarConteoLote()">Guardar conteo</button>'
     +'<div id="clSaveMsg" style="margin-top:10px;font-size:12.5px"></div>'
     +'<div id="clResumen" class="cl-resumen"></div></div>';
@@ -9485,20 +9648,22 @@ function _clRecalc(inp){
   const base=inp.id.replace(/_(c|s)$/,'');
   const V=_clGet(pid,lote);
   const u=document.getElementById(base+'_u');
-  const uds=_clUds(pid, V.c, V.s);
-  if(u) u.textContent = uds ? _clVentaN(pid,uds) : '—';
+  const uds=_clUds(pid, V.c, V.s), pr=_clPrepPorLote()[_clK(pid,lote)]||0;
+  if(u) u.textContent = (uds+pr) ? _clVentaN(pid,uds+pr) : '—';
+  const d=document.getElementById(base+'_d');
+  if(d) d.textContent = pr ? _clDesg(pid,uds,pr) : '';
   // El pie y la cabecera se PARCHAN, no se re-renderizan: un re-render mataría el
   // foco del input y el teclado del teléfono se cerraría en cada dígito.
   const t=_clTotalPorProd(), tp=t[pid]||0;
   const pie=document.getElementById('clPie'+pid);
-  if(pie) pie.innerHTML=esc((NIV_INFO[pid]&&NIV_INFO[pid].nom)||pid)+' · contado hasta ahora <strong>'+_clFmtTot(pid,tp)+'</strong>'+_clCuadre(pid,tp);
+  if(pie) pie.innerHTML=_clPieHTML(pid);
   const cab=tr.closest('.cl-prod'); const tot=cab&&cab.querySelector('.cl-tot');
   // innerHTML, NO textContent: _clFmtTot() devuelve HTML (el <span class="cl-tot-u">
   // de las unidades). Con textContent la cabecera imprimía el marcado crudo
   // —"10 cj <span class="cl-tot-u">60 u</span>"— y el número quedaba enterrado ahí
   // adentro: se leía como que el total no se había actualizado. El pie, dos líneas
   // arriba, siempre usó innerHTML con la misma función; ahora dicen lo mismo.
-  if(tot){ tot.innerHTML = tp ? _clFmtTot(pid,tp) : '—'; tot.classList.toggle('hay', !!tp); }
+  if(tot){ tot.innerHTML = _clFmtProd(pid); tot.classList.toggle('hay', !!tp); }
   _clTotales();
 }
 
@@ -9554,6 +9719,19 @@ function _clFmtCS(pid, cajas, sueltas, uds){
   const b=sueltas?((a?' + ':'')+_rzN(sueltas)+' '+_clSueltaLbl(pid)):'';
   return (a+b)+' <span class="cl-tot-u">'+_clVenta(pid,uds)+'</span>';
 }
+// La cabecera del producto y su pie. UNA definición para el render y para el
+// parche de _clRecalc: dos copias son la que no recibe el arreglo.
+function _clFmtProd(pid){
+  const L=_clTotCS(pid), P=_clPrepProd(pid);
+  if(!P) return L.uds ? _clFmtCS(pid,L.cajas,L.sueltas,L.uds) : '—';
+  return _clVenta(pid,L.uds+P)+' <span class="cl-tot-u">'+esc(_clVentaN(pid,L.uds)+' + '+_clVentaN(pid,P)+' prep.')+'</span>';
+}
+function _clPieHTML(pid){
+  const L=_clTotCS(pid), P=_clPrepProd(pid), nom=esc((NIV_INFO[pid]&&NIV_INFO[pid].nom)||pid);
+  let h=nom+' · libre contado <strong>'+_clFmtTot(pid,L.uds)+'</strong>';
+  if(P) h+='<span class="cl-pie-tot">Total '+_clVenta(pid,L.uds+P)+' · '+esc(_clDesg(pid,L.uds,P))+'</span>';
+  return h+_clCuadre(pid,L.uds+P);
+}
 function _clFmtTot(pid, uds){      // compat: cuando solo se tienen unidades
   const t=_clTotCS(pid);
   if(t.uds===uds) return _clFmtCS(pid,t.cajas,t.sueltas,uds);
@@ -9597,7 +9775,8 @@ function _clTotales(){
   const t=_clLeer(), por={};
   t.forEach(function(r){ por[r.producto_id]=(por[r.producto_id]||0)+r.uds; });
   const parts=ENT_PROD.filter(function(p){return por[p];}).map(function(p){
-    const t=_clTotCS(p);
+    const t=_clTotCS(p), P=_clPrepProd(p);
+    if(P) return esc(NIV_INFO[p]?NIV_INFO[p].nom:p)+' <b>'+_clVenta(p,t.uds+P)+'</b> ('+esc(_clDesg(p,t.uds,P))+')';
     return esc(NIV_INFO[p]?NIV_INFO[p].nom:p)+' <b>'+_rzN(t.cajas)+' cj'
       +(t.sueltas?(' + '+_rzN(t.sueltas)+' '+_clSueltaLbl(p)):'')+'</b> ('+_clVenta(p,t.uds)+')'; });
   el.innerHTML = parts.length ? ('Contado hasta ahora: '+parts.join(' · ')) : '';
@@ -9608,13 +9787,28 @@ function _clTotales(){
 // ceros ensucia la foto con lotes que ya no existen.
 // Lee EL ESTADO, no la pantalla. Antes recorría las filas del DOM y por eso
 // guardaba solo el producto abierto (bug del 14-ago).
+// T-93: a lo libre se le suman los PREPARADOS MARCADOS del mismo lote. Lo apartado
+// entra en cajas enteras y el resto en sueltas, con el mismo factor de _clUds, así
+// que `uds = cajas × caja + sueltas × presentación` sigue valiendo en cada fila.
 function _clLeer(){
-  const out=[];
+  const out=[], acc={};
   Object.keys(_clVal).forEach(function(k){
-    const i=k.indexOf('|'), pid=+k.slice(0,i), lote=k.slice(i+1);
     const v=_clVal[k], cajas=+(v.c||0), sueltas=+(v.s||0);
     if(!cajas && !sueltas) return;
-    out.push({producto_id:pid, lote:lote, cajas:cajas, sueltas:sueltas, uds:_clUds(pid,cajas,sueltas)});
+    acc[k]={c:cajas, s:sueltas, prep:0};
+  });
+  const prep=_clPrepPorLote();
+  Object.keys(prep).forEach(function(k){
+    const a=acc[k]=acc[k]||{c:0, s:0, prep:0}; a.prep+=prep[k];
+  });
+  Object.keys(acc).forEach(function(k){
+    const i=k.indexOf('|'), pid=+k.slice(0,i), lote=k.slice(i+1), a=acc[k];
+    const I=NIV_INFO[pid]||{cajaU:1,presDiv:1};
+    const pc=Math.floor(a.prep/I.cajaU+1e-9);
+    const ps=Math.round(((a.prep-pc*I.cajaU)/I.presDiv)*1e6)/1e6;
+    const cajas=a.c+pc, sueltas=a.s+ps;
+    out.push({producto_id:pid, lote:lote, cajas:cajas, sueltas:sueltas,
+              uds:_clUds(pid,a.c,a.s)+a.prep});
   });
   out.sort(function(a,z){ return a.producto_id-z.producto_id || String(a.lote).localeCompare(String(z.lote),'es'); });
   return out;
@@ -9653,12 +9847,37 @@ function _clAgregar(pid){
 
 async function guardarConteoLote(){
   if(_clGuardando) return;
-  const msg=document.getElementById('clSaveMsg'), btn=document.getElementById('clSave');
-  const lineas=_clLeer();
-  if(!lineas.length){ msg.style.color='var(--warn)'; msg.textContent='No hay nada anotado todavía.'; return; }
+  let msg=document.getElementById('clSaveMsg'), btn=document.getElementById('clSave');
   const c=sbClient();
   if(!c){ msg.style.color='var(--stop-tx)'; msg.textContent='No hay sesión de Supabase.'; return; }
-  if(!confirm('Guardar el conteo con '+lineas.length+' lote'+(lineas.length===1?'':'s')+'?\n\nQueda como BORRADOR: no cambia ningún saldo hasta que lo confirmes como ancla.')) return;
+  // T-93 · LOS PREPARADOS SE RELEEN ANTES DE GUARDAR. Si mientras se contaba un
+  // pedido salió o se preparó otro, lo marcado ya no es lo que hay: sumar un
+  // pedido que salió deja producto de más en el ancla, y no ver uno nuevo cuenta
+  // como libre lo que está apartado. Se muestra la lista nueva y no se guarda.
+  _clGuardando=true;
+  msg.style.color='var(--busy)'; msg.textContent='Revisando los preparados…';
+  const firma=_clPrepFirma(_clPrep);
+  await _clCargarPrep();
+  _clGuardando=false;
+  if(!_clPrepErr && _clPrepFirma(_clPrep)!==firma){
+    const vivos={}; _clPrep.forEach(function(p){ vivos[p.pedido_id]=1; });
+    Object.keys(_clPrepOk).forEach(function(k){ if(!vivos[k]) delete _clPrepOk[k]; });
+    _clRender();
+    msg=document.getElementById('clSaveMsg');
+    if(msg){ msg.style.color='var(--warn)';
+      msg.textContent='La lista de preparados cambió mientras contabas. Revisala y volvé a guardar.'; }
+    return;
+  }
+  if(_clPrepErr){ _clRender(); msg=document.getElementById('clSaveMsg'); btn=document.getElementById('clSave'); }
+  msg.textContent='';
+  const lineas=_clLeer();
+  if(!lineas.length){ msg.style.color='var(--warn)'; msg.textContent='No hay nada anotado todavía.'; return; }
+  const sin=_clPrepSinMarcar(), np=(_clPrep||[]).length;
+  const prepTxt=_clPrepErr ? '\n\nNo pude leer los preparados: el conteo va solo con lo libre.'
+    : (np ? ('\n\nPreparados en el congelador: '+(np-sin.length)+' de '+np+'.'
+             +sin.map(function(p){ return '\nEl pedido '+p.pedido_id+' no está en el congelador: revisá si salió sin registrarse.'; }).join(''))
+          : '');
+  if(!confirm('Guardar el conteo con '+lineas.length+' lote'+(lineas.length===1?'':'s')+'?'+prepTxt+'\n\nQueda como BORRADOR: no cambia ningún saldo hasta que lo confirmes como ancla.')) return;
   _clGuardando=true; btn.disabled=true;
   msg.style.color='var(--busy)'; msg.textContent='Guardando…';
   try{
