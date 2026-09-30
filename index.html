@@ -4401,7 +4401,9 @@ body.es-socia .face-pend{display:block}
   /* Punto de descuadre: solo cuando el físico no calza. Inline al lado del nombre, 7px, sin
      texto; la fila que calza (o que todavía no se contó) queda limpia. No toca la altura:
      va en la misma línea del nombre con vertical-align. */
-  #vConteo .cn-dot.cn-warn,#vConteo .cn-dot.cn-bad{display:inline-block;width:7px;height:7px;
+  /* 30-sep: el punto pasó al renglón de la diferencia (td.cn-diff::before). Este queda
+     apagado para que no haya dos circulitos por fila. */
+  #vConteo .cn-dot.cn-warn,#vConteo .cn-dot.cn-bad{display:none;width:7px;height:7px;
     border-radius:50%;margin-left:7px;vertical-align:middle;flex:none}
   #vConteo .cn-dot.cn-warn{background:#E9A23B}
   #vConteo .cn-dot.cn-bad{background:#E24B4A}
@@ -4410,7 +4412,20 @@ body.es-socia .face-pend{display:block}
   #vConteo .cn-tbl td.cn-sub{display:block;grid-column:1;grid-row:2;font-size:10px;color:var(--text-3);
     font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   #vConteo .cn-tbl td.cn-count{grid-column:2;grid-row:1/span 2;white-space:nowrap;text-align:right}
-  #vConteo .cn-tbl td.cn-odoo,#vConteo .cn-tbl td.cn-diff{display:none}
+  #vConteo .cn-tbl td.cn-odoo{display:none}
+  /* LA DIFERENCIA EN TELÉFONO (30-sep): tercer renglón bajo "contado · Odoo", con el
+     circulito del semáforo a su izquierda. En su propio renglón y no pegada al nombre:
+     el nombre y la sub-línea son de una línea y se recortan, y la diferencia es lo
+     único de la fila que no se puede perder. Sin diferencia (o sin contar), no hay
+     renglón: la celda queda vacía y :empty la esconde. */
+  #vConteo .cn-tbl td.cn-diff{display:block;grid-column:1;grid-row:3;font-size:11.5px;font-weight:600;
+    text-align:left;white-space:normal;margin-top:2px}
+  #vConteo .cn-tbl td.cn-diff:empty{display:none}
+  #vConteo .cn-tbl td.cn-diff.cn-ok{color:var(--text-3);font-weight:500}
+  #vConteo .cn-tbl td.cn-diff.cn-warn::before,#vConteo .cn-tbl td.cn-diff.cn-bad::before{content:'';display:inline-block;
+    width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
+  #vConteo .cn-tbl td.cn-diff.cn-warn::before{background:#E9A23B}
+  #vConteo .cn-tbl td.cn-diff.cn-bad::before{background:#E24B4A}
   #vConteo .cn-ttot{display:none}
   /* Campos: centrados, 15px, y la etiqueta mínima al lado. Vacíos con placeholder "0" —
      nunca value="0", que con teclado numérico termina en "05". */
@@ -18391,8 +18406,8 @@ function cnRecMP(pid){
   const de=document.getElementById('cn-mdif'+pid), se=document.getElementById('cn-msem'+pid);
   const dot=document.getElementById('cn-mdot'+pid); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
   const sub=document.getElementById('cn-msub'+pid);
-  if(sub) sub.textContent=_cnSub(fmtN(fis)+' '+m.uom, fmtN(m.qty)+' '+m.uom, vacio);
-  if(de){ de.textContent=vacio?'—':_cnDifTxt(diff, m.uom, s.cls==='cn-ok'); de.className='cn-diff r '+(vacio?'':s.cls); }
+  if(sub) sub.textContent=_cnSub(fmtN(fis)+' '+_cnUni(m.uom), fmtN(m.qty)+' '+_cnUni(m.uom), vacio);
+  if(de){ de.textContent=vacio?'':_cnDifTxt(diff, m.uom); de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
   cnResumen();
 }
@@ -18404,7 +18419,7 @@ function cnRecPremez(id){
   const dot=document.getElementById('cn-pdot'+id); if(dot) dot.className='cn-dot '+_cnDotCls(vacio,s);
   const sub=document.getElementById('cn-psub'+id);
   if(sub) sub.textContent=_cnSub(fmtN(fis)+' batches', fmtN(p.odoo)+' batches', vacio);
-  if(de){ de.textContent=vacio?'—':_cnDifTxt(diff, 'batch', s.cls==='cn-ok'); de.className='cn-diff r '+(vacio?'':s.cls); }
+  if(de){ de.textContent=vacio?'':_cnDifTxt(diff, 'batch'); de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
   cnResumen();
 }
@@ -18433,17 +18448,25 @@ const _cnNum = n => (Math.round((Number(n)||0)*1000)/1000)
 // contaba. Cuatro filas con número, tres contadas. Ahora una fila dice "cuadra"
 // exactamente cuando el contador no la cuenta, así que los dos números no pueden
 // separarse: la fuente de la verdad es `sem3()`, para los dos.
-function _cnDifTxt(cant, unidad, cuadra){
-  if(cuadra) return 'cuadra';
-  const n=Number(cant)||0;
-  if(n===0) return 'cuadra';
-  return (n>0?'sobran ':'faltan ')+_cnNum(Math.abs(n))+' '+unidad;
+//
+// ⚠️ CAMBIÓ EL 30-sep (Andrea): la diferencia se dice SIEMPRE que exista, con su
+// unidad — "Falta 2,35 kg", "Sobra 12 u", "Falta 450 g", "Sobra 0,5 L" — y si no hay
+// diferencia no se muestra nada (ni "cuadra"). Lo que decía "cuadra" dentro de la
+// tolerancia ahora dice el número, en el color del semáforo (verde = dentro de la
+// tolerancia, no se cuenta como descuadre); el contador sigue saliendo de sem3().
+// Materia prima en la unidad de stock de Odoo; terminado en unidad de venta.
+function _cnUni(u){ return /^unidad/i.test(u||'') ? 'u' : (u||''); }   // "Unidades" → "u"
+function _cnDifTxt(cant, unidad){
+  const n=Math.round((Number(cant)||0)*1000)/1000;
+  if(!n) return '';
+  if(unidad==='batch' && Math.abs(n)!==1) unidad='batches';
+  return (n<0?'Falta ':'Sobra ')+_cnNum(Math.abs(n))+' '+_cnUni(unidad);
 }
 // Diferencia de un terminado, en la unidad en que se CONTÓ: paquetes para
 // Francés/Buns/Pizza, unidades para Blanco/Semillas/Galletas.
-function _cnDiffTxt(t, diff, cuadra){
-  if(t.presDiv>1) return _cnDifTxt(diff/t.presDiv, 'paq', cuadra);
-  return _cnDifTxt(diff, 'u', cuadra);
+function _cnDiffTxt(t, diff){
+  if(t.presDiv>1) return _cnDifTxt(diff/t.presDiv, 'paq');
+  return _cnDifTxt(diff, 'u');
 }
 function cnRecTerm(id){
   const t=_cnTerm.find(x=>x.id===id); if(!t)return;
@@ -18457,7 +18480,7 @@ function cnRecTerm(id){
   const sub=document.getElementById('cn-tsub'+id);
   if(sub) sub.textContent=_cnSub(_cnVentaTxt(t,fis), _cnVentaTxt(t,t.odoo), vacio);
   if(to){ to.textContent=vacio?'':'= '+_cnVentaTxt(t,fis); }
-  if(de){ de.textContent=vacio?'—':_cnDiffTxt(t,diff,s.cls==='cn-ok'); de.className='cn-diff r '+(vacio?'':s.cls); }
+  if(de){ de.textContent=vacio?'':_cnDiffTxt(t,diff); de.className='cn-diff r '+(vacio?'':s.cls); }
   if(se){ se.textContent=s.txt; se.className='cn-sem '+s.cls; }
   cnResumen();
 }
@@ -18608,16 +18631,16 @@ function cnRender(){
     const {fis,vacio}=fisicoMP(m,dr), diff=fis-m.qty, s=sem3(diff,_tolMP(m),vacio);
     // empaques enteros → teclado numérico; el suelto lleva decimales (22,68 kg) → decimal.
     const empIn = pe ? '<input class="cn-in" inputmode="numeric" value="'+(dr.emp!=null?esc(dr.emp):'')+'" oninput="cnMpEmp('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(pe.lab)+' ×'+fmtN(pe.peso)+pe.unidad+'</span><span class="cn-lblm">'+esc(_cnPresCorto(pe))+'</span>' : '';
-    const sueLab=(pe&&pe.sueltoUnit)?pe.sueltoUnit:m.uom;
+    const sueLab=(pe&&pe.sueltoUnit)?pe.sueltoUnit:_cnUni(m.uom);
     const sueIn = (pe&&pe.noSuelto) ? '<span class="cn-lbl">sin suelto</span>'
       : '<input class="cn-in" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnMpSue('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(sueLab)+'</span><span class="cn-lblm">'+esc(sueLab)+'</span>';
-    const subMP=_cnSub(fmtN(fis)+' '+esc(m.uom), fmtN(m.qty)+' '+esc(m.uom), vacio);
+    const subMP=_cnSub(fmtN(fis)+' '+esc(_cnUni(m.uom)), fmtN(m.qty)+' '+esc(_cnUni(m.uom)), vacio);
     const conv=mpConvTxt(m);
     mp+='<tr><td class="cn-nm">'+esc(nombreCortoMP(m.name))+_cnPresTag(_cnPresMP(pe))+_mpViejaHTML(m,pe)
       +(conv?('<span class="cn-conv">'+esc(conv)+'</span>'):'')+_cnDot('m',m.pid,vacio,s)+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
       +'<td class="cn-sub" id="cn-msub'+m.pid+'">'+subMP+'</td>'
       +'<td class="cn-count">'+empIn+(empIn&&!(pe&&pe.noSuelto)?' + ':'')+sueIn+'</td>'
-      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-mdif'+m.pid+'">'+(vacio?'—':_cnDifTxt(diff, m.uom, s.cls==='cn-ok'))+'</td></tr>';
+      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-mdif'+m.pid+'">'+(vacio?'':_cnDifTxt(diff, m.uom))+'</td></tr>';
   }
   document.getElementById('cn-mp').innerHTML=mp+'</tbody></table>';
   // PREMEZCLAS (# batches directo, sin suelto)
@@ -18627,7 +18650,7 @@ function cnRender(){
     pm+='<tr><td class="cn-nm">'+esc(p.label)+_cnDot('p',p.id,vacio,s)+'</td><td class="cn-odoo">'+fmtN(p.odoo)+' batches</td>'
       +'<td class="cn-sub" id="cn-psub'+p.id+'">'+_cnSub(fmtN(fis)+' batches', fmtN(p.odoo)+' batches', vacio)+'</td>'
       +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr!=null?esc(dr):'')+'" oninput="cnPremez('+p.id+',this.value)" placeholder="0"><span class="cn-lbl">batches</span><span class="cn-lblm">bat</span></td>'
-      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-pdif'+p.id+'">'+(vacio?'—':_cnDifTxt(diff, 'batch', s.cls==='cn-ok'))+'</td></tr>';
+      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-pdif'+p.id+'">'+(vacio?'':_cnDifTxt(diff, 'batch'))+'</td></tr>';
   }
   document.getElementById('cn-premez').innerHTML=pm+'</tbody></table>';
   // PRODUCTO TERMINADO — se cuenta en la UNIDAD DE VENTA (Francés/Buns por paq de 4, Pizza por paq de 2,
@@ -18641,7 +18664,7 @@ function cnRender(){
       +'<td class="cn-count"><input class="cn-in" inputmode="numeric" value="'+(dr.cajas!=null?esc(dr.cajas):'')+'" oninput="cnTermCajas('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">cajas</span><span class="cn-lblm">caj</span> + '
       +'<input class="cn-in" inputmode="numeric" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnTermSue('+t.id+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(t.venta)+'</span><span class="cn-lblm">'+esc(t.venta)+'</span>'
       +'<span class="cn-ttot" id="cn-ttot'+t.id+'">'+(vacio?'':'= '+_cnVentaTxt(t,fis))+'</span></td>'
-      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-tdif'+t.id+'">'+(vacio?'—':_cnDiffTxt(t,diff,s.cls==='cn-ok'))+'</td></tr>';
+      +'<td class="cn-diff r '+(vacio?'':s.cls)+'" id="cn-tdif'+t.id+'">'+(vacio?'':_cnDiffTxt(t,diff))+'</td></tr>';
   }
   document.getElementById('cn-term').innerHTML=tm+'</tbody></table>';
   cnResumen();
@@ -21636,20 +21659,23 @@ const INV_PREMEZ = [
   {id:517, label:'Galletas'},
 ];
 // Umbrales de reorden por ingrediente (en kg). CONFIGURABLES: ajustar con el uso.
-// eq = equivalente físico para mostrar (sacos/bolsas/paquetes).
 // Alertas por CANTIDAD FÍSICA. unit = 'kg' o 'L' (debe coincidir con la categoría del stock).
+// ⚠️ SIN EQUIVALENTE ESCRITO A MANO (30-sep). Antes cada fila traía `eq` ("≈3 potes
+// de 6 L") y tres ya estaban viejos: el aceite en potes de 6 L (son de 3), la sal y
+// la xantana en "bolsa" (son sacos de 25 kg). El equivalente sale ahora de
+// PESO_EMPAQUE con _mpEquivEmp(): cuando cambia el empaque, cambia solo.
 const MP_UMBRAL = [
-  {rx:/avena/i,                 val:68,  unit:'kg', eq:'≈3 sacos de 22,68 kg'},
-  {rx:/almid[oó]n.*ma[ií]z/i,   val:75,  unit:'kg', eq:'≈3 sacos'},
-  {rx:/almid[oó]n.*yuca/i,      val:75,  unit:'kg', eq:'≈3 sacos'},
-  {rx:/harina.*arroz/i,         val:25,  unit:'kg', eq:'≈1 saco'},
-  {rx:/harina.*garbanzo/i,      val:25,  unit:'kg', eq:'≈1 saco'},
-  {rx:/semilla|linaza/i,        val:25,  unit:'kg', eq:'≈1 saco'},   // calabaza/girasol/linaza, cada una por separado
-  {rx:/az[uú]car/i,             val:8,   unit:'kg', eq:''},
-  {rx:/^sal$/i,                 val:25,  unit:'kg', eq:'≈1 bolsa'},   // "Sal" exacta (Sal Marina va por batches)
-  {rx:/xant|goma\s*xan/i,       val:25,  unit:'kg', eq:'≈1 bolsa'},
-  {rx:/levadura/i,              val:2.7, unit:'kg', eq:'≈5 paquetes de 500 g'},   // era "≈6", en cajas de 454 g
-  {rx:/aceite/i,                val:18,  unit:'L',  eq:'≈3 potes de 6 L'},
+  {rx:/avena/i,                 val:68,  unit:'kg'},
+  {rx:/almid[oó]n.*ma[ií]z/i,   val:75,  unit:'kg'},
+  {rx:/almid[oó]n.*yuca/i,      val:75,  unit:'kg'},
+  {rx:/harina.*arroz/i,         val:25,  unit:'kg'},
+  {rx:/harina.*garbanzo/i,      val:25,  unit:'kg'},
+  {rx:/semilla|linaza/i,        val:25,  unit:'kg'},   // calabaza/girasol/linaza, cada una por separado
+  {rx:/az[uú]car/i,             val:8,   unit:'kg'},
+  {rx:/^sal$/i,                 val:25,  unit:'kg'},   // "Sal" exacta (Sal Marina va por batches)
+  {rx:/xant|goma\s*xan/i,       val:25,  unit:'kg'},
+  {rx:/levadura/i,              val:2.7, unit:'kg'},
+  {rx:/aceite/i,                val:18,  unit:'L'},
 ];
 // Alertas por BATCHES (ingredientes de galletas): avisar cuando queden < `umbral` batches.
 // "Tapa dulce" (Odoo) = "Panela" (Excel). Vainilla en L (como el aceite).
@@ -21728,13 +21754,21 @@ const PESO_EMPAQUE = [
   {pid:462, nom:'Azucar Cruda',         peso:2,     lab:'bolsas',   unidad:'kg'},   // extra de promo va en suelto
   {pid:524, nom:'Sal Marina',           peso:800,   lab:'cajas',    unidad:'g'},
   {pid:522, nom:'Tapa dulce',           peso:900,   lab:'bolsas',   unidad:'g'},
-  {pid:526, nom:'Chocolate',            peso:6,     lab:'bolsas',   unidad:'kg'},
+  // Chocolate [526] NO tiene empaque a propósito (Andrea, 30-sep): viene en bolsas de
+  // 6 kg o de 20 kg según el pedido, así que se cuenta solo en kg, pesando. Sin fila
+  // acá no hay campo de bolsas ni alarma de presentación vieja. No volver a ponerlo.
   {pid:520, nom:'Huevos',               peso:30,    lab:'cartones', unidad:'u'},    // 30 unidades/cartón
   // Casos especiales:
   {pid:455, nom:'Aceite de Oliva',      peso:3,     lab:'potes',    unidad:'L', sueltoUnit:'kg', sueltoFactor:1/ACEITE_DENSIDAD},  // suelto en kg de balanza → L = kg ÷ densidad
   {pid:521, nom:'Huevo liquido',        peso:9,     lab:'bolsas',   unidad:'kg', noSuelto:true},   // nunca queda bolsa abierta → sin suelto
 ];
 function _pesoEmpaque(pid){ return PESO_EMPAQUE.find(function(x){ return x.pid===+pid; })||null; }
+// Una cantidad en kg/L, dicha en empaques: "≈6 potes de 3 L". Vacío si no hay empaque.
+function _mpEquivEmp(pid, val, unit){
+  const pe=_pesoEmpaque(pid), r=pe&&_MP_REF[pe.unidad]; if(!pe||!r||r[1]!==unit) return '';
+  const n=Math.round(val/(pe.peso*r[0])*10)/10;
+  return '≈'+fmtN(n)+' '+(n===1?(_CN_SING[pe.lab]||pe.lab):pe.lab)+' de '+fmtN(pe.peso)+' '+pe.unidad;
+}
 
 // ── C · PRESENTACIÓN VIEJA: el empaque escrito contra la ÚLTIMA COMPRA (30-sep) ──
 // Criterio de la casa: la presentación de un insumo es la de su última compra
@@ -21876,7 +21910,8 @@ function mpAlerta(m){
   const u=MP_UMBRAL.find(x=>x.rx.test(m.name));
   if(!u) return {nivel:'none', txt:'', tip:'sin umbral configurado'};
   if(m.refU!==u.unit) return {nivel:'none', txt:'', tip:'umbral en '+u.unit+'; stock en '+m.uom};
-  const tip='umbral '+u.val+' '+u.unit+(u.eq?(' '+u.eq):'');
+  const eq=_mpEquivEmp(m.pid, u.val, u.unit);
+  const tip='umbral '+u.val+' '+u.unit+(eq?(' '+eq):'');
   if(m.qtyRef < u.val) return {nivel:'bajo', txt:'reordenar · ~'+fmtN(m.qtyRef)+' '+u.unit, tip};
   return {nivel:'ok', txt:'', tip};
 }
