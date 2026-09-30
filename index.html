@@ -1602,6 +1602,16 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 
 /* ── LA LISTA ── */
 .tkl-vacio{color:var(--text-3);font-size:13px;padding:18px 2px}
+/* LOS CERRADOS, AL FINAL Y PLEGADOS · b75 (29-sep-2026). Gris y sin borde:
+   es archivo, no trabajo. El resumen es el único renglón que se ve hasta
+   que alguien lo toca. */
+.tkl-cerrados{margin-top:14px}
+.tkl-cerrados>summary{cursor:pointer;list-style:none;color:var(--text-3);font-size:13px;
+  padding:9px 2px;border-top:1px solid var(--border)}
+.tkl-cerrados>summary::-webkit-details-marker{display:none}
+.tkl-cerrados>summary::before{content:'▸ ';}
+.tkl-cerrados[open]>summary::before{content:'▾ ';}
+.tkl-cerrados[open]>summary{margin-bottom:8px}
 .tkl-grupo{margin-bottom:22px}
 .tkl-grupo-t{font-size:12px;letter-spacing:.04em;text-transform:uppercase;
   color:var(--text-3);margin-bottom:8px;display:flex;gap:8px;align-items:baseline}
@@ -4511,7 +4521,7 @@ body.es-socia .face-pend{display:block}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 29 sep 2026 · b74';
+const BUILD = 'v 29 sep 2026 · b75';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -22673,6 +22683,7 @@ var _TK_CUENTA={};       /* clave -> abiertos SEGÚN LA BASE (null = todavía no
 var _TK_BUCKETS={};      /* clave -> filas, para dibujar sin volver a leer */
 var _TK_VIS=[];          /* las pestañas que se dibujan, ya ordenadas */
 var _TK_SOCIA=false;
+var _TK_VER_CERR=false;  /* b75: si la sección «Ver cerrados» quedó abierta */
 /* El módulo desde el que se abrió Tickets. Lo captura `irATickets()` ANTES
    de `_modShow`, porque `_modShow` pisa `data-mod` con el de vTickets (que
    es vacío) y para cuando `tkListar` corre ya no queda de dónde sacarlo. */
@@ -22756,8 +22767,27 @@ function _tkCuerpoHtml(){
             : 'No hay tickets de '+_tkEsc(TK_MODNOM[_TK_TAB]||_TK_TAB)+'.'))+
       '</div>';
   }
+  /* ── ABIERTOS ARRIBA, CERRADOS PLEGADOS AL FINAL · b75 (29-sep-2026) ──
+     Pedido de Andrea: la cola muestra el trabajo que queda. Lo cerrado,
+     pospuesto o descartado no desaparece —sigue siendo la única pantalla
+     desde la que se REABRE— pero va al final, plegado, detrás de un toque.
+     El corte es `_tkAbierto`, el MISMO que usan los contadores de las
+     pestañas (que cuentan contra la base), así que el número de la pestaña
+     y la lista de arriba salen de la misma regla.
+     El plegado recuerda si se abrió (`_TK_VER_CERR`): la lista se vuelve a
+     dibujar cuando llegan los contadores y después de cada cambio de
+     estado, y cerrarse sola en la cara de quien la estaba mirando sería
+     un salto sin motivo. */
+  var ab=g.filter(_tkAbierto), ce=g.filter(function(f){ return !_tkAbierto(f); });
   var h='';
-  g.forEach(function(f){ h+=tklItem(f, _TK_SOCIA); });
+  if(!ab.length) h+='<div class="tkl-vacio">Nada abierto acá.</div>';
+  ab.forEach(function(f){ h+=tklItem(f, _TK_SOCIA); });
+  if(ce.length){
+    h+='<details class="tkl-cerrados"'+(_TK_VER_CERR?' open':'')+
+       ' ontoggle="_TK_VER_CERR=this.open"><summary>Ver cerrados ('+ce.length+')</summary>';
+    ce.forEach(function(f){ h+=tklItem(f, _TK_SOCIA); });
+    h+='</details>';
+  }
   return h;
 }
 
