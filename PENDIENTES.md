@@ -143,3 +143,180 @@ esa lógica no llega a Storage.
 misma trampa que preguntarle a una tabla con RLS: puede contestar "vacío" en vez
 de "no tenés permiso", y ese vacío no prueba nada. La comprobación de `public`
 necesita SQL (`pg_lector.py`), no REST.
+
+---
+
+## H2 · 🟠 ABIERTO · `esquema_check.py` no ve NINGUNA de las cuatro tablas donde se ESCRIBE
+
+Anotado el 16-sep-2026, preparando b60. **Pedido por Andrea.**
+
+### Qué pasa
+
+El chequeo saca los objetos con un regex de literales:
+
+```python
+def objetos_de(txt): return set(re.findall(r"from\('([a-z_][a-z0-9_]*)'\)", txt))
+```
+
+Así que `c.from(t)` dentro de un helper se le escapa. **Esto no es nuevo**: es el
+punto ciego 2 que `CLAUDE.md` ya documenta, con su incidente del 19-ago
+(`ent_pedido_motivo_vigente` y `ent_pedido_valida_vigente` — Pendientes caída en
+producción y el chequeo en ✓).
+
+### Lo que sí es nuevo, y es la razón de anotarlo aparte
+
+**Los objetos que se le escapan son justamente los de ESCRITURA.** Medido hoy:
+`index.html` tiene exactamente **dos** llamadas por variable, y no es casualidad
+cuáles son:
+
+| línea | helper | qué hace |
+|---|---|---|
+| 13090 | `q(t,sel)` | **lee** cuatro vistas de Pendientes |
+| 13602 | `pdInsert(tabla,fila,texto)` | **escribe**, y es el único `insert` genérico del archivo |
+
+Por `pdInsert` pasan **cuatro tablas, las cuatro invisibles para el chequeo**:
+
+- `ent_alisto_linea_autorizacion` ← el «Visto» de b60
+- `ent_pedido_valida` ← "Ya validé"
+- `ent_pedido_motivo` ← "Clasificar"
+- `ent_pedido_factura` ← "Vincular"
+
+De los 27 `.insert(` del archivo, éstas son las que el portón no mira. Las otras
+23 escriben con el nombre puesto y sí se ven.
+
+### Por qué importa más que un punto ciego de lectura
+
+**La dirección del daño es distinta.** Un objeto de LECTURA que falta rompe una
+pantalla entera y a la vista: es lo que pasó el 19-ago, Pendientes no cargaba y
+se notó el mismo día. Un objeto de ESCRITURA que falta no rompe nada hasta que
+alguien **toca el botón** — después de haber tomado la decisión y escrito la
+nota, sobre un caso real, y en un camino que se recorre pocas veces (el «Visto»
+lo tocan dos personas y solo cuando hay excepciones abiertas).
+
+El paso 6 del `CIERRE_TECNICO.md` existe por el incidente del 17-ago: se publicó
+código que dependía de un `.sql` sin pegar. **Ese portón hoy no cubre ninguna de
+las cuatro escrituras del módulo.**
+
+### Estado hoy (medido el 16-sep, sondeo REST con la anon key)
+
+Las cuatro existen — ninguna devuelve `42P01` ni `PGRST205`. O sea que **no hay
+nada roto ahora**: esto es el portón, no un incendio.
+
+⚠️ Y ese sondeo prueba EXISTENCIA y nada más. Un `200` con lista vacía no
+distingue "legible" de "la RLS filtró todo" cuando la tabla puede estar vacía.
+
+### Qué habría que agregarle
+
+- Sumar al regex las llamadas con literal dentro de los helpers de escritura:
+  `pdInsert('tabla'` es un literal, solo que no pegado a `.from(`. Un segundo
+  patrón lo caza hoy mismo y cuesta una línea.
+- Mejor todavía, y más a prueba del próximo helper: **sacar los literales de
+  cualquier llamada que termine en un objeto de Supabase**, no solo de `from(`.
+- Y dejar escrito en la salida **cuántos objetos se vieron por cada camino**.
+  Como en el punto ciego 1: si el contador no se mueve cuando se agrega una
+  escritura nueva, el chequeo está mirando para otro lado.
+
+
+---
+
+## O2 · 🟠 ABIERTO · Un Buns facturado en "Caja" de 6 cuando la caja de Buns son 24
+
+Encontrado el 17-sep-2026 midiendo los factores de unidad para Devoluciones.
+**El dato malo está en ODOO, no en Truefie** — Truefie lo copió fielmente.
+
+### La fila
+
+| | |
+|---|---|
+| pedido | **67** |
+| factura | `00100001010000003534` |
+| cliente | Arrendadora Bm Pz Sociedad |
+| fecha | 2026-09-14 |
+| producto | **503 · Buns** |
+| unidad | `uom_id 46` · **"Caja"** · factor 1/6 → **6 unidades** |
+| cantidad | 1 caja = 6 unidades |
+
+### Por qué está mal
+
+Buns se factura normalmente en **`Caja (Hamburguesa)` (uom 42) = 24 unidades**, o
+en `Paquete de 4` (uom 37). La unidad `Caja` (uom 46) es la de **Pan Blanco y Pan
+Semillas**, que sí traen 6 por caja.
+
+Medido sobre `ent_pedido_linea`: Buns aparece con **tres** unidades distintas —
+`Paquete de 4` (30 líneas), `Caja (Hamburguesa)` (11) y **`Caja` (1 sola línea,
+ésta)**. Las otras dos son correctas.
+
+### Qué corregir, y dónde
+
+**En Odoo**, en la factura `…3534`: la línea de Buns debería ir en
+`Caja (Hamburguesa)` (1 caja = 24 u) o en `Paquete de 4`. Como está, esa entrega
+dice que salieron **6 unidades** de Buns cuando es probable que hayan salido
+**24** — hay que confirmarlo contra lo que realmente se despachó antes de tocar
+nada.
+
+⚠️ **No se corrige desde Truefie.** `ent_pedido_linea` copia la unidad de la
+factura en el momento del despacho, a propósito: es el dato tal como se facturó.
+Cambiarlo acá dejaría a Truefie diciendo una cosa y a Odoo otra.
+
+### Qué NO rompe
+
+- El **saldo por lote** usa `cant_uds` (6), que es lo que Truefie registró como
+  salido. Si de verdad salieron 24, el saldo de ese lote está **18 unidades alto**.
+- **Devoluciones** no se ve afectada desde el 17-sep: la unidad de entrada pasó a
+  ser la de manejo del producto, así que un Buns que vuelve se escribe en paquetes
+  sin importar cómo se facturó (ver `ENTREGAS_PENDIENTES` §12).
+
+---
+
+## S1 · 🟠 ABIERTO · Datos de clientes en el repo PÚBLICO — el repaso sigue sin hacerse
+
+Anotado el 17-sep-2026 al chequear secretos para b61. **No es exposición nueva**,
+pero la lista crece build a build y nadie la ha revisado entera.
+
+### El repo es público y sirve GitHub Pages
+
+`TrueFood1/Conciliacion` es público. `BITACORA.md` está gitignored **precisamente
+por esto** — su encabezado lo dice: *"el repo es público y esto lleva razones
+sociales de clientes"*. Pero esa decisión se tomó para la bitácora y **nunca se
+extendió al resto de los archivos versionados**.
+
+### Lo medido el 17-sep
+
+| qué | dónde | ¿nuevo? |
+|---|---|---|
+| `andrea@truefoodcr.com` | `index.html` (4 veces en `main`) + `ANULAR_DEVOLUCION.sql` | no |
+| consecutivos de factura `001000010100000…` | `CORRECCION_B56_PEDIDO44.sql`, `ENTREGAS_EXCEPCIONES_LINEA.sql` (en `main`) y ahora **`PENDIENTES.md` §O2** | el de O2 sí |
+| razones sociales | `ENTREGAS_PENDIENTES.md` (Automercado, Green Center, Mentha…), y §O2 agrega *Arrendadora Bm Pz Sociedad* | se suman |
+
+**El correo no es el problema**: la regla del repo ya lo resuelve —los
+`@truefoodcr.com` van en claro porque son direcciones de empresa, y los
+personales van por huella (`SALUDO_HUELLAS`)—. Está aplicada y es consistente.
+
+**Lo que no tiene regla es el resto**: número de factura + razón social + fecha +
+qué se le vendió. Eso, junto, es información comercial de un tercero.
+
+### Por qué no bloqueó b61
+
+Porque **no es una puerta nueva**: cada cosa que se agregó es de la misma clase
+que lo que ya está publicado desde hace semanas. Bloquear el build por un
+consecutivo más, dejando los que ya están, no protege nada — solo da la sensación
+de haber hecho algo.
+
+⚠️ Y ése es justamente el riesgo de este pendiente: **cada build individual
+siempre va a parecer "una más"**, y así es como la lista crece sin que ninguna
+decisión la autorice.
+
+### Qué hay que hacer cuando se retome
+
+1. **Barrer los archivos versionados** buscando consecutivos, razones sociales y
+   cédulas. No solo `.md`: los `.sql` de corrección y verificación llevan casos
+   reales con nombre y número.
+2. **Decidir la regla**, que hoy no existe:
+   - ¿los ejemplos de un pendiente van con el cliente real, o anonimizados?
+   - ¿los `.sql` de corrección —que necesitan el id real para correrse— van al
+     repo, o al lado de la bitácora, gitignored?
+3. **Aplicarla hacia atrás**, sabiendo que reescribir la historia de git es otra
+   conversación: lo que ya se publicó siguió publicado aunque se borre el archivo.
+4. **Y dejarla en `CLAUDE.md`**, junto a la de credenciales, para que el chequeo
+   de secretos del cierre técnico tenga contra qué medir. Hoy ese paso busca
+   claves y tokens, no datos de clientes.

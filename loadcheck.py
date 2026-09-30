@@ -35,3 +35,32 @@ if tdz:
     print('✗ ERROR DE CARGA:'); [print('   '+l) for l in tdz[:6]]; sys.exit(1)
 print('✓ el script corre de arriba a abajo sin errores de carga')
 if out: print('  (ruido esperado del DOM falso, no bloquea):', out.splitlines()[0][:110])
+
+# ── CERCA: LA CAJA SE NOMBRA EN UNIDAD DE VENTA (30-sep-2026) ─────────────
+# Francés y Buns: "caja de 6 paq · paq de 4 u"; Pizza: "caja de 6 paq · paq de 2 u".
+# Nunca "caja de 24" ni "caja de 12 u": es el error que Andrea vio en b76 y que ya
+# estaba escrito a mano en más de un lugar. Dos capas:
+#  1. ESTÁTICA: ningún texto del código (fuera de comentarios) lo dice.
+#  2. EN EJECUCIÓN: los rótulos que arma la app para 453/503/472 no lo dicen.
+MAL = re.compile(r'caja de (24|12 ?u\b|12 ?uds)', re.I)
+def _sin_comentarios(js):
+    js = re.sub(r'/\*.*?\*/', '', js, flags=re.S)
+    return '\n'.join(re.sub(r'(^|[^:\\\'"])//.*$', r'\1', l) for l in js.splitlines())
+malos = [l.strip()[:110] for l in _sin_comentarios(body).splitlines() if MAL.search(l)]
+if malos:
+    print('✗ CAJA EN UNIDADES SUELTAS escrita en el código:'); [print('   '+l) for l in malos[:6]]; sys.exit(1)
+open(SP+'/_rotulos.js','w',encoding='utf-8').write(r'''
+var _r=[453,503,472].map(function(p){ return [p,_presRotulo(p),_cajaRotulo(p),_cajaNombreUom(p),
+  _cnPresTerm(INV_TERM.find(function(t){return t.id===p;}))]; });
+print('ROTULOS '+JSON.stringify(_r));
+''')
+r2=subprocess.run([JSC,SP+'/_load.js',SP+'/_rotulos.js'],capture_output=True,text=True)
+lin=[l for l in (r2.stdout+r2.stderr).splitlines() if l.startswith('ROTULOS ')]
+if not lin:
+    print('✗ la cerca de rótulos no pudo correr (¿cambió el nombre de _presRotulo/_cajaRotulo?)'); sys.exit(1)
+import json
+rot=json.loads(lin[0][8:])
+peor=[x for x in rot if any(MAL.search(str(v)) for v in x[1:])]
+if peor or any(not str(x[1]).startswith('caja de 6 paq') for x in rot):
+    print('✗ ROTULO DE CAJA MAL para un producto en paquete:', peor or rot); sys.exit(1)
+print('✓ rótulo de caja en unidad de venta:', ' | '.join('%d %s' % (x[0], x[1]) for x in rot))

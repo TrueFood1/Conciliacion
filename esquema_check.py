@@ -70,9 +70,38 @@ DEUDA = {
 # Un objeto sensible con otro nombre y sin anotar se escapa de las dos: si nace uno,
 # va a la lista. Es la parte que sigue dependiendo de alguien.
 SENSIBLE_PREFIJOS = ('rrhh_', 'v_rrhh_')
-SENSIBLE_LISTA    = {'acceso_usuario', 'v_acceso_usuario'}
+# Desde el 21-sep-2026 se suman las tres de TICKETS. No es que guarden salarios:
+# `ticket.creado_por` es el CORREO de quien reportó, `v_ticket` expone además
+# `estado_por`, y la descripción la escribe una persona contando lo que le pasó.
+# Eso es dato de persona con el mismo criterio que el de arriba.
+# Se anotan acá porque sin la anotación salían como `?` —"sin permiso para la
+# anon key, ¿le falta grant o le sobra RLS?"— TODOS LOS DÍAS. Y ese rechazo es
+# el resultado CORRECTO: las tres se cerraron a propósito el 19-sep. Una alarma
+# que suena siempre cuando todo está bien se termina apagando, y ese día no va a
+# sonar la que importa. Anotadas, el mismo rechazo se lee como `✓ cerrado`.
+# ⚠️ `ticket_marca`, `ticket_detalle` y `ticket_foto` NO están acá porque hoy
+# `index.html` no las consulta, y este chequeo solo mira lo que el código llama.
+# El día que una pantalla las use van a aparecer como `?` — y ahí van a la lista,
+# no al olvido.
+SENSIBLE_LISTA    = {'acceso_usuario', 'v_acceso_usuario',
+                     'ticket', 'ticket_estado', 'v_ticket'}
+# CERRADAS A PROPÓSITO PARA anon (27-sep-2026). No son dato de persona, pero la
+# anon key NO tiene que leerlas, y desde hoy las rechaza — que es lo correcto:
+#   · ent_alisto_lote_efectivo: era la FUGA. Sin security_invoker y con SELECT
+#     para anon, la llave pública leía sus 299 filas por REST. La cerró
+#     ENTREGAS_VISTAS_INVOKER.sql (invoker + revoke de anon).
+#   · ent_salido_del_congelador_desde_ancla, v_ent_excepcion_pendiente y
+#     v_ent_excepcion_pendiente_pedido: leen de la de arriba, así que heredan
+#     el rechazo ("permission denied for view ent_alisto_lote_efectivo").
+#   · ent_conteo_correccion_vigente: nació sin permiso para anon
+#     (ENTREGAS_CORRECCION_LOTE.sql, 27-sep).
+# Mismo trato que las sensibles: el rechazo es `✓ cerrado`, y una lista —aunque
+# venga vacía— es una FUGA. Sin esta anotación salían como `?` todos los días.
+CERRADA_ANON      = {'ent_alisto_lote_efectivo', 'ent_salido_del_congelador_desde_ancla',
+                     'v_ent_excepcion_pendiente', 'v_ent_excepcion_pendiente_pedido',
+                     'ent_conteo_correccion_vigente'}
 def es_sensible(t):
-    return t in SENSIBLE_LISTA or t.startswith(SENSIBLE_PREFIJOS)
+    return t in SENSIBLE_LISTA or t in CERRADA_ANON or t.startswith(SENSIBLE_PREFIJOS)
 
 HTML='index.html'
 base='main'
