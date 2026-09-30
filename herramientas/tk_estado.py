@@ -22,6 +22,8 @@ COMO SE USA
     python3 herramientas/tk_estado.py ver 115
     python3 herramientas/tk_estado.py mover 116 en_curso --seco
     python3 herramientas/tk_estado.py anunciar 15 --texto "hallazgo…" [--seco]
+    python3 herramientas/tk_estado.py explicar 15 \\
+        --que-es "…" --por-que "…" --falta "chico. …" --recomienda "HACER. …" [--seco]
     python3 herramientas/tk_estado.py cerrar 116 \\
         --evidencia "Resuelto en b72 (65ac781): el 247 ya aparece en Despachos" \\
         --build b72 [--cierre "texto del detalle de cierre"] [--seco]
@@ -205,6 +207,52 @@ def anunciar(db, t, texto, seco=True):
     return True
 
 
+# ── EN PALABRAS CLARAS (29-sep-2026, TICKETS_EXPLICACION.sql) ──────────────
+# Cuatro renglones fijos para Andrea. El texto se ARMA aca, desde cuatro
+# opciones, para que nadie escriba los titulos a mano. La regla que manda es
+# la de la TABLA (tres CHECK: forma, tamano, recomienda); esto solo avisa antes
+# de conectar, con el mismo criterio.
+TAMANOS = ("chico", "mediano", "grande")
+RECOMIENDA = ("HACER", "CERRAR", "DESCARTAR")
+
+
+def armar_explicacion(que_es, por_que, falta, recomienda):
+    partes = {"--que-es": que_es, "--por-que": por_que, "--falta": falta, "--recomienda": recomienda}
+    for nombre, v in partes.items():
+        if not v or len(v.strip()) < 3:
+            sys.exit("%s es obligatorio (3 caracteres o mas)" % nombre)
+        if "\n" in v or "\r" in v:
+            sys.exit("%s va en UN renglon" % nombre)
+    if not re.match(r"(%s)\b" % "|".join(TAMANOS), falta.strip()):
+        sys.exit("--falta empieza con el tamano: %s" % " | ".join(TAMANOS))
+    if not re.match(r"(%s)\b" % "|".join(RECOMIENDA), recomienda.strip()):
+        sys.exit("--recomienda empieza con: %s" % " | ".join(RECOMIENDA))
+    return "\n".join(("Qué es: " + que_es.strip(),
+                      "Por qué importa: " + por_que.strip(),
+                      "Qué haría falta: " + falta.strip(),
+                      "Recomendación: " + recomienda.strip()))
+
+
+def explicar(db, t, texto, seco=True):
+    """Un detalle 'explicacion'. Vale la ULTIMA: reescribir es agregar otra."""
+    sql = ("begin;\n"
+           "insert into ticket_detalle (ticket_id, clase, texto, creado_por) "
+           "values (%d, 'explicacion', %s, %s);\n%s" % (t, lit(texto), lit(FIRMA), "rollback;" if seco else "commit;"))
+    try:
+        db._crudo(sql)
+    except RuntimeError as e:
+        try:
+            db._crudo("rollback;")
+        except Exception:
+            pass
+        print("RECHAZADO por la base: %s" % e)
+        return False
+    print(texto)
+    print("✓ %s" % ("SECO: la base lo acepto y se deshizo. No quedo nada."
+                   if seco else "GUARDADO (explicacion)."))
+    return True
+
+
 def main():
     a = sys.argv[1:]
     if not a or a[0] in ("-h", "--help"):
@@ -244,6 +292,10 @@ def main():
                 sys.exit("--texto es obligatorio (10 caracteres o mas)")
             if ver(db, t) is None: return
             anunciar(db, t, tx, seco=seco); return
+        if cmd == "explicar":
+            tx = armar_explicacion(opt("--que-es"), opt("--por-que"), opt("--falta"), opt("--recomienda"))
+            if ver(db, t) is None: return
+            explicar(db, t, tx, seco=seco); return
         if cmd == "cerrar":
             ev = opt("--evidencia")
             if not ev or "\n" in ev or not EVIDENCIA.search(ev):
