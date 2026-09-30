@@ -1,10 +1,15 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- TICKETS_EXPLICACION.sql  ·  29-sep-2026  ·  ⛔ NO SE CORRIO TODAVIA
+-- TICKETS_EXPLICACION.sql  ·  29-sep-2026  ·  ✅ APLICADO el 29-sep-2026 — NO VOLVER A CORRER
 -- Un tipo de detalle nuevo: 'explicacion' — «En palabras claras»
 --
--- ⚠️ Este encabezado se cambia DESPUES de ver la fila de control, nunca antes
---    (CLAUDE.md, 16-sep). Mientras diga NO SE CORRIO, no se afirma lo contrario
---    en ningun otro lado.
+-- EVIDENCIA (este encabezado se cambio DESPUES de verificar, no antes):
+--   · ensayo ENSAYO_TICKETS_EXPLICACION.sql: 23/23 ok (29-sep), y despues del
+--     rollback, con pg_lector: 0 CHECK nuevos, guardia y v_ticket con el md5 viejo.
+--   · pegado: fila de control 3 · t · t · 2 · t · 1 · 3 · t · t · 0 (la esperada).
+--   · verificado desde afuera con pg_lector: los 3 CHECK existen, guardia md5
+--     00c71e82f346a69da6500d247e6bac85, las 3 vistas con security_invoker=true,
+--     v_ticket.en_claro existe, 0 grants de anon en v_ticket*.
+--   · Si se volviera a correr, lo frena su propio candado (el md5 ya no es el del 29-sep).
 --
 -- POR QUE (decision de Andrea, 29-sep-2026)
 --   Cada ticket abierto de Truefie lleva una explicacion para Andrea, que no es
