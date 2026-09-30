@@ -1,5 +1,9 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- ENTREGAS_VALIDACION_ODOO.sql  ·  30-sep-2026  ·  NO SE CORRIÓ TODAVÍA
+-- ENTREGAS_VALIDACION_ODOO.sql  ·  30-sep-2026  ·  APLICADO (30-sep-2026)
+-- ✅ Pegado por Andrea en Supabase producción el 30-sep, después del ensayo
+--    (ENSAYO_VALIDACION_ODOO.sql: 11 de 11 ok = true, con el texto esperado en
+--    cada rechazo). Fila de control vista: 1 · 2 · 0 · INSERT,SELECT.
+--    NO SE VUELVE A PEGAR (y si se pega, frena solo: la tabla ya existe).
 -- El RASTRO del carril de escritura (fase 1): quién validó en Odoo, desde
 -- Truefie, qué albarán, de qué pedido y cuándo.
 --
@@ -9,7 +13,8 @@
 -- QUÉ CREA
 --   ent_odoo_validacion — append-only: se inserta y se lee; no se edita ni se
 --   borra (sin grant de update/delete). Una fila por albarán validado.
---   La escribe el servidor del carril (escritura/servidor.py) CON EL TOKEN DE LA
+--   La escribe el servidor del carril (servidor.py del repo privado
+--   TrueFood1/truefie-escritura) CON EL TOKEN DE LA
 --   SOCIA que tocó el botón, así que la base decide, no el servidor:
 --     · solo una socia (acceso_es_socia());
 --     · y solo con SU nombre: validado_por = el correo del token.

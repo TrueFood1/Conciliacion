@@ -1,6 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ENSAYO_VALIDACION_ODOO.sql  ·  30-sep-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA
 -- Prueba la tabla del rastro del carril (ENTREGAS_VALIDACION_ODOO.sql) y la deshace.
+-- ✅ CORRIDO el 30-sep-2026 por Andrea en producción: 11 de 11 ok = true, con el
+--    texto esperado en cada rechazo. Después se aplicó ENTREGAS_VALIDACION_ODOO.sql.
 --
 -- QUÉ HACE
 --   1. Aplica el BLOQUE DDL de ENTREGAS_VALIDACION_ODOO.sql, igual.
