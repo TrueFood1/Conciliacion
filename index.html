@@ -4368,6 +4368,10 @@ body.es-socia .face-pend{display:block}
 /* La presentación entre paréntesis se ve en las DOS anchuras (antes era solo de teléfono y en
    escritorio se mostraba .cn-pcaja "caja = 6 paq", que decía otra cosa). Fuente única. */
 #vConteo .cn-pres{margin-left:6px;color:var(--text-3);font-size:11px;font-weight:400}
+/* En su propio renglón: en el Conteo de teléfono la celda del nombre corta lo que
+   se pasa (medido a 375: la píldora terminaba en el px 255 y la celda en el 186). */
+.mp-vieja{display:table;margin:3px 0 0;font-size:10.5px;color:#E9A23B;border:1px solid rgba(233,162,59,.45);border-radius:999px;padding:0 7px;white-space:nowrap;vertical-align:1px}
+.mp-vieja-det{display:block;font-size:10.5px;color:var(--text-3);margin-top:2px;white-space:normal}
 /* Rótulo de conversión (Vainilla): dice de dónde sale el número, para que nadie crea que
    cambió algo en Odoo. Segunda línea, gris terciario. */
 #vConteo .cn-conv{display:block;color:var(--text-3);font-size:10.5px;font-weight:400;margin-top:1px}
@@ -4804,7 +4808,18 @@ async function odooRpc(endpoint, params){
   if(data.error) throw new Error(data.error.data?.message || data.error.message || 'Error Odoo');
   return data.result;
 }
+// ⚠️ TODA LECTURA DE PRODUCTOS VA EN es_CR (30-sep-2026). Sin contexto de idioma
+// Odoo contesta en inglés donde hay traducción: la unidad sale "Units" (Huevos, en
+// Inventario), 517 y 519 se llaman los dos "Prueba Galletas" y 503 "Hamburguesas 75
+// buns". Se pone ACÁ, en la puerta, para que ninguna lectura nueva lo olvide: los
+// modelos de producto, unidades y recetas. Quien ya pasa un idioma, manda el suyo.
+// Medido antes de encenderlo: las 18 reglas de PESO_EMPAQUE y las de MP_UMBRAL /
+// MP_BATCH caen en el mismo insumo en los dos idiomas; `/gal/` sigue calzando con
+// "gal (EE. UU.)" y `refUnitDe` ya entendía "unidad".
+const ODOO_LANG_MODELOS=/^(product\.|uom\.uom$|mrp\.bom)/;
 async function odooCall(model,method,args,kwargs={}){
+  if(ODOO_LANG_MODELOS.test(model) && !(kwargs.context && kwargs.context.lang))
+    kwargs=Object.assign({}, kwargs, {context:Object.assign({lang:'es_CR'}, kwargs.context||{})});
   return odooRpc('/web/dataset/call_kw',{model,method,args,kwargs});
 }
 
@@ -18031,7 +18046,7 @@ function rzMedirHtml(){
 }
 // Faltante en unidad de compra: sacos (PESO_EMPAQUE: avena 22,68 · resto 25 kg), cartones (huevos), o kg/L.
 function _faltaCompra(it){
-  const pe=PESO_EMPAQUE.find(function(x){ return x.rx.test(it.nombre); });
+  const pe=_pesoEmpaque(it.pid);
   if(pe && pe.lab==='sacos'){ const n=Math.max(1, Math.round(it.falta/pe.peso)); return n+' saco'+(n===1?'':'s'); }
   return _compraUnidad(it.pid, it.falta, it.uom);
 }
@@ -18553,7 +18568,7 @@ function cnCargarHistConfirm(){
 // ── Piezas que solo se ven en teléfono (el CSS decide; el HTML es uno solo) ──
 // .cn-sub  = segunda línea de la fila: "existencia Odoo · presentación" ("669 u · caja 6").
 // .cn-lblm = etiqueta mínima del campo ("caj", "u", "paq") — la larga es de escritorio.
-const _CN_SING={sacos:'saco', cajas:'caja', bolsas:'bolsa', cartones:'cartón', potes:'pote'};
+const _CN_SING={sacos:'saco', cajas:'caja', bolsas:'bolsa', cartones:'cartón', potes:'pote', paquetes:'paquete'};
 // Punto de descuadre (solo teléfono): la fila cuyo físico NO calza con Odoo lleva un punto del
 // color del semáforo, sin texto. Lo que calza y lo que todavía no se contó quedan limpios —
 // por eso la clase sale vacía salvo en cn-warn/cn-bad. Se pinta al escribir, sin guardar:
@@ -18589,7 +18604,7 @@ function cnRender(){
   // MATERIA PRIMA
   let mp='<table class="cn-tbl"><thead><tr><th>Ingrediente</th><th>Odoo dice</th><th>Conteo físico</th><th class="r">Diferencia</th></tr></thead><tbody>';
   for(const m of _cnMP){
-    const pe=PESO_EMPAQUE.find(x=>x.rx.test(m.name)), dr=(d.mp||{})[m.pid]||{};
+    const pe=_pesoEmpaque(m.pid), dr=(d.mp||{})[m.pid]||{};
     const {fis,vacio}=fisicoMP(m,dr), diff=fis-m.qty, s=sem3(diff,_tolMP(m),vacio);
     // empaques enteros → teclado numérico; el suelto lleva decimales (22,68 kg) → decimal.
     const empIn = pe ? '<input class="cn-in" inputmode="numeric" value="'+(dr.emp!=null?esc(dr.emp):'')+'" oninput="cnMpEmp('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(pe.lab)+' ×'+fmtN(pe.peso)+pe.unidad+'</span><span class="cn-lblm">'+esc(_cnPresCorto(pe))+'</span>' : '';
@@ -18598,7 +18613,7 @@ function cnRender(){
       : '<input class="cn-in" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="cnMpSue('+m.pid+',this.value)" placeholder="0"><span class="cn-lbl">'+esc(sueLab)+'</span><span class="cn-lblm">'+esc(sueLab)+'</span>';
     const subMP=_cnSub(fmtN(fis)+' '+esc(m.uom), fmtN(m.qty)+' '+esc(m.uom), vacio);
     const conv=mpConvTxt(m);
-    mp+='<tr><td class="cn-nm">'+esc(nombreCortoMP(m.name))+_cnPresTag(_cnPresMP(pe))
+    mp+='<tr><td class="cn-nm">'+esc(nombreCortoMP(m.name))+_cnPresTag(_cnPresMP(pe))+_mpViejaHTML(m,pe)
       +(conv?('<span class="cn-conv">'+esc(conv)+'</span>'):'')+_cnDot('m',m.pid,vacio,s)+'</td><td class="cn-odoo">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
       +'<td class="cn-sub" id="cn-msub'+m.pid+'">'+subMP+'</td>'
       +'<td class="cn-count">'+empIn+(empIn&&!(pe&&pe.noSuelto)?' + ':'')+sueIn+'</td>'
@@ -21633,7 +21648,7 @@ const MP_UMBRAL = [
   {rx:/az[uú]car/i,             val:8,   unit:'kg', eq:''},
   {rx:/^sal$/i,                 val:25,  unit:'kg', eq:'≈1 bolsa'},   // "Sal" exacta (Sal Marina va por batches)
   {rx:/xant|goma\s*xan/i,       val:25,  unit:'kg', eq:'≈1 bolsa'},
-  {rx:/levadura/i,              val:2.7, unit:'kg', eq:'≈6 paquetes'},
+  {rx:/levadura/i,              val:2.7, unit:'kg', eq:'≈5 paquetes de 500 g'},   // era "≈6", en cajas de 454 g
   {rx:/aceite/i,                val:18,  unit:'L',  eq:'≈3 potes de 6 L'},
 ];
 // Alertas por BATCHES (ingredientes de galletas): avisar cuando queden < `umbral` batches.
@@ -21683,28 +21698,88 @@ function mpConvTxt(m){
   const c=m&&m.convertido; if(!c) return '';
   return 'convertido de '+fmtN(c.qtyOrig)+' '+c.desde+' · 1 gal = '+fmtN(GAL_US_A_L)+' L';
 }
-const ACEITE_DENSIDAD = 0.92;   // kg por L del aceite (configurable): L = kg ÷ densidad
+// kg por L del aceite: L = kg ÷ densidad. 0,9047 MEDIDO en báscula tarada: 3 L de
+// aceite solo = 2,714 kg → 904,7 g/L (BITACORA.md, bloque del 15-ago-2026, punto 15
+// "AUDITORÍA aceite/huevos (13-ago)": "manda el medido"). Antes decía 0,92, un
+// número redondo sin fuente; la diferencia es 1,7% en el suelto pesado.
+const ACEITE_DENSIDAD = 0.9047;
+// ── EL EMPAQUE DE CADA INSUMO, POR ID DE ODOO (30-sep-2026) ──────────────
+// Era una lista de expresiones sobre el NOMBRE (`/aceite/i`, `/levadura/i`…): el
+// nombre cambia con el idioma de la lectura y dos productos pueden calzar con la
+// misma (`/aceite/i` agarraba también "Aceite en Spray", que va en Unidades). Por
+// id, un producto tiene su empaque o no tiene ninguno. Ids medidos en Odoo el
+// 30-sep con la misma expansión de recetas que `listaMP`; `nom` es solo para leer.
+// El empaque escrito acá se contrasta con la ÚLTIMA COMPRA (ver _mpCompraCheck):
+// si lo comprado no es múltiplo del empaque, la pantalla dice "presentación vieja".
 const PESO_EMPAQUE = [
-  {rx:/avena/i,                 peso:22.68, lab:'sacos',    unidad:'kg'},
-  {rx:/almid[oó]n.*ma[ií]z/i,   peso:25,    lab:'sacos',    unidad:'kg'},
-  {rx:/almid[oó]n.*yuca/i,      peso:25,    lab:'sacos',    unidad:'kg'},
-  {rx:/harina.*arroz/i,         peso:25,    lab:'sacos',    unidad:'kg'},
-  {rx:/harina.*garbanzo/i,      peso:25,    lab:'sacos',    unidad:'kg'},
-  {rx:/linaza/i,                peso:25,    lab:'sacos',    unidad:'kg'},
-  {rx:/girasol/i,               peso:25,    lab:'sacos',    unidad:'kg'},
-  {rx:/calabaza/i,              peso:25,    lab:'sacos',    unidad:'kg'},
-  {rx:/xant|goma\s*xan/i,       peso:25,    lab:'sacos',    unidad:'kg'},
-  {rx:/^sal$/i,                 peso:25,    lab:'sacos',    unidad:'kg'},
-  {rx:/levadura/i,              peso:454,   lab:'cajas',    unidad:'g'},
-  {rx:/az[uú]car/i,             peso:2,     lab:'bolsas',   unidad:'kg'},   // extra de promo va en suelto
-  {rx:/sal\s*marina/i,          peso:800,   lab:'cajas',    unidad:'g'},
-  {rx:/tapa\s*dulce|panela/i,   peso:900,   lab:'bolsas',   unidad:'g'},
-  {rx:/chocolate/i,             peso:6,     lab:'bolsas',   unidad:'kg'},
-  {rx:/huevos/i,                peso:30,    lab:'cartones', unidad:'u'},    // 30 unidades/cartón (no "Huevo liquido")
+  {pid:461, nom:'Avena Molida',         peso:22.68, lab:'sacos',    unidad:'kg'},
+  {pid:456, nom:'Almidon de Maiz',      peso:25,    lab:'sacos',    unidad:'kg'},
+  {pid:457, nom:'Almidon de Yuca',      peso:25,    lab:'sacos',    unidad:'kg'},
+  {pid:464, nom:'Harina de Arroz',      peso:25,    lab:'sacos',    unidad:'kg'},
+  {pid:460, nom:'Harina de Garbanzo',   peso:25,    lab:'sacos',    unidad:'kg'},
+  {pid:476, nom:'Semillas de linaza',   peso:25,    lab:'sacos',    unidad:'kg'},
+  {pid:477, nom:'Semillas de Girasol',  peso:25,    lab:'sacos',    unidad:'kg'},
+  {pid:475, nom:'Semillas de Calabaza', peso:25,    lab:'sacos',    unidad:'kg'},
+  {pid:463, nom:'Goma Xantana',         peso:25,    lab:'sacos',    unidad:'kg'},
+  {pid:459, nom:'Sal',                  peso:25,    lab:'sacos',    unidad:'kg'},
+  // Levadura: paquetes de 500 g desde 2026 (Andrea, 30-sep). Era "cajas de 454 g":
+  // la última compra (P00668, 25 kg) da 55,07 cajas de 454 g y 50 paquetes de 500 g.
+  {pid:458, nom:'Levadura',             peso:500,   lab:'paquetes', unidad:'g'},
+  {pid:462, nom:'Azucar Cruda',         peso:2,     lab:'bolsas',   unidad:'kg'},   // extra de promo va en suelto
+  {pid:524, nom:'Sal Marina',           peso:800,   lab:'cajas',    unidad:'g'},
+  {pid:522, nom:'Tapa dulce',           peso:900,   lab:'bolsas',   unidad:'g'},
+  {pid:526, nom:'Chocolate',            peso:6,     lab:'bolsas',   unidad:'kg'},
+  {pid:520, nom:'Huevos',               peso:30,    lab:'cartones', unidad:'u'},    // 30 unidades/cartón
   // Casos especiales:
-  {rx:/aceite/i,                peso:3,     lab:'potes',    unidad:'L', sueltoUnit:'kg', sueltoFactor:1/ACEITE_DENSIDAD},  // suelto en kg de balanza → L = kg ÷ 0,92
-  {rx:/huevo\s*l[ií]quido/i,    peso:9,     lab:'bolsas',   unidad:'kg', noSuelto:true},   // nunca queda bolsa abierta → sin suelto
+  {pid:455, nom:'Aceite de Oliva',      peso:3,     lab:'potes',    unidad:'L', sueltoUnit:'kg', sueltoFactor:1/ACEITE_DENSIDAD},  // suelto en kg de balanza → L = kg ÷ densidad
+  {pid:521, nom:'Huevo liquido',        peso:9,     lab:'bolsas',   unidad:'kg', noSuelto:true},   // nunca queda bolsa abierta → sin suelto
 ];
+function _pesoEmpaque(pid){ return PESO_EMPAQUE.find(function(x){ return x.pid===+pid; })||null; }
+
+// ── C · PRESENTACIÓN VIEJA: el empaque escrito contra la ÚLTIMA COMPRA (30-sep) ──
+// Criterio de la casa: la presentación de un insumo es la de su última compra
+// registrada. Odoo no guarda el empaque (el producto no tiene `product.packaging`),
+// pero sí CUÁNTO se compró: si esa cantidad no es un múltiplo entero del empaque
+// de PESO_EMPAQUE, el empaque escrito ya no es el que se compra. Es una alarma
+// PERMANENTE, no un arreglo: sigue viva aunque un día el empaque venga de Odoo.
+// El caso que la pidió: Levadura en "cajas de 454 g" cuando la última compra
+// (P00668, factura 2564, 23-sep) fue 25 kg = 55,07 cajas; con 500 g son 50.
+// La compra es la última FACTURA DE PROVEEDOR publicada (account.move.line,
+// in_invoice, display_type=product), sumando sus líneas del mismo producto.
+async function _mpUltimasCompras(pids){
+  if(!pids.length) return {};
+  const desde=_ymd(new Date(Date.now()-540*86400000));   // 18 meses alcanzan de sobra
+  const ls=await odooCall('account.move.line','search_read',
+    [[['product_id','in',pids],['move_id.move_type','=','in_invoice'],['move_id.state','=','posted'],
+      ['display_type','=','product'],['date','>=',desde]]],
+    {fields:['product_id','move_id','date','quantity','product_uom_id'],order:'date desc, id desc',
+     limit:5000, context:{lang:'es_CR'}});
+  await uomFactores([...new Set(ls.map(l=>l.product_uom_id&&l.product_uom_id[0]).filter(Boolean))]);
+  const out={};
+  ls.forEach(function(l){
+    const pid=l.product_id&&l.product_id[0], mv=l.move_id&&l.move_id[0]; if(!pid||!mv) return;
+    const o=out[pid]=out[pid]||{move:mv, factura:(l.move_id[1]||''), fecha:l.date, qtyRef:0};
+    if(o.move!==mv) return;                                // solo la más reciente
+    o.qtyRef+=(+l.quantity||0)/uomFac(l.product_uom_id&&l.product_uom_id[0]);   // → kg · L · Unidades
+  });
+  return out;
+}
+// Unidad del empaque → unidad de referencia de Odoo (kg, L, Unidades: factor 1).
+const _MP_REF={g:[0.001,'kg'], kg:[1,'kg'], mL:[0.001,'L'], L:[1,'L'], u:[1,'u']};
+function _mpCompraCheck(m, pe){
+  const c=m&&m.ultCompra, r=pe&&_MP_REF[pe.unidad];
+  if(!c || !r || !(c.qtyRef>0) || !(pe.peso>0)) return null;
+  const n=c.qtyRef/(pe.peso*r[0]), ent=Math.round(n);
+  return {vieja:!(ent>=1 && Math.abs(n-ent)<0.01), n:n, c:c, refU:r[1]};
+}
+// El rótulo, UNO para Inventario y Conteo. Vacío si la presentación calza.
+function _mpViejaHTML(m, pe){
+  const k=_mpCompraCheck(m, pe); if(!k || !k.vieja) return '';
+  const f=String(k.c.fecha||'').slice(0,10).split('-');
+  const det='última compra '+fmtN(k.c.qtyRef)+' '+k.refU+' ('+(f.length===3?(f[2]+'/'+f[1]):'')
+    +(k.c.factura?(' · '+k.c.factura):'')+') = '+fmtN(k.n)+' '+pe.lab+' de '+fmtN(pe.peso)+' '+pe.unidad;
+  return '<span class="mp-vieja">presentación vieja</span><span class="mp-vieja-det">'+esc(det)+'</span>';
+}
 // ── VAINILLA · conteo estilo aceite, PREPARADO PERO APAGADO ──────────────────
 // Mismo diseño que el aceite, que NO es un error: el pote se cuenta entero y lo que queda
 // suelto se PESA en balanza y se convierte con densidad (aceite 0,92 kg/L). La vainilla va
@@ -21712,7 +21787,7 @@ const PESO_EMPAQUE = [
 // Falta UN número: VAINILLA_DENSIDAD (arriba), que sale de pesar un galón lleno sin abrir.
 // Mientras sea null esta entrada NO entra en PESO_EMPAQUE y la vainilla se sigue contando en
 // unidad base — encenderlo es poner la densidad, nada más.
-const VAINILLA_EMPAQUE = {rx:/vainilla/i, peso:3, lab:'potes', unidad:'L',
+const VAINILLA_EMPAQUE = {pid:VAINILLA_PID, nom:'Vainilla', peso:3, lab:'potes', unidad:'L',
                           sueltoUnit:'g', sueltoFactor:null};   // sueltoFactor = 1/(densidad×1000): g → L
 if(vainillaConteoListo()){
   // g de balanza → L: dividir entre los gramos que pesa un litro (densidad kg/L × 1000).
@@ -21732,7 +21807,7 @@ function invMpEmp(pid,val){ const d=invDraft(); d.mp=d.mp||{}; d.mp[pid]=d.mp[pi
 function invMpSue(pid,val){ const d=invDraft(); d.mp=d.mp||{}; d.mp[pid]=d.mp[pid]||{}; d.mp[pid].sue=val; invSaveDraft(d); recomputeMP(pid); }
 // Físico MP = (# empaques × peso) + suelto, comparado contra stock.quant (mismo semáforo que terminado).
 function fisicoMP(m, dr){
-  const pe=PESO_EMPAQUE.find(x=>x.rx.test(m.name));
+  const pe=_pesoEmpaque(m.pid);
   const emp=_crDec(dr.emp), sue=_crDec(dr.sue);   // es-CR: la coma es el decimal (ver _crDec)
   const sf=(pe&&pe.sueltoFactor)?pe.sueltoFactor:1;
   const fis = pe ? (emp*pe.peso + (pe.noSuelto?0:sue*sf)) : sue;   // suelto convertido a unidad de stock si aplica
@@ -21774,9 +21849,14 @@ async function listaMP(){
   await uomFactores(uomIds);        // caché compartida: una sola definición del factor
   const q=await odooCall('stock.quant','read_group',[[['product_id','in',ids],['location_id.usage','=','internal']],['quantity'],['product_id']],{lazy:false});
   const oh={}; q.forEach(r=>{ const pid=r.product_id&&r.product_id[0]; if(pid) oh[pid]=(oh[pid]||0)+(r.quantity||0); });
+  let compras={};
+  try{ compras=await _mpUltimasCompras(prods.map(p=>p.id)); }
+  catch(e){ try{ console.error('[Truefie] no pude leer la última compra de los insumos ('
+    +((e&&e.message)||e)+'): la alarma de presentación vieja queda apagada.'); }catch(_){} }
   return prods.map(p=>{
     const uomName=(p.uom_id&&p.uom_id[1])||'', factor=uomFac(p.uom_id&&p.uom_id[0]), qty=oh[p.id]||0;
-    const m={pid:p.id, name:p.name, uom:uomName, qty, qtyRef:qty/factor, refU:refUnitDe(uomName)};  // qtyRef en kg/L (unidad de referencia)
+    const m={pid:p.id, name:p.name, uom:uomName, qty, qtyRef:qty/factor, refU:refUnitDe(uomName),
+             ultCompra:compras[p.id]||null};  // qtyRef en kg/L (unidad de referencia)
     return _mpDisplay(m);
   }).sort((a,b)=>a.name.localeCompare(b.name,'es'));
 }
@@ -21820,7 +21900,7 @@ function renderMP(){
       ? '<span class="muted" style="font-size:11px">— (sin suelto)</span>'
       : '<input class="inv-in inv-in-sm" inputmode="decimal" value="'+(dr.sue!=null?esc(dr.sue):'')+'" oninput="invMpSue('+m.pid+',this.value)" placeholder="0"> <span class="muted" style="font-size:11px">'+esc(sueLab)+'</span>';
     const conv=mpConvTxt(m);
-    h+='<tr><td>'+esc(m.name)+_invPresTag(_cnPresMP(pe))
+    h+='<tr><td>'+esc(m.name)+_invPresTag(_cnPresMP(pe))+_mpViejaHTML(m,pe)
       +(conv?(' <span class="muted" style="font-size:10.5px">'+esc(conv)+'</span>'):'')+'</td>'
       +'<td style="text-align:right">'+fmtN(m.qty)+' '+esc(m.uom)+'</td>'
       +'<td>'+empCell+'</td>'
