@@ -95,11 +95,15 @@ SENSIBLE_LISTA    = {'acceso_usuario', 'v_acceso_usuario',
 #     el rechazo ("permission denied for view ent_alisto_lote_efectivo").
 #   · ent_conteo_correccion_vigente: nació sin permiso para anon
 #     (ENTREGAS_CORRECCION_LOTE.sql, 27-sep).
+#   · ent_odoo_validacion (el rastro de «Validar en Odoo», 30-sep) y
+#     ent_pedido_odoo_descarte («Descartar», 1-oct): nacieron con
+#     `revoke all … from anon`. Las dos son de socias y de nadie más.
 # Mismo trato que las sensibles: el rechazo es `✓ cerrado`, y una lista —aunque
 # venga vacía— es una FUGA. Sin esta anotación salían como `?` todos los días.
 CERRADA_ANON      = {'ent_alisto_lote_efectivo', 'ent_salido_del_congelador_desde_ancla',
                      'v_ent_excepcion_pendiente', 'v_ent_excepcion_pendiente_pedido',
-                     'ent_conteo_correccion_vigente'}
+                     'ent_conteo_correccion_vigente',
+                     'ent_odoo_validacion', 'ent_pedido_odoo_descarte'}
 def es_sensible(t):
     return t in SENSIBLE_LISTA or t in CERRADA_ANON or t.startswith(SENSIBLE_PREFIJOS)
 
