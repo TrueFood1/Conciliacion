@@ -4618,7 +4618,7 @@ body.es-socia .face-pend{display:block}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 30 sep 2026 · b76 + Validar en Odoo (validar-odoo, NO PUBLICAR)';
+const BUILD = 'v 1 oct 2026 · b77';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -17224,9 +17224,27 @@ async function entCuadreLeer(){
     const dias=mot.map(function(m){ return m.dia; }).filter(Boolean).sort();
     casos.push({pedido:p.pedido_id, estado:p.estado, factura:p.factura_nombre,
                 cliente:p.cliente_nombre, desde:dias[0]||'', motivos:mot,
-                ambar:mot.some(function(m){ return m.ambar; })});
+                ambar:mot.some(function(m){ return m.ambar; }),
+                // Para la huella de «Descartar» (1-oct): la factura y cada salida
+                // con su estado, tal como Odoo los dice HOY.
+                factura_id:p.factura_id, revertida:!!o.revertida,
+                salidas:o.salidas.map(function(s){ return s.id+':'+s.state; }).sort()});
   });
   casos.sort(function(a,z){ return String(a.desde).localeCompare(String(z.desde)); });
+  // ── LOS DESCARTES · `ent_pedido_odoo_descarte` (1-oct) ──────────────────
+  // Falla ABIERTO, a propósito y al revés que el rastro: si no se pueden leer,
+  // no se esconde nada. Un descarte que no se lee muestra DE MÁS, nunca de menos.
+  try{
+    const ids=casos.map(function(x){ return x.pedido; });
+    if(ids.length){
+      const {data:ds,error:eD}=await c.from('ent_pedido_odoo_descarte')
+        .select('pedido_id,huella,creado_por,creado_en').in('pedido_id',ids);
+      if(eD) throw eD;
+      casos.forEach(function(x){ x.descartes=(ds||[]).filter(function(d){ return d.pedido_id===x.pedido; }); });
+    }
+  }catch(e){
+    try{ console.warn('[Truefie] no pude leer los descartes de Odoo:', (e&&e.message)||e); }catch(_){}
+  }
   return casos;
 }
 
@@ -17275,7 +17293,7 @@ async function pdCuadreCargar(force){
    muestra la tanda entera. Al confirmar se valida DE A UNO, y uno que no calza
    se salta con su motivo sin frenar a los demás. Al final, un resumen.
    ══════════════════════════════════════════════════════════════════════ */
-let _pdv={prev:{}, sel:{}, tanda:null, leyendo:false};
+let _pdv={prev:{}, sel:{}, tanda:null, leyendo:false, descartando:0};
 //  prev[pedido] = {st:'leyendo'|'ok'|'rech'|'red', r, rech}
 //  tanda = {fase:'revisando'|'previa'|'validando'|'fin', items:[{id,cli,r,rech,res}], i}
 
@@ -17306,6 +17324,23 @@ async function pdvPrevias(force){
   try{ pdRender(); }catch(e){}
 }
 
+// LA HUELLA: el estado de Odoo de un pedido en «No se pueden validar». Si cambia
+// la factura o cualquier salida (o, en un rechazo del servidor, el motivo o las
+// cantidades), la huella cambia y el pedido descartado vuelve a la lista.
+function _pdvHuella(x, P){
+  let h='f'+(x.factura_id||'-')+(x.revertida?'r':'')+'|s'+(x.salidas||[]).join(',');
+  if(P && P.st==='rech' && P.rech){
+    h+='|'+(P.rech.motivo||'');
+    if(Array.isArray(P.rech.detalle)) h+='|'+P.rech.detalle.map(function(l){
+      return l.producto_id+':'+[l.salio_truefie,l.facturado,l.albaran_pide,l.reservado].join('/'); }).join(',');
+  }
+  return h;
+}
+function _pdvDescartado(x, P){
+  const hu=_pdvHuella(x, P);
+  return (x.descartes||[]).some(function(d){ return d.huella===hu; });
+}
+
 function pdvHTML(){
   // Solo socias, con la misma pregunta que las alertas de Odoo de al lado.
   if(!_pd || !_pd.odoo || _pd.odoo.noSocia) return '';
@@ -17325,8 +17360,10 @@ function pdvHTML(){
   const va=[], no=[];
   cs.forEach(function(x){
     const P=_pdv.prev[x.pedido];
-    if(_pdvValidable(x) && !(P && P.st==='rech')) va.push(x); else no.push(x);
+    if(_pdvValidable(x) && !(P && P.st==='rech')) va.push(x);
+    else if(!_pdvDescartado(x, P)) no.push(x);   // descartado con la huella de HOY: no se dibuja
   });
+  if(!va.length && !no.length && !T) return '';   // todo descartado: regla 1, no existe
   // El contador cuenta SOLO las validables: es lo que hay para hacer.
   let h=tit+(va.length?(' <span class="pd-cnt on">'+va.length+'</span>'):'')+'</div>';
   if(T) return h+pdvTandaHTML(T)+'</div>';     // con una tanda abierta, solo la tanda
@@ -17367,7 +17404,9 @@ function pdvHTML(){
       h+=cab(x, P, false, 'pdv-no');
       if(P && P.st==='rech') h+=_valRechazoHTML(P.rech, true);
       else x.motivos.forEach(function(m){ h+='<div class="pd-cua">'+esc(m.txt)+'</div>'; });
-      h+='</div></div>';
+      const g=(_pdv.descartando===x.pedido);
+      h+='</div><button class="btn btn-sm pd-acc"'+(g?' disabled':'')
+        +' onclick="pdvDescartar('+x.pedido+')">'+(g?'Guardando…':'Descartar')+'</button></div>';
     });
   }
   return h+'</div>';
@@ -17473,6 +17512,39 @@ async function pdvTandaConfirmar(){
 
 function pdvTandaCerrar(){ _pdv.tanda=null; pdRender(); }
 
+// «Descartar» (1-oct): saca el pedido de «No se pueden validar» con la huella de
+// HOY. No toca Odoo ni el pedido: solo dice "ya lo vi, así está". Si Odoo cambia,
+// la huella cambia y vuelve. Solo socias: lo decide la base (la política exige
+// `acceso_es_socia()` y que `creado_por` sea el correo del token).
+async function pdvDescartar(id){
+  if(_pdv.descartando) return;
+  const x=((_cuadre&&_cuadre.casos)||[]).filter(function(k){ return k.pedido===id; })[0];
+  if(!x) return;
+  const P=_pdv.prev[id]||null;
+  if(!confirm('¿Sacar el pedido #'+id+' de «No se pueden validar»?\n\n'
+    +'No cambia nada en Odoo ni en el pedido. Vuelve a la lista si cambia su factura o su salida en Odoo.')) return;
+  const motivo=(P && P.st==='rech')
+    ? ((VAL_MOTIVO[P.rech.motivo]||'')+' '+(P.rech.texto||'')).trim()
+    : x.motivos.map(function(m){ return m.txt; }).join(' · ');
+  _pdv.descartando=id; pdRender();
+  try{
+    const c=sbClient();
+    const {data:{user}}=await c.auth.getUser();
+    const email=(user&&user.email)||'';
+    if(!email) throw new Error('no hay sesión abierta. El descarte tiene que ir firmado.');
+    // `.select('id')`: sin él, un insert que la RLS rechaza puede volver sin
+    // error y el descarte se pierde en silencio (el bug de Devoluciones, 17-sep).
+    const {data,error}=await c.from('ent_pedido_odoo_descarte')
+      .insert({pedido_id:id, huella:_pdvHuella(x, P), motivo:motivo||null, creado_por:email}).select('id');
+    if(error) throw error;
+    if(!data || !data.length) throw new Error('la base no devolvió el descarte. No se guardó.');
+    (x.descartes=x.descartes||[]).push({pedido_id:id, huella:_pdvHuella(x, P), creado_por:email});
+  }catch(e){
+    alert('No se pudo descartar: '+((e&&e.message)||e)
+      +'\n\nSi dice "row-level security", la sesión no es de una socia.');
+  }finally{ _pdv.descartando=0; pdRender(); try{ cuadreLobby(); }catch(e){} }
+}
+
 // ── EL CONTADOR DEL LOBBY · decisión de Andrea, 27-sep-2026 ────────────
 // 🔴 ESTO REVIERTE A CONCIENCIA LO DEL 26-AGO. Ese día se sacó la alerta de
 // Entregas del lobby ("cada módulo muestra sus alertas al entrar; repetirlas
@@ -17492,7 +17564,9 @@ async function cuadreLobby(){
   const el=document.getElementById('homeEntAlerta'); if(!el) return;
   if(!(await accesoSocia())){ el.textContent=''; return; }
   const q=await entCuadre(false);
-  const cs=(q&&!q.err&&q.casos)||[];
+  // Lo que una socia descartó no es algo que hacer (regla 1 del lobby). Solo
+  // la huella del cuadre: la del servidor no se sabe acá sin preguntarle.
+  const cs=((q&&!q.err&&q.casos)||[]).filter(function(x){ return !_pdvDescartado(x, null); });
   if(!cs.length){ el.textContent=''; el.className='home-mod-alerta'; return; }
   el.textContent=cs.length+(cs.length===1?' pedido':' pedidos')+' por cuadrar con Odoo · desde el '+_cuaDia(cs[0].desde);
   el.className='home-mod-alerta'+(cs.some(function(x){ return x.ambar; })?' ambar':'');
