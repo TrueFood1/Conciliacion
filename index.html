@@ -3995,6 +3995,7 @@ body.es-socia .face-pend{display:block}
 .pdv-mal{font-size:12px;color:#ffb4b4;background:#3a1b1b;border-radius:8px;padding:7px 10px;
          margin-top:5px;line-height:1.45}
 .pdv-mal span{display:block;color:#e8a9a9;font-size:11.5px;margin-top:2px}
+.pdv-neutro span{display:block;font-size:11.5px;margin-top:2px;color:var(--text-3)}
 .pdv-neutro{font-size:12px;color:var(--text-2);background:var(--surface-2,rgba(127,127,127,.08));border-radius:8px;
             padding:7px 10px;margin-top:5px;line-height:1.45}
 .pdv-dq{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:11.5px;color:var(--text-2);padding:4px 0}
@@ -4004,6 +4005,10 @@ body.es-socia .face-pend{display:block}
 .pdv-it .pd-meta b{color:var(--text);font-weight:600}
 .pdv-acc{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:10px}
 .pdv-res-t{font-size:11px;font-weight:500;color:var(--text-3);padding-top:12px}
+/* «No se pueden validar»: aparte, abajo y en gris (Andrea, 1-oct). */
+.pdv-no-t{font-size:11px;font-weight:500;color:var(--text-3);padding:16px 0 2px}
+.pdv-no .pd-quien,.pdv-no .pd-cua{color:var(--text-3)}
+.pdv-no .pdv-dq,.pdv-no .pdv-dq b{color:var(--text-3)}
 
 /* ══ TICKET 29 · CORREGIR UNA PREPARACIÓN ═══════════════════════════════
    El botón de la tarjeta de "Por entregar". Va al lado de "Entregar" y NO
@@ -14778,11 +14783,12 @@ function _valDescuadreHTML(d){
 // Un rechazo, entero: la frase, el texto del servidor y, si es descuadre, el detalle.
 // «Escritura apagada» va en gris: no es un error, es el estado de prueba. Y el
 // texto del servidor no se repite si dice lo mismo que la frase.
-function _valRechazoHTML(R){
+// `gris`: en «No se pueden validar» el motivo no es una alarma, es el porqué.
+function _valRechazoHTML(R, gris){
   R=R||{};
   const frase=VAL_MOTIVO[R.motivo]||'No se pudo validar.';
   const extra=(R.texto && R.texto.trim()!==frase.trim())?('<span>'+esc(R.texto)+'</span>'):'';
-  return '<div class="'+(R.motivo==='escritura_apagada'?'pdv-neutro':'pdv-mal')+'">'+esc(frase)+extra+'</div>'
+  return '<div class="'+((gris||R.motivo==='escritura_apagada')?'pdv-neutro':'pdv-mal')+'">'+esc(frase)+extra+'</div>'
     +(R.motivo==='descuadre'?_valDescuadreHTML(R.detalle):'');
 }
 
@@ -17281,11 +17287,21 @@ function pdvHTML(){
   const cs=_cuadre.casos||[];
   const T=_pdv.tanda;
   if(!cs.length && !T) return '';             // regla 1: sin nada que hacer, no existe
-  let h=tit+(cs.length?(' <span class="pd-cnt on">'+cs.length+'</span>'):'')+'</div>';
+  // DOS GRUPOS (Andrea, 1-oct): arriba lo que se puede validar; abajo, aparte y
+  // en gris, «No se pueden validar» con su motivo — para que el pedido 11 no se
+  // lea como uno más de la tanda. Va abajo lo que el cuadre ya descarta Y lo que
+  // el servidor rechazó en la vista previa (un descuadre tampoco se valida).
+  // Lo que todavía no tiene respuesta del servidor se queda arriba.
+  const va=[], no=[];
+  cs.forEach(function(x){
+    const P=_pdv.prev[x.pedido];
+    if(_pdvValidable(x) && !(P && P.st==='rech')) va.push(x); else no.push(x);
+  });
+  // El contador cuenta SOLO las validables: es lo que hay para hacer.
+  let h=tit+(va.length?(' <span class="pd-cnt on">'+va.length+'</span>'):'')+'</div>';
   if(T) return h+pdvTandaHTML(T)+'</div>';     // con una tanda abierta, solo la tanda
 
-  const oks=cs.filter(function(x){ const P=_pdv.prev[x.pedido];
-    return _pdvValidable(x) && P && P.st==='ok'; });
+  const oks=va.filter(function(x){ const P=_pdv.prev[x.pedido]; return P && P.st==='ok'; });
   const nSel=oks.filter(function(x){ return _pdv.sel[x.pedido]; }).length;
   if(oks.length){
     const todos=(nSel===oks.length);
@@ -17294,27 +17310,36 @@ function pdvHTML(){
       +'<button class="btn btn-sm pdv-si"'+(nSel?'':' disabled')+' onclick="pdvTandaAbrir()">'
       +'Validar seleccionados'+(nSel?(' ('+nSel+')'):'')+'</button></div>';
   }
-  cs.forEach(function(x){
-    const val=_pdvValidable(x), P=_pdv.prev[x.pedido]||null;
-    const ok=val && P && P.st==='ok';
-    h+='<div class="pd-fila pdv-fila"><div class="pd-fila-c">'
+  const cab=function(x, P, ok, cls){
+    return '<div class="pd-fila pdv-fila'+(cls?(' '+cls):'')+'"><div class="pd-fila-c">'
       +'<div class="pd-quien">'
       +(ok?('<input type="checkbox" class="pdv-c"'+(_pdv.sel[x.pedido]?' checked':'')
             +' onchange="pdvSel('+x.pedido+',this.checked)" aria-label="Elegir el pedido '+x.pedido+'"> '):'')
       +esc(x.cliente||('Pedido '+x.pedido))+'</div>'
       +'<div class="pd-meta">#'+x.pedido+' · …'+esc(String(x.factura||'').slice(-4))
       +(ok?(' · '+esc(P.r.albaran)):'')+' · desde el '+esc(_cuaDia(x.desde))+'</div>';
+  };
+  va.forEach(function(x){
+    const P=_pdv.prev[x.pedido]||null, ok=!!(P && P.st==='ok');
+    h+=cab(x, P, ok, '');
     if(ok) h+=_valLineasHTML(P.r);
-    else if(val && P && P.st==='rech') h+=_valRechazoHTML(P.rech);
-    else if(val && P && P.st==='red') h+='<div class="pd-cua">No pude preguntarle al servicio de escritura.</div>';
-    else if(val) h+='<div class="pd-cua">Revisando en Odoo…</div>';
-    else x.motivos.forEach(function(m){
-      h+='<div class="pd-cua'+(m.ambar?' ambar':'')+'">'+esc(m.txt)+'</div>'; });
+    else if(P && P.st==='red') h+='<div class="pd-cua">No pude preguntarle al servicio de escritura.</div>';
+    else h+='<div class="pd-cua">Revisando en Odoo…</div>';
     h+='</div>'+(ok?('<button class="btn btn-sm pd-acc" onclick="pdvUno('+x.pedido+')">Validar</button>'):'')
       +'</div>';
   });
-  if(cs.some(function(x){ const P=_pdv.prev[x.pedido]; return _pdvValidable(x) && P && P.st==='red'; }))
+  if(va.some(function(x){ const P=_pdv.prev[x.pedido]; return P && P.st==='red'; }))
     h+='<button class="rp-ceros" onclick="pdvPrevias(true)">volver a preguntar</button>';
+  if(no.length){
+    h+='<div class="pdv-no-t">No se pueden validar · '+no.length+'</div>';
+    no.forEach(function(x){
+      const P=_pdv.prev[x.pedido]||null;
+      h+=cab(x, P, false, 'pdv-no');
+      if(P && P.st==='rech') h+=_valRechazoHTML(P.rech, true);
+      else x.motivos.forEach(function(m){ h+='<div class="pd-cua">'+esc(m.txt)+'</div>'; });
+      h+='</div></div>';
+    });
+  }
   return h+'</div>';
 }
 
