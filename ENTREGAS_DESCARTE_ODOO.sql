@@ -1,5 +1,9 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- ENTREGAS_DESCARTE_ODOO.sql  ·  1-oct-2026  ·  NO SE CORRIÓ TODAVÍA
+-- ENTREGAS_DESCARTE_ODOO.sql  ·  1-oct-2026  ·  APLICADO (1-oct-2026)
+-- ✅ Pegado por Andrea en Supabase producción el 1-oct, después del ensayo
+--    (ENSAYO_DESCARTE_ODOO.sql: 11 de 11 ok = true, con el texto esperado en
+--    cada rechazo). Fila de control vista: 1 · 2 · 0 · INSERT,SELECT.
+--    NO SE VUELVE A PEGAR (y si se pega, frena solo: la tabla ya existe).
 -- «Descartar» en «No se pueden validar» (Pendientes › Validar entrega en Odoo).
 --
 -- ⚠️ Este encabezado se cambia a "APLICADO" SOLO después de ver la fila de

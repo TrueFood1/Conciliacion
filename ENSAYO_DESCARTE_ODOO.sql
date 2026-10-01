@@ -1,6 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ENSAYO_DESCARTE_ODOO.sql  ·  1-oct-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA
 -- Prueba la tabla de «Descartar» (ENTREGAS_DESCARTE_ODOO.sql) y la deshace.
+-- ✅ CORRIDO el 1-oct-2026 por Andrea en producción: 11 de 11 ok = true, con el
+--    texto esperado en cada rechazo. Después se aplicó ENTREGAS_DESCARTE_ODOO.sql.
 --
 -- QUÉ HACE
 --   1. Aplica el BLOQUE DDL de ENTREGAS_DESCARTE_ODOO.sql, igual.
