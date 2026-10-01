@@ -13934,6 +13934,7 @@ async function bsCargar(force){
   // regla de b53 con el refresco de facturas — un proxy dormido no puede tapar
   // nada, solo tardar.
   bsEnriquecerFacturas();
+  bsLeerSalidasOdoo();       // el guarda de «Validar en Odoo»: también en segundo plano
 }
 
 // ── QUE FACTURA MANDA HOY ───────────────────────────────────────────────
@@ -14696,7 +14697,38 @@ function bsPuedeValidar(p){
   if(!p.factura_id)                 return false;  // sin factura no hay salida de venta
   if(!p.val_ok)                     return false;  // no se pudo leer el rastro
   if(p.odoo_val)                    return false;  // ya validado desde Truefie
+  if(p.odoo_sal_ok!==true)          return false;  // Odoo no se leyó (o todavía no)
+  if(p.odoo_hecha)                  return false;  // la salida ya está validada en Odoo
   return true;
+}
+
+// ── ¿LA SALIDA YA ESTÁ VALIDADA EN ODOO? · el guarda que esconde el botón ──
+// Sin esto, el botón aparecía en 77 de 95 pedidos (1-oct): casi todos los viejos
+// tienen el albarán validado a mano, y tocarlo solo daba `ya_validado_odoo`.
+// Criterio de Andrea (1-oct):
+//   · se esconde SOLO si la salida de venta ya está `done` en Odoo — la misma
+//     regla que el servidor (`hechas` en `revisar`);
+//   · un pedido DESCUADRADO lo sigue mostrando: el rechazo con el detalle
+//     producto por producto es información;
+//   · si Odoo no se pudo leer, NO se ofrece (falla cerrado, como el rastro).
+// La cadena es `entOdooSalidas`, la del cuadre con Odoo: una sola definición.
+// Va en segundo plano, como `bsEnriquecerFacturas`: el Historial no espera a Odoo.
+async function bsLeerSalidasOdoo(){
+  const P=(_bs||[]).filter(function(p){ return p.estado==='entregado' && p.factura_id; });
+  if(!P.length) return;
+  try{
+    const S=await entOdooSalidas(P.map(function(p){ return p.factura_id; }));
+    P.forEach(function(p){
+      const x=S[+p.factura_id];
+      if(!x){ p.odoo_sal_ok=false; return; }     // la factura no volvió: no se sabe
+      p.odoo_sal_ok=true;
+      p.odoo_hecha=(x.salidas||[]).some(function(k){ return k.state==='done'; });
+    });
+  }catch(e){
+    P.forEach(function(p){ p.odoo_sal_ok=false; });
+    try{ console.warn('[Truefie] Historial · no pude leer las salidas en Odoo:', (e&&e.message)||e); }catch(_){}
+  }
+  bsFiltrar();               // solo la lista: no se le saca el foco al buscador
 }
 
 // Cada rechazo del servidor, en el idioma de quien lo lee. El texto del
