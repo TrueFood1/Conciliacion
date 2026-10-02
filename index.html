@@ -18963,11 +18963,15 @@ function rzDiaFijoHtml(){
     // al recibir, el lun 28). Sin orden, "ya pedido" es 0 y "Pedir" repite lo que ya se pidió.
     if(ci.pasado && !R.pedidoErr && !g.filas.some(function(f){ return f.ya>1e-9; }))
       ambar.push('No hay orden de compra en Odoo para el pedido del '+_fechaCorta(ci.P)+': si ya se pidió, «Pedir» repite ese pedido.');
-    g.filas.filter(function(f){ return f.difiere; }).forEach(function(f){
-      ambar.push(f.nombre+': el plan pide '+_dfCant(f.A,f.uom)+' y lo habitual es '+_dfCant(f.B,f.uom)+' — difieren más que el margen ('+_dfCant(f.margen,f.uom)+').'); });
+    // A contra B en UNA línea: con una por insumo, una semana cargada llenaba la tarjeta de ámbar y
+    // tapaba el pedido (medido el 2-oct: cinco renglones). El detalle queda en la columna Habitual.
+    const dif=g.filas.filter(function(f){ return f.difiere; });
+    if(dif.length) ambar.push('El plan de la '+hSem.toLowerCase()+' se aparta de lo habitual más que el margen en: '
+      +dif.map(function(f){ return f.nombre+' ('+_dfCant(f.A,f.uom)+' contra '+_dfCant(f.B,f.uom)+')'; }).join(', ')+'.');
     let h='<div class="rz-df"><div class="rz-dfh">Pedido con día fijo</div><div class="rz-dft">'+tit+'</div>';
     if(rojos.length) h+='<div class="rz-dfrojo">No alcanza '+(med?('para medir el '+_fechaCorta(_dfAdd(ci.U,-7))):('hasta que llegue ('+_fechaCorta(ci.E)+')'))+': '
-      +rojos.map(function(f){ return esc(f.nombre)+' falta '+esc(_dfPedirTxt(f,f.rojo)); }).join(' · ')
+      +rojos.map(function(f){ const e=_dfEmp(f.pid,f.rojo,f.uom);   // lo que FALTA, no el saco entero
+        return esc(f.nombre)+' falta '+esc(_dfCant(f.rojo,f.uom))+(e?(' ('+e.n+' '+esc(e.lab)+')'):''); }).join(' · ')
       +'. '+esc(c.proveedor||'El proveedor')+' ya no llega a tiempo: hay que comprarlo afuera o mover producción.</div>';
     if(ambar.length) h+='<div class="rz-dfamb">'+ambar.map(esc).join('<br>')+'</div>';
     // Escritorio: tabla
