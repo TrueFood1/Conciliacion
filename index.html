@@ -4285,6 +4285,17 @@ body.es-socia .face-pend{display:block}
 #vResumen .rz-dfr .rz-dfn{color:#E24B4A}
 #vResumen .rz-dfmov{display:none}
 #vResumen .rz-dfit{padding:5px 0;border-top:.5px solid #232329}
+#vResumen .rz-dfacc{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+#vResumen .rz-dfmsg{font-size:12px;color:var(--text-2)}
+#vResumen .rz-dfmsg.rz-ok{color:#7E8C5A} #vResumen .rz-dfmsg.rz-dfmal{color:#E24B4A} #vResumen .rz-dfmsg.rz-dfamb2{color:#C99A4E}
+#vResumen .rz-dfpan{margin-top:12px;border-top:.5px solid #26262C;padding-top:12px}
+#vResumen .rz-dfpanh{font-size:12px;color:var(--text-2);margin-bottom:8px;line-height:1.4}
+#vResumen .rz-dfptbl{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+#vResumen .rz-dfptbl th{font-size:10.5px;font-weight:500;color:var(--text-3);text-align:left;padding:4px 10px 6px 0;border-bottom:.5px solid #232329}
+#vResumen .rz-dfptbl td{padding:5px 10px 5px 0;border-top:.5px solid #232329;color:var(--text-2);vertical-align:middle}
+#vResumen .rz-dfin{width:64px;text-align:right}
+#vResumen .rz-dfprev{margin-top:12px;background:#111114;border:.5px solid #26262C;border-radius:10px;padding:10px 12px}
+#vResumen .rz-dftot{margin-top:8px;font-size:12.5px;color:var(--text);font-weight:600;text-align:right}
 @media(max-width:760px){
   #vResumen .rz-cards4{grid-template-columns:1fr 1fr}
   #vResumen .rz-two{gap:22px}
@@ -4838,7 +4849,10 @@ const PROXY_LECTURA_URL   = 'https://truefood-proxy-lectura.onrender.com';
 // calza. El navegador manda {pedido_id, confirmar} y nada más: no elige modelo,
 // método ni albarán. La llave vive en Render y nunca pasa por acá. Ver
 // `bsValidarHTML`. El candado de `odooRpc` NO se toca: esto no pasa por él.
-const ESCRITURA_URL       = 'https://truefie-escritura.onrender.com';
+// Prueba en seco (T-28): SOLO en 127.0.0.1 y con ?escritura=local, el servicio que corre en la Mac
+// (con la llave de LECTURA: aunque se encendiera, Odoo le niega escribir). En producción no existe.
+const ESCRITURA_URL       = (location.hostname==='127.0.0.1' && /[?&]escritura=local\b/.test(location.search))
+                            ? 'http://127.0.0.1:8787' : 'https://truefie-escritura.onrender.com';
 async function lecturaRpc(model, method, args=[], kwargs={}){
   // El proxy exige un JWT de Supabase válido (login). Lo tomamos de la sesión actual.
   let token='';
@@ -8037,7 +8051,13 @@ async function nivDiaFijoDatos(cfg, mon0){
   const prems=NIV_PROD.map(function(p){ return NIV_INFO[p].prem; });
   const pm=await odooCall('mrp.production','search_read',[[['state','=','done'],['product_id','in',prems],['date_start','>=',_ymd(mon0)+' 06:00:00']]],{fields:['product_id']});
   const premCargada={}; pm.forEach(function(m){ premCargada[m.product_id[0]]=1; });
-  return {ins:ins, pids:pids, oh:oh, info:info, uomNom:uomNom, hist:hist, pedido:pedido, pedidoLineas:pedidoLineas, pedidoErr:pedidoErr, premCargada:premCargada};
+  // Órdenes ya creadas DESDE Truefie (compra_pedido_odoo, T-28): el botón no se vuelve a ofrecer.
+  // Si la tabla todavía no está pegada, simplemente no hay ninguna.
+  let registradas=[];
+  try{ const {data,error}=await sbClient().from('compra_pedido_odoo').select('proveedor_id,entrega_dia,po_nombre');
+       if(!error) registradas=data||[]; }catch(e){}
+  await accesoSocia();
+  return {ins:ins, pids:pids, oh:oh, info:info, uomNom:uomNom, hist:hist, pedido:pedido, pedidoLineas:pedidoLineas, pedidoErr:pedidoErr, premCargada:premCargada, registradas:registradas};
 }
 
 // EL CÁLCULO. Se rehace en cada recálculo del plan (editar el calendario mueve A y lo de antes de U).
@@ -8068,7 +8088,8 @@ async function nivDiaFijo(){
       const difiere=(A>1e-9||h.prom>1e-9) && Math.abs(A-h.prom)>Math.max(h.margen,1e-9);
       return {pid:pid, nombre:(inf.name||('id '+pid)).replace(/^\[[^\]]*\]\s*/,''), uom:uom, stock:st, antes:a, sobra:sobra, rojo:rojo,
               A:A, B:h.prom, margen:h.margen, ya:ya, bruto:bruto, pedir:pedir, difiere:difiere}; });
-    out.push({cfg:g.cfg, ci:ci, filas:filas, sinPlan:ci.U2>finPlan});
+    const reg=(D.registradas||[]).filter(function(x){ return +x.proveedor_id===+g.cfg.proveedor_id && x.entrega_dia===ci.E; }).map(function(x){ return x.po_nombre; });
+    out.push({cfg:g.cfg, ci:ci, filas:filas, sinPlan:ci.U2>finPlan, registrada:reg.length?reg:null});
   }
   const metaW0=_rzMetaEfectiva(0);
   const keylor=(_dfDow(hoy)!==1) ? NIV_PROD.filter(function(p){ return (metaW0[p]||0)>0 && !D.premCargada[NIV_INFO[p].prem]; }) : [];
@@ -14997,7 +15018,8 @@ async function escrituraPedir(ruta, id, confirmar){
   try{
     res=await fetch(ESCRITURA_URL+ruta, {method:'POST',
       headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
-      body:JSON.stringify(confirmar?{pedido_id:id, confirmar:true}:{pedido_id:id})});
+      // /pedir (T-28) lleva el id de una PROPUESTA de compra, no de un pedido de Entregas.
+      body:JSON.stringify((function(){ const b={}; b[ruta==='/pedir'?'propuesta_id':'pedido_id']=id; if(confirmar) b.confirmar=true; return b; })())});
   }catch(e){
     try{ console.error('[Truefie] Validar en Odoo · sin respuesta', id, e); }catch(_){}
     return {red:true};
@@ -18948,7 +18970,7 @@ function rzDiaFijoHtml(){
   if(R.sinCargar.length) avisosComunes.push('Producción sin cargar en Odoo ('+R.sinCargar.map(_fechaCorta).join(', ')+'): se estimó con el plan.');
   if(R.keylor.length) avisosComunes.push('Falta cargar en Odoo la medición de esta semana: '+R.keylor.map(function(p){ return NIV_INFO[p].nom; }).join(', ')+'.');
   if(R.pedidoErr) avisosComunes.push(R.pedidoErr);
-  return R.grupos.map(function(g){
+  return R.grupos.map(function(g, gi){
     const ci=g.ci, c=g.cfg, med=c.uso!=='produccion';
     const tit=esc(c.proveedor||'Proveedor')+' · '
       +(ci.sinDia ? 'sin día de pedido (calculado como si pidieras hoy)' : ('pedido '+_fechaCorta(ci.P)+(ci.pasado?' (ya pasó)':'')))
@@ -18993,8 +19015,147 @@ function rzDiaFijoHtml(){
         return '<div class="rz-dfit'+(f.rojo>1e-9?' rz-dfr':'')+'"><div class="rz-c4item"><span class="rz-dfn">'+esc(f.nombre)+'</span>'
           +'<span class="rz-dfp'+(f.pedir>1e-9?'':' rz-ok')+'">'+(f.pedir>1e-9?'pedir ':'')+esc(_dfPedirTxt(f,f.pedir))+'</span></div>'
           +'<div class="rz-c4nota">'+esc(cuenta)+'</div></div>'; }).join('')+'</div>';
-    return h+'</div>';
+    return h+_dfAccionesHtml(g, gi)+'</div>';
   }).join('');
+}
+// ── «PEDIR A BIO» / «REGISTRAR PEDIDO» (T-28, 2-oct) ─────────────────────
+// Crea la orden de compra CONFIRMADA en Odoo por el servicio de escritura (POST /pedir), con
+// las mismas cercas que validar y trasladar y su interruptor propio (COMPRA_ENCENDIDA). Así
+// "ya pedido" se descuenta solo: hoy las órdenes de BIO se cargan al RECIBIR (medido el 2-oct).
+// EL NAVEGADOR NO LE MANDA CANTIDADES AL SERVICIO. Guarda lo que la socia decidió como una fila
+// de `compra_propuesta` (append-only, RLS socia) y le pasa el id: el servicio lee la fila y
+// arma la orden. Corregir = otra propuesta. Precio: el de la última compra real (lo pone el
+// servicio; las tarifas de BIO en Odoo son de 2023).
+// «Registrar pedido» es el mismo camino para un pedido YA hecho (por WhatsApp) que todavía no
+// llegó: queda en Odoo, no se le manda nada al proveedor.
+let _dfPanel=null;   // {gi, valores:{pid:n}, previa, propuestaId, estado, msg}
+// Cantidad del panel → UoM del producto. n en empaques si tiene; si no, en su unidad (g → kg).
+function _dfDesdePanel(f, n){
+  const pe=_pesoEmpaque(f.pid); n=+n||0;
+  if(pe){ const k=(f.uom===pe.unidad)?1:(f.uom==='g'&&pe.unidad==='kg')?1/1000:(f.uom==='kg'&&pe.unidad==='g')?1000:null;
+    if(k!=null) return n*pe.peso/k; }
+  return f.uom==='g' ? n*1000 : n;
+}
+function _dfPanelInicial(f){ const e=_dfEmp(f.pid, f.pedir, f.uom); return e ? e.n : (f.uom==='g' ? Math.round(f.pedir/100)/10 : Math.ceil(f.pedir*10)/10); }
+function _dfUnidadPanel(f){ const pe=_pesoEmpaque(f.pid); return pe ? pe.lab : (f.uom==='g'?'kg':f.uom); }
+function dfAbrir(gi){
+  const g=_rzDiaFijo&&_rzDiaFijo.grupos[gi]; if(!g) return;
+  const v={}; g.filas.forEach(function(f){ v[f.pid]=_dfPanelInicial(f); });
+  _dfPanel={gi:gi, valores:v, previa:null, propuestaId:null, estado:'editando', msg:''};
+  dfPintarPanel();
+}
+function dfCerrar(){ const gi=_dfPanel&&_dfPanel.gi; _dfPanel=null; const el=document.getElementById('dfPanel'+gi); if(el) el.innerHTML=''; }
+function dfValor(gi, pid, val){
+  if(!_dfPanel||_dfPanel.gi!==gi) return;
+  _dfPanel.valores[pid]=String(val).replace(',','.'); _dfPanel.previa=null; _dfPanel.propuestaId=null; _dfPanel.estado='editando';
+  const g=_rzDiaFijo.grupos[gi], f=g.filas.find(function(x){ return x.pid===pid; });
+  const eq=document.getElementById('dfEq'+pid); if(eq&&f) eq.textContent='= '+_dfCant(_dfDesdePanel(f,_dfPanel.valores[pid]), f.uom);
+  const pv=document.getElementById('dfPrev'+gi); if(pv) pv.innerHTML='';
+  const bt=document.getElementById('dfBtn'+gi); if(bt){ bt.textContent='Revisar en Odoo'; bt.setAttribute('onclick','dfRevisar('+gi+')'); bt.disabled=false; }
+}
+function dfPintarPanel(){
+  const P=_dfPanel; if(!P) return;
+  const g=_rzDiaFijo.grupos[P.gi], el=document.getElementById('dfPanel'+P.gi); if(!g||!el) return;
+  const reg=g.ci.pasado;
+  let h='<div class="rz-dfpan"><div class="rz-dfpanh">'+(reg?'Registrar el pedido que ya se le hizo a ':'Pedir a ')+esc(g.cfg.proveedor||'proveedor')
+    +' · llega '+_fechaCorta(g.ci.E)+(reg?' · <span class="muted">no se le manda nada al proveedor: solo queda en Odoo</span>':'')+'</div>'
+    +'<table class="rz-dfptbl"><thead><tr><th>Insumo</th><th>Truefie calcula</th><th>Pedir</th><th></th></tr></thead><tbody>'
+    +g.filas.map(function(f){ const val=P.valores[f.pid];
+      return '<tr><td>'+esc(f.nombre)+'</td><td class="muted">'+esc(_dfPedirTxt(f,f.pedir))+'</td>'
+        +'<td><input class="cn-in rz-dfin" inputmode="decimal" value="'+esc(String(val).replace('.',','))+'" oninput="dfValor('+P.gi+','+f.pid+',this.value)"> '
+        +esc(_dfUnidadPanel(f))+'</td><td class="muted" id="dfEq'+f.pid+'">= '+esc(_dfCant(_dfDesdePanel(f,val),f.uom))+'</td></tr>'; }).join('')
+    +'</tbody></table>'
+    +'<div class="rz-dfacc"><button class="cn-btn cn-guardar" id="dfBtn'+P.gi+'" onclick="dfRevisar('+P.gi+')">Revisar en Odoo</button>'
+    +'<button class="cn-btn" onclick="dfWhatsApp('+P.gi+')">Copiar para WhatsApp</button>'
+    +'<button class="cn-btn" onclick="dfCerrar()">Cerrar</button><span class="rz-dfmsg" id="dfMsgP'+P.gi+'"></span></div>'
+    +'<div id="dfPrev'+P.gi+'"></div></div>';
+  el.innerHTML=h;
+}
+function _dfMsg(gi, txt, cls){ const m=document.getElementById('dfMsgP'+gi)||document.getElementById('dfMsg'+gi); if(m){ m.className='rz-dfmsg'+(cls?(' '+cls):''); m.textContent=txt; } }
+// Guarda la propuesta (lo que la socia decidió) y pide la vista previa al servicio.
+async function dfRevisar(gi){
+  const P=_dfPanel, g=_rzDiaFijo&&_rzDiaFijo.grupos[gi]; if(!P||!g) return;
+  const lineas=g.filas.map(function(f){ const pe=_pesoEmpaque(f.pid), n=+String(P.valores[f.pid]).replace(',','.')||0;
+      return {producto_id:f.pid, nombre:f.nombre, uom:f.uom, calculado:Math.round(f.pedir*1000)/1000,
+              pedido:Math.round(_dfDesdePanel(f,n)*1000)/1000, empaques:pe?n:null, empaque_lab:pe?pe.lab:null,
+              empaque_peso:pe?pe.peso:null, empaque_unidad:pe?pe.unidad:null}; })
+    .filter(function(l){ return l.pedido>0; });
+  if(!lineas.length){ _dfMsg(gi,'No hay nada para pedir.','rz-dfmal'); return; }
+  const bt=document.getElementById('dfBtn'+gi); if(bt) bt.disabled=true;
+  _dfMsg(gi,'Guardando la propuesta y revisando en Odoo…');
+  try{
+    const c=sbClient(); const {data:{user}}=await c.auth.getUser();
+    const {data,error}=await c.from('compra_propuesta').insert({proveedor_id:+g.cfg.proveedor_id, proveedor:g.cfg.proveedor||null,
+        modo:g.ci.pasado?'registrar':'pedir', pedido_dia:g.ci.P, entrega_dia:g.ci.E, uso_dia:g.ci.U, lineas:lineas,
+        creado_por:(user&&user.email)||''}).select('id').single();
+    if(error) throw new Error('No pude guardar la propuesta: '+(error.message||error));
+    P.propuestaId=data.id;
+  }catch(e){ if(bt) bt.disabled=false; _dfMsg(gi,String(e&&e.message||e),'rz-dfmal'); return; }
+  const R=await escrituraPedir('/pedir', P.propuestaId, false);
+  if(bt) bt.disabled=false;
+  if(R.red){ _dfMsg(gi,'El servicio no contestó. No se tocó Odoo.','rz-dfmal'); return; }
+  if(!R.js.ok){ _dfMsg(gi,''); document.getElementById('dfPrev'+gi).innerHTML=_dfRechazoHtml(R.js); return; }
+  P.previa=R.js; P.estado='previa'; _dfMsg(gi,'');
+  document.getElementById('dfPrev'+gi).innerHTML=_dfPreviaHtml(R.js);
+  if(bt){ bt.textContent=g.ci.pasado?'Registrar en Odoo':'Crear la orden en Odoo'; bt.setAttribute('onclick','dfConfirmar('+gi+')'); }
+}
+function _dfRechazoHtml(js){
+  return '<div class="rz-dfrojo">'+esc(js.texto||js.motivo||'El servicio dijo que no.')
+    +(Array.isArray(js.detalle)?('<br>'+js.detalle.map(function(d){ return esc(d.producto+': pide '+_rzN(d.pide,1)+' '+d.unidad+', tope '+_rzN(d.tope,1)+' '+d.unidad); }).join('<br>')):'')+'</div>';
+}
+function _dfPreviaHtml(r){
+  const col=function(n){ return n==null?'—':'₡'+_rzN(n, n%1?2:0); };
+  let h='<div class="rz-dfprev"><div class="rz-dfpanh">Orden que se crearía en Odoo · '+esc(r.proveedor)+' · «'+esc(r.referencia)+'» · llega '
+    +_fechaLarga(r.entrega_dia)+' al mediodía · confirmada</div>'
+    +'<table class="rz-dfptbl"><thead><tr><th>Insumo</th><th>Pedido</th><th>En Odoo</th><th>Precio</th><th>Subtotal</th></tr></thead><tbody>'
+    +r.lineas.map(function(l){ return '<tr><td>'+esc(l.producto.replace(/^\[[^\]]*\]\s*/,''))+'</td><td>'
+        +esc(l.empaques!=null?(_rzN(l.empaques)+' '+(l.empaques===1?(_CN_SING[l.empaque_lab]||l.empaque_lab):l.empaque_lab)):'')+'</td>'
+        +'<td>'+esc(_rzN(l.cant_po,2)+' '+l.uom_po)+'</td><td title="'+esc(l.precio_fuente||'')+'">'+col(l.precio_unit)+'/'+esc(l.uom_po)
+        +'<span class="rz-dfsub">'+esc(l.precio_fuente||'sin precio')+'</span></td><td>'+col(l.subtotal)+'</td></tr>'; }).join('')
+    +'</tbody></table><div class="rz-dftot">Total estimado sin impuestos: '+col(r.total_estimado)+'</div>';
+  const av=[];
+  if(r.sin_precio&&r.sin_precio.length) av.push('Sin precio en Odoo: '+r.sin_precio.join(', ')+'.');
+  if(r.otras_ordenes&&r.otras_ordenes.length) av.push('Ojo: hay órdenes de este proveedor cargadas a mano y sin recibir ('
+    +r.otras_ordenes.map(function(x){ return x.name; }).join(', ')+'). Si alguna es este mismo pedido, registrarlo lo duplicaría.');
+  if(av.length) h+='<div class="rz-dfamb">'+av.map(esc).join('<br>')+'</div>';
+  return h+'</div>';
+}
+async function dfConfirmar(gi){
+  const P=_dfPanel; if(!P||!P.propuestaId||P.estado!=='previa') return;
+  const bt=document.getElementById('dfBtn'+gi); if(bt) bt.disabled=true;
+  _dfMsg(gi,'Creando la orden en Odoo…');
+  const R=await escrituraPedir('/pedir', P.propuestaId, true);
+  if(R.red){ _dfMsg(gi,'No hubo respuesta: no se sabe si Odoo creó la orden. Revisá en Odoo antes de reintentar.','rz-dfmal'); return; }
+  if(R.st===423){ _dfMsg(gi,'Todo calza, pero la compra está apagada (COMPRA_ENCENDIDA): no se creó nada en Odoo.','rz-dfamb2'); return; }
+  if(!R.js.ok){ if(bt) bt.disabled=false; document.getElementById('dfPrev'+gi).innerHTML=_dfRechazoHtml(R.js); _dfMsg(gi,''); return; }
+  _dfMsg(gi,'Orden '+R.js.po_nombre+' creada y confirmada en Odoo.','rz-ok');
+  // la tarjeta se vuelve a leer: "ya pedido" ahora la descuenta
+  setTimeout(function(){ cargarResumen(); }, 1500);
+}
+// Texto para mandarle al proveedor. No escribe nada en ningún lado: solo el portapapeles.
+async function dfWhatsApp(gi){
+  const g=_rzDiaFijo&&_rzDiaFijo.grupos[gi]; if(!g) return;
+  const vals=(_dfPanel&&_dfPanel.gi===gi)?_dfPanel.valores:null;
+  const lin=g.filas.map(function(f){ const n=vals?(+String(vals[f.pid]).replace(',','.')||0):_dfPanelInicial(f); if(!(n>0)) return '';
+      const pe=_pesoEmpaque(f.pid);
+      return '• '+f.nombre+': '+(pe?(_rzN(n)+' '+(n===1?(_CN_SING[pe.lab]||pe.lab):pe.lab)):(_rzN(n,1)+' '+_dfUnidadPanel(f))); })
+    .filter(Boolean);
+  if(!lin.length){ _dfMsg(gi,'No hay nada para pedir.','rz-dfmal'); return; }
+  const txt='Hola, pedido de True Food para entregar el '+_fechaLarga(g.ci.E).replace(/ \d{4}$/,'')+':\n'+lin.join('\n')+'\nGracias.';
+  try{ await navigator.clipboard.writeText(txt); _dfMsg(gi,'Copiado: pegalo en WhatsApp.','rz-ok'); }
+  catch(e){ window.prompt('Copiá este texto:', txt); }
+}
+// Botones de la tarjeta, por grupo. Solo socias (la base y el servicio igual lo exigen).
+function _dfAccionesHtml(g, gi){
+  if(g.registrada) return '<div class="rz-dfacc"><span class="rz-ok">Pedido en Odoo: '+esc(g.registrada.join(', '))+'</span></div>';
+  if(_socia!==true) return '';
+  const hoy=_rzCtx.hoyStr, pasado=g.ci.pasado, futuro=g.ci.P>hoy;
+  const lbl=pasado?'Registrar pedido':('Pedir a '+(g.cfg.proveedor||'proveedor').split(' ')[0]);
+  return '<div class="rz-dfacc">'
+    +(futuro?('<span class="muted">Se pide el '+_fechaCorta(g.ci.P)+'.</span>')
+            :('<button class="cn-btn cn-guardar" onclick="dfAbrir('+gi+')">'+esc(lbl)+'</button>'))
+    +'<button class="cn-btn" onclick="dfWhatsApp('+gi+')">Copiar para WhatsApp</button>'
+    +'<span class="rz-dfmsg" id="dfMsg'+gi+'"></span></div><div id="dfPanel'+gi+'"></div>';
 }
 // ── 1 · PENDIENTE DE FABRICAR: tira horizontal HOY → próximo lunes, editable + touch ──
 function _rzChipPersonas(iso, personas){
