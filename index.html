@@ -4005,6 +4005,7 @@ body.es-socia .face-pend{display:block}
 .pdv-it .pd-meta b{color:var(--text);font-weight:600}
 .pdv-acc{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:10px}
 .pdv-res-t{font-size:11px;font-weight:500;color:var(--text-3);padding-top:12px}
+.pdt-uom{color:var(--text-3)!important;font-size:11.5px}
 /* «No se pueden validar»: aparte, abajo y en gris (Andrea, 1-oct). */
 .pdv-no-t{font-size:11px;font-weight:500;color:var(--text-3);padding:16px 0 2px}
 .pdv-no .pd-quien,.pdv-no .pd-cua{color:var(--text-3)}
@@ -4618,7 +4619,7 @@ body.es-socia .face-pend{display:block}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 1 oct 2026 · b77';
+const BUILD = 'v 1 oct 2026 · b78 (traslado interno, NO PUBLICAR)';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -14734,13 +14735,16 @@ function bsValidadoHTML(p){
 // UNA llamada al servicio. Devuelve {st, js} o {red:true} si no hubo respuesta
 // (corte de red, CORS, servicio caído). Quien llama decide qué significa: al
 // PREVISUALIZAR un corte es solo un corte; al CONFIRMAR, no se sabe si Odoo validó.
-async function escrituraValidar(id, confirmar){
+async function escrituraValidar(id, confirmar){ return escrituraPedir('/validar', id, confirmar); }
+// La misma llamada para las dos rutas del servicio: /validar (salida de venta) y
+// /trasladar (traslado interno, 1-oct). El cuerpo es {pedido_id, confirmar} en las dos.
+async function escrituraPedir(ruta, id, confirmar){
   let token='';
   try{ const s=await sbClient().auth.getSession();
        token=(s&&s.data&&s.data.session&&s.data.session.access_token)||''; }catch(e){}
   let res;
   try{
-    res=await fetch(ESCRITURA_URL+'/validar', {method:'POST',
+    res=await fetch(ESCRITURA_URL+ruta, {method:'POST',
       headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
       body:JSON.stringify(confirmar?{pedido_id:id, confirmar:true}:{pedido_id:id})});
   }catch(e){
@@ -14781,7 +14785,21 @@ const VAL_MOTIVO={
   odoo_error:'Odoo contestó con un error. No se validó nada.',
   truefie_error:'Supabase no contestó bien. No se validó nada.',
   cerca_odoo:'El servicio frenó un pedido a Odoo que no le corresponde. No se validó nada.',
-  interno:'El servicio de escritura falló. No se validó nada.'
+  interno:'El servicio de escritura falló. No se validó nada.',
+  // traslado interno (1-oct)
+  traslado_apagado:'Todo calza, pero el traslado está apagado: no se creó nada.',
+  tiene_factura:'Esta salida tiene factura: se valida en «Validar entrega en Odoo», no se traslada.',
+  motivo_sin_traslado:'Este motivo no lleva traslado interno.',
+  sin_pendiente:'Esta salida ya no está en la cola: alguien la marcó Hecho.',
+  ya_creado_truefie:'El traslado de esta salida ya se creó desde Truefie.',
+  ya_creado_odoo:'Ya hay un traslado en Odoo con esta referencia. No se crea otro.',
+  destino_raro:'La ubicación de destino en Odoo no es la esperada. No se creó nada.',
+  contacto_raro:'El contacto genérico no existe o está archivado en Odoo. No se creó nada.',
+  sin_lineas:'La salida no tiene productos.',
+  producto_raro:'La salida tiene algo que no es un producto terminado.',
+  cantidad_fraccion:'Una cantidad no da exacta en la unidad de Odoo.',
+  sin_existencias:'Odoo no tiene en WH/Stock lo que salió. Hay que corregir el inventario antes.',
+  sin_reserva:'Odoo no reservó todo lo que salió. El traslado se canceló.'
 };
 
 function _valFecha(s){          // Odoo manda "2026-09-30 14:00:00" en UTC, sin zona
@@ -14819,7 +14837,10 @@ function _valRechazoHTML(R, gris){
   const frase=VAL_MOTIVO[R.motivo]||'No se pudo validar.';
   const extra=(R.texto && R.texto.trim()!==frase.trim())?('<span>'+esc(R.texto)+'</span>'):'';
   return '<div class="'+((gris||R.motivo==='escritura_apagada')?'pdv-neutro':'pdv-mal')+'">'+esc(frase)+extra+'</div>'
-    +(R.motivo==='descuadre'?_valDescuadreHTML(R.detalle):'');
+    +(R.motivo==='descuadre'?_valDescuadreHTML(R.detalle):'')
+    +((R.motivo==='sin_existencias' && Array.isArray(R.detalle))?R.detalle.map(function(l){
+        return '<div class="pdv-dq"><b>'+esc(_valProd(l))+'</b><span>salió '+esc(_entPresPlano(l.producto_id, l.uds))
+          +'</span><span>libre en Odoo '+esc(_rzN(l.libre_uom,2))+' '+esc(l.uom||'')+'</span></div>'; }).join(''):'');
 }
 
 // ── La hoja de clientes: frecuentes primero (facturas de los últimos 90 días) ──
@@ -15628,6 +15649,7 @@ async function pdCargar(force){
   }
   pdRender();
   pdCuadreCargar(!!force);   // el cuadre con Odoo llega después y repinta
+  pdtPrevias(true);          // «Crear en Odoo»: le pregunta al servidor cada traslado de la cola
 }
 async function pdLeer(){
   const c=sbClient(); if(!c) throw new Error('sin sesión de Supabase');
@@ -17030,6 +17052,7 @@ function pdOdooHTML(){
     const ls=filas.filter(function(x){ return x.tipo===tipo; });
     if(!ls.length) return;
     const T=PD_ODOO_T[tipo];
+    if(tipo==='traslado_interno'){ h+=pdtHTML(ls, T); return; }   // con «Crear en Odoo» (1-oct)
     h+='<div class="card rp-z"><div class="card-title">'+esc(T.t)
       +' <span class="pd-cnt on">'+ls.length+'</span></div>'
       +'<div class="rp-nota" style="margin:-4px 0 10px">'+esc(T.q)
@@ -17066,6 +17089,199 @@ function pdOdooHTML(){
   });
   return h;
 }
+/* ══════════════════════════════════════════════════════════════════════
+   «CREAR EN ODOO» · traslados internos por crear (1-oct-2026)
+   Una salida SIN factura —regalía (y muestra), degustación, consumo de socias,
+   reposición— se descuenta en Odoo con un traslado interno. Lo crea el servicio
+   `ESCRITURA_URL` (POST /trasladar), con su interruptor propio
+   (TRASLADO_ENCENDIDO), separado del de validar.
+   Decisiones de Andrea: regalía, degustación y consumo de socias → Mercadeo y
+   Muestras [19] (6106008); reposición → Desecho [16] (6106016); un contacto
+   genérico por motivo; referencia «Truefie pedido N · destinatario» y nota en
+   el chatter; se crea y se valida en el momento (misma regla que T-94).
+   NADA de eso lo elige esta pantalla: manda {pedido_id, confirmar} y el servidor
+   saca destino, contacto, productos y cantidades de la salida.
+   Mismo molde que «Validar entrega en Odoo»: vista previa del servidor por fila,
+   casillas, «Seleccionar todos», tanda con vista previa fresca, de a uno sin
+   frenar ante un rechazo, y resumen. «Hecho» queda: es el camino a mano.
+   ══════════════════════════════════════════════════════════════════════ */
+let _pdt={prev:{}, sel:{}, tanda:null, leyendo:false};
+const PDT_MOTIVO={regalia:'Regalía', degustacion:'Degustación', consumo_interno:'Consumo de socias', reposicion:'Reposición'};
+
+function _pdtFilas(){
+  const E=(_pd&&_pd.odoo)||null;
+  return ((E&&!E.noSocia&&E.filas)||[]).filter(function(x){ return x.tipo==='traslado_interno'; });
+}
+
+async function pdtPrevias(force){
+  if(_pdt.leyendo) return;
+  if(!(await accesoSocia())) return;
+  // `_pd` se arma en pdCargar; si todavía no está, no hay filas que preguntar.
+  for(let i=0;i<40 && !_pd;i++) await _esperar(250);
+  if(force) _pdt.prev={};
+  const ids=_pdtFilas().map(function(x){ return x.pedido_id; })
+    .filter(function(id){ return id && (!_pdt.prev[id] || _pdt.prev[id].st==='red'); });
+  if(!ids.length) return;
+  _pdt.leyendo=true;
+  ids.forEach(function(id){ _pdt.prev[id]={st:'leyendo'}; });
+  try{ pdRender(); }catch(e){}
+  await Promise.all(ids.map(async function(id){
+    const R=await escrituraPedir('/trasladar', id, false);
+    if(R.red) _pdt.prev[id]={st:'red'};
+    else if(R.st===200 && R.js.ok) _pdt.prev[id]={st:'ok', r:R.js};
+    else _pdt.prev[id]={st:'rech', rech:R.js};
+    if(_pdt.prev[id].st!=='ok') delete _pdt.sel[id];
+  }));
+  _pdt.leyendo=false;
+  try{ pdRender(); }catch(e){}
+}
+
+// Lo que se crearía: a dónde, con qué contacto, y cada producto en la unidad de
+// venta (lo que se dice en voz alta) y en la de Odoo (lo que va al documento).
+function _pdtPreviaHTML(r){
+  return '<div class="pd-meta">'+esc(PDT_MOTIVO[r.motivo]||r.motivo)+' → <b>'+esc(r.destino)+'</b>'
+    +' · contacto '+esc(r.contacto)+'</div>'
+    +'<table class="pdv-tb"><tbody>'+(r.lineas||[]).map(function(l){
+      return '<tr><td>'+esc(_valProd(l))+'</td><td class="n">'+esc(_entPres(l.producto_id, l.uds))
+        +'</td><td class="n pdt-uom">'+esc(_rzN(l.cant_uom,2))+' '+esc(l.uom)+'</td></tr>'; }).join('')
+    +'</tbody></table>';
+}
+
+function pdtHTML(ls, T){
+  let h='<div class="card rp-z"><div class="card-title">'+esc(T.t)
+    +' <span class="pd-cnt on">'+ls.length+'</span></div>'
+    +'<div class="rp-nota" style="margin:-4px 0 10px">'+esc(T.q)+'</div>';
+  const TD=_pdt.tanda;
+  if(TD) return h+pdtTandaHTML(TD)+'</div>';
+  const oks=ls.filter(function(x){ const P=_pdt.prev[x.pedido_id]; return P && P.st==='ok'; });
+  const nSel=oks.filter(function(x){ return _pdt.sel[x.pedido_id]; }).length;
+  if(oks.length){
+    h+='<div class="pdv-barra"><label class="pdv-chk"><input type="checkbox"'+(nSel===oks.length?' checked':'')
+      +' onchange="pdtTodos(this.checked)"> Seleccionar todos</label>'
+      +'<button class="btn btn-sm pdv-si"'+(nSel?'':' disabled')+' onclick="pdtTandaAbrir()">'
+      +'Crear seleccionados'+(nSel?(' ('+nSel+')'):'')+'</button></div>';
+  }
+  ls.forEach(function(x){
+    const d=_pdExcDias(x.fecha), P=_pdt.prev[x.pedido_id]||null, ok=!!(P && P.st==='ok');
+    h+='<div class="pd-exc-ped"><div class="pd-exc-cab">'
+      +'<div class="pd-exc-cli">'
+      +(ok?('<input type="checkbox" class="pdv-c"'+(_pdt.sel[x.pedido_id]?' checked':'')
+            +' onchange="pdtSel('+x.pedido_id+',this.checked)" aria-label="Elegir el pedido '+x.pedido_id+'"> '):'')
+      +esc(x.cliente_nombre || x.destinatario || '—')+'</div>'
+      +'<div class="pd-exc-dias">'+(d===null?'—':(d<=0?'hoy':(d===1?'1 día':d+' días')))+'</div></div>'
+      +'<div class="pd-exc-meta">#'+x.pedido_id+' · sin factura · '+x.lineas.length
+      +(x.lineas.length===1?' línea':' líneas')+'</div>';
+    if(ok) h+=_pdtPreviaHTML(P.r);
+    else {
+      // Sin vista previa (todavía, o rechazada): el payload de la cola, como antes.
+      x.lineas.forEach(function(l){
+        h+='<div class="pd-exc-lin"><div class="pd-exc-prod">'
+          +'<b>'+esc(_lotNom(l.producto_id))+'</b> · '
+          +'<span class="pd-exc-cant">'+esc(_entPres(l.producto_id, l.cant_uds))+'</span>'
+          +' · <span class="dv-lote">'+esc(l.lote)+'</span></div></div>';
+      });
+      if(P && P.st==='rech') h+=_valRechazoHTML(P.rech);
+      else if(P && P.st==='red') h+='<div class="pd-cua">No pude preguntarle al servicio de escritura.</div>';
+      else if(P) h+='<div class="pd-cua">Revisando en Odoo…</div>';
+    }
+    const ocupada=(_pdOdooHaciendo===x.id);
+    h+='<div class="dv-acc" style="margin-top:10px">'
+      +(ok?('<button class="btn btn-sm pdv-si" onclick="pdtUno('+x.pedido_id+')">Crear en Odoo</button>'):'')
+      // «Hecho» se queda: es el camino a mano (alguien lo creó en Odoo sin Truefie).
+      +'<button class="btn btn-sm"'+(ocupada?' disabled':'')
+      +' onclick="pdOdooHecho('+x.id+')">'+(ocupada?'Guardando…':'Hecho')+'</button>'
+      +'</div></div>';
+  });
+  if(ls.some(function(x){ const P=_pdt.prev[x.pedido_id]; return P && P.st==='red'; }))
+    h+='<button class="rp-ceros" onclick="pdtPrevias(true)">volver a preguntar</button>';
+  return h+'</div>';
+}
+
+function pdtTandaHTML(T){
+  let h='<div class="pdv-tanda">';
+  if(T.fase==='revisando')
+    return h+'<div class="pd-cua">Revisando '+T.items.length+(T.items.length===1?' salida':' salidas')+' en Odoo…</div></div>';
+  if(T.fase==='previa'){
+    const ok=T.items.filter(function(it){ return it.r; });
+    T.items.forEach(function(it){
+      h+='<div class="pdv-it"><div class="pd-quien">'+esc(it.cli)+'</div>';
+      if(it.r) h+='<div class="pd-meta">#'+it.id+' · <b>'+esc(it.r.referencia)+'</b></div>'+_pdtPreviaHTML(it.r);
+      else h+='<div class="pd-meta">#'+it.id+' · se salta</div>'
+        +(it.red?'<div class="pdv-mal">No pude preguntarle al servicio de escritura.</div>':_valRechazoHTML(it.rech));
+      h+='</div>';
+    });
+    if(ok.length)
+      h+='<div class="bs-anu-av">Crea y valida '+(ok.length===1?'el traslado':('los '+ok.length+' traslados'))
+        +' en Odoo hoy, de a uno. Desde Truefie <b>no se deshace</b>.</div>'
+        +'<div class="pdv-acc"><button class="btn btn-sm pdv-si" onclick="pdtTandaConfirmar()">'
+        +(ok.length===1?'Crear el traslado':('Crear '+ok.length+' traslados'))+'</button>'
+        +'<button class="bs-anu-l" onclick="pdtTandaCerrar()">Cancelar</button></div>';
+    else h+='<div class="pdv-acc"><button class="bs-anu-l" onclick="pdtTandaCerrar()">Cerrar</button></div>';
+    return h+'</div>';
+  }
+  if(T.fase==='creando'){
+    const n=T.items.filter(function(it){ return it.r; }).length;
+    return h+'<div class="pd-cua">Creando '+Math.min(T.i+1,n)+' de '+n+'…</div></div>';
+  }
+  const si=T.items.filter(function(it){ return it.res && it.res.ok; });
+  const no=T.items.filter(function(it){ return !(it.res && it.res.ok); });
+  h+='<div class="pdv-res-t">Creados · '+si.length+'</div>';
+  si.forEach(function(it){
+    h+='<div class="pdv-it"><div class="pd-quien">'+esc(it.cli)+'</div><div class="pd-meta">#'+it.id
+      +' · '+esc(it.res.picking)+(it.res.date_done?(' · '+esc(_valFecha(it.res.date_done))):'')
+      +(it.res.hecho===false?' · ⚠ no salió de la cola: marcar Hecho':'')+'</div></div>'; });
+  h+='<div class="pdv-res-t">No creados · '+no.length+'</div>';
+  no.forEach(function(it){
+    h+='<div class="pdv-it"><div class="pd-quien">'+esc(it.cli)+'</div><div class="pd-meta">#'+it.id+'</div>'
+      +(it.incierto
+        ? '<div class="pdv-mal">Se cortó la comunicación al confirmar: no sé si Odoo creó el traslado.'
+          +'<span>Buscá «Truefie pedido '+it.id+'» en Odoo antes de volver a intentar.</span></div>'
+        : (it.red?'<div class="pdv-mal">No pude preguntarle al servicio de escritura.</div>':_valRechazoHTML(it.rech)))
+      +'</div>'; });
+  return h+'<div class="pdv-acc"><button class="bs-anu-l" onclick="pdtTandaCerrar()">Cerrar</button></div></div>';
+}
+
+function pdtSel(id, on){ if(on) _pdt.sel[id]=true; else delete _pdt.sel[id]; pdRender(); }
+function pdtTodos(on){
+  _pdt.sel={};
+  if(on) _pdtFilas().forEach(function(x){ const P=_pdt.prev[x.pedido_id]; if(P && P.st==='ok') _pdt.sel[x.pedido_id]=true; });
+  pdRender();
+}
+function pdtUno(id){ _pdt.sel={}; _pdt.sel[id]=true; pdtTandaAbrir(); }
+
+async function pdtTandaAbrir(){
+  if(_pdt.tanda) return;
+  const items=_pdtFilas().filter(function(x){ return _pdt.sel[x.pedido_id]; })
+    .map(function(x){ return {id:x.pedido_id, cli:x.cliente_nombre||x.destinatario||('Pedido '+x.pedido_id)}; });
+  if(!items.length) return;
+  _pdt.tanda={fase:'revisando', items:items, i:0}; pdRender();
+  await Promise.all(items.map(async function(it){
+    const R=await escrituraPedir('/trasladar', it.id, false);
+    if(R.red) it.red=true; else if(R.st===200 && R.js.ok) it.r=R.js; else it.rech=R.js;
+  }));
+  if(_pdt.tanda){ _pdt.tanda.fase='previa'; pdRender(); }
+}
+
+async function pdtTandaConfirmar(){
+  const T=_pdt.tanda; if(!T || T.fase!=='previa') return;
+  T.fase='creando'; T.i=0; pdRender();
+  const ok=T.items.filter(function(it){ return it.r; });
+  for(let k=0;k<ok.length;k++){
+    const it=ok[k]; T.i=k; pdRender();
+    const R=await escrituraPedir('/trasladar', it.id, true);
+    if(R.red){ it.incierto=true; continue; }
+    if(R.st===200 && R.js.ok && R.js.creado){
+      it.res={ok:true, picking:R.js.picking_nombre, date_done:R.js.date_done, hecho:R.js.hecho_marcado}; continue; }
+    it.rech=R.js;
+  }
+  T.fase='fin'; _pdt.sel={}; pdRender();   // el resumen YA, sin esperar la relectura
+  // Lo que salió de Odoo cambia el saldo del producto en Odoo, no el de Truefie
+  // (la salida ya estaba descontada al entregar). Se relee la cola.
+  _pdt.prev={};
+  await pdCargar(true);
+}
+function pdtTandaCerrar(){ _pdt.tanda=null; pdRender(); }
+
 // ════════════════════════════════════════════════════════════════════════
 // CUADRE CON ODOO · opción C, paso C1 (27-sep-2026)
 //
