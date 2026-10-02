@@ -4010,6 +4010,9 @@ body.es-socia .face-pend{display:block}
 .pdv-no-t{font-size:11px;font-weight:500;color:var(--text-3);padding:16px 0 2px}
 .pdv-no .pd-quien,.pdv-no .pd-cua{color:var(--text-3)}
 .pdv-no .pdv-dq,.pdv-no .pdv-dq b{color:var(--text-3)}
+/* Traslados: la tarjeta usa las clases de la cola (pd-exc-*). Mismo gris. */
+.pd-exc-ped.pdv-no .pd-exc-cli,.pd-exc-ped.pdv-no .pd-exc-prod,.pd-exc-ped.pdv-no .pd-exc-prod b,
+.pd-exc-ped.pdv-no .pd-exc-meta,.pd-exc-ped.pdv-no .pd-exc-dias{color:var(--text-3)}
 
 /* ══ TICKET 29 · CORREGIR UNA PREPARACIÓN ═══════════════════════════════
    El botón de la tarjeta de "Por entregar". Va al lado de "Entregar" y NO
@@ -14872,7 +14875,10 @@ function _valRechazoHTML(R, gris){
     +(R.motivo==='descuadre'?_valDescuadreHTML(R.detalle):'')
     +((R.motivo==='sin_existencias' && Array.isArray(R.detalle))?R.detalle.map(function(l){
         return '<div class="pdv-dq"><b>'+esc(_valProd(l))+'</b><span>salió '+esc(_entPresPlano(l.producto_id, l.uds))
-          +'</span><span>libre en Odoo '+esc(_rzN(l.libre_uom,2))+' '+esc(l.uom||'')+'</span></div>'; }).join(''):'');
+          // Lo libre viene en la UoM de Odoo: se pasa a unidades con la misma
+          // proporción de la línea (uds / cant_uom) y se dice como todo lo demás.
+          +'</span><span>libre en Odoo '+esc(_entPresPlano(l.producto_id,
+            (+l.cant_uom>0)?(+l.libre_uom||0)*(+l.uds||0)/(+l.cant_uom):(+l.libre_uom||0)))+'</span></div>'; }).join(''):'');
 }
 
 // ── La hoja de clientes: frecuentes primero (facturas de los últimos 90 días) ──
