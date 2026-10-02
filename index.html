@@ -18958,6 +18958,11 @@ function rzDiaFijoHtml(){
     const rojos=g.filas.filter(function(f){ return f.rojo>1e-9; });
     const ambar=avisosComunes.slice();
     if(g.sinPlan) ambar.push('El plan no llega hasta el '+_fechaCorta(ci.U2)+': la semana del pedido está incompleta.');
+    // Las órdenes de compra se cargan en Odoo AL RECIBIR, no al pedir (medido el 2-oct: el pedido de
+    // Lorena del jue 1-oct no estaba en Odoo en ningún estado; P00669 se creó el vie 25 y se aprobó
+    // al recibir, el lun 28). Sin orden, "ya pedido" es 0 y "Pedir" repite lo que ya se pidió.
+    if(ci.pasado && !R.pedidoErr && !g.filas.some(function(f){ return f.ya>1e-9; }))
+      ambar.push('No hay orden de compra en Odoo para el pedido del '+_fechaCorta(ci.P)+': si ya se pidió, «Pedir» repite ese pedido.');
     g.filas.filter(function(f){ return f.difiere; }).forEach(function(f){
       ambar.push(f.nombre+': el plan pide '+_dfCant(f.A,f.uom)+' y lo habitual es '+_dfCant(f.B,f.uom)+' — difieren más que el margen ('+_dfCant(f.margen,f.uom)+').'); });
     let h='<div class="rz-df"><div class="rz-dfh">Pedido con día fijo</div><div class="rz-dft">'+tit+'</div>';
