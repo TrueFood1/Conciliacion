@@ -4266,6 +4266,25 @@ body.es-socia .face-pend{display:block}
 #vResumen .rz-i3sum:hover{color:var(--text)}
 #vResumen .rz-i3body{margin-top:9px;border-top:.5px solid #232329;padding-top:8px}
 #vResumen .rz-i3body.hidden{display:none}
+/* PEDIDO CON DÍA FIJO (T-28): bloque a ancho completo, arriba de las tarjetas. Rojo = ya no llega
+   a tiempo (la única acción urgente); ámbar = mirar dos veces; el pedido en blanco hueso. */
+#vResumen .rz-df{background:#141417;border:.5px solid #26262C;border-radius:12px;padding:13px 15px;margin-top:26px}
+#vResumen .rz-dfh{font-size:11px;letter-spacing:.02em;color:var(--text-3);font-weight:500;margin-bottom:4px}
+#vResumen .rz-dft{font-size:12.5px;color:var(--text-2);margin-bottom:10px;line-height:1.4}
+#vResumen .rz-dfrojo{font-size:12.5px;line-height:1.4;color:#E24B4A;background:rgba(226,75,74,.08);border:.5px solid rgba(226,75,74,.35);border-radius:8px;padding:8px 10px;margin-bottom:8px}
+#vResumen .rz-dfamb{font-size:11.5px;line-height:1.4;color:#C99A4E;margin-bottom:9px}
+#vResumen .rz-dftbl{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+#vResumen .rz-dftbl th{font-size:10.5px;font-weight:500;color:var(--text-3);text-align:right;padding:4px 0 6px 10px;border-bottom:.5px solid #232329;white-space:nowrap}
+#vResumen .rz-dftbl th:first-child,#vResumen .rz-dftbl td:first-child{text-align:left;padding-left:0}
+#vResumen .rz-dftbl td{text-align:right;padding:5px 0 5px 10px;border-top:.5px solid #232329;color:var(--text-2);white-space:nowrap;vertical-align:top}
+#vResumen .rz-dfn{color:var(--text-2)}
+#vResumen .rz-dfp{color:var(--text);font-weight:600}
+#vResumen .rz-dfp.rz-ok{color:#7E8C5A;font-weight:500}
+#vResumen .rz-dfsub{display:block;font-size:10.5px;font-weight:400;color:var(--text-3)}
+#vResumen .rz-dfdif{color:#C99A4E}
+#vResumen .rz-dfr .rz-dfn{color:#E24B4A}
+#vResumen .rz-dfmov{display:none}
+#vResumen .rz-dfit{padding:5px 0;border-top:.5px solid #232329}
 @media(max-width:760px){
   #vResumen .rz-cards4{grid-template-columns:1fr 1fr}
   #vResumen .rz-two{gap:22px}
@@ -4338,6 +4357,9 @@ body.es-socia .face-pend{display:block}
   /* En "Comprar · para producir" la cantidad va DEBAJO del nombre, no al lado. */
   #vResumen .rz-c4-cprod .rz-c4item{flex-direction:column;align-items:flex-start;gap:1px}
   #vResumen .rz-c4-cprod .rz-c4in{line-height:1.25}
+  /* Pedido con día fijo: la tabla no entra; una línea por insumo con la cuenta debajo. */
+  #vResumen .rz-df{margin-top:20px;padding:12px 13px}
+  #vResumen .rz-dftbl{display:none} #vResumen .rz-dfmov{display:block}
 }
 </style>
 <div id="vResumen" class="hidden">
@@ -4622,7 +4644,7 @@ body.es-socia .face-pend{display:block}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 1 oct 2026 · b79';
+const BUILD = 'v 2 oct 2026 · b79 + pedido día fijo (bio-dia-fijo, NO PUBLICAR)';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -7481,7 +7503,7 @@ function _crDate(dt){
 async function nivConfig(){
   const cfg={ritmoVentana:NIV_CFG_DEF.ritmoVentana, colchonTemporada:NIV_CFG_DEF.colchonTemporada,
              horizonte:NIV_CFG_DEF.horizonte, medirLunesFrac:NIV_CFG_DEF.medirLunesFrac,
-             colchon:{}, ventanas:[], sembrado:false};
+             colchon:{}, ventanas:[], diaFijo:[], sembrado:false};
   NIV_PROD.forEach(p=>cfg.colchon[p]=NIV_CFG_DEF.colchon);
   // SIN atrapa-errores: `plan_config` existe desde el 17-ago-2026 y está sembrada. Antes había un
   // catch mudo acá porque la tabla no existía y el 404 era esperado — pero eso también se tragaba
@@ -7500,6 +7522,7 @@ async function nivConfig(){
       else if(r.clave==='colchon_semanas' && v && typeof v==='object'){ for(const k in v) cfg.colchon[+k]=+v[k]; }
       else if(r.clave==='ventanas_estacionales' && Array.isArray(v)) cfg.ventanas=v;
       else if(r.clave==='medir_lunes_frac' && v!=null && +v>=0 && +v<=1) cfg.medirLunesFrac=+v;
+      else if(r.clave==='compras_dia_fijo' && v && Array.isArray(v.insumos)) cfg.diaFijo=v.insumos;   // T-28
     }
   }
   return cfg;
@@ -7847,8 +7870,12 @@ async function nivCompras(stock){
   // así que la acción por ítem solo indica la fuente — nada de plazos por tipo.
   const _mpFuente=t=>(t==='saco'||t==='huevo') ? 'proveedor' : 'súper';
   const _cant=(q,u)=>_rzN(q, (u==='kg'||u==='L'||/gal/.test(u))?1:0)+(u?(' '+u):'');
+  // Los insumos con DÍA FIJO de entrega (T-28) NO van acá: tienen su propia tarjeta, con otra
+  // ventana. Listarlos en las dos daría dos cantidades distintas para el mismo producto.
+  const diaFijo=_dfPids();
   function items(grupo){ const out=[];
     for(const k in need){ const pid=+k, nm=(meta[pid]&&meta[pid].name)||('id '+pid);
+      if(diaFijo.has(pid)) continue;
       if(_mpGrupo(pid, nm)!==grupo) continue;
       const nq=need[pid], have=mpOh[pid]||0, falta=nq-have; if(falta<=0.0001) continue;
       const uom=(meta[pid]&&meta[pid].uom)||'';
@@ -7873,6 +7900,179 @@ async function nivCompras(stock){
     premezclas:{fecha:fecha, fecha2:fecha2, items:items('medir')},
     produccion:{fecha:fecha, fecha2:fecha2, items:items('producir')}
   };
+}
+// ════════════════════════════════════════════════════════════════════════
+// PEDIDOS CON DÍA FIJO DE ENTREGA (T-28, 2-oct-2026)
+// ════════════════════════════════════════════════════════════════════════
+// EL CASO: BIO Ingredients pasó a entregar los LUNES al mediodía, DESPUÉS de que las socias
+// miden las premezclas de la semana. Lo que llega un lunes recién se usa para medir el lunes
+// SIGUIENTE. La ventana única de nivCompras ("de hoy al lunes que viene") calculaba justo lo
+// que BIO ya no alcanza a traer, y lo que sí puede traer no lo calculaba nadie.
+//
+// LA CONFIGURACIÓN ES POR INSUMO, no por proveedor: BIO trae el huevo líquido los JUEVES.
+// Vive en plan_config, clave `compras_dia_fijo` = {insumos:[{producto_id, proveedor_id,
+// proveedor, pide, llega, momento, uso}]} (ver PLAN_CONFIG_ESQUEMA.sql). Sin fila, no hay
+// tarjeta y todo sigue en "Comprar" como antes.
+//   pide    'lun'…'vie' | null  día en que se hace el pedido (null = sin definir: se calcula
+//                               como si se pidiera hoy)
+//   llega   'lun'…'vie'         día de entrega
+//   momento 'antes'|'despues'   la entrega llega antes o después de usarse ese día
+//   uso     'medicion'          lo usable recién en una medición de lunes (premezclas; y por
+//                               decisión de Andrea, también levadura y semillas de BIO)
+//           'produccion'        usable desde la producción del día (huevo líquido)
+//
+// LOS DOS CÁLCULOS, por ciclo P (pedido) → E (entrega) → U (desde cuándo se puede usar):
+//   ROJO   = lo que se consume ANTES de U − stock de hoy > 0. El proveedor ya no llega a tiempo.
+//   PEDIDO = consumo de la semana que arranca en U (opción A: el plan; si esa semana no está
+//            editada, es la propuesta del nivelador) + margen − lo que sobra antes de U
+//            − lo ya pedido y no recibido. En empaques, HACIA ARRIBA.
+//   MARGEN = lo que la peor de las últimas 6 semanas se pasó del promedio (consumo real Odoo).
+//   CONTROL (opción B) = ese promedio. Si A y B difieren más que el margen, aviso ámbar.
+//
+// LO QUE ODOO NO SABE TODAVÍA (el aviso de Keylor). El stock de MP se infla SOLO cuando hay días
+// de PRODUCCIÓN ya pasados que no están cargados en Odoo: esos consumos todavía no se restaron.
+// Esos días (los "sin" de _rzUltimas) se vuelven a sumar a la ventana con su plan, y se avisa.
+// Una MEDICIÓN de premezcla sin cargar, en cambio, NO infla nada si la producción sí se cargó:
+// Odoo deja la premezcla en negativo, `ceil(batches − premOh)` crece en lo mismo que sobra de MP,
+// y la cuenta cierra sola. Por eso el aviso por premezcla es informativo y no toca números.
+const _DF_DIA={dom:0,lun:1,mar:2,mie:3,jue:4,vie:5,sab:6};
+function _dfDia(s){ if(s==null) return null; const k=String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').slice(0,3); return _DF_DIA[k]!=null?_DF_DIA[k]:null; }
+function _dfAdd(ds,n){ const d=new Date(ds+'T00:00:00'); d.setDate(d.getDate()+n); return _ymd(d); }
+function _dfDow(ds){ return new Date(ds+'T00:00:00').getDay(); }
+function _dfProx(desde, dow, incluir){ let ds=incluir?desde:_dfAdd(desde,1); for(let i=0;i<7 && _dfDow(ds)!==dow;i++) ds=_dfAdd(ds,1); return ds; }
+function _dfPrev(hasta, dow){ let ds=hasta; for(let i=0;i<7 && _dfDow(ds)!==dow;i++) ds=_dfAdd(ds,-1); return ds; }
+// Productos con día fijo (para sacarlos de "Comprar").
+function _dfPids(){ return new Set(((_rzCtx&&_rzCtx.cfg&&_rzCtx.cfg.diaFijo)||[]).map(function(x){ return +x.producto_id; }).filter(Boolean)); }
+
+// EL CICLO que se muestra. Mientras el último pedido no llegó (de P a E inclusive), se muestra ESE
+// ciclo —con lo ya pedido descontado— y no el próximo: entre el jueves y el lunes la pregunta es
+// "¿lo que pedimos alcanza?", no la del pedido de la semana que viene.
+function _dfCiclo(c, hoy){
+  const dE=_dfDia(c.llega), dP=_dfDia(c.pide);
+  let P=hoy, pasado=false;
+  if(dP!=null){ const P0=_dfPrev(hoy,dP), E0=_dfProx(P0,dE,false);
+    if(E0>=hoy){ P=P0; pasado=P0<hoy; } else P=_dfProx(hoy,dP,true); }
+  const E=_dfProx(P,dE,false);
+  let U;
+  if(c.uso==='produccion'){
+    U=E; if(c.momento!=='antes'){ U=_dfAdd(E,1); for(let i=0;i<60 && !_esProductivo(U);i++) U=_dfAdd(U,1); }   // 60: cruza el cierre de diciembre
+  } else U=(_dfDow(E)===1 && c.momento==='antes') ? E : _dfProx(E,1,false);   // la medición es los lunes
+  return {P:P, E:E, U:U, U2:_dfAdd(U,7), sinDia:dP==null, pasado:pasado};
+}
+// Plan por fecha (celdas efectivas: base + ediciones + auto-relleno) hasta `hasta`. Es _rzPerDate
+// sin el tope de 2 semanas: la semana del pedido cae en la 3ª o 4ª, que el calendario no muestra
+// pero el nivelador ya simuló (horizonte de 6).
+function _dfPorFecha(hasta){
+  const m={}, H=(_rzCtx.weeks&&_rzCtx.weeks.length)||2;
+  for(let o=0;o<H;o++){ if(_ymd(_rzMonday(o))>hasta) break;
+    _rzCellsFull(o).forEach(function(c){ const pr=c.prods||{}; if(!Object.keys(pr).length) return;
+      const t=m[c.ds]=m[c.ds]||{}; for(const k in pr) t[+k]=(t[+k]||0)+pr[k]; }); }
+  return m;
+}
+// Batches por ventana. A = antes de U · B = la semana que arranca en U. Premezcla y producción van
+// en mapas aparte porque se consumen en momentos distintos: la premezcla al MEDIR (el lunes cubre
+// su semana + `frac` del lunes siguiente), lo directo el día que se produce.
+function _dfVentanas(ci, uso, frac, porFecha, hoy){
+  const premA={}, prodA={}, premB={}, prodB={};
+  const add=function(m,t,w){ if(w<=0) return; for(const k in t) m[+k]=(m[+k]||0)+t[k]*w; };
+  for(const ds in porFecha){ if(ds<hoy) continue; const t=porFecha[ds];
+    if(uso==='produccion'){
+      if(ds<ci.U){ add(premA,t,1); add(prodA,t,1); }
+      else if(ds<ci.U2){ add(premB,t,1); add(prodB,t,1); }
+    } else {
+      if(ds<ci.U){ add(premA,t,1); add(prodA,t,1); }
+      else if(ds===ci.U){ add(premA,t,frac); add(premB,t,1-frac); add(prodB,t,1); }
+      else if(ds<ci.U2){ add(premB,t,1); add(prodB,t,1); }
+      else if(ds===ci.U2){ add(premB,t,frac); }
+    } }
+  return {premA:premA, prodA:prodA, premB:premB, prodB:prodB};
+}
+// MP de una ventana: premezcla por medir (menos la premezcla en stock) + directos de la etapa final.
+async function _dfMP(premMap, prodMap, premOh){
+  const a=await _mpNeeds(premMap, premOh), b=await _mpNeeds(prodMap, null), m={};
+  for(const k in a.prem)   m[+k]=(m[+k]||0)+a.prem[k];
+  for(const k in b.direct) m[+k]=(m[+k]||0)+b.direct[k];
+  return m;
+}
+
+// DATOS DE ODOO, una vez por carga del Resumen (no dependen del plan, así que editar el calendario
+// no los vuelve a pedir). Todo solo lectura.
+async function nivDiaFijoDatos(cfg, mon0){
+  const ins=(cfg.diaFijo||[]).filter(function(x){ return x && +x.producto_id>0 && _dfDia(x.llega)!=null; });
+  if(!ins.length) return null;
+  const pids=[...new Set(ins.map(function(x){ return +x.producto_id; }))];
+  const q=await odooCall('stock.quant','search_read',[[['product_id','in',pids],['location_id.usage','=','internal']]],{fields:['product_id','quantity']});
+  const oh={}; q.forEach(function(r){ const p=r.product_id[0]; oh[p]=(oh[p]||0)+(r.quantity||0); });
+  const info={}; for(const p of pids) info[p]=await _prodInfo(p);
+  const uomIds=[...new Set(pids.map(function(p){ return info[p].uom; }).filter(Boolean))];
+  const uomNom={}; (uomIds.length?await odooCall('uom.uom','read',[uomIds],{fields:['name']}):[]).forEach(function(u){ uomNom[u.id]=u.name; });
+  // CONSUMO REAL de las últimas 6 semanas completas (lun–dom, hora CR), en la UoM del producto.
+  // Todo consumo de MO cuenta: premezclas y etapa final. Semana sin consumo = 0, no se salta.
+  const N=6, ini=new Date(mon0); ini.setDate(ini.getDate()-7*N);
+  const mv=await odooCall('stock.move','search_read',[[['state','=','done'],['product_id','in',pids],
+      ['raw_material_production_id','!=',false],['date','>=',_ymd(ini)+' 06:00:00'],['date','<',_ymd(mon0)+' 06:00:00']]],
+    {fields:['product_id','quantity','product_uom','date'],limit:20000});
+  const sem={}; pids.forEach(function(p){ sem[p]=new Array(N).fill(0); });
+  for(const m of mv){ const p=m.product_id[0], ds=_crDate(m.date);
+    const w=Math.floor(Math.round((new Date(ds+'T00:00:00')-ini)/86400000)/7); if(w<0||w>=N) continue;
+    sem[p][w]+=await _conv(m.quantity||0, m.product_uom&&m.product_uom[0], info[p].uom); }
+  const hist={}; pids.forEach(function(p){ const a=sem[p], prom=a.reduce(function(s,x){ return s+x; },0)/N;
+    hist[p]={semanas:a, prom:prom, margen:Math.max(0, Math.max.apply(null,a)-prom)}; });
+  // LO YA PEDIDO Y NO RECIBIDO (purchase.order.line). Necesita lectura de compras para el usuario de
+  // solo lectura; si Odoo la niega, se dice y "ya pedido" va en 0 — nunca se inventa.
+  // Solo líneas con fecha prevista de los últimos 21 días: una línea vieja nunca recibida no es un
+  // pedido en camino, es un pendiente olvidado, y descontarla dejaría corto el pedido.
+  const pedido={}, pedidoLineas=[]; let pedidoErr='';
+  try{
+    const partners=[...new Set(ins.map(function(x){ return +x.proveedor_id; }).filter(Boolean))];
+    const desde=new Date(); desde.setDate(desde.getDate()-21);
+    const pl=await odooCall('purchase.order.line','search_read',[[['product_id','in',pids],['state','in',['purchase','done']],
+        ['order_id.partner_id','in',partners],['date_planned','>=',_ymd(desde)]]],
+      {fields:['product_id','product_qty','qty_received','product_uom','order_id','date_planned'],limit:500});
+    for(const l of pl){ const p=l.product_id[0], pend=(l.product_qty||0)-(l.qty_received||0); if(pend<=1e-9) continue;
+      const qq=await _conv(pend, l.product_uom&&l.product_uom[0], info[p].uom);
+      pedido[p]=(pedido[p]||0)+qq; pedidoLineas.push({pid:p, orden:l.order_id&&l.order_id[1], qty:qq, ds:_crDate(l.date_planned)}); }
+  }catch(e){ pedidoErr='No pude leer las compras en Odoo, así que «ya pedido» va en 0 ('+String(e&&e.message||e).slice(0,120)+').'; }
+  // Medición de premezcla cargada esta semana (aviso de Keylor; informativo, ver arriba).
+  const prems=NIV_PROD.map(function(p){ return NIV_INFO[p].prem; });
+  const pm=await odooCall('mrp.production','search_read',[[['state','=','done'],['product_id','in',prems],['date_start','>=',_ymd(mon0)+' 06:00:00']]],{fields:['product_id']});
+  const premCargada={}; pm.forEach(function(m){ premCargada[m.product_id[0]]=1; });
+  return {ins:ins, pids:pids, oh:oh, info:info, uomNom:uomNom, hist:hist, pedido:pedido, pedidoLineas:pedidoLineas, pedidoErr:pedidoErr, premCargada:premCargada};
+}
+
+// EL CÁLCULO. Se rehace en cada recálculo del plan (editar el calendario mueve A y lo de antes de U).
+async function nivDiaFijo(){
+  const D=_rzCtx&&_rzCtx.dfDatos; if(!D) return null;
+  if(D.error) return {error:D.error};
+  const hoy=_rzCtx.hoyStr, frac=(_rzCtx.cfg.medirLunesFrac!=null)?_rzCtx.cfg.medirLunesFrac:NIV_CFG_DEF.medirLunesFrac;
+  const H=(_rzCtx.weeks&&_rzCtx.weeks.length)||2, finPlan=_dfAdd(_ymd(_rzMonday(H-1)),6);
+  // Días de producción ya pasados que Odoo no tiene: su consumo todavía no salió del stock.
+  const sinCargar=(_rzUltimas||[]).filter(function(u){ return u.kind==='sin'; });
+  const premOh={}; NIV_PROD.forEach(function(p){ const pr=NIV_INFO[p].prem; premOh[pr]=(_rzCtx.stock.premOh||{})[pr]||0; });
+  const grupos={}, orden=[];
+  D.ins.forEach(function(x){ const k=[x.proveedor_id,x.pide,x.llega,x.momento,x.uso].join('|');
+    if(!grupos[k]){ grupos[k]={cfg:x, pids:[]}; orden.push(k); } if(grupos[k].pids.indexOf(+x.producto_id)<0) grupos[k].pids.push(+x.producto_id); });
+  const out=[];
+  for(const k of orden){ const g=grupos[k], ci=_dfCiclo(g.cfg, hoy);
+    const V=_dfVentanas(ci, g.cfg.uso, frac, _dfPorFecha(ci.U2), hoy);
+    sinCargar.forEach(function(u){ for(const kk in (u.plan||{})){ V.premA[+kk]=(V.premA[+kk]||0)+u.plan[kk]; V.prodA[+kk]=(V.prodA[+kk]||0)+u.plan[kk]; } });
+    // Premezcla que sobra después de la medición de antes de U (el redondeo a batch entero) → B.
+    const premOh2={}; NIV_PROD.forEach(function(p){ const pr=NIV_INFO[p].prem, oh=premOh[pr], b=V.premA[p]||0, f=Math.max(0,b-oh);
+      premOh2[pr]=Math.max(0,oh-b)+(Math.ceil(f)-f); });
+    const antes=await _dfMP(V.premA, V.prodA, premOh), sig=await _dfMP(V.premB, V.prodB, premOh2);
+    const filas=g.pids.map(function(pid){
+      const inf=D.info[pid]||{}, uom=D.uomNom[inf.uom]||'', st=D.oh[pid]||0, a=antes[pid]||0, A=sig[pid]||0;
+      const h=D.hist[pid]||{prom:0, margen:0}, ya=D.pedido[pid]||0;
+      const sobra=Math.max(0, st-a), rojo=Math.max(0, a-st);
+      const bruto=Math.max(0, A+h.margen-sobra), pedir=Math.max(0, bruto-ya);
+      const difiere=(A>1e-9||h.prom>1e-9) && Math.abs(A-h.prom)>Math.max(h.margen,1e-9);
+      return {pid:pid, nombre:(inf.name||('id '+pid)).replace(/^\[[^\]]*\]\s*/,''), uom:uom, stock:st, antes:a, sobra:sobra, rojo:rojo,
+              A:A, B:h.prom, margen:h.margen, ya:ya, bruto:bruto, pedir:pedir, difiere:difiere}; });
+    out.push({cfg:g.cfg, ci:ci, filas:filas, sinPlan:ci.U2>finPlan});
+  }
+  const metaW0=_rzMetaEfectiva(0);
+  const keylor=(_dfDow(hoy)!==1) ? NIV_PROD.filter(function(p){ return (metaW0[p]||0)>0 && !D.premCargada[NIV_INFO[p].prem]; }) : [];
+  return {grupos:out, sinCargar:sinCargar.map(function(u){ return u.ds; }), keylor:keylor, pedidoErr:D.pedidoErr, pedidoLineas:D.pedidoLineas};
 }
 // ÚLTIMAS producciones pasadas (chequeo de Keylor): plan del motor vs real Odoo.
 // Manda lo REAL de Odoo. Se listan TODOS los días transcurridos de la semana en curso con
@@ -7949,6 +8149,7 @@ let _rzAutoLeft=[];              // faltante que NO cupo ni en el horizonte proy
 let _rzDerrame=[];              // producción que se corrió a una semana POSTERIOR, con día concreto [{pid,batches,ds}]
 let _rzDerrameLog={dayStates:[]};  // estado de cada día futuro (para explicar la búsqueda del destino del derrame)
 let _rzCompras={premezclas:{fecha:'',items:[]}, produccion:{fecha:'',items:[]}};   // 2 tarjetas de compra
+let _rzDiaFijo=null;              // tarjeta de pedido con día fijo (T-28); null = sin insumos configurados
 let _rzUltimas=[];               // últimas 2 producciones pasadas (chequeo de Keylor)
 let _rzShowNext=false;           // móvil: si la próxima semana está desplegada (botón "ver próxima")
 
@@ -8020,6 +8221,9 @@ async function _rzSetup(){
   const {w0, weeks}=nivLevel(ritmo, finPlan, cfg);
   const hoy=new Date();
   _rzCtx={cfg, ritmo, stock, w0, weeks, real, hoyStr:_ymd(hoy), mon0:_mondayProd(hoy)};
+  // Pedido con día fijo (T-28): sus lecturas de Odoo no deben tumbar el Resumen entero.
+  try{ _rzCtx.dfDatos=await nivDiaFijoDatos(cfg, _rzCtx.mon0); }
+  catch(e){ _rzCtx.dfDatos={error:String(e&&e.message||e)}; }
   _rzEdit=null; _rzSel=null; _rzAviso='';
   _rzOverrides=await nivOverrides();          // ediciones futuras guardadas en Supabase
   // ÚLTIMAS producciones: plan del motor (sin real, sin override) de la semana vs Odoo real.
@@ -18652,7 +18856,8 @@ async function rzRecalcAlistar(){ _rzRecalcAuto();
   // UN solo mapa: el de la ventana. El segundo (semana 1) se calculaba y no lo leía nadie, y con
   // la ventana nueva —que ya se mete en la semana siguiente— habría contado el traslape dos veces.
   _rzAlistar=await nivAlistar([_rzMedirBatches()], _rzCtx.stock);
-  _rzCompras=await nivCompras(_rzCtx.stock); }
+  _rzCompras=await nivCompras(_rzCtx.stock);
+  try{ _rzDiaFijo=await nivDiaFijo(); }catch(e){ _rzDiaFijo={error:String(e&&e.message||e)}; } }
 
 function rzRender(){
   const body=document.getElementById('rzBody'); if(!body||!_rzCtx) return;
@@ -18661,6 +18866,7 @@ function rzRender(){
   // Grilla ~940px centrada. Pulso arriba (calendario), 4 tarjetas iguales, y el detalle a un clic.
   body.innerHTML='<div class="rz-wrap">'
     + rzStripHtml()
+    + rzDiaFijoHtml()
     + '<div class="rz-cards4">'+rzVaSemanaCard()+rzMedirCard()+rzComprasCards()+'</div>'
     + '<div class="rz-two">'+rzUltimasHtml()+rzInvHtml()+'</div>'
     + '</div>';
@@ -18712,6 +18918,74 @@ function rzComprasCards(){
   }
   return card('Comprar · para medir premezclas', _rzCompras.premezclas, 'rz-c4-cmedir')
        + card('Comprar · para producir', _rzCompras.produccion, 'rz-c4-cprod');
+}
+// ── TARJETA "PEDIDO CON DÍA FIJO" (T-28) ─────────────────────────────────
+// Una por proveedor + ciclo. Rojo arriba (ya no llega a tiempo), ámbar después (lo que pide
+// mirar dos veces), y la lista. En escritorio, tabla; en teléfono, una línea por insumo con la
+// cuenta debajo. Las cantidades en la unidad del producto (g → kg) y el pedido en empaques.
+function _dfCant(q, uom){
+  if(uom==='g') return _rzN(q/1000,1)+' kg';
+  return _rzN(q,(uom==='kg'||uom==='L')?1:0)+(uom?(' '+uom):'');
+}
+// Empaques HACIA ARRIBA: {n, lab, total(en la unidad del producto)} o null si no tiene empaque.
+function _dfEmp(pid, q, uom){
+  const pe=_pesoEmpaque(pid); if(!pe || !(q>1e-9)) return null;
+  const k=(uom===pe.unidad)?1:(uom==='g'&&pe.unidad==='kg')?1/1000:(uom==='kg'&&pe.unidad==='g')?1000:null;
+  if(k==null) return null;
+  const n=Math.ceil(q*k/pe.peso-1e-9);
+  return {n:n, lab:n===1?(_CN_SING[pe.lab]||pe.lab):pe.lab, total:n*pe.peso/k};
+}
+function _dfPedirTxt(f, q){
+  if(!(q>1e-9)) return 'no hace falta';
+  const e=_dfEmp(f.pid, q, f.uom);
+  return e ? (e.n+' '+e.lab+' ('+_dfCant(e.total,f.uom)+')') : _dfCant(q,f.uom);
+}
+function rzDiaFijoHtml(){
+  const R=_rzDiaFijo; if(!R) return '';
+  if(R.error) return '<div class="rz-df"><div class="rz-dfh">Pedido con día fijo</div><div class="rz-err" style="padding:6px 0">No pude calcularlo: '+esc(R.error)+'</div></div>';
+  if(!R.grupos.length) return '';
+  const avisosComunes=[];
+  if(R.sinCargar.length) avisosComunes.push('Producción sin cargar en Odoo ('+R.sinCargar.map(_fechaCorta).join(', ')+'): se estimó con el plan.');
+  if(R.keylor.length) avisosComunes.push('Falta cargar en Odoo la medición de esta semana: '+R.keylor.map(function(p){ return NIV_INFO[p].nom; }).join(', ')+'.');
+  if(R.pedidoErr) avisosComunes.push(R.pedidoErr);
+  return R.grupos.map(function(g){
+    const ci=g.ci, c=g.cfg, med=c.uso!=='produccion';
+    const tit=esc(c.proveedor||'Proveedor')+' · '
+      +(ci.sinDia ? 'sin día de pedido (calculado como si pidieras hoy)' : ('pedido '+_fechaCorta(ci.P)+(ci.pasado?' (ya pasó)':'')))
+      +' → llega '+_fechaCorta(ci.E)+(med?(c.momento==='antes'?' antes de medir':' después de medir'):'')
+      +' → '+(med?('para medir '+_fechaCorta(ci.U)):('se usa desde '+_fechaCorta(ci.U)));
+    const hAntes='Antes del '+_fechaCorta(ci.U), hSem='Semana del '+_fechaCorta(ci.U);
+    const rojos=g.filas.filter(function(f){ return f.rojo>1e-9; });
+    const ambar=avisosComunes.slice();
+    if(g.sinPlan) ambar.push('El plan no llega hasta el '+_fechaCorta(ci.U2)+': la semana del pedido está incompleta.');
+    g.filas.filter(function(f){ return f.difiere; }).forEach(function(f){
+      ambar.push(f.nombre+': el plan pide '+_dfCant(f.A,f.uom)+' y lo habitual es '+_dfCant(f.B,f.uom)+' — difieren más que el margen ('+_dfCant(f.margen,f.uom)+').'); });
+    let h='<div class="rz-df"><div class="rz-dfh">Pedido con día fijo</div><div class="rz-dft">'+tit+'</div>';
+    if(rojos.length) h+='<div class="rz-dfrojo">No alcanza '+(med?('para medir el '+_fechaCorta(_dfAdd(ci.U,-7))):('hasta que llegue ('+_fechaCorta(ci.E)+')'))+': '
+      +rojos.map(function(f){ return esc(f.nombre)+' falta '+esc(_dfPedirTxt(f,f.rojo)); }).join(' · ')
+      +'. '+esc(c.proveedor||'El proveedor')+' ya no llega a tiempo: hay que comprarlo afuera o mover producción.</div>';
+    if(ambar.length) h+='<div class="rz-dfamb">'+ambar.map(esc).join('<br>')+'</div>';
+    // Escritorio: tabla
+    h+='<table class="rz-dftbl"><thead><tr><th>Insumo</th><th>Stock hoy</th><th title="Lo que se consume antes de que lo nuevo se pueda usar">'+esc(hAntes)+'</th><th>Sobra</th>'
+      +'<th title="Plan de esa semana (si no está editada, la propuesta del nivelador)">'+esc(hSem)+'</th><th title="Lo que la peor de las últimas 6 semanas se pasó del promedio">Margen</th>'
+      +'<th>Ya pedido</th><th>Pedir</th><th title="Consumo real promedio de las últimas 6 semanas en Odoo">Habitual</th></tr></thead><tbody>'
+      +g.filas.map(function(f){
+        return '<tr'+(f.rojo>1e-9?' class="rz-dfr"':'')+'><td class="rz-dfn">'+esc(f.nombre)+'</td><td>'+esc(_dfCant(f.stock,f.uom))+'</td><td>'+esc(_dfCant(f.antes,f.uom))+'</td>'
+          +'<td>'+esc(_dfCant(f.sobra,f.uom))+'</td><td>'+esc(_dfCant(f.A,f.uom))+'</td><td>'+esc(_dfCant(f.margen,f.uom))+'</td>'
+          +'<td>'+(f.ya>1e-9?esc(_dfCant(f.ya,f.uom)):'—')+'</td>'
+          +'<td class="rz-dfp'+(f.pedir>1e-9?'':' rz-ok')+'">'+esc(_dfPedirTxt(f,f.pedir))
+            +(f.ya>1e-9&&f.bruto>1e-9?('<span class="rz-dfsub">sin lo ya pedido: '+esc(_dfPedirTxt(f,f.bruto))+'</span>'):'')+'</td>'
+          +'<td class="'+(f.difiere?'rz-dfdif':'')+'">'+esc(_dfCant(f.B,f.uom))+'</td></tr>'; }).join('')
+      +'</tbody></table>';
+    // Teléfono: una línea por insumo, la cuenta debajo
+    h+='<div class="rz-dfmov">'+g.filas.map(function(f){
+        const cuenta=hSem.toLowerCase()+' '+_dfCant(f.A,f.uom)+' + margen '+_dfCant(f.margen,f.uom)+' − sobra '+_dfCant(f.sobra,f.uom)
+          +(f.ya>1e-9?(' − ya pedido '+_dfCant(f.ya,f.uom)):'');
+        return '<div class="rz-dfit'+(f.rojo>1e-9?' rz-dfr':'')+'"><div class="rz-c4item"><span class="rz-dfn">'+esc(f.nombre)+'</span>'
+          +'<span class="rz-dfp'+(f.pedir>1e-9?'':' rz-ok')+'">'+(f.pedir>1e-9?'pedir ':'')+esc(_dfPedirTxt(f,f.pedir))+'</span></div>'
+          +'<div class="rz-c4nota">'+esc(cuenta)+'</div></div>'; }).join('')+'</div>';
+    return h+'</div>';
+  }).join('');
 }
 // ── 1 · PENDIENTE DE FABRICAR: tira horizontal HOY → próximo lunes, editable + touch ──
 function _rzChipPersonas(iso, personas){
@@ -18819,7 +19093,9 @@ function rzMedirHtml(){
 // Faltante en unidad de compra: sacos (PESO_EMPAQUE: avena 22,68 · resto 25 kg), cartones (huevos), o kg/L.
 function _faltaCompra(it){
   const pe=_pesoEmpaque(it.pid);
-  if(pe && pe.lab==='sacos'){ const n=Math.max(1, Math.round(it.falta/pe.peso)); return n+' saco'+(n===1?'':'s'); }
+  // HACIA ARRIBA (T-28): con Math.round, 30 kg de falta en sacos de 25 decían "1 saco" y quedaban
+  // 5 kg sin comprar. Lo que falta se compra entero; el −1e-9 es para que 50,0000001 no pida 3.
+  if(pe && pe.lab==='sacos'){ const n=Math.max(1, Math.ceil(it.falta/pe.peso-1e-9)); return n+' saco'+(n===1?'':'s'); }
   return _compraUnidad(it.pid, it.falta, it.uom);
 }
 // ── 3 · COMPRAR: 2 tarjetas de ancho fijo (para medir premezclas · para producir) ──
