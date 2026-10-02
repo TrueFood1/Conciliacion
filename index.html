@@ -14096,20 +14096,27 @@ function _entFacRotulo(o){
 // `ent_alisto_linea` y `ent_alisto_lote`, y lo que suma el saldo por lote).
 // Sale en la unidad que se dice en voz alta.
 function _entPresN(x){ return _rzN(x, (Math.abs(x%1)<1e-9)?0:1); }
+// LA PALABRA DE LA UNIDAD (1-oct, Andrea): «1 unidad», «3 unidades», nunca «uds»
+// ni «1,00 Unidades». El paquete sigue «paq.». Una sola definición para todo lo
+// que dibuja `_entPres` y `_entPresPlano` (Historial, Validar, Traslados).
+function _entUniLbl(I, n){
+  if(I && I.presLbl==='paq') return 'paq.';
+  return (Math.abs((+n||0)-1)<1e-9) ? 'unidad' : 'unidades';
+}
 function _entPres(pid, uds){
   const I=NIV_INFO[pid];
   const div=(I&&+I.presDiv)||1, cajaU=(I&&+I.cajaU)||0;
-  const lbl=(I&&I.presLbl==='paq')?'paq.':'uds';
+  const lbl=function(n){ return _entUniLbl(I, n); };
   const vu=(+uds||0)/div;                  // en unidad de venta: paquetes o unidades
   const porCaja=div>0?(cajaU/div):0;       // cuántas de esas entran en una caja
   if(porCaja>1){
     const cj=Math.floor(vu/porCaja+1e-9), resto=vu-cj*porCaja;
     if(cj>=1 && Math.abs(resto)<1e-9)
-      return _entPresN(cj)+(cj===1?' Caja':' Cajas')+' ('+_entPresN(vu)+' '+lbl+')';
+      return _entPresN(cj)+(cj===1?' Caja':' Cajas')+' ('+_entPresN(vu)+' '+lbl(vu)+')';
     if(cj>=1)
-      return _entPresN(cj)+(cj===1?' Caja':' Cajas')+' + '+_entPresN(resto)+' '+lbl;
+      return _entPresN(cj)+(cj===1?' Caja':' Cajas')+' + '+_entPresN(resto)+' '+lbl(resto);
   }
-  return _entPresN(vu)+' '+lbl;
+  return _entPresN(vu)+' '+lbl(vu);
 }
 // EL CAMBIO SE DICE EN UNA SOLA UNIDAD, sin agrupar en cajas. "1,5 paq. → 1 Caja
 // (6 paq.)" obliga a hacer la cuenta para ver de cuánto fue el salto; "1,5 → 6 paq."
@@ -14117,12 +14124,12 @@ function _entPres(pid, uds){
 function _entPresPlano(pid, uds){
   const I=NIV_INFO[pid];
   const div=(I&&+I.presDiv)||1;
-  const lbl=(I&&I.presLbl==='paq')?'paq.':'uds';
-  return _entPresN((+uds||0)/div)+' '+lbl;
+  const n=(+uds||0)/div;
+  return _entPresN(n)+' '+_entUniLbl(I, n);
 }
 function _entPresCambio(pid, antes, despues){
   const a=_entPresPlano(pid, antes), b=_entPresPlano(pid, despues);
-  const suf=b.match(/ (paq\.|uds)$/);
+  const suf=b.match(/ (paq\.|unidades|unidad)$/);
   // La unidad es la misma de los dos lados (es el mismo producto): decirla una vez.
   if(suf && a.endsWith(suf[0])) return a.slice(0, -suf[0].length)+' → '+b;
   return a+' → '+b;
@@ -14392,6 +14399,24 @@ async function bsLeer(){
   }
   P.forEach(function(x){ x.val_ok=valOK; x.odoo_val=val[x.pedido_id]||null; });
 
+  // ── EL RASTRO DEL TRASLADO INTERNO · `ent_odoo_traslado` (1-oct) ───────
+  // Mismo trato que el de arriba: lo usa la línea «Trasladado en Odoo» y el
+  // guarda de «Sale otro día», y falla CERRADO.
+  let trasOK=false; const tras={};
+  try{
+    const ids=P.map(function(x){ return x.pedido_id; }).filter(Boolean);
+    if(ids.length){
+      const {data:ts,error:eT}=await c.from('ent_odoo_traslado')
+        .select('pedido_id,picking_nombre,creado_por,creado_en').in('pedido_id',ids);
+      if(eT) throw eT;
+      (ts||[]).forEach(function(x){ tras[x.pedido_id]=x; });
+    }
+    trasOK=true;
+  }catch(e){
+    try{ console.error('[Truefie] Historial · no pude leer ent_odoo_traslado', e); }catch(_){}
+  }
+  P.forEach(function(x){ x.tras_ok=trasOK; x.odoo_tras=tras[x.pedido_id]||null; });
+
   return await _entColgarDetalle(c, P);
 }
 
@@ -14618,6 +14643,8 @@ function bsPuedeDeshacer(p){
   if(!p.devs_ok)              return false;  // no se pudieron leer las devoluciones
   if(p.tiene_devolucion)      return false;  // ver el comentario de `bsLeer`
   if(!p.val_ok)               return false;  // no se pudo leer el rastro de Odoo
+  if(!p.tras_ok)              return false;  // ni el del traslado interno
+  if(p.odoo_tras)             return false;  // ya trasladado en Odoo desde Truefie
   if(p.odoo_val)              return false;  // ya validada en Odoo desde Truefie:
                                              // deshacerla acá dejaría a Truefie
                                              // en "preparado" con Odoo en "hecho"
@@ -14726,6 +14753,11 @@ async function bsDeshacer(id){
    factura 3560, y la fila en `ent_odoo_validacion`.
    ══════════════════════════════════════════════════════════════════════ */
 function bsValidadoHTML(p){
+  if(p && p.odoo_tras){
+    const t=p.odoo_tras;
+    return '<div class="bs-meta">Trasladado en Odoo · '+esc(t.picking_nombre)
+      +' · '+esc(_quienFirma(t.creado_por))+' · '+esc(_entFechaLarga(t.creado_en))+'</div>';
+  }
   if(!p || !p.odoo_val) return '';
   const v=p.odoo_val;
   return '<div class="bs-meta">Validado en Odoo · '+esc(v.picking_nombre)
@@ -17046,13 +17078,17 @@ function pdOdooHTML(){
   if(E.err) return '<div class="card rp-z"><div class="card-title">Pendientes de Odoo</div>'
     +'<div class="cl-none dp-mal">No pude leer la cola: '+esc(E.err)+'</div></div>';
   const filas=E.filas||[];
-  if(!filas.length) return '';
+  // ⚠️ CON UNA TANDA ABIERTA LA TARJETA SE DIBUJA AUNQUE LA COLA ESTÉ VACÍA. El
+  // 1-oct Andrea creó el primer traslado real (153, WH/INT/00146) y no vio el
+  // resultado: al terminar, Pendientes se relee, el 153 ya no está en la cola, y
+  // la tarjeta desaparecía con el resumen adentro.
+  if(!filas.length && !_pdt.tanda) return '';
   let h='';
   ['nota_credito','traslado_interno'].forEach(function(tipo){
     const ls=filas.filter(function(x){ return x.tipo===tipo; });
-    if(!ls.length) return;
     const T=PD_ODOO_T[tipo];
     if(tipo==='traslado_interno'){ h+=pdtHTML(ls, T); return; }   // con «Crear en Odoo» (1-oct)
+    if(!ls.length) return;
     h+='<div class="card rp-z"><div class="card-title">'+esc(T.t)
       +' <span class="pd-cnt on">'+ls.length+'</span></div>'
       +'<div class="rp-nota" style="margin:-4px 0 10px">'+esc(T.q)
@@ -17073,7 +17109,7 @@ function pdOdooHTML(){
           +'<b>'+esc(_lotNom(l.producto_id))+'</b> · '
           +'<span class="pd-exc-cant">'+esc(_dvNum(l.cant_uom))+' '+esc(l.uom_nombre||'u')+'</span>'
           +' · <span class="dv-lote">'+esc(l.lote)+'</span></div>'
-          +'<div class="pd-exc-det">'+esc(_dvNum(l.cant_uds))+' unidades</div></div>';
+          +'<div class="pd-exc-det">'+esc(_dvNum(l.cant_uds))+' '+_entUniLbl(null, l.cant_uds)+'</div></div>';
       });
       const ocupada=(_pdOdooHaciendo===x.id);
       h+='<div class="dv-acc" style="margin-top:10px">'
@@ -17105,7 +17141,7 @@ function pdOdooHTML(){
    casillas, «Seleccionar todos», tanda con vista previa fresca, de a uno sin
    frenar ante un rechazo, y resumen. «Hecho» queda: es el camino a mano.
    ══════════════════════════════════════════════════════════════════════ */
-let _pdt={prev:{}, sel:{}, tanda:null, leyendo:false};
+let _pdt={prev:{}, sel:{}, tanda:null, leyendo:false, desc:{}, descartando:0};
 const PDT_MOTIVO={regalia:'Regalía', degustacion:'Degustación', consumo_interno:'Consumo de socias', reposicion:'Reposición'};
 
 function _pdtFilas(){
@@ -17124,6 +17160,13 @@ async function pdtPrevias(force){
   if(!ids.length) return;
   _pdt.leyendo=true;
   ids.forEach(function(id){ _pdt.prev[id]={st:'leyendo'}; });
+  // Los descartes: falla ABIERTA, como en entregas (si no se leen, no se esconde nada).
+  try{
+    const {data:ds,error:eD}=await sbClient().from('ent_pedido_odoo_descarte').select('pedido_id,huella')
+      .in('pedido_id',ids).like('huella','t|%');
+    if(eD) throw eD;
+    _pdt.desc={}; (ds||[]).forEach(function(d){ (_pdt.desc[d.pedido_id]=_pdt.desc[d.pedido_id]||[]).push(d.huella); });
+  }catch(e){ try{ console.warn('[Truefie] no pude leer los descartes de traslados:', (e&&e.message)||e); }catch(_){} }
   try{ pdRender(); }catch(e){}
   await Promise.all(ids.map(async function(id){
     const R=await escrituraPedir('/trasladar', id, false);
@@ -17143,17 +17186,37 @@ function _pdtPreviaHTML(r){
     +' · contacto '+esc(r.contacto)+'</div>'
     +'<table class="pdv-tb"><tbody>'+(r.lineas||[]).map(function(l){
       return '<tr><td>'+esc(_valProd(l))+'</td><td class="n">'+esc(_entPres(l.producto_id, l.uds))
-        +'</td><td class="n pdt-uom">'+esc(_rzN(l.cant_uom,2))+' '+esc(l.uom)+'</td></tr>'; }).join('')
+        +'</td></tr>'; }).join('')
     +'</tbody></table>';
 }
 
+// La huella de un traslado que no se puede crear: el motivo del servidor, su
+// texto y la salida (producto y unidades). NO las existencias libres de Odoo, que
+// se mueven todos los días: si la huella las llevara, un descarte no duraría nada.
+// Lleva el prefijo «t|» para no cruzarse nunca con una huella de entregas
+// (la tabla es la misma: `ent_pedido_odoo_descarte`).
+function _pdtHuella(x, P){
+  const R=(P&&P.rech)||{};
+  return 't|'+(R.motivo||'')+'|'+(R.texto||'')+'|'
+    +(x.lineas||[]).map(function(l){ return l.producto_id+':'+l.cant_uds; }).sort().join(',');
+}
+
 function pdtHTML(ls, T){
-  let h='<div class="card rp-z"><div class="card-title">'+esc(T.t)
-    +' <span class="pd-cnt on">'+ls.length+'</span></div>'
-    +'<div class="rp-nota" style="margin:-4px 0 10px">'+esc(T.q)+'</div>';
   const TD=_pdt.tanda;
+  // Se puede crear: la vista previa del servidor dijo que sí, o todavía no
+  // contestó. No se puede: el servidor lo rechazó → abajo, en gris, con Descartar.
+  const va=[], no=[];
+  ls.forEach(function(x){
+    const P=_pdt.prev[x.pedido_id];
+    if(P && P.st==='rech'){ if(!(_pdt.desc[x.pedido_id]||[]).some(function(h){ return h===_pdtHuella(x,P); })) no.push(x); }
+    else va.push(x);
+  });
+  if(!va.length && !no.length && !TD) return '';
+  let h='<div class="card rp-z"><div class="card-title">'+esc(T.t)
+    +(va.length?(' <span class="pd-cnt on">'+va.length+'</span>'):'')+'</div>'
+    +'<div class="rp-nota" style="margin:-4px 0 10px">'+esc(T.q)+'</div>';
   if(TD) return h+pdtTandaHTML(TD)+'</div>';
-  const oks=ls.filter(function(x){ const P=_pdt.prev[x.pedido_id]; return P && P.st==='ok'; });
+  const oks=va.filter(function(x){ const P=_pdt.prev[x.pedido_id]; return P && P.st==='ok'; });
   const nSel=oks.filter(function(x){ return _pdt.sel[x.pedido_id]; }).length;
   if(oks.length){
     h+='<div class="pdv-barra"><label class="pdv-chk"><input type="checkbox"'+(nSel===oks.length?' checked':'')
@@ -17161,40 +17224,75 @@ function pdtHTML(ls, T){
       +'<button class="btn btn-sm pdv-si"'+(nSel?'':' disabled')+' onclick="pdtTandaAbrir()">'
       +'Crear seleccionados'+(nSel?(' ('+nSel+')'):'')+'</button></div>';
   }
-  ls.forEach(function(x){
-    const d=_pdExcDias(x.fecha), P=_pdt.prev[x.pedido_id]||null, ok=!!(P && P.st==='ok');
-    h+='<div class="pd-exc-ped"><div class="pd-exc-cab">'
+  const cab=function(x, ok, cls){
+    const d=_pdExcDias(x.fecha);
+    return '<div class="pd-exc-ped'+(cls?(' '+cls):'')+'"><div class="pd-exc-cab">'
       +'<div class="pd-exc-cli">'
       +(ok?('<input type="checkbox" class="pdv-c"'+(_pdt.sel[x.pedido_id]?' checked':'')
             +' onchange="pdtSel('+x.pedido_id+',this.checked)" aria-label="Elegir el pedido '+x.pedido_id+'"> '):'')
       +esc(x.cliente_nombre || x.destinatario || '—')+'</div>'
       +'<div class="pd-exc-dias">'+(d===null?'—':(d<=0?'hoy':(d===1?'1 día':d+' días')))+'</div></div>'
-      +'<div class="pd-exc-meta">#'+x.pedido_id+' · sin factura · '+x.lineas.length
-      +(x.lineas.length===1?' línea':' líneas')+'</div>';
+      +'<div class="pd-exc-meta">#'+x.pedido_id+' · sin factura</div>';
+  };
+  const payload=function(x){
+    return x.lineas.map(function(l){
+      return '<div class="pd-exc-lin"><div class="pd-exc-prod">'
+        +'<b>'+esc(_lotNom(l.producto_id))+'</b> · '
+        +'<span class="pd-exc-cant">'+esc(_entPres(l.producto_id, l.cant_uds))+'</span>'
+        +' · <span class="dv-lote">'+esc(l.lote)+'</span></div></div>'; }).join('');
+  };
+  va.forEach(function(x){
+    const P=_pdt.prev[x.pedido_id]||null, ok=!!(P && P.st==='ok');
+    h+=cab(x, ok, '');
     if(ok) h+=_pdtPreviaHTML(P.r);
-    else {
-      // Sin vista previa (todavía, o rechazada): el payload de la cola, como antes.
-      x.lineas.forEach(function(l){
-        h+='<div class="pd-exc-lin"><div class="pd-exc-prod">'
-          +'<b>'+esc(_lotNom(l.producto_id))+'</b> · '
-          +'<span class="pd-exc-cant">'+esc(_entPres(l.producto_id, l.cant_uds))+'</span>'
-          +' · <span class="dv-lote">'+esc(l.lote)+'</span></div></div>';
-      });
-      if(P && P.st==='rech') h+=_valRechazoHTML(P.rech);
-      else if(P && P.st==='red') h+='<div class="pd-cua">No pude preguntarle al servicio de escritura.</div>';
-      else if(P) h+='<div class="pd-cua">Revisando en Odoo…</div>';
-    }
-    const ocupada=(_pdOdooHaciendo===x.id);
-    h+='<div class="dv-acc" style="margin-top:10px">'
-      +(ok?('<button class="btn btn-sm pdv-si" onclick="pdtUno('+x.pedido_id+')">Crear en Odoo</button>'):'')
-      // «Hecho» se queda: es el camino a mano (alguien lo creó en Odoo sin Truefie).
-      +'<button class="btn btn-sm"'+(ocupada?' disabled':'')
-      +' onclick="pdOdooHecho('+x.id+')">'+(ocupada?'Guardando…':'Hecho')+'</button>'
-      +'</div></div>';
+    else { h+=payload(x);
+      if(P && P.st==='red') h+='<div class="pd-cua">No pude preguntarle al servicio de escritura.</div>';
+      else h+='<div class="pd-cua">Revisando en Odoo…</div>'; }
+    // UN PASO MENOS (1-oct): el botón de la fila crea directo. La tarjeta ya
+    // muestra destino, contacto y cantidades; el servidor igual revisa todo
+    // antes de escribir, y si algo no calza no escribe y dice por qué.
+    h+=(ok?('<div class="dv-acc" style="margin-top:10px"><button class="btn btn-sm pdv-si" onclick="pdtUno('
+      +x.pedido_id+')">Crear en Odoo</button></div>'):'')+'</div>';
   });
-  if(ls.some(function(x){ const P=_pdt.prev[x.pedido_id]; return P && P.st==='red'; }))
+  if(va.some(function(x){ const P=_pdt.prev[x.pedido_id]; return P && P.st==='red'; }))
     h+='<button class="rp-ceros" onclick="pdtPrevias(true)">volver a preguntar</button>';
+  if(no.length){
+    h+='<div class="pdv-no-t">No se pueden crear · '+no.length+'</div>';
+    no.forEach(function(x){
+      const P=_pdt.prev[x.pedido_id], g=(_pdt.descartando===x.pedido_id);
+      h+=cab(x, false, 'pdv-no')+payload(x)+_valRechazoHTML(P.rech, true)
+        +'<div class="dv-acc" style="margin-top:10px"><button class="btn btn-sm"'+(g?' disabled':'')
+        +' onclick="pdtDescartar('+x.pedido_id+')">'+(g?'Guardando…':'Descartar')+'</button></div></div>';
+    });
+  }
   return h+'</div>';
+}
+
+// «Descartar» un traslado que no se puede crear. Misma tabla que entregas
+// (`ent_pedido_odoo_descarte`, append-only, solo socias con su correo), huella
+// con prefijo «t|». Si cambia lo que dice el servidor, la huella cambia y vuelve.
+async function pdtDescartar(id){
+  if(_pdt.descartando) return;
+  const x=_pdtFilas().filter(function(k){ return k.pedido_id===id; })[0];
+  const P=_pdt.prev[id];
+  if(!x || !P || P.st!=='rech') return;
+  if(!confirm('¿Sacar el pedido #'+id+' de «No se pueden crear»?\n\n'
+    +'No cambia nada en Odoo ni en el pedido. Vuelve a la lista si cambia el motivo.')) return;
+  _pdt.descartando=id; pdRender();
+  try{
+    const c=sbClient();
+    const {data:{user}}=await c.auth.getUser();
+    const email=(user&&user.email)||'';
+    if(!email) throw new Error('no hay sesión abierta. El descarte tiene que ir firmado.');
+    const hu=_pdtHuella(x, P);
+    const {data,error}=await c.from('ent_pedido_odoo_descarte').insert({pedido_id:id, huella:hu,
+      motivo:((VAL_MOTIVO[P.rech.motivo]||'')+' '+(P.rech.texto||'')).trim()||null, creado_por:email}).select('id');
+    if(error) throw error;
+    if(!data || !data.length) throw new Error('la base no devolvió el descarte. No se guardó.');
+    (_pdt.desc[id]=_pdt.desc[id]||[]).push(hu);
+  }catch(e){
+    alert('No se pudo descartar: '+((e&&e.message)||e)+'\n\nSi dice "row-level security", la sesión no es de una socia.');
+  }finally{ _pdt.descartando=0; pdRender(); }
 }
 
 function pdtTandaHTML(T){
@@ -17247,7 +17345,16 @@ function pdtTodos(on){
   if(on) _pdtFilas().forEach(function(x){ const P=_pdt.prev[x.pedido_id]; if(P && P.st==='ok') _pdt.sel[x.pedido_id]=true; });
   pdRender();
 }
-function pdtUno(id){ _pdt.sel={}; _pdt.sel[id]=true; pdtTandaAbrir(); }
+// UN PASO MENOS (1-oct): la fila crea directo, sin la vista previa de la tanda.
+function pdtUno(id){
+  if(_pdt.tanda) return;
+  const x=_pdtFilas().filter(function(k){ return k.pedido_id===id; })[0];
+  const P=_pdt.prev[id];
+  if(!x || !P || P.st!=='ok') return;
+  _pdt.sel={};
+  _pdt.tanda={fase:'previa', items:[{id:id, cli:x.cliente_nombre||x.destinatario||('Pedido '+id), r:P.r}], i:0};
+  pdtTandaConfirmar();
+}
 
 async function pdtTandaAbrir(){
   if(_pdt.tanda) return;
@@ -17685,7 +17792,17 @@ function pdvTodos(on){
   pdRender();
 }
 // «Validar» en una fila = una tanda de uno. Un solo camino, no dos.
-function pdvUno(id){ _pdv.sel={}; _pdv.sel[id]=true; pdvTandaAbrir(); }
+// UN PASO MENOS (1-oct): la fila valida directo. La tarjeta ya muestra albarán y
+// cantidades; el servidor revisa todo otra vez antes de escribir.
+function pdvUno(id){
+  if(_pdv.tanda) return;
+  const x=((_cuadre&&_cuadre.casos)||[]).filter(function(k){ return k.pedido===id; })[0];
+  const P=_pdv.prev[id];
+  if(!x || !P || P.st!=='ok') return;
+  _pdv.sel={};
+  _pdv.tanda={fase:'previa', items:[{id:id, cli:x.cliente||('Pedido '+id), r:P.r}], i:0};
+  pdvTandaConfirmar();
+}
 
 async function pdvTandaAbrir(){
   if(_pdv.tanda) return;
