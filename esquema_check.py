@@ -103,7 +103,7 @@ SENSIBLE_LISTA    = {'acceso_usuario', 'v_acceso_usuario',
 CERRADA_ANON      = {'ent_alisto_lote_efectivo', 'ent_salido_del_congelador_desde_ancla',
                      'v_ent_excepcion_pendiente', 'v_ent_excepcion_pendiente_pedido',
                      'ent_conteo_correccion_vigente',
-                     'ent_odoo_validacion', 'ent_pedido_odoo_descarte'}
+                     'ent_odoo_validacion', 'ent_pedido_odoo_descarte', 'ent_odoo_traslado'}
 def es_sensible(t):
     return t in SENSIBLE_LISTA or t in CERRADA_ANON or t.startswith(SENSIBLE_PREFIJOS)
 

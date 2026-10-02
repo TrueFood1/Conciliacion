@@ -1,6 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ENSAYO_TRASLADO_ODOO.sql  ·  1-oct-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA
 -- Prueba la tabla del rastro del traslado (ENTREGAS_TRASLADO_ODOO.sql) y la deshace.
+-- ✅ CORRIDO el 1-oct-2026 por Andrea en producción: 14 de 14 ok = true. Después se aplicó ENTREGAS_TRASLADO_ODOO.sql.
 --
 -- CÓMO SE LEE
 --   Una tabla de 14 filas, TODAS con ok = true. Un RECHAZA da ok solo si el

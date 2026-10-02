@@ -1,5 +1,9 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- ENTREGAS_TRASLADO_ODOO.sql  ·  1-oct-2026  ·  NO SE CORRIÓ TODAVÍA
+-- ENTREGAS_TRASLADO_ODOO.sql  ·  1-oct-2026  ·  APLICADO (1-oct-2026)
+-- ✅ Pegado por Andrea en Supabase producción el 1-oct, después del ensayo
+--    (ENSAYO_TRASLADO_ODOO.sql: 14 de 14 ok = true, con el texto esperado en
+--    cada rechazo). Fila de control vista: 1 · 2 · 5 · 0 · INSERT,SELECT.
+--    NO SE VUELVE A PEGAR (y si se pega, frena solo: la tabla ya existe).
 -- El RASTRO del traslado interno automático: quién creó en Odoo, desde Truefie,
 -- qué traslado, de qué salida sin factura, a dónde y cuándo.
 --
