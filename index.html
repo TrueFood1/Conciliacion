@@ -4073,10 +4073,14 @@ body.es-socia .face-pend{display:block}
 .pdv-it .pd-meta b{color:var(--text);font-weight:600}
 .pdv-acc{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:10px}
 .pdv-res-t{font-size:11px;font-weight:500;color:var(--text-3);padding-top:12px}
+.pdt-uom{color:var(--text-3)!important;font-size:11.5px}
 /* «No se pueden validar»: aparte, abajo y en gris (Andrea, 1-oct). */
 .pdv-no-t{font-size:11px;font-weight:500;color:var(--text-3);padding:16px 0 2px}
 .pdv-no .pd-quien,.pdv-no .pd-cua{color:var(--text-3)}
 .pdv-no .pdv-dq,.pdv-no .pdv-dq b{color:var(--text-3)}
+/* Traslados: la tarjeta usa las clases de la cola (pd-exc-*). Mismo gris. */
+.pd-exc-ped.pdv-no .pd-exc-cli,.pd-exc-ped.pdv-no .pd-exc-prod,.pd-exc-ped.pdv-no .pd-exc-prod b,
+.pd-exc-ped.pdv-no .pd-exc-meta,.pd-exc-ped.pdv-no .pd-exc-dias{color:var(--text-3)}
 
 /* ══ TICKET 29 · CORREGIR UNA PREPARACIÓN ═══════════════════════════════
    El botón de la tarjeta de "Por entregar". Va al lado de "Entregar" y NO
@@ -4754,11 +4758,11 @@ body.es-socia .face-pend{display:block}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-// ⛔ DEV = b77 (main 1ebdab0) + EL CALENDARIO DE AUSENCIAS DE LORENA (f7186ca, ccc1817,
+// ⛔ DEV = b78 (main 02ceb72) + EL CALENDARIO DE AUSENCIAS DE LORENA (f7186ca, ccc1817,
 // 8-sep), que NO SE PUBLICA hasta que Lorena lo confirme (decisión de Andrea, 30-sep).
 // El rótulo lo dice en el pie: si esto aparece en Pages, se publicó dev por error.
 // Al publicar el calendario, BUILD vuelve a ser 'v <fecha> · bNN' a secas.
-const BUILD = 'v 1 oct 2026 · b77 + calendario Lorena (dev, NO PUBLICAR)';
+const BUILD = 'v 1 oct 2026 · b78 + calendario Lorena (dev, NO PUBLICAR)';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -11154,11 +11158,30 @@ const DESP_UOM_CORTA = {
   37:'paq', 38:'paq', 50:'paq',// Paquete de 4 · de 2 · de 12
   42:'cj', 44:'cj', 46:'cj', 49:'cj',   // Caja (Hamburguesa 24) · (Frances 24) · Caja 6 · (Pizza 12)
 };
-// Rótulo corto de una unidad. Sin id conocido cae al NOMBRE de Odoo, que es
-// largo pero verdadero — y si tampoco hay nombre, a 'u', que es la unidad base.
-function _despUomCorta(uomId, uomNombre){
-  return DESP_UOM_CORTA[+uomId] || uomNombre || 'u';
+// ── LA CANTIDAD EN PALABRAS (1-oct, Andrea) ─────────────────────────────
+// Despachos y Devoluciones decían la unidad como la llama Odoo («6 Unidades»,
+// «2 Caja (Frances)») o abreviada («cj», «u»). Ahora se dice como en el resto:
+// «6 unidades», «1 unidad», «2 cajas», «3 paq.». SOLO SE DIBUJA ASÍ: lo que se
+// guarda y lo que se copia a la nota de crédito siguen siendo lo de la factura.
+// Por ID de la UoM, nunca por el nombre (regla del CLAUDE.md). El nombre se usa
+// solo si el id no está en la tabla, y entonces se muestra tal cual.
+const UOM_PALABRA = {
+  1:['unidad','unidades'], 2:['docena','docenas'],
+  37:['paq.','paq.'], 38:['paq.','paq.'], 50:['paq.','paq.'],
+  42:['caja','cajas'], 44:['caja','cajas'], 46:['caja','cajas'], 49:['caja','cajas']};
+function _uomPalabra(uomId, uomNombre, n){
+  const uno=Math.abs((+n||0)-1)<1e-9;
+  let p=UOM_PALABRA[+uomId];
+  if(!p){
+    const t=String(uomNombre||'');
+    if(!t || /^unidades?$|^units?$/i.test(t)) p=['unidad','unidades'];
+    else return t;
+  }
+  return uno?p[0]:p[1];
 }
+function _cantUom(n, uomId, uomNombre){ return _rzN(n)+' '+_uomPalabra(uomId, uomNombre, n); }
+// Rótulo de una unidad (en plural: es el rótulo del campo, no de una cantidad).
+function _despUomCorta(uomId, uomNombre){ return _uomPalabra(uomId, uomNombre, 2); }
 // ── EL REFRESCO DE FACTURAS (7-sep-2026) ───────────────────────────────
 // EL CASO: la factura 3515 de CSU se creó en Odoo a las 06:20 y Daniel alistó a
 // las 07:58 sin verla. 98 minutos. Hasta b53 las facturas se leían UNA VEZ POR
@@ -12791,22 +12814,21 @@ function despRenderPedido(body){
         // Marcada: la cantidad es 0 y no se edita. El numero de al lado es lo que
         // SE IBA a entregar, en unidad de venta — el que Daniel reconoce, no las
         // unidades individuales que guarda la base.
-        ? ('<span class="dp-l-cant" style="cursor:default"><b>0</b> '+esc(L.uom_nombre||'')+'</span>')
+        ? ('<span class="dp-l-cant" style="cursor:default"><b>0</b> '+esc(_uomPalabra(L.uom_id, L.uom_nombre, 0))+'</span>')
         : e.editando
          ? ('<span class="dp-l-cant"><input class="dp-cant" type="number" min="0" step="any" '
             +'inputmode="decimal" value="'+e.cant+'" oninput="despSetCant('+i+',this.value)" '
-            +'onblur="despFinEdit('+i+')" autofocus> '+esc(L.uom_nombre)+'</span>')
+            +'onblur="despFinEdit('+i+')" autofocus> '+esc(_uomPalabra(L.uom_id, L.uom_nombre, e.cant))+'</span>')
          : ('<button class="dp-l-cant" onclick="despEditar('+i+')">'
-            +'<b>'+_rzN(e.cant)+'</b> '+esc(L.uom_nombre)
+            +'<b>'+_rzN(e.cant)+'</b> '+esc(_uomPalabra(L.uom_id, L.uom_nombre, e.cant))
             +'<span class="dp-lapiz" aria-hidden="true">✎</span></button>'))
       +'</div>'
-      +(dif?'<div class="dp-fact">facturado '+_rzN(L.cant_uom)+'</div>':'');
+      +(dif?'<div class="dp-fact">facturado '+esc(_cantUom(L.cant_uom, L.uom_id, L.uom_nombre))+'</div>':'');
     if(mk){
       // EL SELECTOR SE APAGA, NO DESAPARECE. Que se vea el hueco donde iba el
       // lote es parte de lo que la tarjeta dice: aca no se eligio nada porque no
       // habia nada que elegir.
-      h+='<div class="dp-nofact">no entregado '+_rzN(L.cant_uom)
-        +(L.uom_nombre?(' '+esc(L.uom_nombre)):'')+'</div>'
+      h+='<div class="dp-nofact">no entregado '+esc(_cantUom(L.cant_uom, L.uom_id, L.uom_nombre))+'</div>'
         // Se le pasa la lista REAL, no una vacia: el selector de una linea marcada
         // esta apagado por CSS (pointer-events:none), asi que da igual que tenga
         // adentro — pero con la lista vacia el placeholder decia "No queda saldo
@@ -13043,7 +13065,7 @@ function _despCantHTML(f,i){
     +'<input class="dp-cant-in" type="number" min="0" step="any" inputmode="decimal" '
     +'value="'+(e.cant==null?'':e.cant)+'" oninput="despCorrSetCant('+i+',this.value)">'
     +(un?('<span class="dp-cant-l">'+esc(un)+'</span>'):'')
-    +(dif?('<span class="dp-cant-dif">la factura dice '+esc(_rzN(L.cant_uom))+'</span>')
+    +(dif?('<span class="dp-cant-dif">la factura dice '+esc(_cantUom(L.cant_uom, L.uom_id, L.uom_nombre))+'</span>')
          :('<span class="dp-cant-fac">= la factura</span>'))
     +'</div>';
 }
@@ -13061,14 +13083,7 @@ function despCorrSetCant(i,v){
 }
 /* La unidad en la que se escribe, corta, para el rótulo del campo. Sale de la
    UoM de la factura, que es la unidad de venta — nunca unidades sueltas. */
-function _despUnidadCorta(L){
-  const n=String((L&&L.uom_nombre)||'');
-  if(/paquete/i.test(n)) return 'paq';
-  if(/caja/i.test(n))    return 'cj';
-  if(/docena/i.test(n))  return 'doc';
-  if(/unit|unidad/i.test(n)) return 'u';
-  return n.slice(0,6);
-}
+function _despUnidadCorta(L){ return L ? _despUomCorta(L.uom_id, L.uom_nombre) : ''; }
 
 /* ── ¿CALZA CON LA FACTURA? ────────────────────────────────────────────
    Se compara POR PRODUCTO y no por línea: una factura puede traer el mismo
@@ -13582,7 +13597,7 @@ function despRenderHojaMotivo(){
       +' oninput="despMarcaSetNota(this.value)">'+esc(_despNMNota)+'</textarea>';
   return _despDialogoHTML({
     cliente: esc(L.producto),
-    sub: 'no se entrega · '+_rzN(L.cant_uom)+(un?(' '+un):'')+' facturado',
+    sub: 'no se entrega · '+_cantUom(L.cant_uom, L.uom_id, un)+' facturado',
     cuerpo: cuerpo,
     listo: _despMarcaLista(), ocupado:false,
     cerrar: 'despMarcaCerrar()', ok: 'despMarcaConfirmar()', okTxt: 'Marcar',
@@ -14011,7 +14026,7 @@ function despRenderDialogoEntrega(){
   }else{
     cuerpo=lineas.map(function(l){
       const un=l.uom_nombre||'';
-      const cant=(l.cant_uom!=null&&un)?(_rzN(l.cant_uom)+' '+un):(_rzN(l.cant_uds)+' u');
+      const cant=(l.cant_uom!=null&&(un||l.uom_id))?_cantUom(l.cant_uom, l.uom_id, un):_entPresPlano(l.producto_id, l.cant_uds);
       // El lote va DEBAJO del producto, indentado, y no en la misma línea: una línea con
       // dos lotes es lo normal, no la excepción, y en teléfono el segundo se corta.
       const lotes=(l.lotes||[]).length
@@ -14241,17 +14256,16 @@ function despRenderDialogoPreparar(){
   let cuerpo=f.lineas.map(function(L,i){
     const e=_despEst(f,i), cant=(+e.cant||0), un=L.uom_nombre||'';
     if(Math.abs(cant-L.cant_uom)>1e-9) dif++;
-    const pres=_despUomCorta(L.uom_id, L.uom_nombre);
     const lotes=(e.lotes||[]).filter(function(x){ return x.lote; });
     const filas=lotes.length
       ? lotes.map(function(x){
           // Sin partir, la cantidad del único lote ES el total de la línea.
           const c=(lotes.length===1 && (x.cant==null||x.cant==='')) ? cant : (+x.cant||0);
           return '<div class="de-lote"><span>'+esc(x.lote)+'</span>'
-               +'<span class="de-lote-c">'+_rzN(c)+' '+pres+'</span></div>'; }).join('')
+               +'<span class="de-lote-c">'+esc(_cantUom(c, L.uom_id, L.uom_nombre))+'</span></div>'; }).join('')
       : '<div class="de-lote de-sinlote"><span>sin lote</span></div>';
     return '<div class="de-lin"><div class="de-prod"><span>'+esc(_bsProd(L.producto_id))+'</span>'
-      +'<span class="de-cant">'+_rzN(cant)+(un?(' '+esc(un)):'')+'</span></div>'+filas+'</div>';
+      +'<span class="de-cant">'+esc(_cantUom(cant, L.uom_id, un))+'</span></div>'+filas+'</div>';
   }).join('');
   // Lo que ANTES iba escondido al final del confirm(). Acá está donde se mira.
   if(dif) cuerpo+='<div class="de-mal">'+dif+(dif===1?' línea sale':' líneas salen')
@@ -14287,8 +14301,8 @@ function _despCantLote(uds, l){
   // línea en paquete guarda 'cj' — el mismo error que se arregló arriba, pero
   // grabado. Ver el pendiente en ENTREGAS_PENDIENTES.md §6.
   if(f&&+f>0){ const n=(+uds)*(+f); if(Math.abs(n-Math.round(n))<1e-9)
-    return _rzN(Math.round(n))+' '+_despUomCorta(l.uom_id, l.uom_nombre); }
-  return _rzN(uds)+' u';
+    return _cantUom(Math.round(n), l.uom_id, l.uom_nombre); }
+  return _rzN(uds)+' '+_entUniLbl(null, uds);
 }
 
 async function despEntregar(pedidoId){
@@ -14464,7 +14478,7 @@ function _presRotulo(pid){          // + "· paq de 4 u" cuando hay paquete
 function _lotUds(uds, pid){
   const t=(typeof INV_TERM!=='undefined') ? INV_TERM.find(function(x){ return x.id===pid; }) : null;
   const d=(t&&t.presDiv)||1;
-  return (d>1) ? (_lotNum(uds/d)+' paq') : (_lotNum(uds)+' u');
+  return (d>1) ? (_lotNum(uds/d)+' paq.') : (_lotNum(uds)+' '+_entUniLbl(null, uds));
 }
 function _lotCajas(uds, pid){
   const t=(typeof INV_TERM!=='undefined') ? INV_TERM.find(function(x){ return x.id===pid; }) : null;
@@ -14479,7 +14493,7 @@ function _lotCajas(uds, pid){
   // renglón que existe para que un saldo bajo cero se vea.
   if(!f || uds<0 || uds<f) return _lotUds(uds, pid);
   const cj=Math.floor(uds/f), r=Math.round((uds-cj*f)*1000)/1000;
-  return _rzN(cj)+' cj'+(r?(' + '+_lotUds(r,pid)):'');
+  return _rzN(cj)+(cj===1?' caja':' cajas')+(r?(' + '+_lotUds(r,pid)):'');
 }
 function _lotNom(pid){ const t=(typeof INV_TERM!=='undefined')
   ? INV_TERM.find(function(x){ return x.id===pid; }) : null; return (t&&t.label)||('#'+pid); }
@@ -14892,20 +14906,27 @@ function _entFacRotulo(o){
 // `ent_alisto_linea` y `ent_alisto_lote`, y lo que suma el saldo por lote).
 // Sale en la unidad que se dice en voz alta.
 function _entPresN(x){ return _rzN(x, (Math.abs(x%1)<1e-9)?0:1); }
+// LA PALABRA DE LA UNIDAD (1-oct, Andrea): «1 unidad», «3 unidades», nunca «uds»
+// ni «1,00 Unidades». El paquete sigue «paq.». Una sola definición para todo lo
+// que dibuja `_entPres` y `_entPresPlano` (Historial, Validar, Traslados).
+function _entUniLbl(I, n){
+  if(I && I.presLbl==='paq') return 'paq.';
+  return (Math.abs((+n||0)-1)<1e-9) ? 'unidad' : 'unidades';
+}
 function _entPres(pid, uds){
   const I=NIV_INFO[pid];
   const div=(I&&+I.presDiv)||1, cajaU=(I&&+I.cajaU)||0;
-  const lbl=(I&&I.presLbl==='paq')?'paq.':'uds';
+  const lbl=function(n){ return _entUniLbl(I, n); };
   const vu=(+uds||0)/div;                  // en unidad de venta: paquetes o unidades
   const porCaja=div>0?(cajaU/div):0;       // cuántas de esas entran en una caja
   if(porCaja>1){
     const cj=Math.floor(vu/porCaja+1e-9), resto=vu-cj*porCaja;
     if(cj>=1 && Math.abs(resto)<1e-9)
-      return _entPresN(cj)+(cj===1?' Caja':' Cajas')+' ('+_entPresN(vu)+' '+lbl+')';
+      return _entPresN(cj)+(cj===1?' Caja':' Cajas')+' ('+_entPresN(vu)+' '+lbl(vu)+')';
     if(cj>=1)
-      return _entPresN(cj)+(cj===1?' Caja':' Cajas')+' + '+_entPresN(resto)+' '+lbl;
+      return _entPresN(cj)+(cj===1?' Caja':' Cajas')+' + '+_entPresN(resto)+' '+lbl(resto);
   }
-  return _entPresN(vu)+' '+lbl;
+  return _entPresN(vu)+' '+lbl(vu);
 }
 // EL CAMBIO SE DICE EN UNA SOLA UNIDAD, sin agrupar en cajas. "1,5 paq. → 1 Caja
 // (6 paq.)" obliga a hacer la cuenta para ver de cuánto fue el salto; "1,5 → 6 paq."
@@ -14913,12 +14934,12 @@ function _entPres(pid, uds){
 function _entPresPlano(pid, uds){
   const I=NIV_INFO[pid];
   const div=(I&&+I.presDiv)||1;
-  const lbl=(I&&I.presLbl==='paq')?'paq.':'uds';
-  return _entPresN((+uds||0)/div)+' '+lbl;
+  const n=(+uds||0)/div;
+  return _entPresN(n)+' '+_entUniLbl(I, n);
 }
 function _entPresCambio(pid, antes, despues){
   const a=_entPresPlano(pid, antes), b=_entPresPlano(pid, despues);
-  const suf=b.match(/ (paq\.|uds)$/);
+  const suf=b.match(/ (paq\.|unidades|unidad)$/);
   // La unidad es la misma de los dos lados (es el mismo producto): decirla una vez.
   if(suf && a.endsWith(suf[0])) return a.slice(0, -suf[0].length)+' → '+b;
   return a+' → '+b;
@@ -15188,6 +15209,24 @@ async function bsLeer(){
   }
   P.forEach(function(x){ x.val_ok=valOK; x.odoo_val=val[x.pedido_id]||null; });
 
+  // ── EL RASTRO DEL TRASLADO INTERNO · `ent_odoo_traslado` (1-oct) ───────
+  // Mismo trato que el de arriba: lo usa la línea «Trasladado en Odoo» y el
+  // guarda de «Sale otro día», y falla CERRADO.
+  let trasOK=false; const tras={};
+  try{
+    const ids=P.map(function(x){ return x.pedido_id; }).filter(Boolean);
+    if(ids.length){
+      const {data:ts,error:eT}=await c.from('ent_odoo_traslado')
+        .select('pedido_id,picking_nombre,creado_por,creado_en').in('pedido_id',ids);
+      if(eT) throw eT;
+      (ts||[]).forEach(function(x){ tras[x.pedido_id]=x; });
+    }
+    trasOK=true;
+  }catch(e){
+    try{ console.error('[Truefie] Historial · no pude leer ent_odoo_traslado', e); }catch(_){}
+  }
+  P.forEach(function(x){ x.tras_ok=trasOK; x.odoo_tras=tras[x.pedido_id]||null; });
+
   return await _entColgarDetalle(c, P);
 }
 
@@ -15414,6 +15453,8 @@ function bsPuedeDeshacer(p){
   if(!p.devs_ok)              return false;  // no se pudieron leer las devoluciones
   if(p.tiene_devolucion)      return false;  // ver el comentario de `bsLeer`
   if(!p.val_ok)               return false;  // no se pudo leer el rastro de Odoo
+  if(!p.tras_ok)              return false;  // ni el del traslado interno
+  if(p.odoo_tras)             return false;  // ya trasladado en Odoo desde Truefie
   if(p.odoo_val)              return false;  // ya validada en Odoo desde Truefie:
                                              // deshacerla acá dejaría a Truefie
                                              // en "preparado" con Odoo en "hecho"
@@ -15522,6 +15563,11 @@ async function bsDeshacer(id){
    factura 3560, y la fila en `ent_odoo_validacion`.
    ══════════════════════════════════════════════════════════════════════ */
 function bsValidadoHTML(p){
+  if(p && p.odoo_tras){
+    const t=p.odoo_tras;
+    return '<div class="bs-meta">Trasladado en Odoo · '+esc(t.picking_nombre)
+      +' · '+esc(_quienFirma(t.creado_por))+' · '+esc(_entFechaLarga(t.creado_en))+'</div>';
+  }
   if(!p || !p.odoo_val) return '';
   const v=p.odoo_val;
   return '<div class="bs-meta">Validado en Odoo · '+esc(v.picking_nombre)
@@ -15531,13 +15577,16 @@ function bsValidadoHTML(p){
 // UNA llamada al servicio. Devuelve {st, js} o {red:true} si no hubo respuesta
 // (corte de red, CORS, servicio caído). Quien llama decide qué significa: al
 // PREVISUALIZAR un corte es solo un corte; al CONFIRMAR, no se sabe si Odoo validó.
-async function escrituraValidar(id, confirmar){
+async function escrituraValidar(id, confirmar){ return escrituraPedir('/validar', id, confirmar); }
+// La misma llamada para las dos rutas del servicio: /validar (salida de venta) y
+// /trasladar (traslado interno, 1-oct). El cuerpo es {pedido_id, confirmar} en las dos.
+async function escrituraPedir(ruta, id, confirmar){
   let token='';
   try{ const s=await sbClient().auth.getSession();
        token=(s&&s.data&&s.data.session&&s.data.session.access_token)||''; }catch(e){}
   let res;
   try{
-    res=await fetch(ESCRITURA_URL+'/validar', {method:'POST',
+    res=await fetch(ESCRITURA_URL+ruta, {method:'POST',
       headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
       body:JSON.stringify(confirmar?{pedido_id:id, confirmar:true}:{pedido_id:id})});
   }catch(e){
@@ -15578,7 +15627,21 @@ const VAL_MOTIVO={
   odoo_error:'Odoo contestó con un error. No se validó nada.',
   truefie_error:'Supabase no contestó bien. No se validó nada.',
   cerca_odoo:'El servicio frenó un pedido a Odoo que no le corresponde. No se validó nada.',
-  interno:'El servicio de escritura falló. No se validó nada.'
+  interno:'El servicio de escritura falló. No se validó nada.',
+  // traslado interno (1-oct)
+  traslado_apagado:'Todo calza, pero el traslado está apagado: no se creó nada.',
+  tiene_factura:'Esta salida tiene factura: se valida en «Validar entrega en Odoo», no se traslada.',
+  motivo_sin_traslado:'Este motivo no lleva traslado interno.',
+  sin_pendiente:'Esta salida ya no está en la cola: alguien la marcó Hecho.',
+  ya_creado_truefie:'El traslado de esta salida ya se creó desde Truefie.',
+  ya_creado_odoo:'Ya hay un traslado en Odoo con esta referencia. No se crea otro.',
+  destino_raro:'La ubicación de destino en Odoo no es la esperada. No se creó nada.',
+  contacto_raro:'El contacto genérico no existe o está archivado en Odoo. No se creó nada.',
+  sin_lineas:'La salida no tiene productos.',
+  producto_raro:'La salida tiene algo que no es un producto terminado.',
+  cantidad_fraccion:'Una cantidad no da exacta en la unidad de Odoo.',
+  sin_existencias:'Odoo no tiene en WH/Stock lo que salió. Hay que corregir el inventario antes.',
+  sin_reserva:'Odoo no reservó todo lo que salió. El traslado se canceló.'
 };
 
 function _valFecha(s){          // Odoo manda "2026-09-30 14:00:00" en UTC, sin zona
@@ -15615,8 +15678,14 @@ function _valRechazoHTML(R, gris){
   R=R||{};
   const frase=VAL_MOTIVO[R.motivo]||'No se pudo validar.';
   const extra=(R.texto && R.texto.trim()!==frase.trim())?('<span>'+esc(R.texto)+'</span>'):'';
-  return '<div class="'+((gris||R.motivo==='escritura_apagada')?'pdv-neutro':'pdv-mal')+'">'+esc(frase)+extra+'</div>'
-    +(R.motivo==='descuadre'?_valDescuadreHTML(R.detalle):'');
+  return '<div class="'+((gris||R.motivo==='escritura_apagada'||R.motivo==='traslado_apagado')?'pdv-neutro':'pdv-mal')+'">'+esc(frase)+extra+'</div>'
+    +(R.motivo==='descuadre'?_valDescuadreHTML(R.detalle):'')
+    +((R.motivo==='sin_existencias' && Array.isArray(R.detalle))?R.detalle.map(function(l){
+        return '<div class="pdv-dq"><b>'+esc(_valProd(l))+'</b><span>salió '+esc(_entPresPlano(l.producto_id, l.uds))
+          // Lo libre viene en la UoM de Odoo: se pasa a unidades con la misma
+          // proporción de la línea (uds / cant_uom) y se dice como todo lo demás.
+          +'</span><span>libre en Odoo '+esc(_entPresPlano(l.producto_id,
+            (+l.cant_uom>0)?(+l.libre_uom||0)*(+l.uds||0)/(+l.cant_uom):(+l.libre_uom||0)))+'</span></div>'; }).join(''):'');
 }
 
 // ── La hoja de clientes: frecuentes primero (facturas de los últimos 90 días) ──
@@ -16425,6 +16494,7 @@ async function pdCargar(force){
   }
   pdRender();
   pdCuadreCargar(!!force);   // el cuadre con Odoo llega después y repinta
+  pdtPrevias(true);          // «Crear en Odoo»: le pregunta al servidor cada traslado de la cola
 }
 async function pdLeer(){
   const c=sbClient(); if(!c) throw new Error('sin sesión de Supabase');
@@ -16932,8 +17002,8 @@ function dvListaHTML(){
     const cau=(DV_CAUSAS.find(function(x){ return x.v===d.causa; })||{}).t||d.causa||'—';
     const tot={};
     (d.lineas||[]).forEach(function(l){ const n=_lotNom(l.producto_id);
-      tot[n]=tot[n]||{u:0,uom:l.uom_nombre||'u'}; tot[n].u+=(+l.cant_uom||0); });
-    const que=Object.keys(tot).map(function(n){ return _dvNum(tot[n].u)+' '+tot[n].uom+' de '+n; }).join(' · ');
+      tot[n]=tot[n]||{u:0,uid:l.uom_id,uom:l.uom_nombre||''}; tot[n].u+=(+l.cant_uom||0); });
+    const que=Object.keys(tot).map(function(n){ return _cantUom(tot[n].u, tot[n].uid, tot[n].uom)+' de '+n; }).join(' · ');
     h+='<div class="bs-fila" style="cursor:default">'
       +'<div class="bs-f1"><span class="bs-cli">'+esc(d.cliente_nombre||'—')+'</span>'
       +'<span class="bs-fec">'+esc(_despDia(d.fecha))+'</span></div>'
@@ -17122,12 +17192,12 @@ function dvFormHTML(){
       h+='<table class="cl-tbl"><tr><th>Producto</th><th>Cantidad</th><th>Lotes</th><th></th></tr>';
       N.lineas.forEach(function(l,i){
         const lots=l.lotes.map(function(x){ return esc(x.lote)
-          +(l.lotes.length>1?(' ('+_dvNum(x.cant_man)+')'):''); }).join(' · ');
+          +(l.lotes.length>1?(' ('+esc(_dvManTxt(x.cant_man, l.producto_id))+')'):''); }).join(' · ');
         // ⚠️ SIN "= N u". Para Frances/Buns/Pizza esas son unidades SUELTAS, que es
         // la unidad que nadie usa: "48 u" son 12 paquetes y se lee 4x mal. La
         // cantidad se dice en la unidad de manejo y punto.
         h+='<tr><td>'+esc(_lotNom(l.producto_id))+'</td>'
-          +'<td>'+_dvNum(l.total_man)+' '+esc(l.man_nombre)+'</td>'
+          +'<td>'+esc(_dvManTxt(l.total_man, l.producto_id))+'</td>'
           +'<td style="font-size:11.5px;color:var(--text-2)">'+lots+'</td>'
           +'<td style="text-align:right"><button class="btn btn-sm" onclick="dvEditar('+i+')">✎</button></td></tr>';
       });
@@ -17220,7 +17290,7 @@ function dvLotesHTML(){
     // los dos numeros —15 y 100— no se parezcan en nada.
     const exc=(puesto*M.div) > (L.salioUds+0.0001); if(exc) hayExceso=true;
     h+='<tr><td class="cl-lote">'+esc(L.lote)+'</td>'
-      +'<td class="dv-salio">'+esc(_dvNum(L.salioMan))+' '+esc(M.nombre)+'</td>'
+      +'<td class="dv-salio">'+esc(_dvManTxt(L.salioMan, pid))+'</td>'
       +'<td><input class="cl-in" type="number" min="0" step="any" inputmode="decimal" '
       +'value="'+esc(v==null?'':v)+'" oninput="dvLote(\''+esc(L.lote).replace(/'/g,"&#39;")
       +'\',this.value)"'+(exc?' style="border-color:var(--warn)"':'')+'></td></tr>';
@@ -17234,8 +17304,7 @@ function dvLotesHTML(){
     +'<b>Se registra igual</b> y queda marcado: puede ser producto de una entrega anterior '
     +'en el mismo camión.</div>';
   const I=NIV_INFO[pid]||{nom:pid};
-  h+='<div class="cl-pie">'+esc(I.nom)+' · vuelve hasta ahora <strong>'+_dvNum(totMan)+' '
-    +esc(M.nombre)+'</strong></div>';
+  h+='<div class="cl-pie">'+esc(I.nom)+' · vuelve hasta ahora <strong>'+esc(_dvManTxt(totMan, pid))+'</strong></div>';
   h+='<div style="margin-top:14px"><button class="btn" '+(totMan>0?'':'disabled')
     +' onclick="dvAgregarLinea()">'+(N.editando>=0?'Guardar el cambio':'Agregar a esta devolución')
     +'</button>'
@@ -17298,6 +17367,9 @@ function dvProductosDeLaEntrega(){
 // tiene que espejar la FACTURA, asi que sus lineas van en la unidad de la entrega
 // —`cant_uds x uom_factor`— mientras la devolucion guarda lo fisico. Cada tabla en
 // la unidad de su pregunta.
+// Cómo se DICE una cantidad en unidad de manejo (paquetes o unidades). El nombre
+// que se guarda (`man_nombre`, «Paquete de 4» / «Unidades») no cambia.
+function _dvManTxt(n, pid){ const M=_dvManejo(pid); return _entPresPlano(pid, (+n||0)*M.div); }
 function _dvManejo(pid){
   const I=NIV_INFO[pid]||{presDiv:1,presLbl:'uds'};
   const d=(+I.presDiv>0)?+I.presDiv:1;
@@ -17434,7 +17506,7 @@ function dvFueraHTML(){
 // pantalla SUMA, y sumar de mas es el error grave de este modulo.
 function dvConfirmarHTML(){
   const N=_dv.n;
-  const que=N.lineas.map(function(l){ return _dvNum(l.total_man)+' '+l.man_nombre
+  const que=N.lineas.map(function(l){ return _dvManTxt(l.total_man, l.producto_id)
     +' de '+_lotNom(l.producto_id); }).join(' · ');
   // ⚠️ LO QUE SE SACO DE ACA (17-sep) Y POR QUE:
   //   · el aviso de la nota de credito. NO ES ASUNTO DE DANIEL: el registra lo que
@@ -17821,12 +17893,17 @@ function pdOdooHTML(){
   if(E.err) return '<div class="card rp-z"><div class="card-title">Pendientes de Odoo</div>'
     +'<div class="cl-none dp-mal">No pude leer la cola: '+esc(E.err)+'</div></div>';
   const filas=E.filas||[];
-  if(!filas.length) return '';
+  // ⚠️ CON UNA TANDA ABIERTA LA TARJETA SE DIBUJA AUNQUE LA COLA ESTÉ VACÍA. El
+  // 1-oct Andrea creó el primer traslado real (153, WH/INT/00146) y no vio el
+  // resultado: al terminar, Pendientes se relee, el 153 ya no está en la cola, y
+  // la tarjeta desaparecía con el resumen adentro.
+  if(!filas.length && !_pdt.tanda) return '';
   let h='';
   ['nota_credito','traslado_interno'].forEach(function(tipo){
     const ls=filas.filter(function(x){ return x.tipo===tipo; });
-    if(!ls.length) return;
     const T=PD_ODOO_T[tipo];
+    if(tipo==='traslado_interno'){ h+=pdtHTML(ls, T); return; }   // con «Crear en Odoo» (1-oct)
+    if(!ls.length) return;
     h+='<div class="card rp-z"><div class="card-title">'+esc(T.t)
       +' <span class="pd-cnt on">'+ls.length+'</span></div>'
       +'<div class="rp-nota" style="margin:-4px 0 10px">'+esc(T.q)
@@ -17847,7 +17924,7 @@ function pdOdooHTML(){
           +'<b>'+esc(_lotNom(l.producto_id))+'</b> · '
           +'<span class="pd-exc-cant">'+esc(_dvNum(l.cant_uom))+' '+esc(l.uom_nombre||'u')+'</span>'
           +' · <span class="dv-lote">'+esc(l.lote)+'</span></div>'
-          +'<div class="pd-exc-det">'+esc(_dvNum(l.cant_uds))+' unidades</div></div>';
+          +'<div class="pd-exc-det">'+esc(_dvNum(l.cant_uds))+' '+_entUniLbl(null, l.cant_uds)+'</div></div>';
       });
       const ocupada=(_pdOdooHaciendo===x.id);
       h+='<div class="dv-acc" style="margin-top:10px">'
@@ -17863,6 +17940,270 @@ function pdOdooHTML(){
   });
   return h;
 }
+/* ══════════════════════════════════════════════════════════════════════
+   «CREAR EN ODOO» · traslados internos por crear (1-oct-2026)
+   Una salida SIN factura —regalía (y muestra), degustación, consumo de socias,
+   reposición— se descuenta en Odoo con un traslado interno. Lo crea el servicio
+   `ESCRITURA_URL` (POST /trasladar), con su interruptor propio
+   (TRASLADO_ENCENDIDO), separado del de validar.
+   Decisiones de Andrea: regalía, degustación y consumo de socias → Mercadeo y
+   Muestras [19] (6106008); reposición → Desecho [16] (6106016); un contacto
+   genérico por motivo; referencia «Truefie pedido N · destinatario» y nota en
+   el chatter; se crea y se valida en el momento (misma regla que T-94).
+   NADA de eso lo elige esta pantalla: manda {pedido_id, confirmar} y el servidor
+   saca destino, contacto, productos y cantidades de la salida.
+   Mismo molde que «Validar entrega en Odoo»: vista previa del servidor por fila,
+   casillas, «Seleccionar todos», tanda con vista previa fresca, de a uno sin
+   frenar ante un rechazo, y resumen. «Hecho» queda: es el camino a mano.
+   ══════════════════════════════════════════════════════════════════════ */
+let _pdt={prev:{}, sel:{}, tanda:null, leyendo:false, desc:{}, descartando:0};
+const PDT_MOTIVO={regalia:'Regalía', degustacion:'Degustación', consumo_interno:'Consumo de socias', reposicion:'Reposición'};
+
+function _pdtFilas(){
+  const E=(_pd&&_pd.odoo)||null;
+  return ((E&&!E.noSocia&&E.filas)||[]).filter(function(x){ return x.tipo==='traslado_interno'; });
+}
+
+async function pdtPrevias(force){
+  if(_pdt.leyendo) return;
+  if(!(await accesoSocia())) return;
+  // `_pd` se arma en pdCargar; si todavía no está, no hay filas que preguntar.
+  for(let i=0;i<40 && !_pd;i++) await _esperar(250);
+  if(force) _pdt.prev={};
+  const ids=_pdtFilas().map(function(x){ return x.pedido_id; })
+    .filter(function(id){ return id && (!_pdt.prev[id] || _pdt.prev[id].st==='red'); });
+  if(!ids.length) return;
+  _pdt.leyendo=true;
+  ids.forEach(function(id){ _pdt.prev[id]={st:'leyendo'}; });
+  // Los descartes: falla ABIERTA, como en entregas (si no se leen, no se esconde nada).
+  try{
+    const {data:ds,error:eD}=await sbClient().from('ent_pedido_odoo_descarte').select('pedido_id,huella')
+      .in('pedido_id',ids).like('huella','t|%');
+    if(eD) throw eD;
+    _pdt.desc={}; (ds||[]).forEach(function(d){ (_pdt.desc[d.pedido_id]=_pdt.desc[d.pedido_id]||[]).push(d.huella); });
+  }catch(e){ try{ console.warn('[Truefie] no pude leer los descartes de traslados:', (e&&e.message)||e); }catch(_){} }
+  try{ pdRender(); }catch(e){}
+  await Promise.all(ids.map(async function(id){
+    const R=await escrituraPedir('/trasladar', id, false);
+    if(R.red) _pdt.prev[id]={st:'red'};
+    else if(R.st===200 && R.js.ok) _pdt.prev[id]={st:'ok', r:R.js};
+    else _pdt.prev[id]={st:'rech', rech:R.js};
+    if(_pdt.prev[id].st!=='ok') delete _pdt.sel[id];
+  }));
+  _pdt.leyendo=false;
+  try{ pdRender(); }catch(e){}
+}
+
+// Lo que se crearía: a dónde, con qué contacto, y cada producto en la unidad de
+// venta (lo que se dice en voz alta) y en la de Odoo (lo que va al documento).
+function _pdtPreviaHTML(r){
+  return '<div class="pd-meta">'+esc(PDT_MOTIVO[r.motivo]||r.motivo)+' → <b>'+esc(r.destino)+'</b>'
+    +' · contacto '+esc(r.contacto)+'</div>'
+    +'<table class="pdv-tb"><tbody>'+(r.lineas||[]).map(function(l){
+      return '<tr><td>'+esc(_valProd(l))+'</td><td class="n">'+esc(_entPres(l.producto_id, l.uds))
+        +'</td></tr>'; }).join('')
+    +'</tbody></table>';
+}
+
+// La huella de un traslado que no se puede crear: el motivo del servidor, su
+// texto y la salida (producto y unidades). NO las existencias libres de Odoo, que
+// se mueven todos los días: si la huella las llevara, un descarte no duraría nada.
+// Lleva el prefijo «t|» para no cruzarse nunca con una huella de entregas
+// (la tabla es la misma: `ent_pedido_odoo_descarte`).
+function _pdtHuella(x, P){
+  const R=(P&&P.rech)||{};
+  return 't|'+(R.motivo||'')+'|'+(R.texto||'')+'|'
+    +(x.lineas||[]).map(function(l){ return l.producto_id+':'+l.cant_uds; }).sort().join(',');
+}
+
+function pdtHTML(ls, T){
+  const TD=_pdt.tanda;
+  // Se puede crear: la vista previa del servidor dijo que sí, o todavía no
+  // contestó. No se puede: el servidor lo rechazó → abajo, en gris, con Descartar.
+  const va=[], no=[];
+  ls.forEach(function(x){
+    const P=_pdt.prev[x.pedido_id];
+    if(P && P.st==='rech'){ if(!(_pdt.desc[x.pedido_id]||[]).some(function(h){ return h===_pdtHuella(x,P); })) no.push(x); }
+    else va.push(x);
+  });
+  if(!va.length && !no.length && !TD) return '';
+  let h='<div class="card rp-z"><div class="card-title">'+esc(T.t)
+    +(va.length?(' <span class="pd-cnt on">'+va.length+'</span>'):'')+'</div>'
+    +'<div class="rp-nota" style="margin:-4px 0 10px">'+esc(T.q)+'</div>';
+  if(TD) return h+pdtTandaHTML(TD)+'</div>';
+  const oks=va.filter(function(x){ const P=_pdt.prev[x.pedido_id]; return P && P.st==='ok'; });
+  const nSel=oks.filter(function(x){ return _pdt.sel[x.pedido_id]; }).length;
+  if(oks.length){
+    h+='<div class="pdv-barra"><label class="pdv-chk"><input type="checkbox"'+(nSel===oks.length?' checked':'')
+      +' onchange="pdtTodos(this.checked)"> Seleccionar todos</label>'
+      +'<button class="btn btn-sm pdv-si"'+(nSel?'':' disabled')+' onclick="pdtTandaAbrir()">'
+      +'Crear seleccionados'+(nSel?(' ('+nSel+')'):'')+'</button></div>';
+  }
+  const cab=function(x, ok, cls){
+    const d=_pdExcDias(x.fecha);
+    return '<div class="pd-exc-ped'+(cls?(' '+cls):'')+'"><div class="pd-exc-cab">'
+      +'<div class="pd-exc-cli">'
+      +(ok?('<input type="checkbox" class="pdv-c"'+(_pdt.sel[x.pedido_id]?' checked':'')
+            +' onchange="pdtSel('+x.pedido_id+',this.checked)" aria-label="Elegir el pedido '+x.pedido_id+'"> '):'')
+      +esc(x.cliente_nombre || x.destinatario || '—')+'</div>'
+      +'<div class="pd-exc-dias">'+(d===null?'—':(d<=0?'hoy':(d===1?'1 día':d+' días')))+'</div></div>'
+      +'<div class="pd-exc-meta">#'+x.pedido_id+' · sin factura</div>';
+  };
+  const payload=function(x){
+    return x.lineas.map(function(l){
+      return '<div class="pd-exc-lin"><div class="pd-exc-prod">'
+        +'<b>'+esc(_lotNom(l.producto_id))+'</b> · '
+        +'<span class="pd-exc-cant">'+esc(_entPres(l.producto_id, l.cant_uds))+'</span>'
+        +' · <span class="dv-lote">'+esc(l.lote)+'</span></div></div>'; }).join('');
+  };
+  va.forEach(function(x){
+    const P=_pdt.prev[x.pedido_id]||null, ok=!!(P && P.st==='ok');
+    h+=cab(x, ok, '');
+    if(ok) h+=_pdtPreviaHTML(P.r);
+    else { h+=payload(x);
+      if(P && P.st==='red') h+='<div class="pd-cua">No pude preguntarle al servicio de escritura.</div>';
+      else h+='<div class="pd-cua">Revisando en Odoo…</div>'; }
+    // UN PASO MENOS (1-oct): el botón de la fila crea directo. La tarjeta ya
+    // muestra destino, contacto y cantidades; el servidor igual revisa todo
+    // antes de escribir, y si algo no calza no escribe y dice por qué.
+    h+=(ok?('<div class="dv-acc" style="margin-top:10px"><button class="btn btn-sm pdv-si" onclick="pdtUno('
+      +x.pedido_id+')">Crear en Odoo</button></div>'):'')+'</div>';
+  });
+  if(va.some(function(x){ const P=_pdt.prev[x.pedido_id]; return P && P.st==='red'; }))
+    h+='<button class="rp-ceros" onclick="pdtPrevias(true)">volver a preguntar</button>';
+  if(no.length){
+    h+='<div class="pdv-no-t">No se pueden crear · '+no.length+'</div>';
+    no.forEach(function(x){
+      const P=_pdt.prev[x.pedido_id], g=(_pdt.descartando===x.pedido_id);
+      h+=cab(x, false, 'pdv-no')+payload(x)+_valRechazoHTML(P.rech, true)
+        +'<div class="dv-acc" style="margin-top:10px"><button class="btn btn-sm"'+(g?' disabled':'')
+        +' onclick="pdtDescartar('+x.pedido_id+')">'+(g?'Guardando…':'Descartar')+'</button></div></div>';
+    });
+  }
+  return h+'</div>';
+}
+
+// «Descartar» un traslado que no se puede crear. Misma tabla que entregas
+// (`ent_pedido_odoo_descarte`, append-only, solo socias con su correo), huella
+// con prefijo «t|». Si cambia lo que dice el servidor, la huella cambia y vuelve.
+async function pdtDescartar(id){
+  if(_pdt.descartando) return;
+  const x=_pdtFilas().filter(function(k){ return k.pedido_id===id; })[0];
+  const P=_pdt.prev[id];
+  if(!x || !P || P.st!=='rech') return;
+  if(!confirm('¿Sacar el pedido #'+id+' de «No se pueden crear»?\n\n'
+    +'No cambia nada en Odoo ni en el pedido. Vuelve a la lista si cambia el motivo.')) return;
+  _pdt.descartando=id; pdRender();
+  try{
+    const c=sbClient();
+    const {data:{user}}=await c.auth.getUser();
+    const email=(user&&user.email)||'';
+    if(!email) throw new Error('no hay sesión abierta. El descarte tiene que ir firmado.');
+    const hu=_pdtHuella(x, P);
+    const {data,error}=await c.from('ent_pedido_odoo_descarte').insert({pedido_id:id, huella:hu,
+      motivo:((VAL_MOTIVO[P.rech.motivo]||'')+' '+(P.rech.texto||'')).trim()||null, creado_por:email}).select('id');
+    if(error) throw error;
+    if(!data || !data.length) throw new Error('la base no devolvió el descarte. No se guardó.');
+    (_pdt.desc[id]=_pdt.desc[id]||[]).push(hu);
+  }catch(e){
+    alert('No se pudo descartar: '+((e&&e.message)||e)+'\n\nSi dice "row-level security", la sesión no es de una socia.');
+  }finally{ _pdt.descartando=0; pdRender(); }
+}
+
+function pdtTandaHTML(T){
+  let h='<div class="pdv-tanda">';
+  if(T.fase==='revisando')
+    return h+'<div class="pd-cua">Revisando '+T.items.length+(T.items.length===1?' salida':' salidas')+' en Odoo…</div></div>';
+  if(T.fase==='previa'){
+    const ok=T.items.filter(function(it){ return it.r; });
+    T.items.forEach(function(it){
+      h+='<div class="pdv-it"><div class="pd-quien">'+esc(it.cli)+'</div>';
+      if(it.r) h+='<div class="pd-meta">#'+it.id+' · <b>'+esc(it.r.referencia)+'</b></div>'+_pdtPreviaHTML(it.r);
+      else h+='<div class="pd-meta">#'+it.id+' · se salta</div>'
+        +(it.red?'<div class="pdv-mal">No pude preguntarle al servicio de escritura.</div>':_valRechazoHTML(it.rech));
+      h+='</div>';
+    });
+    if(ok.length)
+      h+='<div class="bs-anu-av">Crea y valida '+(ok.length===1?'el traslado':('los '+ok.length+' traslados'))
+        +' en Odoo hoy, de a uno. Desde Truefie <b>no se deshace</b>.</div>'
+        +'<div class="pdv-acc"><button class="btn btn-sm pdv-si" onclick="pdtTandaConfirmar()">'
+        +(ok.length===1?'Crear el traslado':('Crear '+ok.length+' traslados'))+'</button>'
+        +'<button class="bs-anu-l" onclick="pdtTandaCerrar()">Cancelar</button></div>';
+    else h+='<div class="pdv-acc"><button class="bs-anu-l" onclick="pdtTandaCerrar()">Cerrar</button></div>';
+    return h+'</div>';
+  }
+  if(T.fase==='creando'){
+    const n=T.items.filter(function(it){ return it.r; }).length;
+    return h+'<div class="pd-cua">Creando '+Math.min(T.i+1,n)+' de '+n+'…</div></div>';
+  }
+  const si=T.items.filter(function(it){ return it.res && it.res.ok; });
+  const no=T.items.filter(function(it){ return !(it.res && it.res.ok); });
+  h+='<div class="pdv-res-t">Creados · '+si.length+'</div>';
+  si.forEach(function(it){
+    h+='<div class="pdv-it"><div class="pd-quien">'+esc(it.cli)+'</div><div class="pd-meta">#'+it.id
+      +' · '+esc(it.res.picking)+(it.res.date_done?(' · '+esc(_valFecha(it.res.date_done))):'')
+      +(it.res.hecho===false?' · ⚠ no salió de la cola: marcar Hecho':'')+'</div></div>'; });
+  h+='<div class="pdv-res-t">No creados · '+no.length+'</div>';
+  no.forEach(function(it){
+    h+='<div class="pdv-it"><div class="pd-quien">'+esc(it.cli)+'</div><div class="pd-meta">#'+it.id+'</div>'
+      +(it.incierto
+        ? '<div class="pdv-mal">Se cortó la comunicación al confirmar: no sé si Odoo creó el traslado.'
+          +'<span>Buscá «Truefie pedido '+it.id+'» en Odoo antes de volver a intentar.</span></div>'
+        : (it.red?'<div class="pdv-mal">No pude preguntarle al servicio de escritura.</div>':_valRechazoHTML(it.rech)))
+      +'</div>'; });
+  return h+'<div class="pdv-acc"><button class="bs-anu-l" onclick="pdtTandaCerrar()">Cerrar</button></div></div>';
+}
+
+function pdtSel(id, on){ if(on) _pdt.sel[id]=true; else delete _pdt.sel[id]; pdRender(); }
+function pdtTodos(on){
+  _pdt.sel={};
+  if(on) _pdtFilas().forEach(function(x){ const P=_pdt.prev[x.pedido_id]; if(P && P.st==='ok') _pdt.sel[x.pedido_id]=true; });
+  pdRender();
+}
+// UN PASO MENOS (1-oct): la fila crea directo, sin la vista previa de la tanda.
+function pdtUno(id){
+  if(_pdt.tanda) return;
+  const x=_pdtFilas().filter(function(k){ return k.pedido_id===id; })[0];
+  const P=_pdt.prev[id];
+  if(!x || !P || P.st!=='ok') return;
+  _pdt.sel={};
+  _pdt.tanda={fase:'previa', items:[{id:id, cli:x.cliente_nombre||x.destinatario||('Pedido '+id), r:P.r}], i:0};
+  pdtTandaConfirmar();
+}
+
+async function pdtTandaAbrir(){
+  if(_pdt.tanda) return;
+  const items=_pdtFilas().filter(function(x){ return _pdt.sel[x.pedido_id]; })
+    .map(function(x){ return {id:x.pedido_id, cli:x.cliente_nombre||x.destinatario||('Pedido '+x.pedido_id)}; });
+  if(!items.length) return;
+  _pdt.tanda={fase:'revisando', items:items, i:0}; pdRender();
+  await Promise.all(items.map(async function(it){
+    const R=await escrituraPedir('/trasladar', it.id, false);
+    if(R.red) it.red=true; else if(R.st===200 && R.js.ok) it.r=R.js; else it.rech=R.js;
+  }));
+  if(_pdt.tanda){ _pdt.tanda.fase='previa'; pdRender(); }
+}
+
+async function pdtTandaConfirmar(){
+  const T=_pdt.tanda; if(!T || T.fase!=='previa') return;
+  T.fase='creando'; T.i=0; pdRender();
+  const ok=T.items.filter(function(it){ return it.r; });
+  for(let k=0;k<ok.length;k++){
+    const it=ok[k]; T.i=k; pdRender();
+    const R=await escrituraPedir('/trasladar', it.id, true);
+    if(R.red){ it.incierto=true; continue; }
+    if(R.st===200 && R.js.ok && R.js.creado){
+      it.res={ok:true, picking:R.js.picking_nombre, date_done:R.js.date_done, hecho:R.js.hecho_marcado}; continue; }
+    it.rech=R.js;
+  }
+  T.fase='fin'; _pdt.sel={}; pdRender();   // el resumen YA, sin esperar la relectura
+  // Lo que salió de Odoo cambia el saldo del producto en Odoo, no el de Truefie
+  // (la salida ya estaba descontada al entregar). Se relee la cola.
+  _pdt.prev={};
+  await pdCargar(true);
+}
+function pdtTandaCerrar(){ _pdt.tanda=null; pdRender(); }
+
 // ════════════════════════════════════════════════════════════════════════
 // CUADRE CON ODOO · opción C, paso C1 (27-sep-2026)
 //
@@ -18266,7 +18607,17 @@ function pdvTodos(on){
   pdRender();
 }
 // «Validar» en una fila = una tanda de uno. Un solo camino, no dos.
-function pdvUno(id){ _pdv.sel={}; _pdv.sel[id]=true; pdvTandaAbrir(); }
+// UN PASO MENOS (1-oct): la fila valida directo. La tarjeta ya muestra albarán y
+// cantidades; el servidor revisa todo otra vez antes de escribir.
+function pdvUno(id){
+  if(_pdv.tanda) return;
+  const x=((_cuadre&&_cuadre.casos)||[]).filter(function(k){ return k.pedido===id; })[0];
+  const P=_pdv.prev[id];
+  if(!x || !P || P.st!=='ok') return;
+  _pdv.sel={};
+  _pdv.tanda={fase:'previa', items:[{id:id, cli:x.cliente||('Pedido '+id), r:P.r}], i:0};
+  pdvTandaConfirmar();
+}
 
 async function pdvTandaAbrir(){
   if(_pdv.tanda) return;
