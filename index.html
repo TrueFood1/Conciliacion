@@ -10361,11 +10361,30 @@ const DESP_UOM_CORTA = {
   37:'paq', 38:'paq', 50:'paq',// Paquete de 4 · de 2 · de 12
   42:'cj', 44:'cj', 46:'cj', 49:'cj',   // Caja (Hamburguesa 24) · (Frances 24) · Caja 6 · (Pizza 12)
 };
-// Rótulo corto de una unidad. Sin id conocido cae al NOMBRE de Odoo, que es
-// largo pero verdadero — y si tampoco hay nombre, a 'u', que es la unidad base.
-function _despUomCorta(uomId, uomNombre){
-  return DESP_UOM_CORTA[+uomId] || uomNombre || 'u';
+// ── LA CANTIDAD EN PALABRAS (1-oct, Andrea) ─────────────────────────────
+// Despachos y Devoluciones decían la unidad como la llama Odoo («6 Unidades»,
+// «2 Caja (Frances)») o abreviada («cj», «u»). Ahora se dice como en el resto:
+// «6 unidades», «1 unidad», «2 cajas», «3 paq.». SOLO SE DIBUJA ASÍ: lo que se
+// guarda y lo que se copia a la nota de crédito siguen siendo lo de la factura.
+// Por ID de la UoM, nunca por el nombre (regla del CLAUDE.md). El nombre se usa
+// solo si el id no está en la tabla, y entonces se muestra tal cual.
+const UOM_PALABRA = {
+  1:['unidad','unidades'], 2:['docena','docenas'],
+  37:['paq.','paq.'], 38:['paq.','paq.'], 50:['paq.','paq.'],
+  42:['caja','cajas'], 44:['caja','cajas'], 46:['caja','cajas'], 49:['caja','cajas']};
+function _uomPalabra(uomId, uomNombre, n){
+  const uno=Math.abs((+n||0)-1)<1e-9;
+  let p=UOM_PALABRA[+uomId];
+  if(!p){
+    const t=String(uomNombre||'');
+    if(!t || /^unidades?$|^units?$/i.test(t)) p=['unidad','unidades'];
+    else return t;
+  }
+  return uno?p[0]:p[1];
 }
+function _cantUom(n, uomId, uomNombre){ return _rzN(n)+' '+_uomPalabra(uomId, uomNombre, n); }
+// Rótulo de una unidad (en plural: es el rótulo del campo, no de una cantidad).
+function _despUomCorta(uomId, uomNombre){ return _uomPalabra(uomId, uomNombre, 2); }
 // ── EL REFRESCO DE FACTURAS (7-sep-2026) ───────────────────────────────
 // EL CASO: la factura 3515 de CSU se creó en Odoo a las 06:20 y Daniel alistó a
 // las 07:58 sin verla. 98 minutos. Hasta b53 las facturas se leían UNA VEZ POR
@@ -11998,22 +12017,21 @@ function despRenderPedido(body){
         // Marcada: la cantidad es 0 y no se edita. El numero de al lado es lo que
         // SE IBA a entregar, en unidad de venta — el que Daniel reconoce, no las
         // unidades individuales que guarda la base.
-        ? ('<span class="dp-l-cant" style="cursor:default"><b>0</b> '+esc(L.uom_nombre||'')+'</span>')
+        ? ('<span class="dp-l-cant" style="cursor:default"><b>0</b> '+esc(_uomPalabra(L.uom_id, L.uom_nombre, 0))+'</span>')
         : e.editando
          ? ('<span class="dp-l-cant"><input class="dp-cant" type="number" min="0" step="any" '
             +'inputmode="decimal" value="'+e.cant+'" oninput="despSetCant('+i+',this.value)" '
-            +'onblur="despFinEdit('+i+')" autofocus> '+esc(L.uom_nombre)+'</span>')
+            +'onblur="despFinEdit('+i+')" autofocus> '+esc(_uomPalabra(L.uom_id, L.uom_nombre, e.cant))+'</span>')
          : ('<button class="dp-l-cant" onclick="despEditar('+i+')">'
-            +'<b>'+_rzN(e.cant)+'</b> '+esc(L.uom_nombre)
+            +'<b>'+_rzN(e.cant)+'</b> '+esc(_uomPalabra(L.uom_id, L.uom_nombre, e.cant))
             +'<span class="dp-lapiz" aria-hidden="true">✎</span></button>'))
       +'</div>'
-      +(dif?'<div class="dp-fact">facturado '+_rzN(L.cant_uom)+'</div>':'');
+      +(dif?'<div class="dp-fact">facturado '+esc(_cantUom(L.cant_uom, L.uom_id, L.uom_nombre))+'</div>':'');
     if(mk){
       // EL SELECTOR SE APAGA, NO DESAPARECE. Que se vea el hueco donde iba el
       // lote es parte de lo que la tarjeta dice: aca no se eligio nada porque no
       // habia nada que elegir.
-      h+='<div class="dp-nofact">no entregado '+_rzN(L.cant_uom)
-        +(L.uom_nombre?(' '+esc(L.uom_nombre)):'')+'</div>'
+      h+='<div class="dp-nofact">no entregado '+esc(_cantUom(L.cant_uom, L.uom_id, L.uom_nombre))+'</div>'
         // Se le pasa la lista REAL, no una vacia: el selector de una linea marcada
         // esta apagado por CSS (pointer-events:none), asi que da igual que tenga
         // adentro — pero con la lista vacia el placeholder decia "No queda saldo
@@ -12250,7 +12268,7 @@ function _despCantHTML(f,i){
     +'<input class="dp-cant-in" type="number" min="0" step="any" inputmode="decimal" '
     +'value="'+(e.cant==null?'':e.cant)+'" oninput="despCorrSetCant('+i+',this.value)">'
     +(un?('<span class="dp-cant-l">'+esc(un)+'</span>'):'')
-    +(dif?('<span class="dp-cant-dif">la factura dice '+esc(_rzN(L.cant_uom))+'</span>')
+    +(dif?('<span class="dp-cant-dif">la factura dice '+esc(_cantUom(L.cant_uom, L.uom_id, L.uom_nombre))+'</span>')
          :('<span class="dp-cant-fac">= la factura</span>'))
     +'</div>';
 }
@@ -12268,14 +12286,7 @@ function despCorrSetCant(i,v){
 }
 /* La unidad en la que se escribe, corta, para el rótulo del campo. Sale de la
    UoM de la factura, que es la unidad de venta — nunca unidades sueltas. */
-function _despUnidadCorta(L){
-  const n=String((L&&L.uom_nombre)||'');
-  if(/paquete/i.test(n)) return 'paq';
-  if(/caja/i.test(n))    return 'cj';
-  if(/docena/i.test(n))  return 'doc';
-  if(/unit|unidad/i.test(n)) return 'u';
-  return n.slice(0,6);
-}
+function _despUnidadCorta(L){ return L ? _despUomCorta(L.uom_id, L.uom_nombre) : ''; }
 
 /* ── ¿CALZA CON LA FACTURA? ────────────────────────────────────────────
    Se compara POR PRODUCTO y no por línea: una factura puede traer el mismo
@@ -12789,7 +12800,7 @@ function despRenderHojaMotivo(){
       +' oninput="despMarcaSetNota(this.value)">'+esc(_despNMNota)+'</textarea>';
   return _despDialogoHTML({
     cliente: esc(L.producto),
-    sub: 'no se entrega · '+_rzN(L.cant_uom)+(un?(' '+un):'')+' facturado',
+    sub: 'no se entrega · '+_cantUom(L.cant_uom, L.uom_id, un)+' facturado',
     cuerpo: cuerpo,
     listo: _despMarcaLista(), ocupado:false,
     cerrar: 'despMarcaCerrar()', ok: 'despMarcaConfirmar()', okTxt: 'Marcar',
@@ -13218,7 +13229,7 @@ function despRenderDialogoEntrega(){
   }else{
     cuerpo=lineas.map(function(l){
       const un=l.uom_nombre||'';
-      const cant=(l.cant_uom!=null&&un)?(_rzN(l.cant_uom)+' '+un):(_rzN(l.cant_uds)+' u');
+      const cant=(l.cant_uom!=null&&(un||l.uom_id))?_cantUom(l.cant_uom, l.uom_id, un):_entPresPlano(l.producto_id, l.cant_uds);
       // El lote va DEBAJO del producto, indentado, y no en la misma línea: una línea con
       // dos lotes es lo normal, no la excepción, y en teléfono el segundo se corta.
       const lotes=(l.lotes||[]).length
@@ -13448,17 +13459,16 @@ function despRenderDialogoPreparar(){
   let cuerpo=f.lineas.map(function(L,i){
     const e=_despEst(f,i), cant=(+e.cant||0), un=L.uom_nombre||'';
     if(Math.abs(cant-L.cant_uom)>1e-9) dif++;
-    const pres=_despUomCorta(L.uom_id, L.uom_nombre);
     const lotes=(e.lotes||[]).filter(function(x){ return x.lote; });
     const filas=lotes.length
       ? lotes.map(function(x){
           // Sin partir, la cantidad del único lote ES el total de la línea.
           const c=(lotes.length===1 && (x.cant==null||x.cant==='')) ? cant : (+x.cant||0);
           return '<div class="de-lote"><span>'+esc(x.lote)+'</span>'
-               +'<span class="de-lote-c">'+_rzN(c)+' '+pres+'</span></div>'; }).join('')
+               +'<span class="de-lote-c">'+esc(_cantUom(c, L.uom_id, L.uom_nombre))+'</span></div>'; }).join('')
       : '<div class="de-lote de-sinlote"><span>sin lote</span></div>';
     return '<div class="de-lin"><div class="de-prod"><span>'+esc(_bsProd(L.producto_id))+'</span>'
-      +'<span class="de-cant">'+_rzN(cant)+(un?(' '+esc(un)):'')+'</span></div>'+filas+'</div>';
+      +'<span class="de-cant">'+esc(_cantUom(cant, L.uom_id, un))+'</span></div>'+filas+'</div>';
   }).join('');
   // Lo que ANTES iba escondido al final del confirm(). Acá está donde se mira.
   if(dif) cuerpo+='<div class="de-mal">'+dif+(dif===1?' línea sale':' líneas salen')
@@ -13494,8 +13504,8 @@ function _despCantLote(uds, l){
   // línea en paquete guarda 'cj' — el mismo error que se arregló arriba, pero
   // grabado. Ver el pendiente en ENTREGAS_PENDIENTES.md §6.
   if(f&&+f>0){ const n=(+uds)*(+f); if(Math.abs(n-Math.round(n))<1e-9)
-    return _rzN(Math.round(n))+' '+_despUomCorta(l.uom_id, l.uom_nombre); }
-  return _rzN(uds)+' u';
+    return _cantUom(Math.round(n), l.uom_id, l.uom_nombre); }
+  return _rzN(uds)+' '+_entUniLbl(null, uds);
 }
 
 async function despEntregar(pedidoId){
@@ -13671,7 +13681,7 @@ function _presRotulo(pid){          // + "· paq de 4 u" cuando hay paquete
 function _lotUds(uds, pid){
   const t=(typeof INV_TERM!=='undefined') ? INV_TERM.find(function(x){ return x.id===pid; }) : null;
   const d=(t&&t.presDiv)||1;
-  return (d>1) ? (_lotNum(uds/d)+' paq') : (_lotNum(uds)+' u');
+  return (d>1) ? (_lotNum(uds/d)+' paq.') : (_lotNum(uds)+' '+_entUniLbl(null, uds));
 }
 function _lotCajas(uds, pid){
   const t=(typeof INV_TERM!=='undefined') ? INV_TERM.find(function(x){ return x.id===pid; }) : null;
@@ -13686,7 +13696,7 @@ function _lotCajas(uds, pid){
   // renglón que existe para que un saldo bajo cero se vea.
   if(!f || uds<0 || uds<f) return _lotUds(uds, pid);
   const cj=Math.floor(uds/f), r=Math.round((uds-cj*f)*1000)/1000;
-  return _rzN(cj)+' cj'+(r?(' + '+_lotUds(r,pid)):'');
+  return _rzN(cj)+(cj===1?' caja':' cajas')+(r?(' + '+_lotUds(r,pid)):'');
 }
 function _lotNom(pid){ const t=(typeof INV_TERM!=='undefined')
   ? INV_TERM.find(function(x){ return x.id===pid; }) : null; return (t&&t.label)||('#'+pid); }
@@ -16195,8 +16205,8 @@ function dvListaHTML(){
     const cau=(DV_CAUSAS.find(function(x){ return x.v===d.causa; })||{}).t||d.causa||'—';
     const tot={};
     (d.lineas||[]).forEach(function(l){ const n=_lotNom(l.producto_id);
-      tot[n]=tot[n]||{u:0,uom:l.uom_nombre||'u'}; tot[n].u+=(+l.cant_uom||0); });
-    const que=Object.keys(tot).map(function(n){ return _dvNum(tot[n].u)+' '+tot[n].uom+' de '+n; }).join(' · ');
+      tot[n]=tot[n]||{u:0,uid:l.uom_id,uom:l.uom_nombre||''}; tot[n].u+=(+l.cant_uom||0); });
+    const que=Object.keys(tot).map(function(n){ return _cantUom(tot[n].u, tot[n].uid, tot[n].uom)+' de '+n; }).join(' · ');
     h+='<div class="bs-fila" style="cursor:default">'
       +'<div class="bs-f1"><span class="bs-cli">'+esc(d.cliente_nombre||'—')+'</span>'
       +'<span class="bs-fec">'+esc(_despDia(d.fecha))+'</span></div>'
@@ -16385,12 +16395,12 @@ function dvFormHTML(){
       h+='<table class="cl-tbl"><tr><th>Producto</th><th>Cantidad</th><th>Lotes</th><th></th></tr>';
       N.lineas.forEach(function(l,i){
         const lots=l.lotes.map(function(x){ return esc(x.lote)
-          +(l.lotes.length>1?(' ('+_dvNum(x.cant_man)+')'):''); }).join(' · ');
+          +(l.lotes.length>1?(' ('+esc(_dvManTxt(x.cant_man, l.producto_id))+')'):''); }).join(' · ');
         // ⚠️ SIN "= N u". Para Frances/Buns/Pizza esas son unidades SUELTAS, que es
         // la unidad que nadie usa: "48 u" son 12 paquetes y se lee 4x mal. La
         // cantidad se dice en la unidad de manejo y punto.
         h+='<tr><td>'+esc(_lotNom(l.producto_id))+'</td>'
-          +'<td>'+_dvNum(l.total_man)+' '+esc(l.man_nombre)+'</td>'
+          +'<td>'+esc(_dvManTxt(l.total_man, l.producto_id))+'</td>'
           +'<td style="font-size:11.5px;color:var(--text-2)">'+lots+'</td>'
           +'<td style="text-align:right"><button class="btn btn-sm" onclick="dvEditar('+i+')">✎</button></td></tr>';
       });
@@ -16483,7 +16493,7 @@ function dvLotesHTML(){
     // los dos numeros —15 y 100— no se parezcan en nada.
     const exc=(puesto*M.div) > (L.salioUds+0.0001); if(exc) hayExceso=true;
     h+='<tr><td class="cl-lote">'+esc(L.lote)+'</td>'
-      +'<td class="dv-salio">'+esc(_dvNum(L.salioMan))+' '+esc(M.nombre)+'</td>'
+      +'<td class="dv-salio">'+esc(_dvManTxt(L.salioMan, pid))+'</td>'
       +'<td><input class="cl-in" type="number" min="0" step="any" inputmode="decimal" '
       +'value="'+esc(v==null?'':v)+'" oninput="dvLote(\''+esc(L.lote).replace(/'/g,"&#39;")
       +'\',this.value)"'+(exc?' style="border-color:var(--warn)"':'')+'></td></tr>';
@@ -16497,8 +16507,7 @@ function dvLotesHTML(){
     +'<b>Se registra igual</b> y queda marcado: puede ser producto de una entrega anterior '
     +'en el mismo camión.</div>';
   const I=NIV_INFO[pid]||{nom:pid};
-  h+='<div class="cl-pie">'+esc(I.nom)+' · vuelve hasta ahora <strong>'+_dvNum(totMan)+' '
-    +esc(M.nombre)+'</strong></div>';
+  h+='<div class="cl-pie">'+esc(I.nom)+' · vuelve hasta ahora <strong>'+esc(_dvManTxt(totMan, pid))+'</strong></div>';
   h+='<div style="margin-top:14px"><button class="btn" '+(totMan>0?'':'disabled')
     +' onclick="dvAgregarLinea()">'+(N.editando>=0?'Guardar el cambio':'Agregar a esta devolución')
     +'</button>'
@@ -16561,6 +16570,9 @@ function dvProductosDeLaEntrega(){
 // tiene que espejar la FACTURA, asi que sus lineas van en la unidad de la entrega
 // —`cant_uds x uom_factor`— mientras la devolucion guarda lo fisico. Cada tabla en
 // la unidad de su pregunta.
+// Cómo se DICE una cantidad en unidad de manejo (paquetes o unidades). El nombre
+// que se guarda (`man_nombre`, «Paquete de 4» / «Unidades») no cambia.
+function _dvManTxt(n, pid){ const M=_dvManejo(pid); return _entPresPlano(pid, (+n||0)*M.div); }
 function _dvManejo(pid){
   const I=NIV_INFO[pid]||{presDiv:1,presLbl:'uds'};
   const d=(+I.presDiv>0)?+I.presDiv:1;
@@ -16697,7 +16709,7 @@ function dvFueraHTML(){
 // pantalla SUMA, y sumar de mas es el error grave de este modulo.
 function dvConfirmarHTML(){
   const N=_dv.n;
-  const que=N.lineas.map(function(l){ return _dvNum(l.total_man)+' '+l.man_nombre
+  const que=N.lineas.map(function(l){ return _dvManTxt(l.total_man, l.producto_id)
     +' de '+_lotNom(l.producto_id); }).join(' · ');
   // ⚠️ LO QUE SE SACO DE ACA (17-sep) Y POR QUE:
   //   · el aviso de la nota de credito. NO ES ASUNTO DE DANIEL: el registra lo que
