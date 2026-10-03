@@ -805,7 +805,7 @@ tr.r-ing td{background:#eff6ff}
    con Personal el bloque se ensancha lo justo para que la fila siga siendo UNA y las
    tarjetas conserven su tamaño. Ensanchar el bloque en vez de apretar las columnas es
    lo que mantiene "Conciliación" en un renglón. */
-.home-bottom{width:100%;max-width:746px;display:flex;flex-direction:column;align-items:stretch}
+.home-bottom{width:100%;max-width:440px;display:flex;flex-direction:column;align-items:stretch}   /* b82: angosto, como en el teléfono */
 .home-hi{font-size:26px;font-weight:500;color:#F5F4F0;letter-spacing:-.4px;text-align:center}
 .home-q{font-size:20px;font-weight:400;color:#9A988F;margin:10px 0 0}
 .home-search{display:flex;align-items:center;width:100%;max-width:480px;background:#18181C;border:.5px solid #34343C;border-radius:999px;padding:5px 6px 5px 20px;gap:10px;margin-top:2.5rem}
@@ -823,7 +823,15 @@ tr.r-ing td{background:#eff6ff}
 .home-soon .home-search{margin-top:0}
 .home-sep{border-top:.5px solid #26262C;width:100%;margin:0}
 .home-modlabel{font-size:12px;font-weight:500;color:#6E6C68;letter-spacing:.5px;width:100%;margin:1.5rem 0 .9rem;text-align:left}
-.home-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;width:100%;max-width:760px}
+/* LOBBY (b82, Andrea): el de escritorio "parecía carnaval" — fila de seis con bordes de colores y espacios
+   grandes. Ahora es el MISMO del teléfono en todos lados: contenedor angosto centrado, dos columnas,
+   tarjetas de borde y fondo neutros, y el color del módulo SOLO en el puntito.
+   Seis en cada pantalla, sin huérfana: escritorio = Operaciones · Compras · Entregas · Personal ·
+   Finanzas · Conciliación (Ventas, inerte, no entra); teléfono = lo mismo pero Ventas en lugar de
+   Conciliación, que es solo de escritorio. */
+.home-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;width:100%;max-width:440px}
+.home-mod-ops{order:1} .home-mod-com{order:2} .home-mod-ent{order:3} .home-mod-per{order:4}
+.home-mod-fin{order:5} .home-mod-conc{order:6} .home-mod-ven{order:7;display:none}
 /* El sello de versión iba con estilo en línea; vive acá para que el @media pueda darle
    el respiro del safe-area en teléfono (el estilo en línea le ganaba a la hoja). */
 .home-build{text-align:center;color:#6E6C68;font-size:11px;letter-spacing:.03em;padding:16px 0 6px}
@@ -864,20 +872,11 @@ tr.r-ing td{background:#eff6ff}
      preferencia de diseño sino una restricción de la plataforma. */
   input,select,textarea{font-size:16px !important}
   .home-grid{grid-template-columns:1fr 1fr;gap:9px}
-  /* CUATRO módulos en teléfono: 2×2 exacto, sin huecos ni tarjeta estirada. Arriba lo
-     que se usa a diario (Operaciones y Entregas), abajo lo de la persona (Personal) y
-     lo que se consulta (Finanzas).
-     CON PERSONAL SERÍAN CINCO, y cinco en dos columnas deja una tarjeta huérfana en la
-     tercera fila — justo lo que este bloque vino a arreglar. La que sale del teléfono es
-     VENTAS: es la única inerte, no se puede abrir, y en la pantalla más chica una tarjeta
-     que no hace nada es decoración. Sigue en escritorio, donde no le quita el lugar a
-     nadie. Para devolverla al teléfono: borrar la línea `.home-mod-ven{display:none}` de
-     abajo y darle `order:5` — y asumir la huérfana. */
-  .home-mod-ops{order:1}  .home-mod-ent{order:2}
-  .home-mod-per{order:3}  .home-mod-fin{order:4}
-  .home-mod{padding:14px;min-height:86px;display:flex;flex-direction:column;box-sizing:border-box}
+  /* Teléfono (b82): las mismas seis del escritorio, pero sin Conciliación (es solo de escritorio):
+     su lugar lo toma Ventas, inerte, para que la tercera fila no quede con una huérfana. El orden
+     y el estilo de las tarjetas viven en la regla base, que ahora es la misma para los dos. */
   .home-mod-conc{display:none}
-  .home-mod-ven{display:none}
+  .home-mod-ven{display:flex;order:6}
   /* Por id: la regla base de .home-mod.inert va más abajo en la hoja y le ganaba por orden. */
   #vLobby .home-mod.inert{opacity:.38}
   .home-mod .home-mod-state{margin-top:auto}
@@ -890,9 +889,11 @@ tr.r-ing td{background:#eff6ff}
 .home-qrow{display:flex;justify-content:space-between;align-items:center;padding:12px 2px;border-bottom:1px solid #1C1C20;color:#9A988F;font-size:14px;cursor:default}
 .home-qrow:last-child{border-bottom:none}
 .home-qrow .arr{color:#6E6C68}
-.home-mod{background:#161619;border:.5px solid #2C2C33;border-radius:14px;padding:16px;text-align:left;cursor:pointer;transition:transform .15s,border-color .15s;font-family:'DM Sans',sans-serif}
-.home-mod:hover{transform:translateY(-3px);border-color:#3E3E47}
-.home-mod.inert,.home-mod.inert:hover{cursor:default;transform:none;border-color:#2C2C33;opacity:.45}
+.home-mod{background:#161619;border:.5px solid #26262C;border-radius:14px;padding:14px;min-height:86px;display:flex;flex-direction:column;box-sizing:border-box;text-align:left;cursor:pointer;transition:border-color .15s;font-family:'DM Sans',sans-serif}
+.home-mod:hover{border-color:#3E3E47}
+.home-mod .home-mod-state{margin-top:auto;color:#9A988F}
+.home-mod.inert,.home-mod.inert:hover{cursor:default;border-color:#26262C;opacity:.45}
+.home-mod.inert .home-mod-state{color:#6E6C68}
 .mes-select{background:var(--surface-2);color:var(--text);border:1px solid var(--border-strong);border-radius:8px;padding:7px 10px;font-family:inherit;font-size:13px}
 /* ── ACENTO POR MÓDULO ── el color sigue al módulo vía --mod (heredado por la vista) */
 /* --accent/--blue/--blue-l siguen al módulo → todo acento interno hereda el color correcto (adiós morado viejo) */
@@ -1921,39 +1922,45 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <div class="home-sep"></div>
     <div class="home-modlabel">TUS MÓDULOS</div>
     <div class="home-grid">
-      <div class="home-mod home-mod-fin" style="border-color:#21456B" onclick="abrirFinanzas()">
+      <div class="home-mod home-mod-fin" onclick="abrirFinanzas()">
         <span class="home-mod-dot" style="background:#378ADD"></span>
         <div class="home-mod-name" style="color:#F5F4F0">Finanzas</div>
-        <div class="home-mod-state" style="color:#7FB0E0">Abrir →</div>
+        <div class="home-mod-state">Abrir →</div>
       </div>
-      <div class="home-mod home-mod-conc" style="border-color:#2E5C3A" onclick="abrirConciliacion()">
+      <div class="home-mod home-mod-conc" onclick="abrirConciliacion()">
         <span class="home-mod-dot" style="background:#84BD00"></span>
         <div class="home-mod-name" style="color:#F5F4F0">Conciliación</div>
-        <div class="home-mod-state" style="color:#9BD46A">Abrir →</div>
+        <div class="home-mod-state">Abrir →</div>
       </div>
-      <div class="home-mod home-mod-ops" style="border-color:#4E2536" onclick="abrirOperaciones()">
+      <div class="home-mod home-mod-ops" onclick="abrirOperaciones()">
         <span class="home-mod-dot" style="background:#D4537E"></span>
         <div class="home-mod-name" style="color:#F5F4F0">Operaciones</div>
-        <div class="home-mod-state" style="color:#E491AC">Abrir →</div>
+        <div class="home-mod-state">Abrir →</div>
       </div>
-      <div class="home-mod home-mod-ent" style="border-color:#3F4A16" onclick="abrirEntregas()">
+      <!-- COMPRAS (b82), morado #A27FEB: al lado de Operaciones, que es de donde lee el plan. -->
+      <div class="home-mod home-mod-com" onclick="abrirCompras()">
+        <span class="home-mod-dot" style="background:#A27FEB"></span>
+        <div class="home-mod-name" style="color:#F5F4F0">Compras</div>
+        <div class="home-mod-state">Abrir →</div>
+      </div>
+      <div class="home-mod home-mod-ent" onclick="abrirEntregas()">
         <span class="home-mod-dot" style="background:#E9FE60"></span>
         <div class="home-mod-name" style="color:#F5F4F0">Entregas</div>
-        <div class="home-mod-state" style="color:#E9FE60">Abrir →</div>
+        <div class="home-mod-state">Abrir →</div>
         <div class="home-mod-alerta" id="homeEntAlerta"></div>
       </div>
       <!-- PERSONAL. Es módulo, no tarjeta: ACCESOS_ESQUEMA.sql ya declara que el perfil
            `equipo` ve "Entregas · Personal · Producción". El borde #5E2610 es el naranja
            del módulo oscurecido, derivado igual que los otros cuatro. -->
-      <div class="home-mod home-mod-per" style="border-color:#5E2610" onclick="abrirPersonal()">
+      <div class="home-mod home-mod-per" onclick="abrirPersonal()">
         <span class="home-mod-dot" style="background:#FF671D"></span>
         <div class="home-mod-name" style="color:#F5F4F0">Personal</div>
-        <div class="home-mod-state" style="color:#FF9C63">Abrir →</div>
+        <div class="home-mod-state">Abrir →</div>
       </div>
       <div class="home-mod inert home-mod-ven">
         <span class="home-mod-dot" style="background:#3FB6A8"></span>
         <div class="home-mod-name" style="color:#C9C7C1">Ventas</div>
-        <div class="home-mod-state" style="color:#6E6C68">Pronto</div>
+        <div class="home-mod-state">Pronto</div>
       </div>
     </div>
     <!-- La alerta de Entregas se fue del lobby (26-ago): cada módulo muestra sus
@@ -4289,7 +4296,10 @@ body.es-socia .face-pend{display:block}
 #vResumen .rz-alert{display:flex;align-items:center;gap:9px;margin:0 0 13px;background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.35);border-radius:9px;padding:9px 13px;font-size:12.5px;color:#C99A4E;line-height:1.5}
 #vResumen .rz-alert svg{width:15px;height:15px;flex:none}
 /* fila de 4 tarjetas IGUALES (una por columna de la grilla) */
-#vResumen .rz-cards4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:26px}
+#vResumen .rz-cards4{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:26px}   /* b82: Comprar se mudó a Compras */
+/* Compras en el Resumen (b82): UNA franja roja de una línea si algo no alcanza; lleva a Compras. */
+#vResumen .rz-cpaviso{display:flex;justify-content:space-between;gap:10px;margin-top:18px;padding:10px 13px;border:.5px solid rgba(226,75,74,.4);background:rgba(226,75,74,.08);border-radius:10px;color:#E24B4A;font-size:13px;cursor:pointer}
+#vResumen .rz-cpaviso span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #vResumen .rz-card4{background:#141417;border:.5px solid #26262C;border-radius:12px;padding:13px 15px;min-width:0}
 /* Rótulo = etiqueta, no titular: sin mayúsculas, tracking corto, peso 500. La jerarquía la
    hace el TONO (terciario rótulo → secundario apoyo → blanco hueso el dato), no el tamaño. */
@@ -4334,42 +4344,6 @@ body.es-socia .face-pend{display:block}
 #vResumen .rz-i3sum:hover{color:var(--text)}
 #vResumen .rz-i3body{margin-top:9px;border-top:.5px solid #232329;padding-top:8px}
 #vResumen .rz-i3body.hidden{display:none}
-/* PEDIDO CON DÍA FIJO (T-28): bloque a ancho completo, arriba de las tarjetas. Rojo = ya no llega
-   a tiempo (la única acción urgente); ámbar = mirar dos veces; el pedido en blanco hueso. */
-#vResumen .rz-df{background:#141417;border:.5px solid #26262C;border-radius:12px;padding:13px 15px;margin-top:26px}
-#vResumen .rz-dfh{font-size:11px;letter-spacing:.02em;color:var(--text-3);font-weight:500;margin-bottom:4px}
-#vResumen .rz-dft{font-size:12.5px;color:var(--text-2);margin-bottom:10px;line-height:1.4}
-#vResumen .rz-dfrojo{font-size:12.5px;line-height:1.4;color:#E24B4A;background:rgba(226,75,74,.08);border:.5px solid rgba(226,75,74,.35);border-radius:8px;padding:8px 10px;margin-bottom:8px}
-#vResumen .rz-dfamb{font-size:11.5px;line-height:1.4;color:#C99A4E;margin-bottom:9px}
-#vResumen .rz-dftbl{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
-#vResumen .rz-dftbl th{font-size:10.5px;font-weight:500;color:var(--text-3);text-align:right;padding:4px 0 6px 10px;border-bottom:.5px solid #232329;white-space:nowrap}
-#vResumen .rz-dftbl th:first-child,#vResumen .rz-dftbl td:first-child{text-align:left;padding-left:0}
-#vResumen .rz-dftbl td{text-align:right;padding:5px 0 5px 10px;border-top:.5px solid #232329;color:var(--text-2);white-space:nowrap;vertical-align:top}
-#vResumen .rz-dfn{color:var(--text-2)}
-#vResumen .rz-dfp{color:var(--text);font-weight:600}
-#vResumen .rz-dfp.rz-ok{color:#7E8C5A;font-weight:500}
-#vResumen .rz-dfsub{display:block;font-size:10.5px;font-weight:400;color:var(--text-3)}
-#vResumen .rz-dfdif{color:#C99A4E}
-#vResumen .rz-dfr .rz-dfn{color:#E24B4A}
-#vResumen .rz-dfmov{display:none}
-#vResumen .rz-dfit{padding:5px 0;border-top:.5px solid #232329}
-#vResumen .rz-dfacc{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
-#vResumen .rz-dfmsg{font-size:12px;color:var(--text-2)}
-#vResumen .rz-dfmsg.rz-ok{color:#7E8C5A} #vResumen .rz-dfmsg.rz-dfmal{color:#E24B4A} #vResumen .rz-dfmsg.rz-dfamb2{color:#C99A4E}
-#vResumen .rz-dfpan{margin-top:12px;border-top:.5px solid #26262C;padding-top:12px}
-#vResumen .rz-dfpanh{font-size:12px;color:var(--text-2);margin-bottom:8px;line-height:1.4}
-#vResumen .rz-dfptbl{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
-#vResumen .rz-dfptbl th{font-size:10.5px;font-weight:500;color:var(--text-3);text-align:left;padding:4px 10px 6px 0;border-bottom:.5px solid #232329}
-#vResumen .rz-dfptbl td{padding:5px 10px 5px 0;border-top:.5px solid #232329;color:var(--text-2);vertical-align:middle}
-#vResumen .rz-dfin{width:64px;text-align:right}
-/* Botones y campos del panel de compra: los mismos de Conteo, que viven bajo #vConteo y acá no llegaban
-   (medido el 2-oct: salían como botones del sistema, blancos). */
-#vResumen .rz-df .cn-btn{background:var(--surface-2);border:.5px solid var(--border);color:var(--text-2);font-size:12.5px;padding:9px 16px;border-radius:8px;cursor:pointer;font-family:inherit}
-#vResumen .rz-df .cn-guardar{background:#E9FE60;color:#1A1A1A;border:none;font-weight:600}
-#vResumen .rz-df .cn-btn:disabled{opacity:.45;cursor:default}
-#vResumen .rz-df .cn-in{background:var(--surface-2);border:.5px solid var(--border-m);border-radius:6px;color:var(--text);font-size:13px;padding:5px 7px;font-family:inherit}
-#vResumen .rz-dfprev{margin-top:12px;background:#111114;border:.5px solid #26262C;border-radius:10px;padding:10px 12px}
-#vResumen .rz-dftot{margin-top:8px;font-size:12.5px;color:var(--text);font-weight:600;text-align:right}
 @media(max-width:760px){
   #vResumen .rz-cards4{grid-template-columns:1fr 1fr}
   #vResumen .rz-two{gap:22px}
@@ -4442,10 +4416,72 @@ body.es-socia .face-pend{display:block}
   /* En "Comprar · para producir" la cantidad va DEBAJO del nombre, no al lado. */
   #vResumen .rz-c4-cprod .rz-c4item{flex-direction:column;align-items:flex-start;gap:1px}
   #vResumen .rz-c4-cprod .rz-c4in{line-height:1.25}
-  /* Pedido con día fijo: la tabla no entra; una línea por insumo con la cuenta debajo. */
-  #vResumen .rz-df{margin-top:20px;padding:12px 13px}
-  #vResumen .rz-dftbl{display:none} #vResumen .rz-dfmov{display:block}
-  #vResumen .rz-df .cn-in{font-size:16px}   /* 16px: iOS no hace zoom al tocar el campo */
+}
+/* ══════════ COMPRAS (b82) · morado #A27FEB ══════════
+   Regla de Andrea: TODO LO QUE PUEDA IR EN UNA LÍNEA, VA EN UNA LÍNEA. Contenedor angosto (se diseñó en
+   teléfono y en escritorio se ve igual). El morado identifica (pastilla activa, número de orden, cantidad
+   que difiere de lo sugerido); el rojo es "no alcanza", el ámbar "revisar", el lima la acción principal. */
+body[data-mod="compras"] .main{--mod:#A27FEB;--accent:#A27FEB;--blue:#A27FEB;--blue-l:rgba(162,127,235,.15)}
+#vCompras .cp-wrap{max-width:560px;margin:0 auto;padding:4px 0 40px}
+#vCompras .cp-pills{display:flex;gap:8px;overflow-x:auto;margin:2px 0 16px;scrollbar-width:none}
+#vCompras .cp-pill{border:.5px solid #26262C;background:#161619;color:#9A988F;border-radius:999px;padding:8px 15px;font-size:13px;white-space:nowrap;cursor:pointer;font-family:inherit}
+#vCompras .cp-pill.on{border-color:#A27FEB;color:#A27FEB}
+#vCompras .cp-card{background:#161619;border:.5px solid #26262C;border-radius:14px;padding:14px 15px;margin-bottom:12px}
+#vCompras .cp-f1{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#vCompras .cp-prov{font-size:19px;font-weight:600;color:#F5F4F0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#vCompras .cp-po{border:1px solid #A27FEB;color:#A27FEB;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;white-space:nowrap}
+#vCompras .cp-g2{font-size:13px;color:#F5F4F0;white-space:nowrap}
+#vCompras .cp-ciclo{font-size:13px;color:#F5F4F0;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#vCompras .cp-g{color:#9A988F} #vCompras .cp-sep{color:#6E6C68;margin:0 2px}
+#vCompras .cp-rojo,#vCompras .cp-amb{display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;font-size:13px}
+#vCompras .cp-rojo{margin-top:12px;padding:9px 11px;border:.5px solid rgba(226,75,74,.4);background:rgba(226,75,74,.08);border-radius:9px;color:#E24B4A}
+#vCompras .cp-amb{margin-top:4px;padding:9px 0 2px;color:#C99A4E;border-top:.5px solid #232329}
+#vCompras .cp-rojo span:first-child,#vCompras .cp-amb span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#vCompras .cp-fl{transition:transform .15s;flex:0 0 auto} #vCompras .cp-fl.abierto{transform:rotate(90deg)}
+#vCompras .cp-det{font-size:12px;color:#9A988F;line-height:1.45;padding:2px 0 9px}
+#vCompras .cp-detr{color:#E24B4A;padding:8px 2px} #vCompras .cp-deta,#vCompras .cp-detamb{color:#C99A4E}
+#vCompras .cp-detamb{font-size:12.5px;margin-top:10px;line-height:1.45}
+#vCompras .cp-lista{margin-top:10px}
+#vCompras .cp-it{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:10px 0;border-top:.5px solid #232329;font-size:14px;cursor:pointer}
+#vCompras .cp-it>span{white-space:nowrap}
+#vCompras .cp-in{color:#C9C7C1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#vCompras .cp-r{color:#E24B4A !important}
+#vCompras .cp-pedir{color:#F5F4F0;font-weight:600}
+#vCompras .cp-mto{color:#F5F4F0;min-width:84px;text-align:right}
+#vCompras .cp-ittot{font-weight:600;cursor:default} #vCompras .cp-ittot .cp-in{color:#F5F4F0}
+#vCompras .cp-pon{font-weight:600;color:#F5F4F0}
+#vCompras .cp-pl{font-size:12.5px;color:#F5F4F0}
+#vCompras .cp-btns{display:flex;gap:10px;margin-top:14px}
+#vCompras .cp-btn{flex:1;background:#1E1E22;border:.5px solid #2C2C33;color:#F5F4F0;border-radius:10px;padding:12px 14px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit}
+#vCompras .cp-btnp{background:#E9FE60;color:#1A1A1A;border:none;font-weight:600}
+#vCompras .cp-btn:disabled{opacity:.45;cursor:default}
+#vCompras .cp-cuando{flex:1;align-self:center;text-align:center;font-size:13px}
+#vCompras .cp-msg{font-size:12.5px;margin-top:8px;color:#9A988F} #vCompras .cp-msg:empty{display:none}
+#vCompras .cp-ok{color:#7E8C5A} #vCompras .cp-mal{color:#E24B4A} #vCompras .cp-amb2{color:#C99A4E}
+#vCompras .cp-load,#vCompras .cp-vacio{color:#9A988F;padding:22px 4px;font-size:14px} #vCompras .cp-err{color:#E24B4A;padding:22px 4px;font-size:14px}
+#vCompras .cp-volver{background:none;border:none;color:#9A988F;font-size:13px;padding:0 0 10px;cursor:pointer;font-family:inherit}
+#vCompras .cp-regh{font-size:15px;color:#F5F4F0;margin-bottom:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#vCompras .cp-rtbl{width:100%;border-collapse:collapse;font-size:14px}
+#vCompras .cp-rtbl th{font-size:11px;font-weight:500;color:#6E6C68;text-align:left;padding:4px 0 8px;border-bottom:.5px solid #232329}
+#vCompras .cp-rtbl th:nth-child(2){text-align:center} #vCompras .cp-rtbl th:nth-child(3){text-align:right;padding-right:40px}
+#vCompras .cp-rtbl td{padding:8px 0;border-top:.5px solid #232329;vertical-align:middle}
+#vCompras .cp-rin{color:#C9C7C1}
+#vCompras .cp-rsu{text-align:center;color:#9A988F;width:64px}
+#vCompras .cp-rpe{text-align:right;white-space:nowrap;width:132px}
+#vCompras .cp-pm{width:40px;height:40px;border-radius:10px;border:.5px solid #2C2C33;background:#1E1E22;color:#F5F4F0;font-size:20px;line-height:1;cursor:pointer;font-family:inherit}
+#vCompras .cp-n{display:inline-block;min-width:36px;text-align:center;font-weight:600;color:#F5F4F0}
+#vCompras .cp-n.cp-dif{color:#A27FEB}
+#vCompras .cp-ceros{background:none;border:none;color:#9A988F;font-size:13px;padding:12px 0 2px;cursor:pointer;font-family:inherit;text-decoration:underline}
+#vCompras .cp-pie{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0E0E11;border-top:.5px solid #26262C;padding:12px 0 calc(12px + env(safe-area-inset-bottom));margin-top:14px}
+#vCompras .cp-pie .cp-btn{flex:0 0 auto;min-width:120px}
+#vCompras .cp-pie .cp-btn+.cp-btn{flex:1}
+#vCompras .cp-tot{font-size:14px;color:#F5F4F0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#vCompras .cp-sel{background:#1E1E22;border:.5px solid #2C2C33;color:#F5F4F0;border-radius:7px;padding:5px 6px;font-family:inherit;font-size:13px;margin:2px 2px}
+#vCompras .cp-edit{color:#9A988F;font-size:13px}
+@media(max-width:700px){
+  #vCompras .cp-wrap{padding-bottom:20px}
+  #vCompras .cp-rpe{width:124px}
+  #vCompras .cp-pm{width:38px;height:38px}
 }
 </style>
 <div id="vResumen" class="hidden">
@@ -4586,6 +4622,13 @@ body.es-socia .face-pend{display:block}
     font-size:12.5px;text-decoration:underline;text-align:center}
 }
 </style>
+<!-- COMPRAS (b82): módulo propio, ligado a Operaciones. Pastillas arriba; el cuerpo lo arma irACompras(). -->
+<div id="vCompras" class="hidden">
+  <div class="cp-wrap">
+    <div class="cp-pills" id="cpPills"></div>
+    <div id="cpBody"></div>
+  </div>
+</div>
 <div id="vConteo" class="hidden">
   <div class="faces faces-ops">
     <button class="face" onclick="irAResumen()">Resumen</button>
@@ -4798,7 +4841,7 @@ body.es-socia .face-pend{display:block}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 2 oct 2026 · b81';
+const BUILD = 'v 2 oct 2026 · b81 + Compras (compras, NO PUBLICAR)';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -5286,6 +5329,7 @@ const ACCESO_VISTAS = {
   finanzas:     ['vFacturado','vCostos','vRentabilidad','vSimulador','vCalcPrecios','vResultados','vCobros','vResults'],
   conciliacion: ['vUpload'],
   operaciones:  ['vProduccion','vMermas','vInventario','vPlan','vResumen','vConteo'],
+  compras:      ['vCompras'],     // b82: módulo propio, ligado a Operaciones (lee su plan e inventario)
   entregas:     ['vConteoLote','vReporte','vPendientes','vDespachos','vEntBuscar','vEntLotes','vDevoluciones'],
   personal:     ['vVacaciones','vCalendario','vSolicitar','vDiasCerrados'],
 };
@@ -5347,7 +5391,7 @@ async function accesoCargar(){
 // El lobby no dibuja lo que no le toca (los inertes "Pronto" tampoco).
 function accesoPintarLobby(){
   const map={finanzas:'home-mod-fin', conciliacion:'home-mod-conc', operaciones:'home-mod-ops',
-             entregas:'home-mod-ent', personal:'home-mod-per', ventas:'home-mod-ven'};
+             compras:'home-mod-com', entregas:'home-mod-ent', personal:'home-mod-per', ventas:'home-mod-ven'};
   for(const mod in map){
     const el=document.querySelector('#vLobby .'+map[mod]);
     if(el) el.style.display = accesoPuede(mod) ? '' : 'none';
@@ -5477,7 +5521,7 @@ function crumbSet(area,cur){
   // el punto del breadcrumb sigue el color del módulo (Finanzas azul · Operaciones rosa · Conciliación verde)
   // Entregas va en OLIVA, no en lima: su encabezado es claro y un punto de 7px en
   // #E9FE60 sobre blanco no se ve. Mismo criterio que --ent-line.
-  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Conciliación':'#84BD00','Entregas':'#8A9B00','Ventas':'#3FB6A8','Personal':'#FF671D'};
+  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Compras':'#A27FEB','Conciliación':'#84BD00','Entregas':'#8A9B00','Ventas':'#3FB6A8','Personal':'#FF671D'};
   const d=document.querySelector('.crumb-dot'); if(d)d.style.background=COL[area]||'#378ADD';
 }
 // Entradas desde el HOME (una por módulo).
@@ -5493,6 +5537,7 @@ function abrirConciliacion(){                                // módulo Concilia
   renderCobrosExtracto();   // la lista de cobros sale del extracto subido (no de la pila vieja de Odoo)
 }
 function abrirPersonal(){ irAVacaciones(); }                 // módulo Personal → su única pantalla
+function abrirCompras(){ irACompras('porpedir'); }            // módulo Compras (b82) → Por pedir
 function volverLobby(){
   document.body.classList.remove('ent-claro');   // el lobby es de todos: vuelve a oscuro
   document.body.removeAttribute('data-mod');     // …y sin módulo activo: el lobby no lleva acento de nadie
@@ -8847,6 +8892,16 @@ async function nivDiaFijoDatos(cfg, mon0){
       const qq=await _conv(pend, l.product_uom&&l.product_uom[0], info[p].uom);
       pedido[p]=(pedido[p]||0)+qq; pedidoLineas.push({pid:p, orden:l.order_id&&l.order_id[1], qty:qq, ds:_crDate(l.date_planned)}); }
   }catch(e){ pedidoErr='No pude leer las compras en Odoo, así que «ya pedido» va en 0 ('+String(e&&e.message||e).slice(0,120)+').'; }
+  // PRECIO DE LA ÚLTIMA COMPRA, en ₡ por UoM DEL PRODUCTO: solo para el total estimado de la pantalla
+  // de registro (Compras, b82). El que manda es el que pone el servicio en «Revisar».
+  const precios={};
+  try{
+    const parts=[...new Set(ins.map(function(x){ return +x.proveedor_id; }).filter(Boolean))];
+    const hl=await odooCall('purchase.order.line','search_read',[[['product_id','in',pids],['partner_id','in',parts],['state','in',['purchase','done']]]],
+      {fields:['product_id','price_unit','product_uom'],order:'id desc',limit:300});
+    for(const l of hl){ const p=l.product_id[0]; if(precios[p]!=null || !l.price_unit) continue;
+      precios[p]=l.price_unit*(await _conv(1, info[p].uom, l.product_uom&&l.product_uom[0])); }
+  }catch(e){}
   // Medición de premezcla cargada esta semana (aviso de Keylor; informativo, ver arriba).
   const prems=NIV_PROD.map(function(p){ return NIV_INFO[p].prem; });
   const pm=await odooCall('mrp.production','search_read',[[['state','=','done'],['product_id','in',prems],['date_start','>=',_ymd(mon0)+' 06:00:00']]],{fields:['product_id']});
@@ -8857,7 +8912,7 @@ async function nivDiaFijoDatos(cfg, mon0){
   try{ const {data,error}=await sbClient().from('compra_pedido_odoo').select('proveedor_id,entrega_dia,po_nombre');
        if(!error) registradas=data||[]; }catch(e){}
   await accesoSocia();
-  return {ins:ins, pids:pids, oh:oh, info:info, uomNom:uomNom, hist:hist, pedido:pedido, pedidoLineas:pedidoLineas, pedidoErr:pedidoErr, premCargada:premCargada, registradas:registradas};
+  return {ins:ins, pids:pids, oh:oh, info:info, uomNom:uomNom, hist:hist, pedido:pedido, pedidoLineas:pedidoLineas, pedidoErr:pedidoErr, premCargada:premCargada, registradas:registradas, precios:precios};
 }
 
 // EL CÁLCULO. Se rehace en cada recálculo del plan (editar el calendario mueve A y lo de antes de U).
@@ -9041,7 +9096,7 @@ async function _rzSetup(){
   stock.finPlan=finPlan;
   const {w0, weeks}=nivLevel(ritmo, finPlan, cfg);
   const hoy=new Date();
-  _rzCtx={cfg, ritmo, stock, w0, weeks, real, hoyStr:_ymd(hoy), mon0:_mondayProd(hoy)};
+  _rzCtx={cfg, ritmo, stock, w0, weeks, real, hoyStr:_ymd(hoy), mon0:_mondayProd(hoy), cargadoEn:Date.now()};
   // Pedido con día fijo (T-28): sus lecturas de Odoo no deben tumbar el Resumen entero.
   try{ _rzCtx.dfDatos=await nivDiaFijoDatos(cfg, _rzCtx.mon0); }
   catch(e){ _rzCtx.dfDatos={error:String(e&&e.message||e)}; }
@@ -19688,8 +19743,8 @@ function rzRender(){
   // Grilla ~940px centrada. Pulso arriba (calendario), 4 tarjetas iguales, y el detalle a un clic.
   body.innerHTML='<div class="rz-wrap">'
     + rzStripHtml()
-    + rzDiaFijoHtml()
-    + '<div class="rz-cards4">'+rzVaSemanaCard()+rzMedirCard()+rzComprasCards()+'</div>'
+    + rzComprasAvisoHtml()      // compras (b82): solo la franja roja, si algo no alcanza
+    + '<div class="rz-cards4">'+rzVaSemanaCard()+rzMedirCard()+'</div>'
     + '<div class="rz-two">'+rzUltimasHtml()+rzInvHtml()+'</div>'
     + '</div>';
 }
@@ -19717,30 +19772,6 @@ function rzMedirCard(){
     +(function(v){ return _rzVentanaHtml(v.l1, v.l2); })(_rzMedirLbl())
     +'<div class="rz-c4line'+(pm.length?'':' rz-ok')+'">'+esc(txt)+'</div></div>';
 }
-// TARJETAS "Comprar": LISTA COMPLETA, siempre. Fecha objetivo en rosa apagado.
-// Sin "+N más": es la lista de compra real de Lorena y un ítem escondido es un ítem que no se
-// compra. Antes se mostraba solo el más urgente y el resto quedaba en un <div hidden> con un
-// botón desplegable — y el botón conservaba el texto "+N más" al abrirse (rzToggleId solo
-// cambia el chevron), así que parecía que no había expandido; además cualquier edición del
-// plan re-renderiza y lo volvía a colapsar. La tarjeta crece con la lista.
-function rzComprasCards(){
-  function itemHtml(it){ return '<div class="rz-c4it">'
-      +'<div class="rz-c4item"><span class="rz-c4in">'+esc(it.nombre.toLowerCase())+'</span>'
-      +'<span class="rz-c4falta">falta '+esc(_faltaCompra(it))+'</span></div>'
-      +(it.nota?('<div class="rz-c4nota">'+esc(it.nota)+'</div>'):'')+'</div>'; }
-  function card(titulo, data, extra){
-    const items=(data.items||[]).slice().sort(function(a,b){ return (b.falta/(b.need||1))-(a.falta/(a.need||1)); });   // más urgente primero
-    // Vacío: en teléfono dice lo mismo que "Por medir" ("ya está todo ✓") y en el mismo tono.
-    // Se emiten los dos textos y el CSS elige, para no tocar lo que ya se lee en escritorio.
-    const cuerpo=items.length ? items.map(itemHtml).join('')
-      : '<div class="rz-c4line rz-ok"><span class="rz-c4-desk">alcanza — nada que comprar</span>'
-        +'<span class="rz-c4-mov">ya está todo ✓</span></div>';
-    return '<div class="rz-card4 '+extra+'"><div class="rz-c4h">'+titulo+'</div>'
-      +_rzVentanaHtml(data.fecha, data.fecha2)+cuerpo+'</div>';
-  }
-  return card('Comprar · para medir premezclas', _rzCompras.premezclas, 'rz-c4-cmedir')
-       + card('Comprar · para producir', _rzCompras.produccion, 'rz-c4-cprod');
-}
 // ── TARJETA "PEDIDO CON DÍA FIJO" (T-28) ─────────────────────────────────
 // Una por proveedor + ciclo. Rojo arriba (ya no llega a tiempo), ámbar después (lo que pide
 // mirar dos veces), y la lista. En escritorio, tabla; en teléfono, una línea por insumo con la
@@ -19762,74 +19793,7 @@ function _dfPedirTxt(f, q){
   const e=_dfEmp(f.pid, q, f.uom);
   return e ? (e.n+' '+e.lab+' ('+_dfCant(e.total,f.uom)+')') : _dfCant(q,f.uom);
 }
-function rzDiaFijoHtml(){
-  const R=_rzDiaFijo; if(!R) return '';
-  if(R.error) return '<div class="rz-df"><div class="rz-dfh">Pedido con día fijo</div><div class="rz-err" style="padding:6px 0">No pude calcularlo: '+esc(R.error)+'</div></div>';
-  if(!R.grupos.length) return '';
-  const avisosComunes=[];
-  if(R.sinCargar.length) avisosComunes.push('Producción sin cargar en Odoo ('+R.sinCargar.map(_fechaCorta).join(', ')+'): se estimó con el plan.');
-  if(R.keylor.length) avisosComunes.push('Falta cargar en Odoo la medición de esta semana: '+R.keylor.map(function(p){ return NIV_INFO[p].nom; }).join(', ')+'.');
-  if(R.pedidoErr) avisosComunes.push(R.pedidoErr);
-  return R.grupos.map(function(g, gi){
-    const ci=g.ci, c=g.cfg, med=c.uso!=='produccion';
-    const tit=esc(c.proveedor||'Proveedor')+' · '
-      +(ci.sinDia ? 'sin día de pedido (calculado como si pidieras hoy)' : ('pedido '+_fechaCorta(ci.P)+(ci.pasado?' (ya pasó)':'')))
-      +' → llega '+_fechaCorta(ci.E)+(med?(c.momento==='antes'?' antes de medir':' después de medir'):'')
-      +' → '+(med?('para medir '+_fechaCorta(ci.U)):('se usa desde '+_fechaCorta(ci.U)));
-    const hAntes='Antes del '+_fechaCorta(ci.U), hSem='Semana del '+_fechaCorta(ci.U);
-    const rojos=g.filas.filter(function(f){ return f.rojo>1e-9; });
-    const ambar=avisosComunes.slice();
-    if(g.sinPlan) ambar.push('El plan no llega hasta el '+_fechaCorta(ci.U2)+': la semana del pedido está incompleta.');
-    // Las órdenes de compra se cargan en Odoo AL RECIBIR, no al pedir (medido el 2-oct: el pedido de
-    // Lorena del jue 1-oct no estaba en Odoo en ningún estado; P00669 se creó el vie 25 y se aprobó
-    // al recibir, el lun 28). Sin orden, "ya pedido" es 0 y "Pedir" repite lo que ya se pidió.
-    if(ci.pasado && !R.pedidoErr && !g.filas.some(function(f){ return f.ya>1e-9; }))
-      ambar.push('No hay orden de compra en Odoo para el pedido del '+_fechaCorta(ci.P)+': si ya se pidió, «Pedir» repite ese pedido.');
-    // A contra B en UNA línea: con una por insumo, una semana cargada llenaba la tarjeta de ámbar y
-    // tapaba el pedido (medido el 2-oct: cinco renglones). El detalle queda en la columna Habitual.
-    const dif=g.filas.filter(function(f){ return f.difiere; });
-    if(dif.length) ambar.push('El plan de la '+hSem.toLowerCase()+' se aparta de lo habitual más que el margen en: '
-      +dif.map(function(f){ return f.nombre+' ('+_dfCant(f.A,f.uom)+' contra '+_dfCant(f.B,f.uom)+')'; }).join(', ')+'.');
-    let h='<div class="rz-df"><div class="rz-dfh">Pedido con día fijo</div><div class="rz-dft">'+tit+'</div>';
-    if(rojos.length) h+='<div class="rz-dfrojo">No alcanza '+(med?('para medir el '+_fechaCorta(_dfAdd(ci.U,-7))):('hasta que llegue ('+_fechaCorta(ci.E)+')'))+': '
-      +rojos.map(function(f){ const e=_dfEmp(f.pid,f.rojo,f.uom);   // lo que FALTA, no el saco entero
-        return esc(f.nombre)+' falta '+esc(_dfCant(f.rojo,f.uom))+(e?(' ('+e.n+' '+esc(e.lab)+')'):''); }).join(' · ')
-      +'. '+esc(c.proveedor||'El proveedor')+' ya no llega a tiempo: hay que comprarlo afuera o mover producción.</div>';
-    if(ambar.length) h+='<div class="rz-dfamb">'+ambar.map(esc).join('<br>')+'</div>';
-    // Escritorio: tabla
-    h+='<table class="rz-dftbl"><thead><tr><th>Insumo</th><th>Stock hoy</th><th title="Lo que se consume antes de que lo nuevo se pueda usar">'+esc(hAntes)+'</th><th>Sobra</th>'
-      +'<th title="Plan de esa semana (si no está editada, la propuesta del nivelador)">'+esc(hSem)+'</th><th title="Lo que la peor de las últimas 6 semanas se pasó del promedio">Margen</th>'
-      +'<th>Ya pedido</th><th>Pedir</th><th title="Consumo real promedio de las últimas 6 semanas en Odoo">Habitual</th></tr></thead><tbody>'
-      +g.filas.map(function(f){
-        return '<tr'+(f.rojo>1e-9?' class="rz-dfr"':'')+'><td class="rz-dfn">'+esc(f.nombre)+'</td><td>'+esc(_dfCant(f.stock,f.uom))+'</td><td>'+esc(_dfCant(f.antes,f.uom))+'</td>'
-          +'<td>'+esc(_dfCant(f.sobra,f.uom))+'</td><td>'+esc(_dfCant(f.A,f.uom))+'</td><td>'+esc(_dfCant(f.margen,f.uom))+'</td>'
-          +'<td>'+(f.ya>1e-9?esc(_dfCant(f.ya,f.uom)):'—')+'</td>'
-          +'<td class="rz-dfp'+(f.pedir>1e-9?'':' rz-ok')+'">'+esc(_dfPedirTxt(f,f.pedir))
-            +(f.ya>1e-9&&f.bruto>1e-9?('<span class="rz-dfsub">sin lo ya pedido: '+esc(_dfPedirTxt(f,f.bruto))+'</span>'):'')+'</td>'
-          +'<td class="'+(f.difiere?'rz-dfdif':'')+'">'+esc(_dfCant(f.B,f.uom))+'</td></tr>'; }).join('')
-      +'</tbody></table>';
-    // Teléfono: una línea por insumo, la cuenta debajo
-    h+='<div class="rz-dfmov">'+g.filas.map(function(f){
-        const cuenta=hSem.toLowerCase()+' '+_dfCant(f.A,f.uom)+' + margen '+_dfCant(f.margen,f.uom)+' − sobra '+_dfCant(f.sobra,f.uom)
-          +(f.ya>1e-9?(' − ya pedido '+_dfCant(f.ya,f.uom)):'');
-        return '<div class="rz-dfit'+(f.rojo>1e-9?' rz-dfr':'')+'"><div class="rz-c4item"><span class="rz-dfn">'+esc(f.nombre)+'</span>'
-          +'<span class="rz-dfp'+(f.pedir>1e-9?'':' rz-ok')+'">'+(f.pedir>1e-9?'pedir ':'')+esc(_dfPedirTxt(f,f.pedir))+'</span></div>'
-          +'<div class="rz-c4nota">'+esc(cuenta)+'</div></div>'; }).join('')+'</div>';
-    return h+_dfAccionesHtml(g, gi)+'</div>';
-  }).join('');
-}
-// ── «PEDIR A BIO» / «REGISTRAR PEDIDO» (T-28, 2-oct) ─────────────────────
-// Crea la orden de compra CONFIRMADA en Odoo por el servicio de escritura (POST /pedir), con
-// las mismas cercas que validar y trasladar y su interruptor propio (COMPRA_ENCENDIDA). Así
-// "ya pedido" se descuenta solo: hoy las órdenes de BIO se cargan al RECIBIR (medido el 2-oct).
-// EL NAVEGADOR NO LE MANDA CANTIDADES AL SERVICIO. Guarda lo que la socia decidió como una fila
-// de `compra_propuesta` (append-only, RLS socia) y le pasa el id: el servicio lee la fila y
-// arma la orden. Corregir = otra propuesta. Precio: el de la última compra real (lo pone el
-// servicio; las tarifas de BIO en Odoo son de 2023).
-// «Registrar pedido» es el mismo camino para un pedido YA hecho (por WhatsApp) que todavía no
-// llegó: queda en Odoo, no se le manda nada al proveedor.
-let _dfPanel=null;   // {gi, valores:{pid:n}, previa, propuestaId, estado, msg}
-// Cantidad del panel → UoM del producto. n en empaques si tiene; si no, en su unidad (g → kg).
+// Cantidad del panel de registro → UoM del producto (empaques si tiene; si no, su unidad, g → kg).
 function _dfDesdePanel(f, n){
   const pe=_pesoEmpaque(f.pid); n=+n||0;
   if(pe){ const k=(f.uom===pe.unidad)?1:(f.uom==='g'&&pe.unidad==='kg')?1/1000:(f.uom==='kg'&&pe.unidad==='g')?1000:null;
@@ -19838,51 +19802,220 @@ function _dfDesdePanel(f, n){
 }
 function _dfPanelInicial(f){ const e=_dfEmp(f.pid, f.pedir, f.uom); return e ? e.n : (f.uom==='g' ? Math.round(f.pedir/100)/10 : Math.ceil(f.pedir*10)/10); }
 function _dfUnidadPanel(f){ const pe=_pesoEmpaque(f.pid); return pe ? pe.lab : (f.uom==='g'?'kg':f.uom); }
-function dfAbrir(gi){
+// ════════════════════════════════════════════════════════════════════════
+// MÓDULO COMPRAS (b82, 2-oct-2026) — morado #A27FEB, ligado a Operaciones.
+// ════════════════════════════════════════════════════════════════════════
+// NO CALCULA NADA PROPIO. Lee lo que ya armó Operaciones (_rzSetup): el plan, el stock, la
+// tarjeta de día fijo (_rzDiaFijo, de nivDiaFijo) y lo suelto (_rzCompras, de nivCompras). Si
+// el Resumen ya lo cargó hace menos de 5 minutos, lo reusa; si no, lo vuelve a leer.
+// REGLA DE DISEÑO (Andrea, 2-oct): TODO LO QUE PUEDA IR EN UNA LÍNEA, VA EN UNA LÍNEA. Nada de
+// etiqueta arriba y valor abajo. Las cuentas se abren al tocar; los avisos ámbar van cerrados.
+let _cpVista='porpedir', _cpReg=null, _cpPedidos=null, _cpProv=null, _cpAbiertos={};
+const CP_VISTAS=[['porpedir','Por pedir'],['comprar','Comprar'],['pedidos','Pedidos'],['proveedores','Proveedores']];
+async function irACompras(vista){
+  _modShow('vCompras');
+  if(vista) _cpVista=vista;
+  _cpReg=null;
+  crumbSet('Compras', (CP_VISTAS.find(function(v){ return v[0]===_cpVista; })||[0,'Por pedir'])[1]);
+  cpPintarPills();
+  const b=document.getElementById('cpBody');
+  const fresco=_rzCtx && _rzCtx.cargadoEn && (Date.now()-_rzCtx.cargadoEn < 5*60000);
+  if(!fresco){
+    b.innerHTML='<div class="cp-load">Leyendo el plan y el inventario de Operaciones…</div>';
+    try{ await _rzSetup(); }
+    catch(e){ b.innerHTML='<div class="cp-err">No pude leer el plan: '+esc(e&&e.message||e)+'</div>'; return; }
+  }
+  await accesoSocia();
+  cpRender();
+}
+function cpPintarPills(){
+  const p=document.getElementById('cpPills'); if(!p) return;
+  p.innerHTML=CP_VISTAS.map(function(v){ return '<button class="cp-pill'+(v[0]===_cpVista&&!_cpReg?' on':'')+'" onclick="cpIr(\''+v[0]+'\')">'+v[1]+'</button>'; }).join('');
+}
+function cpIr(v){ _cpVista=v; _cpReg=null; crumbSet('Compras', CP_VISTAS.find(function(x){ return x[0]===v; })[1]); cpPintarPills(); cpRender(); try{ window.scrollTo(0,0); }catch(e){} }
+function cpRender(){
+  const b=document.getElementById('cpBody'); if(!b) return;
+  if(_cpReg) return cpRenderRegistro();
+  if(_cpVista==='porpedir') b.innerHTML=cpPorPedirHtml();
+  else if(_cpVista==='comprar') b.innerHTML=cpComprarHtml();
+  else if(_cpVista==='pedidos') cpPedidos();
+  else if(_cpVista==='proveedores') cpProveedores();
+}
+function cpToggle(k){ _cpAbiertos[k]=!_cpAbiertos[k]; const e=document.getElementById('cpx-'+k); if(e) e.classList.toggle('hidden', !_cpAbiertos[k]);
+  const a=document.getElementById('cpa-'+k); if(a) a.classList.toggle('abierto', !!_cpAbiertos[k]); }
+const _cpCorto=function(n){ return String(n||'').split(' ')[0]; };   // "BIO Ingredients" → "BIO"
+const _cpMin=function(s){ return String(s||'').charAt(0).toLowerCase()+String(s||'').slice(1); };
+// "6 sacos" / "3 paquetes" / "9,0 kg"
+function _cpEmpTxt(f, q){ const e=_dfEmp(f.pid, q, f.uom); return e ? (e.n+' '+e.lab) : _dfCant(q, f.uom); }
+// Palabra gris + fecha blanca: "Pidió jue 1".
+const _cpF=function(pal, ds){ return '<span class="cp-g">'+pal+'</span> '+_fechaCorta(ds); };
+
+// ── POR PEDIR ──────────────────────────────────────────────────────────
+function cpPorPedirHtml(){
+  const R=_rzDiaFijo;
+  if(!R) return '<div class="cp-vacio">No hay insumos con día fijo de entrega.</div>';
+  if(R.error) return '<div class="cp-err">No pude calcularlo: '+esc(R.error)+'</div>';
+  return R.grupos.map(function(g, gi){ return cpTarjetaHtml(g, gi, R); }).join('') || '<div class="cp-vacio">No hay insumos con día fijo de entrega.</div>';
+}
+function _cpAvisos(g, R){
+  const ci=g.ci, med=g.cfg.uso!=='produccion', av=[];
+  if(R.sinCargar.length) av.push('Producción sin cargar en Odoo ('+R.sinCargar.map(_fechaCorta).join(', ')+'): se estimó con el plan.');
+  if(med && R.keylor.length) av.push('Falta cargar en Odoo la medición de esta semana: '+R.keylor.map(function(p){ return NIV_INFO[p].nom; }).join(', ')+'.');
+  if(R.pedidoErr) av.push(R.pedidoErr);
+  if(g.sinPlan) av.push('El plan no llega hasta el '+_fechaCorta(ci.U2)+': la semana del pedido está incompleta.');
+  const dif=g.filas.filter(function(f){ return f.difiere; });
+  if(dif.length) av.push('El plan de la semana del '+_fechaCorta(ci.U)+' se aparta de lo habitual más que el margen en: '
+    +dif.map(function(f){ return f.nombre+' ('+_dfCant(f.A,f.uom)+' contra '+_dfCant(f.B,f.uom)+')'; }).join(', ')+'.');
+  if(ci.pasado && !g.registrada && !R.pedidoErr && !g.filas.some(function(f){ return f.ya>1e-9; }))
+    av.push('No hay orden de compra en Odoo para el pedido del '+_fechaCorta(ci.P)+': si ya se pidió, registralo.');
+  return av;
+}
+function cpTarjetaHtml(g, gi, R){
+  const ci=g.ci, c=g.cfg, med=c.uso!=='produccion', prov=_cpCorto(c.proveedor||'Proveedor');
+  const solo=(!med && g.filas.length===1);           // huevo líquido: su propia tarjeta
+  const k='g'+gi;
+  let h='<div class="cp-card">';
+  // Fila 1: nombre grande · pastilla con la orden
+  h+='<div class="cp-f1"><span class="cp-prov">'+esc(solo?(g.filas[0].nombre+' · '+prov):prov)+'</span>'
+    +(g.registrada?g.registrada.map(function(po){ return '<span class="cp-po">'+esc(po)+'</span>'; }).join('')
+      :(solo?('<span class="cp-g2">'+_cpF('Llega', ci.E)+'</span>'):''))+'</div>';
+  // Fila 2: el ciclo en una línea (no en la tarjeta suelta del huevo: ahí va arriba a la derecha)
+  if(!solo){
+    const pal=(ci.pasado||g.registrada)?'Pidió':'Pide';
+    h+='<div class="cp-ciclo">'+_cpF(pal, ci.P)+' <span class="cp-sep">›</span> '+_cpF('Llega', ci.E)
+      +' <span class="cp-sep">›</span> '+(med?_cpF('Mide', ci.U):_cpF('Usa', ci.U))+'</div>';
+  }
+  // Rojo, en una línea, con el detalle detrás de la flecha
+  const rojos=g.filas.filter(function(f){ return f.rojo>1e-9; });
+  if(rojos.length){
+    const cuando=med?('el '+_fechaCorta(_dfAdd(ci.U,-7))):('antes del '+_fechaCorta(ci.E));
+    const txt=rojos.length===1 ? ('Falta '+_cpMin(rojos[0].nombre)+' '+cuando+' · '+_dfCant(rojos[0].rojo, rojos[0].uom))
+                               : ('Faltan '+rojos.length+' insumos '+cuando+' · '+rojos.map(function(f){ return _cpMin(f.nombre); }).join(', '));
+    h+='<div class="cp-rojo" onclick="cpToggle(\''+k+'r\')"><span>'+esc(txt)+'</span><span class="cp-fl" id="cpa-'+k+'r">›</span></div>'
+      +'<div class="cp-det cp-detr'+(_cpAbiertos[k+'r']?'':' hidden')+'" id="cpx-'+k+'r">'
+      +rojos.map(function(f){ return esc(f.nombre+': hay '+_dfCant(f.stock,f.uom)+' y se necesitan '+_dfCant(f.antes,f.uom)+' '+(med?('para medir el '+_fechaCorta(_dfAdd(ci.U,-7))):('antes del '+_fechaCorta(ci.E)))+'.'); }).join('<br>')
+      +'<br>'+esc((c.proveedor||'El proveedor')+' ya no llega a tiempo: hay que comprarlo afuera o mover producción.')+'</div>';
+  }
+  // Insumos, una línea cada uno; la cuenta se abre al tocar
+  if(!solo || !rojos.length || g.filas[0].pedir>1e-9 || g.filas[0].ya>1e-9){
+    h+='<div class="cp-lista">'+g.filas.map(function(f, fi){
+      const kk=k+'i'+fi;
+      const est = f.pedir>1e-9 ? '<span class="cp-pedir">Pedir '+esc(_cpEmpTxt(f,f.pedir))+'</span>'
+                : f.ya>1e-9 ? '<span class="cp-g">Pedido '+esc(_cpEmpTxt(f,f.ya))+'</span>'
+                : '<span class="cp-g">Alcanza</span>';
+      const cuenta=(med?'Semana del ':'Del ')+_fechaCorta(ci.U)+' '+_dfCant(f.A,f.uom)+' + margen '+_dfCant(f.margen,f.uom)
+        +' − sobra '+_dfCant(f.sobra,f.uom)+(f.ya>1e-9?(' − ya pedido '+_dfCant(f.ya,f.uom)):'')
+        +' · hay '+_dfCant(f.stock,f.uom)+', antes del '+_fechaCorta(ci.U)+' se usan '+_dfCant(f.antes,f.uom)+' · habitual '+_dfCant(f.B,f.uom)+'/sem';
+      return '<div class="cp-it" onclick="cpToggle(\''+kk+'\')"><span class="cp-in'+(f.rojo>1e-9?' cp-r':'')+'">'+esc(solo?'Pedido':f.nombre)+'</span>'+est+'</div>'
+        +'<div class="cp-det'+(_cpAbiertos[kk]?'':' hidden')+'" id="cpx-'+kk+'">'+esc(cuenta)+'</div>'; }).join('')+'</div>';
+  }
+  // Ámbar: juntos y cerrados
+  const av=_cpAvisos(g, R);
+  if(av.length) h+='<div class="cp-amb" onclick="cpToggle(\''+k+'a\')"><span>'+av.length+' aviso'+(av.length===1?'':'s')+' para revisar</span><span class="cp-fl" id="cpa-'+k+'a">›</span></div>'
+    +'<div class="cp-det cp-deta'+(_cpAbiertos[k+'a']?'':' hidden')+'" id="cpx-'+k+'a">'+av.map(esc).join('<br>')+'</div>';
+  // Botones, en una fila
+  const hoy=_rzCtx.hoyStr, futuro=ci.P>hoy;
+  let prim='';
+  if(!g.registrada && _socia===true){
+    prim = futuro ? '<span class="cp-g cp-cuando">'+_cpF('Se pide el', ci.P)+'</span>'
+                  : '<button class="cp-btn cp-btnp" onclick="cpAbrirRegistro('+gi+')">'+(ci.pasado?'Registrar pedido':'Pedir lo que falta')+'</button>';
+  }
+  h+='<div class="cp-btns"><button class="cp-btn" onclick="cpWhatsApp('+gi+')">Copiar WhatsApp</button>'+prim+'</div>'
+    +'<div class="cp-msg" id="cpMsg'+gi+'"></div>';
+  return h+'</div>';
+}
+// Texto para mandarle al proveedor: lo registrado si ya hay orden; si no, lo que falta pedir.
+async function cpWhatsApp(gi, valores){
   const g=_rzDiaFijo&&_rzDiaFijo.grupos[gi]; if(!g) return;
-  const v={}; g.filas.forEach(function(f){ v[f.pid]=_dfPanelInicial(f); });
-  _dfPanel={gi:gi, valores:v, previa:null, propuestaId:null, estado:'editando', msg:''};
-  dfPintarPanel();
+  const lin=g.filas.map(function(f){
+    const n = valores ? (+valores[f.pid]||0) : null;
+    const q = valores ? _dfDesdePanel(f, n) : (g.registrada ? f.ya : f.pedir);
+    if(!(q>1e-9)) return '';
+    return '• '+f.nombre+': '+_cpEmpTxt(f, q); }).filter(Boolean);
+  const m=document.getElementById('cpMsg'+gi)||document.getElementById('cpRegMsg');
+  if(!lin.length){ if(m){ m.textContent='No hay nada para pedir.'; } return; }
+  const txt='Hola, pedido de True Food para entregar el '+_fechaLarga(g.ci.E).replace(/ \d{4}$/,'')+':\n'+lin.join('\n')+'\nGracias.';
+  try{ await navigator.clipboard.writeText(txt); if(m){ m.className='cp-msg cp-ok'; m.textContent='Copiado: pegalo en WhatsApp.'; } }
+  catch(e){ window.prompt('Copiá este texto:', txt); }
 }
-function dfCerrar(){ const gi=_dfPanel&&_dfPanel.gi; _dfPanel=null; const el=document.getElementById('dfPanel'+gi); if(el) el.innerHTML=''; }
-function dfValor(gi, pid, val){
-  if(!_dfPanel||_dfPanel.gi!==gi) return;
-  _dfPanel.valores[pid]=String(val).replace(',','.'); _dfPanel.previa=null; _dfPanel.propuestaId=null; _dfPanel.estado='editando';
-  const g=_rzDiaFijo.grupos[gi], f=g.filas.find(function(x){ return x.pid===pid; });
-  const eq=document.getElementById('dfEq'+pid); if(eq&&f) eq.textContent='= '+_dfCant(_dfDesdePanel(f,_dfPanel.valores[pid]), f.uom);
-  const pv=document.getElementById('dfPrev'+gi); if(pv) pv.innerHTML='';
-  const bt=document.getElementById('dfBtn'+gi); if(bt){ bt.textContent='Revisar en Odoo'; bt.setAttribute('onclick','dfRevisar('+gi+')'); bt.disabled=false; }
+
+// ── REGISTRAR / PEDIR: pantalla aparte ─────────────────────────────────
+// Paso 1 «editar»: Insumo (unidad) · Sugiere · Pedido con − y + grandes; pie fijo con el total
+// estimado y «Revisar». Paso 2 «revisar»: lo que dice el SERVICIO (la propuesta se guarda y el
+// servicio arma la orden: el navegador no le manda cantidades), y abajo de todo, «Registrar».
+function cpAbrirRegistro(gi){
+  const g=_rzDiaFijo&&_rzDiaFijo.grupos[gi]; if(!g) return;
+  const v={}; g.filas.forEach(function(f){ v[f.pid]=_cpSugiere(f); });
+  _cpReg={gi:gi, valores:v, paso:'editar', previa:null, propuestaId:null, verCeros:false, msg:'', cls:''};
+  cpPintarPills(); cpRender(); try{ window.scrollTo(0,0); }catch(e){}
 }
-function dfPintarPanel(){
-  const P=_dfPanel; if(!P) return;
-  const g=_rzDiaFijo.grupos[P.gi], el=document.getElementById('dfPanel'+P.gi); if(!g||!el) return;
-  const reg=g.ci.pasado;
-  let h='<div class="rz-dfpan"><div class="rz-dfpanh">'+(reg?'Registrar el pedido que ya se le hizo a ':'Pedir a ')+esc(g.cfg.proveedor||'proveedor')
-    +' · llega '+_fechaCorta(g.ci.E)+(reg?' · <span class="muted">no se le manda nada al proveedor: solo queda en Odoo</span>':'')+'</div>'
-    +'<table class="rz-dfptbl"><thead><tr><th>Insumo</th><th>Truefie calcula</th><th>Pedir</th><th></th></tr></thead><tbody>'
-    +g.filas.map(function(f){ const val=P.valores[f.pid];
-      return '<tr><td>'+esc(f.nombre)+'</td><td class="muted">'+esc(_dfPedirTxt(f,f.pedir))+'</td>'
-        +'<td><input class="cn-in rz-dfin" inputmode="decimal" value="'+esc(String(val).replace('.',','))+'" oninput="dfValor('+P.gi+','+f.pid+',this.value)"> '
-        +esc(_dfUnidadPanel(f))+'</td><td class="muted" id="dfEq'+f.pid+'">= '+esc(_dfCant(_dfDesdePanel(f,val),f.uom))+'</td></tr>'; }).join('')
-    +'</tbody></table>'
-    +'<div class="rz-dfacc"><button class="cn-btn cn-guardar" id="dfBtn'+P.gi+'" onclick="dfRevisar('+P.gi+')">Revisar en Odoo</button>'
-    +'<button class="cn-btn" onclick="dfWhatsApp('+P.gi+')">Copiar para WhatsApp</button>'
-    +'<button class="cn-btn" onclick="dfCerrar()">Cerrar</button><span class="rz-dfmsg" id="dfMsgP'+P.gi+'"></span></div>'
-    +'<div id="dfPrev'+P.gi+'"></div></div>';
-  el.innerHTML=h;
+// Lo que Truefie sugiere pedir, en empaques (o en la unidad del panel). Si el ciclo ya pasó y
+// nada se registró, es lo que habría pedido (bruto, antes de descontar lo ya pedido).
+function _cpSugiere(f){ const q=f.ya>1e-9?f.pedir:f.bruto; const e=_dfEmp(f.pid,q,f.uom); return e?e.n:(f.uom==='g'?Math.round(q/100)/10:Math.ceil(q*10)/10); }
+function _cpPaso(f){ return _pesoEmpaque(f.pid) ? 1 : (f.uom==='g'||f.uom==='kg' ? 0.5 : 1); }
+function cpMas(pid, d){
+  const P=_cpReg; if(!P) return; const g=_rzDiaFijo.grupos[P.gi], f=g.filas.find(function(x){ return x.pid===pid; });
+  P.valores[pid]=Math.max(0, Math.round(((+P.valores[pid]||0)+d*_cpPaso(f))*10)/10);
+  P.previa=null; P.propuestaId=null; cpRenderRegistro();
 }
-function _dfMsg(gi, txt, cls){ const m=document.getElementById('dfMsgP'+gi)||document.getElementById('dfMsg'+gi); if(m){ m.className='rz-dfmsg'+(cls?(' '+cls):''); m.textContent=txt; } }
-// Guarda la propuesta (lo que la socia decidió) y pide la vista previa al servicio.
-async function dfRevisar(gi){
-  const P=_dfPanel, g=_rzDiaFijo&&_rzDiaFijo.grupos[gi]; if(!P||!g) return;
-  const lineas=g.filas.map(function(f){ const pe=_pesoEmpaque(f.pid), n=+String(P.valores[f.pid]).replace(',','.')||0;
+function cpVerCeros(){ if(_cpReg){ _cpReg.verCeros=!_cpReg.verCeros; cpRenderRegistro(); } }
+// Precio estimado de la pantalla de edición: el de la última compra (lo leyó nivDiaFijoDatos).
+// El que manda es el del servicio, en «Revisar».
+function _cpTotalEstimado(g, valores){
+  const pr=(_rzCtx.dfDatos&&_rzCtx.dfDatos.precios)||{}; let t=0, falta=false;
+  g.filas.forEach(function(f){ const q=_dfDesdePanel(f, +valores[f.pid]||0); if(!(q>1e-9)) return;
+    if(pr[f.pid]==null) falta=true; else t+=q*pr[f.pid]; });
+  return {t:t, falta:falta};
+}
+function cpRenderRegistro(){
+  const P=_cpReg, b=document.getElementById('cpBody'); if(!P||!b) return;
+  const g=_rzDiaFijo.grupos[P.gi], ci=g.ci, prov=_cpCorto(g.cfg.proveedor||'Proveedor'), reg=ci.pasado;
+  const col=function(n){ return n==null?'—':'₡'+_rzN(n, 0); };
+  let h='<div class="cp-reg"><button class="cp-volver" onclick="cpIr(\'porpedir\')">‹ Por pedir</button>';
+  if(P.paso==='editar'){
+    h+='<div class="cp-regh">'+esc(prov)+' · <span class="cp-g">'+(reg?'pidió':'pide')+'</span> '+_fechaCorta(ci.P)
+      +' · <span class="cp-g">llega</span> '+_fechaCorta(ci.E)+'</div>';
+    const vis=[], ceros=[];
+    g.filas.forEach(function(f){ const s=_cpSugiere(f), n=+P.valores[f.pid]||0; ((s>0||n>0)?vis:ceros).push(f); });
+    const fila=function(f){ const s=_cpSugiere(f), n=+P.valores[f.pid]||0, u=_dfUnidadPanel(f);
+      return '<tr><td class="cp-rin">'+esc(f.nombre)+' <span class="cp-g">('+esc(u)+')</span></td><td class="cp-rsu">'+_rzN(s, s%1?1:0)+'</td>'
+        +'<td class="cp-rpe"><button class="cp-pm" onclick="cpMas('+f.pid+',-1)" aria-label="menos">−</button>'
+        +'<span class="cp-n'+(Math.abs(n-s)>1e-9?' cp-dif':'')+'">'+_rzN(n, n%1?1:0)+'</span>'
+        +'<button class="cp-pm" onclick="cpMas('+f.pid+',1)" aria-label="más">+</button></td></tr>'; };
+    h+='<table class="cp-rtbl"><thead><tr><th>Insumo</th><th>Sugiere</th><th>Pedido</th></tr></thead><tbody>'
+      +vis.map(fila).join('')+(P.verCeros?ceros.map(fila).join(''):'')+'</tbody></table>';
+    if(ceros.length) h+='<button class="cp-ceros" onclick="cpVerCeros()">'+(P.verCeros?'Esconder':'Mostrar')+' los '+ceros.length+' que no hacen falta</button>';
+    const T=_cpTotalEstimado(g, P.valores);
+    h+='<div class="cp-pie"><span class="cp-tot"><span class="cp-g">Total estimado sin IVA</span> '+col(T.t)+(T.falta?' <span class="cp-g">+ sin precio</span>':'')+'</span>'
+      +'<button class="cp-btn cp-btnp" onclick="cpRevisar()">Revisar</button></div>';
+  } else {
+    const r=P.previa;
+    h+='<div class="cp-regh">'+esc(prov)+' · <span class="cp-g">llega</span> '+_fechaCorta(r.entrega_dia)+' <span class="cp-g">mediodía · confirmado en Odoo</span></div>'
+      +'<div class="cp-lista">'+r.lineas.map(function(l){
+        const emp=l.empaques!=null?(_rzN(l.empaques)+' '+(l.empaques===1?(_CN_SING[l.empaque_lab]||l.empaque_lab):l.empaque_lab)):(_rzN(l.cant_po,2)+' '+l.uom_po);
+        return '<div class="cp-it"><span class="cp-in">'+esc(l.producto.replace(/^\[[^\]]*\]\s*/,''))+'</span><span class="cp-g">'+esc(emp)+'</span><span class="cp-mto">'+col(l.subtotal)+'</span></div>'; }).join('')
+      +'<div class="cp-it cp-ittot"><span class="cp-in">Total sin IVA</span><span class="cp-mto">'+col(r.total_estimado)+'</span></div></div>';
+    const av=[];
+    if(r.sin_precio&&r.sin_precio.length) av.push('Sin precio en Odoo: '+r.sin_precio.join(', ')+'.');
+    if(r.otras_ordenes&&r.otras_ordenes.length) av.push('Hay órdenes de '+prov+' cargadas a mano y sin recibir ('+r.otras_ordenes.map(function(x){ return x.name; }).join(', ')+'): si alguna es este pedido, se duplicaría.');
+    if(av.length) h+='<div class="cp-detamb">'+av.map(esc).join('<br>')+'</div>';
+    h+='<div class="cp-pie"><button class="cp-btn" onclick="cpEditar()">Editar</button>'
+      +'<button class="cp-btn cp-btnp" id="cpConf" onclick="cpConfirmar()">'+(reg?'Registrar en Odoo':('Pedir a '+esc(prov)))+'</button></div>';
+  }
+  h+='<div class="cp-msg'+(P.cls?(' '+P.cls):'')+'" id="cpRegMsg">'+esc(P.msg||'')+'</div></div>';
+  b.innerHTML=h;
+}
+function cpEditar(){ if(_cpReg){ _cpReg.paso='editar'; _cpReg.msg=''; cpRenderRegistro(); } }
+function _cpRegMsg(txt, cls){ if(_cpReg){ _cpReg.msg=txt; _cpReg.cls=cls||''; } const m=document.getElementById('cpRegMsg'); if(m){ m.className='cp-msg'+(cls?(' '+cls):''); m.textContent=txt; } }
+async function cpRevisar(){
+  const P=_cpReg; if(!P) return; const g=_rzDiaFijo.grupos[P.gi];
+  const lineas=g.filas.map(function(f){ const pe=_pesoEmpaque(f.pid), n=+P.valores[f.pid]||0;
       return {producto_id:f.pid, nombre:f.nombre, uom:f.uom, calculado:Math.round(f.pedir*1000)/1000,
               pedido:Math.round(_dfDesdePanel(f,n)*1000)/1000, empaques:pe?n:null, empaque_lab:pe?pe.lab:null,
               empaque_peso:pe?pe.peso:null, empaque_unidad:pe?pe.unidad:null}; })
     .filter(function(l){ return l.pedido>0; });
-  if(!lineas.length){ _dfMsg(gi,'No hay nada para pedir.','rz-dfmal'); return; }
-  const bt=document.getElementById('dfBtn'+gi); if(bt) bt.disabled=true;
-  _dfMsg(gi,'Guardando la propuesta y revisando en Odoo…');
+  if(!lineas.length){ _cpRegMsg('No hay nada para pedir.','cp-mal'); return; }
+  _cpRegMsg('Guardando la propuesta y revisando en Odoo…');
   try{
     const c=sbClient(); const {data:{user}}=await c.auth.getUser();
     const {data,error}=await c.from('compra_propuesta').insert({proveedor_id:+g.cfg.proveedor_id, proveedor:g.cfg.proveedor||null,
@@ -19890,72 +20023,122 @@ async function dfRevisar(gi){
         creado_por:(user&&user.email)||''}).select('id').single();
     if(error) throw new Error('No pude guardar la propuesta: '+(error.message||error));
     P.propuestaId=data.id;
-  }catch(e){ if(bt) bt.disabled=false; _dfMsg(gi,String(e&&e.message||e),'rz-dfmal'); return; }
+  }catch(e){ _cpRegMsg(String(e&&e.message||e),'cp-mal'); return; }
   const R=await escrituraPedir('/pedir', P.propuestaId, false);
-  if(bt) bt.disabled=false;
-  if(R.red){ _dfMsg(gi,'El servicio no contestó. No se tocó Odoo.','rz-dfmal'); return; }
-  if(!R.js.ok){ _dfMsg(gi,''); document.getElementById('dfPrev'+gi).innerHTML=_dfRechazoHtml(R.js); return; }
-  P.previa=R.js; P.estado='previa'; _dfMsg(gi,'');
-  document.getElementById('dfPrev'+gi).innerHTML=_dfPreviaHtml(R.js);
-  if(bt){ bt.textContent=g.ci.pasado?'Registrar en Odoo':'Crear la orden en Odoo'; bt.setAttribute('onclick','dfConfirmar('+gi+')'); }
+  if(R.red){ _cpRegMsg('El servicio no contestó. No se tocó Odoo.','cp-mal'); return; }
+  if(!R.js.ok){ _cpRegMsg((R.js.texto||R.js.motivo||'El servicio dijo que no.')
+      +(Array.isArray(R.js.detalle)?(' '+R.js.detalle.map(function(d){ return d.producto+': pide '+_rzN(d.pide,1)+', tope '+_rzN(d.tope,1)+' '+d.unidad; }).join(' · ')):''),'cp-mal'); return; }
+  P.previa=R.js; P.paso='revisar'; P.msg=''; P.cls=''; cpRenderRegistro(); try{ window.scrollTo(0,0); }catch(e){}
 }
-function _dfRechazoHtml(js){
-  return '<div class="rz-dfrojo">'+esc(js.texto||js.motivo||'El servicio dijo que no.')
-    +(Array.isArray(js.detalle)?('<br>'+js.detalle.map(function(d){ return esc(d.producto+': pide '+_rzN(d.pide,1)+' '+d.unidad+', tope '+_rzN(d.tope,1)+' '+d.unidad); }).join('<br>')):'')+'</div>';
+async function cpConfirmar(){
+  const P=_cpReg; if(!P||!P.propuestaId||P.paso!=='revisar') return;
+  const bt=document.getElementById('cpConf'); if(bt) bt.disabled=true;
+  _cpRegMsg('Creando la orden en Odoo…');
+  const R=await escrituraPedir('/pedir', P.propuestaId, true);
+  if(R.red){ _cpRegMsg('No hubo respuesta: no se sabe si Odoo creó la orden. Mirá Pedidos antes de reintentar.','cp-mal'); return; }
+  if(R.st===423){ _cpRegMsg('Todo calza, pero la compra está apagada: no se creó nada en Odoo.','cp-amb2'); return; }
+  if(!R.js.ok){ if(bt) bt.disabled=false; _cpRegMsg(R.js.texto||R.js.motivo||'El servicio dijo que no.','cp-mal'); return; }
+  _cpRegMsg('Orden '+R.js.po_nombre+' creada y confirmada en Odoo.','cp-ok');
+  _rzCtx.cargadoEn=0; _cpPedidos=null;            // la próxima vista vuelve a leer: "ya pedido" la descuenta
+  setTimeout(function(){ irACompras('porpedir'); }, 1500);
 }
-function _dfPreviaHtml(r){
-  const col=function(n){ return n==null?'—':'₡'+_rzN(n, n%1?2:0); };
-  let h='<div class="rz-dfprev"><div class="rz-dfpanh">Orden que se crearía en Odoo · '+esc(r.proveedor)+' · «'+esc(r.referencia)+'» · llega '
-    +_fechaLarga(r.entrega_dia)+' al mediodía · confirmada</div>'
-    +'<table class="rz-dfptbl"><thead><tr><th>Insumo</th><th>Pedido</th><th>En Odoo</th><th>Precio</th><th>Subtotal</th></tr></thead><tbody>'
-    +r.lineas.map(function(l){ return '<tr><td>'+esc(l.producto.replace(/^\[[^\]]*\]\s*/,''))+'</td><td>'
-        +esc(l.empaques!=null?(_rzN(l.empaques)+' '+(l.empaques===1?(_CN_SING[l.empaque_lab]||l.empaque_lab):l.empaque_lab)):'')+'</td>'
-        +'<td>'+esc(_rzN(l.cant_po,2)+' '+l.uom_po)+'</td><td title="'+esc(l.precio_fuente||'')+'">'+col(l.precio_unit)+'/'+esc(l.uom_po)
-        +'<span class="rz-dfsub">'+esc(l.precio_fuente||'sin precio')+'</span></td><td>'+col(l.subtotal)+'</td></tr>'; }).join('')
-    +'</tbody></table><div class="rz-dftot">Total estimado sin impuestos: '+col(r.total_estimado)+'</div>';
-  const av=[];
-  if(r.sin_precio&&r.sin_precio.length) av.push('Sin precio en Odoo: '+r.sin_precio.join(', ')+'.');
-  if(r.otras_ordenes&&r.otras_ordenes.length) av.push('Ojo: hay órdenes de este proveedor cargadas a mano y sin recibir ('
-    +r.otras_ordenes.map(function(x){ return x.name; }).join(', ')+'). Si alguna es este mismo pedido, registrarlo lo duplicaría.');
-  if(av.length) h+='<div class="rz-dfamb">'+av.map(esc).join('<br>')+'</div>';
+
+// ── COMPRAR: lo suelto (lo que no tiene día fijo), lo mismo que calcula nivCompras ─────
+function cpComprarHtml(){
+  const C=_rzCompras||{};
+  const items=[].concat((C.premezclas&&C.premezclas.items)||[], (C.produccion&&C.produccion.items)||[])
+    .sort(function(a,b){ return (b.falta/(b.need||1))-(a.falta/(a.need||1)); });
+  let h='<div class="cp-card"><div class="cp-ciclo">'+esc((C.premezclas&&C.premezclas.fecha)||'')
+    .replace(/^cubre hasta el /,'<span class="cp-g">Cubre hasta el</span> ')+'</div>';
+  if(!items.length) return h+'<div class="cp-lista"><div class="cp-it"><span class="cp-in">Alcanza</span><span class="cp-g">nada que comprar</span></div></div></div>';
+  h+='<div class="cp-lista">'+items.map(function(it, i){
+    return '<div class="cp-it"'+(it.nota?(' onclick="cpToggle(\'c'+i+'\')"'):'')+'><span class="cp-in">'+esc(it.nombre.charAt(0).toUpperCase()+it.nombre.slice(1).toLowerCase())+'</span>'
+      +'<span class="cp-pedir">Falta '+esc(_faltaCompra(it))+'</span></div>'
+      +(it.nota?('<div class="cp-det'+(_cpAbiertos['c'+i]?'':' hidden')+'" id="cpx-c'+i+'">'+esc(it.nota)+'</div>'):''); }).join('')+'</div>';
   return h+'</div>';
 }
-async function dfConfirmar(gi){
-  const P=_dfPanel; if(!P||!P.propuestaId||P.estado!=='previa') return;
-  const bt=document.getElementById('dfBtn'+gi); if(bt) bt.disabled=true;
-  _dfMsg(gi,'Creando la orden en Odoo…');
-  const R=await escrituraPedir('/pedir', P.propuestaId, true);
-  if(R.red){ _dfMsg(gi,'No hubo respuesta: no se sabe si Odoo creó la orden. Revisá en Odoo antes de reintentar.','rz-dfmal'); return; }
-  if(R.st===423){ _dfMsg(gi,'Todo calza, pero la compra está apagada (COMPRA_ENCENDIDA): no se creó nada en Odoo.','rz-dfamb2'); return; }
-  if(!R.js.ok){ if(bt) bt.disabled=false; document.getElementById('dfPrev'+gi).innerHTML=_dfRechazoHtml(R.js); _dfMsg(gi,''); return; }
-  _dfMsg(gi,'Orden '+R.js.po_nombre+' creada y confirmada en Odoo.','rz-ok');
-  // la tarjeta se vuelve a leer: "ya pedido" ahora la descuenta
-  setTimeout(function(){ cargarResumen(); }, 1500);
+
+// ── PEDIDOS: lo pedido y en camino, hasta que se valida la recepción ─────
+async function cpPedidos(){
+  const b=document.getElementById('cpBody');
+  if(!_cpPedidos){
+    b.innerHTML='<div class="cp-load">Leyendo las órdenes de compra…</div>';
+    try{
+      const d=new Date(); d.setDate(d.getDate()-45);
+      const ps=await odooCall('purchase.order','search_read',[[['state','in',['purchase','to approve']],['date_planned','>=',_ymd(d)]]],
+        {fields:['name','partner_id','date_planned','receipt_status','origin','amount_untaxed'],order:'date_planned asc',limit:200});
+      _cpPedidos=ps.filter(function(p){ return p.receipt_status!=='full'; });
+    }catch(e){ b.innerHTML='<div class="cp-err">No pude leer las órdenes: '+esc(e&&e.message||e)+'</div>'; return; }
+  }
+  if(_cpVista!=='pedidos'||_cpReg) return;
+  if(!_cpPedidos.length){ b.innerHTML='<div class="cp-card"><div class="cp-lista"><div class="cp-it"><span class="cp-in">Nada en camino</span></div></div></div>'; return; }
+  const est={pending:'por recibir', partial:'parcial', no:'sin recepción'};
+  b.innerHTML='<div class="cp-card"><div class="cp-lista">'+_cpPedidos.map(function(p){
+    const ds=_crDate(p.date_planned), atras=ds<_rzCtx.hoyStr;
+    return '<div class="cp-it"><span class="cp-in"><b class="cp-pon">'+esc(p.name)+'</b> · '+esc(_cpCorto(String(p.partner_id&&p.partner_id[1]||'').replace(/ SOCIEDAD ANONIMA| S\.A\.?/i,'')))+'</span>'
+      +'<span class="cp-g">'+(atras?'<span class="cp-r">':'')+_fechaCorta(ds)+(atras?'</span>':'')+' · '+esc(est[p.receipt_status]||p.receipt_status||'')+'</span></div>'; }).join('')+'</div></div>';
 }
-// Texto para mandarle al proveedor. No escribe nada en ningún lado: solo el portapapeles.
-async function dfWhatsApp(gi){
-  const g=_rzDiaFijo&&_rzDiaFijo.grupos[gi]; if(!g) return;
-  const vals=(_dfPanel&&_dfPanel.gi===gi)?_dfPanel.valores:null;
-  const lin=g.filas.map(function(f){ const n=vals?(+String(vals[f.pid]).replace(',','.')||0):_dfPanelInicial(f); if(!(n>0)) return '';
-      const pe=_pesoEmpaque(f.pid);
-      return '• '+f.nombre+': '+(pe?(_rzN(n)+' '+(n===1?(_CN_SING[pe.lab]||pe.lab):pe.lab)):(_rzN(n,1)+' '+_dfUnidadPanel(f))); })
-    .filter(Boolean);
-  if(!lin.length){ _dfMsg(gi,'No hay nada para pedir.','rz-dfmal'); return; }
-  const txt='Hola, pedido de True Food para entregar el '+_fechaLarga(g.ci.E).replace(/ \d{4}$/,'')+':\n'+lin.join('\n')+'\nGracias.';
-  try{ await navigator.clipboard.writeText(txt); _dfMsg(gi,'Copiado: pegalo en WhatsApp.','rz-ok'); }
-  catch(e){ window.prompt('Copiá este texto:', txt); }
+
+// ── PROVEEDORES: compras_dia_fijo, editable solo por socias ──────────────
+// Se guarda como OTRA fila de plan_config con la lista COMPLETA (append-only; gana la más
+// reciente). Antes de guardar se relee la última: si alguien la cambió mientras tanto, no se pisa.
+// ⚠️ La RLS de plan_config deja insertar a cualquier usuario con sesión: "solo socias" lo hace
+// cumplir ESTA pantalla, no la base (igual que el resto de plan_config). Ver PLAN_CONFIG_ESQUEMA.sql.
+const CP_DIAS=['lun','mar','mie','jue','vie'];
+const _cpDiaTxt=function(d){ return d==null?'—':({lun:'lun',mar:'mar',mie:'mié',jue:'jue',vie:'vie'}[d]||d); };
+async function cpProveedores(){
+  const b=document.getElementById('cpBody');
+  const cfg=(_rzCtx&&_rzCtx.cfg&&_rzCtx.cfg.diaFijo)||[];
+  if(!_cpProv) _cpProv={orig:JSON.stringify(cfg), filas:JSON.parse(JSON.stringify(cfg)), edit:null, msg:'', cls:''};
+  const P=_cpProv, socia=_socia===true, info=(_rzCtx.dfDatos&&_rzCtx.dfDatos.info)||{};
+  const sel=function(i, campo, ops){ return '<select class="cp-sel" onchange="cpProvCambia('+i+',\''+campo+'\',this.value)">'
+    +ops.map(function(o){ return '<option value="'+o[0]+'"'+(String(P.filas[i][campo])===String(o[0])?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select>'; };
+  let h='<div class="cp-card"><div class="cp-lista">'+P.filas.map(function(x, i){
+    const nom=((info[+x.producto_id]&&info[+x.producto_id].name)||x.nombre||('id '+x.producto_id)).replace(/^\[[^\]]*\]\s*/,'');
+    const med=x.uso!=='produccion';
+    const linea='<span class="cp-g">pide</span> '+_cpDiaTxt(x.pide)+' · <span class="cp-g">llega</span> '+_cpDiaTxt(x.llega)
+      +' · '+(x.momento==='antes'?'antes':'después')+' de '+(med?'medir':'producir');
+    let r='<div class="cp-it"'+(socia?(' onclick="cpProvEditar('+i+')"'):'')+'><span class="cp-in">'+esc(nom)+' · '+esc(_cpCorto(x.proveedor))+'</span><span class="cp-pl">'+linea+'</span></div>';
+    if(socia && P.edit===i) r+='<div class="cp-det cp-edit">'
+      +'pide '+sel(i,'pide',[['','—']].concat(CP_DIAS.map(function(d){ return [d,_cpDiaTxt(d)]; })))
+      +' llega '+sel(i,'llega',CP_DIAS.map(function(d){ return [d,_cpDiaTxt(d)]; }))
+      +' '+sel(i,'momento',[['despues','después'],['antes','antes']])
+      +' de '+sel(i,'uso',[['medicion','medir'],['produccion','producir']])+'</div>';
+    return r; }).join('')+'</div>';
+  const sucio=JSON.stringify(P.filas)!==P.orig;
+  if(socia && sucio) h+='<div class="cp-btns"><button class="cp-btn" onclick="cpProvDescartar()">Descartar</button><button class="cp-btn cp-btnp" onclick="cpProvGuardar()">Guardar cambios</button></div>';
+  h+='<div class="cp-msg'+(P.cls?(' '+P.cls):'')+'">'+esc(P.msg||'')+'</div></div>';
+  b.innerHTML=h;
 }
-// Botones de la tarjeta, por grupo. Solo socias (la base y el servicio igual lo exigen).
-function _dfAccionesHtml(g, gi){
-  if(g.registrada) return '<div class="rz-dfacc"><span class="rz-ok">Pedido en Odoo: '+esc(g.registrada.join(', '))+'</span></div>';
-  if(_socia!==true) return '';
-  const hoy=_rzCtx.hoyStr, pasado=g.ci.pasado, futuro=g.ci.P>hoy;
-  const lbl=pasado?'Registrar pedido':('Pedir a '+(g.cfg.proveedor||'proveedor').split(' ')[0]);
-  return '<div class="rz-dfacc">'
-    +(futuro?('<span class="muted">Se pide el '+_fechaCorta(g.ci.P)+'.</span>')
-            :('<button class="cn-btn cn-guardar" onclick="dfAbrir('+gi+')">'+esc(lbl)+'</button>'))
-    +'<button class="cn-btn" onclick="dfWhatsApp('+gi+')">Copiar para WhatsApp</button>'
-    +'<span class="rz-dfmsg" id="dfMsg'+gi+'"></span></div><div id="dfPanel'+gi+'"></div>';
+function cpProvEditar(i){ if(!_cpProv) return; _cpProv.edit=(_cpProv.edit===i?null:i); cpProveedores(); }
+function cpProvCambia(i, campo, v){ if(!_cpProv) return; _cpProv.filas[i][campo]=(campo==='pide'&&v==='')?null:v; _cpProv.msg=''; cpProveedores(); }
+function cpProvDescartar(){ _cpProv=null; cpProveedores(); }
+async function cpProvGuardar(){
+  const P=_cpProv; if(!P||_socia!==true) return;
+  try{
+    const c=sbClient();
+    const {data:ult,error:e1}=await c.from('plan_config').select('valor').eq('clave','compras_dia_fijo').order('creado_en',{ascending:false}).limit(1);
+    if(e1) throw new Error(e1.message||e1);
+    const actual=JSON.stringify(((ult&&ult[0]&&ult[0].valor)||{}).insumos||[]);
+    if(actual!==P.orig){ P.msg='Alguien cambió la configuración mientras tanto: no se guardó. Volvé a abrir Compras.'; P.cls='cp-mal'; return cpProveedores(); }
+    const {data:{user}}=await c.auth.getUser();
+    const {error}=await c.from('plan_config').insert({clave:'compras_dia_fijo', valor:{insumos:P.filas}, usuario:(user&&user.email)||null});
+    if(error) throw new Error(error.message||error);
+    _rzCtx.cfg.diaFijo=JSON.parse(JSON.stringify(P.filas)); _rzCtx.cargadoEn=0;
+    _cpProv={orig:JSON.stringify(P.filas), filas:JSON.parse(JSON.stringify(P.filas)), edit:null, msg:'Guardado. Por pedir se recalcula al abrirlo.', cls:'cp-ok'};
+  }catch(e){ P.msg='No se guardó: '+String(e&&e.message||e); P.cls='cp-mal'; }
+  cpProveedores();
+}
+
+// ── RESUMEN de Operaciones: SOLO la franja roja (si algo no alcanza), que lleva a Compras ──
+function rzComprasAvisoHtml(){
+  const R=_rzDiaFijo; if(!R||R.error||!R.grupos) return '';
+  const fr=[];
+  R.grupos.forEach(function(g){ const med=g.cfg.uso!=='produccion';
+    g.filas.filter(function(f){ return f.rojo>1e-9; }).forEach(function(f){
+      fr.push(_cpMin(f.nombre)+' '+(med?('el '+_fechaCorta(_dfAdd(g.ci.U,-7))):('antes del '+_fechaCorta(g.ci.E)))); }); });
+  if(!fr.length) return '';
+  return '<div class="rz-cpaviso" onclick="irACompras(\'porpedir\')"><span>Compras: falta '+esc(fr.join(' · '))+'</span><span>›</span></div>';
 }
 // ── 1 · PENDIENTE DE FABRICAR: tira horizontal HOY → próximo lunes, editable + touch ──
 function _rzChipPersonas(iso, personas){
@@ -20069,7 +20252,7 @@ function _faltaCompra(it){
   return _compraUnidad(it.pid, it.falta, it.uom);
 }
 // ── 3 · COMPRAR: 2 tarjetas de ancho fijo (para medir premezclas · para producir) ──
-// NO está montada: el Resumen usa rzComprasCards() en la grilla de 4 tarjetas. Se mantiene
+// NO está montada: lo suelto se muestra en el módulo Compras (cpComprarHtml, b82). Se mantiene
 // alineada con el mismo dato por si vuelve el layout ancho.
 function rzComprasHtml(){
   function card(icon, titulo, data){
