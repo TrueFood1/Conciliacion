@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ENSAYO_PLAN_CONFIG_SOCIAS.sql  ·  2-oct-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA
--- Prueba PLAN_CONFIG_SOCIAS.sql y lo deshace todo (rollback). ⚠ ESCRITO, NO CORRIDO.
+-- Prueba PLAN_CONFIG_SOCIAS.sql y lo deshace todo (rollback). ✅ CORRIDO el 3-oct-2026: 7/7 ok.
 --
 -- CÓMO SE LEE: 7 filas, TODAS ok = true. Un RECHAZA vale solo con el SQLSTATE esperado
 -- (42501 = RLS o sin permiso). "Success. No rows returned" = no llegó al final, no vale.

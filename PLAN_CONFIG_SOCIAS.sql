@@ -1,6 +1,9 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- PLAN_CONFIG_SOCIAS.sql  ·  2-oct-2026  ·  Compras › Proveedores: «solo socias» EN LA BASE
--- ⚠ ESCRITO, NO PEGADO. Antes: ENSAYO_PLAN_CONFIG_SOCIAS.sql (no deja nada).
+-- ✅ APLICADO el 3-oct-2026 por Andrea. Ensayo 7/7 ok; fila de control del pegado:
+--    ins_exige_socia 1 · sel_intacta 1 · politicas 2. Verificado después con pg_lector:
+--    pg_policy de plan_config = plan_config_ins (insert, con el check nuevo) + plan_config_sel.
+--    NO volver a pegar: el guarda de arriba lo rechaza («ya no es with check (true)»).
 --
 -- POR QUÉ: la pantalla Proveedores (b82) solo deja editar a las socias, pero la política
 -- `plan_config_ins` acepta el insert de CUALQUIER usuario con sesión (`with check (true)`,
