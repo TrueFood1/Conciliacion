@@ -1,7 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ENSAYO_COMPRA_PEDIDO_ODOO.sql  ·  2-oct-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA
 -- Prueba las dos tablas de COMPRA_PEDIDO_ODOO.sql (T-28) y lo deshace todo (rollback).
--- ⚠ ESCRITO, NO CORRIDO.
+-- ✅ CORRIDO el 2-oct-2026 por Andrea en producción: 21 de 21 ok = true, cada RECHAZA con su SQLSTATE.
 --
 -- CÓMO SE LEE
 --   Una tabla de 21 filas, TODAS con ok = true. Un RECHAZA da ok solo si el SQLSTATE
