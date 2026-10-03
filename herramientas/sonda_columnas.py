@@ -43,13 +43,15 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HTML = os.path.join(RAIZ, 'index.html')
 
 NUEVAS = {
-    'rrhh_permiso':       ['modalidad_descuento', 'horas'],
+    'rrhh_permiso':       ['modalidad_descuento', 'horas',
+                           'incapacidad_origen', 'incapacidad_boleta'],
     'rrhh_ajuste_manual': ['id', 'persona_id', 'fecha', 'monto', 'nota',
                            'creado_por', 'creado_en'],
-    'v_rrhh_permiso_dia': ['permiso_id', 'persona_id', 'dia', 'quincena', 'habil'],
+    'v_rrhh_permiso_dia': ['permiso_id', 'persona_id', 'dia', 'quincena', 'habil',
+                           'dia_n', 'incapacidad_origen'],
     'v_rrhh_pago_detalle':['quincena', 'persona_id', 'concepto', 'monto', 'nota'],
     'v_rrhh_pago':        ['quincena', 'persona_id', 'base', 'descuentos',
-                           'ajustes', 'final'],
+                           'ajustes', 'final', 'incapacidades', 'incap_n'],
 }
 
 def conexion():

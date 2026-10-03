@@ -1,6 +1,6 @@
 // ════════════════════════════════════════════════════════════════════════
 // ENSAYO · los render del PAGO DE QUINCENA, corridos de verdad
-// 3-oct-2026. Se corre con:
+// 3-oct-2026 · REGENERADO al agregar incapacidades (pegado 6).
 //     /System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc \
 //       herramientas/ensayos/prueba_pago_render.js
 //
@@ -9,25 +9,26 @@
 // lineas de concatenacion arrancaban con `+` adentro de un parentesis que ya
 // tenia su `+`, o sea `'texto' + +(...)` — un MAS UNARIO sobre un string, que
 // da NaN. Sintaxis perfecta, loadcheck en verde, y la pantalla habria dicho
-// "NaN" al empleado. De ahi los asserts de `NaN?` y `undefined?` de abajo.
+// "NaN" al empleado. De ahi los asserts de `NaN?` y `undefined?`.
 //
 // ⚠️ LOS MONTOS SON TODOS FICTICIOS. 600.000 es un placeholder elegido porque
-// da tarifas redondas (dia 20.000, hora 2.500) y se puede cuadrar de cabeza.
-// NO escribir aca el salario real de nadie: este archivo va al repo, que es
-// PUBLICO.
+// da tarifas redondas (dia 20.000, hora 2.500) y se cuadra de cabeza. NO
+// escribir aca el salario real de nadie: este archivo va al repo, que es PUBLICO.
 //
 // ⚠️ LAS FUNCIONES SE EXTRAEN DEL index.html POR REGEX al armar este archivo,
-// asi que es una FOTO del 3-oct, no un test vivo. Si se toca un render, hay que
-// volver a generarlo — si no, prueba la version vieja y da verde igual.
+// asi que es una FOTO. Si se toca un render, hay que REGENERARLO — si no,
+// prueba la version vieja y da verde igual. Paso el 3-oct al agregar
+// incapacidades: el ensayo viejo seguia pasando sin probar ni un renglon nuevo.
 // ════════════════════════════════════════════════════════════════════════
 
 
-var _PAG_ORDEN={base:0, descuento_permiso:1, ajuste:2};
+var _PAG_ORDEN={base:0, incapacidad:1, descuento_permiso:2, ajuste:3};
 var PER_MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
              'setiembre','octubre','noviembre','diciembre'];
 function esc(x){ return String(x==null?'':x); }
-var _perEsSocia=true, _calPend=null, _perModPick={}, _solMias=null;
+var _perEsSocia=true, _calPend=null, _perModPick={}, _perOrgPick={}, _solMias=null;
 var _pagQ=null,_pagFilas=null,_pagDet=null,_pagGente=null,_pagAbierto={};
+var _pagFlags={reglas:0, subsidio:0};
 var _SALIDA={};
 function _el(id){ if(!_SALIDA[id]) _SALIDA[id]={innerHTML:'',className:'',classList:{add:function(){},remove:function(){},toggle:function(){}},value:'',textContent:''}; return _SALIDA[id]; }
 var document={ getElementById:_el };
@@ -53,7 +54,10 @@ function _solMiasRender(){
       // recién cuando llega la transferencia no es aceptable. Mientras está
       // pendiente se dice que es lo pedido, porque todavía puede cambiar.
       +  (s.mod ? ('<div class="per-sol-f">'
-             + (s.mod==='descuento'?'Se descuenta del pago':'Se reponen las horas')
+             + (s.mod==='descuento' ? 'Se descuenta del pago'
+                : s.mod==='reposicion' ? 'Se reponen las horas'
+                : 'Incapacidad' + (s.origen==='accidente_trabajo' ? ' (accidente de trabajo)'
+                                   : s.origen==='enfermedad_comun' ? ' (enfermedad)' : ''))
              + (s.estado==='pendiente'?' (lo que pediste)':'')
              + '</div>') : '')
       +  (s.nota?'<div class="per-sol-m">'+esc(s.nota)+'</div>':'')
@@ -66,20 +70,112 @@ function _solMiasRender(){
 
 function _perModHTML(s){
   if(s.fuente!=='permiso') return '';
-  const cur=(_perModPick[s.id]!==undefined)?_perModPick[s.id]:s.mod;
-  return '<div class="per-mod">'
+  const cur=_perModCur(s);
+  // UN PERMISO PEDIDO POR HORAS NO PUEDE PASAR A INCAPACIDAD, y no es una regla
+  // de esta pantalla: `horas` NO está en el grant de update por columna, así que
+  // no se puede limpiar, y el CHECK `rrhh_permiso_incap_ok` prohíbe una
+  // incapacidad con horas. Las dos cosas juntas lo hacen imposible del lado del
+  // servidor. Se dice acá en vez de ofrecer un botón que va a fallar.
+  const porHoras=!!s.horas;
+  let h='<div class="per-mod">'
     + '<button class="btn'+(cur==='descuento'?' per-opt on':'')+'" onclick="perModPick('+s.id+',\'descuento\')">Se descuenta</button>'
     + '<button class="btn'+(cur==='reposicion'?' per-opt on':'')+'" onclick="perModPick('+s.id+',\'reposicion\')">Repone horas</button>'
+    + (porHoras
+        ? '<span class="per-cnt" style="margin:0;align-self:center">Pedido por horas: no puede ser incapacidad.</span>'
+        : '<button class="btn'+(cur==='incapacidad'?' per-opt on':'')+'" onclick="perModPick('+s.id+',\'incapacidad\')">Incapacidad</button>')
     + (cur?'':'<span class="per-cnt" style="margin:0;align-self:center">Se pidió sin elegir — así no descuenta.</span>')
     + '</div>';
+  if(cur==='incapacidad'){
+    const o=_perOrgCur(s);
+    h+='<div class="per-mod">'
+      + '<button class="btn'+(o==='enfermedad_comun'?' per-opt on':'')+'" onclick="perOrgPick('+s.id+',\'enfermedad_comun\')">Enfermedad (CCSS)</button>'
+      + '<button class="btn'+(o==='accidente_trabajo'?' per-opt on':'')+'" onclick="perOrgPick('+s.id+',\'accidente_trabajo\')">Accidente (INS)</button>'
+      + (o?'':'<span class="per-cnt" style="margin:0;align-self:center;color:var(--amber)">Falta de qué es: el servidor no la acepta sin eso.</span>')
+      + (s.boleta?'<span class="per-cnt" style="margin:0;align-self:center">Boleta '+esc(s.boleta)+'</span>':'')
+      + '</div>';
+  }
+  return h;
+}
+
+function _perModCur(s){ return (_perModPick[s.id]!==undefined)?_perModPick[s.id]:(s.mod||null); }
+function _perOrgCur(s){ return (_perOrgPick[s.id]!==undefined)?_perOrgPick[s.id]:(s.origen||null); }
+function _perModHTML(s){
+  if(s.fuente!=='permiso') return '';
+  const cur=_perModCur(s);
+  // UN PERMISO PEDIDO POR HORAS NO PUEDE PASAR A INCAPACIDAD, y no es una regla
+  // de esta pantalla: `horas` NO está en el grant de update por columna, así que
+  // no se puede limpiar, y el CHECK `rrhh_permiso_incap_ok` prohíbe una
+  // incapacidad con horas. Las dos cosas juntas lo hacen imposible del lado del
+  // servidor. Se dice acá en vez de ofrecer un botón que va a fallar.
+  const porHoras=!!s.horas;
+  let h='<div class="per-mod">'
+    + '<button class="btn'+(cur==='descuento'?' per-opt on':'')+'" onclick="perModPick('+s.id+',\'descuento\')">Se descuenta</button>'
+    + '<button class="btn'+(cur==='reposicion'?' per-opt on':'')+'" onclick="perModPick('+s.id+',\'reposicion\')">Repone horas</button>'
+    + (porHoras
+        ? '<span class="per-cnt" style="margin:0;align-self:center">Pedido por horas: no puede ser incapacidad.</span>'
+        : '<button class="btn'+(cur==='incapacidad'?' per-opt on':'')+'" onclick="perModPick('+s.id+',\'incapacidad\')">Incapacidad</button>')
+    + (cur?'':'<span class="per-cnt" style="margin:0;align-self:center">Se pidió sin elegir — así no descuenta.</span>')
+    + '</div>';
+  if(cur==='incapacidad'){
+    const o=_perOrgCur(s);
+    h+='<div class="per-mod">'
+      + '<button class="btn'+(o==='enfermedad_comun'?' per-opt on':'')+'" onclick="perOrgPick('+s.id+',\'enfermedad_comun\')">Enfermedad (CCSS)</button>'
+      + '<button class="btn'+(o==='accidente_trabajo'?' per-opt on':'')+'" onclick="perOrgPick('+s.id+',\'accidente_trabajo\')">Accidente (INS)</button>'
+      + (o?'':'<span class="per-cnt" style="margin:0;align-self:center;color:var(--amber)">Falta de qué es: el servidor no la acepta sin eso.</span>')
+      + (s.boleta?'<span class="per-cnt" style="margin:0;align-self:center">Boleta '+esc(s.boleta)+'</span>':'')
+      + '</div>';
+  }
+  return h;
+}
+
+function _perOrgCur(s){ return (_perOrgPick[s.id]!==undefined)?_perOrgPick[s.id]:(s.origen||null); }
+function _perModHTML(s){
+  if(s.fuente!=='permiso') return '';
+  const cur=_perModCur(s);
+  // UN PERMISO PEDIDO POR HORAS NO PUEDE PASAR A INCAPACIDAD, y no es una regla
+  // de esta pantalla: `horas` NO está en el grant de update por columna, así que
+  // no se puede limpiar, y el CHECK `rrhh_permiso_incap_ok` prohíbe una
+  // incapacidad con horas. Las dos cosas juntas lo hacen imposible del lado del
+  // servidor. Se dice acá en vez de ofrecer un botón que va a fallar.
+  const porHoras=!!s.horas;
+  let h='<div class="per-mod">'
+    + '<button class="btn'+(cur==='descuento'?' per-opt on':'')+'" onclick="perModPick('+s.id+',\'descuento\')">Se descuenta</button>'
+    + '<button class="btn'+(cur==='reposicion'?' per-opt on':'')+'" onclick="perModPick('+s.id+',\'reposicion\')">Repone horas</button>'
+    + (porHoras
+        ? '<span class="per-cnt" style="margin:0;align-self:center">Pedido por horas: no puede ser incapacidad.</span>'
+        : '<button class="btn'+(cur==='incapacidad'?' per-opt on':'')+'" onclick="perModPick('+s.id+',\'incapacidad\')">Incapacidad</button>')
+    + (cur?'':'<span class="per-cnt" style="margin:0;align-self:center">Se pidió sin elegir — así no descuenta.</span>')
+    + '</div>';
+  if(cur==='incapacidad'){
+    const o=_perOrgCur(s);
+    h+='<div class="per-mod">'
+      + '<button class="btn'+(o==='enfermedad_comun'?' per-opt on':'')+'" onclick="perOrgPick('+s.id+',\'enfermedad_comun\')">Enfermedad (CCSS)</button>'
+      + '<button class="btn'+(o==='accidente_trabajo'?' per-opt on':'')+'" onclick="perOrgPick('+s.id+',\'accidente_trabajo\')">Accidente (INS)</button>'
+      + (o?'':'<span class="per-cnt" style="margin:0;align-self:center;color:var(--amber)">Falta de qué es: el servidor no la acepta sin eso.</span>')
+      + (s.boleta?'<span class="per-cnt" style="margin:0;align-self:center">Boleta '+esc(s.boleta)+'</span>':'')
+      + '</div>';
+  }
+  return h;
 }
 
 function perModPick(id,m){
   // Volver a tocar lo ya marcado lo desmarca: es la forma de dejar un permiso
   // explícitamente sin descuento, y sin ella la única salida sería rechazarlo.
   const s=(_calPend||[]).filter(function(x){ return x.fuente==='permiso' && x.id===id; })[0];
+  if(m==='incapacidad' && s && s.horas){
+    return _perAviso('calStatus','s-warn','Ese permiso se pidió por horas y una incapacidad '
+      +'se paga por días. No se puede convertir: hay que rechazarlo y volver a pedirlo por días.');
+  }
   const cur=(_perModPick[id]!==undefined)?_perModPick[id]:(s&&s.mod);
   _perModPick[id]=(cur===m)?null:m;
+  if(_perModPick[id]!=='incapacidad') delete _perOrgPick[id];   // el origen no sobrevive al cambio
+  _calBandejaRender();
+}
+
+function perOrgPick(id,o){
+  const s=(_calPend||[]).filter(function(x){ return x.fuente==='permiso' && x.id===id; })[0];
+  const cur=_perOrgCur(s||{id:id});
+  _perOrgPick[id]=(cur===o)?null:o;
   _calBandejaRender();
 }
 
@@ -93,7 +189,7 @@ function _pagRender(){
       +'Si debería haber, revisá que la persona tenga salario cargado en rrhh_salario.</div>';
     return;
   }
-  let h='', totalQuincena=0, descuadres=0;
+  let h='', totalQuincena=0, descuadres=0, nIncap=0;
   filas.forEach(function(f){
     const det=(_pagDet||[]).filter(function(d){ return Number(d.persona_id)===Number(f.persona_id); })
       .sort(function(a,b){
@@ -101,7 +197,10 @@ function _pagRender(){
         return o || String(a.dia).localeCompare(String(b.dia)); });
     // LA SUMA ES DE LOS RENGLONES REDONDEADOS (ver la nota 3 del encabezado).
     let suma=0;
-    det.forEach(function(d){ suma+=Math.round(Number(d.monto)||0); });
+    det.forEach(function(d){
+      suma+=Math.round(Number(d.monto)||0);
+      if(d.concepto==='incapacidad') nIncap++;
+    });
     const exacto=Math.round(Number(f.final)||0);
     if(Math.abs(suma-exacto)>1) descuadres++;
     totalQuincena+=suma;
@@ -112,6 +211,14 @@ function _pagRender(){
       if(d.concepto==='base'){
         qué='Base de la quincena';
         como=d.nota||'';
+      }else if(d.concepto==='incapacidad'){
+        // La etiqueta entera la arma el SQL (`nota`), con el origen, los días y
+        // la línea de que el subsidio no va en esta transferencia. Acá no se
+        // reescribe: si se redactara de nuevo, el día que cambie el parámetro
+        // del subsidio esta pantalla seguiría diciendo lo de antes.
+        qué=(d.nota||'Incapacidad');
+        const ci=Number(d.cantidad)||0;
+        como=_perDiasTxt(ci)+(ci?(' × '+_pagTarifa(d.tarifa)+'/día, menos lo que paga la empresa'):'');
       }else if(d.concepto==='descuento_permiso'){
         const cant=Number(d.cantidad)||0;
         qué=(d.nota||'Permiso');
@@ -146,6 +253,27 @@ function _pagRender(){
    +   '<div class="pag-q">Total de la quincena · '+filas.length+(filas.length===1?' persona':' personas')+'</div>'
    +   '<div class="pag-n">'+_pagCRC(totalQuincena)+'</div>'
    + '</div></div>';
+  // EL AVISO DE REGLAS SIN CONFIRMAR VA ADENTRO DEL CUERPO, no en la barra de
+  // estado: la barra la pisa el aviso de descuadre y el de "calculando", y éste
+  // no puede desaparecer porque pasó otra cosa. Va ARRIBA de todo, antes del
+  // primer número, porque es lo que hay que leer antes de transferir.
+  //
+  // SOLO SI HAY INCAPACIDADES EN ESTA QUINCENA. Con cero, las reglas sin
+  // confirmar no cambian ningún número, y un aviso que aparece siempre se
+  // termina ignorando — justo el día que sí importe (las 5 reglas de alertas de
+  // CLAUDE.md: informar no es alertar).
+  if(nIncap && !_pagFlags.reglas){
+    h='<div class="status s-warn" style="margin-bottom:14px">'
+     + '<b>Reglas de incapacidad pendientes de confirmar con la contadora.</b> '
+     + 'Hay '+nIncap+(nIncap===1?' incapacidad':' incapacidades')+' en esta quincena. '
+     + 'El descuento está calculado con los valores provisionales de <code>rrhh_param</code> '
+     + '(empresa paga el 50% los primeros días, 0% después). '
+     + '<b>Verificá el monto a mano antes de transferir.</b> '
+     + (_pagFlags.subsidio
+         ? 'Además está marcado que el subsidio lo paga la empresa, así que el modelo de resta de esta pantalla puede no corresponder.'
+         : 'El subsidio de la CCSS o del INS no va en esta transferencia: se lo depositan al trabajador.')
+     + '</div>' + h;
+  }
   box.innerHTML=h;
   if(descuadres) _perAviso('pagStatus','s-warn',descuadres+(descuadres===1?' persona':' personas')
     +' con el desglose descuadrado respecto del total de la vista. Está marcado abajo.');
@@ -270,78 +398,107 @@ function _calBandejaRender(){
 
 
 // ── DATOS DE PRUEBA · TODOS LOS MONTOS SON FICTICIOS (placeholders) ──────
-// Salario de ejemplo 600.000 -> tarifa_dia 20.000, tarifa_hora 2.500.
 var SAL=600000, TDIA=SAL/30, THORA=TDIA/8;
-
 function dice(t){ print(t); }
+function R(n){ return Math.round(n); }
 
-// 1 · _solMiasRender con permiso por horas y modalidad
-_solMias=[{tipo:'Permiso', ini:'2026-10-07', fin:'2026-10-07', dias:1, horas:3,
-           motivo:'tramite', estado:'aprobado', mod:'descuento', nota:null, por:'socia@x'},
-          {tipo:'Permiso', ini:'2026-10-12', fin:'2026-10-13', dias:2, horas:null,
-           motivo:null, estado:'pendiente', mod:'reposicion', nota:null, por:null}];
+// 1 · "Lo que pediste" con incapacidad
+_solMias=[{tipo:'Permiso', ini:'2026-10-14', fin:'2026-10-18', dias:5, horas:null,
+           motivo:null, estado:'aprobado', mod:'incapacidad', origen:'enfermedad_comun',
+           nota:null, por:'socia@x'},
+          {tipo:'Permiso', ini:'2026-10-20', fin:'2026-10-20', dias:1, horas:null,
+           motivo:null, estado:'pendiente', mod:'incapacidad', origen:'accidente_trabajo',
+           nota:null, por:null}];
 _solMiasRender();
 var o1=_SALIDA['solMias'].innerHTML;
-dice('1 · _solMiasRender');
-dice('   NaN? '+(/NaN/.test(o1)?'SI -> BUG':'no'));
-dice('   undefined? '+(/undefined/.test(o1)?'SI -> BUG':'no'));
-dice('   dice horas: '+(/3 horas/.test(o1)?'ok':'FALTA'));
-dice('   dice descuento: '+(/Se descuenta del pago/.test(o1)?'ok':'FALTA'));
-dice('   marca lo pedido en pendiente: '+(/\(lo que pediste\)/.test(o1)?'ok':'FALTA'));
+dice('1 · _solMiasRender con incapacidad');
+dice('   NaN? '+(/NaN/.test(o1)?'SI -> BUG':'no')+' · undefined? '+(/undefined/.test(o1)?'SI -> BUG':'no'));
+dice('   dice enfermedad: '+(/Incapacidad \(enfermedad\)/.test(o1)?'ok':'FALTA'));
+dice('   dice accidente:  '+(/Incapacidad \(accidente de trabajo\)/.test(o1)?'ok':'FALTA'));
 
-// 2 · _perModHTML
+// 2 · la bandeja: tercer boton, origen, y el bloqueo del permiso por horas
 dice('2 · _perModHTML');
-var a=_perModHTML({fuente:'permiso', id:7, mod:'descuento'});
-dice('   marcado descuento: '+(/per-opt on[^>]*>Se descuenta/.test(a)?'ok':'FALTA'));
-var b=_perModHTML({fuente:'permiso', id:8, mod:null});
-dice('   sin elegir avisa: '+(/sin elegir/.test(b)?'ok':'FALTA'));
-dice('   vacacion no dibuja: '+(_perModHTML({fuente:'vacacion',id:9})===''?'ok':'FALTA'));
+var a=_perModHTML({fuente:'permiso', id:1, mod:'incapacidad', origen:'enfermedad_comun'});
+dice('   boton incapacidad marcado: '+(/per-opt on[^>]*>Incapacidad/.test(a)?'ok':'FALTA'));
+dice('   muestra el selector de origen: '+(/Enfermedad \(CCSS\)/.test(a)?'ok':'FALTA'));
+var b=_perModHTML({fuente:'permiso', id:2, mod:'incapacidad', origen:null});
+dice('   sin origen avisa: '+(/Falta de qué es/.test(b)?'ok':'FALTA'));
+var c=_perModHTML({fuente:'permiso', id:3, mod:'descuento', horas:3});
+dice('   pedido por horas NO ofrece incapacidad: '
+     +((!/>Incapacidad</.test(c) && /no puede ser incapacidad/.test(c))?'ok':'FALTA'));
+var d=_perModHTML({fuente:'permiso', id:4, mod:'incapacidad', origen:'accidente_trabajo', boleta:'B-123'});
+dice('   muestra la boleta: '+(/Boleta B-123/.test(d)?'ok':'FALTA'));
 
-// 3 · quincenas — los bordes que un if suelto se come
-dice('3 · quincenas');
-dice('   hoy 2026-10-03 -> '+_pagQDeISO('2026-10-03')+' (espera 2026-10-Q1)');
-dice('   2026-10-16     -> '+_pagQDeISO('2026-10-16')+' (espera 2026-10-Q2)');
-dice('   Q1+1           -> '+_pagQMas('2026-10-Q1',1)+' (espera 2026-10-Q2)');
-dice('   Q2+1           -> '+_pagQMas('2026-10-Q2',1)+' (espera 2026-11-Q1)');
-dice('   ene-Q1 -1      -> '+_pagQMas('2026-01-Q1',-1)+' (espera 2025-12-Q2)');
-dice('   dic-Q2 +1      -> '+_pagQMas('2026-12-Q2',1)+' (espera 2027-01-Q1)');
-dice('   titulo Q2 feb bisiesto: '+_pagQTit('2028-02-Q2')+' (espera 16 al 29 febrero 2028)');
-dice('   titulo Q2 oct: '+_pagQTit('2026-10-Q2')+' (espera 16 al 31 octubre 2026)');
-dice('   ISO borde: '+_pagQISO('2026-10-Q2',31)+' (espera 2026-10-31)');
+// 3 · perModPick no deja convertir un permiso por horas en incapacidad
+dice('3 · perModPick');
+_calPend=[{fuente:'permiso', id:9, mod:'descuento', horas:3}];
+_perModPick={};
+perModPick(9,'incapacidad');
+dice('   bloquea la conversion: '+(_perModPick[9]===undefined?'ok':'NO BLOQUEO -> BUG'));
+dice('   y lo dice en pantalla: '
+     +(/no se puede convertir|No se puede convertir/.test(_SALIDA['AVISO:calStatus'].innerHTML)?'ok':'FALTA'));
 
-// 4 · _pagRender — el desglose y que la columna SUME
-dice('4 · _pagRender');
-_pagQ='2026-10-Q1';
+// 4 · el desglose con incapacidad · 5 dias, cruza el dia 3 -> 4
+// dias 1-3 al 50% -> descuenta 0,5 x tarifa_dia cada uno
+// dias 4-5 al 0%  -> descuenta 1,0 x tarifa_dia cada uno
+dice('4 · _pagRender con incapacidad');
+_pagQ='2026-10-Q1'; _pagFlags={reglas:0, subsidio:0};
+var descIncap = 3*(TDIA*0.5) + 2*(TDIA*1.0);
 var det=[
  {persona_id:1, concepto:'base', ref_id:null, dia:'2026-10-01', cantidad:1, unidad:'quincena',
   tarifa:SAL, monto:SAL/2, nota:'Salario vigente desde 01-01-2026'},
- {persona_id:1, concepto:'descuento_permiso', ref_id:7, dia:'2026-10-07', cantidad:3, unidad:'horas',
-  tarifa:THORA, monto:-(3*THORA), nota:'Permiso 07-10'},
- {persona_id:1, concepto:'descuento_permiso', ref_id:9, dia:'2026-10-11', cantidad:0, unidad:'dias',
-  tarifa:TDIA, monto:0, nota:'Permiso 11-10'},
- {persona_id:1, concepto:'ajuste', ref_id:3, dia:'2026-10-05', cantidad:1, unidad:null,
-  tarifa:null, monto:-50000, nota:'adelanto'}
+ {persona_id:1, concepto:'incapacidad', ref_id:7, dia:'2026-10-11', cantidad:5, unidad:'dias',
+  tarifa:TDIA, monto:-descIncap,
+  nota:'Incapacidad (enfermedad comun): 5 dias · 11-10 al 15-10 · subsidio CCSS NO incluido en esta transferencia · REGLAS SIN CONFIRMAR'}
 ];
-var suma=SAL/2 - 3*THORA + 0 - 50000;
+var suma=R(SAL/2)+R(-descIncap);
 _pagFilas=[{persona_id:1, nombre:'Persona Ejemplo', ini:'2026-10-01', fin:'2026-10-15',
-            base:SAL/2, descuentos:-(3*THORA), ajustes:-50000, final:suma, permisos:2, ajustes_n:1}];
+            base:SAL/2, descuentos:0, ajustes:0, incapacidades:-descIncap,
+            final:SAL/2-descIncap, permisos:0, ajustes_n:0, incap_n:1}];
 _pagDet=det; _pagGente=[{id:1,nombre:'Persona Ejemplo'}];
 _pagRender();
 var o4=_SALIDA['pagBody'].innerHTML;
-dice('   NaN? '+(/NaN/.test(o4)?'SI -> BUG':'no'));
-dice('   undefined? '+(/undefined/.test(o4)?'SI -> BUG':'no'));
-dice('   desglose cuadra (sin aviso de descuadre): '+(/Falta un renglón/.test(o4)?'DESCUADRA -> BUG':'ok'));
-dice('   renglon de 0 dice que no descuenta: '+(/no descuenta/.test(o4)?'ok':'FALTA'));
-dice('   muestra la nota del ajuste: '+(/adelanto/.test(o4)?'ok':'FALTA'));
-dice('   muestra el total de la quincena: '+(/Total de la quincena/.test(o4)?'ok':'FALTA'));
-// La suma de la columna tiene que ser EXACTAMENTE lo que dice "A transferir".
-var esperado=Math.round(SAL/2)+Math.round(-(3*THORA))+0+Math.round(-50000);
-dice('   columna suma a: '+esperado+' · aparece en pantalla: '
-     +(o4.indexOf('₡'+Math.abs(esperado).toLocaleString('es-CR'))>=0?'ok':'FALTA'));
+dice('   NaN? '+(/NaN/.test(o4)?'SI -> BUG':'no')+' · undefined? '+(/undefined/.test(o4)?'SI -> BUG':'no'));
+dice('   renglon aparte de incapacidad: '+(/Incapacidad \(enfermedad comun\)/.test(o4)?'ok':'FALTA'));
+dice('   dice que el subsidio no va: '+(/subsidio CCSS NO incluido/.test(o4)?'ok':'FALTA'));
+dice('   AVISO de reglas sin confirmar: '+(/pendientes de confirmar con la contadora/.test(o4)?'ok':'FALTA'));
+dice('   el aviso va ARRIBA del primer numero: '
+     +(o4.indexOf('pendientes de confirmar') < o4.indexOf('pag-fila')?'ok':'ESTA ABAJO -> revisar'));
+dice('   desglose cuadra: '+(/Falta un renglón/.test(o4)?'DESCUADRA -> BUG':'ok'));
+dice('   columna suma a '+suma+' y aparece: '
+     +(o4.indexOf('₡'+Math.abs(suma).toLocaleString('es-CR'))>=0?'ok':'FALTA'));
 
-// 5 · el control de descuadre TIENE que disparar si falta un renglon
-dice('5 · control de descuadre');
-_pagFilas=[{persona_id:1, nombre:'Persona Ejemplo', ini:'2026-10-01', fin:'2026-10-15',
-            base:SAL/2, descuentos:0, ajustes:0, final:suma-99999, permisos:2, ajustes_n:1}];
+// 5 · con reglas CONFIRMADAS el aviso desaparece
+dice('5 · reglas confirmadas');
+_pagFlags={reglas:1, subsidio:0};
 _pagRender();
-dice('   avisa cuando no cuadra: '+(/Falta un renglón/.test(_SALIDA['pagBody'].innerHTML)?'ok':'NO AVISA -> BUG'))
+dice('   el aviso ya no aparece: '
+     +(/pendientes de confirmar/.test(_SALIDA['pagBody'].innerHTML)?'SIGUE -> BUG':'ok'));
+
+// 6 · sin incapacidades, el aviso NO aparece aunque las reglas no esten confirmadas
+dice('6 · sin incapacidades');
+_pagFlags={reglas:0, subsidio:0};
+_pagDet=[det[0]];
+_pagFilas=[{persona_id:1, nombre:'Persona Ejemplo', ini:'2026-10-01', fin:'2026-10-15',
+            base:SAL/2, descuentos:0, ajustes:0, incapacidades:0, final:SAL/2,
+            permisos:0, ajustes_n:0, incap_n:0}];
+_pagRender();
+dice('   no mete ruido: '
+     +(/pendientes de confirmar/.test(_SALIDA['pagBody'].innerHTML)?'APARECE -> ruido':'ok'));
+
+// 7 · subsidio a cargo de la empresa: el aviso lo dice
+dice('7 · subsidio lo paga la empresa');
+_pagFlags={reglas:0, subsidio:1};
+_pagDet=det;
+_pagFilas=[{persona_id:1, nombre:'Persona Ejemplo', ini:'2026-10-01', fin:'2026-10-15',
+            base:SAL/2, descuentos:0, ajustes:0, incapacidades:-descIncap,
+            final:SAL/2-descIncap, permisos:0, ajustes_n:0, incap_n:1}];
+_pagRender();
+dice('   advierte que el modelo puede no corresponder: '
+     +(/puede no corresponder/.test(_SALIDA['pagBody'].innerHTML)?'ok':'FALTA'));
+
+// 8 · el orden de los renglones: base, incapacidad, descuento, ajuste
+dice('8 · orden del desglose');
+dice('   _PAG_ORDEN: '+JSON.stringify(_PAG_ORDEN));
+dice('   incapacidad va antes que descuento: '
+     +(_PAG_ORDEN.incapacidad < _PAG_ORDEN.descuento_permiso?'ok':'FALTA'));

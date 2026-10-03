@@ -4811,7 +4811,7 @@ body.es-socia .face-pend{display:block}
 // orden que evita un botón que deja mandar algo que la base rechaza.
 // b80 · El calendario de ausencias de Personal se publico el 2-oct (decision de
 // Andrea, confirmada por Lorena). dev y main vuelven a estar alineados.
-const BUILD = 'v 3 oct 2026 · b81: pago de quincena en Personal';
+const BUILD = 'v 3 oct 2026 · b81: pago de quincena e incapacidades en Personal';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -5904,7 +5904,8 @@ async function calBandeja(force){
       .concat((rp.data||[]).map(function(r){ return {fuente:'permiso', id:r.id, nombre:r.nombre,
         persona_id:r.persona_id, ini:r.fecha_inicio, fin:r.fecha_fin, dias:r.dias,
         motivo:r.motivo, creado:r.creado_en,
-        mod:r.modalidad_descuento, horas:(r.horas===null?null:Number(r.horas))}; }))
+        mod:r.modalidad_descuento, horas:(r.horas===null?null:Number(r.horas)),
+        origen:r.incapacidad_origen, boleta:r.incapacidad_boleta}; }))
       .concat((rv.data||[]).map(function(r){ return {fuente:'vacacion', id:r.id, nombre:r.nombre,
         ini:r.fecha, fin:_perISO(_perMasDias(_perDe(r.fecha),(Number(r.dias)||1)-1)),
         dias:Number(r.dias)||1, motivo:r.motivo, creado:r.creado_en}; }));
@@ -5952,22 +5953,54 @@ function _calBandejaRender(){
 // UN PERMISO VIEJO LLEGA SIN MODALIDAD (null) y eso se DICE, no se rellena con
 // un default: null significa "no descuenta" en el cálculo, y poner 'descuento'
 // por nuestra cuenta sería restarle plata a alguien por un valor que inventamos.
-let _perModPick={};
+let _perModPick={}, _perOrgPick={};
+function _perModCur(s){ return (_perModPick[s.id]!==undefined)?_perModPick[s.id]:(s.mod||null); }
+function _perOrgCur(s){ return (_perOrgPick[s.id]!==undefined)?_perOrgPick[s.id]:(s.origen||null); }
 function _perModHTML(s){
   if(s.fuente!=='permiso') return '';
-  const cur=(_perModPick[s.id]!==undefined)?_perModPick[s.id]:s.mod;
-  return '<div class="per-mod">'
+  const cur=_perModCur(s);
+  // UN PERMISO PEDIDO POR HORAS NO PUEDE PASAR A INCAPACIDAD, y no es una regla
+  // de esta pantalla: `horas` NO está en el grant de update por columna, así que
+  // no se puede limpiar, y el CHECK `rrhh_permiso_incap_ok` prohíbe una
+  // incapacidad con horas. Las dos cosas juntas lo hacen imposible del lado del
+  // servidor. Se dice acá en vez de ofrecer un botón que va a fallar.
+  const porHoras=!!s.horas;
+  let h='<div class="per-mod">'
     + '<button class="btn'+(cur==='descuento'?' per-opt on':'')+'" onclick="perModPick('+s.id+',\'descuento\')">Se descuenta</button>'
     + '<button class="btn'+(cur==='reposicion'?' per-opt on':'')+'" onclick="perModPick('+s.id+',\'reposicion\')">Repone horas</button>'
+    + (porHoras
+        ? '<span class="per-cnt" style="margin:0;align-self:center">Pedido por horas: no puede ser incapacidad.</span>'
+        : '<button class="btn'+(cur==='incapacidad'?' per-opt on':'')+'" onclick="perModPick('+s.id+',\'incapacidad\')">Incapacidad</button>')
     + (cur?'':'<span class="per-cnt" style="margin:0;align-self:center">Se pidió sin elegir — así no descuenta.</span>')
     + '</div>';
+  if(cur==='incapacidad'){
+    const o=_perOrgCur(s);
+    h+='<div class="per-mod">'
+      + '<button class="btn'+(o==='enfermedad_comun'?' per-opt on':'')+'" onclick="perOrgPick('+s.id+',\'enfermedad_comun\')">Enfermedad (CCSS)</button>'
+      + '<button class="btn'+(o==='accidente_trabajo'?' per-opt on':'')+'" onclick="perOrgPick('+s.id+',\'accidente_trabajo\')">Accidente (INS)</button>'
+      + (o?'':'<span class="per-cnt" style="margin:0;align-self:center;color:var(--amber)">Falta de qué es: el servidor no la acepta sin eso.</span>')
+      + (s.boleta?'<span class="per-cnt" style="margin:0;align-self:center">Boleta '+esc(s.boleta)+'</span>':'')
+      + '</div>';
+  }
+  return h;
+}
+function perOrgPick(id,o){
+  const s=(_calPend||[]).filter(function(x){ return x.fuente==='permiso' && x.id===id; })[0];
+  const cur=_perOrgCur(s||{id:id});
+  _perOrgPick[id]=(cur===o)?null:o;
+  _calBandejaRender();
 }
 function perModPick(id,m){
   // Volver a tocar lo ya marcado lo desmarca: es la forma de dejar un permiso
   // explícitamente sin descuento, y sin ella la única salida sería rechazarlo.
   const s=(_calPend||[]).filter(function(x){ return x.fuente==='permiso' && x.id===id; })[0];
+  if(m==='incapacidad' && s && s.horas){
+    return _perAviso('calStatus','s-warn','Ese permiso se pidió por horas y una incapacidad '
+      +'se paga por días. No se puede convertir: hay que rechazarlo y volver a pedirlo por días.');
+  }
   const cur=(_perModPick[id]!==undefined)?_perModPick[id]:(s&&s.mod);
   _perModPick[id]=(cur===m)?null:m;
+  if(_perModPick[id]!=='incapacidad') delete _perOrgPick[id];   // el origen no sobrevive al cambio
   _calBandejaRender();
 }
 
@@ -6021,6 +6054,13 @@ async function perResolver(fuente,id,ok){
   const mod=(fuente==='permiso')
     ? ((_perModPick[id]!==undefined)?_perModPick[id]:((s&&s.mod)||null))
     : null;
+  const org=(mod==='incapacidad') ? _perOrgCur(s||{id:id}) : null;
+  // SE FRENA ANTES DEL CONFIRM. Preguntar "¿aprobar?" para después chocar contra
+  // el CHECK del servidor hace que la socia crea que aprobó algo que no entró.
+  if(ok && mod==='incapacidad' && !org){
+    return _perAviso('calStatus','s-warn','Falta decir de qué es la incapacidad '
+      +'(enfermedad o accidente de trabajo) antes de aprobarla. El servidor no la acepta sin eso.');
+  }
   let aviso='';
   if(ok){
     _perAviso('calStatus','s-info','<span class="spin"></span>Revisando el día…');
@@ -6030,6 +6070,10 @@ async function perResolver(fuente,id,ok){
   const comoSeCompensa=(fuente==='permiso' && ok)
     ? ('\n\nSe compensa: '+(mod==='descuento'?'SE DESCUENTA del pago de la quincena.'
         : mod==='reposicion'?'REPONE las horas trabajando.'
+        : mod==='incapacidad'
+          ? ('INCAPACIDAD ('+(org==='accidente_trabajo'?'accidente de trabajo, INS':'enfermedad, CCSS')+').'
+             +'\nSe paga la parte que le toca a la empresa; el subsidio no va en esta transferencia.'
+             +'\n⚠ Las reglas de incapacidad todavía no las confirmó la contadora: revisá el monto a mano.')
         : 'sin definir — NO va a descontar nada.'))
     : '';
   if(!confirm(aviso+(ok?'¿Aprobar ':'¿Rechazar ')+(s?(s.fuente==='vacacion'?'la vacación de ':'el permiso de ')+quien
@@ -6049,12 +6093,21 @@ async function perResolver(fuente,id,ok){
       // permiso no va a descontar nada igual, y reescribirla sería dejar escrita
       // una decisión de plata sobre algo que no pasó.
       const pay={estado: ok?'aprobado':'rechazado', resolucion_nota:(nota||null)};
-      if(ok) pay.modalidad_descuento=mod;
+      if(ok){
+        pay.modalidad_descuento=mod;
+        // EL ORIGEN Y LA BOLETA VIAJAN SIEMPRE QUE SE APRUEBA, incluso en null, y
+        // eso no es por prolijidad: el CHECK `rrhh_permiso_incap_ok` PROHÍBE que
+        // un permiso que no es incapacidad los lleve puestos. Si se pidió como
+        // incapacidad y la socia lo cambia a descuento, sin limpiarlos el update
+        // se estrella contra el CHECK y la aprobación no entra.
+        pay.incapacidad_origen = (mod==='incapacidad') ? org : null;
+        if(mod!=='incapacidad') pay.incapacidad_boleta = null;
+      }
       const {data,error}=await c.from('rrhh_permiso')
         .update(pay).eq('id',id).eq('estado','pendiente').select();
       if(error) throw error;
       filas=data||[];
-      delete _perModPick[id];   // resuelto: la elección local ya no manda nada
+      delete _perModPick[id]; delete _perOrgPick[id];   // resuelto: lo local ya no manda
     }else{
       const {data,error}=await c.rpc('rrhh_resolver_evento',
         {p_evento_id:id, p_aprobado:!!ok, p_motivo:(nota||null)});
@@ -6114,7 +6167,7 @@ let _solTipo='vacaciones', _solSaldo=null, _solMias=null;
 // así que preguntarle cómo se compensa no tendría respuesta posible.
 // `_solMod` arranca en null A PROPÓSITO: es una decisión de PLATA, y un default
 // la tomaría en silencio por quien pide. Sin elegir, solEnviar() no deja enviar.
-let _solDur='dia', _solMod=null;
+let _solDur='dia', _solMod=null, _solOrigen=null;
 
 function irASolicitar(){
   _modShow('vSolicitar'); crumbSet('Personal','Pedir días'); _perTabs('pedir');
@@ -6176,7 +6229,7 @@ function _solForm(){
    // re-render las borraba — el formulario se "reiniciaba" al cambiar de
    // categoría y nadie podía saber por qué.
    + '<div id="solPerm" class="'+(_solTipo==='permiso'?'':'hidden')+'">'
-   +   '<div class="field"><label>Cuánto</label>'
+   +   '<div class="field" id="solDurBox"><label>Cuánto</label>'
    +     '<div style="display:flex;gap:8px">'
    +       '<button class="btn per-opt'+(_solDur==='dia'?' on':'')+'" id="solDurDia" onclick="solDur(\'dia\')">Día completo</button>'
    +       '<button class="btn per-opt'+(_solDur==='horas'?' on':'')+'" id="solDurHor" onclick="solDur(\'horas\')">Horas</button>'
@@ -6187,7 +6240,21 @@ function _solForm(){
    +     '<div style="display:flex;gap:8px;flex-wrap:wrap">'
    +       '<button class="btn per-opt'+(_solMod==='descuento'?' on':'')+'" id="solModDes" onclick="solMod(\'descuento\')">Se descuenta del pago</button>'
    +       '<button class="btn per-opt'+(_solMod==='reposicion'?' on':'')+'" id="solModRep" onclick="solMod(\'reposicion\')">Repongo las horas</button>'
+   +       '<button class="btn per-opt'+(_solMod==='incapacidad'?' on':'')+'" id="solModInc" onclick="solMod(\'incapacidad\')">Incapacidad</button>'
    +     '</div></div>'
+   // EL ORIGEN ES OBLIGATORIO EN UNA INCAPACIDAD y lo exige el servidor
+   // (`rrhh_permiso_incap_ok`), no solo esta pantalla. Son dos tramites
+   // distintos —la CCSS y el INS— y de eso depende qué subsidio se nombra en el
+   // desglose del pago.
+   +   '<div id="solIncBox" class="'+(_solMod==='incapacidad'?'':'hidden')+'">'
+   +     '<div class="field"><label>De qué es la incapacidad</label>'
+   +       '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+   +         '<button class="btn per-opt'+(_solOrigen==='enfermedad_comun'?' on':'')+'" id="solOrgEnf" onclick="solOrigen(\'enfermedad_comun\')">Enfermedad (CCSS)</button>'
+   +         '<button class="btn per-opt'+(_solOrigen==='accidente_trabajo'?' on':'')+'" id="solOrgAcc" onclick="solOrigen(\'accidente_trabajo\')">Accidente de trabajo (INS)</button>'
+   +       '</div></div>'
+   +     '<div class="field"><label>Número de boleta (opcional)</label>'
+   +       '<input id="solBoleta" placeholder="El de la boleta de la CCSS o del INS"></div>'
+   +   '</div>'
    + '</div>'
    + '<div id="solResumen" class="per-cnt" style="margin-bottom:12px"></div>'
    + '<button class="btn per-go" onclick="solEnviar()">Enviar solicitud</button>';
@@ -6213,9 +6280,30 @@ function solDur(d){
 }
 function solMod(m){
   _solMod=m;
-  const a=document.getElementById('solModDes'), b=document.getElementById('solModRep');
+  const a=document.getElementById('solModDes'), b=document.getElementById('solModRep'),
+        c=document.getElementById('solModInc'), box=document.getElementById('solIncBox'),
+        dur=document.getElementById('solDurBox');
   if(a) a.classList.toggle('on', m==='descuento');
   if(b) b.classList.toggle('on', m==='reposicion');
+  if(c) c.classList.toggle('on', m==='incapacidad');
+  if(box) box.classList.toggle('hidden', m!=='incapacidad');
+  // UNA INCAPACIDAD NO SE MIDE EN HORAS: se paga por días, y el CHECK del
+  // servidor (`rrhh_permiso_incap_ok`) prohíbe `horas` cuando la modalidad es
+  // incapacidad. Se fuerza día completo y se esconde la elección en vez de
+  // dejar que el servidor rechace algo que la pantalla ya sabía.
+  if(m==='incapacidad'){
+    if(_solDur!=='dia') solDur('dia');
+    if(dur) dur.classList.add('hidden');
+  }else if(dur){
+    dur.classList.remove('hidden');
+  }
+  _solResumen();
+}
+function solOrigen(o){
+  _solOrigen=o;
+  const a=document.getElementById('solOrgEnf'), b=document.getElementById('solOrgAcc');
+  if(a) a.classList.toggle('on', o==='enfermedad_comun');
+  if(b) b.classList.toggle('on', o==='accidente_trabajo');
   _solResumen();
 }
 // El resumen es ESTADO DEL DATO, no instrucciones: cuántos días salen de las dos
@@ -6247,6 +6335,9 @@ function _solResumen(){
     h+=' No descuenta días de vacaciones.';
     h+= (_solMod==='descuento') ? ' Se descuenta del pago de la quincena.'
       : (_solMod==='reposicion') ? ' Las horas se reponen trabajando.'
+      : (_solMod==='incapacidad')
+        ? (' Incapacidad por días naturales.'
+           + (_solOrigen ? '' : ' <span style="color:var(--amber)">Falta decir de qué es.</span>'))
       : ' <span style="color:var(--amber)">Falta elegir cómo se compensa.</span>';
   }
   box.innerHTML=h;
@@ -6263,10 +6354,18 @@ async function solEnviar(){
   // mandar null: null significa "no descuenta" en el cálculo de la quincena
   // (ver PERSONAL_PAGO_QUINCENA.sql §1), así que dejarlo vacío no es "sin
   // decidir" — es decidir que no se descuenta, y en silencio.
-  let horas=null;
+  let horas=null, origen=null, boleta=null;
   if(_solTipo==='permiso'){
-    if(!_solMod) return _perAviso('solStatus','s-warn','Falta elegir cómo se compensa el permiso: se descuenta del pago, o reponés las horas.');
-    if(_solDur==='horas'){
+    if(!_solMod) return _perAviso('solStatus','s-warn','Falta elegir cómo se compensa el permiso: se descuenta del pago, reponés las horas, o es una incapacidad.');
+    if(_solMod==='incapacidad'){
+      // Las tres condiciones del CHECK `rrhh_permiso_incap_ok`, comprobadas acá
+      // para no gastar un viaje en un rechazo que la pantalla ya podía evitar.
+      if(!_solOrigen) return _perAviso('solStatus','s-warn','Falta decir de qué es la incapacidad: enfermedad (CCSS) o accidente de trabajo (INS).');
+      origen=_solOrigen;
+      boleta=((document.getElementById('solBoleta')||{}).value||'').trim()||null;
+      horas=null;   // una incapacidad se paga por días: el servidor la rechaza con horas
+    }
+    if(_solMod!=='incapacidad' && _solDur==='horas'){
       horas=Number((document.getElementById('solHoras')||{}).value)||0;
       if(!(horas>0 && horas<=8)) return _perAviso('solStatus','s-warn','Las horas tienen que estar entre 0,5 y 8 (la jornada es de 8 h).');
       // El CHECK del servidor exige fecha_fin = fecha_inicio. Se iguala acá para
@@ -6293,10 +6392,12 @@ async function solEnviar(){
       const {error}=await c.from('rrhh_permiso').insert({
         persona_id:yo.id, fecha_inicio:ini, fecha_fin:fin,
         motivo:(mot||null), estado:'pendiente', creado_por:(em||'desconocido'),
-        modalidad_descuento:(_solTipo==='permiso'?_solMod:null), horas:horas});
+        modalidad_descuento:(_solTipo==='permiso'?_solMod:null), horas:horas,
+        incapacidad_origen:origen, incapacidad_boleta:boleta});
       if(error) throw error;
     }
     const mm=document.getElementById('solMotivo'); if(mm) mm.value='';
+    const bb=document.getElementById('solBoleta'); if(bb) bb.value='';
     _calDatos=null; _calPend=null;
     await solCargar(false);
     _perAviso('solStatus','s-ok','Pedido. Queda esperando el visto bueno de Andrea o Lorena.');
@@ -6315,7 +6416,7 @@ async function solMias(force){
     const c=sbClient();
     const [rp,rv]=await Promise.all([
       c.from('v_rrhh_permiso')
-       .select('id,fecha_inicio,fecha_fin,dias,motivo,estado,resolucion_nota,resuelto_por,modalidad_descuento,horas')
+       .select('id,fecha_inicio,fecha_fin,dias,motivo,estado,resolucion_nota,resuelto_por,modalidad_descuento,horas,incapacidad_origen')
        .eq('persona_id',yo.id),
       c.from('v_rrhh_evento_estado').select('id,fecha,dias,motivo,estado,aprobado_por')
        .eq('persona_id',yo.id).eq('tipo','vacaciones')
@@ -6325,7 +6426,8 @@ async function solMias(force){
     _solMias=[]
       .concat((rp.data||[]).map(function(r){ return {tipo:'Permiso', ini:r.fecha_inicio, fin:r.fecha_fin,
         dias:r.dias, motivo:r.motivo, estado:r.estado, nota:r.resolucion_nota, por:r.resuelto_por,
-        mod:r.modalidad_descuento, horas:(r.horas===null?null:Number(r.horas))}; }))
+        mod:r.modalidad_descuento, horas:(r.horas===null?null:Number(r.horas)),
+        origen:r.incapacidad_origen}; }))
       .concat((rv.data||[]).map(function(r){ return {tipo:'Vacación', ini:r.fecha,
         fin:_perISO(_perMasDias(_perDe(r.fecha),(Number(r.dias)||1)-1)), dias:Number(r.dias)||1,
         motivo:r.motivo, estado:(r.estado==='solicitado'?'pendiente':r.estado), por:r.aprobado_por}; }));
@@ -6350,7 +6452,10 @@ function _solMiasRender(){
       // recién cuando llega la transferencia no es aceptable. Mientras está
       // pendiente se dice que es lo pedido, porque todavía puede cambiar.
       +  (s.mod ? ('<div class="per-sol-f">'
-             + (s.mod==='descuento'?'Se descuenta del pago':'Se reponen las horas')
+             + (s.mod==='descuento' ? 'Se descuenta del pago'
+                : s.mod==='reposicion' ? 'Se reponen las horas'
+                : 'Incapacidad' + (s.origen==='accidente_trabajo' ? ' (accidente de trabajo)'
+                                   : s.origen==='enfermedad_comun' ? ' (enfermedad)' : ''))
              + (s.estado==='pendiente'?' (lo que pediste)':'')
              + '</div>') : '')
       +  (s.nota?'<div class="per-sol-m">'+esc(s.nota)+'</div>':'')
@@ -6515,7 +6620,26 @@ function _ferRender(){
 // 4. EL RECORTE ES DEL SERVIDOR. Las tres vistas llevan `where
 //    acceso_es_socia()`, así que un empleado que llegue acá recibe cero filas
 //    del lado de la base. `_perEsSocia` es para dibujar y falla CERRADA.
+//
+// 5. LA RAMA `permiso_sin_goce` DE `v_rrhh_ajuste_detalle` SIGUE MUERTA A
+//    PROPÓSITO, y vale igual ahora que hay incapacidades. Todo el descuento de
+//    un permiso —y de una incapacidad— vive en `rrhh_permiso` y se calcula en
+//    `v_rrhh_pago_detalle`. `rrhh_evento` tiene los tipos `permiso_sin_goce`,
+//    `incap_ccss` e `incap_ins` con su propio cálculo en `v_rrhh_ajuste`, y
+//    NINGUNA pantalla los escribe ni los lee (medido con grep el 3-oct-2026).
+//    Si alguien le construye pantalla a eso sin leer esto, la misma ausencia se
+//    descuenta DOS VECES: una por cada tabla, y nada en la base lo impide.
+//    No es deuda para limpiar — es una decisión, y está escrita en
+//    PERSONAL_PAGO_QUINCENA.sql y en PERSONAL_INCAPACIDAD.sql.
 let _pagQ=null, _pagFilas=null, _pagDet=null, _pagGente=null, _pagAbierto={};
+// LOS INDICADORES DE INCAPACIDAD SALEN DE rrhh_param, no de una constante de
+// acá. Son reglas que la contadora todavía no confirmó
+// (PREGUNTAS_contadora_incapacidades.md) y tienen que poder cambiar insertando
+// una fila, sin publicar la herramienta de nuevo.
+// FALLAN DEL LADO SEGURO: si la lectura no contesta, `reglas` queda en 0 y el
+// aviso SE MUESTRA. Al revés —asumir confirmadas— sería esconder la advertencia
+// justo cuando el sistema no sabe nada.
+let _pagFlags={reglas:0, subsidio:0};
 
 function irAPagoQuincena(){
   _modShow('vPagoQuincena'); crumbSet('Personal','Pago de quincena'); _perTabs('pago');
@@ -6588,14 +6712,17 @@ async function pagCargar(force){
   _perAviso('pagStatus','s-info','<span class="spin"></span>Calculando la quincena…');
   try{
     const c=sbClient(); if(!c) throw new Error('no hay conexión a Supabase');
-    const [rp,rd,rg]=await Promise.all([
+    const [rp,rd,rg,rf]=await Promise.all([
       c.from('v_rrhh_pago')
        .select('persona_id,nombre,ini,fin,base,descuentos,ajustes,final,permisos,ajustes_n')
        .eq('quincena',_pagQ),
       c.from('v_rrhh_pago_detalle')
        .select('persona_id,concepto,ref_id,dia,cantidad,unidad,tarifa,monto,nota')
        .eq('quincena',_pagQ),
-      c.from('rrhh_persona').select('id,nombre')
+      c.from('rrhh_persona').select('id,nombre'),
+      c.from('rrhh_param').select('clave,valor,vigente_desde')
+       .in('clave',['incapacidad_reglas_confirmadas','incap_subsidio_lo_paga_la_empresa'])
+       .order('vigente_desde',{ascending:false})
     ]);
     if(rp.error) throw rp.error;
     if(rd.error) throw rd.error;
@@ -6603,6 +6730,12 @@ async function pagCargar(force){
     _pagFilas=rp.data||[];
     _pagDet=rd.data||[];
     _pagGente=(rg.data||[]).slice().sort(function(a,b){ return String(a.nombre||'').localeCompare(String(b.nombre||'')); });
+    // El primero de cada clave es el vigente: vienen ordenados por vigente_desde
+    // descendente, igual que hace rrhh_param() del lado del servidor.
+    const vig={};
+    ((rf&&rf.data)||[]).forEach(function(r){ if(vig[r.clave]===undefined) vig[r.clave]=Number(r.valor); });
+    _pagFlags={reglas:(vig['incapacidad_reglas_confirmadas']===1?1:0),
+               subsidio:(vig['incap_subsidio_lo_paga_la_empresa']===1?1:0)};
     _perAviso('pagStatus','');
     _pagRender();
   }catch(e){
@@ -6614,7 +6747,7 @@ async function pagCargar(force){
 // El orden de los renglones del desglose es fijo y no alfabético: primero de
 // dónde sale la plata, después lo que se resta por permiso, después lo que se
 // movió a mano. Es el orden en que se explica el número.
-const _PAG_ORDEN={base:0, descuento_permiso:1, ajuste:2};
+const _PAG_ORDEN={base:0, incapacidad:1, descuento_permiso:2, ajuste:3};
 
 function _pagRender(){
   const box=document.getElementById('pagBody'); if(!box) return;
@@ -6626,7 +6759,7 @@ function _pagRender(){
       +'Si debería haber, revisá que la persona tenga salario cargado en rrhh_salario.</div>';
     return;
   }
-  let h='', totalQuincena=0, descuadres=0;
+  let h='', totalQuincena=0, descuadres=0, nIncap=0;
   filas.forEach(function(f){
     const det=(_pagDet||[]).filter(function(d){ return Number(d.persona_id)===Number(f.persona_id); })
       .sort(function(a,b){
@@ -6634,7 +6767,10 @@ function _pagRender(){
         return o || String(a.dia).localeCompare(String(b.dia)); });
     // LA SUMA ES DE LOS RENGLONES REDONDEADOS (ver la nota 3 del encabezado).
     let suma=0;
-    det.forEach(function(d){ suma+=Math.round(Number(d.monto)||0); });
+    det.forEach(function(d){
+      suma+=Math.round(Number(d.monto)||0);
+      if(d.concepto==='incapacidad') nIncap++;
+    });
     const exacto=Math.round(Number(f.final)||0);
     if(Math.abs(suma-exacto)>1) descuadres++;
     totalQuincena+=suma;
@@ -6645,6 +6781,14 @@ function _pagRender(){
       if(d.concepto==='base'){
         qué='Base de la quincena';
         como=d.nota||'';
+      }else if(d.concepto==='incapacidad'){
+        // La etiqueta entera la arma el SQL (`nota`), con el origen, los días y
+        // la línea de que el subsidio no va en esta transferencia. Acá no se
+        // reescribe: si se redactara de nuevo, el día que cambie el parámetro
+        // del subsidio esta pantalla seguiría diciendo lo de antes.
+        qué=(d.nota||'Incapacidad');
+        const ci=Number(d.cantidad)||0;
+        como=_perDiasTxt(ci)+(ci?(' × '+_pagTarifa(d.tarifa)+'/día, menos lo que paga la empresa'):'');
       }else if(d.concepto==='descuento_permiso'){
         const cant=Number(d.cantidad)||0;
         qué=(d.nota||'Permiso');
@@ -6679,6 +6823,27 @@ function _pagRender(){
    +   '<div class="pag-q">Total de la quincena · '+filas.length+(filas.length===1?' persona':' personas')+'</div>'
    +   '<div class="pag-n">'+_pagCRC(totalQuincena)+'</div>'
    + '</div></div>';
+  // EL AVISO DE REGLAS SIN CONFIRMAR VA ADENTRO DEL CUERPO, no en la barra de
+  // estado: la barra la pisa el aviso de descuadre y el de "calculando", y éste
+  // no puede desaparecer porque pasó otra cosa. Va ARRIBA de todo, antes del
+  // primer número, porque es lo que hay que leer antes de transferir.
+  //
+  // SOLO SI HAY INCAPACIDADES EN ESTA QUINCENA. Con cero, las reglas sin
+  // confirmar no cambian ningún número, y un aviso que aparece siempre se
+  // termina ignorando — justo el día que sí importe (las 5 reglas de alertas de
+  // CLAUDE.md: informar no es alertar).
+  if(nIncap && !_pagFlags.reglas){
+    h='<div class="status s-warn" style="margin-bottom:14px">'
+     + '<b>Reglas de incapacidad pendientes de confirmar con la contadora.</b> '
+     + 'Hay '+nIncap+(nIncap===1?' incapacidad':' incapacidades')+' en esta quincena. '
+     + 'El descuento está calculado con los valores provisionales de <code>rrhh_param</code> '
+     + '(empresa paga el 50% los primeros días, 0% después). '
+     + '<b>Verificá el monto a mano antes de transferir.</b> '
+     + (_pagFlags.subsidio
+         ? 'Además está marcado que el subsidio lo paga la empresa, así que el modelo de resta de esta pantalla puede no corresponder.'
+         : 'El subsidio de la CCSS o del INS no va en esta transferencia: se lo depositan al trabajador.')
+     + '</div>' + h;
+  }
   box.innerHTML=h;
   if(descuadres) _perAviso('pagStatus','s-warn',descuadres+(descuadres===1?' persona':' personas')
     +' con el desglose descuadrado respecto del total de la vista. Está marcado abajo.');
