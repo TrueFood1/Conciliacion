@@ -1,6 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- COMPRA_PEDIDO_ODOO.sql  ·  2-oct-2026  ·  T-28 · «Pedir a BIO» / «Registrar pedido»
--- ⚠ ESCRITO, NO PEGADO. Antes de pegar: correr ENSAYO_COMPRA_PEDIDO_ODOO.sql (no deja nada).
+-- ✅ APLICADO el 2-oct-2026 por Andrea en producción (verificación: 2 tablas con RLS · 4 políticas ·
+--    0 grants a anon · INSERT,SELECT a authenticated), después del ensayo 21/21.
 -- Para saber si está aplicado, mirar la base: `select to_regclass('public.compra_propuesta')`.
 --
 -- QUÉ HACE
