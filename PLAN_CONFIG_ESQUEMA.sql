@@ -29,6 +29,16 @@
 --   cierre_fecha_autowm      fecha       cierreConfig()          cierreGuardar()
 --   cierre_fecha_resto       fecha       cierreConfig()          cierreGuardar()
 --   cierre_galletas_dic_cj   número      cierreConfig()          cierreGuardar()
+--   compras_dia_fijo         objeto      nivConfig()             NADIE (sin UI) — se siembra con
+--                                                                COMPRAS_DIA_FIJO.sql (T-28, 2-oct-2026)
+--
+-- `compras_dia_fijo` = {insumos:[{producto_id, proveedor_id, proveedor, pide, llega, momento, uso}]}.
+-- Un insumo con fila acá sale de las tarjetas "Comprar" y va a la tarjeta "Pedido con día fijo"
+-- del Resumen. La configuración es POR INSUMO (BIO trae el huevo líquido otro día que el resto).
+--   pide    'lun'…'vie' o null (sin definir)    llega   'lun'…'vie'
+--   momento 'antes'|'despues' (de medir o de producir ese día)
+--   uso     'medicion' (se usa recién en una medición de lunes) | 'produccion' (desde que llega)
+-- Cambiar un día = insertar otra fila con la misma clave y la lista COMPLETA (gana la más reciente).
 --
 -- OJO con la columna "quién la escribe": las cinco primeras se LEEN pero no las guarda
 -- ninguna pantalla. Hoy solo existen como default del código. Crear la tabla no las hace
