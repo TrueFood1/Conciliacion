@@ -4577,8 +4577,11 @@ body[data-mod="compras"] .main{--mod:#A27FEB;--accent:#A27FEB;--blue:#A27FEB;--b
 #vCompras .cp-btns-d .cp-btn{flex:0 0 auto;padding:10px 16px}
 #vCompras .cp-centro{max-width:760px;margin:0 auto}
 #vCompras .cp-pcl{padding:4px 14px 6px}
-#vCompras .cp-gtit{font-size:14px;font-weight:700;color:#F5F4F0;padding:12px 0 2px}
+/* Fechas de grupo de Por comprar como etiqueta, igual que los encabezados de Armar pedido (Andrea, 4-oct):
+   así no se confunden con los nombres de proveedor. «HOY» sigue en ámbar. */
+#vCompras .cp-gtit{font-size:10px;font-weight:500;color:var(--text-3);letter-spacing:.04em;text-transform:uppercase;padding:14px 0 4px}
 #vCompras .cp-gtit-hoy{color:#E9A23B}
+#vCompras .cp-aviso-crea{font-size:12.5px;text-align:right;margin:10px 0 -2px}
 #vCompras .cp-pcrow .cp-in1{font-weight:500}
 #vCompras .cp-canal{font-size:11.5px;color:#6E6C68;font-weight:400;margin-left:4px}
 #vCompras .cp-pcrow>span.cp-g{font-size:12.5px}
@@ -20541,7 +20544,11 @@ function cpRenderRegistro(){
       +'<button class="cp-btn cp-btnp" onclick="cpRevisar()">'+(g.canal==='tienda'?'Registrar compra en Odoo':'Crear orden en Odoo')+'</button></div></div>';
   } else {
     const r=P.previa;
-    h+='<div class="cp-regh">'+esc(prov)+' <span class="cp-sep">·</span> '+_cpF('llega', r.entrega_dia)+' <span class="cp-g">· confirmada en Odoo</span></div>'
+    // Antes de confirmar NO existe en Odoo (Andrea, 4-oct: «confirmada en Odoo» se leía como hecha).
+    // `P.creada` (el nombre de la orden) lo pone cpConfirmar cuando Odoo contestó que la creó.
+    const bot=(F.modo==='registrar'?'Registrar en Odoo':'Confirmar la orden');
+    h+='<div class="cp-regh">'+esc(prov)+' <span class="cp-sep">·</span> '+_cpF('llega', r.entrega_dia)
+      +' <span class="cp-g">· '+(P.creada?(esc(P.creada)+' confirmada en Odoo'):'todavía no está en Odoo')+'</span></div>'
       +'<div class="cp-lista">'+r.lineas.map(function(l){
         const emp=l.empaques!=null?(_rzN(l.empaques)+' '+(l.empaques===1?(_CN_SING[l.empaque_lab]||l.empaque_lab):l.empaque_lab)):(_rzN(l.cant_po,2)+' '+l.uom_po);
         return '<div class="cp-it cp-it3"><span class="cp-in">'+esc(l.producto.replace(/^\[[^\]]*\]\s*/,''))+'</span><span class="cp-g">'+esc(emp)+'</span><span class="cp-mto">'+col(l.subtotal)+'</span></div>'; }).join('')
@@ -20550,8 +20557,9 @@ function cpRenderRegistro(){
     if(r.sin_precio&&r.sin_precio.length) av.push('Sin precio en Odoo: '+r.sin_precio.join(', ')+'.');
     if(r.otras_ordenes&&r.otras_ordenes.length) av.push('Hay órdenes de '+prov+' cargadas a mano y sin recibir ('+r.otras_ordenes.map(function(x){ return x.name; }).join(', ')+'): si alguna es este pedido, se duplicaría.');
     if(av.length) h+='<div class="cp-detamb">'+av.map(esc).join('<br>')+'</div>';
-    h+='<div class="cp-pie"><button class="cp-btn" onclick="cpEditar()">Editar</button>'
-      +'<button class="cp-btn cp-btnp" id="cpConf" onclick="cpConfirmar()">'+(F.modo==='registrar'?'Registrar en Odoo':'Confirmar la orden')+'</button></div>';
+    if(!P.creada) h+='<div class="cp-g cp-aviso-crea">Al tocar «'+bot+'» la orden se crea ya confirmada en Odoo.</div>'
+      +'<div class="cp-pie"><button class="cp-btn" onclick="cpEditar()">Editar</button>'
+      +'<button class="cp-btn cp-btnp" id="cpConf" onclick="cpConfirmar()">'+bot+'</button></div>';
   }
   h+='<div class="cp-msg'+(P.cls?(' '+P.cls):'')+'" id="cpRegMsg">'+esc(P.msg||'')+'</div></div>';
   b.innerHTML=h;
@@ -20599,7 +20607,7 @@ async function cpConfirmar(){
   if(R.red){ _cpRegMsg('No hubo respuesta: no se sabe si Odoo creó la orden. Mirá Pedidos antes de reintentar.','cp-mal'); return; }
   if(R.st===423){ _cpRegMsg('Todo calza, pero la compra está apagada: no se creó nada en Odoo.','cp-amb2'); return; }
   if(!R.js.ok){ if(bt) bt.disabled=false; _cpRegMsg(R.js.texto||R.js.motivo||'El servicio dijo que no.','cp-mal'); return; }
-  _cpRegMsg('Orden '+R.js.po_nombre+' creada y confirmada en Odoo.','cp-ok');
+  P.creada=R.js.po_nombre||'La orden'; P.msg='Orden '+R.js.po_nombre+' creada y confirmada en Odoo.'; P.cls='cp-ok'; cpRenderRegistro();
   _rzCtx.cargadoEn=0; _cpPedidos=null;            // la próxima vista vuelve a leer: "ya pedido" la descuenta
   setTimeout(function(){ irACompras('porcomprar'); }, 1500);
 }
