@@ -20282,6 +20282,18 @@ async function cpAlcance(){
     for(const d of dias){ const c=(cons[d]&&cons[d][pid])||0;
       if(c>1e-9){ if(s-c<-1e-9){ falla=d; break; } s-=c; ultimo=d; }
       s+=((rec[pid]||{})[d]||0); }
+    // «POR CARGAR» (Andrea, 4-oct; regla permanente): si lo ya usado y sin cargar supera el stock de
+    // Odoo, ese negativo no es un faltante sino compras que llegaron y no se cargaron. Para decidir
+    // qué comprar (Falta, Sugiere, color y cuándo) el stock se toma como CERO después de lo usado:
+    // `fallaC` es el recorrido sin ese negativo. `falla` queda como la dice Odoo, para el aviso
+    // «faltan compras por cargar». Cuando se cargan compras y producción, `deficit` es false y todo
+    // vuelve solo al cálculo normal.
+    const sinCargar=consSin[pid]||0, deficit=sinCargar>st+1e-9;
+    let fallaC=falla;
+    if(deficit){ let s0=0; fallaC=null;
+      for(const d of dias){ const c=((cons[d]&&cons[d][pid])||0)-(d===hoy?sinCargar:0);
+        if(c>1e-9){ if(s0-c<-1e-9){ fallaC=d; break; } s0-=c; }
+        s0+=((rec[pid]||{})[d]||0); } }
     const fijo=(_rzCtx.cfg.diaFijo||[]).find(function(x){ return +x.producto_id===pid; })||null;
     const cada=Math.max(1, fijo ? (+fijo.cada||1) : (+pv.cada_semanas||1));   // semanas hasta la compra siguiente
     let U, pedirEl=null, llega, ci=null;
@@ -20289,23 +20301,25 @@ async function cpAlcance(){
     if(fijo){ ci=_cpCicloProximo(fijo, hoy); U=ci.U; llega=ci.E; pedirEl=(_dfDia(fijo.pide)==null)?ci.E:ci.P; }
     else { U=_dfAdd(hoy, +pv.demora||0); llega=U; }
     // ámbar = se acaba antes de que llegue la compra SIGUIENTE (cada `cada` semanas): va en esta.
-    const color=(falla && falla<U) ? 'rojo' : (falla && falla<_dfAdd(U, 7*cada)) ? 'ambar' : 'verde';
-    const comprarAntes=(!fijo && falla) ? _dfAdd(falla, -(+pv.demora||0)) : null;
+    const color=(fallaC && fallaC<U) ? 'rojo' : (fallaC && fallaC<_dfAdd(U, 7*cada)) ? 'ambar' : 'verde';
+    const comprarAntes=(!fijo && fallaC) ? _dfAdd(fallaC, -(+pv.demora||0)) : null;
     const h=D.hist[pid]||{prom:0, margen:0};
     // Lo sugerido. Día fijo: el del motor de la tarjeta de BIO para ESE ciclo (validado con Lorena).
     // Sin día fijo: solo si no es verde, lo que se consume desde hoy hasta 2 semanas después de la
     // llegada + margen − stock − lo que llega en ese tramo.
     // Cubre hasta la compra siguiente (`cada` semanas desde que llega) + margen; `falta`, sin margen.
+    // «Por cargar»: sin el consumo ya usado y con stock 0 (el motor de día fijo ya lo hace: `sobra`
+    // nunca baja de 0).
     let sug=0, falta=0;
     if(fijo){ const g=_cpGrupoDF(pid); if(g){ const gg=(g.ci.pasado&&g.sig)?g.sig:g; const f=gg.filas.find(function(x){ return x.pid===pid; });
       sug=f?f.pedir:0; falta=f?f.falta:0; } }
     else { const H=_dfAdd(llega, 7*cada-1); let q=0, r=0;
       for(const d of dias){ if(d>H) break; q+=((cons[d]||{})[pid]||0); r+=((rec[pid]||{})[d]||0); }
-      falta=Math.max(0, q-st-r);
-      if(color!=='verde') sug=Math.max(0, q+h.margen-st-r); }
-    const sinCargar=consSin[pid]||0;
+      const stQ=deficit?0:st; if(deficit) q-=sinCargar;
+      falta=Math.max(0, q-stQ-r);
+      if(color!=='verde') sug=Math.max(0, q+h.margen-stQ-r); }
     return {pid:pid, nombre:(inf.name||i.nombre||('id '+pid)).replace(/^\[[^\]]*\]\s*/,'').trim(), uom:uom, proveedor_id:+i.proveedor_id,
-            sinCargar:sinCargar, deficit:sinCargar>st+1e-9,
+            sinCargar:sinCargar, deficit:deficit, fallaC:fallaC,
             stock:st, falla:falla, ultimo:ultimo, color:color, U:U, llega:llega, pedirEl:pedirEl, comprarAntes:comprarAntes,
             fijo:!!fijo, ci:ci, sug:sug, falta:falta, cada:cada, margen:h.margen, ya:D.pedido[pid]||0}; });
   // 5 · por pedido: proveedor + entrega (BIO tiene dos: lo del lunes y el huevo líquido del jueves)
@@ -20327,7 +20341,7 @@ async function cpAlcance(){
   });
   grupos.sort(function(a,b){ return (a.limite||'9999').localeCompare(b.limite||'9999'); });
   // Lo próximo, si hoy no hace falta nada: la primera fecha en que algo pasa a necesitar pedido.
-  let prox=filas.map(function(f){ return f.falla ? _dfAdd(f.falla, -Math.max(0, Math.round((Date.parse(f.U+'T00:00:00')-Date.parse(hoy+'T00:00:00'))/86400000))) : null; }).filter(Boolean).sort()[0]||null;
+  let prox=filas.map(function(f){ return f.fallaC ? _dfAdd(f.fallaC, -Math.max(0, Math.round((Date.parse(f.U+'T00:00:00')-Date.parse(hoy+'T00:00:00'))/86400000))) : null; }).filter(Boolean).sort()[0]||null;
   if(prox && prox<hoy) prox=hoy;
   // cons/rec/dias quedan guardados: «Armar pedido» recalcula «alcanza hasta» en vivo con ellos.
   return {filas:filas, grupos:grupos, proximo:prox, hoy:hoy, fin:fin, cons:cons, rec:rec, dias:dias};
