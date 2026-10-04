@@ -1,34 +1,34 @@
 // ════════════════════════════════════════════════════════════════════════
 // ENSAYO · los render del PAGO DE QUINCENA, corridos de verdad
-// 3-oct-2026 · REGENERADO al agregar incapacidades (pegado 6).
+// 3-oct-2026 · REGENERADO al agregar la REBAJA DEL TRABAJADOR (pegado 7).
 //     /System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc \
 //       herramientas/ensayos/prueba_pago_render.js
 //
 // POR QUE EXISTE. `loadcheck.py` prueba que el bloque JS CARGUE; no ejecuta
-// ningun render. El 3-oct eso dejo pasar un bug real: en `_solMiasRender` unas
-// lineas de concatenacion arrancaban con `+` adentro de un parentesis que ya
-// tenia su `+`, o sea `'texto' + +(...)` — un MAS UNARIO sobre un string, que
-// da NaN. Sintaxis perfecta, loadcheck en verde, y la pantalla habria dicho
-// "NaN" al empleado. De ahi los asserts de `NaN?` y `undefined?`.
+// ningun render. El 3-oct eso dejo pasar dos bugs reales:
+//   · `'texto' + +(...)` en _solMiasRender — mas unario sobre un string, NaN en
+//     la pantalla del empleado. Sintaxis perfecta y loadcheck en verde.
+//   · los dos avisos se prependian uno tras otro, asi que el orden salia AL
+//     REVES del escrito y el de la rebaja —que afecta a TODAS las personas—
+//     quedaba debajo del de incapacidad. De ahi la prueba de ORDEN de abajo.
 //
-// ⚠️ LOS MONTOS SON TODOS FICTICIOS. 600.000 es un placeholder elegido porque
-// da tarifas redondas (dia 20.000, hora 2.500) y se cuadra de cabeza. NO
-// escribir aca el salario real de nadie: este archivo va al repo, que es PUBLICO.
+// ⚠️ MONTOS TODOS FICTICIOS. 600.000 da tarifa 20.000 y base 300.000; con el
+// 6,49% el neto es 280.530 y se cuadra de cabeza. NO es el salario de nadie:
+// este archivo va al repo, que es PUBLICO.
 //
-// ⚠️ LAS FUNCIONES SE EXTRAEN DEL index.html POR REGEX al armar este archivo,
-// asi que es una FOTO. Si se toca un render, hay que REGENERARLO — si no,
-// prueba la version vieja y da verde igual. Paso el 3-oct al agregar
-// incapacidades: el ensayo viejo seguia pasando sin probar ni un renglon nuevo.
+// ⚠️ LAS FUNCIONES SE EXTRAEN DEL index.html POR REGEX: es una FOTO. Si se toca
+// un render hay que REGENERARLO, o prueba la version vieja y da verde igual.
+// Paso dos veces ya (incapacidades y esta).
 // ════════════════════════════════════════════════════════════════════════
 
 
-var _PAG_ORDEN={base:0, incapacidad:1, descuento_permiso:2, ajuste:3};
+var _PAG_ORDEN={base:0, incapacidad:1, descuento_permiso:2, rebaja:3, ajuste:4};
 var PER_MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
              'setiembre','octubre','noviembre','diciembre'];
 function esc(x){ return String(x==null?'':x); }
 var _perEsSocia=true, _calPend=null, _perModPick={}, _perOrgPick={}, _solMias=null;
 var _pagQ=null,_pagFilas=null,_pagDet=null,_pagGente=null,_pagAbierto={};
-var _pagFlags={reglas:0, subsidio:0};
+var _pagFlags={reglas:0, subsidio:0, rebajaOk:0, rebajaPct:null, incapRebaja:0};
 var _SALIDA={};
 function _el(id){ if(!_SALIDA[id]) _SALIDA[id]={innerHTML:'',className:'',classList:{add:function(){},remove:function(){},toggle:function(){}},value:'',textContent:''}; return _SALIDA[id]; }
 var document={ getElementById:_el };
@@ -189,7 +189,7 @@ function _pagRender(){
       +'Si debería haber, revisá que la persona tenga salario cargado en rrhh_salario.</div>';
     return;
   }
-  let h='', totalQuincena=0, descuadres=0, nIncap=0;
+  let h='', totalQuincena=0, descuadres=0, nIncap=0, nRebaja=0;
   filas.forEach(function(f){
     const det=(_pagDet||[]).filter(function(d){ return Number(d.persona_id)===Number(f.persona_id); })
       .sort(function(a,b){
@@ -200,17 +200,34 @@ function _pagRender(){
     det.forEach(function(d){
       suma+=Math.round(Number(d.monto)||0);
       if(d.concepto==='incapacidad') nIncap++;
+      if(d.concepto==='rebaja') nRebaja++;
     });
     const exacto=Math.round(Number(f.final)||0);
     if(Math.abs(suma-exacto)>1) descuadres++;
     totalQuincena+=suma;
 
-    let filasHTML='';
+    // EL SUBTOTAL ES UN ACUMULADO DE LOS RENGLONES REDONDEADOS, los mismos que
+    // se dibujan. Se emite justo antes de la rebaja para que el paso «salario
+    // menos ausencias → rebaja → neto» se pueda seguir con el dedo. No es un
+    // sumando: no entra en `suma`, que ya recorrio todo el detalle arriba.
+    let filasHTML='', acum=0, subPuesto=false;
     det.forEach(function(d){
+      if(d.concepto==='rebaja' && !subPuesto){
+        filasHTML+='<tr class="sub"><td>Subtotal antes de rebajas</td>'
+                 + '<td class="n">'+_pagCRC(acum)+'</td></tr>';
+        subPuesto=true;
+      }
+      acum+=Math.round(Number(d.monto)||0);
       let qué='', como='';
       if(d.concepto==='base'){
         qué='Base de la quincena';
         como=d.nota||'';
+      }else if(d.concepto==='rebaja'){
+        // La etiqueta con el porcentaje la arma el SQL (`nota`), igual que en
+        // incapacidad: si se redactara acá, el día que cambie el parámetro esta
+        // pantalla seguiría diciendo el porcentaje viejo.
+        qué=(d.nota||'Rebajas del trabajador');
+        como='Del salario guardado al neto que se transfiere';
       }else if(d.concepto==='incapacidad'){
         // La etiqueta entera la arma el SQL (`nota`), con el origen, los días y
         // la línea de que el subsidio no va en esta transferencia. Acá no se
@@ -262,8 +279,27 @@ function _pagRender(){
   // confirmar no cambian ningún número, y un aviso que aparece siempre se
   // termina ignorando — justo el día que sí importe (las 5 reglas de alertas de
   // CLAUDE.md: informar no es alertar).
+  // LOS DOS AVISOS SE ARMAN APARTE Y SE PEGAN AL FINAL, EN ORDEN EXPLICITO.
+  // Prependiendo uno tras otro el orden sale AL REVES del que se escribe —el
+  // primero en prependerse queda abajo— y el de la rebaja tiene que ir arriba:
+  // afecta el neto de TODAS las personas, no solo de quien tuvo una incapacidad.
+  let avisoRebaja='', avisoIncap='';
+  if(nRebaja && !_pagFlags.rebajaOk){
+    avisoRebaja='<div class="status s-warn" style="margin-bottom:14px">'
+     + '<b>Porcentaje de rebajas sin confirmar con la contadora: verificá que el neto '
+     + 'coincida con la transferencia real.</b> '
+     + 'El salario guardado está ANTES de las rebajas del trabajador, así que la pantalla '
+     + 'le aplica '
+     + (_pagFlags.rebajaPct===null ? 'el porcentaje de <code>rebaja_trabajador_pct</code>'
+        : ('el '+Number(_pagFlags.rebajaPct).toLocaleString('es-CR',{minimumFractionDigits:0,maximumFractionDigits:2})+'%'))
+     + ' para llegar al neto. Ese porcentaje salió de una observación '
+     + '(la pantalla daba 6,94% más que la transferencia), no de una tasa confirmada. '
+     + 'Cuadrá a mano una quincena sin permisos: si el neto de las tres personas no calza '
+     + 'al colón, un porcentaje único no alcanza.'
+     + '</div>';
+  }
   if(nIncap && !_pagFlags.reglas){
-    h='<div class="status s-warn" style="margin-bottom:14px">'
+    avisoIncap='<div class="status s-warn" style="margin-bottom:14px">'
      + '<b>Reglas de incapacidad pendientes de confirmar con la contadora.</b> '
      + 'Hay '+nIncap+(nIncap===1?' incapacidad':' incapacidades')+' en esta quincena. '
      + 'El descuento está calculado con los valores provisionales de <code>rrhh_param</code> '
@@ -272,8 +308,9 @@ function _pagRender(){
      + (_pagFlags.subsidio
          ? 'Además está marcado que el subsidio lo paga la empresa, así que el modelo de resta de esta pantalla puede no corresponder.'
          : 'El subsidio de la CCSS o del INS no va en esta transferencia: se lo depositan al trabajador.')
-     + '</div>' + h;
+     + '</div>';
   }
+  h = avisoRebaja + avisoIncap + h;
   box.innerHTML=h;
   if(descuadres) _perAviso('pagStatus','s-warn',descuadres+(descuadres===1?' persona':' personas')
     +' con el desglose descuadrado respecto del total de la vista. Está marcado abajo.');
@@ -397,108 +434,83 @@ function _calBandejaRender(){
 }
 
 
-// ── DATOS DE PRUEBA · TODOS LOS MONTOS SON FICTICIOS (placeholders) ──────
-var SAL=600000, TDIA=SAL/30, THORA=TDIA/8;
+// ── DATOS FICTICIOS ─────────────────────────────────────────────────────
+var SAL=600000, TDIA=SAL/30, B=SAL/2, PCT=6.49, F=1-PCT/100;
 function dice(t){ print(t); }
 function R(n){ return Math.round(n); }
+function CRC(n){ return '₡'+Math.abs(R(n)).toLocaleString('es-CR'); }
 
-// 1 · "Lo que pediste" con incapacidad
-_solMias=[{tipo:'Permiso', ini:'2026-10-14', fin:'2026-10-18', dias:5, horas:null,
-           motivo:null, estado:'aprobado', mod:'incapacidad', origen:'enfermedad_comun',
-           nota:null, por:'socia@x'},
-          {tipo:'Permiso', ini:'2026-10-20', fin:'2026-10-20', dias:1, horas:null,
-           motivo:null, estado:'pendiente', mod:'incapacidad', origen:'accidente_trabajo',
-           nota:null, por:null}];
-_solMiasRender();
-var o1=_SALIDA['solMias'].innerHTML;
-dice('1 · _solMiasRender con incapacidad');
-dice('   NaN? '+(/NaN/.test(o1)?'SI -> BUG':'no')+' · undefined? '+(/undefined/.test(o1)?'SI -> BUG':'no'));
-dice('   dice enfermedad: '+(/Incapacidad \(enfermedad\)/.test(o1)?'ok':'FALTA'));
-dice('   dice accidente:  '+(/Incapacidad \(accidente de trabajo\)/.test(o1)?'ok':'FALTA'));
+function filaBase(){ return {persona_id:1, concepto:'base', ref_id:null, dia:'2026-10-01',
+  cantidad:1, unidad:'quincena', tarifa:SAL, monto:B, nota:'Salario vigente desde 01-01-2026'}; }
+function filaRebaja(){ return {persona_id:1, concepto:'rebaja', ref_id:null, dia:'2026-10-01',
+  cantidad:PCT, unidad:'pct', tarifa:null, monto:-(B*PCT/100),
+  nota:'Rebajas del trabajador ('+PCT.toFixed(2)+'%) · PORCENTAJE SIN CONFIRMAR'}; }
+function pintar(det, flags, finalVista){
+  var suma=0; det.forEach(function(d){ suma+=R(Number(d.monto)||0); });
+  _pagQ='2026-10-Q1'; _pagFlags=flags; _pagDet=det; _pagGente=[{id:1,nombre:'Persona Ejemplo'}];
+  _pagFilas=[{persona_id:1, nombre:'Persona Ejemplo', ini:'2026-10-01', fin:'2026-10-15',
+              base:B, descuentos:0, ajustes:0, incapacidades:0,
+              rebaja:-(B*PCT/100), subtotal:B,
+              final:(finalVista===undefined?suma:finalVista),
+              permisos:0, ajustes_n:0, incap_n:0}];
+  _pagRender();
+  return {html:_SALIDA['pagBody'].innerHTML, suma:suma};
+}
 
-// 2 · la bandeja: tercer boton, origen, y el bloqueo del permiso por horas
-dice('2 · _perModHTML');
-var a=_perModHTML({fuente:'permiso', id:1, mod:'incapacidad', origen:'enfermedad_comun'});
-dice('   boton incapacidad marcado: '+(/per-opt on[^>]*>Incapacidad/.test(a)?'ok':'FALTA'));
-dice('   muestra el selector de origen: '+(/Enfermedad \(CCSS\)/.test(a)?'ok':'FALTA'));
-var b=_perModHTML({fuente:'permiso', id:2, mod:'incapacidad', origen:null});
-dice('   sin origen avisa: '+(/Falta de qué es/.test(b)?'ok':'FALTA'));
-var c=_perModHTML({fuente:'permiso', id:3, mod:'descuento', horas:3});
-dice('   pedido por horas NO ofrece incapacidad: '
-     +((!/>Incapacidad</.test(c) && /no puede ser incapacidad/.test(c))?'ok':'FALTA'));
-var d=_perModHTML({fuente:'permiso', id:4, mod:'incapacidad', origen:'accidente_trabajo', boleta:'B-123'});
-dice('   muestra la boleta: '+(/Boleta B-123/.test(d)?'ok':'FALTA'));
+// 1 · el renglon de rebaja, el subtotal y el neto
+dice('1 · rebaja en el desglose');
+var r1=pintar([filaBase(), filaRebaja()], {reglas:1, subsidio:0, rebajaOk:0, rebajaPct:PCT, incapRebaja:0});
+dice('   NaN? '+(/NaN/.test(r1.html)?'SI -> BUG':'no')+' · undefined? '+(/undefined/.test(r1.html)?'SI -> BUG':'no'));
+dice('   renglon de rebaja con su %: '+(/Rebajas del trabajador \(6\.49%\)/.test(r1.html)?'ok':'FALTA'));
+dice('   subtotal antes de la rebaja: '+(/Subtotal antes de rebajas/.test(r1.html)?'ok':'FALTA'));
+dice('   el subtotal va ANTES del renglon de rebaja: '
+     +(r1.html.indexOf('Subtotal antes de rebajas') < r1.html.indexOf('Rebajas del trabajador')?'ok':'AL REVES -> BUG'));
+dice('   subtotal = base ('+CRC(B)+'): '+(r1.html.indexOf(CRC(B))>=0?'ok':'FALTA'));
+dice('   neto = '+CRC(B*F)+' y la columna suma a '+CRC(r1.suma)+': '
+     +(R(B*F)===r1.suma ? 'ok' : 'NO CUADRA -> BUG'));
+dice('   el neto aparece en pantalla: '+(r1.html.indexOf(CRC(B*F))>=0?'ok':'FALTA'));
+dice('   desglose cuadra con la vista: '+(/Falta un renglón/.test(r1.html)?'DESCUADRA -> BUG':'ok'));
 
-// 3 · perModPick no deja convertir un permiso por horas en incapacidad
-dice('3 · perModPick');
-_calPend=[{fuente:'permiso', id:9, mod:'descuento', horas:3}];
-_perModPick={};
-perModPick(9,'incapacidad');
-dice('   bloquea la conversion: '+(_perModPick[9]===undefined?'ok':'NO BLOQUEO -> BUG'));
-dice('   y lo dice en pantalla: '
-     +(/no se puede convertir|No se puede convertir/.test(_SALIDA['AVISO:calStatus'].innerHTML)?'ok':'FALTA'));
+// 2 · el aviso del porcentaje sin confirmar
+dice('2 · aviso de rebaja sin confirmar');
+dice('   aparece con rebajaOk=0: '+(/sin confirmar con la contadora/.test(r1.html)?'ok':'FALTA'));
+dice('   dice el porcentaje: '+(/6,49%/.test(r1.html)?'ok':'FALTA'));
+var r2=pintar([filaBase(), filaRebaja()], {reglas:1, subsidio:0, rebajaOk:1, rebajaPct:PCT, incapRebaja:0});
+dice('   desaparece con rebajaOk=1: '+(/sin confirmar con la contadora/.test(r2.html)?'SIGUE -> BUG':'ok'));
 
-// 4 · el desglose con incapacidad · 5 dias, cruza el dia 3 -> 4
-// dias 1-3 al 50% -> descuenta 0,5 x tarifa_dia cada uno
-// dias 4-5 al 0%  -> descuenta 1,0 x tarifa_dia cada uno
-dice('4 · _pagRender con incapacidad');
-_pagQ='2026-10-Q1'; _pagFlags={reglas:0, subsidio:0};
-var descIncap = 3*(TDIA*0.5) + 2*(TDIA*1.0);
-var det=[
- {persona_id:1, concepto:'base', ref_id:null, dia:'2026-10-01', cantidad:1, unidad:'quincena',
-  tarifa:SAL, monto:SAL/2, nota:'Salario vigente desde 01-01-2026'},
- {persona_id:1, concepto:'incapacidad', ref_id:7, dia:'2026-10-11', cantidad:5, unidad:'dias',
-  tarifa:TDIA, monto:-descIncap,
-  nota:'Incapacidad (enfermedad comun): 5 dias · 11-10 al 15-10 · subsidio CCSS NO incluido en esta transferencia · REGLAS SIN CONFIRMAR'}
-];
-var suma=R(SAL/2)+R(-descIncap);
-_pagFilas=[{persona_id:1, nombre:'Persona Ejemplo', ini:'2026-10-01', fin:'2026-10-15',
-            base:SAL/2, descuentos:0, ajustes:0, incapacidades:-descIncap,
-            final:SAL/2-descIncap, permisos:0, ajustes_n:0, incap_n:1}];
-_pagDet=det; _pagGente=[{id:1,nombre:'Persona Ejemplo'}];
-_pagRender();
-var o4=_SALIDA['pagBody'].innerHTML;
-dice('   NaN? '+(/NaN/.test(o4)?'SI -> BUG':'no')+' · undefined? '+(/undefined/.test(o4)?'SI -> BUG':'no'));
-dice('   renglon aparte de incapacidad: '+(/Incapacidad \(enfermedad comun\)/.test(o4)?'ok':'FALTA'));
-dice('   dice que el subsidio no va: '+(/subsidio CCSS NO incluido/.test(o4)?'ok':'FALTA'));
-dice('   AVISO de reglas sin confirmar: '+(/pendientes de confirmar con la contadora/.test(o4)?'ok':'FALTA'));
-dice('   el aviso va ARRIBA del primer numero: '
-     +(o4.indexOf('pendientes de confirmar') < o4.indexOf('pag-fila')?'ok':'ESTA ABAJO -> revisar'));
-dice('   desglose cuadra: '+(/Falta un renglón/.test(o4)?'DESCUADRA -> BUG':'ok'));
-dice('   columna suma a '+suma+' y aparece: '
-     +(o4.indexOf('₡'+Math.abs(suma).toLocaleString('es-CR'))>=0?'ok':'FALTA'));
+// 3 · sin renglon de rebaja no hay aviso ni subtotal (nada que explicar)
+dice('3 · sin rebaja');
+var r3=pintar([filaBase()], {reglas:1, subsidio:0, rebajaOk:0, rebajaPct:PCT, incapRebaja:0});
+dice('   no mete el aviso: '+(/sin confirmar con la contadora/.test(r3.html)?'APARECE -> ruido':'ok'));
+dice('   no mete subtotal: '+(/Subtotal antes de rebajas/.test(r3.html)?'APARECE -> ruido':'ok'));
 
-// 5 · con reglas CONFIRMADAS el aviso desaparece
-dice('5 · reglas confirmadas');
-_pagFlags={reglas:1, subsidio:0};
-_pagRender();
-dice('   el aviso ya no aparece: '
-     +(/pendientes de confirmar/.test(_SALIDA['pagBody'].innerHTML)?'SIGUE -> BUG':'ok'));
+// 4 · EL ORDEN DE LOS DOS AVISOS — el bug que se cazo al escribirlo
+dice('4 · orden de los avisos');
+var detIncap=[filaBase(),
+  {persona_id:1, concepto:'incapacidad', ref_id:7, dia:'2026-10-06', cantidad:2, unidad:'dias',
+   tarifa:TDIA, monto:-(2*TDIA*0.5),
+   nota:'Incapacidad (enfermedad comun): 2 dias · 06-10 al 07-10 · subsidio CCSS NO incluido en esta transferencia · REGLAS SIN CONFIRMAR'},
+  filaRebaja()];
+var r4=pintar(detIncap, {reglas:0, subsidio:0, rebajaOk:0, rebajaPct:PCT, incapRebaja:0});
+dice('   salen los dos avisos: '
+     +((/sin confirmar con la contadora/.test(r4.html) && /pendientes de confirmar con la contadora/.test(r4.html))?'ok':'FALTA'));
+dice('   el de REBAJA va ARRIBA del de incapacidad: '
+     +(r4.html.indexOf('sin confirmar con la contadora') < r4.html.indexOf('pendientes de confirmar')?'ok':'AL REVES -> BUG'));
+dice('   los dos avisos van arriba del primer numero: '
+     +(Math.max(r4.html.indexOf('sin confirmar con la contadora'),
+                r4.html.indexOf('pendientes de confirmar')) < r4.html.indexOf('pag-fila')?'ok':'ABAJO -> revisar'));
 
-// 6 · sin incapacidades, el aviso NO aparece aunque las reglas no esten confirmadas
-dice('6 · sin incapacidades');
-_pagFlags={reglas:0, subsidio:0};
-_pagDet=[det[0]];
-_pagFilas=[{persona_id:1, nombre:'Persona Ejemplo', ini:'2026-10-01', fin:'2026-10-15',
-            base:SAL/2, descuentos:0, ajustes:0, incapacidades:0, final:SAL/2,
-            permisos:0, ajustes_n:0, incap_n:0}];
-_pagRender();
-dice('   no mete ruido: '
-     +(/pendientes de confirmar/.test(_SALIDA['pagBody'].innerHTML)?'APARECE -> ruido':'ok'));
+// 5 · el control de descuadre TIENE que ver el renglon de rebaja
+dice('5 · el descuadre incluye la rebaja');
+var r5=pintar([filaBase(), filaRebaja()],
+              {reglas:1, subsidio:0, rebajaOk:1, rebajaPct:PCT, incapRebaja:0},
+              B);   // la vista dice `final` = base, como si la rebaja no existiera
+dice('   avisa cuando la vista ignora la rebaja: '
+     +(/Falta un renglón/.test(r5.html)?'ok':'NO AVISA -> BUG'));
 
-// 7 · subsidio a cargo de la empresa: el aviso lo dice
-dice('7 · subsidio lo paga la empresa');
-_pagFlags={reglas:0, subsidio:1};
-_pagDet=det;
-_pagFilas=[{persona_id:1, nombre:'Persona Ejemplo', ini:'2026-10-01', fin:'2026-10-15',
-            base:SAL/2, descuentos:0, ajustes:0, incapacidades:-descIncap,
-            final:SAL/2-descIncap, permisos:0, ajustes_n:0, incap_n:1}];
-_pagRender();
-dice('   advierte que el modelo puede no corresponder: '
-     +(/puede no corresponder/.test(_SALIDA['pagBody'].innerHTML)?'ok':'FALTA'));
-
-// 8 · el orden de los renglones: base, incapacidad, descuento, ajuste
-dice('8 · orden del desglose');
-dice('   _PAG_ORDEN: '+JSON.stringify(_PAG_ORDEN));
-dice('   incapacidad va antes que descuento: '
-     +(_PAG_ORDEN.incapacidad < _PAG_ORDEN.descuento_permiso?'ok':'FALTA'));
+// 6 · el orden de los conceptos
+dice('6 · _PAG_ORDEN');
+dice('   '+JSON.stringify(_PAG_ORDEN));
+dice('   rebaja despues de los descuentos: '+(_PAG_ORDEN.rebaja > _PAG_ORDEN.descuento_permiso?'ok':'FALTA'));
+dice('   y ANTES de los ajustes (que no llevan rebaja): '
+     +(_PAG_ORDEN.rebaja < _PAG_ORDEN.ajuste?'ok':'FALTA'));

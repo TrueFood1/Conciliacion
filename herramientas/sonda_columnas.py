@@ -51,7 +51,8 @@ NUEVAS = {
                            'dia_n', 'incapacidad_origen'],
     'v_rrhh_pago_detalle':['quincena', 'persona_id', 'concepto', 'monto', 'nota'],
     'v_rrhh_pago':        ['quincena', 'persona_id', 'base', 'descuentos',
-                           'ajustes', 'final', 'incapacidades', 'incap_n'],
+                           'ajustes', 'final', 'incapacidades', 'incap_n',
+                           'rebaja', 'subtotal'],
 }
 
 def conexion():

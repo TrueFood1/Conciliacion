@@ -1070,6 +1070,10 @@ body[data-mod="personal"] .main{
 .pag-det td{padding:3px 0;vertical-align:top;color:var(--text-m)}
 .pag-det td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:14px}
 .pag-det tr.tot td{border-top:1px solid var(--border);padding-top:6px;color:var(--text)}
+/* El SUBTOTAL es un paso intermedio, no un total: lleva la linea divisoria pero
+   NO el color de texto principal, para que no compita con «A transferir». Y no
+   se suma de nuevo — es la suma de lo que esta arriba. */
+.pag-det tr.sub td{border-top:1px solid var(--border);padding-top:6px}
 /* La sugerencia del empleado dentro de la bandeja. Dos botones chicos: lo que
    viene marcado es lo que pidio, y tocar el otro lo cambia antes de aprobar. */
 .per-mod{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
@@ -4811,7 +4815,7 @@ body.es-socia .face-pend{display:block}
 // orden que evita un botón que deja mandar algo que la base rechaza.
 // b80 · El calendario de ausencias de Personal se publico el 2-oct (decision de
 // Andrea, confirmada por Lorena). dev y main vuelven a estar alineados.
-const BUILD = 'v 3 oct 2026 · b81: pago de quincena e incapacidades en Personal';
+const BUILD = 'v 3 oct 2026 · b81: pago de quincena, incapacidades y neto en Personal';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -6639,7 +6643,7 @@ let _pagQ=null, _pagFilas=null, _pagDet=null, _pagGente=null, _pagAbierto={};
 // FALLAN DEL LADO SEGURO: si la lectura no contesta, `reglas` queda en 0 y el
 // aviso SE MUESTRA. Al revés —asumir confirmadas— sería esconder la advertencia
 // justo cuando el sistema no sabe nada.
-let _pagFlags={reglas:0, subsidio:0};
+let _pagFlags={reglas:0, subsidio:0, rebajaOk:0, rebajaPct:null, incapRebaja:0};
 
 function irAPagoQuincena(){
   _modShow('vPagoQuincena'); crumbSet('Personal','Pago de quincena'); _perTabs('pago');
@@ -6721,7 +6725,8 @@ async function pagCargar(force){
        .eq('quincena',_pagQ),
       c.from('rrhh_persona').select('id,nombre'),
       c.from('rrhh_param').select('clave,valor,vigente_desde')
-       .in('clave',['incapacidad_reglas_confirmadas','incap_subsidio_lo_paga_la_empresa'])
+       .in('clave',['incapacidad_reglas_confirmadas','incap_subsidio_lo_paga_la_empresa',
+                    'rebaja_trabajador_confirmada','rebaja_trabajador_pct','incap_sujeta_a_rebaja'])
        .order('vigente_desde',{ascending:false})
     ]);
     if(rp.error) throw rp.error;
@@ -6735,7 +6740,13 @@ async function pagCargar(force){
     const vig={};
     ((rf&&rf.data)||[]).forEach(function(r){ if(vig[r.clave]===undefined) vig[r.clave]=Number(r.valor); });
     _pagFlags={reglas:(vig['incapacidad_reglas_confirmadas']===1?1:0),
-               subsidio:(vig['incap_subsidio_lo_paga_la_empresa']===1?1:0)};
+               subsidio:(vig['incap_subsidio_lo_paga_la_empresa']===1?1:0),
+               rebajaOk:(vig['rebaja_trabajador_confirmada']===1?1:0),
+               // El porcentaje se LEE para poder decirlo en el aviso, nunca para
+               // calcular: el monto de la rebaja lo manda la vista. Si esta
+               // pantalla lo multiplicara por su cuenta, habria dos formulas.
+               rebajaPct:(vig['rebaja_trabajador_pct']===undefined?null:vig['rebaja_trabajador_pct']),
+               incapRebaja:(vig['incap_sujeta_a_rebaja']===1?1:0)};
     _perAviso('pagStatus','');
     _pagRender();
   }catch(e){
@@ -6747,7 +6758,7 @@ async function pagCargar(force){
 // El orden de los renglones del desglose es fijo y no alfabético: primero de
 // dónde sale la plata, después lo que se resta por permiso, después lo que se
 // movió a mano. Es el orden en que se explica el número.
-const _PAG_ORDEN={base:0, incapacidad:1, descuento_permiso:2, ajuste:3};
+const _PAG_ORDEN={base:0, incapacidad:1, descuento_permiso:2, rebaja:3, ajuste:4};
 
 function _pagRender(){
   const box=document.getElementById('pagBody'); if(!box) return;
@@ -6759,7 +6770,7 @@ function _pagRender(){
       +'Si debería haber, revisá que la persona tenga salario cargado en rrhh_salario.</div>';
     return;
   }
-  let h='', totalQuincena=0, descuadres=0, nIncap=0;
+  let h='', totalQuincena=0, descuadres=0, nIncap=0, nRebaja=0;
   filas.forEach(function(f){
     const det=(_pagDet||[]).filter(function(d){ return Number(d.persona_id)===Number(f.persona_id); })
       .sort(function(a,b){
@@ -6770,17 +6781,34 @@ function _pagRender(){
     det.forEach(function(d){
       suma+=Math.round(Number(d.monto)||0);
       if(d.concepto==='incapacidad') nIncap++;
+      if(d.concepto==='rebaja') nRebaja++;
     });
     const exacto=Math.round(Number(f.final)||0);
     if(Math.abs(suma-exacto)>1) descuadres++;
     totalQuincena+=suma;
 
-    let filasHTML='';
+    // EL SUBTOTAL ES UN ACUMULADO DE LOS RENGLONES REDONDEADOS, los mismos que
+    // se dibujan. Se emite justo antes de la rebaja para que el paso «salario
+    // menos ausencias → rebaja → neto» se pueda seguir con el dedo. No es un
+    // sumando: no entra en `suma`, que ya recorrio todo el detalle arriba.
+    let filasHTML='', acum=0, subPuesto=false;
     det.forEach(function(d){
+      if(d.concepto==='rebaja' && !subPuesto){
+        filasHTML+='<tr class="sub"><td>Subtotal antes de rebajas</td>'
+                 + '<td class="n">'+_pagCRC(acum)+'</td></tr>';
+        subPuesto=true;
+      }
+      acum+=Math.round(Number(d.monto)||0);
       let qué='', como='';
       if(d.concepto==='base'){
         qué='Base de la quincena';
         como=d.nota||'';
+      }else if(d.concepto==='rebaja'){
+        // La etiqueta con el porcentaje la arma el SQL (`nota`), igual que en
+        // incapacidad: si se redactara acá, el día que cambie el parámetro esta
+        // pantalla seguiría diciendo el porcentaje viejo.
+        qué=(d.nota||'Rebajas del trabajador');
+        como='Del salario guardado al neto que se transfiere';
       }else if(d.concepto==='incapacidad'){
         // La etiqueta entera la arma el SQL (`nota`), con el origen, los días y
         // la línea de que el subsidio no va en esta transferencia. Acá no se
@@ -6832,8 +6860,27 @@ function _pagRender(){
   // confirmar no cambian ningún número, y un aviso que aparece siempre se
   // termina ignorando — justo el día que sí importe (las 5 reglas de alertas de
   // CLAUDE.md: informar no es alertar).
+  // LOS DOS AVISOS SE ARMAN APARTE Y SE PEGAN AL FINAL, EN ORDEN EXPLICITO.
+  // Prependiendo uno tras otro el orden sale AL REVES del que se escribe —el
+  // primero en prependerse queda abajo— y el de la rebaja tiene que ir arriba:
+  // afecta el neto de TODAS las personas, no solo de quien tuvo una incapacidad.
+  let avisoRebaja='', avisoIncap='';
+  if(nRebaja && !_pagFlags.rebajaOk){
+    avisoRebaja='<div class="status s-warn" style="margin-bottom:14px">'
+     + '<b>Porcentaje de rebajas sin confirmar con la contadora: verificá que el neto '
+     + 'coincida con la transferencia real.</b> '
+     + 'El salario guardado está ANTES de las rebajas del trabajador, así que la pantalla '
+     + 'le aplica '
+     + (_pagFlags.rebajaPct===null ? 'el porcentaje de <code>rebaja_trabajador_pct</code>'
+        : ('el '+Number(_pagFlags.rebajaPct).toLocaleString('es-CR',{minimumFractionDigits:0,maximumFractionDigits:2})+'%'))
+     + ' para llegar al neto. Ese porcentaje salió de una observación '
+     + '(la pantalla daba 6,94% más que la transferencia), no de una tasa confirmada. '
+     + 'Cuadrá a mano una quincena sin permisos: si el neto de las tres personas no calza '
+     + 'al colón, un porcentaje único no alcanza.'
+     + '</div>';
+  }
   if(nIncap && !_pagFlags.reglas){
-    h='<div class="status s-warn" style="margin-bottom:14px">'
+    avisoIncap='<div class="status s-warn" style="margin-bottom:14px">'
      + '<b>Reglas de incapacidad pendientes de confirmar con la contadora.</b> '
      + 'Hay '+nIncap+(nIncap===1?' incapacidad':' incapacidades')+' en esta quincena. '
      + 'El descuento está calculado con los valores provisionales de <code>rrhh_param</code> '
@@ -6842,8 +6889,9 @@ function _pagRender(){
      + (_pagFlags.subsidio
          ? 'Además está marcado que el subsidio lo paga la empresa, así que el modelo de resta de esta pantalla puede no corresponder.'
          : 'El subsidio de la CCSS o del INS no va en esta transferencia: se lo depositan al trabajador.')
-     + '</div>' + h;
+     + '</div>';
   }
+  h = avisoRebaja + avisoIncap + h;
   box.innerHTML=h;
   if(descuadres) _perAviso('pagStatus','s-warn',descuadres+(descuadres===1?' persona':' personas')
     +' con el desglose descuadrado respecto del total de la vista. Está marcado abajo.');
