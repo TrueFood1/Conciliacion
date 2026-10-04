@@ -175,6 +175,23 @@ d as (
                           current_setting('ensayo.p2', true)::bigint,
                           current_setting('ensayo.p3', true)::bigint,
                           current_setting('ensayo.p4', true)::bigint)
+     -- ⚠️ EL FILTRO DE QUINCENA FALTABA, Y ESO ROMPIO LA FILA 15 (3-oct-2026).
+     -- `v_rrhh_pago_detalle` emite un renglon de `base` por persona y por CADA
+     -- quincena del universo, no solo por las del ensayo. Y el universo lo fija
+     -- el ensayo mismo: los salarios entran con vigente_desde 2026-01-05 y el
+     -- permiso del caso 3 llega al 21-oct, asi que van de 2026-01-Q1 a
+     -- 2026-10-Q2 = 20 quincenas. 4 personas × 20 = 80 renglones de base, y la
+     -- fila 15 esperaba 8. El 80 era CORRECTO: la prueba estaba mal escrita.
+     --
+     -- Las quincenas se DERIVAN del dato y no se escriben a mano, para que el
+     -- filtro siga valiendo si alguien mueve las fechas del ensayo. Escribir
+     -- 'in (2026-10-Q1, 2026-10-Q2)' habria sido poner la respuesta al lado de
+     -- la pregunta.
+     and d.quincena in (
+       select distinct rrhh_quincena(pm.fecha_inicio + g.i)
+         from rrhh_permiso pm
+         cross join generate_series(0, (pm.fecha_fin - pm.fecha_inicio)) g(i)
+        where pm.creado_por = 'ensayo-incap')
 ),
 f as (
   select d.*, round(d.monto / t.tdia, 4) as factor from d cross join t
@@ -294,9 +311,25 @@ filas as (
   union all
   -- Y que la base de la quincena siga ahi: si el pegado rompio la rama vieja,
   -- esto lo caza antes que cualquier revision a ojo.
-  select 15, 'la base de la quincena sigue saliendo (4 personas × 2 quincenas)', '8',
+  -- Ahora cuenta SOLO las quincenas del ensayo (ver el filtro del CTE `d`):
+  -- 4 personas × 2 quincenas = 8.
+  select 15, 'la base sigue saliendo · 4 personas × 2 quincenas del ensayo', '8',
          (select count(*)::text from f where concepto = 'base'),
          (select count(*) = 8 from f where concepto = 'base')
+  union all
+  -- INFO, no es una prueba. Deja a la vista cuantas quincenas tiene el universo
+  -- y cuantos renglones de base salen SIN el filtro. Existe porque el 3-oct ese
+  -- numero (80) aparecio sin explicacion y costo una vuelta entenderlo: con esta
+  -- fila, la proxima vez se lee solo.
+  select 16, 'INFO · base en TODAS las quincenas del universo (sin filtrar)',
+         'informativo: 4 × (quincenas del universo)',
+         (select count(*)::text from v_rrhh_pago_detalle x
+           where x.concepto = 'base'
+             and x.persona_id in (current_setting('ensayo.p1', true)::bigint,
+                                  current_setting('ensayo.p2', true)::bigint,
+                                  current_setting('ensayo.p3', true)::bigint,
+                                  current_setting('ensayo.p4', true)::bigint)),
+         true
 )
 select ord, prueba, esperado, obtenido,
        case when ok then 'OK' else 'FALLA' end as veredicto
