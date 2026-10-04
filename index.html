@@ -20523,14 +20523,19 @@ function _cpFilasPedido(g){ return _cpAlc.filas.filter(function(f){ return f.pro
 function _cpAlcPedido(g, filas, valores){
   const A=_cpAlc, F=_cpFechasPedido(g), antes=!g.fijo && F.entrega<=A.hoy, res={};
   filas.forEach(function(f){ res[f.pid]=_cpAlcanzaCon(f, _dfDesdePanel(f, +valores[f.pid]||0), F.entrega, antes); });
+  // Un insumo «por cargar» con pedido en CERO no decide el texto (Andrea, 4-oct: la tapa dulce de
+  // Automercado tapaba el «alcanza» del azúcar); sigue a la vista como «por cargar» en su fila y en
+  // el Resumen. Si todos son así, deciden ellos.
+  const fuera=function(f){ return _cpEsOdoo(f, res[f.pid]) && !(+valores[f.pid]>0); };
+  const cuentan=filas.some(function(f){ return !fuera(f); }) ? filas.filter(function(f){ return !fuera(f); }) : filas;
   let peor=null, fp=null;
-  filas.forEach(function(f){ const r=res[f.pid]; if(r.falla && r.falla>=F.entrega && (!peor || r.falla<peor.falla)){ peor=r; fp=f; } });
+  cuentan.forEach(function(f){ const r=res[f.pid]; if(r.falla && r.falla>=F.entrega && (!peor || r.falla<peor.falla)){ peor=r; fp=f; } });
   return {F:F, res:res, peor:peor,
     alc: !peor ? 'más de 4 semanas' : (peor.ultimo ? ('hasta el '+_fechaCorta(peor.ultimo)) : null),
     corto: !!(peor && peor.falla<=g.alcanzaHasta),
     // Si no hay ninguno después de la entrega (huevo líquido: falta hoy, llega el jue 8), igual avisa
     // cuando lo que falta antes es solo Odoo: «más de 4 semanas» ahí era mentira.
-    odoo: peor ? !!(fp.deficit && peor.falla<=A.hoy) : filas.some(function(f){ return _cpEsOdoo(f, res[f.pid]); })};
+    odoo: peor ? !!(fp.deficit && peor.falla<=A.hoy) : cuentan.some(function(f){ return _cpEsOdoo(f, res[f.pid]); })};
 }
 // Una fila que «falta hoy» solo porque Odoo tiene menos de lo que ya se usó.
 const _cpEsOdoo=function(f, r){ return !!(f.deficit && r.falla && r.falla<=_cpAlc.hoy); };
