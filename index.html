@@ -539,7 +539,7 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .calc-rec td{padding:5px 6px;border-bottom:1px solid var(--border);vertical-align:middle}
 .calc-rec .calc-num{height:32px}
 .calc-rec-x{background:none;border:1px solid var(--border-strong);color:var(--text-3);border-radius:6px;width:24px;height:24px;cursor:pointer;font-size:11px;line-height:1;padding:0}
-.calc-rec-x:hover{border-color:#7a3a3a;color:#E08A8A}
+.calc-rec-x:hover{border-color:#7a3a3a;color:var(--err-6)}
 #calcTabla td, #calcTabla th{white-space:nowrap}
 tr:last-child td{border-bottom:none}
 tr.r-done td{background:#f2f9d6}
@@ -722,7 +722,7 @@ tr.r-ing td{background:#eff6ff}
 .inv-in{width:96px;padding:5px 7px;border:1px solid var(--border-m);border-radius:6px;font-size:13px;text-align:right;background:var(--surface);color:var(--text)}
 .inv-in-sm{width:60px}
 .inv-ok{color:#3a8a3a;font-weight:600}
-.inv-bad{color:#D9776E;font-weight:400}
+.inv-bad{color:var(--err-7);font-weight:400}
 .inv-dot{color:var(--good);font-size:9px;cursor:default;opacity:.7}
 .inv-dot-none{display:inline-block;width:9px}
 /* ── Login Truefie (tema oscuro) ── */
@@ -911,7 +911,7 @@ tr.r-ing td{background:#eff6ff}
 .mes-select{background:var(--surface-2);color:var(--text);border:1px solid var(--border-strong);border-radius:8px;padding:7px 10px;font-family:inherit;font-size:13px}
 /* ── ACENTO POR MÓDULO ── el color sigue al módulo vía --mod (heredado por la vista) */
 /* --accent/--blue/--blue-l siguen al módulo → todo acento interno hereda el color correcto (adiós morado viejo) */
-#vFacturado,#vCostos,#vRentabilidad,#vSimulador,#vCalcPrecios,#vResultados{--mod:var(--m-fin);--accent:var(--m-fin);--blue:var(--m-fin);--blue-l:rgba(55,138,221,.15)}   /* Finanzas = azul */
+#vFacturado,#vCostos,#vRentabilidad,#vSimulador,#vCalcPrecios,#vResultados,#vCobros,#vResults{--mod:var(--m-fin);--accent:var(--m-fin);--blue:var(--m-fin);--blue-l:rgba(55,138,221,.15)}   /* Finanzas = azul */
 #vProduccion,#vMermas,#vInventario,#vResumen,#vConteo,#vPlan{--mod:var(--m-ops);--accent:var(--m-ops);--blue:var(--m-ops);--blue-l:rgba(199,125,160,.15)}                          /* Operaciones = rosa apagado (sistema de color disciplinado) */
 #vUpload{--mod:var(--m-conc);--accent:var(--m-conc);--blue:var(--m-conc);--blue-l:rgba(132,189,0,.15)}                                                     /* Conciliación = verde */
 /* ENTREGAS = LIMA TRUE FOOD (13-ago-2026). Antes era morado #7F77DD; Andrea lo cambió
@@ -1239,6 +1239,10 @@ tr.r-done td{background:rgba(192,208,72,.08)}
   /* señal */
   --err-soft:#FFB4B4;--err-2:#FF8A8A;--err-wash:#3A1B1B;--ok-olive:#7E8C5A;--ok-fill:#7E8C5A;
   --dot-ok:#5FB37A;--odoo:#9AA7B8;--lime-hover:#DFF04A;
+  /* señal (2): tonos sueltos que estaban escritos a mano */
+  --warn-3:#F0B45C;--warn-4:#E8C96A;--warn-5:#C9A227;--warn-6:#D9BE8C;--warn-7:#C9B284;
+  --warn-line:#E0A82E;--err-3:#E7A6A6;--err-4:#E8A9A9;--err-5:#FFD9D9;--err-6:#E08A8A;
+  --err-7:#D9776E;--err-8:#E5484D;--ok-2:#8EDE9F;
   /* acento de módulo */
   --m-fin:#378ADD;--m-ops:#C77DA0;--m-ops-2:#D4537E;--m-conc:#84BD00;--m-comp:#A27FEB;
   --m-per:#FF671D;--magenta:#C964CF;--orange-2:#FF751F;
@@ -1342,6 +1346,10 @@ html[data-tema="claro"]{
   /* señal */
   --err-soft:#A32D2D;--err-2:#B03030;--err-wash:#FBE9E9;--ok-olive:#5F6B3A;--ok-fill:#B5C493;
   --dot-ok:#3E8A57;--odoo:#5E6B7D;--lime-hover:#DFF04A;
+  /* señal (2): tonos sueltos que estaban escritos a mano */
+  --warn-3:#9A6410;--warn-4:#8A5A00;--warn-5:#7A5A00;--warn-6:#7A4E08;--warn-7:#7A5A20;
+  --warn-line:#B07A10;--err-3:#A32D2D;--err-4:#A32D2D;--err-5:#8E2525;--err-6:#A83A3A;
+  --err-7:#A8402F;--err-8:#C0393D;--ok-2:#2F7A45;
   /* acento de módulo */
   --m-fin:#1F66B3;--m-ops:#9E4C75;--m-ops-2:#B3325E;--m-conc:#4E7A00;--m-comp:#6E46CC;
   --m-per:#C04400;--magenta:#A23DA8;--orange-2:#C85400;
@@ -1467,6 +1475,10 @@ table td,table th{border-color:#F2F0EA}
   /* 4-oct: +30 px para la luna/sol (110 → 140). */
   body #appHeader,body .header{padding-right:140px}
   body .home-hdr{padding-right:140px}
+  /* …y la línea de la conexión se recorta con «…» en vez de desbordarse sobre el logo: medía
+     198 px en una columna de 100 (el chip de tickets de abajo ya se recortaba así). */
+  .home-hdr-right .home-live{max-width:100%}
+  .home-hdr-right .home-live .t{min-width:0;text-overflow:ellipsis}
 }
 .crumbs{display:flex;align-items:center;gap:9px;font-size:14px}
 .crumb-dot{width:7px;height:7px;border-radius:50%;background:var(--magenta);flex-shrink:0}
@@ -1660,6 +1672,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:var(--wash-2)}
 html[data-tema="claro"] #temaBtn .tema-sol{display:none}
 html[data-tema="claro"] #temaBtn .tema-luna{display:block}
 #temaBtn:active{transform:scale(.94)}
+html.tema-cambiando *,html.tema-cambiando *::before,html.tema-cambiando *::after{transition:none!important}
+/* El selector de fecha sigue al tema (Entregas lo tenía fijo en claro hasta el 4-oct). */
+html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
 @media(max-width:700px){
   #temaBtn{top:calc(6px + env(safe-area-inset-top));right:98px}
 }
@@ -1922,7 +1937,7 @@ html[data-tema="claro"] #temaBtn .tema-luna{display:block}
   padding:13px;cursor:pointer}
 .tke-ok[disabled]{opacity:.45;cursor:default}
 .tke-msg{font-size:13px;margin-top:12px;padding:10px;border-radius:9px;display:none;white-space:pre-wrap}
-.tke-msg.ok{display:block;background:#12301c;color:#8ede9f}
+.tke-msg.ok{display:block;background:#12301c;color:var(--ok-2)}
 .tke-msg.mal{display:block;background:var(--err-wash);color:var(--err-soft)}
 </style>
 </head>
@@ -2813,7 +2828,7 @@ html[data-tema="claro"] #temaBtn .tema-luna{display:block}
 #vPlan .pm-cumpl{color:var(--m-conc);font-weight:500}
 #vPlan .pm-est{font-size:10px;color:var(--warn-2);margin-left:6px;letter-spacing:.02em}
 #vPlan .pm-corto{margin-top:12px;background:rgba(233,162,59,.10);border:.5px solid rgba(233,162,59,.35);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--warn);line-height:1.55}
-#vPlan .pm-corto b{color:#F0B45C}
+#vPlan .pm-corto b{color:var(--warn-3)}
 #vPlan .pm-foot{font-size:11.5px;color:var(--text-3);padding:9px 0 10px;line-height:1.55}
 #vPlan .pl-reaco{max-width:940px;margin:14px 0 2px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:rgba(199,125,160,.08);border:.5px solid rgba(199,125,160,.30);border-radius:9px;padding:11px 14px}
 #vPlan .pl-reaco-txt{font-size:12.5px;color:var(--text-2);line-height:1.5;flex:1;min-width:220px}
@@ -2888,7 +2903,7 @@ html[data-tema="claro"] #temaBtn .tema-luna{display:block}
 #vPlan .pl-fok,#vPlan .pl-fx{flex:1;border:none;border-radius:6px;padding:4px 0;font-size:13px;cursor:pointer;font-weight:600}
 #vPlan .pl-fok{background:var(--ok-fill);color:#0E0E11} #vPlan .pl-fx{background:var(--surface-2);color:var(--text-2);border:.5px solid var(--border)}
 #vPlan .pl-edithint{font-size:11px;color:var(--text-3);margin:0 0 10px}
-#vPlan .pl-impacto{margin:2px 0 14px;background:rgba(201,154,78,.09);border:.5px solid rgba(201,154,78,.32);border-radius:8px;padding:9px 13px;font-size:12px;color:#D9BE8C;line-height:1.55;max-width:940px}
+#vPlan .pl-impacto{margin:2px 0 14px;background:rgba(201,154,78,.09);border:.5px solid rgba(201,154,78,.32);border-radius:8px;padding:9px 13px;font-size:12px;color:var(--warn-6);line-height:1.55;max-width:940px}
 #vPlan .pl-impacto b{color:var(--warn-tx)}
 #vPlan .pl-cierre{font-size:11px;color:var(--m-ops-2);margin-top:6px;font-weight:600}
 </style>
@@ -2911,7 +2926,7 @@ html[data-tema="claro"] #temaBtn .tema-luna{display:block}
 <style>
 #vResumen .rz-load,#vResumen .rz-err{padding:22px 4px;color:var(--text-2);font-size:14px}
 #vResumen .rz-err{color:var(--stop-tx)}
-#vResumen .rz-warn{margin-top:14px;background:rgba(226,75,74,.08);border:.5px solid rgba(226,75,74,.35);border-radius:9px;padding:9px 12px;font-size:12px;color:#E7A6A6}
+#vResumen .rz-warn{margin-top:14px;background:rgba(226,75,74,.08);border:.5px solid rgba(226,75,74,.35);border-radius:9px;padding:9px 12px;font-size:12px;color:var(--err-3)}
 #vResumen .rz-sec{margin-top:22px}
 #vResumen .rz-sh{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
 #vResumen .rz-st{font-size:13px;font-weight:600;color:var(--text)}
@@ -3977,10 +3992,10 @@ body:has(.de-fondo) #tkBtn{display:none}
    es otra cosa, y es la unica que dice "lo que hay puesto no sirve". El borde
    izquierdo va rojo por la misma razon que el resto usa el borde: es el estado
    de la tarjeta, leido de un vistazo. */
-.dp-l.obsoleto{border-left-color:var(--stop-tx,#E5484D)}
+.dp-l.obsoleto{border-left-color:var(--stop-tx,var(--err-8))}
 .dp-obs{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:8px;
   background:rgba(229,72,77,.10);border:1px solid rgba(229,72,77,.35)}
-.dp-obs-t{font-size:12px;font-weight:600;color:var(--stop-tx,#E5484D)}
+.dp-obs-t{font-size:12px;font-weight:600;color:var(--stop-tx,var(--err-8))}
 .dp-obs-m{font-size:11.5px;color:var(--text-2);line-height:1.45}
 /* El <option> del lote muerto tambien se rotula, porque en iOS el selector es
    una rueda nativa y no se puede pintar: el texto es la unica via. */
@@ -4084,8 +4099,8 @@ body:has(.de-fondo) #tkBtn{display:none}
    desglose pero en ámbar, que en este módulo significa "esto es correcto y
    además hay que saberlo" — no rojo, que es excepción pendiente. Ocupa toda
    la fila para no quedar suelto entre dos términos con los que no se suma. */
-.el-des-org{flex-basis:100%;color:#C9A227;margin-top:2px}
-.el-des-org .el-des-r{color:#C9A227;opacity:.8}
+.el-des-org{flex-basis:100%;color:var(--warn-5);margin-top:2px}
+.el-des-org .el-des-r{color:var(--warn-5);opacity:.8}
 /* ── Corrección de conteo (b72) ──
    La marca va en gris: una corrección hecha y verificada es un hecho, no una
    alerta. Pasa a ámbar SOLO cuando el destino no se pudo verificar contra los
@@ -4157,7 +4172,7 @@ body:has(.de-fondo) #tkBtn{display:none}
 /* La corrección NO va en gris de nota al pie: es parte de lo que el papel cuenta.
    Ámbar del módulo, con una barra a la izquierda para que se lea como un renglón
    aparte y no como la continuación de la meta. */
-.bs-corr{color:#8a5a12;border-left:3px solid #e0a82e;padding-left:8px;margin-top:6px}
+.bs-corr{color:#8a5a12;border-left:3px solid var(--warn-line);padding-left:8px;margin-top:6px}
 /* ── «Sale otro día» · deshacer una entrega (b63) ──────────────────────
    Prefijo `bs-` y NO `dv-`, aunque el bloque de Devoluciones se vea igual.
    Reusar `.dv-anu*` acá sería exactamente el pendiente §23 —el prefijo `rp-`
@@ -4192,7 +4207,7 @@ body:has(.de-fondo) #tkBtn{display:none}
 .pdv-si:disabled{opacity:.45;cursor:default}
 .pdv-mal{font-size:12px;color:var(--err-soft);background:var(--err-wash);border-radius:8px;padding:7px 10px;
          margin-top:5px;line-height:1.45}
-.pdv-mal span{display:block;color:#e8a9a9;font-size:11.5px;margin-top:2px}
+.pdv-mal span{display:block;color:var(--err-4);font-size:11.5px;margin-top:2px}
 .pdv-neutro span{display:block;font-size:11.5px;margin-top:2px;color:var(--text-3)}
 .pdv-neutro{font-size:12px;color:var(--text-2);background:var(--surface-2,rgba(127,127,127,.08));border-radius:8px;
             padding:7px 10px;margin-top:5px;line-height:1.45}
@@ -4224,16 +4239,16 @@ body:has(.de-fondo) #tkBtn{display:none}
    decidió que saliera así — lo que hay que saber es que no calza con lo
    facturado. El rojo de este módulo es para la excepción pendiente. */
 .ent-desc{background:#2b2418;border:1px solid #6b5a2e;border-radius:9px;
-  padding:9px 11px;margin:8px 0;font-size:12.5px;color:#e8c96a;line-height:1.45}
+  padding:9px 11px;margin:8px 0;font-size:12.5px;color:var(--warn-4);line-height:1.45}
 .ent-desc-t{font-weight:600;margin-bottom:5px}
 .ent-desc-f{display:flex;justify-content:space-between;gap:10px;padding:2px 0}
-.ent-desc-x{margin-top:6px;color:#c9b284;font-size:11.5px}
+.ent-desc-x{margin-top:6px;color:var(--warn-7);font-size:11.5px}
 .ent-desc-min{padding:6px 9px;margin:6px 0 0;font-size:11.5px}
 /* La cinta que dice que esto NO es preparar por primera vez. Sin esto, la
    pantalla de corregir es indistinguible de la de preparar, y el error de
    pegarle "Preparar y entregar" a una corrección seria caro. */
 .dp-corr-cinta{background:#2b2418;border:1px solid #6b5a2e;border-radius:9px;
-  padding:9px 11px;font-size:12.5px;color:#e8c96a;line-height:1.45;margin-bottom:12px}
+  padding:9px 11px;font-size:12.5px;color:var(--warn-4);line-height:1.45;margin-bottom:12px}
 /* El campo de cantidad de la línea, SOLO en corrección. Mismo alto y mismo
    borde que el de los lotes partidos: es el mismo gesto, no un control nuevo. */
 .dp-cant{display:flex;align-items:center;gap:8px;margin:7px 0 2px}
@@ -4260,7 +4275,7 @@ body:has(.de-fondo) #tkBtn{display:none}
   box-shadow:0 18px 48px rgba(0,0,0,.5);touch-action:auto}
 /* El encabezado es lo único en color de alerta. Pintar la ventana entera de
    rojo la vuelve ilegible y, peor, la vuelve costumbre. */
-.dpc-cab{background:#5a2020;color:#ffd9d9;padding:13px 16px;font-size:14px;font-weight:600}
+.dpc-cab{background:#5a2020;color:var(--err-5);padding:13px 16px;font-size:14px;font-weight:600}
 .dpc-sub{padding:12px 16px 0;font-size:12.5px;color:var(--text-2);line-height:1.5}
 .dpc-lista{padding:10px 16px 4px;overflow-y:auto;flex:1 1 auto}
 .dpc-fila{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
@@ -4273,7 +4288,7 @@ body:has(.de-fondo) #tkBtn{display:none}
 .dpc-mot-g{display:grid;gap:7px}
 .dpc-mot-b{background:var(--surface-2);border:1px solid var(--border);border-radius:9px;
   padding:10px 11px;font:inherit;font-size:13px;color:var(--text-2);cursor:pointer;text-align:left}
-.dpc-mot-b.on{border-color:#c98a8a;color:#ffd9d9;font-weight:600}
+.dpc-mot-b.on{border-color:#c98a8a;color:var(--err-5);font-weight:600}
 .dpc-nota{width:100%;box-sizing:border-box;margin-top:7px;background:var(--field);
   border:1px solid var(--border-strong);border-radius:8px;color:var(--text);
   font:inherit;font-size:16px;padding:9px 10px;min-height:64px;resize:vertical}
@@ -5689,9 +5704,13 @@ function _temaGuardarLocal(email, t){
 }
 function temaActual(){ return document.documentElement.getAttribute('data-tema')==='claro' ? 'claro' : 'oscuro'; }
 function temaAplicar(t){
-  const claro=(t==='claro');
-  if(claro) document.documentElement.setAttribute('data-tema','claro');
-  else document.documentElement.removeAttribute('data-tema');
+  const claro=(t==='claro'), h=document.documentElement;
+  // AL INSTANTE: sin esto, cada regla con `transition` (tarjetas, zonas de carga) fundía su
+  // color durante 0,15 s y el cambio se veía por partes. Se apagan solo durante el cambio.
+  h.classList.add('tema-cambiando');
+  if(claro) h.setAttribute('data-tema','claro'); else h.removeAttribute('data-tema');
+  void h.offsetHeight;
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ h.classList.remove('tema-cambiando'); }); });
   const m=document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content', claro?'#F7F8FA':'#0E0E11');
   const b=document.getElementById('temaBtn');
   if(b){ const txt=claro?'Modo oscuro':'Modo claro'; b.setAttribute('aria-label',txt); b.title=txt; }
@@ -9930,7 +9949,7 @@ function escenariosCuerpoHTML(R, calc){
 
   // El viernes se REPARTE entre pan y Galletas por urgencia (Galletas solo pueden ese día).
   const split=function(x){ return '<b>'+panDias(x)+'</b> a pan · <b>'+x.galDias+'</b> a Galletas'; };
-  const avisoGal='<div style="margin-top:20px;background:rgba(201,154,78,.09);border:.5px solid rgba(201,154,78,.35);border-radius:9px;padding:12px 15px;font-size:12.5px;color:#D9BE8C;line-height:1.6;max-width:940px">'
+  const avisoGal='<div style="margin-top:20px;background:rgba(201,154,78,.09);border:.5px solid rgba(201,154,78,.35);border-radius:9px;padding:12px 15px;font-size:12.5px;color:var(--warn-6);line-height:1.6;max-width:940px">'
     +veredicto+'<br><br>'
     +'<b style="color:var(--warn-tx)">El viernes se reparte entre pan y Galletas.</b> '
     +'Es un día productivo para todo menos Semillas; gana el más urgente por stock. Galletas solo pueden hacerse el viernes '
