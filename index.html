@@ -4534,6 +4534,8 @@ body[data-mod="compras"] .main{--mod:#A27FEB;--accent:#A27FEB;--blue:#A27FEB;--b
 #vCompras .cp-ped .cp-pon{color:#A27FEB}
 #vCompras .cp-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
 #vCompras .cp-dot-verde{background:#5FB37A} #vCompras .cp-dot-ambar{background:#E9A23B} #vCompras .cp-dot-rojo{background:#E24B4A}
+#vCompras .cp-dot-odoo{background:transparent;box-shadow:inset 0 0 0 1.5px #9AA7B8}   /* faltan compras por cargar (4-oct) */
+#vCompras .cp-fr-odoo{margin-top:8px;padding:10px 12px;border:.5px dashed #9AA7B8;border-radius:10px;font-size:12.5px;color:#9AA7B8;font-style:italic}
 #vCompras .cp-btnh{flex:0 0 auto;background:#1E1E22;border:.5px solid #2C2C33;color:#F5F4F0;border-radius:10px;padding:9px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
 #vCompras .cp-btnh-u{background:#E9FE60;color:#1A1A1A;border-color:#E9FE60}
 #vCompras .cp-it0{cursor:default}
@@ -4586,6 +4588,9 @@ body[data-mod="compras"] .main{--mod:#A27FEB;--accent:#A27FEB;--blue:#A27FEB;--b
 #vCompras .cp-canal{font-size:11.5px;color:#6E6C68;font-weight:400;margin-left:4px}
 #vCompras .cp-pcrow>span.cp-g{font-size:12.5px}
 #vCompras .cp-amb3{color:#E9A23B !important}
+/* «Faltan compras por cargar» (4-oct): Odoo tiene menos de lo que ya se usó. NO es un faltante
+   (no pide comprar): gris azulado y en cursiva, nunca rojo ni ámbar. */
+#vCompras .cp-odoo{color:#9AA7B8 !important;font-style:italic}
 #vCompras .cp-atbl{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
 #vCompras .cp-atbl td{padding:7px 0;border-top:.5px solid #232329;vertical-align:middle;color:#C9C7C1;white-space:nowrap}
 #vCompras .cp-atbl th{text-align:left;padding:4px 0 8px;border-bottom:.5px solid #232329}
@@ -19341,7 +19346,8 @@ async function lobbyAlertas(){
   }
   const A=_cpAlc;
   if(!_rzCtx || !A || A.error){ _lobAl('homeOpsAlerta',''); _lobAl('homeComAlerta',''); return; }
-  const roj=A.filas.filter(function(f){ return f.color==='rojo'; });
+  // Igual que la franja de Compras (4-oct): lo que «falta hoy» solo en Odoo no cuenta como faltante.
+  const roj=A.filas.filter(function(f){ return f.color==='rojo' && !_cpEsOdoo(f, f); });
   const aCompras=function(){ irACompras('porcomprar'); };
   if(roj.length===1) _lobAl('homeOpsAlerta', 'Falta '+_cpMin(roj[0].nombre), 'rojo', aCompras);
   else if(roj.length>1) _lobAl('homeOpsAlerta', 'Faltan '+roj.length+' insumos', 'rojo', aCompras);
@@ -20245,8 +20251,9 @@ async function cpAlcance(){
   const medir={}, prod={};
   const sum=function(m, ds, p, b){ const t=m[ds]=m[ds]||{}; t[p]=(t[p]||0)+b; };
   const usarPrem=function(p, b){ const t=Math.min(Math.max(0,premLeft[p]||0), b); premLeft[p]=(premLeft[p]||0)-t; return b-t; };
-  const sinB=_rzSinCargarBatches();
-  for(const k in sinB){ const p=+k, r=usarPrem(p, sinB[k]); if(r>1e-9) sum(medir, hoy, p, r); sum(prod, hoy, p, sinB[k]); }
+  const sinB=_rzSinCargarBatches(), medirSin={}, prodSin={};
+  for(const k in sinB){ const p=+k, r=usarPrem(p, sinB[k]); if(r>1e-9){ sum(medir, hoy, p, r); sum(medirSin, hoy, p, r); }
+    sum(prod, hoy, p, sinB[k]); sum(prodSin, hoy, p, sinB[k]); }
   const pf=_dfPorFecha(fin);
   Object.keys(pf).sort().forEach(function(ds){ if(ds<hoy||ds>fin) return; const t=pf[ds];
     for(const k in t){ const p=+k, b=+t[k]||0; if(b<=0) continue; sum(prod, ds, p, b);
@@ -20259,6 +20266,12 @@ async function cpAlcance(){
   for(const ds in medir){ const bm={}; for(const k in medir[ds]){ const n=Math.ceil(medir[ds][k]-1e-9); if(n>0) bm[k]=n; }
     if(Object.keys(bm).length) add(ds, (await _mpNeeds(bm, null)).prem); }
   for(const ds in prod) add(ds, (await _mpNeeds(prod[ds], null)).direct);
+  // Lo que ya se usó y Odoo todavía no descontó (4-oct). Si es MÁS que el stock de Odoo, el «falta hoy»
+  // no es un faltante: son compras sin cargar (azúcar y tapa dulce desde el 15-sep).
+  const consSin={};
+  if(medirSin[hoy]){ const bm={}; for(const k in medirSin[hoy]){ const n=Math.ceil(medirSin[hoy][k]-1e-9); if(n>0) bm[k]=n; }
+    if(Object.keys(bm).length){ const m=(await _mpNeeds(bm, null)).prem; for(const k in m) consSin[+k]=(consSin[+k]||0)+m[k]; } }
+  if(prodSin[hoy]){ const m=(await _mpNeeds(prodSin[hoy], null)).direct; for(const k in m) consSin[+k]=(consSin[+k]||0)+m[k]; }
   // 3 · lo que llega
   const rec={}; (D.pedidoLineas||[]).forEach(function(l){ const d=(l.ds&&l.ds>hoy)?l.ds:hoy; const r=rec[l.pid]=rec[l.pid]||{}; r[d]=(r[d]||0)+l.qty; });
   const dias=[]; for(let d=hoy; d<=fin; d=_dfAdd(d,1)) dias.push(d);
@@ -20290,7 +20303,9 @@ async function cpAlcance(){
       for(const d of dias){ if(d>H) break; q+=((cons[d]||{})[pid]||0); r+=((rec[pid]||{})[d]||0); }
       falta=Math.max(0, q-st-r);
       if(color!=='verde') sug=Math.max(0, q+h.margen-st-r); }
+    const sinCargar=consSin[pid]||0;
     return {pid:pid, nombre:(inf.name||i.nombre||('id '+pid)).replace(/^\[[^\]]*\]\s*/,'').trim(), uom:uom, proveedor_id:+i.proveedor_id,
+            sinCargar:sinCargar, deficit:sinCargar>st+1e-9,
             stock:st, falla:falla, ultimo:ultimo, color:color, U:U, llega:llega, pedirEl:pedirEl, comprarAntes:comprarAntes,
             fijo:!!fijo, ci:ci, sug:sug, falta:falta, cada:cada, margen:h.margen, ya:D.pedido[pid]||0}; });
   // 5 · por pedido: proveedor + entrega (BIO tiene dos: lo del lunes y el huevo líquido del jueves)
@@ -20342,19 +20357,24 @@ const _cpMay=function(t){ t=String(t||''); return t.charAt(0).toUpperCase()+t.sl
 // "Harina de Arroz" → "Harina de arroz" (para empezar una línea)
 const _cpNomFrase=function(n){ return _cpMay(_cpMin(n).trim()); };
 // La franja roja: UN insumo por línea («Harina de arroz · falta el lun 5»), nunca dos juntos.
+// En rojo solo los faltantes de verdad. Los que «faltan hoy» porque Odoo tiene menos de lo que ya se
+// usó van aparte, punteados y en gris: no piden comprar, piden cargar compras (4-oct).
 function _cpFranjaHtml(A, ir){
-  const r=A.filas.filter(function(f){ return f.color==='rojo'; });
-  if(!r.length) return '';
-  return '<div class="cp-franja" onclick="'+ir+'"><div class="cp-fr-l">'
+  const od=A.filas.filter(function(f){ return _cpEsOdoo(f, f); });
+  const r=A.filas.filter(function(f){ return f.color==='rojo' && od.indexOf(f)<0; });
+  let h='';
+  if(r.length) h+='<div class="cp-franja" onclick="'+ir+'"><div class="cp-fr-l">'
     +r.map(function(f){ return '<div>'+esc(_cpNomFrase(f.nombre))+' · falta '+(f.falla===A.hoy?'hoy':('el '+_fechaCorta(f.falla)))+'</div>'; }).join('')
     +'</div><span>›</span></div>';
+  if(od.length) h+='<div class="cp-fr-odoo">'+esc(CP_ODOO_TXT)+' ('+od.map(function(f){ return esc(_cpNomFrase(f.nombre)); }).join(', ')+').</div>';
+  return h;
 }
 // Lo de un proveedor que hace falta comprar (las filas que se muestran al desplegar).
 const _cpItemsComprar=function(g){ return g.items.filter(function(f){ return f.sug>1e-9 || f.color==='rojo'; }); };
 // Tabla insumo · falta · comprar, con el punto de color del insumo.
 function _cpTablaComprar(its){
   return '<table class="cp-mp cp-pc"><thead><tr><th>Insumo</th><th>Falta</th><th>Comprar</th></tr></thead><tbody>'
-    +its.map(function(f){ return '<tr><td><span class="cp-dot cp-dot-'+f.color+'"></span>'+esc(f.nombre)+'</td>'
+    +its.map(function(f){ return '<tr><td><span class="cp-dot cp-dot-'+_cpDotCls(f)+'"></span>'+esc(f.nombre)+'</td>'
       +'<td>'+(f.falta>1e-9?esc(_cpCant(f.falta, f.uom)):'<span class="cp-g">—</span>')+'</td>'
       +'<td class="cp-pedir">'+(f.sug>1e-9?esc(_cpEmpTxt(f, f.sug)):'—')+'</td></tr>'; }).join('')
     +'</tbody></table>';
@@ -20391,8 +20411,9 @@ function cpResumenHtml(){
   const orden={rojo:0, ambar:1, verde:2};
   const filas=A.filas.slice().sort(function(a,b){ return (orden[a.color]-orden[b.color]) || (a.falla||'9999').localeCompare(b.falla||'9999') || a.nombre.localeCompare(b.nombre); });
   const der='<div class="cp-card"><div class="cp-st2">Materia prima</div><table class="cp-mp cp-mp-s"><thead><tr><th>Insumo</th><th>Hay</th><th>Alcanza hasta</th></tr></thead><tbody>'
-    +filas.map(function(f){ return '<tr><td><span class="cp-dot cp-dot-'+f.color+'"></span>'+esc(f.nombre)+'</td>'
-      +'<td>'+esc(_cpCant(f.stock, f.uom))+'</td><td class="'+(f.color==='rojo'?'cp-r':'')+'">'+esc(_cpAlcTxt(f))+'</td></tr>'; }).join('')
+    +filas.map(function(f){ return '<tr><td><span class="cp-dot cp-dot-'+_cpDotCls(f)+'"></span>'+esc(f.nombre)+'</td>'
+      +'<td>'+esc(_cpCant(f.stock, f.uom))+'</td>'+(_cpEsOdoo(f, f) ? '<td class="cp-odoo" title="'+esc(CP_ODOO_TXT)+'">por cargar</td>'
+        : '<td class="'+(f.color==='rojo'?'cp-r':'')+'">'+esc(_cpAlcTxt(f))+'</td>')+'</tr>'; }).join('')
     +'</tbody></table></div>';
   // Escritorio: dos columnas (izquierda Por comprar + franja, derecha Materia prima). Teléfono: una debajo de otra.
   return '<div class="cp-cols"><div class="cp-col">'+izq+'</div><div class="cp-col">'+der+'</div></div>';
@@ -20426,7 +20447,7 @@ function cpPorComprarHtml(){
       const nom=_cpNomCorto(g.nombre)+(g.fijo&&g.items.length===1&&varios?(' · '+_cpMin(g.items[0].nombre).trim()):'');
       h+='<div class="cp-it cp-pcrow" onclick="cpPcToggle('+gi+')"><span class="cp-in cp-in1">'+esc(nom)
         +' <span class="cp-canal">'+esc(_CP_CANAL_CORTO[g.canal]||g.canal)+'</span></span>'
-        +'<span class="cp-g">'+its.length+' producto'+(its.length===1?'':'s')+' · <span class="cp-alc-l">alcanza </span>hasta '+_fechaCorta(g.alcanzaHasta)
+        +'<span class="cp-g">'+its.length+' producto'+(its.length===1?'':'s')+' · '+_cpAlcLista(g)
         +' <span class="cp-fl'+(ab?' abierto':'')+'">›</span></span></div>';
       if(ab) h+='<div class="cp-desp">'+_cpTablaComprar(its)
         +(_socia===true?('<div class="cp-btns cp-btns-d">'+(g.canal==='whatsapp'?'<button class="cp-btn" onclick="cpCopiarSugerido('+gi+')">Copiar mensaje</button>':'')
@@ -20438,6 +20459,15 @@ function cpPorComprarHtml(){
   const resto=A.grupos.length-nec.length;
   if(resto>0) h+='<div class="cp-pie0">Los demás alcanzan.</div>';
   return h+'</div>';
+}
+// «Alcanza» de la línea: el mismo cálculo que el pie de «Armar pedido», con lo sugerido (4-oct).
+// Antes decía «hasta» la META (llegada + `cada` semanas), que no es lo que alcanza.
+function _cpAlcLista(g){
+  const filas=_cpFilasPedido(g), v={}; filas.forEach(function(f){ v[f.pid]=_cpSugPaq(f); });
+  const AP=_cpAlcPedido(g, filas, v);
+  if(AP.odoo) return '<span class="cp-odoo" title="'+esc(CP_ODOO_TXT)+'">faltan compras por cargar</span>';
+  if(AP.alc) return '<span class="cp-alc-l">alcanza </span>'+esc(AP.alc);
+  return '<span class="'+(AP.corto?'cp-amb3':'')+'">falta '+esc(_cpDia(AP.peor.falla))+'</span>';
 }
 function cpPcToggle(gi){ _cpAbiertos.pc=(_cpAbiertos.pc===gi)?null:gi; cpRender(); }
 // El texto para el proveedor (saludo con el campo `contacto` de compras_config: «Hola <contacto>»).
@@ -20458,13 +20488,40 @@ async function cpCopiarSugerido(gi){
 }
 // «Alcanza hasta» con una llegada EXTRA (lo que se está armando) el día de la entrega. Mismo
 // recorrido que `cpAlcance` (consumo del día y DESPUÉS lo que llega), sin volver a leer Odoo.
-function _cpAlcanzaCon(f, extra, dia){
+// `antes` (4-oct): sin día fijo y con entrega HOY (tienda, demora 0) lo comprado se usa hoy mismo,
+// así que cuenta ANTES del consumo del día; si no, el pedido nunca podía arreglar «falta hoy».
+// Los de día fijo (BIO llega el lunes a mediodía) siguen igual.
+function _cpAlcanzaCon(f, extra, dia, antes){
   const A=_cpAlc; let s=f.stock, ultimo=null; const d0=(dia&&dia>A.hoy)?dia:A.hoy;
-  for(const d of A.dias){ const c=(A.cons[d]||{})[f.pid]||0;
+  for(const d of A.dias){ if(antes && extra>0 && d===d0) s+=extra;
+    const c=(A.cons[d]||{})[f.pid]||0;
     if(c>1e-9){ if(s-c<-1e-9) return {falla:d, ultimo:ultimo}; s-=c; ultimo=d; }
-    s+=((A.rec[f.pid]||{})[d]||0); if(extra>0 && d===d0) s+=extra; }
+    s+=((A.rec[f.pid]||{})[d]||0); if(!antes && extra>0 && d===d0) s+=extra; }
   return {falla:null, ultimo:ultimo};
 }
+// Los insumos de UN pedido: ese proveedor (y esa entrega, si tiene día fijo).
+function _cpFilasPedido(g){ return _cpAlc.filas.filter(function(f){ return f.proveedor_id===g.proveedor_id && (!g.fijo || f.llega===g.llega); }); }
+// «Alcanza» de UN pedido con las cantidades `valores` (unidad del panel). Lo usan la lista de Por
+// comprar (con lo sugerido) y «Armar pedido» (con lo editado): un mismo dato dice lo mismo en las
+// dos pantallas (Andrea, 4-oct). Manda el insumo que se acaba primero DESPUÉS de la entrega: lo que
+// falta antes (harina el lun 5, con la entrega el lun 12) este pedido no lo arregla.
+// `odoo`: lo que manda es un «falta hoy» de un insumo cuyo consumo sin cargar supera el stock de Odoo.
+function _cpAlcPedido(g, filas, valores){
+  const A=_cpAlc, F=_cpFechasPedido(g), antes=!g.fijo && F.entrega<=A.hoy, res={};
+  filas.forEach(function(f){ res[f.pid]=_cpAlcanzaCon(f, _dfDesdePanel(f, +valores[f.pid]||0), F.entrega, antes); });
+  let peor=null, fp=null;
+  filas.forEach(function(f){ const r=res[f.pid]; if(r.falla && r.falla>=F.entrega && (!peor || r.falla<peor.falla)){ peor=r; fp=f; } });
+  return {F:F, res:res, peor:peor,
+    alc: !peor ? 'más de 4 semanas' : (peor.ultimo ? ('hasta el '+_fechaCorta(peor.ultimo)) : null),
+    corto: !!(peor && peor.falla<=g.alcanzaHasta),
+    // Si no hay ninguno después de la entrega (huevo líquido: falta hoy, llega el jue 8), igual avisa
+    // cuando lo que falta antes es solo Odoo: «más de 4 semanas» ahí era mentira.
+    odoo: peor ? !!(fp.deficit && peor.falla<=A.hoy) : filas.some(function(f){ return _cpEsOdoo(f, res[f.pid]); })};
+}
+// Una fila que «falta hoy» solo porque Odoo tiene menos de lo que ya se usó.
+const _cpEsOdoo=function(f, r){ return !!(f.deficit && r.falla && r.falla<=_cpAlc.hoy); };
+const CP_ODOO_TXT='Odoo tiene menos de lo que ya se usó: faltan compras por cargar';
+const _cpDotCls=function(f){ return _cpEsOdoo(f, f) ? 'odoo' : f.color; };
 // Para la columna angosta: la fecha sola; si no alcanza ni el primer día, la fecha en que falta (va en rojo).
 const _cpAlcCorto=function(r){ return !r.falla ? '+4 sem' : (r.ultimo ? _fechaCorta(r.ultimo) : _cpDia(r.falla)); };
 
@@ -20477,7 +20534,7 @@ function cpAbrirPedido(gi){
   const g=_cpAlc&&_cpAlc.grupos[gi]; if(!g) return;
   // Todos los insumos de ese proveedor (y esa entrega, si tiene día fijo): los que no hacen
   // falta quedan detrás de «+ Agregar otro producto de este proveedor».
-  const filas=_cpAlc.filas.filter(function(f){ return f.proveedor_id===g.proveedor_id && (!g.fijo || f.llega===g.llega); });
+  const filas=_cpFilasPedido(g);
   const v={}; filas.forEach(function(f){ v[f.pid]=_cpSugPaq(f); });
   _cpReg={gi:gi, filas:filas, valores:v, paso:'editar', previa:null, propuestaId:null, verTodos:false, msg:'', cls:''};
   cpPintarPills(); cpRender(); try{ window.scrollTo(0,0); }catch(e){}
@@ -20519,26 +20576,24 @@ function cpRenderRegistro(){
     P.filas.forEach(function(f){ const s=_cpSugPaq(f), n=+P.valores[f.pid]||0; ((s>0||n>0)?vis:resto).push(f); });
     // «ALCANZA HASTA» EN VIVO (Andrea, 3-oct): con lo pedido llegando el día de la entrega. En ámbar
     // si ya no llega a la compra siguiente (g.alcanzaHasta = entrega + `cada` semanas).
-    const res={}; P.filas.forEach(function(f){ res[f.pid]=_cpAlcanzaCon(f, _dfDesdePanel(f, +P.valores[f.pid]||0), F.entrega); });
+    const AP=_cpAlcPedido(g, P.filas, P.valores), res=AP.res;
     const fila=function(f){ const s=_cpSugPaq(f), n=+P.valores[f.pid]||0, u=_dfUnidadPanel(f), r=res[f.pid];
       const corto=!!(r.falla && r.falla<=g.alcanzaHasta);
-      return '<tr><td class="cp-rin"><span class="cp-dot cp-dot-'+f.color+'"></span>'+esc(f.nombre)+' <span class="cp-g cp-u">'+esc(u)+'</span></td>'
+      return '<tr><td class="cp-rin"><span class="cp-dot cp-dot-'+_cpDotCls(f)+'"></span>'+esc(f.nombre)+' <span class="cp-g cp-u">'+esc(u)+'</span></td>'
         +'<td class="cp-rfa">'+(f.falta>1e-9?esc(_cpCant(f.falta, f.uom)):'<span class="cp-g">—</span>')+'</td>'
         +'<td class="cp-rsu">'+_rzN(s, s%1?1:0)+'</td>'
         +'<td class="cp-rpe"><button class="cp-pm" onclick="cpMas('+f.pid+',-1)" aria-label="menos">−</button>'
         +'<span class="cp-n'+(Math.abs(n-s)>1e-9?' cp-dif':'')+'">'+_rzN(n, n%1?1:0)+'</span>'
         +'<button class="cp-pm" onclick="cpMas('+f.pid+',1)" aria-label="más">+</button></td>'
-        +'<td class="cp-ral'+((r.falla && r.falla<F.entrega)?' cp-r':(corto?' cp-amb3':''))+'">'+esc(_cpAlcCorto(r))+'</td></tr>'; };
+        +(_cpEsOdoo(f, r) ? '<td class="cp-ral cp-odoo" title="'+esc(CP_ODOO_TXT)+'">por cargar</td></tr>'
+          : '<td class="cp-ral'+((r.falla && r.falla<F.entrega)?' cp-r':(corto?' cp-amb3':''))+'">'+esc(_cpAlcCorto(r))+'</td></tr>'); };
     h+='<table class="cp-atbl"><thead><tr><th>Insumo</th><th>Falta</th><th>Sugiere</th><th>Pedido</th><th>Alcanza</th></tr></thead><tbody>'
       +vis.map(fila).join('')+(P.verTodos?resto.map(fila).join(''):'')+'</tbody></table>';
     if(resto.length && !P.verTodos) h+='<button class="cp-ceros" onclick="cpVerTodos()">+ Agregar otro producto de este proveedor</button>';
-    // Manda el insumo que se acaba primero DESPUÉS de la entrega: lo que falta antes (harina el lun 5,
-    // con la entrega el lun 12) este pedido no lo arregla, y ya está en rojo en su fila.
-    let peor=null; P.filas.forEach(function(f){ const r=res[f.pid]; if(r.falla && r.falla>=F.entrega && (!peor || r.falla<peor.falla)) peor=r; });
-    const alc=!peor ? 'más de 4 semanas' : (peor.ultimo ? ('hasta el '+_fechaCorta(peor.ultimo)) : null);
-    const T=_cpTotalEstimado(P), wa=(g.canal==='whatsapp'), cortoT=!!(peor && peor.falla<=g.alcanzaHasta);
-    h+='<div class="cp-pie cp-pie3"><div class="cp-tot'+(cortoT?' cp-amb3':'')+'">'
-      +(alc?('Con este pedido alcanza '+esc(alc)):('Con este pedido falta '+esc(_cpDia(peor.falla))))
+    const T=_cpTotalEstimado(P), wa=(g.canal==='whatsapp');
+    h+='<div class="cp-pie cp-pie3"><div class="cp-tot'+(AP.odoo?'':(AP.corto?' cp-amb3':''))+'">'
+      +(AP.odoo ? ('<span class="cp-odoo">'+esc(CP_ODOO_TXT)+'</span>')
+        : AP.alc ? ('Con este pedido alcanza '+esc(AP.alc)) : ('Con este pedido falta '+esc(_cpDia(AP.peor.falla))))
       +' <span class="cp-g">·</span> '+col(T.t)+' <span class="cp-g">sin IVA'+(T.falta?' + sin precio':'')+'</span></div>'
       +'<div class="cp-btns2">'+(wa?'<button class="cp-btn" onclick="cpWhatsApp()">Copiar mensaje</button>':'')
       +'<button class="cp-btn cp-btnp" onclick="cpRevisar()">'+(g.canal==='tienda'?'Registrar compra en Odoo':'Crear orden en Odoo')+'</button></div></div>';
