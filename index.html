@@ -11,6 +11,20 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0E0E11">
+<script>
+/* TEMA CLARO / OSCURO (4-oct-2026) — se decide ANTES de pintar, para que la página no arranque
+   en un modo y salte al otro. Esto es SOLO el arranque rápido: la copia local del último modo de
+   esta cuenta en este aparato. La verdad es la de la cuenta (`tema_vigente()`), y `temaResolver()`
+   la aplica apenas hay sesión. La cuenta se lee de la sesión de Supabase guardada, sin red. */
+(function(){ try{
+  var o=JSON.parse(localStorage.getItem('tf_tema')||'{}'), e='';
+  for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i);
+    if(/^sb-.+-auth-token$/.test(k)){ try{ var x=JSON.parse(localStorage.getItem(k)); e=((x&&x.user&&x.user.email)||'').toLowerCase(); }catch(_){} } }
+  var t=(e&&o.por&&o.por[e])||o.ultimo;
+  if(t==='claro'){ document.documentElement.setAttribute('data-tema','claro');
+    var m=document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content','#F7F8FA'); }
+}catch(_){} })();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -63,7 +77,7 @@ body{font-family:var(--font);background:var(--bg2);color:var(--text);font-size:1
 .s-info{background:var(--blue-l);color:var(--blue)}
 .s-warn{background:var(--amber-l);color:var(--amber)}
 /* Tag visible de empaque incompleto (no un asterisco al pie): el que mira el número sabe que le falta empaque. */
-.emp-inc,.dias-cero{display:inline-block;font-size:10.5px;font-weight:600;letter-spacing:.02em;color:#E9A23B;
+.emp-inc,.dias-cero{display:inline-block;font-size:10.5px;font-weight:600;letter-spacing:.02em;color:var(--warn);
   border:.5px solid rgba(233,162,59,.45);border-radius:5px;padding:1px 6px;margin-left:8px;white-space:nowrap;vertical-align:middle;line-height:1.5}
 /* La etiqueta de "sin días propios" puede ser larga: en pantallas chicas que corte, no que desborde. */
 .dias-cero{white-space:normal}
@@ -96,7 +110,7 @@ tr.fila-sinmatch td{background:#f7f7f7}
 .section-header{font-size:11px;font-weight:600;color:var(--text-m);text-transform:uppercase;letter-spacing:.05em;padding:8px 12px;background:var(--bg2);border-bottom:1px solid var(--border)}
 table{width:100%;border-collapse:collapse;font-size:13px}
 /* Encabezado tenue: 11px gris, peso normal, sin fondo, solo línea fina abajo */
-th{text-align:left;padding:6px 9px;font-size:11px;font-weight:400;color:#6E6C68;border-bottom:1px solid #26262C;background:none;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+th{text-align:left;padding:6px 9px;font-size:11px;font-weight:400;color:var(--text-3);border-bottom:1px solid var(--border);background:none;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
 /* Filas sin reja, aire vertical, TODO peso 400 — jerarquía SOLO por color: principal (<strong>) blanco, secundario gris */
 td{padding:10px 9px;border:none;vertical-align:top;color:var(--text-2);font-weight:400}
 td strong{color:var(--text);font-weight:400}
@@ -158,7 +172,7 @@ td[align="right"],td[style*="right"]{font-variant-numeric:tabular-nums}
 
 /* ── Drill-down de producción (Bloque 1) ── */
 tr.prod-row{cursor:pointer}
-tr.prod-row:hover td{background:rgba(255,255,255,.02)}
+tr.prod-row:hover td{background:var(--wash-1)}
 tr.prod-row .pcaret{color:var(--text-3);font-size:10px;display:inline-block;width:11px;transition:transform .15s}
 tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .prod-det-wrap{padding:6px 0 12px 18px}
@@ -232,7 +246,7 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
      consecutivo en mono · días · monto a la derecha. Las fechas de emisión y vencimiento
      son de escritorio: en el teléfono la factura se reconoce por su consecutivo. */
   #vCobros .cob-det .cob-fr{grid-template-columns:1fr auto auto;padding:7px 0 7px 14px;
-    border-bottom:.5px solid #1A1A1E}
+    border-bottom:.5px solid var(--line-soft)}
   #vCobros .cob-det .cob-fr td.cob-f-doc{grid-column:1;grid-row:1;font-size:12.5px;min-width:0}
   #vCobros .cob-det .cob-fr td.cob-f-dias{grid-column:2;grid-row:1;text-align:right;font-size:11px;
     padding-left:10px;align-self:center}
@@ -310,7 +324,7 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .renta-tbl th:first-child{text-align:left}
 .renta-tbl td{padding:10px 12px;text-align:right;border:none;border-bottom:1px solid var(--border);white-space:nowrap;vertical-align:top}
 .renta-prow{cursor:pointer}
-.renta-prow:hover td{background:rgba(255,255,255,.02)}
+.renta-prow:hover td{background:var(--wash-1)}
 .renta-prod{display:inline-flex;align-items:center;gap:8px;color:var(--text)}
 .pdot{width:9px;height:9px;border-radius:2px;display:inline-block;flex-shrink:0}
 .renta-cell .rg{color:var(--text);font-variant-numeric:tabular-nums}
@@ -335,7 +349,7 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
   .rm-pill.on{color:var(--text);border-color:var(--mod);background:rgba(55,138,221,.10)}
   .rm-list{padding:0 12px 4px}
   .rm-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
-    padding:11px 0;border-top:.5px solid #1A1A1E}
+    padding:11px 0;border-top:.5px solid var(--line-soft)}
   .rm-row:first-child{border-top:none}
   .rm-l{min-width:0;flex:1}
   .rm-nm{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text)}
@@ -450,11 +464,11 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
   #vResultados .res-pcell .mg{font-size:15px;margin-top:5px}
   #vResultados .res-pcell .cu{font-size:10.5px;margin-top:2px}
   #vResultados .rp-desk{display:none} #vResultados .rp-mov{display:inline}
-  #vResultados .rp-des{display:block;margin-top:7px;padding-top:6px;border-top:.5px solid #232329}
+  #vResultados .rp-des{display:block;margin-top:7px;padding-top:6px;border-top:.5px solid var(--line)}
   #vResultados .rp-des.hidden{display:none}
   #vResultados .rp-dr{display:flex;justify-content:space-between;gap:6px;font-size:10px;
     color:var(--text-3);padding:1px 0;font-variant-numeric:tabular-nums}
-  #vResultados .res-pcell.rp-abierta{background:#141417}
+  #vResultados .res-pcell.rp-abierta{background:var(--panel)}
   #vResultados .rp-nota{display:block;grid-column:1/-1;padding:9px 10px;font-size:10px;
     color:var(--text-3);line-height:1.45}
   /* la etiqueta de empaque incompleto baja a su propio renglón: al lado del nombre
@@ -578,7 +592,7 @@ tr.r-ing td{background:#eff6ff}
 .conf-title{font-weight:700;font-size:13px;color:#A23DA8;margin-bottom:8px}
 .conf-row{display:flex;justify-content:space-between;gap:14px;font-size:12.5px;padding:3px 0;border-bottom:1px dashed #F0EEE9}
 .conf-row span{color:var(--text-2)}
-.conf-what{font-size:12px;color:#5b5852;background:#FBF4FC;border-radius:8px;padding:8px 10px;margin-top:10px;line-height:1.45}
+.conf-what{font-size:12px;color:var(--text-dim-4);background:#FBF4FC;border-radius:8px;padding:8px 10px;margin-top:10px;line-height:1.45}
 .conf-act{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
 /* ── Dashboard de Costos (cara 1) ── */
 .faces{display:flex;gap:6px;margin-bottom:15px;border-bottom:1px solid var(--border)}
@@ -679,15 +693,15 @@ tr.r-ing td{background:#eff6ff}
   body{overflow-x:hidden}
 }
 .face{appearance:none;background:none;border:none;border-bottom:2px solid transparent;padding:8px 12px;font:600 13px/1 'DM Sans',sans-serif;color:var(--text-2);cursor:pointer}
-.face.on{color:#1A1A1A;border-bottom-color:#C964CF}
-.face.dis{color:#C5C2BA;cursor:not-allowed}
+.face.on{color:#1A1A1A;border-bottom-color:var(--magenta)}
+.face.dis{color:var(--text-hi-2);cursor:not-allowed}
 @keyframes tfpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
-.live-ind{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#6f6c66}
-.live-dot{width:8px;height:8px;border-radius:50%;background:#84BD00;display:inline-block;animation:tfpulse 1.4s ease-in-out infinite}
+.live-ind{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--text-dim-3)}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--m-conc);display:inline-block;animation:tfpulse 1.4s ease-in-out infinite}
 .costos-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:11px;margin-top:12px;align-items:start}
 .ccard{border:1px solid var(--border);border-radius:14px;padding:13px 15px 12px;background:var(--surface);cursor:pointer;transition:box-shadow .15s,border-color .15s}
 .ccard:hover{box-shadow:0 6px 22px rgba(0,0,0,.06)}
-.ccard-name{font-size:13px;font-weight:600;color:#5b5852;display:flex;align-items:center;gap:8px}
+.ccard-name{font-size:13px;font-weight:600;color:var(--text-dim-4);display:flex;align-items:center;gap:8px}
 .ccard-swatch{width:10px;height:10px;border-radius:3px;display:inline-block}
 .ccard-total{font-size:26px;font-weight:700;letter-spacing:-.5px;margin:4px 0 2px;color:var(--text)}
 .ccard-unit{font-size:11px;color:var(--text-3);margin-bottom:9px}
@@ -697,7 +711,7 @@ tr.r-ing td{background:#eff6ff}
 .cbreak-row span:last-child{color:var(--text);font-variant-numeric:tabular-nums}
 .cbar{height:9px;border-radius:6px;overflow:hidden;display:flex;background:#F0EEE9}
 .cbar i{display:block;height:100%}
-.cbar-leg{display:flex;justify-content:space-between;font-size:11px;color:#6f6c66;margin-top:5px}
+.cbar-leg{display:flex;justify-content:space-between;font-size:11px;color:var(--text-dim-3);margin-top:5px}
 .cbreak{margin-top:10px;border-top:1px dashed #ECEAE4;padding-top:8px;font-size:12px;display:none}
 .ccard.open .cbreak{display:block}
 .cbreak-btn{display:inline-block;margin-top:12px;background:none;border:none;padding:0;color:var(--text-3);font-size:12px;font-weight:500;cursor:pointer;text-align:left}
@@ -709,15 +723,15 @@ tr.r-ing td{background:#eff6ff}
 .inv-in-sm{width:60px}
 .inv-ok{color:#3a8a3a;font-weight:600}
 .inv-bad{color:#D9776E;font-weight:400}
-.inv-dot{color:#8FBF6A;font-size:9px;cursor:default;opacity:.7}
+.inv-dot{color:var(--good);font-size:9px;cursor:default;opacity:.7}
 .inv-dot-none{display:inline-block;width:9px}
 /* ── Login Truefie (tema oscuro) ── */
 /* Login: logo protagonista arriba + aire + campos sobrios de tamaño normal (no inflados) */
-#vAuth{position:fixed;inset:0;z-index:200;background:#0E0E11;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;font-family:'DM Sans',sans-serif;box-sizing:border-box}
+#vAuth{position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;font-family:'DM Sans',sans-serif;box-sizing:border-box}
 .auth-logo{width:104px;height:auto;opacity:.95;margin-bottom:76px}
 .auth-card{width:100%;max-width:308px;display:flex;flex-direction:column;gap:15px}
-.auth-card input{background:#161619;border:1px solid #26262C;border-radius:11px;height:46px;padding:0 14px;color:#F5F4F0;font-size:14px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box}
-.auth-card input:focus{border-color:#3A3A42}
+.auth-card input{background:var(--surface);border:1px solid var(--border);border-radius:11px;height:46px;padding:0 14px;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box}
+.auth-card input:focus{border-color:var(--border-hi)}
 /* ── El autofill NO pinta los campos de amarillo ──
    iOS/Chrome rellenan correo y contraseña con su propio fondo amarillo y le ganan a
    `background`: el autofill no se apaga con la propiedad normal. El truco que sí respeta es
@@ -729,16 +743,16 @@ tr.r-ing td{background:#eff6ff}
 .auth-card input:-webkit-autofill:focus,.auth-card input:-webkit-autofill:active,
 #vLogin .field input:-webkit-autofill,#vLogin .field input:-webkit-autofill:hover,
 #vLogin .field input:-webkit-autofill:focus,#vLogin .field input:-webkit-autofill:active{
-  -webkit-box-shadow:0 0 0 1000px #161619 inset!important;
-  box-shadow:0 0 0 1000px #161619 inset!important;
-  -webkit-text-fill-color:#F5F4F0!important;
-  caret-color:#F5F4F0;
+  -webkit-box-shadow:0 0 0 1000px var(--surface) inset!important;
+  box-shadow:0 0 0 1000px var(--surface) inset!important;
+  -webkit-text-fill-color:var(--text)!important;
+  caret-color:var(--text);
   transition:background-color 9999s ease-in-out 0s}
-.auth-btn{background:#E9FE60;color:#1A1A1A;border:none;border-radius:11px;height:46px;padding:0;font-weight:600;font-size:15px;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:12px}
+.auth-btn{background:var(--lime);color:#1A1A1A;border:none;border-radius:11px;height:46px;padding:0;font-weight:600;font-size:15px;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:12px}
 .auth-btn:active{transform:translateY(1px)}
-.auth-hint{font-size:12px;color:#6E6C68;text-align:center}
-#authMsg{font-size:13px;color:#FF8A8A;text-align:center;min-height:17px}
-#btnSalir{position:fixed;top:12px;right:14px;z-index:120;background:none;border:.5px solid #2C2C33;color:#A8A6A0;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif}
+.auth-hint{font-size:12px;color:var(--text-3);text-align:center}
+#authMsg{font-size:13px;color:var(--err-2);text-align:center;min-height:17px}
+#btnSalir{position:fixed;top:12px;right:14px;z-index:120;background:none;border:.5px solid var(--border-strong);color:var(--text-soft);border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif}
 /* ── LOGIN en teléfono: logo en el tercio de arriba, formulario centrado en la pantalla ──
    En escritorio el logo y el formulario son UN bloque centrado, y con los 76px de separación
    el logo cae casi al medio y empuja el formulario al tercio de abajo. Acá el logo sale del
@@ -757,30 +771,30 @@ tr.r-ing td{background:#eff6ff}
 }
 /* ── Historial de conteos (modal oscuro) ── */
 #vHistorial{position:fixed;inset:0;z-index:160;background:rgba(8,8,10,.72);display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;overflow-y:auto;font-family:'DM Sans',sans-serif}
-.hist-box{background:#161619;border:.5px solid #2C2C33;border-radius:14px;width:100%;max-width:640px;padding:18px 20px;color:#F5F4F0;box-sizing:border-box}
+.hist-box{background:var(--surface);border:.5px solid var(--border-strong);border-radius:14px;width:100%;max-width:640px;padding:18px 20px;color:var(--text);box-sizing:border-box}
 .hist-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;font-weight:600;font-size:15px}
-.hist-head button{background:none;border:.5px solid #2C2C33;color:#A8A6A0;border-radius:999px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap}
+.hist-head button{background:none;border:.5px solid var(--border-strong);color:var(--text-soft);border-radius:999px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap}
 .hist-tbl{width:100%;border-collapse:collapse;font-size:13px}
-.hist-tbl th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#6E6C68;font-weight:600;padding:6px 8px;border-bottom:1px solid #2C2C33}
-.hist-tbl td{padding:8px;border-bottom:1px solid #232329;color:#C9C7C1}
-.hist-row{cursor:pointer}.hist-row:hover td{background:#1B1B20}
-.hist-go{color:#E9FE60;text-align:right}
-.hist-sec{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#8FBF6A;font-weight:600;margin:16px 0 4px}
-.hist-muted{color:#6E6C68;font-size:13px;padding:10px 0}
-.hist-volver{background:none;border:none;color:#A8A6A0;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;padding:0 0 10px}
-.hist-cargar-wrap{margin-top:18px;padding-top:14px;border-top:.5px solid #26262C;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.hist-cargar{background:rgba(212,83,126,.14);border:.5px solid #D4537E;color:#F5F4F0;font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:600;border-radius:8px;padding:8px 16px;cursor:pointer}
+.hist-tbl th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--border-strong)}
+.hist-tbl td{padding:8px;border-bottom:1px solid var(--line);color:var(--text-hi)}
+.hist-row{cursor:pointer}.hist-row:hover td{background:var(--raise-2)}
+.hist-go{color:var(--ent-line);text-align:right}
+.hist-sec{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--good);font-weight:600;margin:16px 0 4px}
+.hist-muted{color:var(--text-3);font-size:13px;padding:10px 0}
+.hist-volver{background:none;border:none;color:var(--text-soft);cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;padding:0 0 10px}
+.hist-cargar-wrap{margin-top:18px;padding-top:14px;border-top:.5px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.hist-cargar{background:rgba(212,83,126,.14);border:.5px solid var(--m-ops-2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:600;border-radius:8px;padding:8px 16px;cursor:pointer}
 .hist-cargar:hover{background:rgba(212,83,126,.22)}
-.hist-cargar-sub{font-size:11.5px;color:#6E6C68}
+.hist-cargar-sub{font-size:11.5px;color:var(--text-3)}
 /* ── Aviso de borrador a medias (modal oscuro) ── */
 #vBorrador{position:fixed;inset:0;z-index:170;background:rgba(8,8,10,.72);display:flex;align-items:center;justify-content:center;padding:24px;font-family:'DM Sans',sans-serif}
-.brdr-box{background:#161619;border:.5px solid #2C2C33;border-radius:14px;width:100%;max-width:400px;padding:22px;color:#F5F4F0;box-sizing:border-box}
+.brdr-box{background:var(--surface);border:.5px solid var(--border-strong);border-radius:14px;width:100%;max-width:400px;padding:22px;color:var(--text);box-sizing:border-box}
 .brdr-title{font-weight:600;font-size:16px;margin-bottom:8px}
-.brdr-msg{font-size:13px;color:#C9C7C1;line-height:1.5;margin-bottom:18px}
+.brdr-msg{font-size:13px;color:var(--text-hi);line-height:1.5;margin-bottom:18px}
 .brdr-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
-.brdr-btn-1{background:#E9FE60;color:#1A1A1A;border:none;border-radius:999px;padding:10px 18px;font-weight:600;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif}
-.brdr-btn-2{background:none;border:.5px solid #2C2C33;color:#A8A6A0;border-radius:999px;padding:10px 18px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif}
-.cbreak-row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;color:#5b5852}
+.brdr-btn-1{background:var(--lime);color:#1A1A1A;border:none;border-radius:999px;padding:10px 18px;font-weight:600;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif}
+.brdr-btn-2{background:none;border:.5px solid var(--border-strong);color:var(--text-soft);border-radius:999px;padding:10px 18px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif}
+.cbreak-row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;color:var(--text-dim-4)}
 .cbreak-row.sub{padding-left:14px;color:var(--text-2);font-size:11px}
 .cbreak-h{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin:8px 0 3px}
 .valid-box{border:1px solid #E7C6E9;background:#FBF4FC;border-radius:12px;padding:10px 14px;margin-bottom:6px;font-size:13px}
@@ -790,14 +804,14 @@ tr.r-ing td{background:#eff6ff}
 .ok-tag{color:#5a8a00;font-weight:600}.bad-tag{color:#C0392B;font-weight:600}
 /* ── Home del sistema (pantalla tras login) ── */
 @keyframes homepulse{0%,100%{opacity:1}50%{opacity:.3}}
-.home-wrap{position:fixed;inset:0;z-index:60;overflow-y:auto;background:#0E0E11;padding:4vh 1.5rem 7vh;display:flex;flex-direction:column;align-items:center;font-family:'DM Sans',sans-serif;box-sizing:border-box}
-.live-dot-home{width:7px;height:7px;border-radius:50%;background:#84BD00;display:inline-block;animation:homepulse 1.6s ease-in-out infinite}
+.home-wrap{position:fixed;inset:0;z-index:60;overflow-y:auto;background:var(--bg);padding:4vh 1.5rem 7vh;display:flex;flex-direction:column;align-items:center;font-family:'DM Sans',sans-serif;box-sizing:border-box}
+.live-dot-home{width:7px;height:7px;border-radius:50%;background:var(--m-conc);display:inline-block;animation:homepulse 1.6s ease-in-out infinite}
 /* header del lobby: logo chico + Truefie a la izquierda, indicador en vivo a la derecha */
 .home-hdr{display:flex;align-items:center;gap:9px;width:100%}
 .home-hdr-logo{height:30px;width:auto;display:block}
-.home-hdr-name{font-size:15px;font-weight:600;color:#F5F4F0;letter-spacing:-.01em}
+.home-hdr-name{font-size:15px;font-weight:600;color:var(--text);letter-spacing:-.01em}
 .home-live{display:flex;align-items:center;gap:7px;margin-bottom:0;margin-left:auto;margin-right:84px}
-.home-live .t{font-size:12px;font-weight:500;color:#7E7C76;letter-spacing:.3px}
+.home-live .t{font-size:12px;font-weight:500;color:var(--text-dim);letter-spacing:.3px}
 /* zona central: consulta centrada verticalmente */
 .home-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;gap:0}
 /* zona inferior: módulos anclados abajo */
@@ -806,23 +820,23 @@ tr.r-ing td{background:#eff6ff}
    tarjetas conserven su tamaño. Ensanchar el bloque en vez de apretar las columnas es
    lo que mantiene "Conciliación" en un renglón. */
 .home-bottom{width:100%;max-width:440px;display:flex;flex-direction:column;align-items:stretch}   /* b82: angosto, como en el teléfono */
-.home-hi{font-size:26px;font-weight:500;color:#F5F4F0;letter-spacing:-.4px;text-align:center}
-.home-q{font-size:20px;font-weight:400;color:#9A988F;margin:10px 0 0}
-.home-search{display:flex;align-items:center;width:100%;max-width:480px;background:#18181C;border:.5px solid #34343C;border-radius:999px;padding:5px 6px 5px 20px;gap:10px;margin-top:2.5rem}
-.home-search input{flex:1;background:none;border:none;color:#E8E6E0;font-size:15px;outline:none}
-.home-search input::placeholder{color:#6E6C68}
-.home-go{width:40px;height:40px;border-radius:50%;background:#E9FE60;border:none;color:#1A1A1A;cursor:pointer;font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center}
+.home-hi{font-size:26px;font-weight:500;color:var(--text);letter-spacing:-.4px;text-align:center}
+.home-q{font-size:20px;font-weight:400;color:var(--text-2);margin:10px 0 0}
+.home-search{display:flex;align-items:center;width:100%;max-width:480px;background:var(--surface-2);border:.5px solid var(--border-hi-2);border-radius:999px;padding:5px 6px 5px 20px;gap:10px;margin-top:2.5rem}
+.home-search input{flex:1;background:none;border:none;color:var(--text-hi-3);font-size:15px;outline:none}
+.home-search input::placeholder{color:var(--text-3)}
+.home-go{width:40px;height:40px;border-radius:50%;background:var(--lime);border:none;color:#1A1A1A;cursor:pointer;font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center}
 .home-chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:520px;margin-top:22px}
-.home-chip{background:#1B1B20;border:.5px solid #34343C;border-radius:999px;padding:8px 15px;font-size:13px;color:#A8A6A0;cursor:pointer;font-family:'DM Sans',sans-serif}
-.home-chip:hover{border-color:#55555F;color:#E8E6E0}
+.home-chip{background:var(--raise-2);border:.5px solid var(--border-hi-2);border-radius:999px;padding:8px 15px;font-size:13px;color:var(--text-soft);cursor:pointer;font-family:'DM Sans',sans-serif}
+.home-chip:hover{border-color:var(--border-hi-6);color:var(--text-hi-3)}
 /* botón principal habilitado (acción del sistema) */
-.home-cta{background:#E9FE60;color:#1A1A1A;border:none;border-radius:999px;padding:13px 28px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-top:1.9rem;transition:background .15s,transform .15s;box-shadow:0 2px 16px rgba(233,254,96,.14)}
-.home-cta:hover{background:#dff04a;transform:translateY(-1px)}
+.home-cta{background:var(--lime);color:#1A1A1A;border:none;border-radius:999px;padding:13px 28px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-top:1.9rem;transition:background .15s,transform .15s;box-shadow:0 2px 16px rgba(233,254,96,.14)}
+.home-cta:hover{background:var(--lime-hover);transform:translateY(-1px)}
 /* grupo buscador conversacional — atenuado y no clicable (pronto) */
 .home-soon{opacity:.45;pointer-events:none;display:flex;flex-direction:column;align-items:center;width:100%;margin-top:2.25rem}
 .home-soon .home-search{margin-top:0}
-.home-sep{border-top:.5px solid #26262C;width:100%;margin:0}
-.home-modlabel{font-size:12px;font-weight:500;color:#6E6C68;letter-spacing:.5px;width:100%;margin:1.5rem 0 .9rem;text-align:left}
+.home-sep{border-top:.5px solid var(--border);width:100%;margin:0}
+.home-modlabel{font-size:12px;font-weight:500;color:var(--text-3);letter-spacing:.5px;width:100%;margin:1.5rem 0 .9rem;text-align:left}
 /* LOBBY (b82, Andrea): el de escritorio "parecía carnaval" — fila de seis con bordes de colores y espacios
    grandes. Ahora es el MISMO del teléfono en todos lados: contenedor angosto centrado, dos columnas,
    tarjetas de borde y fondo neutros, y el color del módulo SOLO en el puntito.
@@ -836,7 +850,7 @@ tr.r-ing td{background:#eff6ff}
 .home-mod-fin{order:4} .home-mod-conc{order:5} .home-mod-per{order:6}
 /* El sello de versión iba con estilo en línea; vive acá para que el @media pueda darle
    el respiro del safe-area en teléfono (el estilo en línea le ganaba a la hoja). */
-.home-build{text-align:center;color:#6E6C68;font-size:11px;letter-spacing:.03em;padding:16px 0 6px}
+.home-build{text-align:center;color:var(--text-3);font-size:11px;letter-spacing:.03em;padding:16px 0 6px}
 /* ── LOBBY en teléfono: módulos apilados en 2 columnas (la fila de 5 se cortaba) y
    menos aire muerto entre el saludo y los módulos. ── */
 @media(max-width:700px){
@@ -886,20 +900,20 @@ tr.r-ing td{background:#eff6ff}
 }
 /* Preguntas sugeridas: lista fina apilada, no botones */
 .home-qlist{width:100%;max-width:440px;margin-top:22px}
-.home-qrow{display:flex;justify-content:space-between;align-items:center;padding:12px 2px;border-bottom:1px solid #1C1C20;color:#9A988F;font-size:14px;cursor:default}
+.home-qrow{display:flex;justify-content:space-between;align-items:center;padding:12px 2px;border-bottom:1px solid var(--line-3);color:var(--text-2);font-size:14px;cursor:default}
 .home-qrow:last-child{border-bottom:none}
-.home-qrow .arr{color:#6E6C68}
-.home-mod{background:#161619;border:.5px solid #26262C;border-radius:14px;padding:14px;min-height:86px;display:flex;flex-direction:column;box-sizing:border-box;text-align:left;cursor:pointer;transition:border-color .15s;font-family:'DM Sans',sans-serif}
-.home-mod:hover{border-color:#3E3E47}
-.home-mod .home-mod-state{margin-top:auto;color:#9A988F}
-.home-mod.inert,.home-mod.inert:hover{cursor:default;border-color:#26262C;opacity:.45}
-.home-mod.inert .home-mod-state{color:#6E6C68}
+.home-qrow .arr{color:var(--text-3)}
+.home-mod{background:var(--surface);border:.5px solid var(--border);border-radius:14px;padding:14px;min-height:86px;display:flex;flex-direction:column;box-sizing:border-box;text-align:left;cursor:pointer;transition:border-color .15s;font-family:'DM Sans',sans-serif}
+.home-mod:hover{border-color:var(--border-hi-3)}
+.home-mod .home-mod-state{margin-top:auto;color:var(--text-2)}
+.home-mod.inert,.home-mod.inert:hover{cursor:default;border-color:var(--border);opacity:.45}
+.home-mod.inert .home-mod-state{color:var(--text-3)}
 .mes-select{background:var(--surface-2);color:var(--text);border:1px solid var(--border-strong);border-radius:8px;padding:7px 10px;font-family:inherit;font-size:13px}
 /* ── ACENTO POR MÓDULO ── el color sigue al módulo vía --mod (heredado por la vista) */
 /* --accent/--blue/--blue-l siguen al módulo → todo acento interno hereda el color correcto (adiós morado viejo) */
-#vFacturado,#vCostos,#vRentabilidad,#vSimulador,#vCalcPrecios,#vResultados{--mod:#378ADD;--accent:#378ADD;--blue:#378ADD;--blue-l:rgba(55,138,221,.15)}   /* Finanzas = azul */
-#vProduccion,#vMermas,#vInventario,#vResumen,#vConteo,#vPlan{--mod:#C77DA0;--accent:#C77DA0;--blue:#C77DA0;--blue-l:rgba(199,125,160,.15)}                          /* Operaciones = rosa apagado (sistema de color disciplinado) */
-#vUpload{--mod:#84BD00;--accent:#84BD00;--blue:#84BD00;--blue-l:rgba(132,189,0,.15)}                                                     /* Conciliación = verde */
+#vFacturado,#vCostos,#vRentabilidad,#vSimulador,#vCalcPrecios,#vResultados{--mod:var(--m-fin);--accent:var(--m-fin);--blue:var(--m-fin);--blue-l:rgba(55,138,221,.15)}   /* Finanzas = azul */
+#vProduccion,#vMermas,#vInventario,#vResumen,#vConteo,#vPlan{--mod:var(--m-ops);--accent:var(--m-ops);--blue:var(--m-ops);--blue-l:rgba(199,125,160,.15)}                          /* Operaciones = rosa apagado (sistema de color disciplinado) */
+#vUpload{--mod:var(--m-conc);--accent:var(--m-conc);--blue:var(--m-conc);--blue-l:rgba(132,189,0,.15)}                                                     /* Conciliación = verde */
 /* ENTREGAS = LIMA TRUE FOOD (13-ago-2026). Antes era morado #7F77DD; Andrea lo cambió
    porque "ese morado no es de ninguno de nuestros productos" y Entregas es lo que vive
    en producción, frente al congelador: que sea onbrand. Estas vistas NO tenían --mod
@@ -938,7 +952,7 @@ body[data-mod="entregas"] .main{
    Y ojo con Automatización, que en CLAUDE.md tiene #FF751F: es prácticamente el mismo
    naranja. Todavía no existe como módulo; cuando exista, uno de los dos se mueve. */
 body[data-mod="personal"] .main{
-  --mod:#FF671D;--accent:#FF671D;--blue:#FF671D;--blue-l:var(--panel)}
+  --mod:var(--m-per);--accent:var(--m-per);--blue:var(--m-per);--blue-l:var(--panel)}
 .faces .face.on{color:var(--text);border-bottom-color:var(--mod)}
 .m3nav .m3tab.on{background:transparent;color:var(--mod);border-bottom-color:var(--mod)}
 .home-mod-dot{width:9px;height:9px;border-radius:3px;display:inline-block}
@@ -946,9 +960,9 @@ body[data-mod="personal"] .main{
 .home-mod-state{font-size:12px;font-weight:500;margin-top:6px}
 /* El cuadre con Odoo en la tarjeta de Entregas (27-sep). Gris: existe. Ámbar:
    vence hoy o mañana (regla 5 del lobby). Vacía no ocupa lugar. */
-.home-mod-alerta{font-size:12px;line-height:1.35;margin-top:6px;color:#6E6C68;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.home-mod-alerta.ambar{color:#E9A23B;cursor:pointer}
-.home-mod-alerta.rojo{color:#E24B4A;cursor:pointer}
+.home-mod-alerta{font-size:12px;line-height:1.35;margin-top:6px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.home-mod-alerta.ambar{color:var(--warn);cursor:pointer}
+.home-mod-alerta.rojo{color:var(--stop-tx);cursor:pointer}
 .home-mod-alerta:empty{display:none}
 /* ── LOBBY DE UN SOLO MÓDULO (hoy: Daniel) ──
    Una cuadrícula de cinco con una sola tarjeta se lee como una cuadrícula ROTA: la
@@ -1139,7 +1153,7 @@ input[type=date]{color-scheme:dark}
 tr.fila-proceso td{background:rgba(192,208,72,.08)}
 tr.fila-lista td{background:rgba(143,176,255,.07)}
 tr.fila-revisar td{background:rgba(224,138,74,.07)}
-tr.fila-sinmatch td{background:rgba(255,255,255,.03)}
+tr.fila-sinmatch td{background:var(--wash-2)}
 tr.r-done td{background:rgba(192,208,72,.08)}
 .done-check{color:#C0D048}.done-fe{color:#C0D048}
 /* paneles laterales (preview vinculación) */
@@ -1207,6 +1221,30 @@ tr.r-done td{background:rgba(192,208,72,.08)}
   --stop-tx:#E24B4A;       /* texto de bloqueo */
   --busy:#A8A6A0;          /* "guardando…", sin color de estado */
   --warn-wash:rgba(233,162,59,.10);--warn-edge:rgba(233,162,59,.35);--warn-tx:#E8D3AC;
+  /* ── TOKENS DEL TEMA (4-oct-2026) ──────────────────────────────────────
+     Cada uno vale en oscuro EXACTAMENTE el hex que estaba escrito a mano en las reglas
+     (convertidos por script y verificados: 0 diferencias en oscuro). El claro vive en
+     html[data-tema="claro"], más abajo, y solo cambia estos números. */
+  /* superficies */
+  --raise:#1E1E22;--raise-2:#1B1B20;--raise-3:#191920;--sunk-2:#131316;
+  --wash-1:rgba(255,255,255,.02);--wash-2:rgba(255,255,255,.03);--wash-3:rgba(255,255,255,.06);
+  /* líneas y bordes */
+  --line:#232329;--line-soft:#1A1A1E;--line-3:#1C1C20;--line-4:#1F1F24;--border-hi:#3A3A42;
+  --border-hi-2:#34343C;--border-hi-3:#3E3E47;--border-hi-4:#3E3E46;--border-hi-5:#3A3A44;
+  --border-hi-6:#55555F;
+  /* textos */
+  --text-soft:#A8A6A0;--text-hi:#C9C7C1;--text-hi-2:#C5C2BA;--text-hi-3:#E8E6E0;--text-dim:#7E7C76;
+  --text-dim-2:#7A7A72;--text-dim-3:#6F6C66;--text-dim-4:#5B5852;--text-dim-5:#5A5750;
+  --text-dim-6:#57554F;--text-dim-7:#4A4A50;
+  /* señal */
+  --err-soft:#FFB4B4;--err-2:#FF8A8A;--err-wash:#3A1B1B;--ok-olive:#7E8C5A;--ok-fill:#7E8C5A;
+  --dot-ok:#5FB37A;--odoo:#9AA7B8;--lime-hover:#DFF04A;
+  /* acento de módulo */
+  --m-fin:#378ADD;--m-ops:#C77DA0;--m-ops-2:#D4537E;--m-conc:#84BD00;--m-comp:#A27FEB;
+  --m-per:#FF671D;--magenta:#C964CF;--orange-2:#FF751F;
+  /* color de PRODUCTO (puntos y bordes, siempre con su nombre al lado) */
+  --p-blanco:#378ADD;--p-semillas:#84BD00;--p-frances:#D4537E;--p-buns:#7F77DD;--p-pizza:#FF751F;
+  --p-galletas:#ED93B1;
 }
 
 /* ════════ ENTREGAS EN CLARO — decisión de Andrea, 24-ago-2026 ════════════
@@ -1241,7 +1279,8 @@ tr.r-done td{background:rgba(192,208,72,.08)}
    Sobre la tarjeta blanca no cambia nada (5,24 y 3,51): el blanco es el mismo.
    El secundario sobre el fondo era el que venía justo —4,85 contra un mínimo de
    4,5— y queda un poco mejor, no peor. */
-body.ent-claro{
+html[data-tema="claro"]{
+  color-scheme:light;
   --bg:#F7F8FA;--bg2:#FFFFFF;--bg3:#FFFFFF;      /* la página NO es blanco puro */
   --surface:#FFFFFF;--surface-2:#F7F8FA;         /* la tarjeta se eleva siendo más clara */
   --text:#1A1A17;--text-m:#6E6C68;--text-h:#8B897F;
@@ -1284,7 +1323,34 @@ body.ent-claro{
   --green:#4E7A00;--green-l:rgba(78,122,0,.12);--green-d:#4E7A00;
   --amber:#9A6410;--amber-l:rgba(154,100,16,.12);--orange:#9A6410;--orange-l:rgba(154,100,16,.12);
   --red:#A32D2D;--red-l:rgba(209,67,67,.10);
+  /* ── TOKENS DEL TEMA (4-oct-2026): los mismos de :root, en claro. Textos y acentos de
+     módulo pasan AA (4,5:1) sobre la página #F7F8FA; los colores de PRODUCTO son puntos
+     con su nombre al lado (3:1 o más, salvo Galletas, que tiene que seguir distinguiéndose
+     de Francés). El lima de RELLENO no cambia; el de texto y línea es --ent-line. */
+  --ent-line:#6B7800;   /* era #8A9B00 (2,9:1 sobre la página, no llegaba a AA como texto) */
+  /* superficies */
+  --raise:#EEF0F3;--raise-2:#F1F3F6;--raise-3:#F1F3F6;--sunk-2:#F1F3F6;--wash-1:rgba(26,26,23,.025);
+  --wash-2:rgba(26,26,23,.035);--wash-3:rgba(26,26,23,.05);
+  /* líneas y bordes */
+  --line:#E8EAEE;--line-soft:#EEF0F3;--line-3:#EEF0F3;--line-4:#E8EAEE;--border-hi:#C7CBD2;
+  --border-hi-2:#CDD1D7;--border-hi-3:#C2C6CD;--border-hi-4:#C2C6CD;--border-hi-5:#C7CBD2;
+  --border-hi-6:#AEB2BA;
+  /* textos */
+  --text-soft:#5F5D58;--text-hi:#3A3935;--text-hi-2:#45433E;--text-hi-3:#2A2925;--text-dim:#8B897F;
+  --text-dim-2:#8B897F;--text-dim-3:#8B897F;--text-dim-4:#8B897F;--text-dim-5:#8B897F;
+  --text-dim-6:#8B897F;--text-dim-7:#A9ACB3;
+  /* señal */
+  --err-soft:#A32D2D;--err-2:#B03030;--err-wash:#FBE9E9;--ok-olive:#5F6B3A;--ok-fill:#B5C493;
+  --dot-ok:#3E8A57;--odoo:#5E6B7D;--lime-hover:#DFF04A;
+  /* acento de módulo */
+  --m-fin:#1F66B3;--m-ops:#9E4C75;--m-ops-2:#B3325E;--m-conc:#4E7A00;--m-comp:#6E46CC;
+  --m-per:#C04400;--magenta:#A23DA8;--orange-2:#C85400;
+  /* color de PRODUCTO (puntos y bordes, siempre con su nombre al lado) */
+  --p-blanco:#378ADD;--p-semillas:#5E8C00;--p-frances:#D4537E;--p-buns:#7F77DD;--p-pizza:#D9600E;
+  --p-galletas:#E07FA5;
 }
+html{color-scheme:dark}
+
 body{background:var(--bg);color:var(--text);letter-spacing:-0.005em}
 .main{max-width:1180px}
 .card-title,.m3title{letter-spacing:-0.02em}
@@ -1294,15 +1360,15 @@ body{background:var(--bg);color:var(--text);letter-spacing:-0.005em}
 .btn-sm{border-radius:8px;padding:7px 13px}
 .btn-p{background:#F6F4EF;border:1px solid #D8D5CE;color:#1A1A1A;font-weight:600}
 .btn-p:hover{background:#EEEBE3;border-color:#CFCBC1}
-.btn-amarillo,.btn-g,.btn-usar{background:#E9FE60;color:#2C3A00;border:none;font-weight:600;border-radius:10px}
-.btn-amarillo:hover,.btn-g:hover,.btn-usar:hover{background:#dff04a}
+.btn-amarillo,.btn-g,.btn-usar{background:var(--lime);color:#2C3A00;border:none;font-weight:600;border-radius:10px}
+.btn-amarillo:hover,.btn-g:hover,.btn-usar:hover{background:var(--lime-hover)}
 .btn-confirm{background:var(--surface);border:1px solid var(--border-m);color:#A23DA8;font-weight:500}
 .btn-confirm:hover{background:var(--surface)}
-.btn-warn{background:var(--surface);border:1px solid var(--border-m);color:#FF751F}
+.btn-warn{background:var(--surface);border:1px solid var(--border-m);color:var(--orange-2)}
 .btn-undo{background:var(--surface);border:1px solid var(--border-m);color:var(--text-m)}
 /* inputs */
 .field input,select{background:var(--surface);border:1px solid #E4E1DA;color:var(--text);border-radius:10px;padding:11px 13px;font-size:14px}
-.field input:focus,select:focus{border-color:#C964CF;outline:none}
+.field input:focus,select:focus{border-color:var(--magenta);outline:none}
 /* El placeholder iba en #C5C2BA, un gris del tema CLARO que quedó colgado: sobre fondo
    oscuro se lee casi como un valor escrito, no como una pista. Va al gris terciario del
    sistema, que es el escalón que le corresponde. Afecta a todos los campos de Truefie
@@ -1313,8 +1379,8 @@ input[type=date]{color-scheme:light}
 /* pestañas estilo navegador */
 .tabs{gap:18px}
 .tab,.m3tab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-3);font-weight:500;border-radius:0;padding:9px 2px}
-.tab:hover,.m3tab:hover{color:#5A5750;background:transparent}
-.tab.on,.m3tab.on{background:transparent;color:#1A1A1A;font-weight:600;border-bottom:2px solid #C964CF}
+.tab:hover,.m3tab:hover{color:var(--text-dim-5);background:transparent}
+.tab.on,.m3tab.on{background:transparent;color:#1A1A1A;font-weight:600;border-bottom:2px solid var(--magenta)}
 /* tarjetas */
 .card,.m3card{background:var(--surface);border:1px solid var(--border);border-radius:14px}
 .m3head{padding:1.4rem 1.6rem .25rem}
@@ -1326,25 +1392,25 @@ input[type=date]{color-scheme:light}
 .m3sec-desc{color:var(--text-2)}
 /* pills de estado */
 .pill{font-weight:600}
-.pill-ok,.pill-proc{background:#eef6dd;color:#5a7a00}.pill-ok .dot,.pill-proc .dot{background:#84BD00}
-.pill-lista{background:#f7edf7;color:#A23DA8}.pill-lista .dot{background:#C964CF}
-.pill-rev{background:var(--surface)2ea;color:#C2410C}.pill-rev .dot{background:#FF751F}
-.pill-gris{background:#F2F0EA;color:var(--text-2)}.pill-gris .dot{background:#C5C2BA}
+.pill-ok,.pill-proc{background:#eef6dd;color:#5a7a00}.pill-ok .dot,.pill-proc .dot{background:var(--m-conc)}
+.pill-lista{background:#f7edf7;color:#A23DA8}.pill-lista .dot{background:var(--magenta)}
+.pill-rev{background:var(--surface)2ea;color:#C2410C}.pill-rev .dot{background:var(--orange-2)}
+.pill-gris{background:#F2F0EA;color:var(--text-2)}.pill-gris .dot{background:var(--text-hi-2)}
 /* vista resultados: filas planas */
 tr.fila-proceso td,tr.fila-lista td,tr.fila-revisar td,tr.fila-sinmatch td,tr.r-done td{background:transparent}
 table td,table th{border-color:#F2F0EA}
 .done-check,.done-fe{color:#5a7a00}
 /* tarjetas de propuesta */
 .prop-card{background:var(--surface);border:1px solid var(--border);border-left:1px solid var(--border);border-radius:12px}
-.prop-card.best{border:1px solid var(--border);border-left:3px solid #C964CF}
-.prop-fac{color:#5A5750}
+.prop-card.best{border:1px solid var(--border);border-left:3px solid var(--magenta)}
+.prop-fac{color:var(--text-dim-5)}
 .prop-foot{color:var(--text-2);border-top-color:#F2F0EA}
 .prop-badge,.prop-badge.exacto,.prop-badge.sobra{background:transparent;padding:0;font-weight:600}
 .prop-badge.exacto{color:#5a7a00}.prop-badge.sobra{color:#C2410C}
 /* tablas premium: líneas finas, sin caja */
 .tbl-clara{background:transparent;border-radius:0;margin-top:6px}
 .tbl-clara th{background:transparent;color:var(--text-3);border-bottom:1px solid var(--border);letter-spacing:0.06em}
-.tbl-clara td{color:#5A5750;border-bottom:1px solid #F2F0EA;padding:12px 10px;background:transparent}
+.tbl-clara td{color:var(--text-dim-5);border-bottom:1px solid #F2F0EA;padding:12px 10px;background:transparent}
 .tbl-clara tr:nth-child(even) td{background:transparent}
 .tbl-clara td strong,.tbl-clara .num{color:#1A1A1A;font-weight:500}
 .tbl-clara .monto{color:#1A1A1A;font-weight:600}
@@ -1388,7 +1454,7 @@ table td,table th{border-color:#F2F0EA}
   .header .hdr-prod::after{content:'solo lectura';font-size:11px;color:var(--text-3)}
   .header .logo-link{height:22px!important;order:-2}
   #btnSalir{top:calc(9px + env(safe-area-inset-top));right:12px;padding:4px 10px;font-size:11px;
-    color:var(--text-3);border-color:#26262C}
+    color:var(--text-3);border-color:var(--border)}
   /* EL ✱ DE TICKETS, ARRIBA (3-oct-2026, Andrea: «que no tape contenido»). Abajo a la derecha
      tapaba lo que se lee alineado a la derecha —en Compras, «Llega jue 8»—, y en teléfono no hay
      margen libre: el contenido va de borde a borde. Va al lado de «Salir», chico y sin sombra, y el
@@ -1396,24 +1462,25 @@ table td,table th{border-color:#F2F0EA}
      contenido va centrado y angosto y no queda nada debajo. Sigue en z 150, así que con un modal
      abierto se puede reportar igual. */
   body #tkBtn{top:calc(6px + env(safe-area-inset-top));bottom:auto;right:62px;width:30px;height:30px;
-    font-size:14px;box-shadow:none;background:transparent;color:var(--text-3);border-color:#26262C}
+    font-size:14px;box-shadow:none;background:transparent;color:var(--text-3);border-color:var(--border)}
   /* (`body` delante: la regla base de #tkBtn va más abajo en la hoja y ganaba por orden.) */
-  body #appHeader,body .header{padding-right:110px}
-  body .home-hdr{padding-right:110px}
+  /* 4-oct: +30 px para la luna/sol (110 → 140). */
+  body #appHeader,body .header{padding-right:140px}
+  body .home-hdr{padding-right:140px}
 }
 .crumbs{display:flex;align-items:center;gap:9px;font-size:14px}
-.crumb-dot{width:7px;height:7px;border-radius:50%;background:#C964CF;flex-shrink:0}
-.crumb-area{color:var(--text-2)}.crumb-sep{color:#C5C2BA}.crumb-cur{color:#1A1A1A;font-weight:600}
+.crumb-dot{width:7px;height:7px;border-radius:50%;background:var(--magenta);flex-shrink:0}
+.crumb-area{color:var(--text-2)}.crumb-sep{color:var(--text-hi-2)}.crumb-cur{color:#1A1A1A;font-weight:600}
 /* Columna derecha del encabezado. Estaba con estilo EN LÍNEA; vive acá para que el @media de
    teléfono pueda volverla display:contents y repartir sus dos piezas a los extremos. */
-.hdr-right{margin-left:auto;margin-right:66px;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.hdr-right{margin-left:auto;margin-right:152px;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
 /* El aviso de producción también tenía su estilo en línea (le ganaba al @media). Solo queda
    `display` en línea, que es lo que el JS enciende y apaga. */
 /* "producción · solo lectura" es INFORMACIÓN, no un estado de error. El #B08585
    era un rojo apagado que sobre el encabezado claro se lee marrón y parece alerta.
    Va al gris secundario, que es lo que corresponde a un dato de contexto. */
 .hdr-prod{font-size:11px;color:var(--text-2);letter-spacing:.01em}
-.conn-ind{margin-left:auto;display:flex;align-items:center;gap:7px;color:#5A5750;font-size:13px}
+.conn-ind{margin-left:auto;display:flex;align-items:center;gap:7px;color:var(--text-dim-5);font-size:13px}
 .conn-ind .gdot{width:7px;height:7px;border-radius:50%;background:#4CAF6E}
 .logo-link{cursor:pointer}
 /* ── Login ── */
@@ -1422,10 +1489,10 @@ table td,table th{border-color:#F2F0EA}
 .login-os{color:var(--text-2);font-size:14px;margin-bottom:34px}
 .login-form{text-align:left}
 .login-form .field{margin-bottom:14px}
-.login-foot{color:#C5C2BA;font-size:11px;margin-top:22px;letter-spacing:.03em}
+.login-foot{color:var(--text-hi-2);font-size:11px;margin-top:22px;letter-spacing:.03em}
 /* Campos del login: oscuros, altos, sin fondo amarillento */
-#vLogin .field input{background:#161619;border:1px solid #26262C;color:#F5F4F0;border-radius:12px;height:52px;padding:0 14px;font-size:15px;box-sizing:border-box}
-#vLogin .field input:focus{border-color:#3A3A44;outline:none}
+#vLogin .field input{background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:12px;height:52px;padding:0 14px;font-size:15px;box-sizing:border-box}
+#vLogin .field input:focus{border-color:var(--border-hi-5);outline:none}
 /* ── Lobby ── */
 .app-top{display:flex;align-items:center;justify-content:space-between;padding:18px 28px;max-width:760px;margin:0 auto}
 .app-top-left{display:flex;align-items:center;gap:12px}
@@ -1442,9 +1509,9 @@ table td,table th{border-color:#F2F0EA}
 .area-body{flex:1}
 .area-name{font-size:17px;font-weight:600;color:#1A1A1A}
 .area-sub{font-size:13px;color:var(--text-2);margin-top:3px}
-.area-row.pend .area-name,.area-row.pend .area-sub{color:#C5C2BA}
+.area-row.pend .area-name,.area-row.pend .area-sub{color:var(--text-hi-2)}
 .area-arrow{color:var(--text-2);font-size:18px}
-.area-soon{font-size:10px;font-weight:600;letter-spacing:0.14em;color:#C5C2BA;text-transform:uppercase}
+.area-soon{font-size:10px;font-weight:600;letter-spacing:0.14em;color:var(--text-hi-2);text-transform:uppercase}
 /* ═══════════ TEMA OSCURO — override de sistema (último, gana la cascada) ═══════════ */
 body,.main{background:var(--bg);color:var(--text)}
 .logo span{color:var(--lime)}
@@ -1472,8 +1539,8 @@ body,.main{background:var(--bg);color:var(--text)}
 .btn-amarillo,.btn-usar{background:var(--lime);color:#1A1A1A;border:none}
 /* El texto sobre el relleno lima, SOLO en Entregas: la regla de arriba es global y
    el resto de Truefie no se toca. #2E3300 es el de la paleta clara. */
-body.ent-claro .btn-amarillo,body.ent-claro .btn-usar{color:var(--ent-fill-tx)}
-.btn-amarillo:hover,.btn-usar:hover{background:#dff04a}
+html[data-tema="claro"] .btn-amarillo,html[data-tema="claro"] .btn-usar{color:var(--ent-fill-tx)}
+.btn-amarillo:hover,.btn-usar:hover{background:var(--lime-hover)}
 /* dropzone */
 .uz{border-color:var(--border-strong);background:var(--surface-2)}
 .uz:hover,.uz.ok{border-color:var(--green);background:var(--green-l)}
@@ -1503,12 +1570,12 @@ td{border:none}
 tr.fila-proceso td,tr.r-done td{background:rgba(132,189,0,.08)}
 tr.fila-lista td,tr.r-ing td{background:rgba(143,176,255,.08)}
 tr.fila-revisar td,tr.r-crear td{background:rgba(255,117,31,.08)}
-tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
+tr.fila-sinmatch td,tr.r-rev td{background:var(--wash-2)}
 /* pills */
 .pill-ok{background:var(--green-l);color:var(--green)}.pill-ok .dot{background:var(--green)}
 .pill-lista,.b-rev{background:rgba(143,176,255,.14);color:#8FB0FF}.pill-lista .dot{background:#8FB0FF}
 .pill-rev{background:var(--amber-l);color:var(--amber)}.pill-rev .dot{background:var(--amber)}
-.pill-gris{background:rgba(255,255,255,.06);color:var(--text-3)}.pill-gris .dot{background:var(--text-3)}
+.pill-gris{background:var(--wash-3);color:var(--text-3)}.pill-gris .dot{background:var(--text-3)}
 .pill-proc{background:var(--purple-l);color:var(--purple)}.pill-proc .dot{background:var(--purple)}
 /* detective — prop-cards */
 .prop-card{background:var(--surface);border-color:var(--border-strong);border-left:1px solid var(--border-strong)}
@@ -1572,14 +1639,30 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    segura cuando es más grande (iPhone con barra de gestos: 34px de inset
    → 50px). No se suma el piso al inset: en el iPhone eso lo dejaría
    flotando demasiado alto. */
-#tkBtn{position:fixed;z-index:150;right:16px;
-  bottom:max(28px, calc(16px + env(safe-area-inset-bottom)));
-  width:46px;height:46px;border-radius:50%;
+/* ⚠️ 4-oct-2026 (Andrea): el ✱ va ARRIBA también en escritorio, igual que en teléfono — al lado
+   de «Salir», con la luna/sol a su izquierda. Lo de abajo (el piso de 28px del ticket 19) quedó
+   sin uso: ya no hay botón abajo. El encabezado reserva la esquina (ver `.hdr-right`). */
+#tkBtn{position:fixed;z-index:150;right:78px;top:10px;bottom:auto;
+  width:30px;height:30px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  background:var(--surface);color:var(--text-2);
-  border:1px solid var(--border-strong);
-  box-shadow:0 4px 14px rgba(0,0,0,.28);
-  font:inherit;font-size:19px;line-height:1;cursor:pointer;padding:0}
+  background:transparent;color:var(--text-3);
+  border:.5px solid var(--border-strong);
+  box-shadow:none;
+  font:inherit;font-size:14px;line-height:1;cursor:pointer;padding:0}
+/* LUNA / SOL (4-oct-2026): a la izquierda del ✱, mismo tamaño y mismo trazo. Muestra el modo al
+   que PASA. Íconos SVG con currentColor: nada de emojis. */
+#temaBtn{position:fixed;z-index:150;right:114px;top:10px;width:30px;height:30px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;
+  background:transparent;color:var(--text-3);border:.5px solid var(--border-strong)}
+#temaBtn.hidden{display:none}
+#temaBtn svg{width:15px;height:15px}
+#temaBtn .tema-luna{display:none}
+html[data-tema="claro"] #temaBtn .tema-sol{display:none}
+html[data-tema="claro"] #temaBtn .tema-luna{display:block}
+#temaBtn:active{transform:scale(.94)}
+@media(max-width:700px){
+  #temaBtn{top:calc(6px + env(safe-area-inset-top));right:98px}
+}
 #tkBtn:active{transform:scale(.94)}
 #tkBtn.hidden{display:none}
 
@@ -1618,7 +1701,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .tk-amb{background:var(--surface-2);border:1px solid var(--border);border-radius:9px;
         padding:9px 10px;font:inherit;font-size:13px;color:var(--text-2);cursor:pointer}
 .tk-amb:hover{border-color:var(--border-strong)}
-.tk-amb.on{background:var(--ent-fill,#E9FE60);border-color:var(--ent-fill,#E9FE60);
+.tk-amb.on{background:var(--ent-fill,var(--lime));border-color:var(--ent-fill,var(--ent-line));
            color:var(--ent-fill-tx,#1A1A1A);font-weight:600}
 .tk-tipo{background:var(--field);border:1px solid var(--border);border-radius:9px;
   color:var(--text);font:inherit;font-size:13px;padding:11px 10px;cursor:pointer;text-align:left}
@@ -1633,7 +1716,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    guardado que fallaba en silencio en Devoluciones (17-sep). */
 .tk-msg{font-size:13px;margin-top:12px;padding:10px;border-radius:9px;display:none}
 .tk-msg.ok{display:block;background:var(--green-l,#123);color:var(--green-d,#7d7)}
-.tk-msg.mal{display:block;background:#3a1b1b;color:#ffb4b4;white-space:pre-wrap}
+.tk-msg.mal{display:block;background:var(--err-wash);color:var(--err-soft);white-space:pre-wrap}
 
 /* ── TICKETS · EL CHIP DEL LOBBY Y LA LISTA (b62) ─────────────────────
    NO es una septima tarjeta: la grilla es `repeat(6,1fr)` y ya tiene seis, y
@@ -1654,7 +1737,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    CONTENEDOR nuevo para que valga para las dos lineas, no solo para la de la
    conexion. Aca no hay miga: la miga vive en `#appHeader`, que es otra
    pantalla. */
-.home-hdr-right{margin-left:auto;margin-right:84px;min-width:0;
+.home-hdr-right{margin-left:auto;margin-right:158px;min-width:0;
   display:flex;flex-direction:column;align-items:flex-end;gap:3px}
 /* La reserva la lleva el contenedor: si se quedara en `.home-live`, el chip
    de abajo no la heredaria y se metria bajo "Salir". */
@@ -1670,16 +1753,16 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   background:transparent;border:none;padding:7px 0 7px 8px;margin:-5px 0;
   font:inherit;cursor:pointer;color:inherit;max-width:100%}
 .tk-chip:active{opacity:.6}
-.tk-chip-n{font-size:11px;color:#7E7C76;letter-spacing:.3px}
+.tk-chip-n{font-size:11px;color:var(--text-dim);letter-spacing:.3px}
 /* LOS CUATRO ESTADOS DEL CONTADOR, cada uno con su color y su texto. El `0`
    por defecto no existe a proposito: un 0 mientras se cuenta es
    indistinguible de "no hay nada que triar", y esa confusion es la familia de
    los tres bugs del 18-sep. */
 .tk-chip-e{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tk-chip-e.cargando{color:#6E6C68;font-style:italic}
-.tk-chip-e.dato{color:#C964CF;font-weight:600}
-.tk-chip-e.vacio{color:#6E6C68}
-.tk-chip-e.roto{color:#ffb4b4}
+.tk-chip-e.cargando{color:var(--text-3);font-style:italic}
+.tk-chip-e.dato{color:var(--magenta);font-weight:600}
+.tk-chip-e.vacio{color:var(--text-3)}
+.tk-chip-e.roto{color:var(--err-soft)}
 
 /* ── LA LISTA ── */
 .tkl-vacio{color:var(--text-3);font-size:13px;padding:18px 2px}
@@ -1701,7 +1784,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 .tkl-l1{display:flex;gap:9px;align-items:baseline;flex-wrap:wrap;margin-bottom:5px}
 .tkl-id{font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums}
 .tkl-est{font-size:11px;padding:1px 7px;border-radius:99px;border:1px solid var(--border-strong);color:var(--text-2)}
-.tkl-est.sin_triar{border-color:#C964CF;color:#C964CF}
+.tkl-est.sin_triar{border-color:var(--magenta);color:var(--magenta)}
 .tkl-tipo{font-size:11px;color:var(--text-3)}
 .tkl-txt{font-size:14px;color:var(--text);line-height:1.45}
 .tkl-pie{font-size:11px;color:var(--text-3);margin-top:6px;line-height:1.5;word-break:break-word}
@@ -1733,7 +1816,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
    renglón esté gris, "no hay avisos" quiere decir que se revisó y no había
    nada. En rojo quiere decir que nadie revisó, que es lo contrario. */
 .tkl-vigia.tkl-vigia-mal{color:#8a3b12;font-weight:600}
-.tkl-roto{font-size:13px;color:#ffb4b4;background:#3a1b1b;border-radius:9px;
+.tkl-roto{font-size:13px;color:var(--err-soft);background:var(--err-wash);border-radius:9px;
   padding:11px 12px;white-space:pre-wrap;margin-bottom:12px}
 
 /* ── LAS PESTAÑAS · b68 (23-sep-2026) ─────────────────────────────────
@@ -1833,14 +1916,14 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   border:1px solid var(--border-strong);border-radius:9px;color:var(--text);
   font:inherit;font-size:16px;padding:10px 12px;min-height:74px;resize:vertical}
 .tke-n{font-size:11px;color:var(--text-3);margin-top:5px}
-.tke-n.falta{color:#ffb4b4}
+.tke-n.falta{color:var(--err-soft)}
 .tke-ok{width:100%;margin-top:14px;background:var(--field);border:1px solid var(--border-strong);
   border-radius:9px;color:var(--text);font:inherit;font-size:15px;font-weight:600;
   padding:13px;cursor:pointer}
 .tke-ok[disabled]{opacity:.45;cursor:default}
 .tke-msg{font-size:13px;margin-top:12px;padding:10px;border-radius:9px;display:none;white-space:pre-wrap}
 .tke-msg.ok{display:block;background:#12301c;color:#8ede9f}
-.tke-msg.mal{display:block;background:#3a1b1b;color:#ffb4b4}
+.tke-msg.mal{display:block;background:var(--err-wash);color:var(--err-soft)}
 </style>
 </head>
 <body>
@@ -1856,6 +1939,11 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   </div>
 </div>
 <button id="btnSalir" class="hidden" onclick="authLogout()">Salir</button>
+<!-- Luna / sol (4-oct-2026). Muestra el modo AL QUE PASA: sol en oscuro, luna en claro. -->
+<button id="temaBtn" class="hidden" onclick="temaCambiar()" aria-label="Modo claro" title="Modo claro">
+  <svg class="tema-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>
+  <svg class="tema-luna" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+</button>
 <!-- HISTORIAL DE CONTEOS (modal, lee de Supabase) -->
 <div id="vHistorial" class="hidden">
   <div class="hist-box">
@@ -1867,7 +1955,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <div id="vBorrador" class="hidden">
   <div class="brdr-box">
     <div class="brdr-title">Quedó un conteo a medias</div>
-    <div class="brdr-msg">De la última vez quedó un conteo sin guardar. ¿Seguís con esos datos o arrancás de cero?<br><span style="color:#6E6C68">Los conteos ya guardados en el historial no se tocan.</span></div>
+    <div class="brdr-msg">De la última vez quedó un conteo sin guardar. ¿Seguís con esos datos o arrancás de cero?<br><span style="color:var(--text-3)">Los conteos ya guardados en el historial no se tocan.</span></div>
     <div class="brdr-actions">
       <button class="brdr-btn-2" onclick="borradorEmpezarCero()">Empezar de cero</button>
       <button class="brdr-btn-1" onclick="borradorSeguir()">Seguir con esos datos</button>
@@ -1939,36 +2027,36 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
            por hacer, «Al día» en gris si no hay nada. Tocar la alerta lleva a donde se resuelve.
            Personal es de Lorena: sin alerta hasta que ella decida. Las llena `lobbyAlertas()`. -->
       <div class="home-mod home-mod-ops" onclick="abrirOperaciones()">
-        <span class="home-mod-dot" style="background:#D4537E"></span>
-        <div class="home-mod-name" style="color:#F5F4F0">Operaciones</div>
+        <span class="home-mod-dot" style="background:var(--m-ops-2)"></span>
+        <div class="home-mod-name" style="color:var(--text)">Operaciones</div>
         <div class="home-mod-alerta" id="homeOpsAlerta"></div>
       </div>
       <!-- COMPRAS (b82), morado #A27FEB: al lado de Operaciones, que es de donde lee el plan. -->
       <div class="home-mod home-mod-com" onclick="abrirCompras()">
-        <span class="home-mod-dot" style="background:#A27FEB"></span>
-        <div class="home-mod-name" style="color:#F5F4F0">Compras</div>
+        <span class="home-mod-dot" style="background:var(--m-comp)"></span>
+        <div class="home-mod-name" style="color:var(--text)">Compras</div>
         <div class="home-mod-alerta" id="homeComAlerta"></div>
       </div>
       <div class="home-mod home-mod-ent" onclick="abrirEntregas()">
-        <span class="home-mod-dot" style="background:#E9FE60"></span>
-        <div class="home-mod-name" style="color:#F5F4F0">Entregas</div>
+        <span class="home-mod-dot" style="background:var(--ent-line)"></span>
+        <div class="home-mod-name" style="color:var(--text)">Entregas</div>
         <div class="home-mod-alerta" id="homeEntAlerta"></div>
       </div>
       <div class="home-mod home-mod-fin" onclick="abrirFinanzas()">
-        <span class="home-mod-dot" style="background:#378ADD"></span>
-        <div class="home-mod-name" style="color:#F5F4F0">Finanzas</div>
+        <span class="home-mod-dot" style="background:var(--m-fin)"></span>
+        <div class="home-mod-name" style="color:var(--text)">Finanzas</div>
         <div class="home-mod-alerta" id="homeFinAlerta"></div>
       </div>
       <div class="home-mod home-mod-conc" onclick="abrirConciliacion()">
-        <span class="home-mod-dot" style="background:#84BD00"></span>
-        <div class="home-mod-name" style="color:#F5F4F0">Conciliación</div>
+        <span class="home-mod-dot" style="background:var(--m-conc)"></span>
+        <div class="home-mod-name" style="color:var(--text)">Conciliación</div>
         <div class="home-mod-alerta" id="homeConcAlerta"></div>
       </div>
       <!-- PERSONAL. Es módulo, no tarjeta: ACCESOS_ESQUEMA.sql ya declara que el perfil
            `equipo` ve "Entregas · Personal · Producción". -->
       <div class="home-mod home-mod-per" onclick="abrirPersonal()">
-        <span class="home-mod-dot" style="background:#FF671D"></span>
-        <div class="home-mod-name" style="color:#F5F4F0">Personal</div>
+        <span class="home-mod-dot" style="background:var(--m-per)"></span>
+        <div class="home-mod-name" style="color:var(--text)">Personal</div>
       </div>
     </div>
     <!-- La alerta de Entregas se fue del lobby (26-ago): cada módulo muestra sus
@@ -2036,12 +2124,12 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
     <div class="m3title" style="font-size:24px">Cobros por conciliar</div>
     <div class="m3sub" style="margin-top:4px">Cobros del extracto.</div>
     <div style="margin-top:12px"><div id="cobrosPendResumen" class="muted"></div></div>
-    <div style="background:#161619;border:.5px solid var(--border);border-radius:12px;padding:16px 18px;margin-top:24px">
+    <div style="background:var(--surface);border:.5px solid var(--border);border-radius:12px;padding:16px 18px;margin-top:24px">
       <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin-bottom:12px">Ingresos · Cobros de clientes</div>
       <div id="ingresosSec"><div class="muted" style="padding:6px 0">Subí el extracto del BAC arriba para ver los cobros del mes.</div></div>
       <div id="conciliadosSec"></div>
     </div>
-    <div style="background:#161619;border:.5px solid var(--border);border-radius:12px;padding:16px 18px;margin-top:16px">
+    <div style="background:var(--surface);border:.5px solid var(--border);border-radius:12px;padding:16px 18px;margin-top:16px">
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)">Egresos · Pagos a proveedores</span>
         <span class="area-soon">Pronto</span>
@@ -2722,9 +2810,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vPlan .pm-tab tfoot td{padding-top:10px;border-top:.5px solid var(--border);color:var(--text-2);font-weight:600}
 #vPlan .pm-tab tfoot td:first-child{color:var(--text-3);font-weight:400;text-transform:uppercase;font-size:11px;letter-spacing:.04em}
 #vPlan .pm-falta{color:var(--mod);font-weight:600}
-#vPlan .pm-cumpl{color:#84BD00;font-weight:500}
-#vPlan .pm-est{font-size:10px;color:#C99A4E;margin-left:6px;letter-spacing:.02em}
-#vPlan .pm-corto{margin-top:12px;background:rgba(233,162,59,.10);border:.5px solid rgba(233,162,59,.35);border-radius:8px;padding:9px 12px;font-size:12px;color:#E9A23B;line-height:1.55}
+#vPlan .pm-cumpl{color:var(--m-conc);font-weight:500}
+#vPlan .pm-est{font-size:10px;color:var(--warn-2);margin-left:6px;letter-spacing:.02em}
+#vPlan .pm-corto{margin-top:12px;background:rgba(233,162,59,.10);border:.5px solid rgba(233,162,59,.35);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--warn);line-height:1.55}
 #vPlan .pm-corto b{color:#F0B45C}
 #vPlan .pm-foot{font-size:11.5px;color:var(--text-3);padding:9px 0 10px;line-height:1.55}
 #vPlan .pl-reaco{max-width:940px;margin:14px 0 2px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:rgba(199,125,160,.08);border:.5px solid rgba(199,125,160,.30);border-radius:9px;padding:11px 14px}
@@ -2742,31 +2830,31 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #planNivelModal .pn-ok{background:var(--mod);border-color:var(--mod);color:#fff;font-weight:600}
 #vPlan .dm-toggle-wrap{max-width:940px;margin:10px 0 0}
 #vPlan .dm-toggle{background:none;border:none;color:var(--text-3);font-family:inherit;font-size:12px;padding:2px 0;cursor:pointer;letter-spacing:.01em}
-#vPlan .dm-toggle:hover{color:#C77DA0}
+#vPlan .dm-toggle:hover{color:var(--m-ops)}
 #vPlan .dm{max-width:940px;margin:10px 0 4px;background:var(--surface);border:.5px solid var(--border);border-radius:11px;padding:14px 18px 4px}
 #vPlan .dm-tab{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;margin-top:12px}
 #vPlan .dm-tab th{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);font-weight:600;text-align:right;padding:0 0 7px 14px;border-bottom:.5px solid var(--border);vertical-align:bottom}
 #vPlan .dm-tab th:first-child{text-align:left;padding-left:0}
 #vPlan .dm-tab th span{display:block;text-transform:none;letter-spacing:0;font-weight:400;color:var(--text-3);font-size:10px;margin-top:3px;opacity:.8}
-#vPlan .dm-tab td{padding:11px 0 11px 14px;text-align:right;color:var(--text-2);border-bottom:.5px solid #1A1A1E}
+#vPlan .dm-tab td{padding:11px 0 11px 14px;text-align:right;color:var(--text-2);border-bottom:.5px solid var(--line-soft)}
 #vPlan .dm-tab td:first-child{text-align:left;padding-left:0;color:var(--text)}
 #vPlan .dm-tab tbody tr:last-child td{border-bottom:.5px solid var(--border)}
 #vPlan .dm-tab tfoot td{padding:10px 0 10px 14px;color:var(--text-2);font-weight:600;border-bottom:none}
 #vPlan .dm-tab tfoot td:first-child{color:var(--text-3);font-weight:400;text-transform:uppercase;font-size:11px;letter-spacing:.04em}
-#vPlan .dm-tab td.dm-meta{color:#D4537E;font-weight:600}
+#vPlan .dm-tab td.dm-meta{color:var(--m-ops-2);font-weight:600}
 #vPlan .pl-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:16px 0 0}
 @media(max-width:900px){#vPlan .pl-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:520px){#vPlan .pl-grid{grid-template-columns:1fr 1fr}}
 #vPlan .pl-mes{background:var(--surface);border:.5px solid var(--border);border-radius:11px;padding:11px 12px;cursor:pointer;transition:border-color .12s;min-height:96px}
 #vPlan .pl-mes:hover{border-color:var(--border-m)}
-#vPlan .pl-mes-now{border-color:#D4537E;box-shadow:0 0 0 1px rgba(212,83,126,.35)}
+#vPlan .pl-mes-now{border-color:var(--m-ops-2);box-shadow:0 0 0 1px rgba(212,83,126,.35)}
 #vPlan .pl-mnom{font-size:14px;font-weight:600;color:var(--text);text-transform:capitalize}
-#vPlan .pl-hoy{font-size:10.5px;color:#D4537E;font-weight:600;text-transform:none}
+#vPlan .pl-hoy{font-size:10.5px;color:var(--m-ops-2);font-weight:600;text-transform:none}
 #vPlan .pl-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 #vPlan .pl-tag{font-size:9.5px;font-weight:600;letter-spacing:.02em;border-radius:4px;padding:1px 6px}
-#vPlan .pl-tag-fer{color:#E9A23B;background:rgba(233,162,59,.12)}
-#vPlan .pl-tag-cierre{color:#D4537E;background:rgba(212,83,126,.12)}
-#vPlan .pl-tag-rampa{color:#C77DA0;background:rgba(199,125,160,.14)}
+#vPlan .pl-tag-fer{color:var(--warn);background:rgba(233,162,59,.12)}
+#vPlan .pl-tag-cierre{color:var(--m-ops-2);background:rgba(212,83,126,.12)}
+#vPlan .pl-tag-rampa{color:var(--m-ops);background:rgba(199,125,160,.14)}
 #vPlan .pl-bat{margin-top:8px;display:flex;flex-direction:column;gap:2px}
 #vPlan .pl-bl{font-size:11.5px;color:var(--text-2);line-height:1.35;font-variant-numeric:tabular-nums}
 #vPlan .pl-b0{color:var(--text-3)}
@@ -2783,26 +2871,26 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vPlan .pl-d{background:var(--surface-2);border:.5px solid var(--border);border-radius:8px;padding:7px 7px 8px;min-height:64px}
 #vPlan .pl-dd{font-size:10px;color:var(--text-3);text-transform:uppercase}
 #vPlan .pl-dp{font-size:11.5px;color:var(--text);margin-top:4px;line-height:1.25}
-#vPlan .pl-dtag{font-size:9.5px;color:#E9A23B;margin-top:3px}
-#vPlan .pl-dtag-ed{color:#E9A23B}
+#vPlan .pl-dtag{font-size:9.5px;color:var(--warn);margin-top:3px}
+#vPlan .pl-dtag-ed{color:var(--warn)}
 #vPlan .pl-dtag-auto{color:var(--text-3)}
 #vPlan .pl-d-ed{border-color:rgba(233,162,59,.5)}
-#vPlan .pl-d-real .pl-dp{color:#7A7A72}
+#vPlan .pl-d-real .pl-dp{color:var(--text-dim-2)}
 #vPlan .pl-d-pend{border-color:rgba(233,162,59,.4)}
 #vPlan .pl-d-clean .pl-dp{color:var(--text-2)}
-#vPlan .pl-d-fer{border-color:rgba(233,162,59,.4);background:rgba(233,162,59,.06)} #vPlan .pl-d-fer .pl-dp{color:#E9A23B}
+#vPlan .pl-d-fer{border-color:rgba(233,162,59,.4);background:rgba(233,162,59,.06)} #vPlan .pl-d-fer .pl-dp{color:var(--warn)}
 /* Edición completa del Plan (mismo gesto que el Resumen): día futuro clickeable → mini-form. */
 #vPlan .pl-d-editable{cursor:pointer;transition:border-color .12s}
 #vPlan .pl-d-editable:hover{border-color:var(--border-m)}
-#vPlan .pl-d-editing{display:flex;flex-direction:column;border-color:#C77DA0;box-shadow:0 0 0 1px rgba(199,125,160,.35)}
-#vPlan .pl-fsel,#vPlan .pl-fbt{width:100%;background:#0E0E11;border:.5px solid var(--border);color:var(--text);border-radius:6px;padding:4px 6px;font-size:12px;font-family:inherit;margin-top:5px}
+#vPlan .pl-d-editing{display:flex;flex-direction:column;border-color:var(--m-ops);box-shadow:0 0 0 1px rgba(199,125,160,.35)}
+#vPlan .pl-fsel,#vPlan .pl-fbt{width:100%;background:var(--bg);border:.5px solid var(--border);color:var(--text);border-radius:6px;padding:4px 6px;font-size:12px;font-family:inherit;margin-top:5px}
 #vPlan .pl-frow{display:flex;gap:5px;margin-top:6px}
 #vPlan .pl-fok,#vPlan .pl-fx{flex:1;border:none;border-radius:6px;padding:4px 0;font-size:13px;cursor:pointer;font-weight:600}
-#vPlan .pl-fok{background:#7E8C5A;color:#0E0E11} #vPlan .pl-fx{background:var(--surface-2);color:var(--text-2);border:.5px solid var(--border)}
+#vPlan .pl-fok{background:var(--ok-fill);color:#0E0E11} #vPlan .pl-fx{background:var(--surface-2);color:var(--text-2);border:.5px solid var(--border)}
 #vPlan .pl-edithint{font-size:11px;color:var(--text-3);margin:0 0 10px}
 #vPlan .pl-impacto{margin:2px 0 14px;background:rgba(201,154,78,.09);border:.5px solid rgba(201,154,78,.32);border-radius:8px;padding:9px 13px;font-size:12px;color:#D9BE8C;line-height:1.55;max-width:940px}
-#vPlan .pl-impacto b{color:#E8D3AC}
-#vPlan .pl-cierre{font-size:11px;color:#D4537E;margin-top:6px;font-weight:600}
+#vPlan .pl-impacto b{color:var(--warn-tx)}
+#vPlan .pl-cierre{font-size:11px;color:var(--m-ops-2);margin-top:6px;font-weight:600}
 </style>
 <div id="vPlan" class="hidden">
   <div class="faces faces-ops">
@@ -2822,7 +2910,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 <!-- RESUMEN (módulo Operaciones / Inventario) — portada del Planificador. SOLO LECTURA. -->
 <style>
 #vResumen .rz-load,#vResumen .rz-err{padding:22px 4px;color:var(--text-2);font-size:14px}
-#vResumen .rz-err{color:#E24B4A}
+#vResumen .rz-err{color:var(--stop-tx)}
 #vResumen .rz-warn{margin-top:14px;background:rgba(226,75,74,.08);border:.5px solid rgba(226,75,74,.35);border-radius:9px;padding:9px 12px;font-size:12px;color:#E7A6A6}
 #vResumen .rz-sec{margin-top:22px}
 #vResumen .rz-sh{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
@@ -2831,20 +2919,20 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-tbl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 #vResumen .rz-tbl th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);padding:0 12px 8px 0;border-bottom:.5px solid var(--border)}
 #vResumen .rz-tbl th:last-child,#vResumen .rz-tbl td:last-child{text-align:right;padding-right:0}
-#vResumen .rz-tbl td{padding:11px 12px 11px 0;border-bottom:.5px solid #1A1A1E;font-size:13.5px;color:var(--text)}
+#vResumen .rz-tbl td{padding:11px 12px 11px 0;border-bottom:.5px solid var(--line-soft);font-size:13.5px;color:var(--text)}
 #vResumen .rz-tbl tbody tr:last-child td{border-bottom:none}
 #vResumen .rz-pnm{font-weight:500}
 #vResumen .rz-gray{color:var(--text-3);font-size:12px;margin-left:5px}
 #vResumen .rz-sem{color:var(--text-2)}
-#vResumen .rz-sem.rz-amber{color:#C99A4E;font-weight:600}
+#vResumen .rz-sem.rz-amber{color:var(--warn-2);font-weight:600}
 #vResumen .rz-prod{color:var(--text)}
 #vResumen .rz-cal{display:flex;flex-direction:column;gap:16px;max-width:640px;margin-right:auto}
-#vResumen .rz-wk-next .rz-day{background:#131316;border-color:#1F1F24}
-#vResumen .rz-wk-next .rz-dp{color:#9A988F;font-weight:500}
-#vResumen .rz-wk-next .rz-dd,#vResumen .rz-wk-next .rz-db{color:#6E6C68}
+#vResumen .rz-wk-next .rz-day{background:var(--sunk-2);border-color:var(--line-4)}
+#vResumen .rz-wk-next .rz-dp{color:var(--text-2);font-weight:500}
+#vResumen .rz-wk-next .rz-dd,#vResumen .rz-wk-next .rz-db{color:var(--text-3)}
 #vResumen .rz-whead{display:flex;align-items:baseline;gap:9px;margin-bottom:9px}
 #vResumen .rz-wtag{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--text-3);background:var(--surface-2);border:.5px solid var(--border);border-radius:5px;padding:2px 7px}
-#vResumen .rz-wtag.rz-wnow{color:#C77DA0;border-color:rgba(199,125,160,.5)}
+#vResumen .rz-wtag.rz-wnow{color:var(--m-ops);border-color:rgba(199,125,160,.5)}
 #vResumen .rz-wrange{font-size:12px;color:var(--text-2)}
 #vResumen .rz-days{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
 @media(max-width:520px){#vResumen .rz-days{grid-auto-flow:column;grid-auto-columns:104px;grid-template-columns:none;overflow-x:auto;padding-bottom:6px}}
@@ -2855,17 +2943,17 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-db{font-size:11px;color:var(--text-2);margin-top:2px}
 /* Desacuerdo con lo que Odoo registró ese día. Ámbar porque avisa, y compacto porque es un dato
    de contraste, no el número principal de la celda. */
-#vResumen .rz-dodoo{font-size:10px;color:#C99A4E;margin-top:3px;line-height:1.3}
-#vResumen .rz-gnote{font-size:10px;color:#C99A4E;margin-top:3px}
+#vResumen .rz-dodoo{font-size:10px;color:var(--warn-2);margin-top:3px;line-height:1.3}
+#vResumen .rz-gnote{font-size:10px;color:var(--warn-2);margin-top:3px}
 #vResumen .rz-ds{margin-top:auto;font-size:11px;font-weight:600;padding-top:8px}
 #vResumen .rz-dsm{display:none}   /* estado en una palabra: solo teléfono (ver @media 700px) */
 #vResumen .rz-c4-mov{display:none}   /* texto de tarjeta vacía: solo teléfono */
-#vResumen .rz-day.rz-done{border-color:var(--border)} #vResumen .rz-day.rz-done .rz-ds{color:#7A7A72}
-#vResumen .rz-day.rz-today{border-color:#C77DA0;box-shadow:0 0 0 1px rgba(199,125,160,.4)} #vResumen .rz-day.rz-today .rz-ds{color:#C77DA0}
-#vResumen .rz-day.rz-miss{border-color:rgba(201,154,78,.4)} #vResumen .rz-day.rz-miss .rz-ds{color:#C99A4E}
+#vResumen .rz-day.rz-done{border-color:var(--border)} #vResumen .rz-day.rz-done .rz-ds{color:var(--text-dim-2)}
+#vResumen .rz-day.rz-today{border-color:var(--m-ops);box-shadow:0 0 0 1px rgba(199,125,160,.4)} #vResumen .rz-day.rz-today .rz-ds{color:var(--m-ops)}
+#vResumen .rz-day.rz-miss{border-color:rgba(201,154,78,.4)} #vResumen .rz-day.rz-miss .rz-ds{color:var(--warn-2)}
 #vResumen .rz-day.rz-plan .rz-ds{color:var(--text-3)}
 #vResumen .rz-day.rz-clean .rz-dp{color:var(--text-2);font-weight:500} #vResumen .rz-day.rz-clean .rz-ds{color:var(--text-3)}
-#vResumen .rz-day.rz-fer{border-color:rgba(201,154,78,.4);background:rgba(201,154,78,.06)} #vResumen .rz-day.rz-fer .rz-dp{color:#C99A4E} #vResumen .rz-day.rz-fer .rz-ds{color:#C99A4E}
+#vResumen .rz-day.rz-fer{border-color:rgba(201,154,78,.4);background:rgba(201,154,78,.06)} #vResumen .rz-day.rz-fer .rz-dp{color:var(--warn-2)} #vResumen .rz-day.rz-fer .rz-ds{color:var(--warn-2)}
 #vResumen .rz-legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;font-size:11px;color:var(--text-3)}
 #vResumen .rz-legend span{display:inline-flex;align-items:center;gap:6px}
 #vResumen .rz-legend i{width:9px;height:9px;border-radius:3px;display:inline-block}
@@ -2873,9 +2961,9 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 #vResumen .rz-hint{font-size:11px;color:var(--text-3)}
 #vResumen .rz-day{position:relative}
 #vResumen .rz-day.rz-ed{cursor:pointer;transition:border-color .12s,background .12s}
-#vResumen .rz-day.rz-ed:hover{border-color:#3A3A42;background:#191920}
+#vResumen .rz-day.rz-ed:hover{border-color:var(--border-hi);background:var(--raise-3)}
 #vResumen .rz-day.rz-nav{cursor:pointer}
-#vResumen .rz-day.rz-nav:hover{border-color:#3A3A42}
+#vResumen .rz-day.rz-nav:hover{border-color:var(--border-hi)}
 /* Lápiz de edición: el glifo se dibuja a 15px pero el blanco táctil es de 44×44 (dedo), sin
    salirse de la celda — el resto del día queda libre para el toque de intercambio. Siempre
    visible (en pantalla táctil no hay hover) y solo en días editables. */
@@ -2884,27 +2972,27 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
 /* El glifo se alinea con la LÍNEA DE LA FECHA (padding-top), no con el centro del blanco táctil:
    así fecha, punto y lápiz caen en el mismo eje. El área de 44×44 para el dedo no cambia. */
 #vResumen .rz-pen{position:absolute;top:0;right:0;width:44px;height:44px;display:flex;
-  align-items:flex-start;justify-content:center;padding-top:8px;color:#4A4A50;cursor:pointer;transition:color .12s}
+  align-items:flex-start;justify-content:center;padding-top:8px;color:var(--text-dim-7);cursor:pointer;transition:color .12s}
 #vResumen .rz-pen svg{width:15px;height:15px;display:block;pointer-events:none}
-#vResumen .rz-day.rz-ed:hover .rz-pen{color:#6E6C68}
-#vResumen .rz-pen:hover{color:#C77DA0}
+#vResumen .rz-day.rz-ed:hover .rz-pen{color:var(--text-3)}
+#vResumen .rz-pen:hover{color:var(--m-ops)}
 /* Día seleccionado para intercambiar: acento del módulo, anillo de 2px (el de hoy es de 1px)
    y el estado lo dice con palabras — el color nunca es la única señal. */
-#vResumen .rz-day.rz-sel{border-color:#C77DA0;box-shadow:0 0 0 2px rgba(199,125,160,.55)}
-#vResumen .rz-day.rz-sel .rz-ds{color:#C77DA0}
+#vResumen .rz-day.rz-sel{border-color:var(--m-ops);box-shadow:0 0 0 2px rgba(199,125,160,.55)}
+#vResumen .rz-day.rz-sel .rz-ds{color:var(--m-ops)}
 /* Motivo de un intercambio bloqueado: discreto, arriba del calendario. */
-#vResumen .rz-aviso{margin:0 0 10px;font-size:12px;color:#C99A4E;background:rgba(201,154,78,.08);
+#vResumen .rz-aviso{margin:0 0 10px;font-size:12px;color:var(--warn-2);background:rgba(201,154,78,.08);
   border:.5px solid rgba(201,154,78,.3);border-radius:8px;padding:7px 11px;max-width:640px}
 /* El día editado NO lleva borde ámbar: el punto rosa ya lo dice, y el ámbar está reservado a
    advertencias (picado, recorte de capacidad, sin registrar). Dos señales para lo mismo, una de
    ellas del color equivocado. */
-#vResumen .rz-day.rz-autofill{border-style:dashed;border-color:#3E3E46}   /* provisional: lo agrega el sistema para la meta */
+#vResumen .rz-day.rz-autofill{border-style:dashed;border-color:var(--border-hi-4)}   /* provisional: lo agrega el sistema para la meta */
 #vResumen .rz-day.rz-autofill .rz-ds{color:var(--text-3)}
-#vPlan .pl-metanota{margin:12px 0 0;max-width:640px;font-size:12px;color:#C99A4E;background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.3);border-radius:8px;padding:8px 12px}
+#vPlan .pl-metanota{margin:12px 0 0;max-width:640px;font-size:12px;color:var(--warn-2);background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.3);border-radius:8px;padding:8px 12px}
 /* ═══ REDISEÑO mobile-first del Resumen ═══ */
 /* 1 · Pendiente de fabricar (calendario de 2 semanas; ver .rz-cal2 arriba) */
-#vResumen .rz-day.rz-today{border-color:#C77DA0;box-shadow:0 0 0 1px rgba(199,125,160,.4)}
-#vResumen .rz-day.rz-today .rz-dd{color:#C77DA0}
+#vResumen .rz-day.rz-today{border-color:var(--m-ops);box-shadow:0 0 0 1px rgba(199,125,160,.4)}
+#vResumen .rz-day.rz-today .rz-dd{color:var(--m-ops)}
 /* Calendario de 2 semanas: ESTA semana completa (lun–vie) + PRÓXIMA atenuada a la derecha. */
 #vResumen .rz-cal2{display:flex;gap:26px;align-items:flex-start;margin-top:4px}
 #vResumen .rz-cal2 .rz-wk{flex:1 1 0;min-width:0}
@@ -2917,7 +3005,7 @@ tr.fila-sinmatch td,tr.r-rev td{background:rgba(255,255,255,.03)}
   #vResumen .rz-cal2.rz-shownext .rz-wk-next{display:block}
   #vResumen .rz-cal2 .rz-days{grid-auto-flow:column;grid-auto-columns:132px;grid-template-columns:none;overflow-x:auto;padding-bottom:6px}
   #vResumen .rz-vernext{display:inline-block;margin-top:12px;background:none;border:.5px solid var(--border);color:var(--text-2);font-size:12px;border-radius:6px;padding:5px 12px;cursor:pointer}
-  #vResumen .rz-vernext:hover{border-color:#3A3A42;color:var(--text)}
+  #vResumen .rz-vernext:hover{border-color:var(--border-hi);color:var(--text)}
 }
 
 /* ── Reporte de despacho + Pendientes + tarjeta del lobby ── */
@@ -3724,7 +3812,7 @@ body:has(.de-fondo) #tkBtn{display:none}
   font-family:var(--font);font-size:10px;font-weight:600;letter-spacing:.03em;
   color:var(--ent-fill-tx);
   cursor:pointer;white-space:nowrap;vertical-align:middle;-webkit-tap-highlight-color:transparent}
-.pdf-b:hover{background:#dff04a}
+.pdf-b:hover{background:var(--lime-hover)}
 /* GRANDE: la variante de la tarjeta. Misma píldora lima, tamaño de botón real,
    alineada con el primario para que los dos se lean como una sola fila de
    acciones. El chico sigue vivo donde va pegado a un texto (el diálogo y el
@@ -4019,7 +4107,7 @@ body:has(.de-fondo) #tkBtn{display:none}
 .el-merma-t{font-weight:600}
 .el-merma-n{font-family:var(--mono);white-space:nowrap;text-align:right}
 .el-merma-x{grid-column:1/-1;font-size:11px;line-height:1.5;color:var(--text-3);margin-top:2px}
-.el-merma-sin{background:rgba(255,255,255,.03);border:.5px solid var(--border)}
+.el-merma-sin{background:var(--wash-2);border:.5px solid var(--border)}
 .el-merma-sin .el-merma-t,.el-merma-sin .el-merma-n{color:var(--text-2)}
 .el-merma-dud{background:rgba(233,162,59,.07);border:.5px solid rgba(233,162,59,.35)}
 .el-merma-dud .el-merma-t,.el-merma-dud .el-merma-n{color:var(--warn)}
@@ -4094,15 +4182,15 @@ body:has(.de-fondo) #tkBtn{display:none}
 .pdv-barra{display:flex;align-items:center;justify-content:space-between;gap:10px;
            flex-wrap:wrap;margin:-2px 0 6px}
 .pdv-chk{font-size:12.5px;color:var(--text-2);display:flex;align-items:center;gap:7px;cursor:pointer}
-.pdv-c,.pdv-chk input{width:17px;height:17px;margin:0;vertical-align:-3px;accent-color:var(--ent-fill,#E9FE60)}
+.pdv-c,.pdv-chk input{width:17px;height:17px;margin:0;vertical-align:-3px;accent-color:var(--ent-fill,var(--ent-line))}
 .pdv-fila{align-items:flex-start}
 .pdv-tb{width:100%;border-collapse:collapse;margin-top:4px}
 .pdv-tb td{font-size:12.5px;padding:3px 8px 3px 0;color:var(--text-2);vertical-align:top}
 .pdv-tb td.n{text-align:right;padding-right:0;font-variant-numeric:tabular-nums;
              color:var(--text);white-space:nowrap}
-.pdv-si{background:var(--ent-fill,#E9FE60);color:var(--ent-fill-tx,#2C3A00);border:none;font-weight:600}
+.pdv-si{background:var(--ent-fill,var(--lime));color:var(--ent-fill-tx,#2C3A00);border:none;font-weight:600}
 .pdv-si:disabled{opacity:.45;cursor:default}
-.pdv-mal{font-size:12px;color:#ffb4b4;background:#3a1b1b;border-radius:8px;padding:7px 10px;
+.pdv-mal{font-size:12px;color:var(--err-soft);background:var(--err-wash);border-radius:8px;padding:7px 10px;
          margin-top:5px;line-height:1.45}
 .pdv-mal span{display:block;color:#e8a9a9;font-size:11.5px;margin-top:2px}
 .pdv-neutro span{display:block;font-size:11.5px;margin-top:2px;color:var(--text-3)}
@@ -4192,53 +4280,53 @@ body:has(.de-fondo) #tkBtn{display:none}
 .dpc-pie{padding:12px 16px calc(14px + env(safe-area-inset-bottom));display:grid;gap:8px}
 /* EL PRINCIPAL ES "VOLVER A CORREGIR", no "sí, sale así". El botón grande es
    el camino que uno querría tomar casi siempre. */
-.dpc-ok{background:var(--ent-fill,#E9FE60);color:var(--ent-fill-tx,#1A1A1A);border:none;
+.dpc-ok{background:var(--ent-fill,var(--lime));color:var(--ent-fill-tx,#1A1A1A);border:none;
   border-radius:10px;padding:14px;font:inherit;font-size:15px;font-weight:600;cursor:pointer}
 .dpc-sec{background:none;border:1px solid var(--border-strong);border-radius:10px;
   padding:11px;font:inherit;font-size:13px;color:var(--text-3);cursor:pointer}
 .dpc-sec:disabled{opacity:.4;cursor:default}
-.dpc-msg{font-size:12px;color:#ffb4b4;min-height:15px;padding:0 16px 8px}
+.dpc-msg{font-size:12px;color:var(--err-soft);min-height:15px;padding:0 16px 8px}
 /* Vacío no ocupa: sin texto no hay renglón, así el bloque no "salta" al abrirse. */
 .bs-anu-msg{flex:1 1 100%;font-size:11.5px;line-height:1.45;color:var(--text-3)}
 .bs-anu-msg:empty{display:none}
-.bs-anu-msg.mal{color:#ffb4b4;background:#3a1b1b;border-radius:8px;padding:8px 10px;
+.bs-anu-msg.mal{color:var(--err-soft);background:var(--err-wash);border-radius:8px;padding:8px 10px;
                 white-space:pre-wrap}
 /* chip de capacidad por personas (marca manual de la semana) */
 #vResumen .rz-chip,#vPlan .rz-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text-2);background:var(--surface-2);border:.5px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer;white-space:nowrap}
-#vResumen .rz-chip:hover,#vPlan .rz-chip:hover{border-color:#3A3A42}
-#vResumen .rz-chip-amber,#vPlan .rz-chip-amber{color:#C99A4E;border-color:rgba(201,154,78,.5);background:rgba(201,154,78,.08)}
+#vResumen .rz-chip:hover,#vPlan .rz-chip:hover{border-color:var(--border-hi)}
+#vResumen .rz-chip-amber,#vPlan .rz-chip-amber{color:var(--warn-2);border-color:rgba(201,154,78,.5);background:rgba(201,154,78,.08)}
 #vResumen .rz-chip-x,#vPlan .rz-chip-x{font-size:10px;font-weight:500;color:var(--text-3);text-decoration:underline}
 #vResumen .rz-note2p{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:var(--text-3)}
 #vResumen .rz-note2p svg{width:14px;height:14px;color:var(--text-3);flex:none}
 #vPlan .pl-note2p{margin-left:8px;font-size:10.5px;color:var(--text-3)}
 /* Recorte por dotación: los días editados que no cabían en la capacidad de la semana. Va pegado
    al chip de personas (debajo, en su propia línea, para no romper la cabecera en teléfono). */
-#vResumen .rz-recorte,#vPlan .rz-recorte{margin:0 0 9px;font-size:11.5px;line-height:1.35;color:#C99A4E;
+#vResumen .rz-recorte,#vPlan .rz-recorte{margin:0 0 9px;font-size:11.5px;line-height:1.35;color:var(--warn-2);
   background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.35);border-radius:7px;padding:5px 8px}
 /* Picado: consecuencia, no marca. Ámbar porque cambia el techo del día. */
 #vResumen .rz-picchip,#vPlan .rz-picchip{display:inline-block;margin-top:5px;font-size:9.5px;font-weight:600;
-  color:#C99A4E;background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.4);border-radius:5px;
+  color:var(--warn-2);background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.4);border-radius:5px;
   padding:1px 5px;line-height:1.5;white-space:normal}
 /* barra de confirmación del cambio manual de personas */
 #vResumen .rz-confirm,#vPlan .rz-confirm{margin-top:12px;background:rgba(199,125,160,.08);border:.5px solid rgba(199,125,160,.35);border-radius:9px;padding:10px 14px;font-size:13px;color:var(--text-2);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 #vResumen .rz-confirm b,#vPlan .rz-confirm b{color:var(--text)}
 #vResumen .rz-cbtn,#vPlan .rz-cbtn{border:none;border-radius:6px;padding:5px 12px;font-size:12.5px;font-weight:600;cursor:pointer}
-#vResumen .rz-cok,#vPlan .rz-cok{background:#C77DA0;color:#fff}
+#vResumen .rz-cok,#vPlan .rz-cok{background:var(--m-ops);color:#fff}
 #vResumen .rz-cno,#vPlan .rz-cno{background:var(--surface-2);color:var(--text-2);border:.5px solid var(--border)}
 /* 2 · Premezclas por medir */
 #vResumen .rz-medir{margin-top:16px;font-size:13px;color:var(--text-2);background:var(--surface);border:.5px solid var(--border);border-radius:9px;padding:10px 14px;line-height:1.5}
 #vResumen .rz-medlbl{color:var(--text-3);font-size:11px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;margin-right:6px}
 /* 3 · Comprar — tarjetas de ancho fijo, NO se estiran */
 #vResumen .rz-cards{display:flex;flex-wrap:wrap;gap:14px}
-#vResumen .rz-card{flex:0 0 290px;max-width:290px;background:#141417;border:.5px solid #2C2C33;border-radius:12px;padding:14px 16px}
+#vResumen .rz-card{flex:0 0 290px;max-width:290px;background:var(--panel);border:.5px solid var(--border-strong);border-radius:12px;padding:14px 16px}
 #vResumen .rz-ch{display:flex;align-items:center;gap:7px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text);font-weight:600}
-#vResumen .rz-ch svg{width:15px;height:15px;color:#9A988F;flex:none}
-#vResumen .rz-cfecha{font-size:11px;font-weight:600;color:#C77DA0;margin:3px 0 10px}
-#vResumen .rz-ci{padding:8px 0;border-top:.5px solid #232329}
+#vResumen .rz-ch svg{width:15px;height:15px;color:var(--text-2);flex:none}
+#vResumen .rz-cfecha{font-size:11px;font-weight:600;color:var(--m-ops);margin:3px 0 10px}
+#vResumen .rz-ci{padding:8px 0;border-top:.5px solid var(--line)}
 #vResumen .rz-ci:first-of-type{border-top:none;padding-top:2px}
 #vResumen .rz-cin{font-size:13px;color:var(--text);font-weight:500}
-#vResumen .rz-cf{font-size:12.5px;color:#C99A4E;margin-top:2px}
-#vResumen .rz-cf b{color:#C99A4E;font-weight:600}
+#vResumen .rz-cf{font-size:12.5px;color:var(--warn-2);margin-top:2px}
+#vResumen .rz-cf b{color:var(--warn-2);font-weight:600}
 #vResumen .rz-cst{color:var(--text-3);font-size:11px;font-weight:400}
 #vResumen .rz-ca{font-size:11px;color:var(--text-3);margin-top:2px}
 #vResumen .rz-cnota{font-size:11px;color:var(--text-3);margin-top:1px}
@@ -4246,17 +4334,17 @@ body:has(.de-fondo) #tkBtn{display:none}
 /* 4 · Últimas producciones — pegada a su título (no dejarla flotando lejos) */
 #vResumen .rz-ult{margin-top:16px}
 #vResumen .rz-ult .rz-sh{margin-bottom:2px}
-#vResumen .rz-urow{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:7px 0;border-bottom:.5px solid #1A1A1E}
+#vResumen .rz-urow{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:7px 0;border-bottom:.5px solid var(--line-soft)}
 #vResumen .rz-urow:last-child{border-bottom:none}
 #vResumen .rz-ud{font-size:12px;color:var(--text-3);min-width:74px}
 #vResumen .rz-up{font-size:13px;color:var(--text);flex:1}
 #vResumen .rz-ue{font-size:12px;font-weight:600}
-#vResumen .rz-uok .rz-ue{color:#7E8C5A}
-#vResumen .rz-udif .rz-ue{color:#C99A4E}
+#vResumen .rz-uok .rz-ue{color:var(--ok-olive)}
+#vResumen .rz-udif .rz-ue{color:var(--warn-2)}
 #vResumen .rz-usin .rz-ue{color:var(--text-3)} #vResumen .rz-usin .rz-up{color:var(--text-2)}
 /* 5 · Inventario — 3 tarjetas de ancho natural, lado a lado */
 #vResumen .rz-inv{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
-#vResumen .rz-icard{flex:0 0 240px;background:#161619;border:.5px solid #26262C;border-radius:11px;padding:12px 14px}
+#vResumen .rz-icard{flex:0 0 240px;background:var(--surface);border:.5px solid var(--border);border-radius:11px;padding:12px 14px}
 #vResumen .rz-icard-sm{flex:0 0 180px}
 #vResumen .rz-ith{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);font-weight:600;margin-bottom:8px}
 /* Escritorio: la fila de inventario baja a la escala del resto de la pantalla y el número deja
@@ -4271,15 +4359,15 @@ body:has(.de-fondo) #tkBtn{display:none}
    contexto, no alarma. Si el ítem no se contó, no se dibuja. */
 #vResumen .rz-ir{flex-wrap:wrap}
 #vResumen .rz-irs{flex:0 0 100%;color:var(--text-3);font-size:11px;font-variant-numeric:tabular-nums;margin-top:1px}
-#vResumen .rz-vermas{margin-top:8px;background:none;border:none;color:#C77DA0;font-size:12px;cursor:pointer;padding:0}
+#vResumen .rz-vermas{margin-top:8px;background:none;border:none;color:var(--m-ops);font-size:12px;cursor:pointer;padding:0}
 #vResumen .rz-revert{background:none;border:.5px solid var(--border);color:var(--text-2);font-size:10.5px;border-radius:5px;padding:2px 8px;cursor:pointer}
-#vResumen .rz-revert:hover{border-color:#3A3A42;color:var(--text)}
-#vResumen .rz-day.rz-editing{border-color:#C77DA0;box-shadow:0 0 0 1px rgba(199,125,160,.35);gap:5px}
-#vResumen .rz-fsel,#vResumen .rz-fbt{width:100%;background:#0E0E11;border:.5px solid var(--border);color:var(--text);border-radius:6px;padding:4px 6px;font-size:12px;font-family:inherit;margin-top:5px}
+#vResumen .rz-revert:hover{border-color:var(--border-hi);color:var(--text)}
+#vResumen .rz-day.rz-editing{border-color:var(--m-ops);box-shadow:0 0 0 1px rgba(199,125,160,.35);gap:5px}
+#vResumen .rz-fsel,#vResumen .rz-fbt{width:100%;background:var(--bg);border:.5px solid var(--border);color:var(--text);border-radius:6px;padding:4px 6px;font-size:12px;font-family:inherit;margin-top:5px}
 #vResumen .rz-fbt{margin-top:4px}
 #vResumen .rz-frow{display:flex;gap:5px;margin-top:auto;padding-top:6px}
 #vResumen .rz-fok,#vResumen .rz-fx{flex:1;border:none;border-radius:6px;padding:4px 0;font-size:13px;cursor:pointer;font-weight:600}
-#vResumen .rz-fok{background:#7E8C5A;color:#0E0E11}
+#vResumen .rz-fok{background:var(--ok-fill);color:#0E0E11}
 #vResumen .rz-fx{background:var(--surface-2);color:var(--text-2);border:.5px solid var(--border)}
 /* Foco al venir del calendario (pestaña Producción) */
 #vProduccion .prod-foco{background:rgba(199,125,160,.08);border:.5px solid rgba(199,125,160,.35);border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:12.5px;color:var(--text-2)}
@@ -4293,16 +4381,16 @@ body:has(.de-fondo) #tkBtn{display:none}
 #vResumen .rz-bottom .rz-sec{margin-top:0}
 #vResumen .rz-bottom .rz-tblwrap{max-width:none}
 @media(max-width:760px){#vResumen .rz-bottom{grid-template-columns:1fr;gap:20px}}
-#vResumen .rz-prep{background:#141417;border:.5px solid #2C2C33;border-radius:12px;padding:15px 18px 17px}
+#vResumen .rz-prep{background:var(--panel);border:.5px solid var(--border-strong);border-radius:12px;padding:15px 18px 17px}
 #vResumen .rz-prep .rz-sh{margin-bottom:4px}
 #vResumen .rz-pwk{margin-top:14px}
-#vResumen .rz-pwk+.rz-pwk{border-top:.5px solid #232329;padding-top:14px}
-#vResumen .rz-pwtag{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:#C77DA0;margin-bottom:8px}   /* ambas semanas en rosa */
+#vResumen .rz-pwk+.rz-pwk{border-top:.5px solid var(--line);padding-top:14px}
+#vResumen .rz-pwtag{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--m-ops);margin-bottom:8px}   /* ambas semanas en rosa */
 #vResumen .rz-pg{margin-top:14px}
 #vResumen .rz-pg:first-of-type{margin-top:0}
-#vResumen .rz-pg+.rz-pg{margin-top:16px;border-top:.5px solid #232329;padding-top:15px}   /* separación clara fabricar / comprar */
+#vResumen .rz-pg+.rz-pg{margin-top:16px;border-top:.5px solid var(--line);padding-top:15px}   /* separación clara fabricar / comprar */
 #vResumen .rz-pgh{display:flex;align-items:center;gap:7px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text);font-weight:600}   /* header en negrita, brillante */
-#vResumen .rz-pico{width:15px;height:15px;color:#9A988F;flex:none}
+#vResumen .rz-pico{width:15px;height:15px;color:var(--text-2);flex:none}
 #vResumen .rz-pl{list-style:none;margin:8px 0 0;padding:0}
 #vResumen .rz-pl li{font-size:13px;color:var(--text-2);padding:3px 0;line-height:1.35}
 #vResumen .rz-pl li b{color:var(--text);font-weight:600}
@@ -4318,24 +4406,24 @@ body:has(.de-fondo) #tkBtn{display:none}
 /* cabecera de "Pendiente de fabricar": título izq · hint · botón "Volver al plan" arriba a la derecha (solo si hay ediciones) */
 #vResumen .rz-wrap .rz-sh{display:flex;align-items:center;gap:12px;margin-bottom:12px}
 #vResumen .rz-shr{margin-left:auto;display:flex;align-items:center;gap:10px}
-#vResumen .rz-wrap .rz-revert{background:none;border:.5px solid #2C2C33;color:var(--text-2);font-size:11px;border-radius:6px;padding:3px 10px;cursor:pointer}
-#vResumen .rz-wrap .rz-revert:hover{border-color:#3A3A42;color:var(--text)}
+#vResumen .rz-wrap .rz-revert{background:none;border:.5px solid var(--border-strong);color:var(--text-2);font-size:11px;border-radius:6px;padding:3px 10px;cursor:pointer}
+#vResumen .rz-wrap .rz-revert:hover{border-color:var(--border-hi);color:var(--text)}
 /* 2 semanas separadas por línea divisoria vertical; la próxima "EN OFF" */
 #vResumen .rz-cal2{gap:0}
 #vResumen .rz-cal2 .rz-wk:first-child{padding-right:26px;border-right:.5px solid var(--border)}
 #vResumen .rz-cal2 .rz-wk:last-child{padding-left:26px}
 #vResumen .rz-cal2 .rz-wk-next{opacity:.5}
-#vResumen .rz-cal2 .rz-wk-next .rz-day{background:transparent;border-style:dashed;border-color:#26262C}
+#vResumen .rz-cal2 .rz-wk-next .rz-day{background:transparent;border-style:dashed;border-color:var(--border)}
 #vResumen .rz-cal2 .rz-wk-next .rz-day.rz-ed:hover{opacity:1}
 /* franja "sin registrar": discreta pero visible, arriba del calendario. Ámbar mostaza, sin rojo ni popup. */
-#vResumen .rz-alert{display:flex;align-items:center;gap:9px;margin:0 0 13px;background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.35);border-radius:9px;padding:9px 13px;font-size:12.5px;color:#C99A4E;line-height:1.5}
+#vResumen .rz-alert{display:flex;align-items:center;gap:9px;margin:0 0 13px;background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.35);border-radius:9px;padding:9px 13px;font-size:12.5px;color:var(--warn-2);line-height:1.5}
 #vResumen .rz-alert svg{width:15px;height:15px;flex:none}
 /* fila de 4 tarjetas IGUALES (una por columna de la grilla) */
 #vResumen .rz-cards4{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:26px}   /* b82: Comprar se mudó a Compras */
 /* Compras en el Resumen (b82): UNA franja roja de una línea si algo no alcanza; lleva a Compras. */
-#vResumen .rz-cpaviso{display:flex;justify-content:space-between;gap:10px;margin-top:18px;padding:10px 13px;border:.5px solid rgba(226,75,74,.4);background:rgba(226,75,74,.08);border-radius:10px;color:#E24B4A;font-size:13px;cursor:pointer}
+#vResumen .rz-cpaviso{display:flex;justify-content:space-between;gap:10px;margin-top:18px;padding:10px 13px;border:.5px solid rgba(226,75,74,.4);background:rgba(226,75,74,.08);border-radius:10px;color:var(--stop-tx);font-size:13px;cursor:pointer}
 #vResumen .rz-cpaviso span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#vResumen .rz-card4{background:#141417;border:.5px solid #26262C;border-radius:12px;padding:13px 15px;min-width:0}
+#vResumen .rz-card4{background:var(--panel);border:.5px solid var(--border);border-radius:12px;padding:13px 15px;min-width:0}
 /* Rótulo = etiqueta, no titular: sin mayúsculas, tracking corto, peso 500. La jerarquía la
    hace el TONO (terciario rótulo → secundario apoyo → blanco hueso el dato), no el tamaño. */
 #vResumen .rz-c4h{font-size:11px;letter-spacing:.02em;color:var(--text-3);font-weight:500;margin-bottom:9px}
@@ -4344,15 +4432,15 @@ body:has(.de-fondo) #tkBtn{display:none}
 #vResumen .rz-c4fecha{font-size:11px;font-weight:500;color:var(--text-2);margin:-4px 0 9px}
 #vResumen .rz-c4fecha span{display:block;line-height:1.35}
 #vResumen .rz-c4line{font-size:13px;color:var(--text);line-height:1.5}
-#vResumen .rz-c4line.rz-ok{color:#7E8C5A}
+#vResumen .rz-c4line.rz-ok{color:var(--ok-olive)}
 #vResumen .rz-c4none{font-size:12.5px;color:var(--text-3)}
 /* VA DE LA SEMANA: progreso meta−producido por producto */
 #vResumen .rz-vsrow{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:3px 0;font-size:13px}
 #vResumen .rz-vsn{color:var(--text-2)}
 #vResumen .rz-vsv{color:var(--text-3);font-variant-numeric:tabular-nums;white-space:nowrap}
-#vResumen .rz-vsv.rz-ok{color:#7E8C5A;font-weight:600}
+#vResumen .rz-vsv.rz-ok{color:var(--ok-olive);font-weight:600}
 /* tarjetas COMPRAR: lista completa, sin desplegable (la tarjeta crece) */
-#vResumen .rz-c4it{padding:5px 0;border-top:.5px solid #232329}
+#vResumen .rz-c4it{padding:5px 0;border-top:.5px solid var(--line)}
 #vResumen .rz-c4item{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12.5px}
 #vResumen .rz-c4nota{font-size:10.5px;color:var(--text-3);margin-top:1px}
 #vResumen .rz-c4in{color:var(--text-2);text-transform:capitalize}
@@ -4360,7 +4448,7 @@ body:has(.de-fondo) #tkBtn{display:none}
    nada. Ahora el dato va en blanco hueso, y el ámbar queda para .rz-c4urg — el único caso que
    exige acción HOY (la compra vence hoy o mañana). */
 #vResumen .rz-c4falta{color:var(--text);white-space:nowrap;font-weight:600;font-size:11.5px}
-#vResumen .rz-c4it.rz-c4urg .rz-c4falta{color:#C99A4E}
+#vResumen .rz-c4it.rz-c4urg .rz-c4falta{color:var(--warn-2)}
 /* 2 secciones abajo, 2 columnas cada una, cerrando contra el mismo borde */
 /* Una sola columna: Inventario pasó a ocupar el ancho completo con sus tres tarjetas lado a
    lado, y con la grilla de 2 columnas quedaba encajado en media pantalla, apilado y sobrando
@@ -4370,14 +4458,14 @@ body:has(.de-fondo) #tkBtn{display:none}
 #vResumen .rz-two .rz-ult .rz-sh{margin-bottom:6px}
 /* inventario: 3 tarjetas-resumen; "›" abre la tabla completa */
 #vResumen .rz-inv3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:start}
-#vResumen .rz-i3{background:#141417;border:.5px solid #26262C;border-radius:11px;padding:11px 14px}
+#vResumen .rz-i3{background:var(--panel);border:.5px solid var(--border);border-radius:11px;padding:11px 14px}
 #vResumen .rz-i3h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
 /* Mismo encabezado que las tarjetas de arriba (rz-c4h): sin VERSALITA y sin 600. El bloque
    gritaba por tamaño y peso; la jerarquía la hacen los tonos de gris, no la tipografía. */
 #vResumen .rz-i3t{font-size:11px;letter-spacing:.02em;color:var(--text-3);font-weight:400}
 #vResumen .rz-i3sum{font-size:12px;color:var(--text-2);cursor:pointer;user-select:none}
 #vResumen .rz-i3sum:hover{color:var(--text)}
-#vResumen .rz-i3body{margin-top:9px;border-top:.5px solid #232329;padding-top:8px}
+#vResumen .rz-i3body{margin-top:9px;border-top:.5px solid var(--line);padding-top:8px}
 #vResumen .rz-i3body.hidden{display:none}
 @media(max-width:760px){
   #vResumen .rz-cards4{grid-template-columns:1fr 1fr}
@@ -4456,74 +4544,74 @@ body:has(.de-fondo) #tkBtn{display:none}
    Regla de Andrea: TODO LO QUE PUEDA IR EN UNA LÍNEA, VA EN UNA LÍNEA. Contenedor angosto (se diseñó en
    teléfono y en escritorio se ve igual). El morado identifica (pastilla activa, número de orden, cantidad
    que difiere de lo sugerido); el rojo es "no alcanza", el ámbar "revisar", el lima la acción principal. */
-body[data-mod="compras"] .main{--mod:#A27FEB;--accent:#A27FEB;--blue:#A27FEB;--blue-l:rgba(162,127,235,.15)}
+body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue:var(--m-comp);--blue-l:rgba(162,127,235,.15)}
 #vCompras .cp-wrap{max-width:560px;margin:0 auto;padding:4px 0 40px}
 #vCompras .cp-pills{display:flex;gap:8px;overflow-x:auto;margin:2px 0 16px;scrollbar-width:none}
-#vCompras .cp-pill{border:.5px solid #26262C;background:#161619;color:#9A988F;border-radius:999px;padding:8px 15px;font-size:13px;white-space:nowrap;cursor:pointer;font-family:inherit}
-#vCompras .cp-pill.on{border-color:#A27FEB;color:#A27FEB}
-#vCompras .cp-card{background:#161619;border:.5px solid #26262C;border-radius:14px;padding:14px 15px;margin-bottom:12px}
+#vCompras .cp-pill{border:.5px solid var(--border);background:var(--surface);color:var(--text-2);border-radius:999px;padding:8px 15px;font-size:13px;white-space:nowrap;cursor:pointer;font-family:inherit}
+#vCompras .cp-pill.on{border-color:var(--m-comp);color:var(--m-comp)}
+#vCompras .cp-card{background:var(--surface);border:.5px solid var(--border);border-radius:14px;padding:14px 15px;margin-bottom:12px}
 #vCompras .cp-f1{display:flex;align-items:center;justify-content:space-between;gap:10px}
-#vCompras .cp-prov{font-size:19px;font-weight:600;color:#F5F4F0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#vCompras .cp-po{border:1px solid #A27FEB;color:#A27FEB;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;white-space:nowrap}
-#vCompras .cp-g2{font-size:13px;color:#F5F4F0;white-space:nowrap}
-#vCompras .cp-ciclo{font-size:13px;color:#F5F4F0;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#vCompras .cp-g{color:#9A988F} #vCompras .cp-sep{color:#6E6C68;margin:0 2px}
+#vCompras .cp-prov{font-size:19px;font-weight:600;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#vCompras .cp-po{border:1px solid var(--m-comp);color:var(--m-comp);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;white-space:nowrap}
+#vCompras .cp-g2{font-size:13px;color:var(--text);white-space:nowrap}
+#vCompras .cp-ciclo{font-size:13px;color:var(--text);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#vCompras .cp-g{color:var(--text-2)} #vCompras .cp-sep{color:var(--text-3);margin:0 2px}
 #vCompras .cp-rojo,#vCompras .cp-amb{display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;font-size:13px}
-#vCompras .cp-rojo{margin-top:12px;padding:9px 11px;border:.5px solid rgba(226,75,74,.4);background:rgba(226,75,74,.08);border-radius:9px;color:#E24B4A}
-#vCompras .cp-amb{margin-top:4px;padding:9px 0 2px;color:#C99A4E;border-top:.5px solid #232329}
+#vCompras .cp-rojo{margin-top:12px;padding:9px 11px;border:.5px solid rgba(226,75,74,.4);background:rgba(226,75,74,.08);border-radius:9px;color:var(--stop-tx)}
+#vCompras .cp-amb{margin-top:4px;padding:9px 0 2px;color:var(--warn-2);border-top:.5px solid var(--line)}
 #vCompras .cp-rojo span:first-child,#vCompras .cp-amb span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #vCompras .cp-fl{transition:transform .15s;flex:0 0 auto} #vCompras .cp-fl.abierto{transform:rotate(90deg)}
-#vCompras .cp-det{font-size:12px;color:#9A988F;line-height:1.45;padding:2px 0 9px}
-#vCompras .cp-detr{color:#E24B4A;padding:8px 2px} #vCompras .cp-deta,#vCompras .cp-detamb{color:#C99A4E}
+#vCompras .cp-det{font-size:12px;color:var(--text-2);line-height:1.45;padding:2px 0 9px}
+#vCompras .cp-detr{color:var(--stop-tx);padding:8px 2px} #vCompras .cp-deta,#vCompras .cp-detamb{color:var(--warn-2)}
 #vCompras .cp-detamb{font-size:12.5px;margin-top:10px;line-height:1.45}
 #vCompras .cp-lista{margin-top:10px}
-#vCompras .cp-it{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:10px 0;border-top:.5px solid #232329;font-size:14px;cursor:pointer}
+#vCompras .cp-it{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:10px 0;border-top:.5px solid var(--line);font-size:14px;cursor:pointer}
 #vCompras .cp-it>span{white-space:nowrap}
-#vCompras .cp-in{color:#C9C7C1;min-width:0;overflow:hidden;text-overflow:ellipsis}
-#vCompras .cp-r{color:#E24B4A !important}
-#vCompras .cp-pedir{color:#F5F4F0;font-weight:600}
-#vCompras .cp-mto{color:#F5F4F0;min-width:84px;text-align:right}
+#vCompras .cp-in{color:var(--text-hi);min-width:0;overflow:hidden;text-overflow:ellipsis}
+#vCompras .cp-r{color:var(--stop-tx) !important}
+#vCompras .cp-pedir{color:var(--text);font-weight:600}
+#vCompras .cp-mto{color:var(--text);min-width:84px;text-align:right}
 #vCompras .cp-it3{cursor:default} #vCompras .cp-it3 .cp-in{flex:1} #vCompras .cp-it3 .cp-g{width:78px;text-align:right}   /* revisar: columnas alineadas */
-#vCompras .cp-ittot{font-weight:600;cursor:default} #vCompras .cp-ittot .cp-in{color:#F5F4F0}
-#vCompras .cp-pon{font-weight:600;color:#F5F4F0}
-#vCompras .cp-pl{font-size:12.5px;color:#F5F4F0}
+#vCompras .cp-ittot{font-weight:600;cursor:default} #vCompras .cp-ittot .cp-in{color:var(--text)}
+#vCompras .cp-pon{font-weight:600;color:var(--text)}
+#vCompras .cp-pl{font-size:12.5px;color:var(--text)}
 #vCompras .cp-btns{display:flex;gap:10px;margin-top:14px}
-#vCompras .cp-btn{flex:1;background:#1E1E22;border:.5px solid #2C2C33;color:#F5F4F0;border-radius:10px;padding:12px 14px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit}
-#vCompras .cp-btnp{background:#E9FE60;color:#1A1A1A;border:none;font-weight:600}
+#vCompras .cp-btn{flex:1;background:var(--raise);border:.5px solid var(--border-strong);color:var(--text);border-radius:10px;padding:12px 14px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit}
+#vCompras .cp-btnp{background:var(--lime);color:#1A1A1A;border:none;font-weight:600}
 #vCompras .cp-btn:disabled{opacity:.45;cursor:default}
 #vCompras .cp-cuando{flex:1;align-self:center;text-align:center;font-size:13px}
-#vCompras .cp-msg{font-size:12.5px;margin-top:8px;color:#9A988F} #vCompras .cp-msg:empty{display:none}
-#vCompras .cp-ok{color:#7E8C5A} #vCompras .cp-mal{color:#E24B4A} #vCompras .cp-amb2{color:#C99A4E}
-#vCompras .cp-load,#vCompras .cp-vacio{color:#9A988F;padding:22px 4px;font-size:14px} #vCompras .cp-err{color:#E24B4A;padding:22px 4px;font-size:14px}
-#vCompras .cp-volver{background:none;border:none;color:#9A988F;font-size:13px;padding:0 0 10px;cursor:pointer;font-family:inherit}
-#vCompras .cp-regh{font-size:15px;color:#F5F4F0;margin-bottom:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#vCompras .cp-msg{font-size:12.5px;margin-top:8px;color:var(--text-2)} #vCompras .cp-msg:empty{display:none}
+#vCompras .cp-ok{color:var(--ok-olive)} #vCompras .cp-mal{color:var(--stop-tx)} #vCompras .cp-amb2{color:var(--warn-2)}
+#vCompras .cp-load,#vCompras .cp-vacio{color:var(--text-2);padding:22px 4px;font-size:14px} #vCompras .cp-err{color:var(--stop-tx);padding:22px 4px;font-size:14px}
+#vCompras .cp-volver{background:none;border:none;color:var(--text-2);font-size:13px;padding:0 0 10px;cursor:pointer;font-family:inherit}
+#vCompras .cp-regh{font-size:15px;color:var(--text);margin-bottom:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #vCompras .cp-rtbl{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}
-#vCompras .cp-rtbl th{font-size:11px;font-weight:500;color:#6E6C68;text-align:left;padding:4px 0 8px;border-bottom:.5px solid #232329}
+#vCompras .cp-rtbl th{font-size:11px;font-weight:500;color:var(--text-3);text-align:left;padding:4px 0 8px;border-bottom:.5px solid var(--line)}
 #vCompras .cp-rtbl th:nth-child(2){text-align:center;width:64px} #vCompras .cp-rtbl th:nth-child(3){text-align:right;padding-right:40px;width:132px}   /* table-layout:fixed: los anchos salen del encabezado */
-#vCompras .cp-rtbl td{padding:8px 0;border-top:.5px solid #232329;vertical-align:middle}
-#vCompras .cp-rin{color:#C9C7C1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* una línea, siempre */
-#vCompras .cp-rsu{text-align:center;color:#9A988F;width:64px}
+#vCompras .cp-rtbl td{padding:8px 0;border-top:.5px solid var(--line);vertical-align:middle}
+#vCompras .cp-rin{color:var(--text-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* una línea, siempre */
+#vCompras .cp-rsu{text-align:center;color:var(--text-2);width:64px}
 #vCompras .cp-rpe{text-align:right;white-space:nowrap;width:132px}
-#vCompras .cp-pm{width:40px;height:40px;border-radius:10px;border:.5px solid #2C2C33;background:#1E1E22;color:#F5F4F0;font-size:20px;line-height:1;cursor:pointer;font-family:inherit}
-#vCompras .cp-n{display:inline-block;min-width:36px;text-align:center;font-weight:600;color:#F5F4F0}
-#vCompras .cp-n.cp-dif{color:#A27FEB}
-#vCompras .cp-ceros{background:none;border:none;color:#9A988F;font-size:13px;padding:12px 0 2px;cursor:pointer;font-family:inherit;text-decoration:underline}
-#vCompras .cp-pie{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0E0E11;border-top:.5px solid #26262C;padding:12px 0 calc(12px + env(safe-area-inset-bottom));margin-top:14px}
+#vCompras .cp-pm{width:40px;height:40px;border-radius:10px;border:.5px solid var(--border-strong);background:var(--raise);color:var(--text);font-size:20px;line-height:1;cursor:pointer;font-family:inherit}
+#vCompras .cp-n{display:inline-block;min-width:36px;text-align:center;font-weight:600;color:var(--text)}
+#vCompras .cp-n.cp-dif{color:var(--m-comp)}
+#vCompras .cp-ceros{background:none;border:none;color:var(--text-2);font-size:13px;padding:12px 0 2px;cursor:pointer;font-family:inherit;text-decoration:underline}
+#vCompras .cp-pie{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--bg);border-top:.5px solid var(--border);padding:12px 0 calc(12px + env(safe-area-inset-bottom));margin-top:14px}
 #vCompras .cp-pie .cp-btn{flex:0 0 auto;min-width:120px}
 #vCompras .cp-pie .cp-btn+.cp-btn{flex:1}
-#vCompras .cp-tot{font-size:14px;color:#F5F4F0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#vCompras .cp-sel{background:#1E1E22;border:.5px solid #2C2C33;color:#F5F4F0;border-radius:7px;padding:5px 6px;font-family:inherit;font-size:13px;margin:2px 2px}
-#vCompras .cp-edit{color:#9A988F;font-size:13px}
+#vCompras .cp-tot{font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#vCompras .cp-sel{background:var(--raise);border:.5px solid var(--border-strong);color:var(--text);border-radius:7px;padding:5px 6px;font-family:inherit;font-size:13px;margin:2px 2px}
+#vCompras .cp-edit{color:var(--text-2);font-size:13px}
 /* ── Compras v2 (3-oct) ── todo en una línea; el botón de confirmar, abajo. */
-#vCompras .cp-res{border-color:#A27FEB;cursor:pointer}
-#vCompras .cp-rt{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:16px;font-weight:600;color:#F5F4F0}
-#vCompras .cp-st{font-size:12px;font-weight:500;color:#6E6C68;margin-bottom:6px}
+#vCompras .cp-res{border-color:var(--m-comp);cursor:pointer}
+#vCompras .cp-rt{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:16px;font-weight:600;color:var(--text)}
+#vCompras .cp-st{font-size:12px;font-weight:500;color:var(--text-3);margin-bottom:6px}
 #vCompras .cp-franja{display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;font-size:13px;margin:-2px 0 12px;
-  padding:9px 11px;border:.5px solid rgba(226,75,74,.4);background:rgba(226,75,74,.08);border-radius:9px;color:#E24B4A}
+  padding:9px 11px;border:.5px solid rgba(226,75,74,.4);background:rgba(226,75,74,.08);border-radius:9px;color:var(--stop-tx)}
 #vCompras .cp-franja span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #vCompras .cp-mp{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}
-#vCompras .cp-mp th{font-size:11px;font-weight:500;color:#6E6C68;text-align:left;padding:4px 0 8px;border-bottom:.5px solid #232329}
-#vCompras .cp-mp td{padding:9px 0;border-top:.5px solid #232329;color:#C9C7C1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#vCompras .cp-mp th{font-size:11px;font-weight:500;color:var(--text-3);text-align:left;padding:4px 0 8px;border-bottom:.5px solid var(--line)}
+#vCompras .cp-mp td{padding:9px 0;border-top:.5px solid var(--line);color:var(--text-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #vCompras .cp-mp th:nth-child(2),#vCompras .cp-mp td:nth-child(2){width:74px;text-align:right;padding-right:14px}
 #vCompras .cp-mp th:nth-child(3),#vCompras .cp-mp td:nth-child(3){width:96px}
 #vCompras .cp-wrap2{white-space:normal;line-height:1.55} #vCompras .cp-nw{white-space:nowrap}
@@ -4531,29 +4619,29 @@ body[data-mod="compras"] .main{--mod:#A27FEB;--accent:#A27FEB;--blue:#A27FEB;--b
 #vCompras .cp-ped th:nth-child(1),#vCompras .cp-ped td:nth-child(1){width:74px}
 #vCompras .cp-ped th:nth-child(2),#vCompras .cp-ped td:nth-child(2){width:auto;text-align:left;padding-right:0}
 #vCompras .cp-ped th:nth-child(3),#vCompras .cp-ped td:nth-child(3),#vCompras .cp-ped th:nth-child(4),#vCompras .cp-ped td:nth-child(4){width:62px}
-#vCompras .cp-ped .cp-pon{color:#A27FEB}
+#vCompras .cp-ped .cp-pon{color:var(--m-comp)}
 #vCompras .cp-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
-#vCompras .cp-dot-verde{background:#5FB37A} #vCompras .cp-dot-ambar{background:#E9A23B} #vCompras .cp-dot-rojo{background:#E24B4A}
-#vCompras .cp-dot-odoo{background:transparent;box-shadow:inset 0 0 0 1.5px #9AA7B8}   /* faltan compras por cargar (4-oct) */
-#vCompras .cp-fr-odoo{margin-top:8px;padding:10px 12px;border:.5px dashed #9AA7B8;border-radius:10px;font-size:12.5px;color:#9AA7B8;font-style:italic}
-#vCompras .cp-btnh{flex:0 0 auto;background:#1E1E22;border:.5px solid #2C2C33;color:#F5F4F0;border-radius:10px;padding:9px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
-#vCompras .cp-btnh-u{background:#E9FE60;color:#1A1A1A;border-color:#E9FE60}
+#vCompras .cp-dot-verde{background:var(--dot-ok)} #vCompras .cp-dot-ambar{background:var(--warn)} #vCompras .cp-dot-rojo{background:var(--stop-line)}
+#vCompras .cp-dot-odoo{background:transparent;box-shadow:inset 0 0 0 1.5px var(--odoo)}   /* faltan compras por cargar (4-oct) */
+#vCompras .cp-fr-odoo{margin-top:8px;padding:10px 12px;border:.5px dashed var(--odoo);border-radius:10px;font-size:12.5px;color:var(--odoo);font-style:italic}
+#vCompras .cp-btnh{flex:0 0 auto;background:var(--raise);border:.5px solid var(--border-strong);color:var(--text);border-radius:10px;padding:9px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+#vCompras .cp-btnh-u{background:var(--lime);color:#1A1A1A;border-color:var(--ent-line)}
 #vCompras .cp-it0{cursor:default}
-#vCompras .cp-in1{color:#F5F4F0}
-#vCompras .cp-pie0{font-size:12.5px;color:#6E6C68;padding:0 4px}
+#vCompras .cp-in1{color:var(--text)}
+#vCompras .cp-pie0{font-size:12.5px;color:var(--text-3);padding:0 4px}
 #vCompras .cp-pie2{flex-direction:column;align-items:stretch;gap:10px}
 #vCompras .cp-btns2{display:flex;gap:12px}
 #vCompras .cp-btns2 .cp-btn{flex:1;min-width:0;padding:12px 8px;white-space:nowrap}
 #vCompras .cp-pc{margin-top:8px}
 #vCompras .cp-pc th:nth-child(2),#vCompras .cp-pc td:nth-child(2){width:78px;text-align:right;padding-right:12px}
 #vCompras .cp-pc th:nth-child(3),#vCompras .cp-pc td:nth-child(3){width:96px;text-align:right}
-#vCompras .cp-pc td.cp-pedir{color:#F5F4F0;font-weight:600}
-#vCompras .cp-pon-m{color:#A27FEB}
+#vCompras .cp-pc td.cp-pedir{color:var(--text);font-weight:600}
+#vCompras .cp-pon-m{color:var(--m-comp)}
 #vCompras .cp-po-det,#vCompras .cp-prov-det{padding:2px 0 12px}
-#vCompras .cp-pol{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:13px;color:#C9C7C1;padding:5px 0}
+#vCompras .cp-pol{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:13px;color:var(--text-hi);padding:5px 0}
 #vCompras .cp-pol>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #vCompras .cp-pol>span:last-child{white-space:nowrap}
-#vCompras .cp-link{color:#A27FEB;text-decoration:none;white-space:nowrap;font-size:13px}
+#vCompras .cp-link{color:var(--m-comp);text-decoration:none;white-space:nowrap;font-size:13px}
 #vCompras .cp-prov-det .cp-btns{margin-top:8px}
 /* ── Espacio (3-oct): tarjetas más compactas; en escritorio, dos columnas y dos tarjetas por fila ── */
 #vCompras .cp-grid .cp-card{padding:12px 14px}
@@ -4568,9 +4656,9 @@ body[data-mod="compras"] .main{--mod:#A27FEB;--accent:#A27FEB;--blue:#A27FEB;--b
 #vCompras .cp-col .cp-franja{margin:0}
 /* ── v4 (3-oct) ── */
 #vCompras .cp-st2{display:block;background:none;border:none;padding:0 0 8px;font-family:inherit;text-align:left;
-  font-size:16px;font-weight:600;color:#F5F4F0}
+  font-size:16px;font-weight:600;color:var(--text)}
 #vCompras .cp-st2-l{cursor:pointer}
-#vCompras .cp-mp-s th,#vCompras .cp-pc th,#vCompras .cp-atbl th{font-size:10px;font-weight:500;color:#57554F;letter-spacing:.04em;text-transform:uppercase}
+#vCompras .cp-mp-s th,#vCompras .cp-pc th,#vCompras .cp-atbl th{font-size:10px;font-weight:500;color:var(--text-dim-6);letter-spacing:.04em;text-transform:uppercase}
 .cp-fr-l{display:flex;flex-direction:column;gap:3px;min-width:0}
 .cp-fr-l>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #vCompras .cp-franja{align-items:flex-start}
@@ -4582,18 +4670,18 @@ body[data-mod="compras"] .main{--mod:#A27FEB;--accent:#A27FEB;--blue:#A27FEB;--b
 /* Fechas de grupo de Por comprar como etiqueta, igual que los encabezados de Armar pedido (Andrea, 4-oct):
    así no se confunden con los nombres de proveedor. «HOY» sigue en ámbar. */
 #vCompras .cp-gtit{font-size:10px;font-weight:500;color:var(--text-3);letter-spacing:.04em;text-transform:uppercase;padding:14px 0 4px}
-#vCompras .cp-gtit-hoy{color:#E9A23B}
+#vCompras .cp-gtit-hoy{color:var(--warn)}
 #vCompras .cp-aviso-crea{font-size:12.5px;text-align:right;margin:10px 0 -2px}
 #vCompras .cp-pcrow .cp-in1{font-weight:500}
-#vCompras .cp-canal{font-size:11.5px;color:#6E6C68;font-weight:400;margin-left:4px}
+#vCompras .cp-canal{font-size:11.5px;color:var(--text-3);font-weight:400;margin-left:4px}
 #vCompras .cp-pcrow>span.cp-g{font-size:12.5px}
-#vCompras .cp-amb3{color:#E9A23B !important}
+#vCompras .cp-amb3{color:var(--warn) !important}
 /* «Faltan compras por cargar» (4-oct): Odoo tiene menos de lo que ya se usó. NO es un faltante
    (no pide comprar): gris azulado y en cursiva, nunca rojo ni ámbar. */
-#vCompras .cp-odoo{color:#9AA7B8 !important;font-style:italic}
+#vCompras .cp-odoo{color:var(--odoo) !important;font-style:italic}
 #vCompras .cp-atbl{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
-#vCompras .cp-atbl td{padding:7px 0;border-top:.5px solid #232329;vertical-align:middle;color:#C9C7C1;white-space:nowrap}
-#vCompras .cp-atbl th{text-align:left;padding:4px 0 8px;border-bottom:.5px solid #232329}
+#vCompras .cp-atbl td{padding:7px 0;border-top:.5px solid var(--line);vertical-align:middle;color:var(--text-hi);white-space:nowrap}
+#vCompras .cp-atbl th{text-align:left;padding:4px 0 8px;border-bottom:.5px solid var(--line)}
 #vCompras .cp-atbl th:nth-child(2),#vCompras .cp-atbl td:nth-child(2){width:62px;text-align:right;padding-right:8px}
 #vCompras .cp-atbl th:nth-child(3),#vCompras .cp-atbl td:nth-child(3){width:50px;text-align:center}
 #vCompras .cp-atbl th:nth-child(4),#vCompras .cp-atbl td:nth-child(4){width:116px;text-align:center}
@@ -4650,13 +4738,13 @@ body[data-mod="compras"] .main{--mod:#A27FEB;--accent:#A27FEB;--blue:#A27FEB;--b
 #vConteo .cn-head-sub{color:var(--text-2);font-size:12.5px;margin-top:2px}
 #vConteo .cn-rezago{margin-top:16px;background:var(--surface);border:.5px solid var(--border);border-radius:11px;padding:14px 16px;max-width:640px;margin-right:auto}
 #vConteo #cn-mp,#vConteo #cn-premez,#vConteo #cn-term{max-width:640px;margin-right:auto}
-#vConteo .cn-alerta{max-width:640px;margin:14px auto 0 0;background:var(--surface-2);border:.5px solid var(--border);border-left:3px solid #E9A23B;border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--text-2)}
-#vConteo .cn-alerta.cn-alerta-on{border-left-color:#E24B4A;color:var(--text)}
+#vConteo .cn-alerta{max-width:640px;margin:14px auto 0 0;background:var(--surface-2);border:.5px solid var(--border);border-left:3px solid var(--warn);border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--text-2)}
+#vConteo .cn-alerta.cn-alerta-on{border-left-color:var(--stop-line);color:var(--text)}
 #vConteo .cn-rq{font-size:12.5px;color:var(--text);font-weight:600;margin-bottom:9px}
 #vConteo .cn-rz-grp{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-bottom:9px}
 #vConteo .cn-rz-lbl{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);min-width:118px}
 #vConteo .cn-rz-grp label{font-size:12.5px;color:var(--text-2);display:inline-flex;align-items:center;gap:5px;cursor:pointer}
-#vConteo input[type=radio]{accent-color:#D4537E}
+#vConteo input[type=radio]{accent-color:var(--m-ops-2)}
 #vConteo #cn-planbox{margin-top:4px;border-top:.5px solid var(--border);padding-top:10px}
 #vConteo #cn-planbox .cn-ph{font-size:12px;color:var(--text-2);margin-bottom:8px}
 #vConteo #cn-planrows{display:flex;flex-wrap:wrap;gap:8px 16px}
@@ -4667,7 +4755,7 @@ body[data-mod="compras"] .main{--mod:#A27FEB;--accent:#A27FEB;--blue:#A27FEB;--b
 #vConteo .cn-tbl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 #vConteo .cn-tbl th{text-align:left;font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);padding:0 10px 8px 0;border-bottom:.5px solid var(--border)}
 #vConteo .cn-tbl th.r,#vConteo .cn-tbl td.r{text-align:right}
-#vConteo .cn-tbl td{padding:9px 10px 9px 0;border-bottom:.5px solid #1A1A1E;font-size:13px;color:var(--text);vertical-align:middle}
+#vConteo .cn-tbl td{padding:9px 10px 9px 0;border-bottom:.5px solid var(--line-soft);font-size:13px;color:var(--text);vertical-align:middle}
 #vConteo .cn-tbl tbody tr:last-child td{border-bottom:none}
 #vConteo #cn-pending:empty{display:none}
 #vConteo .cn-chip{display:inline-flex;align-items:center;gap:10px;margin-top:12px;background:var(--surface-2);border:.5px solid var(--border);border-left:3px solid var(--mod);border-radius:8px;padding:8px 12px;font-size:12.5px;color:var(--text-2)}
@@ -4676,30 +4764,30 @@ body[data-mod="compras"] .main{--mod:#A27FEB;--accent:#A27FEB;--blue:#A27FEB;--b
 #vConteo .cn-nm{font-weight:500;min-width:132px}
 #vConteo .cn-pnom{display:block;white-space:nowrap}
 #vConteo .cn-odoo{color:var(--text-2);white-space:nowrap}
-#vConteo .cn-aj{color:#E9A23B;font-size:11px}
+#vConteo .cn-aj{color:var(--warn);font-size:11px}
 #vConteo .cn-count{white-space:nowrap}
 #vConteo .cn-in{width:52px;background:var(--surface-2);border:.5px solid var(--border-m);border-radius:6px;color:var(--text);font-size:13px;padding:5px 7px;text-align:right}
 #vConteo .cn-in:focus{outline:none;border-color:var(--mod)}
 #vConteo .cn-lbl{color:var(--text-3);font-size:11px;margin:0 8px 0 4px}
 #vConteo .cn-ttot{color:var(--text-2);font-size:11.5px;font-variant-numeric:tabular-nums;margin-left:2px;white-space:nowrap}
 #vConteo .cn-diff{white-space:nowrap}
-#vConteo .cn-diff.cn-ok,#vConteo .cn-sem.cn-ok{color:#84BD00}
-#vConteo .cn-diff.cn-warn,#vConteo .cn-sem.cn-warn{color:#E9A23B}
-#vConteo .cn-diff.cn-bad,#vConteo .cn-sem.cn-bad{color:#E24B4A}
+#vConteo .cn-diff.cn-ok,#vConteo .cn-sem.cn-ok{color:var(--m-conc)}
+#vConteo .cn-diff.cn-warn,#vConteo .cn-sem.cn-warn{color:var(--warn)}
+#vConteo .cn-diff.cn-bad,#vConteo .cn-sem.cn-bad{color:var(--stop-tx)}
 #vConteo .cn-sem.cn-none,#vConteo .cn-diff.cn-none{color:var(--text-3)}
 #vConteo .cn-sem{font-size:12px;font-weight:600;white-space:nowrap}
 #vConteo .cn-bar{margin-top:18px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;border-top:.5px solid var(--border);padding-top:14px}
 #vConteo .cn-resumen{font-size:13px;color:var(--text-2)} #vConteo .cn-resumen b{color:var(--text)}
 #vConteo .cn-btns{display:flex;gap:10px}
 #vConteo .cn-btn{background:var(--surface-2);border:.5px solid var(--border);color:var(--text-2);font-size:12.5px;padding:9px 16px;border-radius:8px;cursor:pointer}
-#vConteo .cn-guardar{background:#E9FE60;color:#1A1A1A;border:none;font-weight:600}
+#vConteo .cn-guardar{background:var(--lime);color:#1A1A1A;border:none;font-weight:600}
 #vConteo .cn-sub,#vConteo .cn-lblm,#vConteo .cn-tmov,#vConteo .cn-dot{display:none}   /* piezas de teléfono */
 /* La presentación entre paréntesis se ve en las DOS anchuras (antes era solo de teléfono y en
    escritorio se mostraba .cn-pcaja "caja = 6 paq", que decía otra cosa). Fuente única. */
 #vConteo .cn-pres{margin-left:6px;color:var(--text-3);font-size:11px;font-weight:400}
 /* En su propio renglón: en el Conteo de teléfono la celda del nombre corta lo que
    se pasa (medido a 375: la píldora terminaba en el px 255 y la celda en el 186). */
-.mp-vieja{display:table;margin:3px 0 0;font-size:10.5px;color:#E9A23B;border:1px solid rgba(233,162,59,.45);border-radius:999px;padding:0 7px;white-space:nowrap;vertical-align:1px}
+.mp-vieja{display:table;margin:3px 0 0;font-size:10.5px;color:var(--warn);border:1px solid rgba(233,162,59,.45);border-radius:999px;padding:0 7px;white-space:nowrap;vertical-align:1px}
 .mp-vieja-det{display:block;font-size:10.5px;color:var(--text-3);margin-top:2px;white-space:normal}
 /* Rótulo de conversión (Vainilla): dice de dónde sale el número, para que nadie crea que
    cambió algo en Odoo. Segunda línea, gris terciario. */
@@ -4719,7 +4807,7 @@ body[data-mod="compras"] .main{--mod:#A27FEB;--accent:#A27FEB;--blue:#A27FEB;--b
   /* 8,5px de padding: con el campo a 16px (34px de alto) la fila cierra en los mismos 52px
      que antes del cambio, así no entra menos producto por pantalla. */
   #vConteo .cn-tbl tr{display:grid;grid-template-columns:1fr auto;align-items:center;
-    column-gap:10px;row-gap:1px;padding:8.5px 0;border-bottom:.5px solid #1A1A1E}
+    column-gap:10px;row-gap:1px;padding:8.5px 0;border-bottom:.5px solid var(--line-soft)}
   #vConteo .cn-tbl tbody tr:last-child{border-bottom:none}
   #vConteo .cn-tbl td{display:block;border:none;padding:0}
   /* `td.` en el selector para ganarle a la regla genérica `#vConteo .cn-tbl td` de arriba. */
@@ -4734,8 +4822,8 @@ body[data-mod="compras"] .main{--mod:#A27FEB;--accent:#A27FEB;--blue:#A27FEB;--b
      apagado para que no haya dos circulitos por fila. */
   #vConteo .cn-dot.cn-warn,#vConteo .cn-dot.cn-bad{display:none;width:7px;height:7px;
     border-radius:50%;margin-left:7px;vertical-align:middle;flex:none}
-  #vConteo .cn-dot.cn-warn{background:#E9A23B}
-  #vConteo .cn-dot.cn-bad{background:#E24B4A}
+  #vConteo .cn-dot.cn-warn{background:var(--warn)}
+  #vConteo .cn-dot.cn-bad{background:var(--stop-line)}
   /* Una sola línea siempre: si no cabe se recorta por el final (lo primero que se pierde es la
      presentación, que es lo menos crítico) y todas las filas conservan la misma altura. */
   #vConteo .cn-tbl td.cn-sub{display:block;grid-column:1;grid-row:2;font-size:10px;color:var(--text-3);
@@ -4753,8 +4841,8 @@ body[data-mod="compras"] .main{--mod:#A27FEB;--accent:#A27FEB;--blue:#A27FEB;--b
   #vConteo .cn-tbl td.cn-diff.cn-ok{color:var(--text-3);font-weight:500}
   #vConteo .cn-tbl td.cn-diff.cn-warn::before,#vConteo .cn-tbl td.cn-diff.cn-bad::before{content:'';display:inline-block;
     width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
-  #vConteo .cn-tbl td.cn-diff.cn-warn::before{background:#E9A23B}
-  #vConteo .cn-tbl td.cn-diff.cn-bad::before{background:#E24B4A}
+  #vConteo .cn-tbl td.cn-diff.cn-warn::before{background:var(--warn)}
+  #vConteo .cn-tbl td.cn-diff.cn-bad::before{background:var(--stop-line)}
   #vConteo .cn-ttot{display:none}
   /* Campos: centrados, 15px, y la etiqueta mínima al lado. Vacíos con placeholder "0" —
      nunca value="0", que con teclado numérico termina en "05". */
@@ -5363,28 +5451,30 @@ async function authInit(){
 }
 
 async function authSubmit(){
-  const msg=document.getElementById('authMsg'); msg.style.color='#A8A6A0';
+  const msg=document.getElementById('authMsg'); msg.style.color='var(--text-soft)';
   const pass=document.getElementById('authPass').value;
   if(_authMode==='setpass'){
-    if((pass||'').length<8){ msg.style.color='#FF8A8A'; msg.textContent='Mínimo 8 caracteres.'; return; }
+    if((pass||'').length<8){ msg.style.color='var(--err-2)'; msg.textContent='Mínimo 8 caracteres.'; return; }
     msg.textContent='Guardando…';
     const { error } = await sbClient().auth.updateUser({password:pass});
-    if(error){ msg.style.color='#FF8A8A'; msg.textContent='No se pudo guardar: '+error.message; return; }
+    if(error){ msg.style.color='var(--err-2)'; msg.textContent='No se pudo guardar: '+error.message; return; }
     history.replaceState(null,'',window.location.pathname+window.location.search);   // limpiar el hash
     authEntrar(); return;
   }
   const email=document.getElementById('authEmail').value.trim();
-  if(!email||!pass){ msg.style.color='#FF8A8A'; msg.textContent='Completá email y contraseña.'; return; }
+  if(!email||!pass){ msg.style.color='var(--err-2)'; msg.textContent='Completá email y contraseña.'; return; }
   msg.textContent='Entrando…';
   const { error } = await sbClient().auth.signInWithPassword({email,password:pass});
-  if(error){ msg.style.color='#FF8A8A'; msg.textContent='No se pudo entrar: '+error.message; return; }
+  if(error){ msg.style.color='var(--err-2)'; msg.textContent='No se pudo entrar: '+error.message; return; }
   authEntrar();
 }
 
 async function authEntrar(){
   document.getElementById('vLogin').classList.add('hidden');   // nunca mostrar el login de Odoo viejo (flujo de un solo login)
   document.getElementById('btnSalir').classList.remove('hidden');
-  const msg=document.getElementById('authMsg'); if(msg){ msg.style.color='#A8A6A0'; msg.textContent='Conectando a producción…'; }
+  document.getElementById('temaBtn').classList.remove('hidden');
+  temaResolver();   // el modo de la CUENTA; no espera a Odoo
+  const msg=document.getElementById('authMsg'); if(msg){ msg.style.color='var(--text-soft)'; msg.textContent='Conectando a producción…'; }
   await entrarProd();   // conecta a producción (solo lectura, por el proxy con el JWT) y muestra el lobby
   if(SESSION && SESSION.uid){
     document.getElementById('vAuth').classList.add('hidden');   // conectado → recién ahora dejamos ver el lobby
@@ -5392,8 +5482,9 @@ async function authEntrar(){
     await accesoCargar();                                       // qué módulos dibuja el lobby (cosmético)
     accesoSocia();                                              // pinta la pestaña «Pendientes» cuando conteste
   }else if(msg){
-    msg.style.color='#FF8A8A'; msg.textContent='No pude conectar a producción. Reintentá.';
+    msg.style.color='var(--err-2)'; msg.textContent='No pude conectar a producción. Reintentá.';
     document.getElementById('btnSalir').classList.add('hidden');
+    document.getElementById('temaBtn').classList.add('hidden');
   }
 }
 // Saludo por usuario autenticado: lee el email de la sesión de Supabase y lo mapea a un nombre.
@@ -5583,6 +5674,51 @@ async function setSaludo(){
   el.textContent=nom ? ('Hola '+nom+'.') : 'Hola.';
 }
 async function authLogout(){ try{ await sbClient().auth.signOut(); }catch(e){} location.reload(); }
+// ── TEMA CLARO / OSCURO (4-oct-2026) ─────────────────────────────────────────────
+// La preferencia es de la CUENTA (tabla `preferencia_tema`, append-only, gana la última fila).
+// Si alguien nunca tocó el botón, manda el perfil: socias en oscuro, el equipo en claro
+// (`tema_vigente()` lo resuelve en la base con acceso_perfil()). La copia local `tf_tema`
+// ({ultimo, por:{correo:tema}}) es solo el arranque sin parpadeo del <head>.
+// Hasta que PREFERENCIA_TEMA.sql esté aplicado, la rpc falla y se usa la copia local de esta
+// cuenta o, si no hay, el perfil (accesoSocia, el mismo dato que lee acceso_perfil()).
+const TEMA_LS='tf_tema';
+function _temaLocal(){ try{ return JSON.parse(localStorage.getItem(TEMA_LS)||'{}')||{}; }catch(e){ return {}; } }
+function _temaGuardarLocal(email, t){
+  try{ const o=_temaLocal(); o.ultimo=t; o.por=o.por||{}; if(email) o.por[email]=t;
+       localStorage.setItem(TEMA_LS, JSON.stringify(o)); }catch(e){}
+}
+function temaActual(){ return document.documentElement.getAttribute('data-tema')==='claro' ? 'claro' : 'oscuro'; }
+function temaAplicar(t){
+  const claro=(t==='claro');
+  if(claro) document.documentElement.setAttribute('data-tema','claro');
+  else document.documentElement.removeAttribute('data-tema');
+  const m=document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content', claro?'#F7F8FA':'#0E0E11');
+  const b=document.getElementById('temaBtn');
+  if(b){ const txt=claro?'Modo oscuro':'Modo claro'; b.setAttribute('aria-label',txt); b.title=txt; }
+}
+async function _temaEmail(){
+  try{ const {data}=await sbClient().auth.getUser(); return ((data&&data.user&&data.user.email)||'').trim().toLowerCase(); }
+  catch(e){ return ''; }
+}
+async function temaResolver(){
+  const email=await _temaEmail(); if(!email) return;
+  let t=null;
+  try{ const {data,error}=await sbClient().rpc('tema_vigente'); if(!error && (data==='claro'||data==='oscuro')) t=data; }catch(e){}
+  if(!t){ const loc=_temaLocal(); t=(loc.por&&loc.por[email]) || ((await accesoSocia()) ? 'oscuro' : 'claro'); }
+  _temaGuardarLocal(email, t);
+  if(t!==temaActual()) temaAplicar(t);
+}
+// El cambio es INSTANTÁNEO: se pinta primero y se guarda después. Si la base no contesta, el
+// modo queda igual en esta pantalla y en la copia local; se avisa en la consola, sin cartel.
+async function temaCambiar(){
+  const t=temaActual()==='claro' ? 'oscuro' : 'claro';
+  temaAplicar(t);
+  const email=await _temaEmail();
+  _temaGuardarLocal(email, t);
+  if(!email) return;
+  try{ const {error}=await sbClient().from('preferencia_tema').insert({usuario:email, tema:t}); if(error) throw error; }
+  catch(e){ try{ console.warn('[Truefie] tema: no pude guardar la preferencia en la cuenta', (e&&e.message)||e); }catch(_){} }
+}
 window.addEventListener('DOMContentLoaded', authInit);
 // ── AUDITORÍA DE PANTALLAS (26-ago) ──────────────────────────────────────
 // Al arrancar, compara las vistas DECLARADAS contra los <div> que existen de
@@ -5639,7 +5775,8 @@ function _modShow(id){
   // que ya es la lista canónica del módulo: una vista nueva de Entregas entra en
   // claro sola, sin que nadie tenga que acordarse de tocar el CSS. Va en `body`
   // porque el encabezado vive fuera de las vistas — ver `body.ent-claro`.
-  document.body.classList.toggle('ent-claro', mod==='entregas');
+  // (Hasta el 4-oct esto forzaba Entregas en claro. El claro ahora es del TEMA, para todo
+  //  Truefie: html[data-tema="claro"]. La clase queda sin reglas.)
   // El MÓDULO activo, en el body. De acá cuelga el acento de color (ver el CSS de
   // `body[data-mod="entregas"]`), derivado de ACCESO_VISTAS igual que todo lo demás.
   document.body.setAttribute('data-mod', mod||'');
@@ -5674,10 +5811,11 @@ function crumbSet(area,cur){
     c.style.display=igual?'none':''; }
   const sp=document.querySelector('.crumb-sep'); if(sp) sp.style.display=igual?'none':'';
   // el punto del breadcrumb sigue el color del módulo (Finanzas azul · Operaciones rosa · Conciliación verde)
-  // Entregas va en OLIVA, no en lima: su encabezado es claro y un punto de 7px en
-  // #E9FE60 sobre blanco no se ve. Mismo criterio que --ent-line.
-  const COL={'Finanzas':'#378ADD','Operaciones':'#D4537E','Compras':'#A27FEB','Conciliación':'#84BD00','Entregas':'#8A9B00','Ventas':'#3FB6A8','Personal':'#FF671D'};
-  const d=document.querySelector('.crumb-dot'); if(d)d.style.background=COL[area]||'#378ADD';
+  // Tokens del tema (4-oct): Entregas usa --ent-line, que es lima en oscuro y oliva en claro
+  // (un punto de 7px en #E9FE60 sobre blanco no se ve). Hasta el 4-oct iba oliva fijo porque
+  // Entregas era siempre claro.
+  const COL={'Finanzas':'var(--m-fin)','Operaciones':'var(--m-ops-2)','Compras':'var(--m-comp)','Conciliación':'var(--m-conc)','Entregas':'var(--ent-line)','Ventas':'#3FB6A8','Personal':'var(--m-per)'};
+  const d=document.querySelector('.crumb-dot'); if(d)d.style.background=COL[area]||'var(--m-fin)';
 }
 // Entradas desde el HOME (una por módulo).
 // Finanzas entra por Resultados en escritorio y por COBROS Y PAGOS en teléfono: es la
@@ -5694,7 +5832,7 @@ function abrirConciliacion(){                                // módulo Concilia
 function abrirPersonal(){ irAVacaciones(); }                 // módulo Personal → su única pantalla
 function abrirCompras(){ irACompras(); }                     // módulo Compras → Resumen (v2, 3-oct)
 function volverLobby(){
-  document.body.classList.remove('ent-claro');   // el lobby es de todos: vuelve a oscuro
+  // (el lobby ya no vuelve a oscuro a la fuerza: manda el tema de la cuenta)
   document.body.removeAttribute('data-mod');     // …y sin módulo activo: el lobby no lleva acento de nadie
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.add('hidden'); });
   _modFallo('');   // el aviso de pantalla rota no sobrevive a volver al inicio
@@ -8024,13 +8162,13 @@ const cM = n => '₡'+Math.round(Number(n)||0).toLocaleString('es-CR');   // col
 //   cuántas bolsas trae — Andrea las cuenta a mano. El empHold se queda hasta tener ese dato.
 const COSTOS_PROD = [
   // prodId FIJO por producto — búsqueda por ID, nunca por nombre (trampa 517/519 "Prueba Galletas"). kw/rx quedan solo informativos.
-  {key:'blanco',  label:'Pan Blanco',      prodId:451, kw:'Pan Blanco', rx:/pan\s*blanco/i,    batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#378ADD', chkMP:805, chkInd:1462, chkTot:2267, emp:69.55,  empOK:true},
-  {key:'semillas',label:'Pan de Semillas', prodId:452, kw:'Semillas',   rx:/semillas/i,        batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'#84BD00', chkMP:980, chkInd:1462, chkTot:2442, emp:77.58,  empOK:true},
-  {key:'pizza',   label:'Pizza Crust',     prodId:472, kw:'Pizza',      rx:/pizza/i,           batch:10,  unitsPer:2, pack:1, batchOverride:10, unidad:'por paquete de 2',  color:'#FF751F', chkMP:422, chkInd:3070, chkTot:3492, emp:417.43, empOK:false, empHold:'falta solo la bolsa de polipropileno (conteo manual pendiente)'},
-  {key:'frances', label:'Pan Francés',     prodId:453, kw:'Franc',      rx:/franc[eé]s/i,      batch:15,  unitsPer:4, pack:1, unidad:'por paquete de 4',  color:'#D4537E', emp:64.26,  empOK:true},
-  {key:'buns',    label:'Buns',            prodId:503, kw:'Bun',        rx:/buns?|hamburgues/i,batch:75,  unitsPer:1, pack:4, unidad:'por paquete de 4',  color:'#7F77DD', emp:60.34,  empOK:true},
+  {key:'blanco',  label:'Pan Blanco',      prodId:451, kw:'Pan Blanco', rx:/pan\s*blanco/i,    batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'var(--p-blanco)', chkMP:805, chkInd:1462, chkTot:2267, emp:69.55,  empOK:true},
+  {key:'semillas',label:'Pan de Semillas', prodId:452, kw:'Semillas',   rx:/semillas/i,        batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'var(--p-semillas)', chkMP:980, chkInd:1462, chkTot:2442, emp:77.58,  empOK:true},
+  {key:'pizza',   label:'Pizza Crust',     prodId:472, kw:'Pizza',      rx:/pizza/i,           batch:10,  unitsPer:2, pack:1, batchOverride:10, unidad:'por paquete de 2',  color:'var(--p-pizza)', chkMP:422, chkInd:3070, chkTot:3492, emp:417.43, empOK:false, empHold:'falta solo la bolsa de polipropileno (conteo manual pendiente)'},
+  {key:'frances', label:'Pan Francés',     prodId:453, kw:'Franc',      rx:/franc[eé]s/i,      batch:15,  unitsPer:4, pack:1, unidad:'por paquete de 4',  color:'var(--p-frances)', emp:64.26,  empOK:true},
+  {key:'buns',    label:'Buns',            prodId:503, kw:'Bun',        rx:/buns?|hamburgues/i,batch:75,  unitsPer:1, pack:4, unidad:'por paquete de 4',  color:'var(--p-buns)', emp:60.34,  empOK:true},
   // Galletas = product.product 519 en PRODUCCIÓN (es_CR "Cookie Dough" / en_US "Prueba Galletas"; template 705, BOM18 con chocolate, rinde 160, 353 on-hand). El 529 era id del demo.
-  {key:'galletas',label:'Galletas',        prodId:519, kw:'cookie dough',rx:/cookie\s*dough|cookie/i, batch:160, unitsPer:1, pack:1, unidad:'por unidad',        color:'#ED93B1', emp:412.66, empOK:true},
+  {key:'galletas',label:'Galletas',        prodId:519, kw:'cookie dough',rx:/cookie\s*dough|cookie/i, batch:160, unitsPer:1, pack:1, unidad:'por unidad',        color:'var(--p-galletas)', emp:412.66, empOK:true},
 ];
 // Estado del empaque de un producto de COSTOS_PROD. `emp`=colones/unidad de venta o null.
 // `completo` sólo si hay número, empOK y NO hay empHold (Pizza nunca completa hasta quitar el hold).
@@ -9289,7 +9427,7 @@ async function rzDiagProduccion(body){
         +'<thead><tr style="color:var(--text-3);text-align:left;border-bottom:.5px solid var(--border)">'
           +'<th style="padding:6px 10px 6px 0">Orden</th><th>Producto</th><th style="text-align:right">product_id</th>'
           +'<th style="text-align:right">qty</th><th>date_start (→ día CR)</th><th>date_finished (→ día CR)</th></tr></thead>'
-        +'<tbody>'+(filas||'<tr><td colspan="6" style="padding:10px 0;color:#E24B4A">Odoo no devolvió NINGUNA orden done en el rango.</td></tr>')+'</tbody>'
+        +'<tbody>'+(filas||'<tr><td colspan="6" style="padding:10px 0;color:var(--stop-tx)">Odoo no devolvió NINGUNA orden done en el rango.</td></tr>')+'</tbody>'
       +'</table></div>';
   }catch(e){ body.innerHTML='<div class="rz-err">Diagnóstico falló: '+esc(e&&e.message||e)+'</div>'; }
 }
@@ -9363,7 +9501,7 @@ async function rzDiagPlan(body){
     const filas=NIV_PROD.map(function(p){ const m=meta[p]||0, r=realB[p]||0, falta=Math.max(0,m-r);
       if(m===0 && r===0) return '';
       return '<tr><td>'+esc(_nomCorto(p))+'</td><td style="text-align:right">'+m+'</td>'
-        +'<td style="text-align:right;color:#7E8C5A">'+r+'</td>'
+        +'<td style="text-align:right;color:var(--ok-olive)">'+r+'</td>'
         +'<td style="text-align:right;color:'+(falta>0?'#C99A4E':'var(--text-3)')+'">'+falta+'</td></tr>'; }).join('');
     const dias=_rzCellsFull(0).map(function(c){ return '<tr><td>'+esc(c.dow+' '+c.dnum)+'</td><td>'+esc(c.prod||'—')
       +'</td><td style="color:var(--text-3)">'+esc(c.kind)+(c.auto?' (auto)':'')+'</td></tr>'; }).join('');
@@ -9374,7 +9512,7 @@ async function rzDiagPlan(body){
     const derFilas=states.map(function(s){ const hit=derByDs[s.ds];
       return '<tr'+(hit?' style="background:rgba(233,162,59,.08)"':'')+'><td>'+esc(s.dow+' '+s.dnum)+'</td>'
         +'<td style="color:'+(s.libre?'#7E8C5A':'var(--text-3)')+'">'+esc(s.estado)+'</td>'
-        +'<td style="color:#C99A4E">'+(hit?('← derrame: '+esc(hit.join(' · '))):'')+'</td></tr>'; }).join('');
+        +'<td style="color:var(--warn-2)">'+(hit?('← derrame: '+esc(hit.join(' · '))):'')+'</td></tr>'; }).join('');
     console.log('DIAG DERRAME · destino(s):', der);
     console.log('DIAG DERRAME · estado día por día (por qué se descartó/eligió):', (_rzDerrameLog&&_rzDerrameLog.dayStates)||[]);
     console.log('DIAG PLAN · meta semanal (batches):', meta, '· producido:', realB);
@@ -9748,18 +9886,18 @@ function escenariosCuerpoHTML(R, calc){
   const panA=panSem(A), panB=panSem(B), panHOY=panSem(HOY);
   const panSube = panHOY > panA + 0.1;
   const veredicto = panSube
-    ? '<b style="color:#E8D3AC">El viernes productivo suma PAN.</b> El viernes es un día de producción más para el pan (Blanco, Francés, Buns, Pizza) y para Galletas — todo menos Semillas. El colchón de pan (Blanco + Francés + Buns) pasa de <b>'+_rzN(panA,1)+'</b> semanas con viernes de limpieza (A) a <b>'+_rzN(panHOY,1)+'</b> con todos productivos (HOY)'+(Math.abs(panB-panA)>0.1?', y <b>'+_rzN(panB,1)+'</b> con alternos (B)':'')+'. Cada viernes productivo es un día extra de pan.'
-    : '<b style="color:#E8D3AC">Con este ritmo, el viernes productivo casi no mueve el pan.</b> Las Galletas se llevan casi todos los viernes (solo pueden hacerse ese día y vienen muy cortas de stock), así que al pan le quedan pocos: el colchón de pan pasa de '+_rzN(panA,1)+' a '+_rzN(panHOY,1)+' semanas. Con más viernes libres de Galletas, el pan subiría más.';
+    ? '<b style="color:var(--warn-tx)">El viernes productivo suma PAN.</b> El viernes es un día de producción más para el pan (Blanco, Francés, Buns, Pizza) y para Galletas — todo menos Semillas. El colchón de pan (Blanco + Francés + Buns) pasa de <b>'+_rzN(panA,1)+'</b> semanas con viernes de limpieza (A) a <b>'+_rzN(panHOY,1)+'</b> con todos productivos (HOY)'+(Math.abs(panB-panA)>0.1?', y <b>'+_rzN(panB,1)+'</b> con alternos (B)':'')+'. Cada viernes productivo es un día extra de pan.'
+    : '<b style="color:var(--warn-tx)">Con este ritmo, el viernes productivo casi no mueve el pan.</b> Las Galletas se llevan casi todos los viernes (solo pueden hacerse ese día y vienen muy cortas de stock), así que al pan le quedan pocos: el colchón de pan pasa de '+_rzN(panA,1)+' a '+_rzN(panHOY,1)+' semanas. Con más viernes libres de Galletas, el pan subiría más.';
   const col=function(s){ return s==null?'var(--text-3)':(s>=CIERRE_COLCHON_SEM?'#7E8C5A':(s>=CIERRE_COLCHON_SEM*0.6?'#C99A4E':'#C0564E')); };
 
   // Tarjeta grande por escenario
   const tarjeta=function(x){
     const ok=x.C.sem!=null && x.C.sem>=CIERRE_COLCHON_SEM;
-    return '<div style="flex:1;min-width:270px;background:#141417;border:.5px solid '+(ok?'#3A4A2E':'#2C2C33')+';border-radius:11px;padding:15px 18px">'
+    return '<div style="flex:1;min-width:270px;background:var(--panel);border:.5px solid '+(ok?'#3A4A2E':'#2C2C33')+';border-radius:11px;padding:15px 18px">'
       +'<div style="font-size:11px;letter-spacing:.05em;color:var(--text-3);text-transform:uppercase">Escenario '+x.k+'</div>'
       +'<div style="font-size:14px;font-weight:600;color:var(--text);margin-top:3px">'+esc(x.tit)+'</div>'
       +'<div style="font-size:11.5px;color:var(--text-3);margin-top:5px;line-height:1.5;min-height:48px">'+esc(x.sub)+'</div>'
-      +'<div style="margin-top:12px;padding-top:12px;border-top:.5px solid #26262C;display:flex;align-items:baseline;gap:8px">'
+      +'<div style="margin-top:12px;padding-top:12px;border-top:.5px solid var(--border);display:flex;align-items:baseline;gap:8px">'
         +'<span style="font-size:30px;font-weight:700;color:'+col(x.C.sem)+';font-variant-numeric:tabular-nums;line-height:1">'+semTxt(x.C.sem)+'</span>'
         +'<span style="font-size:12px;color:var(--text-3)">semanas de colchón · '+_rzN(x.C.cj)+' cj</span>'
       +'</div>'
@@ -9780,7 +9918,7 @@ function escenariosCuerpoHTML(R, calc){
       +'<td style="text-align:right;color:var(--text-3);font-size:11.5px">'+_rzN(metaCj(m))+' cj</td>'; };
   const filas=R.M.map(function(m){
     return '<tr>'
-      +'<td style="padding:11px 16px 11px 0;color:var(--text)">'+esc(_nomCorto(m.p))+(R.estim[m.p]?'<span style="color:#C99A4E;font-size:10px;margin-left:6px">estimado</span>':'')+'</td>'
+      +'<td style="padding:11px 16px 11px 0;color:var(--text)">'+esc(_nomCorto(m.p))+(R.estim[m.p]?'<span style="color:var(--warn-2);font-size:10px;margin-left:6px">estimado</span>':'')+'</td>'
       +metaCelda(m,false)+celda(A,m.p,true)+celda(B,m.p,true)+celda(HOY,m.p,true)
     +'</tr>'; }).join('');
   const metaTotCj=R.M.reduce(function(a,m){ return a+metaCj(m); },0);
@@ -9794,7 +9932,7 @@ function escenariosCuerpoHTML(R, calc){
   const split=function(x){ return '<b>'+panDias(x)+'</b> a pan · <b>'+x.galDias+'</b> a Galletas'; };
   const avisoGal='<div style="margin-top:20px;background:rgba(201,154,78,.09);border:.5px solid rgba(201,154,78,.35);border-radius:9px;padding:12px 15px;font-size:12.5px;color:#D9BE8C;line-height:1.6;max-width:940px">'
     +veredicto+'<br><br>'
-    +'<b style="color:#E8D3AC">El viernes se reparte entre pan y Galletas.</b> '
+    +'<b style="color:var(--warn-tx)">El viernes se reparte entre pan y Galletas.</b> '
     +'Es un día productivo para todo menos Semillas; gana el más urgente por stock. Galletas solo pueden hacerse el viernes '
     +'(no van al horno lun–jue), así que compiten con el pan por ese día — cuando están cubiertas, el viernes va al pan. Reparto de los viernes productivos: '
     +'A ('+split(A)+') · B ('+split(B)+') · HOY ('+split(HOY)+'). '
@@ -9805,7 +9943,7 @@ function escenariosCuerpoHTML(R, calc){
 
   return ''
     +'<div style="color:var(--text-3);margin-bottom:14px;max-width:940px">Los tres con <b style="color:var(--text-2)">3 personas</b> y la rampa arrancando en <b style="color:var(--text-2)">agosto</b> (julio sigue en certificaciones). Cambia solo la política del viernes.</div>'
-    +'<div style="background:#141417;border:.5px solid #2C2C33;border-radius:9px;padding:12px 15px;margin-bottom:20px;max-width:940px;font-size:12px;color:var(--text-2);line-height:1.65">'
+    +'<div style="background:var(--panel);border:.5px solid var(--border-strong);border-radius:9px;padding:12px 15px;margin-bottom:20px;max-width:940px;font-size:12px;color:var(--text-2);line-height:1.65">'
       +'<b style="color:var(--text)">Qué es el colchón.</b> Es el stock que queda el <b style="color:var(--text)">11-ene al ABRIR la fábrica, ANTES de la primera entrega de reapertura</b>: el stock del cierre (18-dic) menos las dos entregas de diciembre. Entre el 18-dic y el 11-ene no se produce ni se vende, así que ese stock no se mueve — es exactamente con lo que se abre.<br>'
       +'<b style="color:var(--text)">La meta son las primeras '+CIERRE_COLCHON_SEM+' semanas de venta de enero</b>, y el arranque fuerte del 11-ene YA está adentro de esas '+CIERRE_COLCHON_SEM+' semanas (no se suma aparte). Por eso el colchón se mide en <b style="color:var(--text)">semanas de venta de enero</b> (el ritmo del arranque, no el de julio): si la rampa cumple la meta, el stock de apertura cubre exactas '+CIERRE_COLCHON_SEM+' semanas.'
     +'</div>'
@@ -9829,7 +9967,7 @@ function escenariosCuerpoHTML(R, calc){
         +metaTotCelda+totCelda(A,true)+totCelda(B,true)+totCelda(HOY,true)+'</tr>'
       +'</tbody></table></div>'
     +avisoGal
-    +(R.avisos.length?('<div style="margin-top:16px;font-size:12px;color:#C99A4E;max-width:940px">'+R.avisos.map(function(a){ return '⚠ '+esc(a); }).join('<br>')+'</div>'):'')
+    +(R.avisos.length?('<div style="margin-top:16px;font-size:12px;color:var(--warn-2);max-width:940px">'+R.avisos.map(function(a){ return '⚠ '+esc(a); }).join('<br>')+'</div>'):'')
     +'<div style="color:var(--text-3);margin-top:18px;font-size:12px;max-width:940px">'
       +'· Mismo motor del Plan (mismas reglas duras: un producto/día · Semillas solo jueves · Galletas solo viernes · feriados · cierre 18-dic). Lo único que cambia es la política del viernes.<br>'
       +'· Semanas = colchón ÷ (colchón de la meta ÷ '+CIERRE_COLCHON_SEM+'), o sea contra el ritmo real de enero. Si la rampa cumpliera la meta darían '+CIERRE_COLCHON_SEM+',0.<br>'
@@ -11327,7 +11465,7 @@ async function guardarConteoLote(){
 // salida queda en el estado CON NOMBRE `sin_clasificar` y Andrea o Lorena la
 // clasifican después desde Pendientes. Append-only de punta a punta.
 // ════════════════════════════════════════════════════════════════════════
-const RP_COLOR={451:'#378ADD',452:'#84BD00',453:'#D4537E',503:'#7F77DD',472:'#FF751F',519:'#ED93B1'};
+const RP_COLOR={451:'var(--p-blanco)',452:'var(--p-semillas)',453:'var(--p-frances)',503:'var(--p-buns)',472:'var(--p-pizza)',519:'var(--p-galletas)'};
 let _rp=null, _rpLotes=null, _rpSaldo=null, _rpClientes=null, _rpGuardando=false;
 // EL CORTE DEL ANCLA VIGENTE, en ms. Es lo que separa "no tiene saldo porque se
 // acabo" de "no tiene saldo porque se produjo DESPUES de la foto". Sin el no se
@@ -19483,21 +19621,21 @@ async function rzDiagLotes(body){
         +'<td style="text-align:right;color:var(--text);font-weight:600">'+arr.length+'</td>'
         +'<td style="color:var(--text-3);padding-left:14px">'+(sample||'—')+(arr.length>4?' …':'')+'</td></tr>'; };
 
-    const barra=function(n){ const p=total?n/total*100:0; return '<div style="height:7px;background:#26262C;border-radius:4px;overflow:hidden;margin-top:4px"><div style="height:100%;width:'+p.toFixed(1)+'%;background:var(--ent)"></div></div>'; };
+    const barra=function(n){ const p=total?n/total*100:0; return '<div style="height:7px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:4px"><div style="height:100%;width:'+p.toFixed(1)+'%;background:var(--ent)"></div></div>'; };
 
     body.innerHTML='<div class="rz-wrap" style="font-size:13px;color:var(--text-2);line-height:1.6">'
       +'<style>.rz-wrap{--ent:#E9FE60}</style>'
       +'<h3 style="color:var(--text);font-size:15px;margin:0 0 4px">Extractor de lote v2 — cobertura (validación Etapa 1)</h3>'
-      +'<div style="color:var(--text-3);margin-bottom:16px;max-width:900px">Órdenes <b style="color:var(--text-2)">done</b> de los 6 productos desde <b style="color:var(--text-2)">2025-01-01</b>. El lote se lee del chatter (comentario de Keylor) con la regla v2. El año de PRODUCCIÓN se ancla en <code>date_start</code>; <b style="color:var(--text-2)">M/AA es la fecha de vencimiento</b> (producción + 6 meses hasta la orden WH/MO/01436, + 9 meses desde WH/MO/01437: la vida útil cambió el 2-sep-2026 y las dos épocas conviven). Solo lectura de Odoo.'+(capado?' <b style="color:#C99A4E">⚠ lectura tope: hay más datos de los leídos, la cobertura es aproximada.</b>':'')+'</div>'
+      +'<div style="color:var(--text-3);margin-bottom:16px;max-width:900px">Órdenes <b style="color:var(--text-2)">done</b> de los 6 productos desde <b style="color:var(--text-2)">2025-01-01</b>. El lote se lee del chatter (comentario de Keylor) con la regla v2. El año de PRODUCCIÓN se ancla en <code>date_start</code>; <b style="color:var(--text-2)">M/AA es la fecha de vencimiento</b> (producción + 6 meses hasta la orden WH/MO/01436, + 9 meses desde WH/MO/01437: la vida útil cambió el 2-sep-2026 y las dos épocas conviven). Solo lectura de Odoo.'+(capado?' <b style="color:var(--warn-2)">⚠ lectura tope: hay más datos de los leídos, la cobertura es aproximada.</b>':'')+'</div>'
 
       // las dos reglas, lado a lado
       +'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:20px">'
-        +'<div style="flex:1;min-width:260px;background:#141417;border:.5px solid #3A3A55;border-radius:11px;padding:15px 18px">'
+        +'<div style="flex:1;min-width:260px;background:var(--panel);border:.5px solid #3A3A55;border-radius:11px;padding:15px 18px">'
           +'<div style="font-size:11px;letter-spacing:.05em;color:var(--text-3);text-transform:uppercase">Regla nueva · vencimiento 24–27</div>'
           +'<div style="font-size:30px;font-weight:700;color:var(--ent);font-variant-numeric:tabular-nums;line-height:1.1;margin-top:4px">'+pct(okNueva)+'%</div>'
           +'<div style="font-size:11.5px;color:var(--text-3)">'+_rzN(okNueva)+' de '+_rzN(total)+' órdenes con lote</div>'+barra(okNueva)
         +'</div>'
-        +'<div style="flex:1;min-width:260px;background:#141417;border:.5px solid #2C2C33;border-radius:11px;padding:15px 18px">'
+        +'<div style="flex:1;min-width:260px;background:var(--panel);border:.5px solid var(--border-strong);border-radius:11px;padding:15px 18px">'
           +'<div style="font-size:11px;letter-spacing:.05em;color:var(--text-3);text-transform:uppercase">Regla vieja ESPEC · 24–26</div>'
           +'<div style="font-size:30px;font-weight:700;color:var(--text-2);font-variant-numeric:tabular-nums;line-height:1.1;margin-top:4px">'+pct(okEspec)+'%</div>'
           +'<div style="font-size:11.5px;color:var(--text-3)">'+_rzN(okEspec)+' de '+_rzN(total)+' órdenes con lote</div>'+barra(okEspec)
@@ -19554,7 +19692,7 @@ async function rzDiagCierre(body){
     const avisos=R.avisos.slice(), estim=R.estim, M=R.M;
     const filas=M.map(function(m){
       const cj=function(u){ return Math.ceil(u/m.I.cajaU); }, meta=m.b1+m.b2+m.b3;
-      return '<tr><td style="color:var(--text)">'+esc(_nomCorto(m.p))+(m.nota?'<span style="color:#C99A4E">'+m.nota+'</span>':'')+'</td>'
+      return '<tr><td style="color:var(--text)">'+esc(_nomCorto(m.p))+(m.nota?'<span style="color:var(--warn-2)">'+m.nota+'</span>':'')+'</td>'
         +'<td style="text-align:right;color:var(--text-2)">'+_rzN(m.b1)+'</td><td style="text-align:right;color:var(--text-3)">'+_rzN(cj(m.b1))+'</td>'
         +'<td style="text-align:right;color:var(--text-2);padding-left:18px">'+_rzN(m.b2)+'</td><td style="text-align:right;color:var(--text-3)">'+_rzN(cj(m.b2))+'</td>'
         +'<td style="text-align:right;color:var(--text-2);padding-left:18px">'+_rzN(m.b3)+'</td><td style="text-align:right;color:var(--text-3)">'+_rzN(cj(m.b3))+'</td>'
@@ -19616,12 +19754,12 @@ async function rzDiagCierre(body){
         +'<tbody>'+pFilasDia
         +'<tr style="border-top:.5px solid var(--border)"><td style="padding-top:7px;color:var(--text);font-weight:600" colspan="3">Produce y despacha esa semana</td>'
         +'<td style="text-align:right;color:var(--text);font-weight:700;padding:7px 0 0 16px">'+_rzN(pT.prodCj)+'</td></tr></tbody></table>'
-      +'<div style="background:#141417;border:.5px solid #26262C;border-radius:9px;padding:14px 18px;max-width:430px;font-variant-numeric:tabular-nums">'
+      +'<div style="background:var(--panel);border:.5px solid var(--border);border-radius:9px;padding:14px 18px;max-width:430px;font-variant-numeric:tabular-nums">'
         +'<div style="display:flex;justify-content:space-between;color:var(--text-2);padding:3px 0"><span>Meta total al '+esc(_fechaCorta(fc.resto))+'</span><span>'+_rzN(total)+' cj</span></div>'
-        +'<div style="display:flex;justify-content:space-between;color:var(--text-2);padding:3px 0;border-bottom:.5px solid #26262C;padding-bottom:8px"><span>− produce y despacha la última semana</span><span>−'+_rzN(pT.prodCj)+' cj</span></div>'
+        +'<div style="display:flex;justify-content:space-between;color:var(--text-2);padding:3px 0;border-bottom:.5px solid var(--border);padding-bottom:8px"><span>− produce y despacha la última semana</span><span>−'+_rzN(pT.prodCj)+' cj</span></div>'
         +'<div style="display:flex;justify-content:space-between;color:var(--text);font-weight:700;padding:9px 0 3px"><span>PICO REAL · cierre del '+esc(_fechaCorta(pPicoDs))+'</span><span style="color:var(--accent);font-size:15px">'+_rzN(pT.picoCj)+' cj</span></div>'
         +'<div style="display:flex;justify-content:space-between;color:var(--text-3);padding:3px 0"><span>Congelador</span><span>'+_rzN(CONGELADOR_CJ)+' cj</span></div>'
-        +'<div style="margin-top:9px;padding-top:9px;border-top:.5px solid #26262C;color:'+pCol+';font-weight:600">'
+        +'<div style="margin-top:9px;padding-top:9px;border-top:.5px solid var(--border);color:'+pCol+';font-weight:600">'
           +(pOK?('Entra · sobran '+_rzN(CONGELADOR_CJ-pT.picoCj)+' cj de espacio'):('No entra · sobran '+_rzN(pExceso)+' cj (necesita '+(pT.picoCj/CONGELADOR_CJ).toLocaleString('es-CR',{minimumFractionDigits:1,maximumFractionDigits:1})+'× el congelador de hoy)'))
         +'</div></div>'
       +'<div style="color:var(--text);font-weight:600;margin:20px 0 6px">Pico por producto</div>'
@@ -19638,7 +19776,7 @@ async function rzDiagCierre(body){
         +'<div style="color:var(--text-2);max-width:730px;line-height:1.65;font-size:12.5px">'
           +'<b style="color:var(--text)">1 · Secuenciar ya está al máximo.</b> Producir parte del colchón en la última semana es exactamente lo que descuenta el cálculo de arriba ('+_rzN(pT.prodCj)+' cj). Son 5 días y ya están todos ocupados. Con el mix MÁS rendidor posible (Semillas el jueves + '+_rzN(pTecho)+' cj en total) el pico bajaría a <b>'+_rzN(pPicoMin)+' cj</b> — '+(pPicoMin>CONGELADOR_CJ?'sigue sin caber. La mezcla de productos no cambia la conclusión.':'ahí sí entraría, pero exige el mix perfecto.')+'<br>'
           +'<b style="color:var(--text)">2 · El espacio que libera la entrega del '+esc(_fechaCorta(fc.autowm))+' llega tarde.</b> Libera '+_rzN(pB1Cj)+' cj, pero el pico es 3 días ANTES (el '+esc(_fechaCorta(pPicoDs))+'). Ese espacio no existe todavía cuando el congelador está más lleno.<br>'
-          +'<b style="color:var(--text)">3 · Frío extra:</b> hacen falta <b style="color:#C99A4E">'+_rzN(pExceso)+' cj</b> más de congelador para la meta completa.<br>'
+          +'<b style="color:var(--text)">3 · Frío extra:</b> hacen falta <b style="color:var(--warn-2)">'+_rzN(pExceso)+' cj</b> más de congelador para la meta completa.<br>'
           +'<b style="color:var(--text)">4 · O bajar el colchón</b> (lo único que baja el pico sin fierros nuevos):'
         +'</div>'
         +'<table style="border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;margin-top:10px">'
@@ -19656,7 +19794,7 @@ async function rzDiagCierre(body){
         +'· El pico real es el número que la rampa del motor tiene que respetar.'
       +'</div></div>';
 
-    function detalle(e,lbl){ if(e.vacio) return '<div style="color:#C99A4E">'+lbl+': sin datos en '+esc(e.D1)+' → '+esc(e.D2)+'</div>';
+    function detalle(e,lbl){ if(e.vacio) return '<div style="color:var(--warn-2)">'+lbl+': sin datos en '+esc(e.D1)+' → '+esc(e.D2)+'</div>';
       return '<div style="margin-bottom:3px"><b style="color:var(--text)">'+lbl+'</b> — pico: <b style="color:var(--accent)">'+esc(_fechaLarga(e.pico.ds))+'</b> ('+_rzN(e.pico.uds)+' uds)</div>'
         +'<div style="color:var(--text-3);font-size:11.5px">'+e.porDia.map(function(x){ const es=x.ds===e.pico.ds;
           return '<span style="'+(es?'color:var(--accent);font-weight:600':'')+'">'+esc(_fechaCorta(x.ds))+' '+_rzN(x.uds)+'</span>'; }).join(' · ')+'</div>'; }
@@ -19671,15 +19809,15 @@ async function rzDiagCierre(body){
     body.innerHTML='<div class="rz-wrap" style="font-size:13px;color:var(--text-2);line-height:1.6">'
       +'<h3 style="color:var(--text);font-size:15px;margin:0 0 4px">Meta de cierre al 18-dic — 3 bloques, con datos reales del cierre pasado</h3>'
       +'<div style="color:var(--text-3);margin-bottom:14px;max-width:730px">Cierre completo <b style="color:var(--text-2)">18-dic → 11-ene</b> (no produce ni vende) y enero arranca con <b style="color:var(--text-2)">3 personas</b>: la producción tarda en recuperar. El año pasado cerraron con poco stock y quedaron cortos hasta marzo. La meta es llegar al 18-dic con stock para todo el arranque. <b style="color:var(--text-2)">Todo debe estar producido antes del 18-dic.</b></div>'
-      +'<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:18px;background:#141417;border:.5px solid #26262C;border-radius:9px;padding:10px 14px">'
+      +'<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:18px;background:var(--panel);border:.5px solid var(--border);border-radius:9px;padding:10px 14px">'
         +'<span style="color:var(--text-3);font-size:11.5px">Última entrega — Auto + Walmart</span>'
-        +'<input id="cierreFAutowm" type="date" value="'+esc(fc.autowm)+'" style="background:#0E0E11;border:.5px solid #26262C;color:var(--text);border-radius:6px;padding:4px 8px;font-family:inherit;font-size:12px">'
+        +'<input id="cierreFAutowm" type="date" value="'+esc(fc.autowm)+'" style="background:var(--bg);border:.5px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-family:inherit;font-size:12px">'
         +'<span style="color:var(--text-3);font-size:11.5px">· resto + HORECA + Abner</span>'
-        +'<input id="cierreFResto" type="date" value="'+esc(fc.resto)+'" style="background:#0E0E11;border:.5px solid #26262C;color:var(--text);border-radius:6px;padding:4px 8px;font-family:inherit;font-size:12px">'
+        +'<input id="cierreFResto" type="date" value="'+esc(fc.resto)+'" style="background:var(--bg);border:.5px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-family:inherit;font-size:12px">'
         +'<span style="color:var(--text-3);font-size:11.5px">· Galletas 14-dic (antojo)</span>'
-        +'<input id="cierreGalDicCj" type="number" min="0" step="1" value="'+(fc.galDicCj?esc(String(fc.galDicCj)):'')+'" placeholder="cj" title="Override manual de galletas en la entrega grande de dic, en cajas. Vacío = ritmo actual." style="width:56px;background:#0E0E11;border:.5px solid #26262C;color:var(--text);border-radius:6px;padding:4px 8px;font-family:inherit;font-size:12px">'
+        +'<input id="cierreGalDicCj" type="number" min="0" step="1" value="'+(fc.galDicCj?esc(String(fc.galDicCj)):'')+'" placeholder="cj" title="Override manual de galletas en la entrega grande de dic, en cajas. Vacío = ritmo actual." style="width:56px;background:var(--bg);border:.5px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-family:inherit;font-size:12px">'
         +'<span style="color:var(--text-3);font-size:11.5px">cj</span>'
-        +'<button onclick="cierreGuardarFechas()" style="background:none;border:.5px solid #2C2C33;color:var(--text-2);font-size:11.5px;border-radius:6px;padding:4px 12px;cursor:pointer">Guardar y recalcular</button>'
+        +'<button onclick="cierreGuardarFechas()" style="background:none;border:.5px solid var(--border-strong);color:var(--text-2);font-size:11.5px;border-radius:6px;padding:4px 12px;cursor:pointer">Guardar y recalcular</button>'
       +'</div>'
       +'<div style="margin-bottom:8px">'+detalle(e1,'Bloque 1 · entrega Auto + Walmart (dic pasado)')+'</div>'
       +'<div style="margin-bottom:8px">'+detalle(e2,'Bloque 2 · entrega resto + HORECA + Abner (dic pasado)')+'</div>'
@@ -19701,7 +19839,7 @@ async function rzDiagCierre(body){
         +'<td colspan="6"></td><td style="text-align:right;color:var(--accent);font-weight:700;font-size:14px;padding-top:9px;padding-left:18px">'+_rzN(total)+'</td></tr>'
         +'</tbody></table>'
       +'<div style="margin-top:10px;font-size:12px;color:var(--text-3)">Las '+_rzN(total)+' cj de la meta NO son el número del congelador: nunca están juntas. El que importa está abajo.</div>'
-      +(avisos.length?('<div style="margin-top:14px;font-size:12px;color:#C99A4E;max-width:730px">'+avisos.map(function(a){ return '⚠ '+esc(a); }).join('<br>')+'</div>'):'')
+      +(avisos.length?('<div style="margin-top:14px;font-size:12px;color:var(--warn-2);max-width:730px">'+avisos.map(function(a){ return '⚠ '+esc(a); }).join('<br>')+'</div>'):'')
       +'<div style="color:var(--text-3);margin-top:16px;font-size:12px;max-width:730px">'
         +'· Bloques 1 y 2 = el DÍA PICO de cada ventana (±3 días de la fecha configurada, del año pasado). El detalle diario está arriba.<br>'
         +'· Canal por PARTNER (la misma clasificación de Finanzas/Rentabilidad). "Resto" = MegaSuper · Compre Bien · BM · Super Negro · HORECA · Retail (incluye Abner) · Otros.<br>'
@@ -22461,7 +22599,7 @@ function renderTarjetas(el,prods,atipicos){
   if(atipicos && atipicos.length){
     const det=atipicos.map(a=>esc(a.label)+' '+a.fecha.split('-').reverse().join('-')+' ('+esc(a.razon)+')').join(' · ');
     h+='<div class="valid-box" style="border-color:rgba(233,162,59,.35);background:rgba(233,162,59,.07);margin-bottom:14px">'
-      +'<div style="font-weight:700;color:#E9A23B;font-size:12.5px">Los cinco panes subieron de costo</div>'
+      +'<div style="font-weight:700;color:var(--warn);font-size:12.5px">Los cinco panes subieron de costo</div>'
       +'<div style="font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.6">'
       +'Salieron del reparto de indirecto días con producción real que no son jornada normal de fábrica: '+det+'. '
       +'Sus unidades siguen contando; sus días no. Como el pozo de indirecto es el mismo y ahora se divide entre menos días, '
@@ -22490,7 +22628,7 @@ function renderTarjetas(el,prods,atipicos){
     h+='<div class="cbreak-row"><span>Por días de producción ('+fmtN(p.dias||0)+' días/mes · '+((p.pct||0)*100).toFixed(1)+'% del pool)</span><span>'+cM(ind)+'</span></div>';
     h+='<div class="cbreak-h">Empaque '+esc(p.unidad||'por unidad')+'</div>';
     h+='<div class="cbreak-row"><span>Empaque'+(emp!=null&&!p.empCompleto?' (parcial)':'')+'</span><span>'+(emp!=null?cM(emp):'sin dato')+'</span></div>';
-    h+=(p.empCompleto?'':'<div class="cbreak-row" style="color:#E9A23B"><span>empaque incompleto</span><span>'+esc(p.empRazon||'')+'</span></div>');
+    h+=(p.empCompleto?'':'<div class="cbreak-row" style="color:var(--warn)"><span>empaque incompleto</span><span>'+esc(p.empRazon||'')+'</span></div>');
     h+='<div class="cbreak-row" style="font-weight:700;border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span>Costo total</span><span>'+cM(tot)+'</span></div>';
     h+='</div></div>';
   });
@@ -22807,12 +22945,12 @@ function renderVentas(d,label){
 // ════════════════════════════════════════════════════════════════════════
 // key casa con computeCostos. pid = product.product (facturas + UoM de referencia).
 const RENTA_PROD = [
-  {key:'blanco',  pid:451, label:'Pan Blanco',      color:'#378ADD'},
-  {key:'semillas',pid:452, label:'Pan de Semillas', color:'#84BD00'},
-  {key:'frances', pid:453, label:'Pan Francés',     color:'#D4537E'},
-  {key:'buns',    pid:503, label:'Buns',            color:'#7F77DD'},
-  {key:'pizza',   pid:472, label:'Pizza Crust',     color:'#FF751F'},
-  {key:'galletas',pid:519, label:'Cookie Dough',    color:'#ED93B1'},
+  {key:'blanco',  pid:451, label:'Pan Blanco',      color:'var(--p-blanco)'},
+  {key:'semillas',pid:452, label:'Pan de Semillas', color:'var(--p-semillas)'},
+  {key:'frances', pid:453, label:'Pan Francés',     color:'var(--p-frances)'},
+  {key:'buns',    pid:503, label:'Buns',            color:'var(--p-buns)'},
+  {key:'pizza',   pid:472, label:'Pizza Crust',     color:'var(--p-pizza)'},
+  {key:'galletas',pid:519, label:'Cookie Dough',    color:'var(--p-galletas)'},
 ];
 // ════════════════════════════════════════════════════════════════════════
 // CANALES — FUENTE ÚNICA DE SUPUESTOS DE CANAL (rediseño Finanzas, fase 1).
@@ -23224,7 +23362,7 @@ function rentaRender(R, label){
     const t=' title="'+esc(canalFuente(c))+'"';
     if(canalComRenta(c)) return '<span'+t+'>'+esc(c.label)+' −'+_pct(canalComRenta(c)*100)+' sobre neto</span>';
     return '<span'+t+'>'+esc(c.label)+' frío '+cM(canalFrio(c))+'/mes ÷ '+fmtN(Math.round(R.chVol[c.key]||0))+' u = '
-      +cM(R.frioUnit[c.key])+'/u'+((c.frio&&c.frio.provisional)?' <em style="font-style:normal;color:#E9A23B">provisional</em>':'')+'</span>';
+      +cM(R.frioUnit[c.key])+'/u'+((c.frio&&c.frio.provisional)?' <em style="font-style:normal;color:var(--warn)">provisional</em>':'')+'</span>';
   });
   if(notas.length) foot+='<br>Costos de canal: '+notas.join(' · ')+'.';
   // Cambio de supuestos VISIBLE (no silencioso): quien note que el margen de esos canales
@@ -23301,7 +23439,7 @@ function rentaDetalle(key){
   ((d.mp&&d.mp.desglose)||[]).slice(0,14).forEach(x=>{ h+='<tr><td>'+esc(x.name)+'</td><td style="text-align:right">'+cM(x.perUnit*pack)+'</td></tr>'; });
   h+='<tr style="font-weight:600;border-top:1px solid var(--border)"><td>Materia prima</td><td style="text-align:right">'+cM(mp)+'</td></tr>';
   h+='<tr><td>Indirecto ('+fmtN(Math.round(d.dias||0))+' días/mes · '+((d.pct||0)*100).toFixed(1)+'% del pool)</td><td style="text-align:right">'+cM(ind)+'</td></tr>';
-  h+='<tr><td>Empaque'+(emp!=null&&!d.empCompleto?' (parcial)':'')+(d.empCompleto?'':' — <span style="color:#E9A23B">'+esc(d.empRazon||'incompleto')+'</span>')+'</td><td style="text-align:right">'+(emp!=null?cM(emp):'sin dato')+'</td></tr>';
+  h+='<tr><td>Empaque'+(emp!=null&&!d.empCompleto?' (parcial)':'')+(d.empCompleto?'':' — <span style="color:var(--warn)">'+esc(d.empRazon||'incompleto')+'</span>')+'</td><td style="text-align:right">'+(emp!=null?cM(emp):'sin dato')+'</td></tr>';
   h+='<tr style="border-top:1px solid var(--border-strong)"><td><strong>Costo total</strong>'+empTag(d)+'</td><td style="text-align:right"><strong>'+cM(tot)+'</strong></td></tr>';
   h+='</table></div><div class="m3sub" style="margin-top:8px;font-size:11px;color:var(--text-3)">Del motor real de Costos (promedio de los últimos meses cerrados). Reemplaza "Costos por producto".</div></div>';
   el.innerHTML=h; el.scrollIntoView({block:'nearest'});
@@ -23803,12 +23941,12 @@ const _pctM = x => (x && x.pct !== null && isFinite(x.pct))
 const SIM_FIJO = {3:6071996, 4:6559218};                                  // SOLO para el DELTA de personas (Angelo = 4p−3p)
 const SIM_BATCHDIA = {blanco:8, semillas:10, frances:10, buns:10, pizza:12, galletas:1};   // batches/día base (3p); galletas ≈1/día real (verificado Odoo); referencia del ratio
 const SIM_PROD = [
-  {key:'blanco',  label:'Pan Blanco',      color:'#378ADD'},
-  {key:'semillas',label:'Pan de Semillas', color:'#84BD00'},
-  {key:'frances', label:'Pan Francés',     color:'#D4537E'},
-  {key:'buns',    label:'Buns',            color:'#7F77DD'},
-  {key:'pizza',   label:'Pizza Crust',     color:'#FF751F'},
-  {key:'galletas',label:'Cookie Dough',    color:'#ED93B1', comparte:true},
+  {key:'blanco',  label:'Pan Blanco',      color:'var(--p-blanco)'},
+  {key:'semillas',label:'Pan de Semillas', color:'var(--p-semillas)'},
+  {key:'frances', label:'Pan Francés',     color:'var(--p-frances)'},
+  {key:'buns',    label:'Buns',            color:'var(--p-buns)'},
+  {key:'pizza',   label:'Pizza Crust',     color:'var(--p-pizza)'},
+  {key:'galletas',label:'Cookie Dough',    color:'var(--p-galletas)', comparte:true},
 ];
 let simMP={}, simDiasReal={}, simUnidReal={}, simEmp={}, simEmpP={}, simPoolAvg=0, simTotalDiasReal=0, simPrecios=[], SIM=null, simPrev={};
 
@@ -24318,12 +24456,12 @@ async function reporteResultados(){
 // Pie de la vista 1: costo real por producto, del MISMO motor que "Costos por producto"
 // (computeCostos). Carga async, no bloquea el P&L. El margen por canal vive en Rentabilidad.
 const RES_PROD = [
-  {key:'blanco',  label:'Pan Blanco',      color:'#378ADD'},
-  {key:'semillas',label:'Pan de Semillas', color:'#84BD00'},
-  {key:'frances', label:'Pan Francés',     color:'#D4537E'},
-  {key:'buns',    label:'Buns',            color:'#7F77DD'},
-  {key:'pizza',   label:'Pizza Crust',     color:'#FF751F'},
-  {key:'galletas',label:'Cookie Dough',    color:'#ED93B1'},
+  {key:'blanco',  label:'Pan Blanco',      color:'var(--p-blanco)'},
+  {key:'semillas',label:'Pan de Semillas', color:'var(--p-semillas)'},
+  {key:'frances', label:'Pan Francés',     color:'var(--p-frances)'},
+  {key:'buns',    label:'Buns',            color:'var(--p-buns)'},
+  {key:'pizza',   label:'Pizza Crust',     color:'var(--p-pizza)'},
+  {key:'galletas',label:'Cookie Dough',    color:'var(--p-galletas)'},
 ];
 async function resProdFooter(){
   const el=document.getElementById('resProdLinea'); if(!el) return;
