@@ -11,8 +11,10 @@ dos está mal. Diseño en OPCION_C_CUADRE_ODOO.md.
     python3 herramientas/cuadre_odoo.py            # la lista, legible
     python3 herramientas/cuadre_odoo.py --json     # para comparar con la pantalla
 
-LOS CASOS (C1)
-  1 · preparado en Truefie, la salida ya está validada (done) en Odoo
+LOS CASOS (C1) · SOLO PEDIDOS ENTREGADOS EN TRUEFIE (Andrea, 3-oct-2026)
+  Un preparado no salió del congelador: su salida abierta es lo normal. El #156
+  (entregado por error y deshecho el 2-oct) seguía en la lista. El caso 1
+  (preparado con la salida ya validada en Odoo) dejó de existir.
   2 · la salida está sin validar en Odoo (ni done ni cancel)
   3 · entregado en Truefie y Odoo no tiene ninguna salida hecha
   4 · entregado, y por producto lo que salió en Truefie ≠ lo que Odoo descontó
@@ -41,7 +43,7 @@ def leer_truefie():
         cols, filas = db.consulta(
             "select pedido_id, estado, factura_id, factura_nombre, cliente_nombre, "
             "preparado_en, salida_en from v_ent_pedido_estado "
-            "where factura_id is not null and estado in ('preparado','entregado') "
+            "where factura_id is not null and estado = 'entregado' "
             "and fecha_despacho >= '%s' order by pedido_id" % DESDE)
         peds = [dict(zip(cols, f)) for f in filas]
         ids = ','.join(str(p['pedido_id']) for p in peds) or '0'
@@ -112,9 +114,6 @@ def cuadre():
         hechas = [s for s in sal if s['state'] == 'done']
         abiertas = [s for s in sal if s['state'] not in ('done', 'cancel')]
         motivos = []
-        if est == 'preparado' and hechas:
-            motivos.append({'caso': 1, 'que': 'preparado en Truefie, validado en Odoo',
-                            'odoo': ', '.join('%s el %s' % (s['name'], s['date_done']) for s in hechas)})
         if abiertas:
             motivos.append({'caso': 2, 'que': 'salida sin validar en Odoo',
                             'odoo': ', '.join('%s (%s, programada %s)' % (s['name'], s['state'], s['scheduled_date'])
