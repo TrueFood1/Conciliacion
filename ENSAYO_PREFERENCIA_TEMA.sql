@@ -1,7 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ENSAYO_PREFERENCIA_TEMA.sql  ·  4-oct-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA
 -- Prueba PREFERENCIA_TEMA.sql imitando a una socia y a alguien de equipo con
--- request.jwt.claims, y lo deshace todo (rollback). ⛔ SIN CORRER.
+-- request.jwt.claims, y lo deshace todo (rollback).
+-- ✅ CORRIDO el 4-oct-2026 por Andrea en producción: 19 de 19 ok = true, cada RECHAZA con su SQLSTATE.
 --
 -- CÓMO SE LEE
 --   Una tabla de 19 filas, TODAS con ok = true. Un RECHAZA da ok solo si el SQLSTATE
