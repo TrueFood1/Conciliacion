@@ -22064,7 +22064,10 @@ async function planSaveEdit(ds){
   planVerDetalle(_planEditMes, true);            // repinta el detalle (rzCeldas honra el override) + recomputa el aviso de colchón
   planRefreshReaco();                            // el aviso "reacomodar" aparece si esta edición dejó un descuadre (sin colapsar el detalle)
   rzPersist([{fecha:ds, producto_id:val.producto_id, batches:val.batches, tipo:'edicion'}]);   // persiste en plan_overrides
-  if(_rzCtx && document.getElementById('rzBody')) rzRender();   // si el Resumen está montado, refrescalo también
+  // Recalcula MP, premezclas y COMPRAS igual que una edición en el Resumen (4-oct): antes solo
+  // rehacía el auto-relleno, y Compras y el lobby seguían con el plan viejo hasta recargar o
+  // hasta que la lectura cumpliera 5 minutos.
+  if(_rzCtx) rzRecalcAlistar().then(function(){ if(document.getElementById('rzBody')) rzRender(); });
 }
 
 // Proyección override-aware hasta el cierre (18-dic): corre el MISMO motor semana a semana pero
