@@ -1,6 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- PREFERENCIA_TEMA.sql  ·  4-oct-2026  ·  modo claro / oscuro de Truefie, guardado en la CUENTA
--- ⛔ SIN APLICAR. Primero ENSAYO_PREFERENCIA_TEMA.sql (19 de 19 ok = true).
+-- ✅ APLICADO el 4-oct-2026 por Andrea en producción, después del ensayo 19/19. Fila de control
+--    1 · 2 · 0 · INSERT,SELECT · f · t, y verificado aparte con pg_lector (RLS t, políticas ins+sel,
+--    0 grants a anon/PUBLIC, tema_vigente() solo authenticated, 0 filas).
 -- Para saber si está aplicado, mirar la base: `select to_regclass('public.preferencia_tema')`.
 --
 -- QUÉ HACE
