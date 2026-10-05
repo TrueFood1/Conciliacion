@@ -516,8 +516,11 @@ Productos terminados (IDs de producción):
 - Formato **es-CR** en todo número (₡, coma decimal), incluidos campos editables.
 - **El color identifica y señala, nunca decora** — un solo acento por vista,
   el del módulo: Finanzas `#378ADD` · Conciliación `#84BD00` · Operaciones
-  `#D4537E` · **Entregas `#E9FE60` (lima True Food)** · Ventas `#3FB6A8` ·
-  Automatización `#FF751F`.
+  `#D4537E` · **Entregas `#E9FE60` (lima True Food)** · **Compras `#A27FEB`** ·
+  **Personal `#FF671D`** · Ventas `#3FB6A8` · Automatización `#FF751F`.
+  (Esos son los valores en OSCURO. Cada uno es un token —`--m-fin`, `--m-conc`,
+  `--m-ops`/`--m-ops-2`, `--ent-line`, `--m-comp`, `--m-per`— con su variante clara;
+  ver "Modo claro / oscuro" abajo.)
   **El morado `#7F77DD` ya NO es color de módulo** (13-ago-2026): Entregas es lo que
   vive en producción frente al congelador y va onbrand. Sigue existiendo como color
   de PRODUCTO (Buns) en las tablas — son dos paletas distintas, no tocar.
@@ -530,6 +533,51 @@ Productos terminados (IDs de producción):
   bloques de alerta conservan su lavado naranja y su borde. No poner fondos lima.
 - Tablas: encabezado 11px gris terciario con línea 1px debajo, sin bordes entre
   filas, padding vertical ~11px, número principal de la fila en blanco hueso.
+- **Esquina de arriba a la derecha** (4-oct-2026): «Salir» · ✱ de tickets · luna/sol, en
+  fila, en teléfono **y en escritorio** (el ✱ ya no flota abajo en ningún tamaño). El
+  encabezado les reserva el lugar: `.hdr-right` 152 px y `.home-hdr-right` 158 px en
+  escritorio, `padding-right:140px` en teléfono. Un botón nuevo en esa esquina = agrandar
+  las tres reservas.
+- **«Error Odoo» en la primera carga = `SESSION.url` vacío.** Las lecturas que salen antes
+  de que `entrarProd` llene `SESSION.url` van al proxy de demo y fallan (fue la causa del
+  lobby en blanco en Safari, 3-oct). Cualquier lectura nueva que corra antes de conectar
+  puede fallar igual: esperar a `_esperarOdoo()`.
+
+### Modo claro / oscuro (estándar del sistema, 4-oct-2026)
+
+Todo Truefie tiene los dos modos. **La regla: ningún color nuevo se escribe a mano; se
+escribe un token.**
+
+- **Cómo está armado.** `:root` tiene los tokens con su valor OSCURO; `html[data-tema="claro"]`
+  redefine los mismos tokens en claro (es el claro de Entregas del 24-ago, generalizado). Las
+  reglas usan `var(--token)`. Nada más cambia entre modos.
+- **Un color nuevo** = un token en `herramientas/tema/tokens.py` y en los DOS bloques de
+  `index.html`. Si viene escrito a mano, `python3 herramientas/tema/convertir.py index.html`
+  lo convierte y **demuestra que el oscuro no cambia** (cada línea tocada, con el token
+  reemplazado por su valor oscuro, da el mismo color; tiene que decir "0 diferencias").
+- **Contraste en claro: AA (4,5:1) para texto** sobre la página `#F7F8FA`. El lima
+  `#E9FE60` NO se lee sobre blanco: es solo de RELLENO (`--lime`, botones con texto oscuro).
+  Para texto, borde, punto o subrayado se usa `--ent-line` (lima en oscuro, oliva `#6B7800`
+  en claro). Lo mismo con todo acento: `--m-fin #1F66B3` · `--m-ops #9E4C75` ·
+  `--m-ops-2 #B3325E` · `--m-conc #4E7A00` · `--m-comp #6E46CC` · `--m-per #C04400` ·
+  ámbar `--warn #9A6410` · rojo `--stop-tx #A32D2D` (valores en claro).
+- **Colores de PRODUCTO** (`--p-blanco`, `--p-semillas`, `--p-frances`, `--p-buns`,
+  `--p-pizza`, `--p-galletas`): son puntos y bordes con el nombre al lado. En claro bajan un
+  tono Semillas, Pizza y Galletas; Buns (`#7F77DD`) queda igual. Galletas tiene que seguir
+  distinguiéndose de Francés: no oscurecerlo hasta el rosa de Francés.
+- **Arranque por perfil**: socias en oscuro, equipo en claro, mientras la persona no toque
+  la luna/sol. La preferencia es de la **cuenta** (`preferencia_tema`, append-only, gana la
+  última fila; `tema_vigente()` resuelve con `acceso_perfil()`). La copia local `tf_tema` es
+  solo el arranque sin parpadeo del `<head>`: la verdad la pone `temaResolver()` al entrar.
+- **Sin parpadeo y al instante.** El modo se pone en el `<head>` antes de pintar.
+  `temaAplicar()` apaga las transiciones durante el cambio (`html.tema-cambiando`): sin eso
+  las reglas con `transition` fundían su color por partes.
+- **No cambia tamaños.** El piso táctil de Entregas y los 16 px de los campos en teléfono son
+  los mismos en los dos modos (medido el 4-oct; las pestañas de Entregas, 31 px, y los chips de
+  producto, 37 px, ya estaban bajo 44 antes del tema).
+- **Personal es de Lorena**: su zona de `index.html` (CSS de `.vac-`/`.cal-`/`.per-`, HTML de
+  sus cuatro vistas y el JS de `PER_TABS` a `setProgress`) no la toca el conversor. Sus colores
+  fijos los decide ella.
 
 ### Sin explicaciones en pantalla (estándar del sistema, 14-ago-2026)
 
@@ -560,8 +608,10 @@ cumple las cinco no es una alerta: es información, y la información vive adent
 del módulo.
 
 1. **Una alerta solo existe si hay algo que hacer.** Informar no es alertar.
-   Corolario: si no hay nada pendiente, la alerta **no aparece** — no se muestra
-   diciendo "todo al día".
+   ⚠️ **Cambió el 3-oct-2026 (b83, lobby 3×3):** cada módulo sin pendientes muestra
+   **«Al día»** en gris. Es el ESTADO del módulo, no una alerta: no lleva color, no
+   cuenta para el máximo de tres y no reemplaza a las otras cuatro reglas. Lo que sigue
+   sin existir es la alerta que avisa "no hay nada".
 2. **Tiene fecha o no es alerta.** Lo que no vence no urge; eso vive adentro
    del módulo.
 3. **Se apaga sola al resolverse.** Nunca "marcar como visto": el estado sale
