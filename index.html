@@ -845,7 +845,8 @@ tr.r-ing td{background:#eff6ff}
    Conciliación, que es solo de escritorio. */
 /* LOBBY v2 (3-oct-2026, Andrea): escritorio = dos filas de TRES (Operaciones · Compras · Entregas /
    Finanzas · Conciliación · Personal); teléfono = dos columnas, sin Conciliación (solo escritorio). Sin Ventas. */
-.home-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;width:100%;max-width:620px}
+.home-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));   /* parejas: un texto largo no ensancha su columna */
+  gap:9px;width:100%;max-width:620px}
 .home-mod-ops{order:1} .home-mod-com{order:2} .home-mod-ent{order:3}
 .home-mod-fin{order:4} .home-mod-conc{order:5} .home-mod-per{order:6}
 /* El sello de versión iba con estilo en línea; vive acá para que el @media pueda darle
@@ -887,7 +888,7 @@ tr.r-ing td{background:#eff6ff}
      que le ganan por especificidad a un selector de elemento, y esto no es una
      preferencia de diseño sino una restricción de la plataforma. */
   input,select,textarea{font-size:16px !important}
-  .home-grid{grid-template-columns:1fr 1fr;gap:9px}
+  .home-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
   /* Teléfono (v2, 3-oct): dos columnas. Conciliación sigue siendo SOLO de escritorio (Andrea, 3-oct):
      en el teléfono no aparece, como antes; Personal queda sola en la última fila. */
   .home-mod.home-mod-conc{display:none}
@@ -960,7 +961,10 @@ body[data-mod="personal"] .main{
 .home-mod-state{font-size:12px;font-weight:500;margin-top:6px}
 /* El cuadre con Odoo en la tarjeta de Entregas (27-sep). Gris: existe. Ámbar:
    vence hoy o mañana (regla 5 del lobby). Vacía no ocupa lugar. */
-.home-mod-alerta{font-size:12px;line-height:1.35;margin-top:6px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Hasta DOS líneas (4-oct): la alerta dice una acción («Falta MP para producción», «Comprar en
+   Automercado hoy») y en una sola no entraba —se cortaba o ensanchaba su columna—. */
+.home-mod-alerta{font-size:12px;line-height:1.35;margin-top:6px;color:var(--text-3);overflow:hidden;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow-wrap:anywhere}
 .home-mod-alerta.ambar{color:var(--warn);cursor:pointer}
 .home-mod-alerta.rojo{color:var(--stop-tx);cursor:pointer}
 .home-mod-alerta:empty{display:none}
@@ -991,7 +995,7 @@ body[data-mod="personal"] .main{
 @media(min-width:701px){
   .home-wrap.duo .home-center{flex:0 0 auto;margin:auto 0 0}
   .home-wrap.duo .home-bottom{margin:26px auto auto;max-width:480px}
-  .home-wrap.duo .home-grid{grid-template-columns:1fr 1fr;max-width:480px}
+  .home-wrap.duo .home-grid{grid-template-columns:repeat(2,minmax(0,1fr));max-width:480px}
 }
 /* ── PERSONAL · MIS VACACIONES ──
    Un número y su detalle. El número grande va en blanco hueso, no en el naranja del
@@ -19511,9 +19515,9 @@ async function lobbyAlertas(){
   else { const sin=(_rzUltimas||[]).filter(function(u){ return u.kind==='sin'; }).length;
     if(sin) _lobAl('homeOpsAlerta', sin+(sin===1?' día':' días')+' sin cargar', 'ambar', function(){ irAResumen(); });
     else _lobAl('homeOpsAlerta', 'Al día'); }
-  const n=new Set(A.grupos.filter(function(g){ return g.necesita; }).map(function(g){ return g.proveedor_id; })).size;
-  if(n) _lobAl('homeComAlerta', 'Pedir a '+n+(n===1?' proveedor':' proveedores'), 'ambar', aCompras);
-  else _lobAl('homeComAlerta', 'Al día');
+  // Compras: lo MÁS URGENTE, no la cuenta (4-oct). Mismos grupos que Por comprar: `_cpUrgencia`.
+  const u=_cpUrgencia(A);
+  _lobAl('homeComAlerta', u.txt, u.cls, aCompras);
 }
 
 // "Ya lo hice" = insertar en ent_odoo_hecho. Append-only, como todo el modulo:
@@ -20563,7 +20567,7 @@ function cpResumenHtml(){
   // a la pestaña; la flechita de un proveedor lo despliega AHÍ MISMO (Andrea, 3-oct). Los dos pedidos
   // de BIO (lo del lunes y el huevo líquido) van en una sola línea, con el cuándo más cercano.
   const porProv={};
-  A.grupos.filter(function(g){ return g.necesita; }).forEach(function(g){
+  _cpGruposPorComprar(A).forEach(function(g){
     const p=porProv[g.proveedor_id]=porProv[g.proveedor_id]||{g:g, its:[]};
     p.its=p.its.concat(_cpItemsComprar(g));
     if((g.limite||'9999')<(p.g.limite||'9999')) p.g=g; });
@@ -20601,11 +20605,42 @@ function _cpCuandoTit(g){
   if(l===hoy) return 'Hoy';
   return (g.fijo && !g.sinPedido) ? _cpMay(_cpFechaLarga(l)) : ('Antes del '+_cpFechaLarga(l));
 }
+// LOS PEDIDOS QUE HAY QUE HACER: la lista de Por comprar, la tarjeta del Resumen y la alerta del
+// lobby salen de acá, así nunca dicen cosas distintas.
+function _cpGruposPorComprar(A){ return A.grupos.filter(function(g){ return g.necesita; }); }
+// LA ALERTA DE COMPRAS EN EL LOBBY (Andrea, 4-oct): la ACCIÓN, no la cuenta. Gana lo más urgente.
+//   rojo  «Falta MP para producción»  una materia prima ya no llega a tiempo por su
+//         proveedor normal (color rojo: se acaba antes de U, la primera llegada que se puede pedir).
+//   ámbar «Pedir a BIO hoy» (WhatsApp/app) · «Comprar en Automercado hoy» (tienda): hoy es el
+//         último día para pedirle a ese proveedor. Varios: «Pedir hoy: BIO +1».
+//   gris  «Próximo: BIO jue 8»: nada para hoy; el próximo pedido.
+// Los insumos «por cargar» no cuentan: ese faltante es Odoo atrasado, no un pedido. Un proveedor
+// que solo tiene insumos así no entra en la alerta (sí sigue en la lista, para verlo).
+// El nombre corto sale de compras_config (`corto`, opcional); si no está, de _cpNomCorto.
+function _cpProvCorto(g){ const pv=_cpCfgProv(g.proveedor_id)||{}; return pv.corto || _cpNomCorto(g.nombre); }
+function _cpUrgencia(A){
+  const hoy=A.hoy; let tarde=false, prox=null; const deHoy=[];
+  _cpGruposPorComprar(A).forEach(function(g){
+    const its=g.items.filter(function(f){ return (f.sug>1e-9 || f.color==='rojo') && !_cpEsOdoo(f, f); });
+    if(!its.length) return;
+    if(its.some(function(f){ return f.color==='rojo'; })) tarde=true;
+    const ca=its.map(function(f){ return f.comprarAntes; }).filter(Boolean).sort();
+    const lim=g.fijo ? g.pedirEl : (ca.length ? (ca[0]<hoy ? hoy : ca[0]) : null);
+    if(lim && lim<=hoy){ if(!deHoy.some(function(x){ return x.proveedor_id===g.proveedor_id; })) deHoy.push(g); }
+    else if(lim && (!prox || lim<prox.lim)) prox={g:g, lim:lim};
+  });
+  if(tarde) return {txt:'Falta MP para producción', cls:'rojo'};
+  if(deHoy.length===1){ const g=deHoy[0];
+    return {txt:(g.canal==='tienda' ? 'Comprar en ' : 'Pedir a ')+_cpProvCorto(g)+' hoy', cls:'ambar'}; }
+  if(deHoy.length>1) return {txt:'Pedir hoy: '+_cpProvCorto(deHoy[0])+' +'+(deHoy.length-1), cls:'ambar'};
+  if(prox) return {txt:'Próximo: '+_cpProvCorto(prox.g)+' '+_fechaCorta(prox.lim), cls:''};
+  return A.proximo ? {txt:'Próximo: '+_fechaCorta(A.proximo), cls:''} : {txt:'Al día', cls:''};
+}
 function cpPorComprarHtml(){
   const A=_cpAlc;
   if(!A) return '<div class="cp-vacio">Falta cargar la configuración de Compras (compras_config).</div>';
   if(A.error) return '<div class="cp-err">No pude calcularlo: '+esc(A.error)+'</div>';
-  const nec=A.grupos.filter(function(g){ return g.necesita; });
+  const nec=_cpGruposPorComprar(A);
   if(!nec.length) return '<div class="cp-centro"><div class="cp-card"><div class="cp-lista cp-lista0"><div class="cp-it cp-it0"><span class="cp-in">No hace falta comprar nada'
     +(A.proximo?(' hasta el '+_fechaCorta(A.proximo)):' en 4 semanas')+'</span></div></div></div></div>';
   const bloques=[], porTit={};
