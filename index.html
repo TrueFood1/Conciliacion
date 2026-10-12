@@ -4323,6 +4323,24 @@ body:has(.de-fondo) #tkBtn{display:none}
 #vResumen .rz-recorte,#vPlan .rz-recorte{margin:0 0 9px;font-size:11.5px;line-height:1.35;color:var(--warn-2);
   background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.35);border-radius:7px;padding:5px 8px}
 /* Picado: consecuencia, no marca. Ámbar porque cambia el techo del día. */
+/* Fracción del día: dos productos el mismo día (11-oct-2026). Un tramo por producto, el texto
+   debajo; en teléfono solo el total. Más de 100 % = ámbar: avisa, no bloquea. */
+#vResumen .rz-frac,#vPlan .rz-frac{margin-top:6px}
+#vResumen .rz-fbar,#vPlan .rz-fbar{display:flex;gap:2px;height:4px;border-radius:2px;background:var(--border);overflow:hidden}
+#vResumen .rz-fbar span,#vPlan .rz-fbar span{display:block;height:100%}
+#vResumen .rz-ftx,#vPlan .rz-ftx{font-size:10.5px;color:var(--text-3);margin-top:3px;font-variant-numeric:tabular-nums}
+#vResumen .rz-ftxm,#vPlan .rz-ftxm{display:none;font-size:10.5px;color:var(--text-3);margin-top:3px;font-variant-numeric:tabular-nums}
+#vResumen .rz-frac-pasa .rz-fbar,#vPlan .rz-frac-pasa .rz-fbar{outline:1px solid var(--warn)}
+#vResumen .rz-frac-pasa .rz-ftx,#vResumen .rz-frac-pasa .rz-ftxm,#vPlan .rz-frac-pasa .rz-ftx,#vPlan .rz-frac-pasa .rz-ftxm{color:var(--warn);font-weight:700}
+/* Formulario del día: renglón de batches + su fracción; la barra del total abajo. */
+#vResumen .df-line,#vPlan .df-line{display:flex;gap:5px;align-items:center}
+#vResumen .df-line input,#vPlan .df-line input{flex:1 1 auto;min-width:0}
+#vResumen .df-frac,#vPlan .df-frac{flex:0 0 auto;font-size:10.5px;color:var(--text-3);margin-top:4px;font-variant-numeric:tabular-nums;white-space:nowrap}
+#vResumen .df-tot,#vPlan .df-tot{min-height:4px}
+@media(max-width:700px){
+  #vResumen .rz-ftx,#vPlan .rz-ftx{display:none}
+  #vResumen .rz-ftxm,#vPlan .rz-ftxm{display:block}
+}
 #vResumen .rz-picchip,#vPlan .rz-picchip{display:inline-block;margin-top:5px;font-size:9.5px;font-weight:600;
   color:var(--warn-2);background:rgba(201,154,78,.08);border:.5px solid rgba(201,154,78,.4);border-radius:5px;
   padding:1px 5px;line-height:1.5;white-space:normal}
@@ -19879,7 +19897,7 @@ const OV_DIAS_ATRAS=120;   // ventana de lectura de plan_overrides hacia atrás 
 async function nivOverrides(){
   const c=sbClient(); if(!c) return {};
   try{
-    const {data,error}=await c.from('plan_overrides').select('fecha,producto_id,batches,tipo,personas,creado_en').order('creado_en',{ascending:false});
+    const {data,error}=await c.from('plan_overrides').select('fecha,producto_id,batches,tipo,personas,creado_en,edicion').order('creado_en',{ascending:false});
     if(error||!data) return {};
     // Se leen también los días PASADOS: son correcciones de REGISTRO (el plan decía 6 Francés y
     // en planta se hizo limpieza). El tope era el lunes de ESTA semana, y eso las hacía
@@ -19888,13 +19906,63 @@ async function nivOverrides(){
     // sobre lo que cualquier pantalla llega a mostrar (el Resumen ve 2 semanas; el Plan, del mes
     // en curso en adelante).
     const desde=new Date(); desde.setDate(desde.getDate()-OV_DIAS_ATRAS);
+    // DOS PRODUCTOS EL MISMO DÍA (11-oct-2026). Una edición del día puede ser VARIAS filas: las
+    // que comparten `edicion` (uuid). Gana la edición de la fila más nueva de la fecha, y se
+    // juntan todas sus hermanas. Una fila sin `edicion` (las de antes, o una app vieja) es una
+    // edición de un solo producto, como siempre.
     const desdeStr=_ymd(desde), seen={}, ov={};
     for(const r of data){ const f=r.fecha; if(!f||seen[f])continue; seen[f]=1;
       if(f<desdeStr) continue;
       if(r.tipo==='anulacion') continue;        // la última fila es "volver al plan" → sin override
-      ov[f]={producto_id:r.producto_id, batches:r.batches, tipo:r.tipo, personas:(r.personas!=null?+r.personas:null)}; }
+      const filas=r.edicion ? data.filter(function(x){ return x.fecha===f && x.edicion===r.edicion; }) : [r];
+      const items=[]; filas.forEach(function(x){ if(x.producto_id!=null && x.batches>0) items.push({producto_id:+x.producto_id, batches:+x.batches}); });
+      items.sort(function(a,b){ return NIV_PROD.indexOf(a.producto_id)-NIV_PROD.indexOf(b.producto_id); });
+      // producto_id/batches = el PRIMER producto: lo siguen leyendo los que solo preguntan
+      // "¿el día quedó vacío?" (aviso de colchón). La verdad del día es `items`.
+      ov[f]={producto_id:items.length?items[0].producto_id:null, batches:items.length?items[0].batches:0,
+             items:items, tipo:r.tipo, personas:(r.personas!=null?+r.personas:null)}; }
     return ov;
   }catch(e){ return {}; }   // tabla no creada aún → sin overrides (degradación limpia, como plan_config)
+}
+// Los productos de una edición del día, siempre como lista [{producto_id, batches}]. Una sola
+// puerta para leerlas: las que vienen de la base traen `items`; las armadas en memoria por un
+// camino viejo (un producto) se traducen acá.
+function _ovItems(ov){
+  if(!ov) return [];
+  if(Array.isArray(ov.items)) return ov.items.filter(function(x){ return x && x.producto_id!=null && x.batches>0; });
+  return (ov.producto_id!=null && ov.batches>0) ? [{producto_id:+ov.producto_id, batches:+ov.batches}] : [];
+}
+// ── LA FRACCIÓN DEL DÍA (dos productos el mismo día, Andrea 11-oct-2026) ──────────────────
+// Cada producto ocupa batches ÷ su capacidad del día. La capacidad es la de la SEMANA (2 o 3
+// personas) y, el día de picado, la de 2 personas. El cambio de producto a mitad del día no
+// resta. Galletas no ocupa el día: se hace al lado del pan, como siempre (no es "segundo pan").
+// Pasar de 100 % AVISA, no bloquea. Una sola cuenta: la usan la celda, el formulario del
+// Resumen y el del Plan.
+function _rzFraccionPartes(prods, personas, picado){
+  const out=[];
+  NIV_PROD.forEach(function(p){ const b=+((prods||{})[p]||0); if(!(b>0) || p===519) return;
+    const cap=picado ? Math.min(_capDe(p, personas||3), _capDe(p, 2)) : _capDe(p, personas||3);
+    out.push({pid:p, batches:b, frac:b/(cap||1)}); });
+  return out;
+}
+// Dotación del día: la del último render (índice del picado), o la de su semana.
+function _rzPersDe(ds){ const st=_rzPicIdx[ds]; return (st && st.personas) || _personasDe(_isoWk(new Date(ds+'T00:00:00'))); }
+function _rzFraccionTxt(partes){
+  const pc=function(f){ return Math.round(f*100)+' %'; };
+  const tot=partes.reduce(function(s,x){ return s+x.frac; },0);
+  if(!partes.length) return {txt:'', tot:0, pasa:false};
+  const txt=partes.length>1 ? partes.map(function(x){ return pc(x.frac); }).join(' + ')+' = '+pc(tot) : pc(tot);
+  return {txt:txt, tot:tot, pasa:tot>1+1e-9};
+}
+// La barra del día (Resumen y Plan, misma función): un tramo por producto con su color, y el
+// texto. En teléfono, solo el total. Más de 100 % = ámbar, y se guarda igual.
+function _rzFracHtml(prods, personas, picado){
+  const partes=_rzFraccionPartes(prods, personas, picado); if(!partes.length) return '';
+  const F=_rzFraccionTxt(partes), escala=Math.max(1, F.tot);
+  const bar=partes.map(function(x){ return '<span style="width:'+(x.frac/escala*100).toFixed(1)+'%;background:'+(RP_COLOR[x.pid]||'var(--text-3)')+'"></span>'; }).join('');
+  const tot=Math.round(F.tot*100)+' %';
+  return '<div class="rz-frac'+(F.pasa?' rz-frac-pasa':'')+'"><div class="rz-fbar">'+bar+'</div>'
+    +'<div class="rz-ftx">'+esc(F.txt)+(F.pasa?' · se pasa':'')+'</div><div class="rz-ftxm">'+esc(tot)+'</div></div>';
 }
 // ── Personas por semana (Supabase semana_capacidad; append-only, la fila más reciente por ISO manda) ──
 async function nivPersonas(){
@@ -19986,10 +20054,13 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
     // DÍA PASADO CORREGIDO A MANO. Va antes que el registro de Odoo porque es lo que Andrea afirma
     // que pasó; Odoo no se toca ni se contradice en silencio: si discrepan, se dice en la celda.
     if(ov && past){
-      c.kind=ov.producto_id==null||!(ov.batches>0)?'edit-empty':'edit';
+      const its=_ovItems(ov);
+      c.kind=its.length?'edit':'edit-empty';
       c.editable=true; c.edited=true; c.swappable=false; c.nav=!!realDay; c.pasado=true;
-      if(c.kind==='edit'){ const tope=_capDe(ov.producto_id, pers), bt=Math.min(ov.batches, tope);
-        c.pid=ov.producto_id; c.batches=bt; c.prods[ov.producto_id]=bt; c.prod=_rzBP(bt, ov.producto_id); }
+      if(c.kind==='edit'){
+        its.forEach(function(it){ const bt=Math.min(it.batches, _capDe(it.producto_id, pers)); c.prods[it.producto_id]=bt; });
+        c.pid=its[0].producto_id; c.batches=c.prods[c.pid];
+        c.prod=its.map(function(it){ return _rzBP(c.prods[it.producto_id], it.producto_id); }).join(' + '); }
       else { c.prod=i===4?'Limpieza':'—'; }
       if(!_mismosBatches(c.prods, realB)) c.odoo=realDay?('Odoo: '+odooTxt):'Odoo: sin registro';
       c.bt=''; return c;
@@ -20000,7 +20071,8 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
       c.prod=odooTxt; return c; }
     if(i<4 && slot[i] && slot[i].feriado){ c.kind='feriado'; c.editable=false; c.prod='Feriado'; c.bt=slot[i].feriado; return c; }
     if(ov && fut){ c.editable=true; c.edited=true; c.swappable=true;
-      if(ov.producto_id==null || !(ov.batches>0)){ c.kind='edit-empty';
+      const its=_ovItems(ov);
+      if(!its.length){ c.kind='edit-empty';
         c.prod=(i===4?'Limpieza':'—'); c.bt=''; return c; }
       // LA CAPACIDAD MANDA EN LOS DOS SENTIDOS. b21 solo recortaba (Math.min), así que un
       // override guardado en una semana de 2 se quedaba clavado abajo cuando la semana volvía a
@@ -20013,14 +20085,18 @@ function rzCeldas(monday, layout, real, hoyStr, overrides){
       //   · otra dotación, y era otro número → fue deliberado: solo se recorta, nunca se sube.
       //   · sin dato (filas anteriores a la columna) → se trata como deliberado: solo se recorta.
       // El override NO se toca en la base: esto ajusta lo que el plan EJECUTA y SUMA.
-      const hoyCap=_capDe(ov.producto_id, pers);
+      // Con dos productos en el día, la regla se aplica a CADA UNO contra su propio techo; que
+      // la suma de fracciones pase de 100 % no recorta nada: se avisa (_rzFraccionPartes).
       const opers=(ov.personas!=null)?+ov.personas:null;
-      const eraTecho=(opers!=null && ov.batches===_capDe(ov.producto_id, opers));
-      const bt=(opers!==pers && eraTecho) ? hoyCap : Math.min(ov.batches, hoyCap);
-      if(bt!==ov.batches) c.recortes=[{pid:ov.producto_id, de:ov.batches, a:bt,
-                                       motivo:(bt>ov.batches?'suba':'dotacion')}];
-      c.kind='edit'; c.pid=ov.producto_id; c.batches=bt; c.prods[ov.producto_id]=bt;
-      c.prod=_rzBP(bt, ov.producto_id); c.bt=''; return c; }
+      its.forEach(function(it){
+        const hoyCap=_capDe(it.producto_id, pers);
+        const eraTecho=(opers!=null && it.batches===_capDe(it.producto_id, opers));
+        const bt=(opers!==pers && eraTecho) ? hoyCap : Math.min(it.batches, hoyCap);
+        if(bt!==it.batches) (c.recortes=c.recortes||[]).push({pid:it.producto_id, de:it.batches, a:bt,
+                                                              motivo:(bt>it.batches?'suba':'dotacion')});
+        c.prods[it.producto_id]=bt; });
+      c.kind='edit'; c.pid=its[0].producto_id; c.batches=c.prods[c.pid];
+      c.prod=its.map(function(it){ return _rzBP(c.prods[it.producto_id], it.producto_id); }).join(' + '); c.bt=''; return c; }
     if(i<4){
       const e=slot[i];
       if(e&&e.p){ c.kind=fut?'prop':(past?'pend':'prop'); c.editable=true; c.swappable=fut; if(past) c.pasado=true; c.pid=e.p; c.batches=e.batches; c.prods[e.p]=e.batches; c.prod=_rzBP(e.batches, e.p); c.bt=''; c.today=ds===hoyStr; return c; }
@@ -21259,6 +21335,9 @@ function rzCellHtml(cell){
   // Desacuerdo con Odoo en un día corregido: se DICE, no se bloquea. Odoo sigue siendo la verdad
   // de lo que se produjo; la corrección es lo que Andrea afirma. Ver los dos es la información.
   const od=cell.odoo?('<div class="rz-dodoo">'+esc(cell.odoo)+'</div>'):'';
+  // La fracción del día: solo en lo que el plan propone o se editó (lo registrado en Odoo es un
+  // hecho, no un plan, y no se le mide la capacidad).
+  const fr=(cell.kind!=='real' && cell.kind!=='feriado') ? _rzFracHtml(cell.prods, _rzPersDe(ds), !!cell.picado) : '';
   const sel=_rzSel===ds;
   const estado=(cell.auto&&cell.kind==='viernes'?'Para cumplir la meta':m[1])+(sel?' · seleccionado':'');
   // En teléfono el estado va en UNA palabra minúscula. Se emiten los dos textos y el CSS
@@ -21276,14 +21355,78 @@ function rzCellHtml(cell){
     :cell.editable?(sel?'Tocá otro día para intercambiar, o este mismo para cancelar':'Tocá para seleccionar e intercambiar')
     :(cell.nav?'Ver esta producción en Odoo':'');
   return '<div class="rz-day '+cls+(cell.nav?' rz-nav':'')+'" data-ds="'+ds+'"'
-    +(tip?(' title="'+tip+'"'):'')+' onclick="rzTapDia(\''+ds+'\')">'+pen+dd+dp+pic+od+db+st+'</div>';
+    +(tip?(' title="'+tip+'"'):'')+' onclick="rzTapDia(\''+ds+'\')">'+pen+dd+dp+fr+pic+od+db+st+'</div>';
+}
+// ── EL FORMULARIO DEL DÍA: dos productos el mismo día (Andrea, 11-oct-2026) ────────────────
+// UNA implementación para el Resumen (pfx 'rz') y el Plan (pfx 'plan'): si vivieran en dos
+// lados, el segundo se quedaría sin el arreglo del primero. Hasta DOS productos; cada renglón
+// muestra su fracción del día y abajo va la barra del total. Más de 100 % avisa y deja guardar.
+const DIA_MAX_PRODUCTOS=2;
+function _diaFormCls(pfx){ return pfx==='plan' ? 'pl' : 'rz'; }
+function _diaFormLeer(pfx){
+  const out=[];
+  for(let k=0;;k++){ const s=document.getElementById(pfx+'Fsel'+k); if(!s) break;
+    const b=document.getElementById(pfx+'Fbt'+k);
+    out.push({pid:s.value?+s.value:null, batches:(b&&b.value!=='')?Math.max(0,Math.round(+b.value)):0}); }
+  return out;
+}
+// Fracción de cada renglón + la barra del día, con el MISMO techo que aplica la celda (la
+// capacidad de la semana, la de 2 personas si el día es de picado). Devuelve lo que se pinta.
+function _diaFormFracs(ds, filas){
+  const pers=_rzPersDe(ds), pic=!!(_rzPicIdx[ds] && _rzPicIdx[ds].picado), prods={};
+  const txt=filas.map(function(f){
+    if(!f.pid || !(f.batches>0)) return '';
+    const cap=pic ? Math.min(_capDe(f.pid,pers), _capDe(f.pid,2)) : _capDe(f.pid,pers);
+    const bt=Math.min(f.batches, cap); prods[f.pid]=(prods[f.pid]||0)+bt;
+    if(f.pid===519) return '';
+    return Math.round(bt/(cap||1)*100)+' %'+(f.batches>cap?' · tope '+cap:''); });
+  return {txt:txt, barra:_rzFracHtml(prods, pers, pic)};
+}
+function _diaFormCalc(pfx, ds){
+  const F=_diaFormFracs(ds, _diaFormLeer(pfx));
+  F.txt.forEach(function(t,k){ const el=document.getElementById(pfx+'Ffr'+k); if(el) el.textContent=t; });
+  const tot=document.getElementById(pfx+'Ftot'); if(tot) tot.innerHTML=F.barra;
+}
+function _diaFormHtml(pfx, cell, vacio){
+  const cls=_diaFormCls(pfx), ds=cell.ds;
+  const its=[]; NIV_PROD.forEach(function(p){ const b=(cell.prods||{})[p]; if(b>0) its.push({pid:p, batches:b}); });
+  const n=Math.max(DIA_MAX_PRODUCTOS, its.length);
+  while(its.length<n) its.push({pid:null, batches:0});
+  const F=_diaFormFracs(ds, its), calc='_diaFormCalc(\''+pfx+'\',\''+ds+'\')';
+  return its.map(function(it,k){
+    const opts=NIV_PROD.map(function(p){ return '<option value="'+p+'"'+(it.pid===p?' selected':'')+'>'+esc(NIV_INFO[p].nom)+'</option>'; }).join('');
+    return '<select class="'+cls+'-fsel" id="'+pfx+'Fsel'+k+'" aria-label="Producto '+(k+1)+'" onchange="'+calc+'">'
+      +'<option value="">'+(k===0?vacio:'— segundo producto')+'</option>'+opts+'</select>'
+      +'<div class="df-line"><input class="'+cls+'-fbt" id="'+pfx+'Fbt'+k+'" type="number" min="0" step="1" placeholder="batches"'
+      +' aria-label="Batches del producto '+(k+1)+'" value="'+(it.batches||'')+'" oninput="'+calc+'">'
+      +'<span class="df-frac" id="'+pfx+'Ffr'+k+'">'+esc(F.txt[k]||'')+'</span></div>';
+  }).join('')+'<div class="df-tot" id="'+pfx+'Ftot">'+F.barra+'</div>';
+}
+// Lo que se guarda: los renglones con producto y batches, validados con los MISMOS porteros
+// que el intercambio y el auto-relleno, producto por producto. Sin renglones = el día vacío.
+function _diaFormValidar(ds, filas){
+  const items=[], vistos={};
+  for(const f of filas){ if(!f.pid || !(f.batches>0)) continue;
+    if(vistos[f.pid]) return {error:'El mismo producto va dos veces en el día: dejalo en un solo renglón.'};
+    vistos[f.pid]=1; items.push({producto_id:f.pid, batches:f.batches}); }
+  for(const it of items){
+    if(it.producto_id===452){ const m=_semillasVeto(ds); if(m) return {error:m}; }
+    const m=_picado2pVeto(ds, it.producto_id); if(m) return {error:m}; }
+  return {items:items};
+}
+// La edición del día en memoria y en filas para plan_overrides. producto_id/batches = el
+// primero, para los lectores que solo preguntan si el día quedó vacío.
+function _ovDe(items, tipo){
+  return {producto_id:items.length?items[0].producto_id:null, batches:items.length?items[0].batches:0, items:items.slice(), tipo:tipo};
+}
+function _ovFilas(ds, items, tipo){
+  if(!items.length) return [{fecha:ds, producto_id:null, batches:0, tipo:tipo}];
+  return items.map(function(it){ return {fecha:ds, producto_id:it.producto_id, batches:it.batches, tipo:tipo}; });
 }
 function rzFormHtml(cell){
-  const opts=NIV_PROD.map(p=>'<option value="'+p+'"'+(cell.pid===p?' selected':'')+'>'+esc(NIV_INFO[p].nom)+'</option>').join('');
   return '<div class="rz-day rz-editing" data-ds="'+cell.ds+'">'
     +'<div class="rz-dd">'+cell.dow+' '+cell.dnum+'</div>'
-    +'<select class="rz-fsel" id="rzFsel"><option value="">— (nada)</option>'+opts+'</select>'
-    +'<input class="rz-fbt" id="rzFbt" type="number" min="0" step="1" placeholder="batches" value="'+(cell.batches||'')+'">'
+    +_diaFormHtml('rz', cell, '— (nada)')
     +'<div class="rz-frow"><button class="rz-fok" title="Guardar" onclick="rzSaveEdit(\''+cell.ds+'\')">✓</button>'
     +'<button class="rz-fx" title="Cancelar" onclick="rzCancelEdit()">✕</button></div></div>';
 }
@@ -21291,21 +21434,16 @@ function rzFormHtml(cell){
 // ── Interacción: edición inline, intercambio (swap) y volver al plan ──
 // Abrir el editor cancela la selección de intercambio: un día no puede estar en los dos modos.
 function rzOpenEdit(ds){ if(_rzEdit===ds)return; _rzEdit=ds; _rzSel=null; _rzAviso=''; rzRender();
-  const s=document.getElementById('rzFsel'); if(s)s.focus(); }
+  const s=document.getElementById('rzFsel0'); if(s)s.focus(); }
 function rzCancelEdit(){ _rzEdit=null; rzRender(); }
 async function rzSaveEdit(ds){
-  const sel=document.getElementById('rzFsel'), bt=document.getElementById('rzFbt');
-  const pid=sel&&sel.value?+sel.value:null;
-  const batches=(bt&&bt.value!=='')?Math.max(0,Math.round(+bt.value)):0;
-  const val=(pid&&batches>0)?{producto_id:pid, batches:batches}:{producto_id:null, batches:0};
-  // La edición pasa por el MISMO portero que el intercambio. Antes no lo hacía: el selector
-  // ofrecía Semillas para cualquier día y el veto solo cubría el swap, así que por edición se
-  // podía dejar Semillas donde su picado caía en sábado.
-  if(pid===452){ const m=_semillasVeto(ds); if(m){ _rzAviso=m; rzRender(); return; } }
-  { const m=_picado2pVeto(ds, pid); if(m){ _rzAviso=m; rzRender(); return; } }
-  _rzOverrides[ds]={producto_id:val.producto_id, batches:val.batches, tipo:'edicion'};
+  // La edición pasa por el MISMO portero que el intercambio, producto por producto (antes no lo
+  // hacía: el selector ofrecía Semillas para cualquier día y el veto solo cubría el swap).
+  const r=_diaFormValidar(ds, _diaFormLeer('rz'));
+  if(r.error){ _rzAviso=r.error; rzRender(); return; }
+  _rzOverrides[ds]=_ovDe(r.items, 'edicion');
   _rzEdit=null; _rzAviso=''; _rzRecalcAuto(); rzRender();     // pinta ya (con re-agendado del faltante)
-  rzPersist([{fecha:ds, producto_id:val.producto_id, batches:val.batches, tipo:'edicion'}]);
+  rzPersist(_ovFilas(ds, r.items, 'edicion'));
   await rzRecalcAlistar(); rzRender();                        // recalcula MP/premezclas sobre la meta
 }
 // ── INTERCAMBIO POR TOQUE (tocar un día · tocar el otro) ─────────────────────
@@ -21320,16 +21458,14 @@ async function rzSaveEdit(ds){
 // El swap lee las celdas TAL COMO SE VEN (con crédito de lo real + auto-relleno), no la base
 // cruda, para que mover un día use el producto/batches realmente mostrado.
 function _rzCellByDs(ds){ for(let o=0;o<2;o++){ const hit=_rzCellsFull(o).find(x=>x.ds===ds); if(hit) return hit; } return null; }
-// Carga intercambiable de una celda: {pid,batches} o null si NO es representable como un solo
-// producto (un override de plan_overrides es una fila con un producto y sus batches). Un viernes
-// con producción corrida por feriado lleva dos panes: eso no cabe en una fila y se avisa.
+// Carga intercambiable de una celda: la lista de sus productos [{producto_id, batches}] (vacía =
+// día vacío). Desde el 11-oct-2026 un día de dos productos se intercambia ENTERO: la edición del
+// día ya puede ser varias filas (`edicion`), así que todo lo que la celda muestra cabe en ella.
 function _rzCarga(c){
-  const pr=c.prods||{}, ks=Object.keys(pr);
-  if(!ks.length) return {pid:null, batches:0};
-  if(ks.length>1) return null;
-  return {pid:+ks[0], batches:pr[ks[0]]};
-}
-function _rzFechaLbl(ds){ const d=new Date(ds+'T00:00:00'); return _DOW[d.getDay()]+' '+d.getDate(); }
+  const pr=c.prods||{}, out=[];
+  NIV_PROD.forEach(function(p){ if(pr[p]>0) out.push({producto_id:p, batches:pr[p]}); });
+  return out;
+}function _rzFechaLbl(ds){ const d=new Date(ds+'T00:00:00'); return _DOW[d.getDay()]+' '+d.getDate(); }
 // ¿Este día admite intercambio? (día futuro editable que no sea feriado ni pasado)
 function _rzSwapOk(c){ return !!(c && c.swappable); }
 // Motivo por el que un día NO admite intercambio. Nunca se falla en silencio.
@@ -21346,16 +21482,15 @@ function _rzMotivoDia(c){
 // agrega lo que el intercambio puede romper y el motor no ve (Semillas fuera del jueves).
 function _rzSwapVeto(a, b){
   const ca=_rzCarga(a), cb=_rzCarga(b);
-  if(!ca) return 'El '+_rzFechaLbl(a.ds)+' lleva más de un producto ('+a.prod+'). El intercambio mueve un producto por día — editalo primero.';
-  if(!cb) return 'El '+_rzFechaLbl(b.ds)+' lleva más de un producto ('+b.prod+'). El intercambio mueve un producto por día — editalo primero.';
-  // SEMILLAS [452] ya no está clavado al jueves: puede ir a cualquier día cuyo día SIGUIENTE se
-  // trabaje (ahí cae el picado). Un solo portero, compartido con la edición y el auto-relleno.
-  if(ca.pid===452){ const m=_semillasVeto(b.ds); if(m) return m; }
-  if(cb.pid===452){ const m=_semillasVeto(a.ds); if(m) return m; }
-  // 2 personas + picado: ese día solo admite Galletas, venga por edición o por intercambio.
-  { const m=_picado2pVeto(b.ds, ca.pid); if(m) return m; }
-  { const m=_picado2pVeto(a.ds, cb.pid); if(m) return m; }
-  return '';
+  // Cada producto que se mueve pasa por los MISMOS porteros que la edición, contra el día
+  // al que va. SEMILLAS [452] puede ir a cualquier día cuyo día SIGUIENTE se trabaje (ahí cae
+  // el picado); 2 personas + picado: ese día solo admite Galletas.
+  const veto=function(items, ds){
+    for(const it of items){
+      if(it.producto_id===452){ const m=_semillasVeto(ds); if(m) return m; }
+      const m=_picado2pVeto(ds, it.producto_id); if(m) return m; }
+    return ''; };
+  return veto(ca, b.ds) || veto(cb, a.ds);
 }
 // Un solo handler para TODO toque sobre un día — editable o no.
 function rzTapDia(ds){
@@ -21376,13 +21511,22 @@ function rzTapDia(ds){
 async function rzSwap(fromDs, toDs){
   const a=_rzCellByDs(fromDs), b=_rzCellByDs(toDs);
   if(!a||!b||!a.swappable||!b.swappable) return;              // solo entre días futuros intercambiables
-  const ca=_rzCarga(a), cb=_rzCarga(b); if(!ca||!cb) return;
-  _rzOverrides[fromDs]={producto_id:cb.pid, batches:cb.batches, tipo:'swap'};
-  _rzOverrides[toDs]  ={producto_id:ca.pid, batches:ca.batches, tipo:'swap'};
+  const ca=_rzCarga(a), cb=_rzCarga(b);
+  _rzOverrides[fromDs]=_ovDe(cb, 'swap');
+  _rzOverrides[toDs]  =_ovDe(ca, 'swap');
   _rzRecalcAuto(); rzRender();
-  rzPersist([{fecha:fromDs, producto_id:cb.pid, batches:cb.batches, tipo:'swap'},
-             {fecha:toDs,   producto_id:ca.pid, batches:ca.batches, tipo:'swap'}]);
+  rzPersist(_ovFilas(fromDs, cb, 'swap').concat(_ovFilas(toDs, ca, 'swap')));
   await rzRecalcAlistar(); rzRender();                        // swap conserva la meta → premezclas/MP no cambian
+}
+// uuid v4 para `edicion`. randomUUID existe en todo navegador actual con https (Pages) o
+// localhost; el respaldo con getRandomValues es para un Safari viejo que no lo tenga.
+function _uuid(){
+  const C=(typeof crypto!=='undefined') ? crypto : null;
+  if(C && C.randomUUID) return C.randomUUID();
+  const b=C ? C.getRandomValues(new Uint8Array(16)) : Uint8Array.from({length:16}, function(){ return Math.floor(Math.random()*256); });
+  b[6]=(b[6]&15)|64; b[8]=(b[8]&63)|128;
+  const h=Array.from(b, function(x){ return x.toString(16).padStart(2,'0'); }).join('');
+  return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
 }
 async function rzPersist(filas){
   const c=sbClient(); if(!c){ alert('Sin conexión con la base — el cambio no se guardó. Reintentá.'); return; }
@@ -21390,9 +21534,14 @@ async function rzPersist(filas){
   // `personas` = la dotación VIGENTE al crear la fila. Sin ella no se puede distinguir "6 porque
   // la semana era de 2" de "6 porque Andrea quiso 6", y esa diferencia decide si el override se
   // ajusta o se respeta cuando cambia la dotación (ver rzCeldas).
+  // `edicion` (11-oct-2026): las filas de UNA MISMA FECHA en este guardado son la edición entera
+  // de ese día —uno o dos productos— y comparten el uuid. El lector junta las hermanas de la
+  // fila más nueva; una fecha nunca mezcla productos de dos guardados distintos.
+  const edicion={};
+  filas.forEach(function(r){ if(!edicion[r.fecha]) edicion[r.fecha]=_uuid(); });
   const payload=filas.map(function(r){ const iso=_isoWk(new Date(r.fecha+'T00:00:00'));
     return {fecha:r.fecha, producto_id:r.producto_id, batches:r.batches, tipo:r.tipo,
-            semana_iso:iso, personas:_personasDe(iso), usuario:email||null}; });
+            semana_iso:iso, personas:_personasDe(iso), usuario:email||null, edicion:edicion[r.fecha]}; });
   try{ const {error}=await c.from('plan_overrides').insert(payload);
     if(error) alert('No se pudo guardar el cambio del plan: '+error.message); }
   catch(e){ alert('No se pudo guardar el cambio del plan: '+(e&&e.message||e)); }
@@ -22031,7 +22180,8 @@ function planVerDetalle(m, noScroll){
       const cls='pl-d '+(PLK[c.kind]||'pl-d-clean')+(c.edited?' pl-d-ed':'')+(c.editable?' pl-d-editable':'');
       const click=c.editable?(' onclick="planOpenEdit(\''+c.ds+'\')"'):'';
       const pic=c.picadoChip?('<div class="rz-picchip">'+esc(c.picadoChip)+'</div>'):'';
-      html+='<div class="'+cls+'" data-ds="'+c.ds+'"'+click+'><div class="pl-dd">'+c.dow+' '+c.dnum+'</div><div class="pl-dp">'+esc(txt)+'</div>'+pic+tag+'</div>';
+      const fr=(c.kind!=='real' && c.kind!=='feriado') ? _rzFracHtml(c.prods, pers, !!c.picado) : '';
+      html+='<div class="'+cls+'" data-ds="'+c.ds+'"'+click+'><div class="pl-dd">'+c.dow+' '+c.dnum+'</div><div class="pl-dp">'+esc(txt)+'</div>'+fr+pic+tag+'</div>';
     });
     html+='</div>'+_rzConfirmBar(iso)+'</div>';
   });
@@ -22041,29 +22191,23 @@ function planVolver(){ _planEdit=null; const el=document.getElementById('planDet
 
 // ── Edición inline del Plan (mismo gesto y misma fuente de overrides que el Resumen) ──
 function planFormHtml(cell){
-  const opts=NIV_PROD.map(p=>'<option value="'+p+'"'+(cell.pid===p?' selected':'')+'>'+esc(NIV_INFO[p].nom)+'</option>').join('');
   return '<div class="pl-d pl-d-editing" data-ds="'+cell.ds+'">'
     +'<div class="pl-dd">'+cell.dow+' '+cell.dnum+'</div>'
-    +'<select class="pl-fsel" id="planFsel"><option value="">— limpieza / nada</option>'+opts+'</select>'
-    +'<input class="pl-fbt" id="planFbt" type="number" min="0" step="1" placeholder="batches" value="'+(cell.batches||'')+'">'
+    +_diaFormHtml('plan', cell, '— limpieza / nada')
     +'<div class="pl-frow"><button class="pl-fok" title="Guardar" onclick="planSaveEdit(\''+cell.ds+'\')">✓</button>'
     +'<button class="pl-fx" title="Cancelar" onclick="planCancelEdit()">✕</button></div></div>';
 }
-function planOpenEdit(ds){ if(_planEdit===ds) return; _planEdit=ds; _planAviso=''; planVerDetalle(_planEditMes, true); const s=document.getElementById('planFsel'); if(s)s.focus(); }
+function planOpenEdit(ds){ if(_planEdit===ds) return; _planEdit=ds; _planAviso=''; planVerDetalle(_planEditMes, true); const s=document.getElementById('planFsel0'); if(s)s.focus(); }
 function planCancelEdit(){ _planEdit=null; _planAviso=''; planVerDetalle(_planEditMes, true); }
 async function planSaveEdit(ds){
-  const sel=document.getElementById('planFsel'), bt=document.getElementById('planFbt');
-  const pid=sel&&sel.value?+sel.value:null;
-  const batches=(bt&&bt.value!=='')?Math.max(0,Math.round(+bt.value)):0;
-  const val=(pid&&batches>0)?{producto_id:pid, batches:batches}:{producto_id:null, batches:0};   // sin producto o 0 batches = limpieza
-  if(pid===452){ const m=_semillasVeto(ds); if(m){ _planAviso=m; planVerDetalle(_planEditMes, true); return; } }
-  { const m=_picado2pVeto(ds, pid); if(m){ _planAviso=m; planVerDetalle(_planEditMes, true); return; } }
-  _rzOverrides[ds]={producto_id:val.producto_id, batches:val.batches, tipo:'edicion'};
+  const r=_diaFormValidar(ds, _diaFormLeer('plan'));   // sin renglones = limpieza
+  if(r.error){ _planAviso=r.error; planVerDetalle(_planEditMes, true); return; }
+  _rzOverrides[ds]=_ovDe(r.items, 'edicion');
   _planEdit=null; _planAviso='';
   if(_rzCtx) _rzRecalcAuto();                    // el Resumen comparte overrides → mantené su auto-relleno coherente
   planVerDetalle(_planEditMes, true);            // repinta el detalle (rzCeldas honra el override) + recomputa el aviso de colchón
   planRefreshReaco();                            // el aviso "reacomodar" aparece si esta edición dejó un descuadre (sin colapsar el detalle)
-  rzPersist([{fecha:ds, producto_id:val.producto_id, batches:val.batches, tipo:'edicion'}]);   // persiste en plan_overrides
+  rzPersist(_ovFilas(ds, r.items, 'edicion'));   // persiste en plan_overrides (una fila por producto, misma edicion)
   // Recalcula MP, premezclas y COMPRAS igual que una edición en el Resumen (4-oct): antes solo
   // rehacía el auto-relleno, y Compras y el lobby seguían con el plan viejo hasta recargar o
   // hasta que la lectura cumpliera 5 minutos.
