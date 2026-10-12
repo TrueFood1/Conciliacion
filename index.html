@@ -19954,12 +19954,19 @@ function _rzFraccionTxt(partes){
   const txt=partes.length>1 ? partes.map(function(x){ return pc(x.frac); }).join(' + ')+' = '+pc(tot) : pc(tot);
   return {txt:txt, tot:tot, pasa:tot>1+1e-9};
 }
-// La barra del día (Resumen y Plan, misma función): un tramo por producto con su color, y el
-// texto. En teléfono, solo el total. Más de 100 % = ámbar, y se guarda igual.
+// La barra del día (Resumen, Plan y su detalle: misma función). La LÍNEA DE COLOR va siempre:
+// identifica el producto. El PORCENTAJE solo con dos productos —un día de un producto no tiene
+// nada que repartir— (Andrea, 11-oct): "50 % + 50 % = 100 %", en teléfono solo el total, y en
+// ámbar si se pasa (se guarda igual). Galletas sola: su línea entera, sin porcentaje.
 function _rzFracHtml(prods, personas, picado){
-  const partes=_rzFraccionPartes(prods, personas, picado); if(!partes.length) return '';
-  const F=_rzFraccionTxt(partes), escala=Math.max(1, F.tot);
+  const partes=_rzFraccionPartes(prods, personas, picado);
+  if(!partes.length){
+    if(!((prods||{})[519]>0)) return '';
+    return '<div class="rz-frac"><div class="rz-fbar"><span style="width:100%;background:'+RP_COLOR[519]+'"></span></div></div>';
+  }
+  const F=_rzFraccionTxt(partes), escala=Math.max(1, F.tot), dos=partes.length>1;
   const bar=partes.map(function(x){ return '<span style="width:'+(x.frac/escala*100).toFixed(1)+'%;background:'+(RP_COLOR[x.pid]||'var(--text-3)')+'"></span>'; }).join('');
+  if(!dos) return '<div class="rz-frac"><div class="rz-fbar">'+bar+'</div></div>';
   const tot=Math.round(F.tot*100)+' %';
   return '<div class="rz-frac'+(F.pasa?' rz-frac-pasa':'')+'"><div class="rz-fbar">'+bar+'</div>'
     +'<div class="rz-ftx">'+esc(F.txt)+(F.pasa?' · se pasa':'')+'</div><div class="rz-ftxm">'+esc(tot)+'</div></div>';
@@ -21372,14 +21379,18 @@ function _diaFormLeer(pfx){
 }
 // Fracción de cada renglón + la barra del día, con el MISMO techo que aplica la celda (la
 // capacidad de la semana, la de 2 personas si el día es de picado). Devuelve lo que se pinta.
+// El % de cada renglón aparece SOLO cuando hay un segundo producto cargado (Andrea, 11-oct):
+// con uno solo no hay nada que repartir. El "tope N" sí va siempre: dice que se va a recortar.
 function _diaFormFracs(ds, filas){
   const pers=_rzPersDe(ds), pic=!!(_rzPicIdx[ds] && _rzPicIdx[ds].picado), prods={};
+  const dos=filas.filter(function(f){ return f.pid && f.batches>0; }).length>1;
   const txt=filas.map(function(f){
     if(!f.pid || !(f.batches>0)) return '';
     const cap=pic ? Math.min(_capDe(f.pid,pers), _capDe(f.pid,2)) : _capDe(f.pid,pers);
     const bt=Math.min(f.batches, cap); prods[f.pid]=(prods[f.pid]||0)+bt;
-    if(f.pid===519) return '';
-    return Math.round(bt/(cap||1)*100)+' %'+(f.batches>cap?' · tope '+cap:''); });
+    const tope=f.batches>cap ? 'tope '+cap : '';
+    if(f.pid===519 || !dos) return tope;
+    return Math.round(bt/(cap||1)*100)+' %'+(tope?' · '+tope:''); });
   return {txt:txt, barra:_rzFracHtml(prods, pers, pic)};
 }
 function _diaFormCalc(pfx, ds){
