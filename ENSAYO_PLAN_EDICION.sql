@@ -1,7 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ENSAYO_PLAN_EDICION.sql  ·  11-oct-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA
 -- Prueba PLAN_EDICION.sql imitando a una socia (request.jwt.claims) y a anon, y lo
--- deshace todo (rollback). ⚠ NO SE CORRIÓ todavía.
+-- deshace todo (rollback). Corrido el 11-oct-2026 por Andrea: 11/11 ok.
 --
 -- CÓMO SE LEE
 --   Una tabla de 11 filas, TODAS con ok = true. Un RECHAZA da ok solo si el SQLSTATE

@@ -1,5 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- PLAN_EDICION.sql  ·  11-oct-2026  ·  ⚠ NO SE CORRIÓ — preparado, sin aplicar
+-- PLAN_EDICION.sql  ·  11-oct-2026  ·  ✅ APLICADO el 11-oct-2026 y VERIFICADO desde afuera
+-- Ensayo 11/11 y pegado 4/4 (Andrea). CC: pg_lector ve edicion uuid · YES, 214 filas, 0 con
+-- edicion, políticas intactas; la API REST la sirve (200; una columna inventada da 42703).
+-- NO VOLVER A CORRER (la guarda lo frena).
 -- DOS PRODUCTOS EL MISMO DÍA (decisión de Andrea, 11-oct): columna opcional
 -- `edicion` en plan_overrides.
 --
