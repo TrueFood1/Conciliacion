@@ -22434,34 +22434,62 @@ async function verificarExclusiones(){
 // Regla "día compartido lo paga el producto principal" (compartidoPid = Cookie Dough 519):
 // un día se le cuenta a Cookie SOLO si ningún otro terminado se produjo ese día calendario.
 // Las UNIDADES de Cookie no cambian (sí se producen); solo cambian sus DÍAS.
+//
+// ── DOS PRODUCTOS EL MISMO DÍA (Andrea, 11-oct-2026; cambia un criterio permanente) ──────
+// Hasta b84 cada producto contaba el día ENTERO: un día con Semillas y Pizza sumaba DOS días
+// al denominador y cada uno se llevaba una parte completa del pool. Ahora el denominador son
+// DÍAS DE CALENDARIO: un día con dos productos sigue siendo 1 día, y se reparte entre ellos en
+// proporción a su FRACCIÓN = batches ÷ capacidad diaria CON 3 PERSONAS (siempre 3 en el costeo,
+// aunque la semana haya sido de 2), normalizada para que el día quede absorbido entero.
+//     4 Blanco (4/8) + 6 Pizza (6/12)  → ½ día cada uno
+//     4 Blanco (4/8) + 3 Pizza (3/12)  → ⅔ Blanco, ⅓ Pizza
+// Los batches son los REALES de Odoo (órdenes por date_start), nunca los del plan.
+// Dos productos que no reparten el día aunque se hayan hecho en él (valen 0):
+//   · Galletas con pan: el día compartido de siempre — el pan lo absorbe entero.
+//   · Las 2 Pizza al final del día de Semillas: Pizza de COSTO_PIZZA_REMATE batches o menos en
+//     un día con Semillas. Semillas se lleva el día (Andrea, 11-oct, opción a).
+// El día se fecha en HORA DE COSTA RICA (_crDate). Hasta b84 era la fecha UTC del string de
+// Odoo: una orden empezada a las 18:00 CR o después caía en el día siguiente. Medido el 11-oct:
+// en jul–sep ninguna orden cambiaba de día, así que el arreglo no mueve números de hoy.
+const COSTO_PIZZA_REMATE = 2;
+function _crIniUtc(ymd){ return ymd+' 06:00:00'; }                         // 00:00 CR del día, en UTC
+function _crFinUtc(ymd){ const d=new Date(ymd+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+1);
+  return d.toISOString().slice(0,10)+' 05:59:59'; }                         // 23:59:59 CR del día, en UTC
 async function diasUnidadesMes(D1,D2,ids,compartidoPid){
   const mos=await odooCall('mrp.production','search_read',
-    [[['state','=','done'],['product_id','in',ids],['date_start','>=',D1],['date_start','<=',D2+' 23:59:59']]],
+    [[['state','=','done'],['product_id','in',ids],['date_start','>=',_crIniUtc(D1)],['date_start','<=',_crFinUtc(D2)]]],
     {fields:['product_id','qty_produced','product_uom_id','date_start'],limit:3000});
-  const acc={};   // pid → {dias:Set, unidades}
+  const acc={};       // pid → {dias: fracción de días (número), unidades, diasDet:{ds:fracción}}
+  const porDia={};    // ds (hora CR) → {pid: batches reales}
   for(const o of mos){
     const pid=o.product_id&&o.product_id[0]; if(!pid)continue;
-    const a=acc[pid]||(acc[pid]={dias:new Set(),unidades:0});
-    const d=(o.date_start||'').slice(0,10); if(d)a.dias.add(d);
+    const a=acc[pid]||(acc[pid]={dias:0,unidades:0,diasDet:{}});
     const facMO=await uomFactor(o.product_uom_id&&o.product_uom_id[0]);
     a.unidades += (o.qty_produced||0)*(await prodUomFactor(pid))/facMO;   // en UoM de venta (= reporte producción)
-  }
-  // Día compartido: Cookie Dough solo conserva los días en que NINGÚN otro terminado produjo.
-  if(compartidoPid && acc[compartidoPid]){
-    const otros=new Set();
-    for(const pid in acc){ if(+pid!==compartidoPid) acc[pid].dias.forEach(d=>otros.add(d)); }
-    acc[compartidoPid].dias = new Set([...acc[compartidoPid].dias].filter(d=>!otros.has(d)));
-  }
-  // DÍAS ATÍPICOS: producción real, pero NO un día normal de fábrica → no reparten indirecto.
-  // Las UNIDADES no se tocan (los potes se produjeron y se vendieron); solo salen los DÍAS.
-  for(const pid in acc){
-    const at=COSTOS_DIAS_ATIPICOS[pid]; if(!at) continue;
-    acc[pid].dias = new Set([...acc[pid].dias].filter(d=>!at[d]));
+    const d=_crDate(o.date_start); if(!d) continue;
+    const rend=(NIV_INFO[pid]&&NIV_INFO[pid].rend)||1;
+    const t=porDia[d]=porDia[d]||{};
+    t[pid]=(t[pid]||0)+((o.qty_produced||0)/(facMO||1))/rend;           // batches = unidades sueltas ÷ rendimiento
   }
   // DÍA DE LIMPIEZA de cada semana: no es día de producción para NADIE, ni para quien haya
-  // producido encima. Mismo tratamiento que los atípicos: salen los días, no las unidades.
+  // producido encima. Sale el día entero; las unidades no se tocan.
   const limp = await diasLimpiezaSemanal(D1,D2,ids,compartidoPid);
-  if(limp.size) for(const pid in acc){ acc[pid].dias = new Set([...acc[pid].dias].filter(d=>!limp.has(d))); }
+  for(const d in porDia){
+    if(limp.has(d)) continue;
+    const t=Object.assign({}, porDia[d]);
+    const hay=function(p){ return t[p]!=null; }, otros=function(p){ return Object.keys(t).some(function(k){ return +k!==p; }); };
+    // Día compartido: Galletas con cualquier otro terminado vale 0.
+    if(compartidoPid && hay(compartidoPid) && otros(compartidoPid)) delete t[compartidoPid];
+    // Las 2 Pizza al final del día de Semillas valen 0: Semillas se lleva el día.
+    if(hay(472) && hay(452) && t[472]<=COSTO_PIZZA_REMATE+1e-9) delete t[472];
+    // DÍAS ATÍPICOS: producción real, pero NO un día normal de fábrica → ese producto no reparte
+    // indirecto ese día. Las UNIDADES no se tocan (los potes se produjeron y se vendieron).
+    for(const k in t){ const at=COSTOS_DIAS_ATIPICOS[k]; if(at && at[d]) delete t[k]; }
+    const fr={}; let s=0;
+    for(const k in t){ fr[k]=(t[k]||0)/(_capDe(+k,3)||1); s+=fr[k]; }
+    if(!(s>0)) continue;
+    for(const k in fr){ const a=acc[k]; if(!a) continue; const f=fr[k]/s; a.dias+=f; a.diasDet[d]=f; }
+  }
   return acc;
 }
 // ── REGLA SEMANAL DEL DÍA DE LIMPIEZA (Andrea, validada contra Odoo el 9-ago-2026) ──────
@@ -22485,10 +22513,10 @@ async function diasLimpiezaSemanal(D1,D2,ids,compartidoPid){
   const dom=new Date(D2+'T00:00:00'); dom.setDate(dom.getDate()+(6-((dom.getDay()+6)%7)));// domingo de la semana de D2
   // Semanas completas aunque crucen el borde del mes: si no, una semana partida inventa días libres.
   const mos=await odooCall('mrp.production','search_read',
-    [[['state','=','done'],['product_id','in',ids],['date_start','>=',_ymd(lun)],['date_start','<=',_ymd(dom)+' 23:59:59']]],
+    [[['state','=','done'],['product_id','in',ids],['date_start','>=',_crIniUtc(_ymd(lun))],['date_start','<=',_crFinUtc(_ymd(dom))]]],
     {fields:['product_id','date_start'],limit:4000});
-  const porDia={};
-  mos.forEach(o=>{ const d=(o.date_start||'').slice(0,10); if(!d)return; (porDia[d]=porDia[d]||new Set()).add(o.product_id&&o.product_id[0]); });
+  const porDia={};   // día en HORA DE COSTA RICA, igual que diasUnidadesMes (antes: la fecha UTC)
+  mos.forEach(o=>{ const d=_crDate(o.date_start); if(!d)return; (porDia[d]=porDia[d]||new Set()).add(o.product_id&&o.product_id[0]); });
   const limp=new Set();
   for(let t=new Date(lun); t<=dom; t.setDate(t.getDate()+7)){
     const lab=[];
@@ -22526,7 +22554,7 @@ async function computeCostos(force){
     const excluido=exMes.reduce((s,e)=>s+e.montoExcluido,0);
     const pool=poolBruto-excluido;
     const acc=await diasUnidadesMes(D1,D2,ids,keyPid['galletas']);   // Cookie Dough = día compartido
-    const porKey={}; COSTOS_PROD.forEach(P=>{ const a=acc[keyPid[P.key]]; porKey[P.key]={dias:a?a.dias.size:0, unidades:a?a.unidades:0}; });
+    const porKey={}; COSTOS_PROD.forEach(P=>{ const a=acc[keyPid[P.key]]; porKey[P.key]={dias:a?a.dias:0, unidades:a?a.unidades:0}; });   // dias = fracción de días de calendario
     meses.push({nom,D1,D2,pool,poolBruto,excluido,exMes,porKey});
   }
   const poolAvg=meses.reduce((s,m)=>s+m.pool,0)/(meses.length||1);
@@ -22791,7 +22819,7 @@ async function reporteCanal(D1,D2){
 async function reporteProduccion(D1,D2){
   const idsT=new Set(PROD_TERM.map(p=>p.id)), idsP=new Set(PROD_PREMEZ.map(p=>p.id));
   const mos=await odooCall('mrp.production','search_read',
-    [[['state','=','done'],['date_start','>=',D1],['date_start','<=',D2+' 23:59:59']]],
+    [[['state','=','done'],['date_start','>=',_crIniUtc(D1)],['date_start','<=',_crFinUtc(D2)]]],   // el mes en hora CR
     {fields:['name','product_id','qty_produced','product_uom_id','date_start'],limit:3000});
   const acc={};   // pid → {qty (UoM producto), indiv (unidades individuales), dias:Set de días distintos, ordenes:[]}
   for(const o of mos){
@@ -22803,7 +22831,7 @@ async function reporteProduccion(D1,D2){
     const t=acc[pid]||(acc[pid]={qty:0,indiv:0,dias:new Set(),ordenes:[]});
     t.qty += cantMO;             // en UoM del producto (= pivot nativo)
     t.indiv += qp/facMO;         // unidades individuales (para la derivación)
-    const d=(o.date_start||'').slice(0,10); if(d) t.dias.add(d);   // DÍAS distintos, no órdenes (varias tandas/día)
+    const d=_crDate(o.date_start); if(d) t.dias.add(d);   // DÍAS distintos (hora CR), no órdenes (varias tandas/día)
     t.ordenes.push({fecha:o.date_start||'', cant:cantMO, ref:o.name||''});   // detalle para el drill-down (Bloque 1)
   }
   const build=cfg=>cfg.map(c=>{ const a=acc[c.id]; return Object.assign({},c,a
