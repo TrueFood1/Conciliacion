@@ -2,7 +2,8 @@
 -- ENSAYO_COMPRA_V3_E1.sql  ·  13-oct-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA
 -- Aplica COMPRA_V3_E1.sql (copia del bloque), lo prueba como socia, equipo y editor, y lo deshace
 -- todo (rollback).
--- ⏳ SIN CORRER.
+-- ✅ CORRIDO el 13-oct-2026 por Andrea en producción: 20 de 20 ok = true, cada RECHAZA con su SQLSTATE y
+--    por SU restricción; Z2 = 16 propuestas viejas (14 + las 21 y 22 de Lorena).
 --
 -- CÓMO SE LEE: 20 filas, TODAS con ok = true. Un RECHAZA vale solo con su SQLSTATE Y el nombre de SU
 -- restricción en el mensaje (no vale rechazar por la de al lado). Si el editor dice "Success. No rows
