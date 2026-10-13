@@ -2,7 +2,9 @@
 -- ENSAYO_COMPRA_INSUMO_ODOO.sql  ·  13-oct-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA
 -- Prueba las dos tablas de COMPRA_INSUMO_ODOO.sql (propuestas de insumo nuevo y su rastro) y lo
 -- deshace todo (rollback).
--- ⏳ SIN CORRER.
+-- ✅ CORRIDO el 13-oct-2026 por Andrea en producción: 34 de 34 ok = true, cada RECHAZA con su SQLSTATE
+--    y por SU restricción (P3/P4 cabys, P5 iva, P6 uom, P7 precio, P8/P9 nombre, P10 factura, P11 nulo,
+--    P12 código, R2/R3 únicos, R4 fkey, R5 RLS, R6 huella). Z3: el disparador puso las 8 restrictivas.
 --
 -- CÓMO SE LEE
 --   Una tabla de 34 filas, TODAS con ok = true. Un RECHAZA da ok solo si el SQLSTATE
