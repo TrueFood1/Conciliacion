@@ -1,6 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- COMPRA_TARIFA_ODOO.sql  ·  12-oct-2026  ·  Tarifas de BIO que se mantienen solas desde Truefie
--- ⚠ NO SE CORRIÓ — preparado, sin aplicar. Primero ENSAYO_COMPRA_TARIFA_ODOO.sql (18/18).
+-- ✅ APLICADO el 12-oct-2026 por Andrea en producción, después del ensayo 18/18. Fila de control:
+--    1 tabla con RLS · 2 políticas · 0 grants a anon · INSERT,SELECT a authenticated · 1 índice.
+--    VERIFICADO desde afuera: REST con la anon key → 42501 (existe y anon no entra). NO VOLVER A CORRER.
 -- Para saber si está aplicado, mirar la base: `select to_regclass('public.compra_tarifa_odoo')`.
 --
 -- QUÉ HACE

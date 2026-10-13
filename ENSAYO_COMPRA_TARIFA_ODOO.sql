@@ -2,6 +2,9 @@
 -- ENSAYO_COMPRA_TARIFA_ODOO.sql  ·  12-oct-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA
 -- Prueba la tabla de COMPRA_TARIFA_ODOO.sql (el rastro de las tarifas de BIO) y lo deshace
 -- todo (rollback).
+-- ✅ CORRIDO el 12-oct-2026 por Andrea en producción: 18 de 18 ok = true, cada RECHAZA con su SQLSTATE.
+--    Ojo: T7 (precio en cero) lo frena compra_tarifa_odoo_banda, no el check de precio > 0 (Postgres
+--    revisa los checks por nombre). Mismo SQLSTATE; la banda ya implica precio > 0.
 --
 -- CÓMO SE LEE
 --   Una tabla de 18 filas, TODAS con ok = true. Un RECHAZA da ok solo si el SQLSTATE
