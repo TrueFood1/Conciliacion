@@ -3,7 +3,8 @@
 -- Aplica el bloque de INSTINCT_VE_TODO.sql, prueba a Instinct encendido y apagado TABLA POR TABLA
 -- (las 61 de public), Personal, el calendario y los archivos, que siga sin escribir, y que socias y
 -- equipo sigan igual. Lo deshace todo (rollback).
--- ⏳ SIN CORRER.
+-- ✅ CORRIDO el 13-oct-2026 por Andrea en producción: 23 de 23 ok = true. T1 «todas» y A1 «ninguna» en
+--    las 61 tablas; 3 salarios, 3 personas, 15 eventos de calendario. Archivos: 0 en el bucket (T6/A3 sin datos).
 --
 -- W1 y W4: sin regla permisiva de inserción (salarios) o solo de socias (archivos), Postgres rechaza con el
 -- mensaje genérico de RLS; W6 (pedidos, permisiva `true`) prueba que el que frena es asistente_no_inserta.
