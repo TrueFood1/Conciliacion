@@ -4710,6 +4710,8 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
    proveedor pasa a secundario (ver `.cp-pcrow .cp-in1`). «Hoy» sigue en ámbar. */
 #vCompras .cp-gtit{font-size:14px;font-weight:600;color:var(--text);padding:14px 0 4px}
 #vCompras .cp-gtit-hoy{color:var(--warn)}
+#vCompras .cp-avrojo{color:var(--stop-tx);font-weight:600;font-size:13.5px;line-height:1.45;border:1px solid currentColor;border-radius:8px;padding:10px 12px;margin-top:12px}
+#vCompras .cp-detinfo{font-size:12.5px;margin-top:10px;line-height:1.45;color:var(--text-2)}
 #vCompras .cp-llego{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px}
 #vCompras .cp-tog{flex:0 0 auto;padding:7px 12px;font-size:13px}
 #vCompras .cp-tog.cp-on{border-color:var(--m-comp);color:var(--m-comp)}
@@ -21025,11 +21027,15 @@ function cpRenderRegistro(){
         const emp=l.empaques!=null?(_rzN(l.empaques)+' '+(l.empaques===1?(_CN_SING[l.empaque_lab]||l.empaque_lab):l.empaque_lab)):(_rzN(l.cant_po,2)+' '+l.uom_po);
         return '<div class="cp-it cp-it3"><span class="cp-in">'+esc(l.producto.replace(/^\[[^\]]*\]\s*/,''))+'</span><span class="cp-g">'+esc(emp)+'</span><span class="cp-mto">'+col(l.subtotal)+'</span></div>'; }).join('')
       +'<div class="cp-it cp-it3 cp-ittot"><span class="cp-in">Total sin IVA</span><span class="cp-mto">'+col(r.total_estimado)+'</span></div></div>';
-    if(r.factura_ref||r.nota) h+='<div class="cp-g cp-detamb">'+(r.factura_ref?('FE '+esc(r.factura_ref)):'')+(r.factura_ref&&r.nota?'<br>':'')+(r.nota?esc(r.nota):'')+'</div>';
-    const av=[];
-    // El tope ya no frena (13-oct): avisa. Se confirma igual, con la huella de esta vista.
-    (r.avisos_tope||[]).forEach(function(e){ av.push(String(e.producto).replace(/^\[[^\]]*\]\s*/,'')+': '+_rzN(e.pide, e.pide%1?1:0)+' '+e.unidad
-      +', más que el consumo habitual (tope '+_rzN(e.tope, e.tope%1?1:0)+' '+e.unidad+').'); });
+    if(r.factura_ref||r.nota) h+='<div class="cp-detinfo">'+(r.factura_ref?('FE '+esc(r.factura_ref)):'')+(r.factura_ref&&r.nota?'<br>':'')+(r.nota?esc(r.nota):'')+'</div>';
+    const av=[], rojo=[];
+    // El tope NO frena (Andrea, 13-oct): avisa y confirma la socia con el clic. Pasado 10 × el tope el
+    // aviso va en ROJO, arriba de todo, diciendo cuántas veces es (`fuerte`, lo decide el servidor).
+    (r.avisos_tope||[]).forEach(function(e){
+      const nom=String(e.producto).replace(/^\[[^\]]*\]\s*/,''), q=_rzN(e.pide, e.pide%1?1:0)+' '+e.unidad, t=_rzN(e.tope, e.tope%1?1:0)+' '+e.unidad;
+      if(e.fuerte) rojo.push(nom+': '+q+(e.veces!=null?(' es '+_rzN(e.veces, e.veces%1?1:0)+' veces el tope ('+t+').'):' sin consumo con qué comparar.'));
+      else av.push(nom+': '+q+', más que el consumo habitual (tope '+t+').'); });
+    if(rojo.length) h+='<div class="cp-avrojo" role="alert">'+rojo.map(esc).join('<br>')+'</div>';
     (r.posibles_duplicados||[]).forEach(function(x){ av.push(x+' Si es esta misma compra, se duplicaría.'); });
     if(r.sin_precio&&r.sin_precio.length) av.push('Sin precio en Odoo: '+r.sin_precio.join(', ')+'.');
     if(r.otras_ordenes&&r.otras_ordenes.length) av.push('Hay órdenes de '+prov+' cargadas a mano y sin recibir ('+r.otras_ordenes.map(function(x){ return x.name; }).join(', ')+'): si alguna es este pedido, se duplicaría.');
