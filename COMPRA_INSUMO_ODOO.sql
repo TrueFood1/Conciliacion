@@ -1,6 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- COMPRA_INSUMO_ODOO.sql  ·  13-oct-2026  ·  Insumos de materia prima nuevos, creados desde Truefie
--- ⏳ SIN PEGAR. Antes: ENSAYO_COMPRA_INSUMO_ODOO.sql (todas las filas ok = true).
+-- ✅ APLICADO el 13-oct-2026 por Andrea en producción, después del ensayo 34/34. Fila de control:
+--    2 · 6 · 8 · 0 · INSERT,SELECT · INSERT,SELECT · 1. VERIFICADO desde afuera: pg_lector ve las dos
+--    tablas con RLS, 3 propias + 4 restrictivas cada una, vacías; REST con la anon key → 42501. NO VOLVER A CORRER.
 -- Para saber si está aplicado, mirar la base: `select to_regclass('public.compra_insumo_odoo')`.
 --
 -- QUÉ HACE
