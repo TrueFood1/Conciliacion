@@ -55,7 +55,11 @@ def pedir(metodo, url, cuerpo=None, cab=None):
     try:
         with urllib.request.urlopen(req, timeout=90) as r:
             t = r.read().decode()
-            return r.status, (json.loads(t) if t and t[:1] in "[{" else t), dict(r.headers)
+            try:   # las funciones de Supabase devuelven valores sueltos (true, "asistente"): también son JSON
+                dato = json.loads(t) if t else t
+            except ValueError:
+                dato = t
+            return r.status, dato, dict(r.headers)
     except urllib.error.HTTPError as e:
         t = e.read().decode(errors="replace")
         try:
