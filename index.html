@@ -4715,6 +4715,14 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 #vCompras .cp-canal{font-size:11.5px;color:var(--text-3);font-weight:400;margin-left:4px}
 #vCompras .cp-pcrow>span.cp-g{font-size:12.5px}
 #vCompras .cp-amb3{color:var(--warn) !important}
+/* tarifas de BIO (12-oct) */
+#vCompras .cp-tartbl{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}
+#vCompras .cp-tartbl th{font-size:10px;font-weight:500;color:var(--text-dim-6);letter-spacing:.04em;text-transform:uppercase;text-align:left;padding:4px 0 8px;border-bottom:.5px solid var(--line)}
+#vCompras .cp-tartbl td{padding:9px 0;border-top:.5px solid var(--line);color:var(--text-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#vCompras .cp-tartbl th:nth-child(2),#vCompras .cp-tartbl td:nth-child(2){width:84px;text-align:right;padding-right:12px}
+#vCompras .cp-tartbl th:nth-child(3),#vCompras .cp-tartbl td:nth-child(3){width:48px}
+#vCompras .cp-tartbl th:nth-child(4),#vCompras .cp-tartbl td:nth-child(4){width:88px;text-align:right}
+@media (max-width:560px){#vCompras .cp-tartbl th:nth-child(3),#vCompras .cp-tartbl td:nth-child(3){display:none}}
 /* «Faltan compras por cargar» (4-oct): Odoo tiene menos de lo que ya se usó. NO es un faltante
    (no pide comprar): gris azulado y en cursiva, nunca rojo ni ámbar. */
 #vCompras .cp-odoo{color:var(--odoo) !important;font-style:italic}
@@ -20437,6 +20445,7 @@ async function irACompras(vista){
   }
   await accesoSocia();
   cpRender();
+  cpTarCargar();           // tarifas de BIO: en segundo plano, solo socias (no frena el Resumen)
 }
 function cpPintarPills(){
   const p=document.getElementById('cpPills'); if(!p) return;
@@ -20663,7 +20672,7 @@ function cpResumenHtml(){
         +'<span class="cp-g">'+esc(cuando(p.g))+' · '+p.its.length+' producto'+(p.its.length===1?'':'s')+' <span class="cp-fl'+(ab?' abierto':'')+'">›</span></span></div>'
         +(ab?('<div class="cp-desp">'+_cpTablaComprar(p.its)+'</div>'):''); }).join('');
   else izq+='<div class="cp-it cp-it0"><span class="cp-in">No hace falta comprar nada'+(A.proximo?(' hasta el '+_fechaCorta(A.proximo)):' en 4 semanas')+'</span></div>';
-  izq+='</div></div>'+_cpFranjaHtml(A, "cpIr('porcomprar')");
+  izq+='</div></div>'+_cpFranjaHtml(A, "cpIr('porcomprar')")+cpTarifasHtml();
   const orden={rojo:0, ambar:1, verde:2};
   const filas=A.filas.slice().sort(function(a,b){ return (orden[a.color]-orden[b.color]) || (a.falla||'9999').localeCompare(b.falla||'9999') || a.nombre.localeCompare(b.nombre); });
   const der='<div class="cp-card"><div class="cp-st2">Materia prima</div><table class="cp-mp cp-mp-s"><thead><tr><th>Insumo</th><th>Hay</th><th>Alcanza hasta</th></tr></thead><tbody>'
@@ -20675,6 +20684,98 @@ function cpResumenHtml(){
   return '<div class="cp-cols"><div class="cp-col">'+izq+'</div><div class="cp-col">'+der+'</div></div>';
 }
 function cpResToggle(k){ _cpAbiertos[k]=!_cpAbiertos[k]; cpRender(); }
+
+// ── TARIFAS DE BIO (12-oct-2026) ─────────────────────────────────────────
+// Cuarto carril del servicio de escritura (POST /tarifas): la tarifa de proveedor de BIO en Odoo
+// se actualiza con el precio de la última factura de BIO. El navegador manda {modo, confirmar,
+// huella} y nada más: qué tarifas y a qué precio lo decide la revisión del servidor.
+// · La TARJETA (modo «factura_nueva») solo aparece si hay algo que actualizar o fuera de banda, y
+//   el servidor no le da líneas hasta que exista la corrección inicial: nunca muestra el atraso.
+// · La CORRECCIÓN INICIAL (modo «inicial», una vez) solo se ve con ?tarifas=inicial en la dirección.
+let _cpTar=null;    // {modo, r, cargando, msg, msgCls, enviando, en}
+const CP_TAR_INICIAL=/[?&]tarifas=inicial\b/.test(location.search);
+async function escrituraTarifas(cuerpo){
+  let token='';
+  try{ const s=await sbClient().auth.getSession();
+       token=(s&&s.data&&s.data.session&&s.data.session.access_token)||''; }catch(e){}
+  let res;
+  try{ res=await fetch(ESCRITURA_URL+'/tarifas', {method:'POST',
+         headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token}, body:JSON.stringify(cuerpo)}); }
+  catch(e){ try{ console.error('[Truefie] tarifas · sin respuesta', e); }catch(_){} return {red:true}; }
+  let js=null; try{ js=await res.json(); }catch(e){}
+  if(!js || typeof js!=='object') return {red:true, st:res.status};
+  return {st:res.status, js:js};
+}
+async function cpTarCargar(forzar){
+  if(_socia!==true) return;
+  if(!forzar && _cpTar && _cpTar.en && Date.now()-_cpTar.en < 5*60000) return;
+  const modo=CP_TAR_INICIAL ? 'inicial' : 'factura_nueva';
+  _cpTar=Object.assign({}, _cpTar||{}, {modo:modo, cargando:true});
+  const R=await escrituraTarifas({modo:modo});
+  _cpTar.cargando=false; _cpTar.en=Date.now();
+  if(R.red || R.st!==200 || !R.js.ok){
+    // Sin respuesta, sin tabla de rastro o con el servicio caído, la tarjeta no aparece: no hay nada que hacer acá.
+    try{ console.warn('[Truefie] tarifas · vista previa', R.st, R.js&&R.js.motivo, R.js&&R.js.texto); }catch(_){}
+    _cpTar.r=null;
+  } else _cpTar.r=R.js;
+  if(_cpVista==='resumen' && !_cpReg) cpRender();
+}
+const _cpTarCol=function(n){ return n==null?'—':'₡'+_rzN(n, 2); };
+function cpTarifasHtml(){
+  const T=_cpTar; if(!T || !T.r || _socia!==true) return '';
+  const r=T.r, inicial=(T.modo==='inicial');
+  if(inicial && r.inicializado) return T.msg ? '<div class="cp-card cp-tar"><div class="cp-st2">Tarifas de BIO</div><div class="cp-msg '+(T.msgCls||'')+'">'+esc(T.msg)+'</div></div>' : '';
+  const ver=r.lineas.filter(function(l){ return l.estado==='actualiza' || l.estado==='fuera_de_banda'; });
+  if(!ver.length && !T.msg) return '';
+  let h='<div class="cp-card cp-tar"><div class="cp-st2">'+(inicial?'Tarifas de BIO · corrección inicial':'Tarifas de BIO')+'</div>';
+  if(ver.length){
+    // La unidad va en el encabezado si es la misma para todas (hoy: kg), si no, en cada fila.
+    const u0=ver[0].unidad, unaU=ver.every(function(l){ return l.unidad===u0; });
+    h+='<table class="cp-tartbl"><thead><tr><th>Insumo</th><th>Hoy</th><th>Factura</th><th>Queda'+(unaU&&u0?(' /'+esc(u0)):'')+'</th></tr></thead><tbody>'
+      +ver.map(function(l){ const fuera=(l.estado==='fuera_de_banda');
+        return '<tr><td>'+esc(l.producto)+'</td><td>'+esc(_cpTarCol(l.precio_actual))+'</td>'
+          +'<td><span class="cp-g" title="'+esc(l.factura_fecha||'')+'">'+esc(l.factura_nombre||'—')+'</span></td>'
+          +'<td'+(fuera?' class="cp-amb3"':'')+'>'+esc(_cpTarCol(l.precio_nuevo)+(unaU?'':('/'+(l.unidad||''))))+'</td></tr>'; }).join('')
+      +'</tbody></table>';
+    if(r.fuera_de_banda) h+='<div class="cp-msg cp-amb3">Fuera de banda ('+String(r.banda[0]).replace('.',',')+'× a '+String(r.banda[1]).replace('.',',')+'×): no se aplica.</div>';
+    if(r.aplicables) h+='<div class="cp-btns"><button class="cp-btn cp-btnp"'+(T.enviando?' disabled':'')+' onclick="cpTarAplicar()">'
+      +(inicial?'Aplicar corrección inicial · ':'Actualizar ')+r.aplicables+' tarifa'+(r.aplicables===1?'':'s')+'</button></div>';
+  }
+  h+='<div class="cp-msg '+(T.msgCls||'')+'">'+esc(T.msg||'')+'</div></div>';
+  return h;
+}
+const CP_TAR_MOTIVO={
+  tarifa_apagada:'Las tarifas están apagadas en el servicio: no se cambió nada en Odoo.',
+  huella_vieja:'Cambió algo desde que abriste esta vista: volvé a mirarla. No se cambió nada.',
+  inicial_ya_hecha:'La corrección inicial ya estaba hecha.',
+  sin_correccion_inicial:'Falta la corrección inicial.',
+  nada_que_actualizar:'No hay tarifas para actualizar.',
+  sin_sesion:'Tu sesión venció. Volvé a entrar y probá otra vez.',
+  sin_rol:'Solo para socias.',
+  // Estas dos dejan algo CAMBIADO en Odoo: el texto del servidor dice cuáles, y va entero.
+  rastro_truefie:'Las tarifas SÍ se cambiaron en Odoo, pero no quedó el rastro en Truefie.',
+  tarifa_distinta:'Odoo no dejó el precio esperado.'};
+async function cpTarAplicar(){
+  const T=_cpTar; if(!T || !T.r || T.enviando) return;
+  T.enviando=true; T.msg='Aplicando en Odoo…'; T.msgCls=''; cpRender();
+  const R=await escrituraTarifas({modo:T.modo, confirmar:true, huella:T.r.huella});
+  T.enviando=false;
+  if(R.red){ T.msg='Sin respuesta del servicio: no sé si se aplicó. Volvé a abrir Compras para ver cómo quedó.'; T.msgCls='cp-mal'; cpRender(); return; }
+  if(R.st===200 && R.js.ok){
+    const c=R.js.cambiadas||[];
+    T.msg=c.length+' tarifa'+(c.length===1?'':'s')+' actualizada'+(c.length===1?'':'s')+' en Odoo: '
+      +c.map(function(x){ return x.producto+' '+_cpTarCol(x.ahora); }).join(' · ')+'.';
+    T.msgCls='cp-ok';
+  } else {
+    const m=R.js.motivo, conTexto=(!CP_TAR_MOTIVO[m] || m==='rastro_truefie' || m==='tarifa_distinta');
+    T.msg=(CP_TAR_MOTIVO[m]||'No se aplicó.')+(conTexto&&R.js.texto?(' '+R.js.texto):'');
+    T.msgCls=(m==='tarifa_apagada'||m==='huella_vieja')?'cp-amb2':'cp-mal';
+  }
+  const msg=T.msg, cls=T.msgCls;
+  await cpTarCargar(true);
+  if(_cpTar){ _cpTar.msg=msg; _cpTar.msgCls=cls; }
+  cpRender();
+}
 
 // ── POR COMPRAR (rediseño aprobado por Andrea en el canvas, 3-oct) ──────────
 // Agrupado por CUÁNDO hay que comprar («Hoy» en ámbar, «Lunes 5», «Antes del sábado 10»), una línea
