@@ -1,5 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- ASISTENTE_ROL.sql  ·  12-oct-2026  ·  ⚠ NO SE CORRIÓ — preparado, sin aplicar. Primero el ENSAYO (28/28).
+-- ASISTENTE_ROL.sql  ·  12-oct-2026  ·  ✅ APLICADO el 12-oct-2026 por Andrea, después del ensayo 28/28.
+--    Fila de control: 59 · 59 · 4 · 1 · 6 · 2 · 1 · 2 · 0 · 1. VERIFICADO desde afuera (pg_lector): 0 tablas
+--    sin las 4, 240 restrictivas, 129 permisivas, interruptor sin filas (apagado), 0 cuentas asistente;
+--    REST anon → 42501 en las tablas y la función nuevas. NO VOLVER A CORRER.
 -- El perfil «asistente» (Instinct, decisión de Andrea del 12-oct): lee Truefie, NO escribe nada.
 --
 -- QUÉ HACE (las piezas, en orden)
