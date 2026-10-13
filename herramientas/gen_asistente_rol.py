@@ -349,8 +349,9 @@ begin
   -- ═ W · ESCRITURA, TABLA POR TABLA: equipo, asistente y socia intentan un insert vacío ═
   -- Postgres revisa primero las políticas de hoy y después las restrictivas, así que la prueba
   -- que importa es esta: donde el EQUIPO pasa RLS hoy, al asistente lo tiene que frenar
-  -- «asistente_no_inserta» (el error trae su nombre). Si el rechazo es idéntico al del equipo,
-  -- lo frenó algo que corre ANTES de RLS (una guardia o un NOT NULL): se lista aparte.
+  -- «asistente_no_inserta» (el error trae su nombre). Si lo frena un P0001, fue un disparador
+  -- BEFORE (una guardia) que corre ANTES de RLS: se lista aparte. Cualquier otra cosa es fuga
+  -- (un NOT NULL, por ejemplo, salta DESPUÉS de RLS: querría decir que RLS lo dejó pasar).
   for r in %(TABLAS)s loop
     n_tablas := n_tablas + 1;
     begin %(COMO_E)s execute format('insert into public.%%I default values', r.relname); r_eq := 'ENTRA';
@@ -365,11 +366,11 @@ begin
     if r_eq = 'ENTRA' or r_eq not like '42501%%' then                -- el equipo pasa RLS hoy
       n_pasa := n_pasa + 1; l_pasa := l_pasa || r.relname || ' ';
       if r_as like '42501%%"asistente_no_inserta"%%' then n_frena := n_frena + 1;
-      elsif r_as = r_eq then n_previo := n_previo + 1; l_antes := l_antes || r.relname || ' [' || left(r_as, 40) || '] ';
+      elsif r_as like 'P0001%%' then n_previo := n_previo + 1; l_antes := l_antes || r.relname || ' [' || left(r_as, 40) || '] ';
       else l_fuga := l_fuga || r.relname || ' [' || left(r_as, 60) || '] ';
       end if;
     end if;
-    if r_eq like '%%asistente\_%%' or r_so like '%%asistente\_%%' then l_regr := l_regr || r.relname || ' '; end if;
+    if r_eq like '%%policy "asistente\_%%' or r_so like '%%policy "asistente\_%%' then l_regr := l_regr || r.relname || ' '; end if;
   end loop;
   %(F_W1)s
   %(F_W2)s
@@ -449,7 +450,7 @@ F = {
  "F_W1": fila("'W1 ninguna tabla le acepta un insert al asistente (interruptor ENCENDIDO)'", "'ninguna'", "coalesce(nullif(l_entra, ''), 'ninguna')", "l_entra = ''"),
  "F_W2": fila("'W2 donde el equipo pasa RLS hoy, lo frena «asistente_no_inserta»'", "(n_pasa - n_previo)::text || ' de ' || n_pasa", "n_frena::text || ' de ' || (n_pasa - n_previo) || ' · ' || l_pasa", "l_fuga = '' and n_pasa > 0 and n_frena = n_pasa - n_previo"),
  "F_W3": fila("'W3 fugas: el equipo pasa y al asistente no lo frena el candado'", "'ninguna'", "coalesce(nullif(l_fuga, ''), 'ninguna')", "l_fuga = ''"),
- "F_W4": fila("'W4 frenadas ANTES de RLS (guardia o NOT NULL, igual que al equipo): informativo'", "'(lista)'", "coalesce(nullif(l_antes, ''), 'ninguna')", "true"),
+ "F_W4": fila("'W4 frenadas ANTES de RLS por una guardia (P0001): informativo'", "'(lista)'", "coalesce(nullif(l_antes, ''), 'ninguna')", "true"),
  "F_W5": fila("'W5 regresión: a socia y equipo nunca los frena una política del asistente'", "'ninguna'", "coalesce(nullif(l_regr, ''), 'ninguna') || ' · ' || n_tablas || ' tablas probadas'", "l_regr = ''"),
  "F_E1": fila("'E1 tabla nueva: el disparador le puso las 4 políticas y RLS está prendido'", "'4 · true'", "n::text || ' · ' || b", "n = 4 and b"),
  "F_E2": fila("'E2 tabla nueva abierta a todos: el asistente no inserta (lo frena el candado)'", "'RECHAZA · 42501 asistente_no_inserta'", "r_as", "r_as like '42501%\"asistente_no_inserta\"%'"),

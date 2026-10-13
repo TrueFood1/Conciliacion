@@ -335,8 +335,9 @@ begin
   -- ═ W · ESCRITURA, TABLA POR TABLA: equipo, asistente y socia intentan un insert vacío ═
   -- Postgres revisa primero las políticas de hoy y después las restrictivas, así que la prueba
   -- que importa es esta: donde el EQUIPO pasa RLS hoy, al asistente lo tiene que frenar
-  -- «asistente_no_inserta» (el error trae su nombre). Si el rechazo es idéntico al del equipo,
-  -- lo frenó algo que corre ANTES de RLS (una guardia o un NOT NULL): se lista aparte.
+  -- «asistente_no_inserta» (el error trae su nombre). Si lo frena un P0001, fue un disparador
+  -- BEFORE (una guardia) que corre ANTES de RLS: se lista aparte. Cualquier otra cosa es fuga
+  -- (un NOT NULL, por ejemplo, salta DESPUÉS de RLS: querría decir que RLS lo dejó pasar).
   for r in select c.relname from pg_class c join pg_namespace ns on ns.oid = c.relnamespace where ns.nspname = 'public' and c.relkind in ('r', 'p') order by 1 loop
     n_tablas := n_tablas + 1;
     begin perform set_config('request.jwt.claims', json_build_object('email', v_equipo, 'role', 'authenticated')::text, true); perform set_config('role', 'authenticated', true); execute format('insert into public.%I default values', r.relname); r_eq := 'ENTRA';
@@ -351,11 +352,11 @@ begin
     if r_eq = 'ENTRA' or r_eq not like '42501%' then                -- el equipo pasa RLS hoy
       n_pasa := n_pasa + 1; l_pasa := l_pasa || r.relname || ' ';
       if r_as like '42501%"asistente_no_inserta"%' then n_frena := n_frena + 1;
-      elsif r_as = r_eq then n_previo := n_previo + 1; l_antes := l_antes || r.relname || ' [' || left(r_as, 40) || '] ';
+      elsif r_as like 'P0001%' then n_previo := n_previo + 1; l_antes := l_antes || r.relname || ' [' || left(r_as, 40) || '] ';
       else l_fuga := l_fuga || r.relname || ' [' || left(r_as, 60) || '] ';
       end if;
     end if;
-    if r_eq like '%asistente\_%' or r_so like '%asistente\_%' then l_regr := l_regr || r.relname || ' '; end if;
+    if r_eq like '%policy "asistente\_%' or r_so like '%policy "asistente\_%' then l_regr := l_regr || r.relname || ' '; end if;
   end loop;
     v_res := v_res || jsonb_build_object('p', 'W1 ninguna tabla le acepta un insert al asistente (interruptor ENCENDIDO)', 'esperado', 'ninguna', 'obtenido', coalesce(nullif(l_entra, ''), 'ninguna'), 'ok', l_entra = '');
 
@@ -363,7 +364,7 @@ begin
 
     v_res := v_res || jsonb_build_object('p', 'W3 fugas: el equipo pasa y al asistente no lo frena el candado', 'esperado', 'ninguna', 'obtenido', coalesce(nullif(l_fuga, ''), 'ninguna'), 'ok', l_fuga = '');
 
-    v_res := v_res || jsonb_build_object('p', 'W4 frenadas ANTES de RLS (guardia o NOT NULL, igual que al equipo): informativo', 'esperado', '(lista)', 'obtenido', coalesce(nullif(l_antes, ''), 'ninguna'), 'ok', true);
+    v_res := v_res || jsonb_build_object('p', 'W4 frenadas ANTES de RLS por una guardia (P0001): informativo', 'esperado', '(lista)', 'obtenido', coalesce(nullif(l_antes, ''), 'ninguna'), 'ok', true);
 
     v_res := v_res || jsonb_build_object('p', 'W5 regresión: a socia y equipo nunca los frena una política del asistente', 'esperado', 'ninguna', 'obtenido', coalesce(nullif(l_regr, ''), 'ninguna') || ' · ' || n_tablas || ' tablas probadas', 'ok', l_regr = '');
 
