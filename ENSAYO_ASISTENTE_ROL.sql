@@ -1,5 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ENSAYO_ASISTENTE_ROL.sql  ·  12-oct-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA (rollback)
+-- ✅ CORRIDO el 12-oct-2026 por Andrea en producción: 28 de 28 ok = true (segunda corrida, abaf85f).
+--    La primera dio 25/28: las 3 en false eran del ensayo (W2/W3 guardias P0001, W5 el nombre de la
+--    tabla), no del candado. W2 22 de 22 · W3 sin fugas · W4 8 guardias · W5 sin regresión en 59 tablas.
 -- El perfil «asistente» (Instinct, decisión de Andrea del 12-oct): lee Truefie, NO escribe nada.
 --
 -- QUÉ HACE (las piezas, en orden)
