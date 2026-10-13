@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- PERFIL_INSTINCT.sql  ·  13-oct-2026  ·  El perfil «asistente» de Instinct (fase 1)
--- ⏳ SIN PEGAR. Antes: ENSAYO_PERFIL_INSTINCT.sql (todas las filas ok = true).
+-- ✅ APLICADO el 13-oct-2026 por Andrea (ensayo 37/37). Control 1 · 2 · 4 · 7 · 0. Verificado desde afuera (pg_lector). NO VOLVER A CORRER.
 --
 -- ORDEN (importa): este pegado VA ANTES de invitar a instinct@truefoodcr.com en Supabase Auth.
 --   Una cuenta autenticada SIN fila en acceso_usuario no es asistente para la base: hoy podría
