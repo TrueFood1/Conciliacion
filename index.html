@@ -5134,7 +5134,7 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 13 oct 2026 · b88';
+const BUILD = 'v 13 oct 2026 · b89';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -20397,9 +20397,15 @@ function _dfCant(q, uom){
 // Empaques HACIA ARRIBA: {n, lab, total(en la unidad del producto)} o null si no tiene empaque.
 // EL EMPAQUE DE COMPRA sale de `compras_config` (Compras v2, 3-oct): {peso, lab (plural), unidad}.
 // Sin configuración, el de PESO_EMPAQUE (que sigue siendo el del conteo de Inventario).
+// MÍNIMO Y MÚLTIPLO (Compras v3, adelanto de la etapa 2 solo para el cacao, Andrea 13-oct): un insumo con
+// `multiplo` en compras_config se pide en SU unidad (kg; Maryanto vende por kg y manda presentaciones
+// variadas), los botones avanzan de `multiplo` en `multiplo` y nunca menos que `minimo`. Su `empaque`
+// sigue en la configuración para el tope del servidor (+1 empaque), pero la pantalla no lo muestra.
+function _cpMult(pid){ const i=_cpCfgIns(pid); return (i && +i.multiplo>0) ? {mult:+i.multiplo, min:+(i.minimo||0)} : null; }
+function _cpRedMult(m, q){ if(!(q>1e-9)) return 0; return Math.max(m.min, Math.ceil(q/m.mult-1e-9)*m.mult); }
 function _cpPE(pid){
   const i=_cpCfgIns(pid);
-  if(i){ if(i.empaque==null) return null;
+  if(i){ if(i.empaque==null || +i.multiplo>0) return null;
     return {pid:+pid, peso:+i.empaque, lab:_cpPlural[i.empaque_nombre]||i.empaque_nombre, unidad:i.empaque_uom}; }
   return _pesoEmpaque(pid);
 }
@@ -20423,7 +20429,8 @@ function _dfDesdePanel(f, n){
     if(k!=null) return n*pe.peso/k; }
   return f.uom==='g' ? n*1000 : n;
 }
-function _dfPanelInicial(f){ const e=_dfEmp(f.pid, f.pedir, f.uom); return e ? e.n : (f.uom==='g' ? Math.round(f.pedir/100)/10 : Math.ceil(f.pedir*10)/10); }
+function _dfPanelInicial(f){ const m=_cpMult(f.pid); if(m) return _cpRedMult(m, f.uom==='g' ? f.pedir/1000 : f.pedir);
+  const e=_dfEmp(f.pid, f.pedir, f.uom); return e ? e.n : (f.uom==='g' ? Math.round(f.pedir/100)/10 : Math.ceil(f.pedir*10)/10); }
 function _dfUnidadPanel(f){ const pe=_cpPE(f.pid); return pe ? pe.lab : (f.uom==='g'?'kg':f.uom); }
 // ════════════════════════════════════════════════════════════════════════
 // MÓDULO COMPRAS (b82, 2-oct-2026) — morado #A27FEB, ligado a Operaciones.
@@ -20944,11 +20951,14 @@ function cpAbrirPedido(gi){
   cpPintarPills(); cpRender(); try{ window.scrollTo(0,0); }catch(e){}
 }
 // Lo sugerido en la unidad del panel: empaques hacia arriba, o la unidad del producto (g → kg).
-function _cpSugPaq(f){ const q=f.sug||0; if(!(q>1e-9)) return 0; const e=_dfEmp(f.pid,q,f.uom); return e?e.n:(f.uom==='g'?Math.ceil(q/100)/10:Math.ceil(q*10)/10); }
-function _cpPaso(f){ return _cpPE(f.pid) ? 1 : (f.uom==='g'||f.uom==='kg' ? 0.5 : 1); }
+function _cpSugPaq(f){ const q=f.sug||0; if(!(q>1e-9)) return 0; const m=_cpMult(f.pid); if(m) return _cpRedMult(m, f.uom==='g' ? q/1000 : q);
+  const e=_dfEmp(f.pid,q,f.uom); return e?e.n:(f.uom==='g'?Math.ceil(q/100)/10:Math.ceil(q*10)/10); }
+function _cpPaso(f){ const m=_cpMult(f.pid); if(m) return m.mult; return _cpPE(f.pid) ? 1 : (f.uom==='g'||f.uom==='kg' ? 0.5 : 1); }
 function cpMas(pid, d){
   const P=_cpReg; if(!P) return; const f=P.filas.find(function(x){ return x.pid===pid; }); if(!f) return;
-  P.valores[pid]=Math.max(0, Math.round(((+P.valores[pid]||0)+d*_cpPaso(f))*10)/10);
+  let n=Math.max(0, Math.round(((+P.valores[pid]||0)+d*_cpPaso(f))*10)/10);
+  const m=_cpMult(pid); if(m && n>1e-9 && n<m.min-1e-9) n=(d>0 ? m.min : 0);     // nunca entre 0 y el mínimo
+  P.valores[pid]=n;
   P.previa=null; P.propuestaId=null; cpRenderRegistro();
 }
 function cpVerTodos(){ if(_cpReg){ _cpReg.verTodos=true; cpRenderRegistro(); } }
