@@ -2,7 +2,8 @@
 -- ENSAYO_PERFIL_INSTINCT.sql  ·  13-oct-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA
 -- Pone la fila de Instinct (copia de PERFIL_INSTINCT.sql), lo prueba apagado, encendido por una socia
 -- y vuelto a apagar, y lo deshace todo (rollback). Supone el interruptor SIN filas (como hoy).
--- ⏳ SIN CORRER.
+-- ✅ CORRIDO el 13-oct-2026 por Andrea en producción: 37 de 37 ok = true; I7/E8 rechazados por
+--    asistente_no_inserta, I12 por la guardia de ent_corregir_alisto; el equipo sin cambios.
 --
 -- CÓMO SE LEE
 --   Una tabla de 37 filas, TODAS con ok = true. Un RECHAZA da ok solo si el SQLSTATE esperado está
