@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- COMPRA_V3_E1.sql  ·  13-oct-2026  ·  Compras v3, etapa 1: «Ya llegó», nota libre
--- ⏳ SIN PEGAR. Antes: ENSAYO_COMPRA_V3_E1.sql (todas las filas ok = true).
+-- ✅ APLICADO el 13-oct-2026 por Andrea (ensayo 20/20). Control: true · 2 · 4 · 2 · 1 · 16 · 5. Verificado desde afuera (pg_lector). NO VOLVER A CORRER.
 --
 -- QUÉ HACE (decisiones de Andrea del 13-oct; plan https://claude.ai/artifact/RjmgAQgXEM9zeiHMJQsd2V)
 --   compra_propuesta:  modo 'llego' (una compra que YA llegó, con su fecha real: pedido = entrega) ·
