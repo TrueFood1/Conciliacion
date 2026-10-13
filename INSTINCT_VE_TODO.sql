@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- INSTINCT_VE_TODO.sql  ·  13-oct-2026  ·  Instinct lee TODO Truefie (Personal y archivos incluidos)
--- ⏳ SIN PEGAR. Antes: ENSAYO_INSTINCT_VE_TODO.sql (todas las filas ok = true).
+-- ✅ APLICADO el 13-oct-2026 por Andrea (ensayo 23/23). Control 61 · 61 · 0 · 1 · true · true · 4. Verificado desde afuera (pg_lector). NO VOLVER A CORRER.
 --
 -- DECISIÓN DE ANDREA (13-oct): Instinct ve todo Truefie, sin excepciones: salarios, planilla,
 --   quincenas, aguinaldos, ajustes, bajas, parámetros, feriados, permisos, el calendario y los

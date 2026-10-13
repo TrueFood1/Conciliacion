@@ -8,7 +8,7 @@ ignorado por git) y NUNCA imprime la contraseña ni el token. Claude solo ve la 
 
 Qué prueba, con el interruptor ENCENDIDO (ENCENDER_ASISTENTE.sql):
   · Supabase: entra con la cuenta de Instinct; es asistente; el proxy lo deja leer.
-  · Lee pedidos y tarifas de compra; NO ve Personal (rrhh_*).
+  · Lee pedidos, tarifas de compra y TODO Personal (salarios, parámetros, calendario) desde el 13-oct.
   · NO escribe: un insert en ent_pedido (tabla con INSERT abierto) tiene que dar 42501. La fila va
     vacía a propósito: si el candado fallara, la base la rechaza igual por NOT NULL (23502) y no
     queda nada escrito; por eso un 23502 se marca como FALLA del candado, no como éxito.
@@ -105,9 +105,16 @@ def main():
     ver("lee pedidos", "0" if apagado else "> 0", n, (n == 0) if apagado else (isinstance(n, int) and n > 0))
     n = contar("compra_tarifa_odoo")
     ver("lee tarifas de compra", "0" if apagado else "> 0", n, (n == 0) if apagado else (isinstance(n, int) and n > 0))
-    for t in ("rrhh_persona", "rrhh_salario"):
+    # Desde el 13-oct (INSTINCT_VE_TODO.sql) Instinct ve TODO, Personal incluido; apagado, nada.
+    for t in ("rrhh_persona", "rrhh_salario", "rrhh_param"):
         n = contar(t)
-        ver("NO ve Personal (%s)" % t, "0 o sin permiso", n, n == 0 or (isinstance(n, str) and ("42501" in n or "HTTP 401" in n or "HTTP 403" in n)))
+        ver("ve Personal (%s)" % t, "0" if apagado else "> 0", n, (n == 0) if apagado else (isinstance(n, int) and n > 0))
+    st, js, _ = pedir("POST", SUPA + "/rest/v1/rpc/rrhh_calendario", {}, sb)
+    nc = len(js) if st == 200 and isinstance(js, list) else "HTTP %s" % st
+    ver("rrhh_calendario()", "0" if apagado else "> 0", nc, (nc == 0) if apagado else (isinstance(nc, int) and nc > 0))
+    st, js, _ = pedir("POST", SUPA + "/rest/v1/rrhh_salario", {}, dict(sb, Prefer="return=minimal"))
+    cod = js.get("code") if isinstance(js, dict) else None
+    ver("NO inserta salarios", "42501", "%s %s" % (st, cod), cod == "42501")
     st2, js2, _ = pedir("POST", SUPA + "/rest/v1/rpc/acceso_perfil", {}, sb)
     ver("acceso_perfil()", "asistente", js2 if st2 == 200 else st2, js2 == "asistente")
     st, js, _ = pedir("POST", SUPA + "/rest/v1/ent_pedido", {}, dict(sb, Prefer="return=minimal"))
