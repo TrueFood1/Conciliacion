@@ -4710,6 +4710,14 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
    proveedor pasa a secundario (ver `.cp-pcrow .cp-in1`). «Hoy» sigue en ámbar. */
 #vCompras .cp-gtit{font-size:14px;font-weight:600;color:var(--text);padding:14px 0 4px}
 #vCompras .cp-gtit-hoy{color:var(--warn)}
+#vCompras .cp-avrojo{color:var(--stop-tx);font-weight:600;font-size:13.5px;line-height:1.45;border:1px solid currentColor;border-radius:8px;padding:10px 12px;margin-top:12px}
+#vCompras .cp-detinfo{font-size:12.5px;margin-top:10px;line-height:1.45;color:var(--text-2)}
+#vCompras .cp-llego{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px}
+#vCompras .cp-tog{flex:0 0 auto;padding:7px 12px;font-size:13px}
+#vCompras .cp-tog.cp-on{border-color:var(--m-comp);color:var(--m-comp)}
+#vCompras .cp-inp{background:var(--raise);border:.5px solid var(--border-strong);color:var(--text);border-radius:7px;padding:6px 8px;font-family:inherit;font-size:13px;min-width:0}
+#vCompras .cp-inp-fe{width:16.5em;font-variant-numeric:tabular-nums}
+#vCompras .cp-nota{width:100%;min-height:2.6em;resize:vertical;margin:12px 0 0;box-sizing:border-box}
 #vCompras .cp-aviso-crea{font-size:12.5px;text-align:right;margin:10px 0 -2px}
 #vCompras .cp-pcrow .cp-in1{font-weight:400;color:var(--text-2);font-size:12.5px}   /* el proveedor: secundario, del tamaño del resto de la línea */
 #vCompras .cp-canal{font-size:11.5px;color:var(--text-3);font-weight:400;margin-left:4px}
@@ -5126,7 +5134,7 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 12 oct 2026 · b87';
+const BUILD = 'v 13 oct 2026 · b88';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -16349,7 +16357,7 @@ function bsValidadoHTML(p){
 async function escrituraValidar(id, confirmar){ return escrituraPedir('/validar', id, confirmar); }
 // La misma llamada para las dos rutas del servicio: /validar (salida de venta) y
 // /trasladar (traslado interno, 1-oct). El cuerpo es {pedido_id, confirmar} en las dos.
-async function escrituraPedir(ruta, id, confirmar){
+async function escrituraPedir(ruta, id, confirmar, huella){
   let token='';
   try{ const s=await sbClient().auth.getSession();
        token=(s&&s.data&&s.data.session&&s.data.session.access_token)||''; }catch(e){}
@@ -16358,7 +16366,9 @@ async function escrituraPedir(ruta, id, confirmar){
     res=await fetch(ESCRITURA_URL+ruta, {method:'POST',
       headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
       // /pedir (T-28) lleva el id de una PROPUESTA de compra, no de un pedido de Entregas.
-      body:JSON.stringify((function(){ const b={}; b[ruta==='/pedir'?'propuesta_id':'pedido_id']=id; if(confirmar) b.confirmar=true; return b; })())});
+      // Compras v3 (13-oct): /pedir confirma con la huella de su vista previa.
+      body:JSON.stringify((function(){ const b={}; b[ruta==='/pedir'?'propuesta_id':'pedido_id']=id; if(confirmar) b.confirmar=true;
+                                       if(huella && ruta==='/pedir') b.huella=huella; return b; })())});
   }catch(e){
     try{ console.error('[Truefie] Validar en Odoo · sin respuesta', id, e); }catch(_){}
     return {red:true};
@@ -20929,7 +20939,8 @@ function cpAbrirPedido(gi){
   // falta quedan detrás de «+ Agregar otro producto de este proveedor».
   const filas=_cpFilasPedido(g);
   const v={}; filas.forEach(function(f){ v[f.pid]=_cpSugPaq(f); });
-  _cpReg={gi:gi, filas:filas, valores:v, paso:'editar', previa:null, propuestaId:null, verTodos:false, msg:'', cls:''};
+  _cpReg={gi:gi, filas:filas, valores:v, paso:'editar', previa:null, propuestaId:null, verTodos:false, msg:'', cls:'',
+          llego:false, llegoDia:_rzCtx.hoyStr, fe:'', nota:''};
   cpPintarPills(); cpRender(); try{ window.scrollTo(0,0); }catch(e){}
 }
 // Lo sugerido en la unidad del panel: empaques hacia arriba, o la unidad del producto (g → kg).
@@ -20957,14 +20968,28 @@ function _cpFechasPedido(g){
     return {modo:'pedir', pedido:hoy, entrega:g.ci.E, uso:g.ci.U}; }
   return {modo:'pedir', pedido:hoy, entrega:_dfAdd(hoy, g.demora), uso:null};
 }
+// «YA LLEGÓ» (Compras v3, etapa 1, 13-oct): una compra que ya está en bodega se registra con su fecha
+// real (hasta 30 días atrás) y el consecutivo de su FE. Pedido = llegada; no hay mensaje al proveedor.
+const CP_LLEGO_DIAS=30;
+function _cpFechasReg(P, g){
+  return P.llego ? {modo:'llego', pedido:P.llegoDia, entrega:P.llegoDia, uso:null} : _cpFechasPedido(g);
+}
+function cpLlego(){ const P=_cpReg; if(!P) return; P.llego=!P.llego; P.previa=null; P.propuestaId=null; P.msg=''; cpRenderRegistro(); }
+function cpRegCampo(campo, v){ const P=_cpReg; if(!P) return; P[campo]=v; P.previa=null; P.propuestaId=null; }
 function cpRenderRegistro(){
   const P=_cpReg, b=document.getElementById('cpBody'); if(!P||!b) return;
-  const g=_cpAlc.grupos[P.gi], prov=_cpNomCorto(g.nombre), F=_cpFechasPedido(g);
+  const g=_cpAlc.grupos[P.gi], prov=_cpNomCorto(g.nombre), F=_cpFechasReg(P, g);
   const col=function(n){ return n==null?'—':'₡'+_rzN(n, 0); };
   let h='<div class="cp-reg"><button class="cp-volver" onclick="cpIr(\'porcomprar\')">‹ Por comprar</button>';
   if(P.paso==='editar'){
-    h+='<div class="cp-regh">'+esc(prov)+' <span class="cp-sep">·</span> '+(F.modo==='registrar'?_cpF('pidió', F.pedido):_cpF('pide', F.pedido))
-      +' <span class="cp-sep">·</span> '+_cpF('llega', F.entrega)+'</div>';
+    h+='<div class="cp-regh">'+esc(prov)+' <span class="cp-sep">·</span> '
+      +(F.modo==='llego' ? _cpF('llegó', F.entrega)
+        : ((F.modo==='registrar'?_cpF('pidió', F.pedido):_cpF('pide', F.pedido))+' <span class="cp-sep">·</span> '+_cpF('llega', F.entrega)))+'</div>';
+    h+='<div class="cp-llego"><button class="cp-btn cp-tog'+(P.llego?' cp-on':'')+'" onclick="cpLlego()" aria-pressed="'+(P.llego?'true':'false')+'">Ya llegó</button>'
+      +(P.llego ? ('<input type="date" class="cp-inp" id="cpLlegoDia" aria-label="Día que llegó" value="'+esc(P.llegoDia)+'" min="'+_dfAdd(_rzCtx.hoyStr,-CP_LLEGO_DIAS)
+          +'" max="'+_rzCtx.hoyStr+'" onchange="cpRegCampo(\'llegoDia\',this.value);cpRenderRegistro()">'
+          +'<input type="text" class="cp-inp cp-inp-fe" id="cpFe" inputmode="numeric" maxlength="20" placeholder="Consecutivo de la FE (20 dígitos)" aria-label="Consecutivo de la FE" value="'+esc(P.fe)
+          +'" oninput="this.value=this.value.replace(/\\D/g,\'\');cpRegCampo(\'fe\',this.value)">') : '')+'</div>';
     const vis=[], resto=[];
     P.filas.forEach(function(f){ const s=_cpSugPaq(f), n=+P.valores[f.pid]||0; ((s>0||n>0)?vis:resto).push(f); });
     // «ALCANZA HASTA» EN VIVO (Andrea, 3-oct): con lo pedido llegando el día de la entrega. En ámbar
@@ -20983,25 +21008,35 @@ function cpRenderRegistro(){
     h+='<table class="cp-atbl"><thead><tr><th>Insumo</th><th>Falta</th><th>Sugiere</th><th>Pedido</th><th>Alcanza</th></tr></thead><tbody>'
       +vis.map(fila).join('')+(P.verTodos?resto.map(fila).join(''):'')+'</tbody></table>';
     if(resto.length && !P.verTodos) h+='<button class="cp-ceros" onclick="cpVerTodos()">+ Agregar otro producto de este proveedor</button>';
-    const T=_cpTotalEstimado(P), wa=(g.canal==='whatsapp');
+    h+='<textarea class="cp-inp cp-nota" id="cpNota" maxlength="500" placeholder="Nota (opcional)" aria-label="Nota" oninput="cpRegCampo(\'nota\',this.value)">'+esc(P.nota)+'</textarea>';
+    const T=_cpTotalEstimado(P), wa=(g.canal==='whatsapp' && !P.llego);
     h+='<div class="cp-pie cp-pie3"><div class="cp-tot'+(AP.odoo?'':(AP.corto?' cp-amb3':''))+'">'
       +(AP.odoo ? ('<span class="cp-odoo">'+esc(CP_ODOO_TXT)+'</span>')
         : AP.alc ? ('Con este pedido alcanza '+esc(AP.alc)) : ('Con este pedido falta '+esc(_cpDia(AP.peor.falla))))
       +' <span class="cp-g">·</span> '+col(T.t)+' <span class="cp-g">sin IVA'+(T.falta?' + sin precio':'')+'</span></div>'
       +'<div class="cp-btns2">'+(wa?'<button class="cp-btn" onclick="cpWhatsApp()">Copiar mensaje</button>':'')
-      +'<button class="cp-btn cp-btnp" onclick="cpRevisar()">'+(g.canal==='tienda'?'Registrar compra en Odoo':'Crear orden en Odoo')+'</button></div></div>';
+      +'<button class="cp-btn cp-btnp" onclick="cpRevisar()">'+((g.canal==='tienda'||P.llego)?'Registrar compra en Odoo':'Crear orden en Odoo')+'</button></div></div>';
   } else {
     const r=P.previa;
     // Antes de confirmar NO existe en Odoo (Andrea, 4-oct: «confirmada en Odoo» se leía como hecha).
     // `P.creada` (el nombre de la orden) lo pone cpConfirmar cuando Odoo contestó que la creó.
-    const bot=(F.modo==='registrar'?'Registrar en Odoo':'Confirmar la orden');
-    h+='<div class="cp-regh">'+esc(prov)+' <span class="cp-sep">·</span> '+_cpF('llega', r.entrega_dia)
+    const bot=((F.modo==='registrar'||F.modo==='llego')?'Registrar en Odoo':'Confirmar la orden');
+    h+='<div class="cp-regh">'+esc(prov)+' <span class="cp-sep">·</span> '+_cpF(F.modo==='llego'?'llegó':'llega', r.entrega_dia)
       +' <span class="cp-g">· '+(P.creada?(esc(P.creada)+' confirmada en Odoo'):'todavía no está en Odoo')+'</span></div>'
       +'<div class="cp-lista">'+r.lineas.map(function(l){
         const emp=l.empaques!=null?(_rzN(l.empaques)+' '+(l.empaques===1?(_CN_SING[l.empaque_lab]||l.empaque_lab):l.empaque_lab)):(_rzN(l.cant_po,2)+' '+l.uom_po);
         return '<div class="cp-it cp-it3"><span class="cp-in">'+esc(l.producto.replace(/^\[[^\]]*\]\s*/,''))+'</span><span class="cp-g">'+esc(emp)+'</span><span class="cp-mto">'+col(l.subtotal)+'</span></div>'; }).join('')
       +'<div class="cp-it cp-it3 cp-ittot"><span class="cp-in">Total sin IVA</span><span class="cp-mto">'+col(r.total_estimado)+'</span></div></div>';
-    const av=[];
+    if(r.factura_ref||r.nota) h+='<div class="cp-detinfo">'+(r.factura_ref?('FE '+esc(r.factura_ref)):'')+(r.factura_ref&&r.nota?'<br>':'')+(r.nota?esc(r.nota):'')+'</div>';
+    const av=[], rojo=[];
+    // El tope NO frena (Andrea, 13-oct): avisa y confirma la socia con el clic. Pasado 10 × el tope el
+    // aviso va en ROJO, arriba de todo, diciendo cuántas veces es (`fuerte`, lo decide el servidor).
+    (r.avisos_tope||[]).forEach(function(e){
+      const nom=String(e.producto).replace(/^\[[^\]]*\]\s*/,''), q=_rzN(e.pide, e.pide%1?1:0)+' '+e.unidad, t=_rzN(e.tope, e.tope%1?1:0)+' '+e.unidad;
+      if(e.fuerte) rojo.push(nom+': '+q+(e.veces!=null?(' es '+_rzN(e.veces, e.veces%1?1:0)+' veces el tope ('+t+').'):' sin consumo con qué comparar.'));
+      else av.push(nom+': '+q+', más que el consumo habitual (tope '+t+').'); });
+    if(rojo.length) h+='<div class="cp-avrojo" role="alert">'+rojo.map(esc).join('<br>')+'</div>';
+    (r.posibles_duplicados||[]).forEach(function(x){ av.push(x+' Si es esta misma compra, se duplicaría.'); });
     if(r.sin_precio&&r.sin_precio.length) av.push('Sin precio en Odoo: '+r.sin_precio.join(', ')+'.');
     if(r.otras_ordenes&&r.otras_ordenes.length) av.push('Hay órdenes de '+prov+' cargadas a mano y sin recibir ('+r.otras_ordenes.map(function(x){ return x.name; }).join(', ')+'): si alguna es este pedido, se duplicaría.');
     if(av.length) h+='<div class="cp-detamb">'+av.map(esc).join('<br>')+'</div>';
@@ -21025,7 +21060,13 @@ async function cpWhatsApp(){
   catch(e){ window.prompt('Copiá este texto:', txt); }
 }
 async function cpRevisar(){
-  const P=_cpReg; if(!P) return; const g=_cpAlc.grupos[P.gi], F=_cpFechasPedido(g);
+  const P=_cpReg; if(!P) return; const g=_cpAlc.grupos[P.gi], F=_cpFechasReg(P, g);
+  if(P.llego){
+    if(!/^[0-9]{20}$/.test(P.fe||'')){ _cpRegMsg('Falta el consecutivo de la FE: 20 dígitos.','cp-mal'); return; }
+    if(!P.llegoDia || P.llegoDia>_rzCtx.hoyStr || P.llegoDia<_dfAdd(_rzCtx.hoyStr,-CP_LLEGO_DIAS)){
+      _cpRegMsg('El día que llegó tiene que estar entre hoy y '+CP_LLEGO_DIAS+' días atrás.','cp-mal'); return; }
+  }
+  const nota=(P.nota||'').trim();
   const lineas=P.filas.map(function(f){ const pe=_cpPE(f.pid), n=+P.valores[f.pid]||0;
       return {producto_id:f.pid, nombre:f.nombre, uom:f.uom, calculado:Math.round((f.sug||0)*1000)/1000,
               pedido:Math.round(_dfDesdePanel(f,n)*1000)/1000, empaques:pe?n:null, empaque_lab:pe?pe.lab:null,
@@ -21035,9 +21076,12 @@ async function cpRevisar(){
   _cpRegMsg('Guardando la propuesta y revisando en Odoo…');
   try{
     const c=sbClient(); const {data:{user}}=await c.auth.getUser();
-    const {data,error}=await c.from('compra_propuesta').insert({proveedor_id:+g.proveedor_id, proveedor:g.nombre||null,
+    const fila={proveedor_id:+g.proveedor_id, proveedor:g.nombre||null,
         modo:F.modo, pedido_dia:F.pedido, entrega_dia:F.entrega, uso_dia:F.uso, lineas:lineas,
-        creado_por:(user&&user.email)||''}).select('id').single();
+        creado_por:(user&&user.email)||''};
+    if(P.llego) fila.factura_ref=P.fe;
+    if(nota) fila.nota=nota;
+    const {data,error}=await c.from('compra_propuesta').insert(fila).select('id').single();
     if(error) throw new Error('No pude guardar la propuesta: '+(error.message||error));
     P.propuestaId=data.id;
   }catch(e){ _cpRegMsg(String(e&&e.message||e),'cp-mal'); return; }
@@ -21051,11 +21095,13 @@ async function cpConfirmar(){
   const P=_cpReg; if(!P||!P.propuestaId||P.paso!=='revisar') return;
   const bt=document.getElementById('cpConf'); if(bt) bt.disabled=true;
   _cpRegMsg('Creando la orden en Odoo…');
-  const R=await escrituraPedir('/pedir', P.propuestaId, true);
+  const R=await escrituraPedir('/pedir', P.propuestaId, true, P.previa&&P.previa.huella);
   if(R.red){ _cpRegMsg('No hubo respuesta: no se sabe si Odoo creó la orden. Mirá Pedidos antes de reintentar.','cp-mal'); return; }
+  if(R.js && R.js.motivo==='huella_vieja'){ if(bt) bt.disabled=false; P.paso='editar'; P.previa=null; P.propuestaId=null;
+    _cpRegMsg('Algo cambió desde la vista previa: revisala de nuevo.','cp-amb2'); cpRenderRegistro(); return; }
   if(R.st===423){ _cpRegMsg('Todo calza, pero la compra está apagada: no se creó nada en Odoo.','cp-amb2'); return; }
   if(!R.js.ok){ if(bt) bt.disabled=false; _cpRegMsg(R.js.texto||R.js.motivo||'El servicio dijo que no.','cp-mal'); return; }
-  P.creada=R.js.po_nombre||'La orden'; P.msg='Orden '+R.js.po_nombre+' creada y confirmada en Odoo.'; P.cls='cp-ok'; cpRenderRegistro();
+  P.creada=R.js.po_nombre||'La orden'; P.msg='Orden '+R.js.po_nombre+(P.llego?' registrada en Odoo con la FE '+P.fe+'.':' creada y confirmada en Odoo.'); P.cls='cp-ok'; cpRenderRegistro();
   _rzCtx.cargadoEn=0; _cpPedidos=null;            // la próxima vista vuelve a leer: "ya pedido" la descuenta
   setTimeout(function(){ irACompras('porcomprar'); }, 1500);
 }
