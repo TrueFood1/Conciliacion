@@ -2670,7 +2670,6 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
       <div class="m3title" style="font-size:24px">Resultados</div>
     </div>
   </div>
-  <div class="bar-slot" id="barCardRes"></div>
   <div class="sim-seg" id="resSeg" style="max-width:440px;margin-top:18px">
     <button data-v="mes" class="on">El mes</button>
     <button data-v="doce">Últimos 12 meses</button>
@@ -2759,7 +2758,6 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
       <div class="m3sub" style="margin-top:2px;font-size:13px">Saldo pendiente, por vencimiento · solo lectura.</div>
     </div>
   </div>
-  <div class="bar-slot" id="barCardCob"></div>
   <div class="m3nav" id="cobNav" style="margin-top:14px">
     <button class="m3tab on" data-t="cobrar" onclick="cobTab('cobrar')">Por cobrar</button>
     <button class="m3tab" data-t="pagar" onclick="cobTab('pagar')">Por pagar</button>
@@ -4208,25 +4206,6 @@ body:has(.de-fondo) #tkBtn{display:none}
 /* El aviso va en ámbar, que en este sistema es el color que AVISA — no en lima,
    que es el de acción. Ver el estándar visual: "lima y ámbar conviven". */
 .bs-anu-av{flex:1 1 100%;font-size:11.5px;color:var(--warn);line-height:1.45}
-/* ── Barrido de 1103030 · tarjeta de Finanzas (14-oct): acento de Finanzas, el aviso en ámbar ── */
-.bar-slot{max-width:720px;margin-top:16px}
-.bar-slot:empty{display:none}
-.bar-card{display:flex;flex-direction:column;gap:6px}
-.bar-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
-.bar-t{font-size:14px;font-weight:600;color:var(--text)}
-.bar-mes{font-size:12.5px;color:var(--m-fin)}
-.bar-n{font-size:15px;color:var(--text)}
-.bar-n b{font-weight:600}
-.bar-s{font-size:12.5px;color:var(--text-2);line-height:1.45}
-.bar-exc{font-size:12px;color:var(--text-2);line-height:1.5;border-top:.5px solid var(--border);padding-top:6px}
-.bar-ok{font-size:12.5px;color:var(--text-2)}
-.bar-no{font-size:12.5px;color:var(--text-2)}
-.bar-no.amb{color:var(--warn)}
-.bar-acc{display:flex;justify-content:flex-end;margin-top:4px}
-.bar-btn{border-color:var(--m-fin);color:var(--m-fin)}
-.bar-btn:disabled{opacity:.45;cursor:default}
-.bar-msg{font-size:12.5px;color:var(--text-2);line-height:1.45}
-.bar-msg.mal{color:var(--stop-tx)}
 /* «Anular pedido» (§29, 14-oct): reusa la fila de «Sale otro día». El motivo va en chips;
    el elegido lleva el borde del módulo (--ent-line), nunca un fondo lima. */
 .anu-t{flex:1 1 100%;font-size:12.5px;font-weight:600;color:var(--text-2)}
@@ -5277,7 +5256,7 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 14 oct 2026 · b94';
+const BUILD = 'v 14 oct 2026 · b95';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -8546,12 +8525,10 @@ function irACalcPrecios(){
 }
 function irAResultados(){
   _modShow('vResultados'); crumbSet('Finanzas','Resultados');
-  barCargar();   // la tarjeta del barrido de 1103030: solo socias, en segundo plano
   resInit();   // mockup fase 1: datos de ejemplo en el cliente, no lee Odoo
 }
 function irACobros(){
   _modShow('vCobros'); crumbSet('Finanzas','Cobros y Pagos');
-  barCargar();
   if(!_loaded.cob){ _loaded.cob=true; cobTab('cobrar'); }
 }
 function abrirCostos(){ irACostos(); }        // atajo del home-cta "Costos por producto"
@@ -21287,97 +21264,6 @@ async function cpTarAplicar(){
   await cpTarCargar(true);
   if(_cpTar){ _cpTar.msg=msg; _cpTar.msgCls=cls; }
   cpRender();
-}
-
-// ══ BARRIDO DE 1103030 (14-oct-2026) · tarjeta de Finanzas · solo socias ═══════════════
-// Sexto carril del servicio de escritura (POST /barrido). Los residuos que deja la conciliación entre el
-// costo facturado y el valuado al validar (centavos y colones en 1103030) pasan una vez por mes a 6106022.
-// El navegador manda {mes} y nada más: qué se barre, cómo y con qué asiento lo decide el servidor contra
-// Odoo. La tarjeta muestra la vista previa del mes que toca —el anterior, desde el día 1; si ya está barrido
-// o es anterior a octubre-2026, el mes en curso, que se puede MIRAR pero no barrer— y «Barrer [mes]» solo
-// funciona desde el 1 del mes siguiente y con el carril encendido. Decisiones de Andrea, 14-oct.
-let _bar=null;     // {r, hecho:[{mes, asiento}], err, msg, mal, barriendo, en}
-const BAR_DESDE='2026-10';
-const _BAR_MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','setiembre','octubre','noviembre','diciembre'];
-const _barMesTxt=function(m){ const p=String(m||'').split('-'); return p.length===2 ? (_BAR_MES[(+p[1])-1]+' '+p[0]) : m; };
-const _barCol=function(n){ return (n<0?'−':'')+'₡'+_rzN(Math.abs(+n||0), 2); };
-function _barMeses(){
-  const h=new Date(Date.now()-6*3600000).toISOString().slice(0,10);   // hoy, en hora CR
-  const y=+h.slice(0,4), m=+h.slice(5,7), cur=h.slice(0,7);
-  const ant=(m===1 ? (y-1)+'-12' : y+'-'+String(m-1).padStart(2,'0'));
-  return (ant>=BAR_DESDE ? [ant] : []).concat(cur>=BAR_DESDE ? [cur] : []);
-}
-async function barCargar(forzar){
-  const slots=['barCardRes','barCardCob'].map(function(id){ return document.getElementById(id); }).filter(Boolean);
-  if(!(await accesoSocia())){ slots.forEach(function(s){ s.innerHTML=''; }); return; }
-  if(!forzar && _bar && _bar.en && Date.now()-_bar.en < 5*60000) return barPintar();
-  _bar={hecho:[], cargando:true, msg:(_bar&&_bar.msg)||'', mal:!!(_bar&&_bar.mal), aviso:(_bar&&_bar.aviso)||null};
-  barPintar();
-  for(const mes of _barMeses()){
-    const R=await _escrituraPost('/barrido', {mes:mes});
-    if(R.red){ _bar.err='No pude preguntarle al servicio de escritura. Volvé a abrir Finanzas en un rato.'; break; }
-    const js=R.js||{};
-    if(R.st===200 && js.ok){ _bar.r=js; break; }
-    if(js.motivo==='ya_barrido_truefie' || js.motivo==='ya_barrido_odoo'){ _bar.hecho.push({mes:mes, texto:js.texto||''}); continue; }
-    if(js.motivo==='antes_del_inicio') continue;
-    _bar.err=(js.texto||js.motivo||('El servicio contestó '+R.st))+(R.st===404?' (¿el servicio todavía no tiene el barrido?)':'');
-    break;
-  }
-  _bar.cargando=false; _bar.en=Date.now();
-  barPintar();
-}
-function _barHTML(){
-  const B=_bar; if(!B) return '';
-  let h='<div class="card bar-card"><div class="bar-h"><span class="bar-t">Barrido de 1103030</span>';
-  const r=B.r;
-  if(r) h+='<span class="bar-mes">'+esc(_barMesTxt(r.mes))+(r.abierto?' · en curso':'')+'</span>';
-  h+='</div>';
-  B.hecho.forEach(function(x){ h+='<div class="bar-ok">'+esc(_barMesTxt(x.mes))+': barrido · '+esc(String(x.texto).replace(/^.*?: /,''))+'</div>'; });
-  if(B.aviso) h+='<div class="bar-ok">'+esc(B.aviso)+'</div>';
-  if(B.cargando) return h+'<div class="bar-s">Leyendo 1103030 en Odoo…</div></div>';
-  if(B.err) return h+'<div class="bar-msg mal">'+esc(B.err)+'</div></div>';
-  if(!r) return h+'</div>';
-  h+='<div class="bar-n"><b>'+r.n+'</b> residuo'+(r.n===1?'':'s')+' · <b>'+esc(_barCol(r.total))+'</b> a 6106022</div>'
-    +'<div class="bar-s">Asiento al '+esc(_fechaCorta(r.fecha))+' en Operaciones varias · '
-    +'excluidos (más de ₡'+_rzN(r.umbral,0)+'): '+r.excluidos.length+' · pendientes sin pareja: '+r.pendientes.n
-    +(r.pendientes.n?(' ('+esc(_barCol(r.pendientes.monto))+')'):'')+'</div>';
-  if(r.excluidos.length) h+='<div class="bar-exc">'+r.excluidos.map(function(x){
-      return esc((x.asiento||'')+' · '+(x.producto||'')+' · '+_barCol(x.residuo)); }).join('<br>')+'</div>';
-  // POR QUÉ NO SE PUEDE, si no se puede. El botón no se esconde: se ve deshabilitado y dice por qué.
-  let no='';
-  if(r.abierto) no='Se puede barrer desde el '+_fechaCorta(r.barrer_desde)+'.';
-  else if(!r.barrido_encendido) no='El barrido está apagado en el servicio (BARRIDO_ENCENDIDO).';
-  else if(!r.n) no='No hay residuos que barrer.';
-  if(no) h+='<div class="bar-no'+(r.abierto?'':' amb')+'">'+esc(no)+'</div>';
-  h+='<div class="bar-acc"><button class="btn btn-sm bar-btn"'+((no||B.barriendo)?' disabled':'')+' onclick="barBarrer()">'
-    +(B.barriendo?'Barriendo…':('Barrer '+esc(_barMesTxt(r.mes).split(' ')[0])))+'</button></div>';
-  if(B.msg) h+='<div class="bar-msg'+(B.mal?' mal':'')+'">'+esc(B.msg)+'</div>';
-  return h+'</div>';
-}
-function barPintar(){
-  const h=_barHTML();
-  ['barCardRes','barCardCob'].forEach(function(id){ const s=document.getElementById(id); if(s) s.innerHTML=h; });
-}
-async function barBarrer(){
-  const B=_bar, r=B&&B.r; if(!r || B.barriendo) return;
-  if(!confirm('¿Barrer '+_barMesTxt(r.mes)+'?\n\nSe crea en Odoo el asiento al '+_fechaCorta(r.fecha)+': '+r.n+' residuos, '
-     +_barCol(r.total)+' a 6106022, y cada residuo queda conciliado.')) return;
-  B.barriendo=true; B.msg=''; B.mal=false; barPintar();
-  const R=await _escrituraPost('/barrido', {mes:r.mes, confirmar:true, huella:r.huella});
-  B.barriendo=false;
-  const js=(R&&R.js)||{};
-  if(R.red){ B.msg='No hubo respuesta: no se sabe si se barrió. Volvé a abrir Finanzas antes de reintentar.'; B.mal=true; return barPintar(); }
-  if(R.st===200 && js.ok){
-    // Después de barrer: el número del asiento, arriba, y la vista previa vuelve a leerse (el mes siguiente).
-    const aviso=_barMesTxt(r.mes)+': barrido · asiento '+js.asiento_nombre+' · '+js.n+' residuos · '+_barCol(js.total);
-    _bar={en:0, msg:'', mal:false, aviso:aviso}; return barCargar(true);
-  }
-  B.mal=true;
-  if(R.st===423) B.msg='El barrido está apagado en el servicio (BARRIDO_ENCENDIDO): no se tocó Odoo.';
-  else if(js.motivo==='huella_vieja'){ B.msg='Los residuos cambiaron desde la vista previa: la volví a leer. Revisala y barré otra vez.'; B.mal=false;
-    _bar.en=0; return barCargar(true).then(function(){ _bar.msg=B.msg; barPintar(); }); }
-  else B.msg=(js.texto||js.motivo||'No se barrió.');
-  barPintar();
 }
 
 // LOS PEDIDOS QUE HAY QUE HACER: la lista de Por comprar, la tarjeta del Resumen y la alerta del
