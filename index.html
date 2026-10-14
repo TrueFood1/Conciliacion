@@ -812,6 +812,10 @@ tr.r-ing td{background:#eff6ff}
 .home-hdr-name{font-size:15px;font-weight:600;color:var(--text);letter-spacing:-.01em}
 .home-live{display:flex;align-items:center;gap:7px;margin-bottom:0;margin-left:auto;margin-right:84px}
 .home-live .t{font-size:12px;font-weight:500;color:var(--text-dim);letter-spacing:.3px}
+/* Las franjas de «solo lectura» también en el inicio (14-oct): debajo de «conectado a Odoo». */
+.home-live-c{display:flex;flex-direction:column;min-width:0;line-height:1.3}
+.home-fr{display:none;font-size:11px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.home-fr.hdr-asis{color:var(--warn)}
 /* zona central: consulta centrada verticalmente */
 .home-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;gap:0}
 /* zona inferior: módulos anclados abajo */
@@ -1464,6 +1468,9 @@ table td,table th{border-color:#F2F0EA}
   .header .crumb-sep::after{content:'·';font-size:12px;color:var(--text-3)}
   .header .hdr-prod{order:1;margin-left:auto;font-size:0;white-space:nowrap}
   .header .hdr-prod::after{content:'solo lectura';font-size:11px;color:var(--text-3)}
+  /* el asistente: una sola franja en el teléfono, y que diga quién (14-oct) */
+  .header .hdr-asis::after{content:'Instinct · solo lectura';color:var(--warn)}
+  body.es-asistente .header #bannerProd{display:none!important}
   .header .logo-link{height:22px!important;order:-2}
   #btnSalir{top:calc(9px + env(safe-area-inset-top));right:12px;padding:4px 10px;font-size:11px;
     color:var(--text-3);border-color:var(--border)}
@@ -2023,7 +2030,7 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
            ✱ de reportar se queda abajo a la derecha: reportar y ver son dos
            cosas, y juntarlas en la misma esquina las confunde. -->
       <div class="home-hdr-right">
-        <div class="home-live"><span class="live-dot-home"></span><span class="t">conectado a Odoo · datos en vivo</span></div>
+        <div class="home-live"><span class="live-dot-home"></span><span class="home-live-c"><span class="t">conectado a Odoo · datos en vivo</span><span class="home-fr" id="homeFrProd">producción · solo lectura</span><span class="home-fr hdr-asis" id="homeFrAsis">Instinct · solo lectura</span></span></div>
         <button class="tk-chip" id="tkLobby" onclick="irATickets()">
           <span class="tk-chip-n">Tickets</span>
           <span class="tk-chip-e cargando" id="tkLobbyEstado">contando…</span>
@@ -5270,7 +5277,7 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 14 oct 2026 · b93';
+const BUILD = 'v 14 oct 2026 · b94';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -5602,9 +5609,22 @@ async function doLogin(isRetry){
       }
     }catch(e){console.warn('No se pudo cargar diario BAC:',e);}
     st.innerHTML='';
+    // QUIÉN ESTÁ CONECTADO (14-oct): en producción el nombre salía del usuario de Odoo cuyo login es el
+    // del campo `inUser`, que trae «andrea@…» escrito en el HTML — así que TODOS veían «Andrea
+    // Fernandez». Ahora es la persona de la sesión de Truefie (su nombre en acceso_usuario, o su correo).
+    let quien=users[0].name;
+    if(esProd(url)){
+      try{
+        const {data:{user:su}}=await sbClient().auth.getUser();
+        const em=((su&&su.email)||'').trim().toLowerCase();
+        const {data:fil}=await sbClient().from('v_acceso_usuario').select('email,nombre').ilike('email',em).limit(5);
+        const mia=(fil||[]).filter(function(f){ return String(f.email||'').trim().toLowerCase()===em; })[0];
+        quien=(mia&&mia.nombre) || em || quien;
+      }catch(e){}
+    }
     document.getElementById('connPill').style.display='block';
-    document.getElementById('headerSub').textContent=users[0].name+' · '+url;
-    document.getElementById('alertConn').textContent='✓ Conectado como '+users[0].name;
+    document.getElementById('headerSub').textContent=quien+' · '+url;
+    document.getElementById('alertConn').textContent='✓ Conectado como '+quien;
     document.getElementById('alertConn').classList.remove('hidden');
     document.getElementById('vLogin').classList.add('hidden');
     document.getElementById('vLobby').classList.remove('hidden');   // tras conectar → lobby
@@ -5846,7 +5866,7 @@ async function accesoSocia(){
   document.body.classList.toggle('es-socia', _socia);
   document.body.classList.toggle('es-lectora', _lectora);
   document.body.classList.toggle('es-asistente', _perfil==='asistente');
-  const fa=document.getElementById('bannerAsis'); if(fa) fa.style.display=(_perfil==='asistente')?'':'none';
+  franjasPintar();
   return _socia;
 }
 // ¿Puede VER lo que ven las socias? Socias y asistente. Para mirar, nunca para escribir.
@@ -5973,11 +5993,19 @@ async function entrarProd(){
   await doLogin();
 }
 
+// LAS FRANJAS DE «SOLO LECTURA» (14-oct): producción y el asistente, en el encabezado de los módulos Y en
+// el del inicio. Una sola función: dos lugares que dibujan lo mismo se desincronizan.
+function franjasPintar(){
+  const prod=!!(SESSION && SESSION.url && esProd(SESSION.url)), asis=(_perfil==='asistente');
+  const pon=function(id, si, como){ const e=document.getElementById(id); if(e) e.style.display=si?(como||''):'none'; };
+  pon('bannerProd', prod, 'inline-flex'); pon('bannerAsis', asis);
+  pon('homeFrProd', prod, 'block'); pon('homeFrAsis', asis, 'block');
+}
 // Navegación lobby ↔ herramienta (no toca la lógica de conexión a Odoo)
 // Enciende/apaga el modo producción (banner + pestaña Conciliación deshabilitada).
 function aplicarModoProduccion(){
   const prod=esProd(SESSION.url);
-  const b=document.getElementById('bannerProd'); if(b)b.style.display=prod?'inline-flex':'none';
+  franjasPintar();
   document.querySelectorAll('.face-concil').forEach(t=>{
     if(prod){ t.classList.add('dis'); t.disabled=true; t.title='Conciliación bloqueada en modo producción — solo lectura'; }
     else { t.classList.remove('dis'); t.disabled=false; t.removeAttribute('title'); }
@@ -6273,10 +6301,17 @@ async function perPerfil(){
   if(_perPerfilOk) return _perEsSocia;
   try{
     const c=sbClient(); if(!c) throw new Error('sin conexión');
-    const {data,error}=await c.from('v_acceso_usuario').select('perfil,activo');
+    // ⚠️ POR CORREO, como `accesoSocia()` (arreglo del 14-oct). Antes no filtraba: confiaba en que la RLS
+    // devolvía SOLO la fila propia, y eso dejó de ser cierto el 13-oct con «Instinct ve todo» — el
+    // asistente recibía las 7 cuentas, `some(socias)` daba true y le aparecían Aprobar/Rechazar y el
+    // formulario de Días cerrados. Ahora cuenta la fila de quien mira y nada más.
+    const yo=await perEmail();
+    if(!yo) throw new Error('sin sesión');
+    const {data,error}=await c.from('v_acceso_usuario').select('email,perfil,activo').ilike('email',yo).limit(5);
     if(error) throw error;
-    _perEsSocia=(data||[]).some(function(r){ return r.activo && r.perfil==='socias'; });
-    _perLectora=_perEsSocia || (data||[]).some(function(r){ return r.activo && r.perfil==='asistente'; });
+    const mias=(data||[]).filter(function(r){ return String(r.email||'').trim().toLowerCase()===yo; });
+    _perEsSocia=mias.some(function(r){ return r.activo && r.perfil==='socias'; });
+    _perLectora=_perEsSocia || mias.some(function(r){ return r.activo && r.perfil==='asistente'; });
     _perPerfilOk=true;
   }catch(e){ _perEsSocia=false; _perLectora=false; }
   _perTabs(null);
