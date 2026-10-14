@@ -5258,7 +5258,7 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 14 oct 2026 · b96';
+const BUILD = 'v 14 oct 2026 · b97';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -15752,7 +15752,7 @@ async function bsCargar(force){
   bsEnriquecerFacturas();
 }
 
-// ── QUE FACTURA MANDA HOY ───────────────────────────────────────────────
+// ── QUÉ FACTURA MANDA HOY, Y DE QUÉ CLIENTE ES ─────────────────────────
 // Una factura revertida por nota de crédito y re-emitida deja al Historial
 // mostrando la muerta: el pedido 67 decía "factura 3534" cuando la que vale es la
 // 3546. Se deriva de Odoo y no a mano:
@@ -15761,44 +15761,72 @@ async function bsCargar(force){
 //                                    posted, out_invoice, sin revertir, la más nueva
 // `invoice_origin` es el pedido de venta, que es lo que de verdad ata las dos
 // facturas: la NC y la re-emisión cuelgan del mismo S0xxxx.
-let _bsFacEnriquecido=0;
-async function bsEnriquecerFacturas(){
-  const P=_bs||[]; if(!P.length) return;
-  const ids=[];
-  P.forEach(function(p){ if(p.factura_id && ids.indexOf(p.factura_id)<0) ids.push(p.factura_id); });
-  if(!ids.length) return;
-  try{
-    const mv=await odooCall('account.move','read',[ids],
-      {fields:['id','name','invoice_origin','reversal_move_id'],context:{lang:'es_CR'}});
-    const revertidas=mv.filter(function(m){ return (m.reversal_move_id||[]).length; });
-    if(!revertidas.length) return;
-    const origenes=[];
-    revertidas.forEach(function(m){ if(m.invoice_origin && origenes.indexOf(m.invoice_origin)<0)
-      origenes.push(m.invoice_origin); });
-    if(!origenes.length) return;
+//
+// EL CLIENTE TAMBIÉN (14-oct-2026). El TE …0069 salió a «cafe oteca» y el cliente real era
+// Café Pikaluca: Andrea lo anuló con NC y re-facturó con la …3585. `ent_pedido` guarda el
+// cliente del momento y no se toca (es la foto); lo que se MUESTRA es el de la factura
+// vigente, igual que el número. Una sola lectura para el Historial y Pendientes
+// (`_entFacVig`), y `_entQuien` la consulta: quien nombre al cliente con ella la recibe sola.
+// Se compara por ID (`cliente_id` del pedido contra el partner y el comercial de la
+// factura), nunca por el nombre: un alias o un contacto hijo no son otro cliente.
+// Si Odoo no contesta, todo queda como estaba: el cache vacío no cambia ningún nombre.
+const _entFacVig={};        // {factura_id anotado: {id, nombre, reemplaza, cliente_id, comercial_id, cliente, en}}
+const ENT_FACVIG_MS=5*60000;
+async function entFacVigenteLeer(ids){
+  const ahora=Date.now();
+  const pedir=[...new Set((ids||[]).filter(function(x){
+    const v=x && _entFacVig[x]; return x && (!v || ahora-v.en>ENT_FACVIG_MS); }))];
+  if(!pedir.length) return 0;
+  await _esperarOdoo();   // abierto antes de conectar, la lectura iba al proxy de demo y no cambiaba nada
+  const CAMPOS=['id','name','partner_id','commercial_partner_id','invoice_origin','reversal_move_id'];
+  const mv=await odooCall('account.move','read',[pedir],{fields:CAMPOS,context:{lang:'es_CR'}});
+  const origenes=[];
+  mv.forEach(function(m){ if((m.reversal_move_id||[]).length && m.invoice_origin
+    && origenes.indexOf(m.invoice_origin)<0) origenes.push(m.invoice_origin); });
+  const vigente={};
+  if(origenes.length){
     const cand=await odooCall('account.move','search_read',
       [[['move_type','=','out_invoice'],['state','=','posted'],['invoice_origin','in',origenes]]],
-      {fields:['id','name','invoice_origin','reversal_move_id'],limit:200,
-       order:'id desc',context:{lang:'es_CR'}});
+      {fields:CAMPOS,limit:200,order:'id desc',context:{lang:'es_CR'}});
     // La vigente de cada origen: la más nueva que NO esté revertida.
-    const vigente={};
     cand.forEach(function(m){
       if((m.reversal_move_id||[]).length) return;             // esta también murió
       if(!vigente[m.invoice_origin]) vigente[m.invoice_origin]=m;   // order id desc: la 1ª es la más nueva
     });
-    const porId={}; revertidas.forEach(function(m){ porId[m.id]=m; });
+  }
+  mv.forEach(function(m){
+    let v=m;
+    if((m.reversal_move_id||[]).length){ const r=vigente[m.invoice_origin]; if(r && r.id!==m.id) v=r; }
+    const com=v.commercial_partner_id||v.partner_id||[];
+    _entFacVig[m.id]={id:v.id, nombre:v.name, reemplaza:(v.id!==m.id)?m.name:'',
+      cliente_id:(v.partner_id&&v.partner_id[0])||null, comercial_id:com[0]||null,
+      cliente:com[1]||'', en:ahora};
+  });
+  return mv.length;
+}
+function _entFacVigDe(o){ const id=o&&o.factura_id; return (id&&_entFacVig[id])||null; }
+// El cliente de la factura vigente, SOLO si no es el que se anotó en el pedido. '' = no cambia.
+function _entCliVigente(o){
+  const v=_entFacVigDe(o); if(!v || !v.cliente || !o.cliente_id) return '';
+  const id=+o.cliente_id;
+  return (id===+v.cliente_id || id===+v.comercial_id) ? '' : v.cliente;
+}
+
+let _bsFacEnriquecido=0;
+async function bsEnriquecerFacturas(){
+  const P=_bs||[]; if(!P.length) return;
+  try{
+    await entFacVigenteLeer(P.map(function(p){ return p.factura_id; }));
     let n=0;
     P.forEach(function(p){
-      const vieja=porId[p.factura_id]; if(!vieja) return;
-      const v=vigente[vieja.invoice_origin];
-      if(!v || v.id===vieja.id) return;
-      p.fac_vigente={nombre:v.name, reemplaza:vieja.name, factura_id:v.id};
-      n++;
+      const v=_entFacVigDe(p); if(!v) return;
+      if(v.reemplaza){ p.fac_vigente={nombre:v.nombre, reemplaza:v.reemplaza, factura_id:v.id}; n++; }
+      if(_entCliVigente(p)) n++;
     });
     if(n){ _bsFacEnriquecido=Date.now(); bsRender(); }
   }catch(e){
     // En silencio NO: queda en consola. Pero la pantalla no se toca — lo que hay
-    // sigue sirviendo, solo que sin el "(reemplaza a …)".
+    // sigue sirviendo, solo que sin el "(reemplaza a …)" ni el cliente de la vigente.
     try{ console.warn('[Truefie] no pude leer de Odoo qué factura está vigente:',
       (e&&e.message)||e); }catch(_){}
   }
@@ -15836,7 +15864,7 @@ const ENT_MOTIVO_N={regalia:'Regalía', reposicion:'Reposición',
                     venta:'Venta', sin_clasificar:'Sin clasificar'};
 function _entQuien(o){
   o=o||{};
-  const cli=(o.cliente_nombre||o.cliente||'').trim();
+  const cli=_entCliVigente(o) || (o.cliente_nombre||o.cliente||'').trim();   // 14-oct: el de la factura vigente
   if(cli) return {nombre:cli, para:''};
   const m=ENT_MOTIVO_N[o.motivo]||o.motivo||'Salida sin clasificar';
   return {nombre:m, para:(o.destinatario||'').trim()};
@@ -16105,7 +16133,7 @@ async function bsLeer(){
        77 y 78 en la base, y llegaban al navegador sin ellas.
        🔴 La regla que deja: los campos que un GUARDA lee tienen que estar en
        este select. No alcanza con que existan en la vista. */
-    .select('pedido_id,fecha_despacho,factura_id,factura_nombre,cliente_nombre,origen,motivo,'
+    .select('pedido_id,fecha_despacho,factura_id,factura_nombre,cliente_id,cliente_nombre,origen,motivo,'
            +'alisto_id,responsable,preparado_en,salida_id,salida_en,salida_registrada_en,'
            +'estado,fecha_ab_re_04')
     .order('fecha_ab_re_04',{ascending:false}).limit(300);
@@ -17711,16 +17739,17 @@ async function pdLeer(){
       // Un pedido manual sin vincular no tiene ninguno de los dos: queda en null y
       // `entPdfBtn` no dibuja nada, que es justo lo que se busca.
       const pids=[...new Set((lin.data||[]).map(function(x){ return x.pedido_id; }))];
-      const facDe={};
+      const facDe={}, cliDe={};
       if(pids.length){
         const [pp,vv]=await Promise.all([
-          c.from('ent_pedido').select('id,factura_id').in('id',pids),
+          c.from('ent_pedido').select('id,factura_id,cliente_id').in('id',pids),
           c.from('ent_pedido_factura_vigente').select('pedido_id,factura_id,anulado')
            .in('pedido_id',pids).eq('anulado',false) ]);
-        (pp.data||[]).forEach(function(x){ if(x.factura_id) facDe[x.id]=x.factura_id; });
+        (pp.data||[]).forEach(function(x){ if(x.factura_id) facDe[x.id]=x.factura_id;
+          if(x.cliente_id) cliDe[x.id]=x.cliente_id; });
         (vv.data||[]).forEach(function(x){ if(x.factura_id) facDe[x.pedido_id]=x.factura_id; });
       }
-      exc={peds:(ped.data||[]), lins:(lin.data||[]), facDe:facDe};
+      exc={peds:(ped.data||[]), lins:(lin.data||[]), facDe:facDe, cliDe:cliDe};
       // Las dos alertas de Odoo, en su propio try: si la cola falla, «Por
       // resolver» tiene que seguir dibujandose. Son dos listas independientes.
       try{ odoo={filas:await pdOdooLeer(c)}; }
@@ -18912,7 +18941,7 @@ function pdExcHTML(){
             n_no_entrega: porPed[id].length,
             cliente_nombre: r.cliente_nombre || l0.cliente_nombre,
             factura_nombre: r.factura_nombre || l0.factura_nombre,
-            factura_id: facDe[id]||null};
+            factura_id: facDe[id]||null, cliente_id: (E.cliDe||{})[id]||null};
   }).sort(function(a,z){ return Date.parse(a.desde||0)-Date.parse(z.desde||0); });
   // El contador cuenta LO QUE SE DIBUJA, por la misma razón.
   const total=orden.reduce(function(a,id){ return a+porPed[id].length; },0);
@@ -18927,7 +18956,7 @@ function pdExcHTML(){
     const ls=porPed[p.pedido_id]||[];
     const d=_pdExcDias(p.desde);
     h+='<div class="pd-exc-ped"><div class="pd-exc-cab">'
-      +'<div class="pd-exc-cli">'+esc(p.cliente_nombre||'—')+'</div>'
+      +'<div class="pd-exc-cli">'+esc(_entCliVigente(p)||p.cliente_nombre||'—')+'</div>'
       +'<div class="pd-exc-dias">'+(d===null?'—':(d<=0?'hoy':(d===1?'1 día':d+' días')))+'</div></div>'
       +'<div class="pd-exc-meta">#'+p.pedido_id
       // EL PDF, al lado del consecutivo y no del número de pedido: el PDF es de la
@@ -19477,7 +19506,7 @@ function _cuaDia(ymd){ const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd||''));
 async function entCuadreLeer(){
   const c=sbClient(); if(!c) throw new Error('sin sesión de Supabase');
   const {data:peds,error:e1}=await c.from('v_ent_pedido_estado')
-    .select('pedido_id,estado,factura_id,factura_nombre,cliente_nombre,preparado_en,salida_en')
+    .select('pedido_id,estado,factura_id,factura_nombre,cliente_id,cliente_nombre,preparado_en,salida_en')
     .not('factura_id','is',null).eq('estado','entregado')
     .gte('fecha_despacho',DESP_DESDE).limit(1000);
   if(e1) throw e1;
@@ -19529,7 +19558,7 @@ async function entCuadreLeer(){
     if(!mot.length) return;
     const dias=mot.map(function(m){ return m.dia; }).filter(Boolean).sort();
     casos.push({pedido:p.pedido_id, estado:p.estado, factura:p.factura_nombre,
-                cliente:p.cliente_nombre, desde:dias[0]||'', motivos:mot,
+                cliente:p.cliente_nombre, cliente_id:p.cliente_id, desde:dias[0]||'', motivos:mot,
                 ambar:mot.some(function(m){ return m.ambar; }),
                 // Para la huella de «Descartar» (1-oct): la factura y cada salida
                 // con su estado, tal como Odoo los dice HOY.
@@ -19575,8 +19604,21 @@ async function pdCuadreCargar(force){
   if(!(await accesoLectora())) return;   // el cuadre se LEE de Odoo; pdvPrevias (el servicio) sigue de socias
   await entCuadre(force);
   try{ pdRender(); }catch(e){}
+  await pdFacVigente();
   await pdvPrevias(false);   // «Validar entrega en Odoo»: le pregunta al servidor cada fila validable
 }
+
+// El cliente de la factura vigente en Pendientes (14-oct): las dos listas con factura —«Por
+// resolver» y «Validar entrega en Odoo»— leen el mismo cache que el Historial. Si Odoo no
+// contesta, se queda el nombre anotado.
+async function pdFacVigente(){
+  const ids=[];
+  try{ const f=(_pd&&_pd.exc&&_pd.exc.facDe)||{}; Object.keys(f).forEach(function(k){ ids.push(f[k]); }); }catch(e){}
+  try{ ((_cuadre&&_cuadre.casos)||[]).forEach(function(x){ ids.push(x.factura_id); }); }catch(e){}
+  try{ if(await entFacVigenteLeer(ids)) pdRender(); }
+  catch(e){ try{ console.warn('[Truefie] Pendientes: no pude leer la factura vigente', (e&&e.message)||e); }catch(_){} }
+}
+function _pdvQuien(x){ return _entCliVigente({factura_id:x.factura_id, cliente_id:x.cliente_id}) || x.cliente || ('Pedido '+x.pedido); }
 
 /* ══════════════════════════════════════════════════════════════════════
    «VALIDAR ENTREGA EN ODOO» · Pendientes, solo socias (1-oct-2026)
@@ -19657,7 +19699,7 @@ function pdvHTML(){
     +'lista no está al día: '+esc(_cuadre.err)+'</div></div>';
   const cs=_cuadre.casos||[];
   if(_socia!==true) return _pdLecturaHTML('Validar entrega en Odoo', cs.map(function(x){
-    return {quien:x.cliente||('Pedido '+x.pedido), meta:'#'+x.pedido+' · …'+String(x.factura||'').slice(-4)+' · desde el '+_cuaDia(x.desde),
+    return {quien:_pdvQuien(x), meta:'#'+x.pedido+' · …'+String(x.factura||'').slice(-4)+' · desde el '+_cuaDia(x.desde),
             det:(x.motivos||[]).map(function(m){ return m.txt; })}; }));
   const T=_pdv.tanda;
   if(!cs.length && !T) return '';             // regla 1: sin nada que hacer, no existe
@@ -19691,7 +19733,7 @@ function pdvHTML(){
       +'<div class="pd-quien">'
       +(ok?('<input type="checkbox" class="pdv-c"'+(_pdv.sel[x.pedido]?' checked':'')
             +' onchange="pdvSel('+x.pedido+',this.checked)" aria-label="Elegir el pedido '+x.pedido+'"> '):'')
-      +esc(x.cliente||('Pedido '+x.pedido))+'</div>'
+      +esc(_pdvQuien(x))+'</div>'
       +'<div class="pd-meta">#'+x.pedido+' · …'+esc(String(x.factura||'').slice(-4))
       +(ok?(' · '+esc(P.r.albaran)):'')+' · desde el '+esc(_cuaDia(x.desde))+'</div>';
   };
@@ -19788,7 +19830,7 @@ function pdvUno(id){
   const P=_pdv.prev[id];
   if(!x || !P || P.st!=='ok') return;
   _pdv.sel={};
-  _pdv.tanda={fase:'previa', items:[{id:id, cli:x.cliente||('Pedido '+id), r:P.r}], i:0};
+  _pdv.tanda={fase:'previa', items:[{id:id, cli:_pdvQuien(x), r:P.r}], i:0};
   pdvTandaConfirmar();
 }
 
@@ -19796,7 +19838,7 @@ async function pdvTandaAbrir(){
   if(_pdv.tanda) return;
   const cs=((_cuadre&&_cuadre.casos)||[]);
   const items=cs.filter(function(x){ return _pdv.sel[x.pedido] && _pdvValidable(x); })
-    .map(function(x){ return {id:x.pedido, cli:x.cliente||('Pedido '+x.pedido)}; });
+    .map(function(x){ return {id:x.pedido, cli:_pdvQuien(x)}; });
   if(!items.length) return;
   _pdv.tanda={fase:'revisando', items:items, i:0}; pdRender();
   // Vista previa FRESCA de cada uno: lo de la lista puede tener minutos.
