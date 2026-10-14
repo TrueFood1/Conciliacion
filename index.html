@@ -1496,6 +1496,7 @@ table td,table th{border-color:#F2F0EA}
    era un rojo apagado que sobre el encabezado claro se lee marrón y parece alerta.
    Va al gris secundario, que es lo que corresponde a un dato de contexto. */
 .hdr-prod{font-size:11px;color:var(--text-2);letter-spacing:.01em}
+.hdr-asis{color:var(--warn)}   /* «Instinct · solo lectura»: el aviso, en ámbar */
 .conn-ind{margin-left:auto;display:flex;align-items:center;gap:7px;color:var(--text-dim-5);font-size:13px}
 .conn-ind .gdot{width:7px;height:7px;border-radius:50%;background:#4CAF6E}
 .logo-link{cursor:pointer}
@@ -1987,6 +1988,7 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
   <div class="hdr-right">
     <div class="conn-ind" style="margin-left:0"><span class="gdot"></span>Conectado</div>
     <span id="bannerProd" class="hdr-prod" style="display:none">producción · solo lectura</span>
+    <span id="bannerAsis" class="hdr-prod hdr-asis" style="display:none">Instinct · solo lectura</span>
   </div>
   <span id="connPill" style="display:none"></span>
   <span id="headerSub" style="display:none"></span>
@@ -2661,6 +2663,7 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
       <div class="m3title" style="font-size:24px">Resultados</div>
     </div>
   </div>
+  <div class="bar-slot" id="barCardRes"></div>
   <div class="sim-seg" id="resSeg" style="max-width:440px;margin-top:18px">
     <button data-v="mes" class="on">El mes</button>
     <button data-v="doce">Últimos 12 meses</button>
@@ -2749,6 +2752,7 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
       <div class="m3sub" style="margin-top:2px;font-size:13px">Saldo pendiente, por vencimiento · solo lectura.</div>
     </div>
   </div>
+  <div class="bar-slot" id="barCardCob"></div>
   <div class="m3nav" id="cobNav" style="margin-top:14px">
     <button class="m3tab on" data-t="cobrar" onclick="cobTab('cobrar')">Por cobrar</button>
     <button class="m3tab" data-t="pagar" onclick="cobTab('pagar')">Por pagar</button>
@@ -3359,6 +3363,8 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
    default de ACCESO_USUARIOS: de menos, nunca de más. */
 .face-pend{display:none}
 body.es-socia .face-pend{display:block}
+/* «Lectora» (14-oct): el asistente ve Pendientes, en solo lectura. Las acciones siguen siendo de socias. */
+body.es-lectora .face-pend{display:block}
 /* ── Conteo por lote ──
    Se cuenta DENTRO del congelador: frío, guantes, prisa. Todo el diseño responde a eso:
    productos colapsados (los seis en pantalla), uno abierto a la vez, filas a la mitad de
@@ -4195,6 +4201,25 @@ body:has(.de-fondo) #tkBtn{display:none}
 /* El aviso va en ámbar, que en este sistema es el color que AVISA — no en lima,
    que es el de acción. Ver el estándar visual: "lima y ámbar conviven". */
 .bs-anu-av{flex:1 1 100%;font-size:11.5px;color:var(--warn);line-height:1.45}
+/* ── Barrido de 1103030 · tarjeta de Finanzas (14-oct): acento de Finanzas, el aviso en ámbar ── */
+.bar-slot{max-width:720px;margin-top:16px}
+.bar-slot:empty{display:none}
+.bar-card{display:flex;flex-direction:column;gap:6px}
+.bar-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.bar-t{font-size:14px;font-weight:600;color:var(--text)}
+.bar-mes{font-size:12.5px;color:var(--m-fin)}
+.bar-n{font-size:15px;color:var(--text)}
+.bar-n b{font-weight:600}
+.bar-s{font-size:12.5px;color:var(--text-2);line-height:1.45}
+.bar-exc{font-size:12px;color:var(--text-2);line-height:1.5;border-top:.5px solid var(--border);padding-top:6px}
+.bar-ok{font-size:12.5px;color:var(--text-2)}
+.bar-no{font-size:12.5px;color:var(--text-2)}
+.bar-no.amb{color:var(--warn)}
+.bar-acc{display:flex;justify-content:flex-end;margin-top:4px}
+.bar-btn{border-color:var(--m-fin);color:var(--m-fin)}
+.bar-btn:disabled{opacity:.45;cursor:default}
+.bar-msg{font-size:12.5px;color:var(--text-2);line-height:1.45}
+.bar-msg.mal{color:var(--stop-tx)}
 /* «Anular pedido» (§29, 14-oct): reusa la fila de «Sale otro día». El motivo va en chips;
    el elegido lleva el borde del módulo (--ent-line), nunca un fondo lima. */
 .anu-t{flex:1 1 100%;font-size:12.5px;font-weight:600;color:var(--text-2)}
@@ -5245,7 +5270,7 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 14 oct 2026 · b92';
+const BUILD = 'v 14 oct 2026 · b93';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -5595,7 +5620,34 @@ async function doLogin(isRetry){
 const SUPA_URL  = 'https://tomijkqnmpjcraaoeviq.supabase.co';
 const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvbWlqa3FubXBqY3JhYW9ldmlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4Mzk1MDQsImV4cCI6MjA5ODQxNTUwNH0.4fvlH0Tk4oLDe33JfvUs1crop7vC2Yt0hNlmhOMh6Cg';   // pública por diseño; la RLS protege
 let _sb=null, _authMode='login';
-function sbClient(){ if(!_sb && window.supabase) _sb=window.supabase.createClient(SUPA_URL,SUPA_ANON); return _sb; }
+function sbClient(){ if(!_sb && window.supabase) _sb=window.supabase.createClient(SUPA_URL,SUPA_ANON);
+  return (_sb && _perfil==='asistente') ? (_sbL || (_sbL=_sbLectura(_sb))) : _sb; }
+// ══ EL ASISTENTE (INSTINCT) EN SOLO LECTURA, DEL LADO DEL CLIENTE (14-oct-2026) ═══════════
+// Instinct ve todos los módulos (decisión de Andrea), y con eso pantallas del equipo con botones que
+// escriben: preparar, entregar, conteos, plan, borradores, tickets… En vez de tocar ~50 botones, SU
+// cliente de Supabase rechaza toda escritura ANTES de salir y la pantalla muestra «Instinct · solo
+// lectura». ⚠️ ESTO ES UN AVISO, NO LA SEGURIDAD: las tres capas de verdad siguen siendo la RLS (42501,
+// las políticas `asistente_no_*`), el servicio de escritura (403, solo socias) y `acceso_es_socia()`.
+// Las lecturas pasan intactas; de las RPC, solo las de leer (lista cerrada).
+var _perfil=null, _sbL=null;     // `var`: sbClient puede correr antes que la línea del `let` de acceso
+const _SOLO_LECTURA_RPC=['tema_vigente','acceso_es_socia','acceso_perfil','asistente_encendido'];
+const SOLO_LECTURA_TXT='Instinct · solo lectura: no se guardó nada.';
+function _soloLecturaStub(){
+  const r={data:null, error:{message:SOLO_LECTURA_TXT, code:'SOLO_LECTURA'}, status:403, count:null};
+  const p=new Proxy(function(){}, {get:function(_t, k){
+      if(k==='then') return function(ok, mal){ return Promise.resolve(r).then(ok, mal); };
+      return function(){ return p; }; },
+    apply:function(){ return p; }});
+  return p;
+}
+function _sbLectura(c){
+  return {auth:c.auth,
+    from:function(tabla){ const q=c.from(tabla);
+      return new Proxy(q, {get:function(o, k){
+        if(k==='insert'||k==='update'||k==='upsert'||k==='delete') return function(){ return _soloLecturaStub(); };
+        const v=o[k]; return (typeof v==='function') ? v.bind(o) : v; }}); },
+    rpc:function(fn, args, opt){ return _SOLO_LECTURA_RPC.indexOf(fn)>=0 ? c.rpc(fn, args, opt) : _soloLecturaStub(); }};
+}
 
 async function authInit(){
   const msg=document.getElementById('authMsg');
@@ -5761,7 +5813,7 @@ function accesoModDeVista(v){
 // ANTE LA DUDA, NO: si falla la lectura o no hay sesión, devuelve false. Es la
 // misma regla que el default de ACCESO_USUARIOS —"ver de menos, no de más"— y acá
 // además es gratis, porque el trigger igual rechazaría el insert.
-let _socia=null, _sociaProm=null, _miEmail='';
+let _socia=null, _sociaProm=null, _miEmail='', _lectora=false;   // _perfil: arriba, junto a sbClient
 async function accesoSocia(){
   if(_socia!==null) return _socia;
   if(!_sociaProm) _sociaProm=(async function(){
@@ -5774,16 +5826,17 @@ async function accesoSocia(){
       // comparación que hacen la RLS y el trigger. Se filtra en el servidor y se
       // vuelve a comparar acá porque un `_` en un correo sí es comodín para ilike.
       const {data:acc}=await c.from('v_acceso_usuario').select('email,perfil').ilike('email',yo).limit(5);
-      return (acc||[]).some(function(a){
-        return String(a.email||'').trim().toLowerCase()===yo && a.perfil==='socias'; });
-    }catch(e){ return false; }
+      const mia=(acc||[]).filter(function(a){ return String(a.email||'').trim().toLowerCase()===yo; })[0];
+      return mia ? String(mia.perfil||'') : '';   // '' = sin perfil (cae al mapa por correo)
+    }catch(e){ return ''; }
   })();
   const r=await _sociaProm;
   // Un «no» preguntado SIN SESIÓN no se guarda (3-oct): quedaba cacheado y, al entrar después en
   // la misma página, la socia veía el lobby como si no lo fuera (alertas en blanco). Medido en el
   // panel: `accesoSocia()` llamado antes del login → false para siempre hasta recargar.
   if(r===null){ _sociaProm=null; return false; }
-  _socia=r;
+  // EL PERFIL (14-oct): socia escribe; «lectora» (socia o asistente) VE lo que ven las socias.
+  _perfil=r; _socia=(r==='socias'); _lectora=_socia || r==='asistente';
   // El correo de la sesion queda cacheado de paso: lo usa `boPuedeDescartar` para
   // saber si un borrador es tuyo, y no hay por que volver a preguntarlo.
   try{ const {data}=await sbClient().auth.getUser();
@@ -5791,12 +5844,20 @@ async function accesoSocia(){
   // Las seis barras de Entregas son HTML estático —`_modShow` solo prende y apaga
   // vistas, no las vuelve a dibujar—, así que pintar UNA vez alcanza para las seis.
   document.body.classList.toggle('es-socia', _socia);
+  document.body.classList.toggle('es-lectora', _lectora);
+  document.body.classList.toggle('es-asistente', _perfil==='asistente');
+  const fa=document.getElementById('bannerAsis'); if(fa) fa.style.display=(_perfil==='asistente')?'':'none';
   return _socia;
 }
+// ¿Puede VER lo que ven las socias? Socias y asistente. Para mirar, nunca para escribir.
+async function accesoLectora(){ await accesoSocia(); return _lectora; }
 async function accesoCargar(){
   let email='';
   try{ const {data}=await sbClient().auth.getUser(); email=((data&&data.user&&data.user.email)||'').trim().toLowerCase(); }catch(e){}
-  const v=ACCESO_USUARIOS[email];
+  // EL PERFIL DE LA BASE MANDA (14-oct): socias y asistente ven todos los módulos. Para el resto, el
+  // mapa por correo y el default, como siempre: los permisos del equipo no cambian.
+  await accesoSocia();
+  const v=_lectora ? 'todo' : ACCESO_USUARIOS[email];
   _accesoMods = (v==='todo') ? 'todo' : (v || ACCESO_DEFAULT);
   accesoPintarLobby();
 }
@@ -6174,7 +6235,9 @@ const PER_TABS=[['vacaciones','Mis vacaciones','irAVacaciones()',false],
                 ['cerrados','Días cerrados','irADiasCerrados()',true]];
 const PER_TABS_CONT=['perTabsVac','perTabsCal','perTabsSol','perTabsFer'];
 
-let _perEsSocia=false, _perPerfilOk=false, _perEmail=null, _perYoCache=undefined,
+// _perLectora (14-oct, decisión de Andrea): socias y asistente VEN la bandeja y «Días cerrados»;
+// las acciones (aprobar, rechazar, crear/editar/borrar días) siguen con `_perEsSocia`.
+let _perEsSocia=false, _perLectora=false, _perPerfilOk=false, _perEmail=null, _perYoCache=undefined,
     _perTabActiva='vacaciones';
 
 // La barra de pestañas se dibuja en las CUATRO pantallas de una sola pasada: son
@@ -6185,7 +6248,7 @@ function _perTabs(activa){
   if(activa) _perTabActiva=activa;
   let h='';
   PER_TABS.forEach(function(t){
-    if(t[3] && !_perEsSocia) return;
+    if(t[3] && !_perLectora) return;
     const on=(t[0]===_perTabActiva);
     h+='<button class="face'+(on?' on':'')+'"'+(on?'':' onclick="'+t[2]+'"')+'>'+t[1]+'</button>';
   });
@@ -6213,8 +6276,9 @@ async function perPerfil(){
     const {data,error}=await c.from('v_acceso_usuario').select('perfil,activo');
     if(error) throw error;
     _perEsSocia=(data||[]).some(function(r){ return r.activo && r.perfil==='socias'; });
+    _perLectora=_perEsSocia || (data||[]).some(function(r){ return r.activo && r.perfil==='asistente'; });
     _perPerfilOk=true;
-  }catch(e){ _perEsSocia=false; }
+  }catch(e){ _perEsSocia=false; _perLectora=false; }
   _perTabs(null);
   return _perEsSocia;
 }
@@ -6311,7 +6375,7 @@ async function calCargar(force){
       _perAviso('calStatus','s-warn','El calendario vino vacío: ni ausencias ni días cerrados. '
         +'Suele significar que tu cuenta todavía no tiene perfil en Personal — lo enlaza Andrea.');
     }else{ _perAviso('calStatus',''); }
-    if(_perEsSocia) calBandeja(true);
+    if(_perLectora) calBandeja(true);
   }catch(e){
     _perAviso('calStatus','s-err','No pude leer el calendario: '+esc(_perErr(e)));
   }
@@ -6375,7 +6439,7 @@ function _calRender(){
 // información vive adentro del módulo.
 async function calBandeja(force){
   const box=document.getElementById('calBandeja'); if(!box) return;
-  if(!_perEsSocia){ box.innerHTML=''; return; }
+  if(!_perLectora){ box.innerHTML=''; return; }
   if(_calPend && !force){ _calBandejaRender(); return; }
   try{
     const c=sbClient(); if(!c) return;
@@ -6407,7 +6471,7 @@ function _calBandejaRender(){
   // Sin pendientes no se dibuja nada. "Todo al día" es la primera de las cinco
   // reglas: informar no es alertar, y una lista vacía es ruido con marco.
   if(!p.length){ box.innerHTML=''; return; }
-  let h='<div class="m3title" style="font-size:16px">Esperando tu visto bueno</div>'
+  let h='<div class="m3title" style="font-size:16px">'+(_perEsSocia?'Esperando tu visto bueno':'Solicitudes sin resolver')+'</div>'
        +'<div class="per-cnt">'+p.length+(p.length===1?' solicitud':' solicitudes')+' sin resolver.</div>';
   p.forEach(function(s){
     h+='<div class="per-sol">'
@@ -6417,10 +6481,10 @@ function _calBandejaRender(){
       +    '<div class="per-sol-f">'+esc(_perRango(s.ini,s.fin))+' · '+_perDiasTxt(s.dias)+'</div>'
       +    (s.motivo?'<div class="per-sol-m">'+esc(s.motivo)+'</div>':'')
       +  '</div>'
-      +  '<div class="per-sol-b">'
+      +  (_perEsSocia ? ('<div class="per-sol-b">'
       +    '<button class="btn btn-sm per-go" onclick="perResolver(\''+s.fuente+'\','+s.id+',true)">Aprobar</button>'
       +    '<button class="btn btn-sm btn-warn" onclick="perResolver(\''+s.fuente+'\','+s.id+',false)">Rechazar</button>'
-      +  '</div>'
+      +  '</div>') : '')
       +'</div>';
   });
   box.innerHTML=h;
@@ -8447,10 +8511,12 @@ function irACalcPrecios(){
 }
 function irAResultados(){
   _modShow('vResultados'); crumbSet('Finanzas','Resultados');
+  barCargar();   // la tarjeta del barrido de 1103030: solo socias, en segundo plano
   resInit();   // mockup fase 1: datos de ejemplo en el cliente, no lee Odoo
 }
 function irACobros(){
   _modShow('vCobros'); crumbSet('Finanzas','Cobros y Pagos');
+  barCargar();
   if(!_loaded.cob){ _loaded.cob=true; cobTab('cobrar'); }
 }
 function abrirCostos(){ irACostos(); }        // atajo del home-cta "Costos por producto"
@@ -16636,6 +16702,7 @@ async function escrituraValidar(id, confirmar){ return escrituraPedir('/validar'
 // La misma llamada para las dos rutas del servicio: /validar (salida de venta) y
 // /trasladar (traslado interno, 1-oct). El cuerpo es {pedido_id, confirmar} en las dos.
 async function escrituraPedir(ruta, id, confirmar, huella){
+  if(_perfil==='asistente') return {st:403, js:{ok:false, motivo:'sin_rol', texto:SOLO_LECTURA_TXT}};
   let token='';
   try{ const s=await sbClient().auth.getSession();
        token=(s&&s.data&&s.data.session&&s.data.session.access_token)||''; }catch(e){}
@@ -17581,7 +17648,7 @@ async function pdLeer(){
   try{
     // La MISMA pregunta que decide si se dibuja la pestaña, hecha con la misma
     // función. Ver `accesoSocia()`.
-    const esSocia=await accesoSocia();
+    const esSocia=await accesoLectora();   // 14-oct: también la ve el asistente (sus botones, no)
     if(esSocia){
       // ⚠️ SOLO LA RAMA `no_se_entrega`. Decision de Andrea, 16-sep-2026, y el
       // porque importa mas que el filtro:
@@ -18897,12 +18964,12 @@ function pdExcHTML(){
       // "Nota" NO desaparece al abrirse: es el mismo enlace que abre y cierra. Antes
       // se escondía mientras el campo estaba abierto y no quedaba forma de cerrarlo
       // sin guardar.
-      h+='<div class="pd-exc-acc">'
+      h+=(_socia===true ? ('<div class="pd-exc-acc">'
         +'<button class="pd-exc-mas'+(_pdExcAbierta===lid?' on':'')
         +'" onclick="pdExcNota('+lid+')">Nota</button>'
         +'<button class="btn btn-sm pd-acc"'+(ocupada?' disabled':'')
         +' onclick="pdVisto('+lid+')">'+(ocupada?'Guardando…':'Visto')+'</button>'
-        +'</div></div>';
+        +'</div>') : '')+'</div>';
       if(_pdExcAbierta===lid){
         // La nota es OPCIONAL —la base ya no la exige— así que el campo no bloquea
         // el botón: se puede guardar con o sin ella. Por eso "Visto" sigue siendo
@@ -18993,6 +19060,7 @@ function pdOdooHTML(){
           +'<div class="pd-exc-det">'+esc(_dvNum(l.cant_uds))+' '+_entUniLbl(null, l.cant_uds)+'</div></div>';
       });
       const ocupada=(_pdOdooHaciendo===x.id);
+      if(_socia!==true){ h+='</div>'; return; }      // lectora: la cola se VE; «Hecho» es de socias
       h+='<div class="dv-acc" style="margin-top:10px">'
         +'<button class="btn btn-sm"'+(ocupada?' disabled':'')
         // Sin el "No toca Odoo: solo saca esto de la lista" que iba al lado: el
@@ -19082,7 +19150,22 @@ function _pdtHuella(x, P){
     +(x.lineas||[]).map(function(l){ return l.producto_id+':'+l.cant_uds; }).sort().join(',');
 }
 
+// LECTORA (14-oct): la lista tal cual, sin casillas ni botones y sin vista previa del servicio de
+// escritura (que es de socias: le daría 403). Lo mismo para «Validar entrega en Odoo».
+function _pdLecturaHTML(tit, filas){
+  if(!filas.length) return '';
+  return '<div class="card rp-z"><div class="card-title">'+esc(tit)+' <span class="pd-cnt on">'+filas.length+'</span></div>'
+    +'<div class="rp-nota" style="margin:-4px 0 8px">Solo lectura.</div>'
+    +filas.map(function(f){ return '<div class="pd-exc-ped"><div class="pd-exc-cab"><div class="pd-exc-cli">'+esc(f.quien)+'</div>'
+      +'<div class="pd-exc-dias">'+esc(f.cuando||'')+'</div></div><div class="pd-exc-meta">'+esc(f.meta)+'</div>'
+      +(f.det||[]).map(function(d){ return '<div class="pd-cua">'+esc(d)+'</div>'; }).join('')+'</div>'; }).join('')+'</div>';
+}
 function pdtHTML(ls, T){
+  if(_socia!==true) return _pdLecturaHTML(T.t, ls.map(function(x){
+    const d=_pdExcDias(x.fecha);
+    return {quien:x.cliente_nombre||x.destinatario||'—', cuando:(d===null?'':(d<=0?'hoy':(d===1?'1 día':d+' días'))),
+            meta:'#'+x.pedido_id+' · sin factura',
+            det:(x.lineas||[]).map(function(l){ return _lotNom(l.producto_id)+' · '+_entPres(l.producto_id, l.cant_uds)+' · '+l.lote; })}; }));
   const TD=_pdt.tanda;
   // Se puede crear: la vista previa del servidor dijo que sí, o todavía no
   // contestó. No se puede: el servidor lo rechazó → abajo, en gris, con Descartar.
@@ -19473,7 +19556,7 @@ async function entCuadre(force){
 // Pendientes: se dibuja primero sin el cuadre y se repinta cuando llega, para
 // que un proxy dormido (hasta ~40 s) no frene las otras secciones.
 async function pdCuadreCargar(force){
-  if(!(await accesoSocia())) return;
+  if(!(await accesoLectora())) return;   // el cuadre se LEE de Odoo; pdvPrevias (el servicio) sigue de socias
   await entCuadre(force);
   try{ pdRender(); }catch(e){}
   await pdvPrevias(false);   // «Validar entrega en Odoo»: le pregunta al servidor cada fila validable
@@ -19557,6 +19640,9 @@ function pdvHTML(){
   if(_cuadre.err) return tit+'</div><div class="cl-none dp-mal">No pude leer Odoo, así que esta '
     +'lista no está al día: '+esc(_cuadre.err)+'</div></div>';
   const cs=_cuadre.casos||[];
+  if(_socia!==true) return _pdLecturaHTML('Validar entrega en Odoo', cs.map(function(x){
+    return {quien:x.cliente||('Pedido '+x.pedido), meta:'#'+x.pedido+' · …'+String(x.factura||'').slice(-4)+' · desde el '+_cuaDia(x.desde),
+            det:(x.motivos||[]).map(function(m){ return m.txt; })}; }));
   const T=_pdv.tanda;
   if(!cs.length && !T) return '';             // regla 1: sin nada que hacer, no existe
   // DOS GRUPOS (Andrea, 1-oct): arriba lo que se puede validar; abajo, aparte y
@@ -19781,7 +19867,7 @@ async function pdvDescartar(id){
 // Pendientes, que es donde se puede leer entero.
 async function cuadreLobby(){
   const el=document.getElementById('homeEntAlerta'); if(!el) return;
-  if(!(await accesoSocia())){ _lobAl('homeEntAlerta',''); return; }
+  if(!(await accesoLectora())){ _lobAl('homeEntAlerta',''); return; }
   await _esperarOdoo();
   let q=await entCuadre(false);
   if(!q || q.err){ await new Promise(function(r){ setTimeout(r,3000); }); q=await entCuadre(true); }   // un reintento
@@ -19810,7 +19896,7 @@ function _lobAl(id, txt, cls, ir){ const el=document.getElementById(id); if(!el)
 let _lobRzProm=null;
 async function lobbyAlertas(){
   const ids=['homeOpsAlerta','homeComAlerta','homeFinAlerta','homeConcAlerta'];
-  if(!(await accesoSocia())){ ids.forEach(function(id){ _lobAl(id,''); }); cuadreLobby(); return; }
+  if(!(await accesoLectora())){ ids.forEach(function(id){ _lobAl(id,''); }); cuadreLobby(); return; }
   _lobAl('homeFinAlerta','Al día'); _lobAl('homeConcAlerta','Al día');
   cuadreLobby();
   // Operaciones y Compras: el MISMO cálculo que el Resumen y Compras (`_cpAlc`). Si no está
@@ -21081,18 +21167,22 @@ function cpDesdeCero(id){
 // · La CORRECCIÓN INICIAL (modo «inicial», una vez) solo se ve con ?tarifas=inicial en la dirección.
 let _cpTar=null;    // {modo, r, cargando, msg, msgCls, enviando, en}
 const CP_TAR_INICIAL=/[?&]tarifas=inicial\b/.test(location.search);
-async function escrituraTarifas(cuerpo){
+// UN POST al servicio de escritura con un cuerpo propio de la ruta (tarifas, barrido). {st, js} o
+// {red:true} si no hubo respuesta: qué significa eso lo decide quien llama (al confirmar: no se sabe).
+async function _escrituraPost(ruta, cuerpo){
+  if(_perfil==='asistente') return {st:403, js:{ok:false, motivo:'sin_rol', texto:SOLO_LECTURA_TXT}};
   let token='';
   try{ const s=await sbClient().auth.getSession();
        token=(s&&s.data&&s.data.session&&s.data.session.access_token)||''; }catch(e){}
   let res;
-  try{ res=await fetch(ESCRITURA_URL+'/tarifas', {method:'POST',
+  try{ res=await fetch(ESCRITURA_URL+ruta, {method:'POST',
          headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token}, body:JSON.stringify(cuerpo)}); }
-  catch(e){ try{ console.error('[Truefie] tarifas · sin respuesta', e); }catch(_){} return {red:true}; }
+  catch(e){ try{ console.error('[Truefie] '+ruta+' · sin respuesta', e); }catch(_){} return {red:true}; }
   let js=null; try{ js=await res.json(); }catch(e){}
   if(!js || typeof js!=='object') return {red:true, st:res.status};
   return {st:res.status, js:js};
 }
+async function escrituraTarifas(cuerpo){ return _escrituraPost('/tarifas', cuerpo); }
 async function cpTarCargar(forzar){
   if(_socia!==true) return;
   if(!forzar && _cpTar && _cpTar.en && Date.now()-_cpTar.en < 5*60000) return;
@@ -21162,6 +21252,97 @@ async function cpTarAplicar(){
   await cpTarCargar(true);
   if(_cpTar){ _cpTar.msg=msg; _cpTar.msgCls=cls; }
   cpRender();
+}
+
+// ══ BARRIDO DE 1103030 (14-oct-2026) · tarjeta de Finanzas · solo socias ═══════════════
+// Sexto carril del servicio de escritura (POST /barrido). Los residuos que deja la conciliación entre el
+// costo facturado y el valuado al validar (centavos y colones en 1103030) pasan una vez por mes a 6106022.
+// El navegador manda {mes} y nada más: qué se barre, cómo y con qué asiento lo decide el servidor contra
+// Odoo. La tarjeta muestra la vista previa del mes que toca —el anterior, desde el día 1; si ya está barrido
+// o es anterior a octubre-2026, el mes en curso, que se puede MIRAR pero no barrer— y «Barrer [mes]» solo
+// funciona desde el 1 del mes siguiente y con el carril encendido. Decisiones de Andrea, 14-oct.
+let _bar=null;     // {r, hecho:[{mes, asiento}], err, msg, mal, barriendo, en}
+const BAR_DESDE='2026-10';
+const _BAR_MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','setiembre','octubre','noviembre','diciembre'];
+const _barMesTxt=function(m){ const p=String(m||'').split('-'); return p.length===2 ? (_BAR_MES[(+p[1])-1]+' '+p[0]) : m; };
+const _barCol=function(n){ return (n<0?'−':'')+'₡'+_rzN(Math.abs(+n||0), 2); };
+function _barMeses(){
+  const h=new Date(Date.now()-6*3600000).toISOString().slice(0,10);   // hoy, en hora CR
+  const y=+h.slice(0,4), m=+h.slice(5,7), cur=h.slice(0,7);
+  const ant=(m===1 ? (y-1)+'-12' : y+'-'+String(m-1).padStart(2,'0'));
+  return (ant>=BAR_DESDE ? [ant] : []).concat(cur>=BAR_DESDE ? [cur] : []);
+}
+async function barCargar(forzar){
+  const slots=['barCardRes','barCardCob'].map(function(id){ return document.getElementById(id); }).filter(Boolean);
+  if(!(await accesoSocia())){ slots.forEach(function(s){ s.innerHTML=''; }); return; }
+  if(!forzar && _bar && _bar.en && Date.now()-_bar.en < 5*60000) return barPintar();
+  _bar={hecho:[], cargando:true, msg:(_bar&&_bar.msg)||'', mal:!!(_bar&&_bar.mal), aviso:(_bar&&_bar.aviso)||null};
+  barPintar();
+  for(const mes of _barMeses()){
+    const R=await _escrituraPost('/barrido', {mes:mes});
+    if(R.red){ _bar.err='No pude preguntarle al servicio de escritura. Volvé a abrir Finanzas en un rato.'; break; }
+    const js=R.js||{};
+    if(R.st===200 && js.ok){ _bar.r=js; break; }
+    if(js.motivo==='ya_barrido_truefie' || js.motivo==='ya_barrido_odoo'){ _bar.hecho.push({mes:mes, texto:js.texto||''}); continue; }
+    if(js.motivo==='antes_del_inicio') continue;
+    _bar.err=(js.texto||js.motivo||('El servicio contestó '+R.st))+(R.st===404?' (¿el servicio todavía no tiene el barrido?)':'');
+    break;
+  }
+  _bar.cargando=false; _bar.en=Date.now();
+  barPintar();
+}
+function _barHTML(){
+  const B=_bar; if(!B) return '';
+  let h='<div class="card bar-card"><div class="bar-h"><span class="bar-t">Barrido de 1103030</span>';
+  const r=B.r;
+  if(r) h+='<span class="bar-mes">'+esc(_barMesTxt(r.mes))+(r.abierto?' · en curso':'')+'</span>';
+  h+='</div>';
+  B.hecho.forEach(function(x){ h+='<div class="bar-ok">'+esc(_barMesTxt(x.mes))+': barrido · '+esc(String(x.texto).replace(/^.*?: /,''))+'</div>'; });
+  if(B.aviso) h+='<div class="bar-ok">'+esc(B.aviso)+'</div>';
+  if(B.cargando) return h+'<div class="bar-s">Leyendo 1103030 en Odoo…</div></div>';
+  if(B.err) return h+'<div class="bar-msg mal">'+esc(B.err)+'</div></div>';
+  if(!r) return h+'</div>';
+  h+='<div class="bar-n"><b>'+r.n+'</b> residuo'+(r.n===1?'':'s')+' · <b>'+esc(_barCol(r.total))+'</b> a 6106022</div>'
+    +'<div class="bar-s">Asiento al '+esc(_fechaCorta(r.fecha))+' en Operaciones varias · '
+    +'excluidos (más de ₡'+_rzN(r.umbral,0)+'): '+r.excluidos.length+' · pendientes sin pareja: '+r.pendientes.n
+    +(r.pendientes.n?(' ('+esc(_barCol(r.pendientes.monto))+')'):'')+'</div>';
+  if(r.excluidos.length) h+='<div class="bar-exc">'+r.excluidos.map(function(x){
+      return esc((x.asiento||'')+' · '+(x.producto||'')+' · '+_barCol(x.residuo)); }).join('<br>')+'</div>';
+  // POR QUÉ NO SE PUEDE, si no se puede. El botón no se esconde: se ve deshabilitado y dice por qué.
+  let no='';
+  if(r.abierto) no='Se puede barrer desde el '+_fechaCorta(r.barrer_desde)+'.';
+  else if(!r.barrido_encendido) no='El barrido está apagado en el servicio (BARRIDO_ENCENDIDO).';
+  else if(!r.n) no='No hay residuos que barrer.';
+  if(no) h+='<div class="bar-no'+(r.abierto?'':' amb')+'">'+esc(no)+'</div>';
+  h+='<div class="bar-acc"><button class="btn btn-sm bar-btn"'+((no||B.barriendo)?' disabled':'')+' onclick="barBarrer()">'
+    +(B.barriendo?'Barriendo…':('Barrer '+esc(_barMesTxt(r.mes).split(' ')[0])))+'</button></div>';
+  if(B.msg) h+='<div class="bar-msg'+(B.mal?' mal':'')+'">'+esc(B.msg)+'</div>';
+  return h+'</div>';
+}
+function barPintar(){
+  const h=_barHTML();
+  ['barCardRes','barCardCob'].forEach(function(id){ const s=document.getElementById(id); if(s) s.innerHTML=h; });
+}
+async function barBarrer(){
+  const B=_bar, r=B&&B.r; if(!r || B.barriendo) return;
+  if(!confirm('¿Barrer '+_barMesTxt(r.mes)+'?\n\nSe crea en Odoo el asiento al '+_fechaCorta(r.fecha)+': '+r.n+' residuos, '
+     +_barCol(r.total)+' a 6106022, y cada residuo queda conciliado.')) return;
+  B.barriendo=true; B.msg=''; B.mal=false; barPintar();
+  const R=await _escrituraPost('/barrido', {mes:r.mes, confirmar:true, huella:r.huella});
+  B.barriendo=false;
+  const js=(R&&R.js)||{};
+  if(R.red){ B.msg='No hubo respuesta: no se sabe si se barrió. Volvé a abrir Finanzas antes de reintentar.'; B.mal=true; return barPintar(); }
+  if(R.st===200 && js.ok){
+    // Después de barrer: el número del asiento, arriba, y la vista previa vuelve a leerse (el mes siguiente).
+    const aviso=_barMesTxt(r.mes)+': barrido · asiento '+js.asiento_nombre+' · '+js.n+' residuos · '+_barCol(js.total);
+    _bar={en:0, msg:'', mal:false, aviso:aviso}; return barCargar(true);
+  }
+  B.mal=true;
+  if(R.st===423) B.msg='El barrido está apagado en el servicio (BARRIDO_ENCENDIDO): no se tocó Odoo.';
+  else if(js.motivo==='huella_vieja'){ B.msg='Los residuos cambiaron desde la vista previa: la volví a leer. Revisala y barré otra vez.'; B.mal=false;
+    _bar.en=0; return barCargar(true).then(function(){ _bar.msg=B.msg; barPintar(); }); }
+  else B.msg=(js.texto||js.motivo||'No se barrió.');
+  barPintar();
 }
 
 // LOS PEDIDOS QUE HAY QUE HACER: la lista de Por comprar, la tarjeta del Resumen y la alerta del
