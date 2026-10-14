@@ -4195,6 +4195,18 @@ body:has(.de-fondo) #tkBtn{display:none}
 /* El aviso va en ámbar, que en este sistema es el color que AVISA — no en lima,
    que es el de acción. Ver el estándar visual: "lima y ámbar conviven". */
 .bs-anu-av{flex:1 1 100%;font-size:11.5px;color:var(--warn);line-height:1.45}
+/* «Anular pedido» (§29, 14-oct): reusa la fila de «Sale otro día». El motivo va en chips;
+   el elegido lleva el borde del módulo (--ent-line), nunca un fondo lima. */
+.anu-t{flex:1 1 100%;font-size:12.5px;font-weight:600;color:var(--text-2)}
+.anu-mot{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:6px}
+.anu-chip{background:none;border:1px solid var(--border-strong);border-radius:999px;color:var(--text-2);
+          font:inherit;font-size:12px;padding:6px 11px;min-height:32px;cursor:pointer}
+.anu-chip.on{border-color:var(--ent-line);color:var(--text)}
+.anu-chip:disabled{opacity:.6;cursor:default}
+.anu-dv{flex:1 1 100%;font-size:12px;color:var(--text-2);line-height:1.5}
+.anu-bloq{flex:1 1 100%;font-size:11.5px;color:var(--text-3);line-height:1.45}
+/* «Sale otro día» y «Anular pedido» CERRADO, seguidos: una sola raya. El panel abierto lleva la suya. */
+.bs-anu+.bs-anu.anu-l{border-top:none;margin-top:0;padding-top:6px}
 /* ── «Validar entrega en Odoo» · Pendientes (1-oct) ────────────────────
    El botón de confirmar es el ÚNICO lima de la tanda: es la acción; el aviso
    de al lado va en ámbar. */
@@ -5134,7 +5146,7 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 13 oct 2026 · b90';
+const BUILD = 'v 14 oct 2026 · b91';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -16142,6 +16154,7 @@ function bsDetalle(p){
     + _entDescuadreHTML(p)            // ticket 29
     + bsValidadoHTML(p)               // carril de escritura: lo dice, no lo ofrece
     + bsDeshacerHTML(p)
+    + anuHTML(p.pedido_id, 'bs', p)   // §29: anular el pedido entero (14-oct)
     +'</div>';
   return h;
 }
@@ -16314,9 +16327,7 @@ async function bsDeshacer(id){
            `_pd` se tiraba pero el cuadre vive 5 minutos, y el #156 recién
            deshecho seguía en la lista como entregado, con su «Validar».
        Invalidar el saldo y no la lista de pendientes es acordarse de la mitad. */
-    try{ _despLotes=null; _despSaldo=null; _rpLotes=null; _rpSaldo=null; _pd=null; }catch(e){}
-    try{ _cuadre=null; _pdv.prev={}; _pdv.sel={}; }catch(e){}
-    try{ await despCargarEstado(); }catch(e){}   // la verdad la dice la vista
+    await _entInvalidar();                       // la lista vive en UN lugar (14-oct)
     await bsCargar(true);                        // releer, no parchear en memoria
   }catch(e){
     _bsDesGuardando=0;
@@ -16324,6 +16335,174 @@ async function bsDeshacer(id){
     bsFiltrar();
     pon('No se pudo deshacer: '+((e&&e.message)||e)+'. No se cambió nada.', true);
   }
+}
+
+/* QUE SE ENTERE TODO EL QUE MUESTRA UN PEDIDO. La lista de abajo era la de
+   `bsDeshacer`, escrita adentro de él; «Anular pedido» necesita la misma, y dos
+   copias de una lista de cachés es justo el bug que la lista documenta (`_pd`
+   olvidado el 17-sep, `_cuadre` hasta el 3-oct). Una sola, acá. Suma `_pdt`
+   (las vistas previas de «Crear en Odoo»), que al anular también quedan viejas. */
+async function _entInvalidar(){
+  try{ _despLotes=null; _despSaldo=null; _rpLotes=null; _rpSaldo=null; _pd=null; }catch(e){}
+  try{ _cuadre=null; _pdv.prev={}; _pdv.sel={}; }catch(e){}
+  try{ _pdt.prev={}; _pdt.sel={}; }catch(e){}
+  try{ await despCargarEstado(); }catch(e){}   // la verdad la dice la vista
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   «ANULAR PEDIDO» (§29 · 14-oct-2026) · Historial y Pendientes · solo socias
+   Para lo que «Sale otro día» no sirve: el pedido NO salió nunca (registrado
+   dos veces, datos equivocados). Anula alistos + salidas, el producto vuelve
+   al libro y el pedido sale de todas las colas. Lo hace UNA función de la base,
+   `ent_anular_pedido` (ENTREGAS_ANULAR_PEDIDO.sql): todo entra junto o nada.
+   EL CASO: la #195 del 14-oct, una regalía registrada dos veces, que hubo que
+   anular con SQL a mano.
+
+   QUIÉN DECIDE QUÉ:
+   · La BASE frena lo que conoce: perfil, motivo, ya anulado, devolución, y todo
+     rastro de Odoo hecho desde Truefie (validación, traslado, «Hecho» a mano),
+     con el número. La firma sale de la sesión, no de acá.
+   · ESTA PANTALLA mira lo único que la base no ve: si la salida de venta de la
+     factura (WH/OUT) ya está validada EN Odoo, a mano. Lo lee `entOdooSalidas`
+     por el proxy de lectura. Si Odoo no contesta, NO se anula: falla cerrado.
+   · Pedido con factura y WH/OUT sin validar: se anula, y se avisa que la
+     factura sigue en Odoo (decisión de Andrea, 14-oct: lo que frena es el
+     movimiento de inventario, no la factura).
+   DOS PASOS: «Revisar» llama a la función con confirmar=false —hace todo, mide
+   lo que vuelve al libro y lo deshace— y recién ahí se ofrece «Anular pedido».
+   La previa es el mismo código que la anulación: no puede prometer otra cosa.
+   ══════════════════════════════════════════════════════════════════════ */
+const ANU_MOTIVOS=[['duplicado','Registrado dos veces'],['no_salio','No salió del congelador'],
+                   ['datos_mal','Datos equivocados'],['otro','Otro']];
+let _anu={id:0};   // {id, donde:'bs'|'pd', motivo, nota, fase:'elegir'|'revisando'|'previa'|'anulando', previa, msg, mal}
+
+// Lo que el Historial YA sabe del pedido: no se ofrece un botón que la base va a rechazar.
+// Falla cerrado, como «Sale otro día»: si un rastro no se pudo leer, no se ofrece.
+function _anuBloqueo(p){
+  if(!p) return '';
+  if(p.devs_ok===false || p.val_ok===false || p.tras_ok===false)
+    return 'No pude leer si este pedido tiene algo en Odoo: no se ofrece anularlo.';
+  // El renglón de arriba (`bsValidadoHTML`) ya dice «Validado/Trasladado en Odoo · número»: acá, solo qué hacer.
+  if(p.odoo_val) return 'Para anular el pedido hay que revertir '+p.odoo_val.picking_nombre+' en Odoo primero.';
+  if(p.odoo_tras) return 'Para anular el pedido hay que revertir '+p.odoo_tras.picking_nombre+' en Odoo primero.';
+  if(p.tiene_devolucion) return 'Tiene una devolución registrada: no se anula desde acá.';
+  return '';
+}
+// Los textos de la base van sin tildes (raise exception); acá se leen con ellas.
+function _anuTexto(m){
+  // ⚠️ `\b` de JS es ASCII: entre la «a» y una «á» TAMBIÉN hay borde, así que /\balla\b/ convertía el
+  // «allá» que ya traía tilde en «alláá». La cola exige que no siga ninguna letra, con o sin tilde.
+  const F='(?![A-Za-záéíóúñÁÉÍÓÚÑ])';
+  const T=[['esta validado','está validado'],['esta anulado','está anulado'],['alla','allá'],['aca','acá'],
+           ['devolucion','devolución'],['sesion','sesión'],['quien','quién'],['marco','marcó'],
+           ['invalido','inválido'],['por que','por qué'],['mas','más']];
+  let s=String(m||'');
+  T.forEach(function(t){ s=s.replace(new RegExp('(^|[^A-Za-záéíóúñÁÉÍÓÚÑ])'+t[0]+F,'g'), '$1'+t[1]); });
+  return s;
+}
+function _anuDevTxt(dv){
+  // El nombre, el MISMO de la tabla del Historial (`_bsProd`): «Pan Semillas», no «Pan de Semillas».
+  return (dv||[]).map(function(d){ return _bsProd(d.producto_id)+' '+d.lote+' · '+_entPres(d.producto_id, +d.uds); });
+}
+function anuHTML(id, donde, p){
+  if(_socia!==true || !id) return '';
+  const A=_anu, mio=(A.id===id);
+  const bloq=_anuBloqueo(p);
+  if(bloq) return '<div class="bs-anu anu-l"><div class="anu-bloq">'+esc(bloq)+'</div></div>';
+  if(!mio) return '<div class="bs-anu anu-l"><button class="bs-anu-l" onclick="anuAbrir('+id+',\''+donde+'\')">Anular pedido</button></div>';
+  const ocup=(A.fase==='revisando'||A.fase==='anulando');
+  let h='<div class="bs-anu">';
+  if(A.fase==='previa' || A.fase==='anulando'){
+    const r=A.previa, dv=_anuDevTxt(r.devuelve);
+    h+='<div class="anu-t">Anular el pedido #'+id+' · '+esc(r.motivo_txt)+(r.nota?(' · '+esc(r.nota)):'')+'</div>'
+      +'<div class="anu-dv">'+(dv.length ? ('Vuelve al libro:<br>'+dv.map(esc).join('<br>'))
+                                       : 'No cambia el saldo por lote: la salida es anterior al último conteo.')+'</div>'
+      +(r.factura_nombre ? ('<div class="bs-anu-av">La factura …'+esc(String(r.factura_nombre).slice(-4))
+                            +' sigue en Odoo. Si no hubo entrega, va nota de crédito.</div>') : '')
+      +'<div class="bs-anu-av"><b>Esto no se puede deshacer.</b></div>'
+      +'<button class="btn btn-sm" '+(ocup?'disabled ':'')+'onclick="anuConfirmar()">'+(A.fase==='anulando'?'Anulando…':'Anular pedido')+'</button>'
+      +'<button class="bs-anu-l" '+(ocup?'disabled ':'')+'onclick="anuCerrar()">Cancelar</button>';
+  } else {
+    h+='<div class="anu-t">Anular el pedido #'+id+'</div>'
+      +'<div class="anu-mot" role="radiogroup" aria-label="Motivo">'+ANU_MOTIVOS.map(function(m){
+        const on=(A.motivo===m[0]);
+        return '<button type="button" role="radio" aria-checked="'+on+'" class="anu-chip'+(on?' on':'')+'"'
+          +(ocup?' disabled':'')+' onclick="anuMotivo(\''+m[0]+'\')">'+m[1]+'</button>'; }).join('')+'</div>'
+      +'<input class="bs-anu-n" maxlength="500" aria-label="Por qué" '+(ocup?'disabled ':'')
+      +'placeholder="'+(A.motivo==='otro'?'Por qué (10 letras o más)':'Por qué (opcional)')+'" '
+      +'value="'+esc(A.nota||'')+'" oninput="_anu.nota=this.value">'
+      +'<button class="btn btn-sm" '+((ocup||!A.motivo)?'disabled ':'')+'onclick="anuRevisar()">'
+      +(A.fase==='revisando'?'Revisando…':'Revisar')+'</button>'
+      +'<button class="bs-anu-l" '+(ocup?'disabled ':'')+'onclick="anuCerrar()">Cancelar</button>';
+  }
+  return h+'<div class="bs-anu-msg'+(A.mal?' mal':'')+'">'+esc(A.msg||'')+'</div></div>';
+}
+function _anuPintar(){ if(_anu.donde==='bs') bsFiltrar(); else pdRender(); }
+function anuAbrir(id, donde){ _anu={id:id, donde:donde, motivo:'', nota:'', fase:'elegir', previa:null, msg:'', mal:false}; _anuPintar(); }
+function anuCerrar(){ const d=_anu.donde; _anu={id:0, donde:d}; _anuPintar(); }
+function anuMotivo(m){ if(!_anu.id) return; _anu.motivo=m; _anu.msg=''; _anu.mal=false; _anuPintar(); }
+
+async function anuRevisar(){
+  const A=_anu; if(!A.id || !A.motivo || A.fase!=='elegir') return;
+  const nota=String(A.nota||'').trim();
+  if(A.motivo==='otro' && nota.length<10){ A.msg='Con «Otro» hace falta decir por qué: 10 letras o más.'; A.mal=true; return _anuPintar(); }
+  A.fase='revisando'; A.msg=''; A.mal=false; _anuPintar();
+  try{
+    const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
+    // 1 · ODOO, lo que la base no ve: la salida de venta de la factura, ¿ya validada a mano?
+    const {data:pe,error:e0}=await c.from('v_ent_pedido_estado').select('factura_id').eq('pedido_id',A.id).limit(1);
+    if(e0) throw e0;
+    const fid=pe && pe[0] && pe[0].factura_id;
+    if(fid){
+      let S=null;
+      try{ S=(await entOdooSalidas([fid]))[fid]||null; }
+      catch(e){ throw new Error('no pude leer Odoo para saber si la salida de la factura ya se validó. No se anula a ciegas: probá otra vez.'); }
+      if(!S) throw new Error('Odoo no devolvió la factura de este pedido. No se anula a ciegas.');
+      const hechas=(S.salidas||[]).filter(function(s){ return s.state==='done'; });
+      if(hechas.length) throw new Error('la salida '+hechas.map(function(s){ return s.name; }).join(', ')
+        +' ya está validada en Odoo: hay que revertirla allá antes de anular');
+    }
+    // 2 · LA BASE: hace todo, mide lo que vuelve y lo deshace.
+    const {data,error}=await c.rpc('ent_anular_pedido',{p_pedido:A.id, p_motivo:A.motivo, p_nota:(nota||null), p_confirmar:false});
+    if(error) throw error;
+    if(!data || !data.ok || !data.previa) throw new Error('la base no devolvió la vista previa');
+    if(_anu!==A) return;                           // se cerró o se abrió otro mientras tanto
+    A.previa=data; A.fase='previa';
+  }catch(e){
+    if(_anu!==A) return;
+    A.fase='elegir'; A.mal=true; A.msg='No se puede anular: '+_anuTexto((e&&e.message)||String(e))+'.';
+  }
+  _anuPintar();
+}
+
+async function anuConfirmar(){
+  const A=_anu; if(!A.id || A.fase!=='previa') return;
+  A.fase='anulando'; A.msg=''; A.mal=false; _anuPintar();
+  let data=null;
+  try{
+    const r=await sbClient().rpc('ent_anular_pedido',{p_pedido:A.id, p_motivo:A.motivo,
+      p_nota:(String(A.nota||'').trim()||null), p_confirmar:true});
+    if(r.error) throw r.error;
+    data=r.data;
+    if(!data || !data.ok || data.previa || !data.anulacion_id) throw new Error('la base no devolvió la anulación');
+  }catch(e){
+    const m=(e&&e.message)||String(e);
+    A.fase='previa'; A.mal=true;
+    // Sin respuesta no se sabe si la base la grabó: se dice así, y no «no se cambió nada».
+    A.msg=/fetch|network|load failed/i.test(m)
+      ? 'No hubo respuesta: no se sabe si se anuló. Refrescá la pantalla antes de reintentar.'
+      : ('No se anuló: '+_anuTexto(m)+'. No se cambió nada.');
+    _anuPintar(); return;
+  }
+  const id=A.id, donde=A.donde, dv=_anuDevTxt(data.devuelve);
+  const txt='Pedido #'+id+' anulado.'+(dv.length?(' Volvió al libro: '+dv.join(' · ')+'.'):'')
+    +(data.factura_nombre?(' La factura …'+String(data.factura_nombre).slice(-4)+' sigue en Odoo.'):'');
+  _anu={id:0, donde:donde};
+  await _entInvalidar();
+  if(donde==='bs') await bsCargar(true); else await pdCargar(true);
+  // El pedido ya no está en la lista: el resultado va arriba, en la barra de estado.
+  const st=document.getElementById(donde==='bs'?'bsStatus':'pdStatus');
+  if(st){ st.className='status s-ok'; st.classList.remove('hidden'); st.textContent=txt; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -17381,7 +17560,7 @@ async function pdLeer(){
   const ids=(peds||[]).map(function(p){return p.id;});
   if(!ids.length) return {l2:[],l3:[],l4:[],exc:exc,odoo:odoo};
   const q=function(t,sel){ return c.from(t).select(sel).in('pedido_id',ids); };
-  const [mot,fac,als]=await Promise.all([
+  const [mot,fac,als,anu]=await Promise.all([
     q('ent_pedido_motivo_vigente','pedido_id,motivo,clasificado_en'),
     q('ent_pedido_factura_vigente','pedido_id,factura_id,factura_nombre,anulado'),
     // ⚠️ LA VISTA VIGENTE, NO LA TABLA (26-ago). Leía `ent_alisto.anulado`, que es
@@ -17391,8 +17570,13 @@ async function pdLeer(){
     // Con la tabla cruda, un despacho anulado seguía saliendo en Pendientes para
     // siempre — se descubrió anulando el despacho 11 (la salida de Mentha del
     // 19-ago que nunca ocurrió, ver CORRECCION_DESP11.sql).
-    q('ent_alisto_vigente','pedido_id,preparado_en') ]);
-  for(const r of [mot,fac,als]){ if(r.error) throw r.error; }
+    q('ent_alisto_vigente','pedido_id,preparado_en'),
+    // §29 (14-oct): un pedido ANULADO no es un pendiente. Esta lista sale de
+    // `ent_pedido` crudo, así que no se entera sola: mismo criterio que las
+    // vistas `ent_salida_sin_factura` y `ent_salida_sin_clasificar`.
+    q('ent_pedido_anulacion','pedido_id') ]);
+  for(const r of [mot,fac,als,anu]){ if(r.error) throw r.error; }
+  const ANU={}; (anu.data||[]).forEach(function(r){ ANU[r.pedido_id]=1; });
   const M={},F={},A={};
   (mot.data||[]).forEach(function(r){ M[r.pedido_id]=r; });
   (fac.data||[]).forEach(function(r){ if(!r.anulado) F[r.pedido_id]=r; });
@@ -17404,6 +17588,7 @@ async function pdLeer(){
     const it={id:p.id, fecha:p.fecha_despacho, cliente:p.cliente_nombre,
               cliente_id:p.cliente_id, motivo:mv, dias:dias,
               origen:p.origen, destinatario:p.destinatario};
+    if(ANU[p.id]) return;                       // anulado (§29): no es un pendiente
     if(mv==='venta' && !F[p.id]) l2.push(it);
     if(mv==='sin_clasificar') l3.push(it);
   });
@@ -17465,7 +17650,8 @@ function pdRender(){
   // su contador y nada más — la forma de «Por resolver». No es un caso especial
   // metido a la fuerza: una explicación que no explica nada es ruido, y el lugar
   // donde se decide eso es cada llamada, no el helper.
-  const secc=function(titulo,expl,ls,accion){
+  // `anu` (14-oct): la fila lleva «Anular pedido» (§29) debajo de su meta.
+  const secc=function(titulo,expl,ls,accion,anu){
     if(!ls.length) return '';
     let h='<div class="card rp-z"><div class="card-title">'+titulo
       +' <span class="pd-cnt'+(ls.length?' on':'')+'">'+ls.length+'</span></div>'
@@ -17474,6 +17660,7 @@ function pdRender(){
       h+='<div class="pd-fila"><div class="pd-fila-c">'
         +'<div class="pd-quien">'+_pdQuien(it)+'</div>'
         +'<div class="pd-meta">#'+it.id+' · '+esc(_pdCuando(it.fecha,it.dias))+'</div>'
+        +(anu?anuHTML(it.id,'pd'):'')
         +'</div>'+accion(it)+'</div>'
         +'<div id="pdx'+it.id+'"></div>';
     });
@@ -17537,7 +17724,7 @@ function pdRender(){
   h+=pdvHTML();        // «Validar entrega en Odoo» · reemplaza al cuadre y a la marca manual (1-oct)
   h+=secc('Salida sin clasificar',
     'Daniel registró la salida; falta que las socias digan qué fue. El pendiente es un estado con nombre, no un hueco.',
-    _pd.l3, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdClasifUI('+it.id+')">Clasificar</button>'; });
+    _pd.l3, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdClasifUI('+it.id+')">Clasificar</button>'; }, true);
   // «Entregado en Truefie, sin marcar como validado» SE FUE el 1-oct (Andrea):
   // lo reemplaza «Validar entrega en Odoo» (`pdvHTML`), que valida de verdad y
   // cuya lista sale del estado de la salida EN ODOO, no de una marca a mano. La
@@ -17546,7 +17733,7 @@ function pdRender(){
   // pedido 11 sobre una salida CANCELADA, y la del 13, anulado.
   h+=secc('Salida de venta, sin factura vinculada',
     'Solo salidas de tipo venta: una regalía sin factura no es un pendiente, es lo correcto.',
-    _pd.l2, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdVincular('+it.id+','+it.cliente_id+')">Vincular</button>'; });
+    _pd.l2, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdVincular('+it.id+','+it.cliente_id+')">Vincular</button>'; }, true);
 
   // ── FACTURAS SIN DESPACHO PENDIENTE · mudada desde Despachos (26-ago) ──
   // Despachos es la pantalla de TRABAJO; algo que no hay que despachar es ruido
@@ -18847,7 +19034,7 @@ function pdtHTML(ls, T){
     // muestra destino, contacto y cantidades; el servidor igual revisa todo
     // antes de escribir, y si algo no calza no escribe y dice por qué.
     h+=(ok?('<div class="dv-acc" style="margin-top:10px"><button class="btn btn-sm pdv-si" onclick="pdtUno('
-      +x.pedido_id+')">Crear en Odoo</button></div>'):'')+'</div>';
+      +x.pedido_id+')">Crear en Odoo</button></div>'):'')+anuHTML(x.pedido_id,'pd')+'</div>';
   });
   if(va.some(function(x){ const P=_pdt.prev[x.pedido_id]; return P && P.st==='red'; }))
     h+='<button class="rp-ceros" onclick="pdtPrevias(true)">volver a preguntar</button>';
@@ -18857,7 +19044,8 @@ function pdtHTML(ls, T){
       const P=_pdt.prev[x.pedido_id], g=(_pdt.descartando===x.pedido_id);
       h+=cab(x, false, 'pdv-no')+payload(x)+_valRechazoHTML(P.rech, true)
         +'<div class="dv-acc" style="margin-top:10px"><button class="btn btn-sm"'+(g?' disabled':'')
-        +' onclick="pdtDescartar('+x.pedido_id+')">'+(g?'Guardando…':'Descartar')+'</button></div></div>';
+        +' onclick="pdtDescartar('+x.pedido_id+')">'+(g?'Guardando…':'Descartar')+'</button></div>'
+        +anuHTML(x.pedido_id,'pd')+'</div>';
     });
   }
   return h+'</div>';
@@ -19312,6 +19500,7 @@ function pdvHTML(){
     if(ok) h+=_valLineasHTML(P.r);
     else if(P && P.st==='red') h+='<div class="pd-cua">No pude preguntarle al servicio de escritura.</div>';
     else h+='<div class="pd-cua">Revisando en Odoo…</div>';
+    h+=anuHTML(x.pedido,'pd');
     h+='</div>'+(ok?('<button class="btn btn-sm pd-acc" onclick="pdvUno('+x.pedido+')">Validar</button>'):'')
       +'</div>';
   });
@@ -19325,6 +19514,7 @@ function pdvHTML(){
       if(P && P.st==='rech') h+=_valRechazoHTML(P.rech, true);
       else x.motivos.forEach(function(m){ h+='<div class="pd-cua">'+esc(m.txt)+'</div>'; });
       const g=(_pdv.descartando===x.pedido);
+      h+=anuHTML(x.pedido,'pd');
       h+='</div><button class="btn btn-sm pd-acc"'+(g?' disabled':'')
         +' onclick="pdvDescartar('+x.pedido+')">'+(g?'Guardando…':'Descartar')+'</button></div>';
     });

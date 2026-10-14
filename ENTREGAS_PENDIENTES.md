@@ -1801,3 +1801,36 @@ cajas todavía están donde se las dejó y alguien se acuerda.
 **⚠️ Sólo aplica a los lotes producidos después del ancla anterior.** Un lote
 viejo arrastra historia que el tramo no ve, y compararlo así daría falsos
 positivos.
+
+---
+
+## 29 · 🟠 ABIERTO · HOJA DE RUTA · No hay forma de anular una entrega desde la pantalla
+
+**El caso (14-oct-2026):** una regalía se registró dos veces, con dos minutos de
+diferencia: la #194, con 6 productos y su traslado WH/INT/00149 hecho en Odoo, y
+la #195, con 3 productos. La #195 era un duplicado y quedó en «Traslados internos
+por crear». Se anuló con SQL (`ENSAYO_ANULAR_PEDIDO_195.sql` + pegado): alisto
+154, salida 143 y el pendiente 37 cerrado en `ent_odoo_hecho`.
+
+**Lo que hay hoy no sirve para esto.** «Sale otro día — deshacer la entrega»
+(`bsDeshacer`, Historial, solo socias) anula **solo la salida**:
+- el pedido vuelve a «preparado» y el producto sigue apartado (el descuento se
+  sostiene por el alisto: `coalesce(sv.salida_en, av.preparado_en)`);
+- se esconde si el pedido ya tiene traslado o validación en Odoo
+  (`bsPuedeDeshacer`);
+- no cierra la cola de Odoo: `v_ent_odoo_pendiente` solo mira `ent_odoo_hecho`,
+  **no las anulaciones**. Un pedido anulado sigue pidiendo su traslado.
+
+**Lo que se quiere: un botón «Anular entrega», solo socias, con motivo
+OBLIGATORIO.** En una sola operación:
+1. anular el alisto y la salida vigentes (`ent_anulacion`, append-only), así el
+   producto vuelve al saldo por lote;
+2. cerrar el pendiente de Odoo si lo hay (`ent_odoo_hecho` con referencia
+   «anulado: …»), o mejor: que `v_ent_odoo_pendiente` excluya los pedidos sin
+   alisto vigente, y así no depende de acordarse;
+3. si el pedido ya tiene traslado (`ent_odoo_traslado`) o validación en Odoo,
+   **avisar** que hay que revertirlo allá. Truefie no lo revierte.
+
+Que corra en el servidor o en una función de la base, para que las tres cosas
+entren juntas o no entre ninguna (hoy `bsDeshacer` es un insert suelto desde el
+navegador).
