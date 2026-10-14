@@ -1,6 +1,10 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- CONT_BARRIDO_ODOO.sql · 14-oct-2026 · el rastro del barrido mensual de 1103030
--- ⚠️ SIN PEGAR. Va antes de encender BARRIDO_ENCENDIDO, con su ensayo en rollback.
+-- ✅ APLICADO el 14-oct-2026. Ensayo 15/15 ok; control del pegado `true · 7 · 0 · INSERT,SELECT`.
+--   Verificado DESPUÉS, desde afuera: pg_lector (11 columnas, 0 filas, RLS, 7 políticas, 8 restricciones,
+--   authenticated = INSERT,SELECT) y la anon key (GET y POST → 42501 permission denied).
+--   BARRIDO_ENCENDIDO sigue APAGADO: el primer barrido real es el 1-nov, con el OK de Andrea.
+-- ⚠️ No se vuelve a pegar: el bloque DDL aborta si la tabla ya existe.
 --
 -- Sexto carril del servicio de escritura (truefie-escritura, rama `barrido-1103030`):
 -- POST /barrido {mes} deja UNA fila por mes barrido, insertada CON EL TOKEN de la
