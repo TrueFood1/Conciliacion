@@ -25,7 +25,9 @@
     var m=document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content','#F7F8FA'); }
 }catch(_){} })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Versión EXACTA (14-oct-2026): con «@2» suelto jsDelivr servía la última 2.x y la librería cambiaba sola
+     (la 2.117.3 entró así el 7-oct). Se sube a mano, probándola antes. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
@@ -5256,7 +5258,7 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 14 oct 2026 · b95';
+const BUILD = 'v 14 oct 2026 · b96';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -5899,7 +5901,9 @@ async function setSaludo(){
   const nom=_quienNombre(email);   // la MISMA definición que usa el Historial
   el.textContent=nom ? ('Hola '+nom+'.') : 'Hola.';
 }
-async function authLogout(){ try{ await sbClient().auth.signOut(); }catch(e){} location.reload(); }
+// «Salir» cierra SOLO este aparato (14-oct-2026). `signOut()` sin scope es 'global' en supabase-js v2: cerraba
+// la sesión de esa persona en TODOS sus aparatos, y el otro se enteraba con un 400 al renovar.
+async function authLogout(){ try{ await sbClient().auth.signOut({ scope: 'local' }); }catch(e){} location.reload(); }
 // ── TEMA CLARO / OSCURO (4-oct-2026) ─────────────────────────────────────────────
 // La preferencia es de la CUENTA (tabla `preferencia_tema`, append-only, gana la última fila).
 // Si alguien nunca tocó el botón, manda el perfil: socias en oscuro, el equipo en claro
