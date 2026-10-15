@@ -8,7 +8,7 @@ JSC='/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc'
 import tempfile
 SP=tempfile.mkdtemp(prefix='tf_loadcheck_')
 s=open('index.html',encoding='utf-8').read()
-body=re.findall(r'<script(?![^>]*src=)[^>]*>(.*?)</script>', s, re.S)[0]
+body=max(re.findall(r'<script(?![^>]*src=)[^>]*>(.*?)</script>', s, re.S), key=len)   # el bloque grande; el del <head> es el arranque del tema
 stub = r'''
 var _noop=function(){return _el();};
 function _el(){ return new Proxy(function(){}, {
