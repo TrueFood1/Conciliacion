@@ -4806,6 +4806,7 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 #vCompras .cp-sgn .cp-dot{margin-right:6px}
 #vCompras .cp-sgt{font-size:14px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
 #vCompras .cp-sgs{font-size:12px;color:var(--text-2);white-space:nowrap}
+#vCompras .cp-sgi .cp-sgs{white-space:normal;line-height:1.35}
 #vCompras .cp-sgx{padding:0 0 12px}
 #vCompras .cp-sgl{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:baseline;font-size:13px;padding:5px 0;color:var(--text-hi)}
 #vCompras .cp-sgln{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -21228,9 +21229,21 @@ function _cpCuandoTxt(g){
 }
 // Los avisos de una tarjeta, como chips: rojo (ya no llega a tiempo), gris punteado (por cargar),
 // ámbar (con lo sugerido no llega a la compra siguiente). De a tres; el resto, «+N».
+// LO QUE YA VIENE Y NO LLEGA A TIEMPO (Andrea, 15-oct, caso avena): un insumo con algo ya pedido para este
+// ciclo (`ya`) que igual se acaba antes de que llegue —la medición del lunes es a la mañana y BIO llega a
+// mediodía— dice QUÉ viene, CUÁNDO llega y CUÁNDO se acaba: «136,08 kg en camino, llegan lun 19 al
+// mediodía; se acaba lun 19 en la mañana». Sin nada pedido, sigue el «falta …» de siempre. '' = no aplica.
+function _cpEnCaminoTxt(f){
+  if(!(f && f.fijo && f.ya>1e-9 && f.llega && f.falla)) return '';
+  const pv=_cpCfgProv(f.proveedor_id)||{}, h=String(pv.llega_hora||'').trim();
+  const hora=!h ? '' : (/^mediod[ií]a$/i.test(h) ? ' al mediodía' : (' ('+h+')'));
+  const g=(f.uom==='g'), v=g?f.ya/1000:f.ya, q=_rzN(v, Math.abs(v-Math.round(v))>1e-9?2:0)+' '+(g?'kg':_cpUni(f.uom));   // «136,08 kg», con sus decimales
+  return q+' en camino, '+(Math.abs(f.ya-1)<1e-9?'llega ':'llegan ')+_cpDia(f.llega)+hora+'; se acaba '+_cpDia(f.falla)+' en la mañana';
+}
 function _cpChipsHtml(g, filas, AP){
   const ch=[], its=_cpItemsComprar(g);
-  its.forEach(function(f){ if(f.color==='rojo' && !_cpEsOdoo(f, f)) ch.push(['r', _cpNomFrase(f.nombre)+': falta '+_cpDia(f.falla)]); });
+  its.forEach(function(f){ if(f.color==='rojo' && !_cpEsOdoo(f, f)){ const ec=_cpEnCaminoTxt(f);
+    ch.push(['r', _cpNomFrase(f.nombre)+': '+(ec || ('falta '+_cpDia(f.falla)))]); } });
   its.forEach(function(f){ if(_cpEsOdoo(f, f)) ch.push(['o', _cpNomFrase(f.nombre)+': por cargar']); });
   // El ámbar NO se repite sobre un insumo que ya está en rojo: la avena del 14-oct salía «falta lun 19»
   // y «justa hasta el mié 14» a la vez — lo segundo era el mismo faltante dicho peor (llega a
@@ -21260,14 +21273,17 @@ function _cpSugDatos(g){
 // se arma por su lado, porque /pedir acepta una entrega por propuesta.
 function _cpSugFilaHtml(gs){
   const A=_cpAlc, D=gs.map(_cpSugDatos), k='sp'+gs[0].proveedor_id, ab=!!_cpAbiertos[k];
-  const n=D.reduce(function(a,d){ return a+d.its.length; },0), tot=D.reduce(function(a,d){ return a+d.T.t; },0), falta=D.some(function(d){ return d.T.falta; });
+  // «3 insumos» con 2 líneas confundía (15-oct): se cuenta lo que tiene algo para pedir; lo que ya viene
+  // y no pide más va aparte como «en camino».
+  const n=D.reduce(function(a,d){ return a+d.filas.filter(function(f){ return d.v[f.pid]>0; }).length; },0);
+  const nc=D.reduce(function(a,d){ return a+d.its.filter(function(f){ return !(d.v[f.pid]>0) && f.ya>1e-9; }).length; },0), tot=D.reduce(function(a,d){ return a+d.T.t; },0), falta=D.some(function(d){ return d.T.falta; });
   const prim=gs.slice().sort(function(a,b){ return (a.limite||A.hoy).localeCompare(b.limite||A.hoy); })[0];
   const urge=(prim.limite||A.hoy)<=A.hoy, rojo=D.some(function(d){ return d.rojo; });
   const llegas=D.filter(function(d){ return d.g.canal!=='tienda'; }).map(function(d){ return _fechaCorta(d.F.entrega); });
   const pr=(_rzCtx.dfDatos&&_rzCtx.dfDatos.precios)||{};
   let h='<div class="cp-sgr'+(ab?' abierto':'')+'"><button class="cp-sgc" aria-expanded="'+ab+'" onclick="cpSugToggle(\''+k+'\')">'
     +'<span class="cp-sgi"><span class="cp-sgn">'+(rojo?'<span class="cp-dot cp-dot-rojo"></span>':'')+esc(gs.length>1?_cpProvCorto(gs[0]):_cpGrupoNom(gs[0]))+'</span>'
-    +'<span class="cp-sgs">'+n+' insumo'+(n===1?'':'s')+(llegas.length?(' · llega '+llegas.join(' y ')):'')+'</span></span>'
+    +'<span class="cp-sgs">'+(n?(n+' por pedir'):'')+(n&&nc?' · ':'')+(nc?(nc+' en camino'):'')+(llegas.length&&n?(' · llega '+llegas.join(' y ')):'')+'</span></span>'
     +'<span class="cp-sgd"><span class="cp-sgt">₡'+_rzN(tot, 0)+(falta?'*':'')+'</span>'
     +'<span class="cp-sgs'+(urge?' cp-amb3':'')+'">'+esc(_cpCuandoTxt(prim))+'</span></span>'
     +'<span class="cp-fl'+(ab?' abierto':'')+'" aria-hidden="true">›</span></button>';
@@ -21736,7 +21752,8 @@ function _cpAvisosLinea(P, g, F, f, r, q){
   const bm=_cpBajoMinimo(f, +P.valores[f.pid]||0);
   if(bm) av.push(['a', 'Debajo del mínimo de '+_cpProvCorto(g)+' ('+bm+'). Podés pedirlo igual.']);
   if(_cpEsOdoo(f, r)) av.push(['o', 'Por cargar: Odoo tiene menos de lo que ya se usó.']);
-  else if(_cpFaltaAntes(g, F, r)) av.push(['r', 'Falta '+(_cpDia(r.falla)==='hoy'?'hoy':('el '+_fechaCorta(r.falla)))+', antes de que llegue.']);
+  else if(_cpFaltaAntes(g, F, r)){ const ec=_cpEnCaminoTxt(f);
+    av.push(['r', ec ? _cpMay(ec)+'.' : ('Falta '+(_cpDia(r.falla)==='hoy'?'hoy':('el '+_fechaCorta(r.falla)))+', antes de que llegue.')]); }
   else if(r.falla && r.falla<=g.alcanzaHasta) av.push(['a', 'Con esto alcanza hasta el '+_fechaCorta(r.ultimo||r.falla)+': no llega a la compra siguiente.']);
   return av.map(function(a){ return '<div class="cp-lav cp-lav-'+a[0]+'">'+esc(a[1])+'</div>'; }).join('');
 }
