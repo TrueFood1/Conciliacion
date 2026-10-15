@@ -4222,6 +4222,7 @@ body:has(.de-fondo) #tkBtn{display:none}
 .bar-ok{font-size:12.5px;color:var(--text-2)}
 .bar-no{font-size:12.5px;color:var(--text-2)}
 .bar-no.amb{color:var(--warn)}
+.bar-nw{white-space:nowrap}
 .bar-acc{display:flex;justify-content:flex-end;margin-top:4px}
 .bar-btn{border-color:var(--m-fin);color:var(--m-fin)}
 .bar-btn:disabled{opacity:.45;cursor:default}
@@ -21340,16 +21341,19 @@ function _barHTML(){
   h+='<div class="bar-n"><b>'+r.n+'</b> residuo'+(r.n===1?'':'s')+' · <b>'+esc(_barCol(r.total))+'</b> a 6106022</div>'
     +'<div class="bar-s">Asiento al '+esc(_fechaCorta(r.fecha))+' en Operaciones varias · '
     +'excluidos (más de ₡'+_rzN(r.umbral,0)+'): '+r.excluidos.length+' · pendientes sin pareja: '+r.pendientes.n
-    +(r.pendientes.n?(' ('+esc(_barCol(r.pendientes.monto))+')'):'')+'</div>';
+    +(r.pendientes.n?(' <span class="bar-nw">('+esc(_barCol(r.pendientes.monto))+')</span>'):'')+'</div>';
   if(r.excluidos.length) h+='<div class="bar-exc">'+r.excluidos.map(function(x){
       return esc((x.asiento||'')+' · '+(x.producto||'')+' · '+_barCol(x.residuo)); }).join('<br>')+'</div>';
   // POR QUÉ NO SE PUEDE, si no se puede. El botón no se esconde: se ve deshabilitado y dice por qué.
   let no='';
   if(r.abierto) no='Se puede barrer desde el '+_fechaCorta(r.barrer_desde)+'.';
-  else if(!r.barrido_encendido) no='El barrido está apagado en el servicio (BARRIDO_ENCENDIDO).';
   else if(!r.n) no='No hay residuos que barrer.';
-  if(no) h+='<div class="bar-no'+(r.abierto?'':' amb')+'">'+esc(no)+'</div>';
-  h+='<div class="bar-acc"><button class="btn btn-sm bar-btn"'+((no||B.barriendo)?' disabled':'')+' onclick="barBarrer()">'
+  if(no) h+='<div class="bar-no">'+esc(no)+'</div>';
+  // APAGADO SE DICE SIEMPRE (14-oct): era una rama del `else if` y, con el mes abierto, la razón
+  // de arriba lo tapaba — hasta el 1-nov la tarjeta nunca lo habría dicho.
+  const apagado=!r.barrido_encendido;
+  if(apagado) h+='<div class="bar-no amb">El barrido está apagado en el servicio (BARRIDO_ENCENDIDO).</div>';
+  h+='<div class="bar-acc"><button class="btn btn-sm bar-btn"'+((no||apagado||B.barriendo)?' disabled':'')+' onclick="barBarrer()">'
     +(B.barriendo?'Barriendo…':('Barrer '+esc(_barMesTxt(r.mes).split(' ')[0])))+'</button></div>';
   if(B.msg) h+='<div class="bar-msg'+(B.mal?' mal':'')+'">'+esc(B.msg)+'</div>';
   return h+'</div>';
