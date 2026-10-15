@@ -4611,6 +4611,8 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 #vCompras .cp-pills{display:flex;gap:8px;overflow-x:auto;margin:2px 0 16px;scrollbar-width:none}
 #vCompras .cp-pill{border:.5px solid var(--border);background:var(--surface);color:var(--text-2);border-radius:999px;padding:8px 15px;font-size:13px;white-space:nowrap;cursor:pointer;font-family:inherit}
 #vCompras .cp-pill.on{border-color:var(--m-comp);color:var(--m-comp)}
+#vCompras .cp-pill-mas{margin-left:auto;min-width:38px;font-size:16px;line-height:1;padding:7px 12px}
+#vCompras .cp-pill-mas.on{font-size:13px}
 #vCompras .cp-card{background:var(--surface);border:.5px solid var(--border);border-radius:14px;padding:14px 15px;margin-bottom:12px}
 #vCompras .cp-f1{display:flex;align-items:center;justify-content:space-between;gap:10px}
 #vCompras .cp-prov{font-size:19px;font-weight:600;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -4824,6 +4826,20 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 #vCompras .cp-po-cab .cp-chip{white-space:nowrap}
 #vCompras .cp-po-lin{font-size:13.5px;color:var(--text-hi);line-height:1.45}
 #vCompras .cp-po-pie{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--text-2)}
+#vCompras .cp-pl>summary{list-style:none;cursor:pointer}
+#vCompras .cp-pl>summary::-webkit-details-marker{display:none}
+#vCompras .cp-pl>summary>span:first-child::after{content:'›';display:inline-block;margin-left:8px;transition:transform .15s}
+#vCompras .cp-pl[open]>summary>span:first-child::after{transform:rotate(90deg)}
+#vCompras .cp-filtro{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+#vCompras .cp-fil{border:.5px solid var(--border-strong);background:transparent;color:var(--text-2);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;min-height:32px}
+#vCompras .cp-fil.on{border-color:var(--m-comp);color:var(--m-comp);font-weight:600}
+#vCompras .cp-selr .cp-in{display:flex;align-items:center;gap:10px}
+#vCompras .cp-chk{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:6px;border:.5px solid var(--border-strong);color:var(--m-comp);flex:0 0 auto}
+#vCompras .cp-selr.on .cp-chk{border-color:var(--m-comp)}
+#vCompras .cp-selg{margin:10px 0}
+#vCompras .cp-selp{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0}
+#vCompras .cp-selp+.cp-selp{border-top:.5px solid var(--line)}
+#vCompras .cp-sels{font-size:12.5px;margin-top:2px;white-space:normal}
 #vCompras .cp-oc .cp-po-det{border-top:.5px solid var(--line);padding-top:6px;margin-top:2px}
 #vCompras .cp-cero{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 #vCompras .cp-cero-b{display:flex;flex-direction:column;gap:2px;text-align:left;background:var(--surface);border:.5px solid var(--border);border-radius:12px;padding:12px 14px;font:inherit;cursor:pointer;min-height:56px}
@@ -20940,7 +20956,9 @@ async function irACompras(vista){
 // La pastilla de Comprar sigue encendida mientras se arma o se revisa: es parte de Comprar.
 function cpPintarPills(){
   const p=document.getElementById('cpPills'); if(!p) return;
-  p.innerHTML=CP_VISTAS.map(function(v){ return '<button class="cp-pill'+(v[0]===_cpVista?' on':'')+'" onclick="cpIr(\''+v[0]+'\')">'+v[1]+'</button>'; }).join('');
+  // Ajustes casi no se usa (Andrea, 15-oct): no es pestaña, es un «+» al final que se abre solo si se quiere.
+  p.innerHTML=CP_VISTAS.filter(function(v){ return v[0]!=='ajustes'; }).map(function(v){ return '<button class="cp-pill'+(v[0]===_cpVista?' on':'')+'" onclick="cpIr(\''+v[0]+'\')">'+v[1]+'</button>'; }).join('')
+    +'<button class="cp-pill cp-pill-mas'+(_cpVista==='ajustes'?' on':'')+'" aria-label="Ajustes" title="Ajustes" aria-pressed="'+(_cpVista==='ajustes')+'" onclick="cpIr(\''+(_cpVista==='ajustes'?'comprar':'ajustes')+'\')">'+(_cpVista==='ajustes'?'Ajustes ×':'+')+'</button>';
 }
 function cpIr(v){ _cpVista=_cpVistaDe(v); _cpReg=null; _cpProvSel=null; crumbSet('Compras', CP_VISTAS.find(function(x){ return x[0]===_cpVista; })[1]); cpPintarPills(); cpRender(); try{ window.scrollTo(0,0); }catch(e){} }
 function cpRender(){
@@ -21186,45 +21204,94 @@ function _cpMpTablaHtml(A){
         : '<td class="'+(f.color==='rojo'?'cp-r':'')+'">'+esc(_cpAlcTxt(f))+'</td>')+'</tr>'; }).join('')
     +'</tbody></table>';
 }
+// COMPRAR v2 (Andrea, 15-oct): dos secciones plegables. «SUGERIDO» = lo que Truefie calcula (antes «Truefie
+// sugiere»). «PERSONALIZADO» = armar a mano, POR PROVEEDOR (todos sus insumos en 0) o POR PRODUCTO (se eligen
+// insumos sueltos; los del mismo pedido se juntan solos en un solo armado, uno por proveedor y entrega).
+let _cpModoPers='prov', _cpSel={};
+const _CP_CHK='<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-10"/></svg>';
 function cpComprarHtml(){
   const A=_cpAlc;
   if(!A) return '<div class="cp-vacio">Falta cargar la configuración de Compras (compras_config).</div>';
   if(A.error) return '<div class="cp-err">No pude calcularlo: '+esc(A.error)+'</div>';
   const C=_rzCtx.cfg.compras, socia=(_socia===true);
-  let h='<div class="cp-cmp">'
-    +'<div class="cp-busc"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>'
-    +'<input type="search" id="cpBusq" aria-label="Buscar un insumo" placeholder="Buscar un insumo" autocomplete="off" value="'+esc(_cpBusq)+'" oninput="cpBuscar(this.value)"></div>'
-    +'<div id="cpBusRes">'+_cpBusResHtml()+'</div>';
-  // TRUEFIE SUGIERE
+  const abre=function(k, def){ return (_cpAbiertos[k]==null ? def : _cpAbiertos[k]) ? ' open' : ''; };
+  let h='<div class="cp-cmp">';
+  // SUGERIDO
   const nec=_cpGruposPorComprar(A);
-  h+='<div class="cp-sec">Truefie sugiere</div>';
+  h+='<details class="cp-pl"'+abre('secSug', true)+' ontoggle="_cpAbiertos.secSug=this.open"><summary class="cp-sec cp-sec-f"><span>Sugerido'+(nec.length?(' · '+nec.length):'')+'</span></summary>';
   if(nec.length) h+='<div class="cp-sugs">'+nec.map(_cpSugCardHtml).join('')+'</div>';
   else h+='<div class="cp-card cp-sug0">No hace falta comprar nada'+(A.proximo?(' hasta el '+_fechaCorta(A.proximo)):' en 4 semanas')+'.</div>';
-  // ARMAR DESDE CERO (solo socias: arman pedidos)
+  h+='</details>';
+  // PERSONALIZADO (solo socias: arman pedidos)
   if(socia){
-    h+='<div class="cp-sec">Armar desde cero</div><div class="cp-cero">'
-      +C.proveedores.filter(function(pv){ return C.insumos.some(function(i){ return +i.proveedor_id===+pv.id; }); })
-        .map(function(pv){ return '<button class="cp-cero-b" onclick="cpDesdeCero('+(+pv.id)+')"><span class="cp-cero-n">'
-          +esc(pv.corto||_cpNomCorto(pv.nombre))+'</span><span class="cp-cero-l">'+esc(_cpProvLinea(pv))+'</span></button>'; }).join('')
-      +'</div>';
+    const porProd=(_cpModoPers==='prod');
+    h+='<details class="cp-pl"'+abre('secPers', false)+' ontoggle="_cpAbiertos.secPers=this.open"><summary class="cp-sec cp-sec-f"><span>Personalizado</span></summary>'
+      +'<div class="cp-seg" role="group" aria-label="Armar por proveedor o por producto">'
+      +'<button class="'+(porProd?'':'on')+'" aria-pressed="'+(!porProd)+'" onclick="cpModoPers(\'prov\')">Por proveedor</button>'
+      +'<button class="'+(porProd?'on':'')+'" aria-pressed="'+porProd+'" onclick="cpModoPers(\'prod\')">Por producto</button></div>';
+    if(!porProd){
+      h+='<div class="cp-cero">'
+        +C.proveedores.filter(function(pv){ return C.insumos.some(function(i){ return +i.proveedor_id===+pv.id; }); })
+          .map(function(pv){ return '<button class="cp-cero-b" onclick="cpDesdeCero('+(+pv.id)+')"><span class="cp-cero-n">'
+            +esc(pv.corto||_cpNomCorto(pv.nombre))+'</span><span class="cp-cero-l">'+esc(_cpProvLinea(pv))+'</span></button>'; }).join('')
+        +'</div>';
+    } else {
+      h+='<div class="cp-busc"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>'
+        +'<input type="search" id="cpBusq" aria-label="Buscar un insumo" placeholder="Buscar un insumo" autocomplete="off" value="'+esc(_cpBusq)+'" oninput="cpBuscar(this.value)"></div>'
+        +'<div id="cpSelRes">'+_cpSelHtml()+'</div>'
+        +'<div id="cpBusRes">'+_cpBusResHtml()+'</div>';
+    }
+    h+='</details>';
   }
   // MATERIA PRIMA, plegada (Andrea, 14-oct)
   h+='<details class="cp-mpdet"'+(_cpAbiertos.mp?' open':'')+' ontoggle="_cpAbiertos.mp=this.open"><summary>Materia prima · hay · alcanza hasta</summary>'
     +_cpMpTablaHtml(A)+'</details>';
   return h+'</div>';
 }
-// EL BUSCADOR. Se redibujan solo los resultados: redibujar la pantalla le quitaría el foco al campo.
+function cpModoPers(m){ _cpModoPers=(m==='prod')?'prod':'prov'; cpRender(); if(m==='prod'){ const e=document.getElementById('cpBusq'); if(e) try{ e.focus(); }catch(_){} } }
+// POR PRODUCTO: todos los insumos (el buscador filtra), se tocan para elegirlos. Se redibujan solo las dos
+// listas: redibujar la pantalla le quitaría el foco al buscador.
 function _cpBusResHtml(){
-  const A=_cpAlc, q=_cpNorm(_cpBusq).trim(); if(!A || A.error || q.length<2) return '';
-  const rs=A.filas.filter(function(f){ return _cpNorm(f.nombre).indexOf(q)>=0; }).slice(0,8);
+  const A=_cpAlc; if(!A || A.error) return '';
+  const q=_cpNorm(_cpBusq).trim();
+  const rs=A.filas.filter(function(f){ return _cpGrupoDe(f) && (!q || _cpNorm(f.nombre).indexOf(q)>=0); })
+    .sort(function(a,b){ return _cpNorm(a.nombre).localeCompare(_cpNorm(b.nombre)); });
   if(!rs.length) return '<div class="cp-busv">Ningún insumo con «'+esc(_cpBusq.trim())+'».</div>';
-  return '<div class="cp-card cp-busl">'+rs.map(function(f){ const g=_cpGrupoDe(f);
-      return '<button class="cp-busr"'+(_socia===true&&g?'':' disabled')+' onclick="cpBuscarAbrir('+f.pid+')">'
-        +'<span class="cp-in"><span class="cp-dot cp-dot-'+_cpDotCls(f)+'"></span>'+esc(f.nombre)+'</span>'
-        +'<span class="cp-g">'+esc(g?_cpGrupoNom(g):'')+(_socia===true&&g?' ›':'')+'</span></button>'; }).join('')+'</div>';
+  return '<div class="cp-card cp-busl">'+rs.map(function(f){ const on=!!_cpSel[f.pid], g=_cpGrupoDe(f);
+      return '<button class="cp-busr cp-selr'+(on?' on':'')+'" aria-pressed="'+on+'" onclick="cpSelToggle('+f.pid+')">'
+        +'<span class="cp-in"><span class="cp-chk">'+(on?_CP_CHK:'')+'</span>'+esc(f.nombre)+'</span>'
+        +'<span class="cp-g">'+esc(_cpProvCorto(g))+'</span></button>'; }).join('')+'</div>';
 }
+// Lo elegido, juntado por pedido (proveedor y entrega): un renglón con «Armar» por cada uno.
+function _cpSelPorGrupo(){
+  const A=_cpAlc, out=[]; if(!A) return out;
+  Object.keys(_cpSel).forEach(function(k){ const pid=+k, f=A.filas.find(function(x){ return x.pid===pid; }), g=f&&_cpGrupoDe(f);
+    if(!g) return; const gi=A.grupos.indexOf(g); let o=out.find(function(x){ return x.gi===gi; });
+    if(!o){ o={gi:gi, g:g, filas:[]}; out.push(o); } o.filas.push(f); });
+  return out;
+}
+function _cpSelHtml(){
+  const G=_cpSelPorGrupo(); if(!G.length) return '';
+  return '<div class="cp-card cp-selg">'+G.map(function(o){
+    return '<div class="cp-selp"><div class="cp-in"><div class="cp-sugn">'+esc(_cpGrupoNom(o.g))+'</div>'
+      +'<div class="cp-g cp-sels">'+esc(o.filas.map(function(f){ return f.nombre; }).join(' · '))+'</div></div>'
+      +'<button class="cp-btn cp-btnp cp-btnar" onclick="cpSelArmar('+o.gi+')">Armar</button></div>'; }).join('')+'</div>';
+}
+function cpSelToggle(pid){ if(_cpSel[pid]) delete _cpSel[pid]; else _cpSel[pid]=true;
+  const r=document.getElementById('cpBusRes'), s=document.getElementById('cpSelRes');
+  if(r) r.innerHTML=_cpBusResHtml(); if(s) s.innerHTML=_cpSelHtml(); }
 function cpBuscar(v){ _cpBusq=v; const e=document.getElementById('cpBusRes'); if(e) e.innerHTML=_cpBusResHtml(); }
-// Del buscador al armado de su pedido, con esa línea cargada: lo sugerido, o el mínimo si no sugiere nada.
+// El armado de ese pedido con SOLO lo elegido: lo sugerido, o el mínimo si no sugiere nada; el resto en 0.
+function cpSelArmar(gi){
+  const A=_cpAlc, o=_cpSelPorGrupo().find(function(x){ return x.gi===gi; }); if(!o || _socia!==true) return;
+  cpAbrirPedido(gi);
+  const P=_cpReg; if(!P) return;
+  Object.keys(P.valores).forEach(function(k){ P.valores[k]=0; });
+  o.filas.forEach(function(f){ const s=_cpSugPaq(f), m=_cpMult(f.pid);
+    P.valores[f.pid]=s>0 ? s : (m ? (m.min||m.mult) : (_cpPE(f.pid) ? 1 : _cpPaso(f))); delete _cpSel[f.pid]; });
+  _cpBusq=''; cpRenderRegistro();
+}
+// Del buscador viejo (lo usan otras puertas): el armado de su pedido con esa línea cargada.
 function cpBuscarAbrir(pid){
   const A=_cpAlc, f=A&&A.filas.find(function(x){ return x.pid===pid; }), g=f&&_cpGrupoDe(f);
   if(!g || _socia!==true) return;
@@ -21753,7 +21820,10 @@ async function cpPedidos(){
         :L.map(function(l){ return '<div class="cp-pol"><span>'+esc(_cpLinNom(l))+'</span><span>'+_cpLinCant(l.product_qty, l)
             +(l.qty_received>1e-9 && l.qty_received<l.product_qty-1e-9?(' <span class="cp-g">· recibido '+_rzN(l.qty_received, l.qty_received%1?2:0)+'</span>'):'')+'</span></div>'; }).join('')))
       +'<div class="cp-pol"><span></span><a class="cp-link" href="'+_cpOdooOC(p.id)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">Abrir en Odoo ›</a></div></div>'; };
-  let h='<div class="cp-sec cp-sec-f"><span>En camino</span><span class="cp-g">con IVA</span></div>';
+  // Las dos secciones se pliegan (Andrea, 15-oct): «En camino» abierta de entrada, «Recibidos» cerrada.
+  const abre=function(k, def){ return (_cpAbiertos[k]==null ? def : _cpAbiertos[k]) ? ' open' : ''; };
+  let h='<details class="cp-pl"'+abre('secCamino', true)+' ontoggle="_cpAbiertos.secCamino=this.open">'
+    +'<summary class="cp-sec cp-sec-f"><span>En camino'+(C.length?(' · '+C.length):'')+'</span><span class="cp-g">con IVA</span></summary>';
   if(!C.length) h+='<div class="cp-card cp-card-s"><div class="cp-it cp-it-cab"><span class="cp-in cp-g">Nada en camino</span></div></div>';
   else h+='<div class="cp-grid">'+C.map(function(p){
     const ds=_crDate(p.date_planned), fe=_cpFE(p), ab=!!_cpAbiertos['po'+p.id], t=tipoDe(p);
@@ -21761,21 +21831,33 @@ async function cpPedidos(){
     const chip=(ds && ds<hoy) ? '<span class="cp-chip cp-chip-a">'+(fe?'llegó ':'llegaba ')+_fechaCorta(ds)+' · falta recibir</span>'
       : (p.receipt_status==='partial' ? '<span class="cp-chip">recibida en parte</span>'
       : '<span class="cp-chip cp-chip-m">llega '+(ds===hoy?'hoy':_fechaCorta(ds))+'</span>');
-    const od=_crDate(p.date_order);
+    const od=_crDate(p.date_order), n=(p._lineas||[]).length;
+    // Cerrada: proveedor, llegada, P y total. Al tocarla, la lista de productos con su cantidad (15-oct).
     return '<div class="cp-card cp-oc" onclick="cpPedidoToggle(\'c\','+p.id+')">'
       +'<div class="cp-po-cab"><span class="cp-po-nom">'+esc(nomDe(p))+(t?(' · '+t):'')+'</span>'+chip+'</div>'
-      +'<div class="cp-po-lin">'+(p._lineas||[]).map(function(l){ return esc(_cpLinNom(l))+' '+_cpLinCant(l.product_qty, l); }).join(' · ')+'</div>'
-      +'<div class="cp-po-pie"><span>'+esc(p.name)+' · pedido '+(od===hoy?'hoy':_fechaCorta(od))+(fe?(' · FE …'+fe.slice(-4)):'')+'</span><span>₡'+_rzN(p.amount_total||0,0)+'</span></div>'
+      +'<div class="cp-po-pie"><span>'+esc(p.name)+' · '+n+' producto'+(n===1?'':'s')+' · pedido '+(od===hoy?'hoy':_fechaCorta(od))+(fe?(' · FE …'+fe.slice(-4)):'')+'</span>'
+      +'<span>₡'+_rzN(p.amount_total||0,0)+' <span class="cp-fl'+(ab?' abierto':'')+'">›</span></span></div>'
       +(ab?detalle(p, p._lineas):'')+'</div>'; }).join('')+'</div>';
-  h+='<div class="cp-sec">Recibidos · '+CP_RECIBIDOS_DIAS+' días</div>';
-  if(!H.length) h+='<div class="cp-card cp-card-s"><div class="cp-it cp-it-cab"><span class="cp-in cp-g">Nada recibido</span></div></div>';
-  else h+='<div class="cp-card cp-card-s"><div class="cp-lista cp-lista0">'+H.map(function(p){
+  h+='</details>';
+  // RECIBIDOS, con filtro por proveedor (15-oct): solo los proveedores que aparecen en estos 60 días.
+  const provs=[]; H.forEach(function(p){ const id=p.partner_id&&p.partner_id[0]; if(id && !provs.some(function(x){ return x[0]===id; })) provs.push([id, nomDe(p)]); });
+  provs.sort(function(a,b){ return a[1].localeCompare(b[1]); });
+  const fp=_cpAbiertos.recProv||null, HF=fp ? H.filter(function(p){ return p.partner_id&&p.partner_id[0]===fp; }) : H;
+  h+='<details class="cp-pl"'+abre('secRecibidos', false)+' ontoggle="_cpAbiertos.secRecibidos=this.open">'
+    +'<summary class="cp-sec cp-sec-f"><span>Recibidos · '+CP_RECIBIDOS_DIAS+' días</span><span class="cp-g">'+HF.length+'</span></summary>';
+  if(provs.length>1) h+='<div class="cp-filtro" role="group" aria-label="Filtrar por proveedor">'
+    +[[null,'Todos']].concat(provs).map(function(x){ const on=(x[0]===fp);
+      return '<button class="cp-fil'+(on?' on':'')+'" aria-pressed="'+on+'" onclick="cpRecFiltro('+(x[0]==null?'null':x[0])+')">'+esc(x[1])+'</button>'; }).join('')+'</div>';
+  if(!HF.length) h+='<div class="cp-card cp-card-s"><div class="cp-it cp-it-cab"><span class="cp-in cp-g">Nada recibido</span></div></div>';
+  else h+='<div class="cp-card cp-card-s"><div class="cp-lista cp-lista0">'+HF.map(function(p){
     const ab=!!_cpAbiertos['pr'+p.id];
     return '<div class="cp-it" onclick="cpPedidoToggle(\'r\','+p.id+')"><span class="cp-in">'+esc(nomDe(p))+' · '+esc(p.name)+'</span>'
       +'<span class="cp-g">'+_cpDiaMes(_crDate(p.effective_date))+' · ₡'+_rzN(p.amount_total||0,0)+' <span class="cp-fl'+(ab?' abierto':'')+'">›</span></span></div>'
       +(ab?detalle(p, p._lineas):''); }).join('')+'</div></div>';
+  h+='</details>';
   b.innerHTML=h;
 }
+function cpRecFiltro(id){ _cpAbiertos.recProv=id; cpPedidos(); }
 // En camino ya trae sus líneas; Recibidos las lee al abrir, una vez.
 async function cpPedidoToggle(cual, id){
   const k=(cual==='r'?'pr':'po')+id; _cpAbiertos[k]=!_cpAbiertos[k];
