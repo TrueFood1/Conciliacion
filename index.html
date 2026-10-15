@@ -4795,6 +4795,28 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 #vCompras .cp-sugt{font-size:15px;font-weight:600;color:var(--text)} #vCompras .cp-sugt .cp-g{font-weight:400;font-size:13px}
 #vCompras .cp-btnar{flex:0 0 auto;padding:10px 20px}
 #vCompras .cp-sug0{font-size:14px;color:var(--text-2)}
+/* Sugerido, lista limpia (15-oct) */
+#vCompras .cp-sgl0{padding:2px 14px}
+#vCompras .cp-sgr+.cp-sgr{border-top:.5px solid var(--line)}
+#vCompras .cp-sgc{display:flex;align-items:center;gap:12px;width:100%;background:none;border:0;padding:12px 0;font:inherit;color:inherit;text-align:left;cursor:pointer;min-height:52px}
+#vCompras .cp-sgi,#vCompras .cp-sgd{display:flex;flex-direction:column;gap:2px;min-width:0}
+#vCompras .cp-sgi{flex:1}
+#vCompras .cp-sgd{align-items:flex-end;flex:0 0 auto}
+#vCompras .cp-sgn{font-size:14.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#vCompras .cp-sgn .cp-dot{margin-right:6px}
+#vCompras .cp-sgt{font-size:14px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+#vCompras .cp-sgs{font-size:12px;color:var(--text-2);white-space:nowrap}
+#vCompras .cp-sgx{padding:0 0 12px}
+#vCompras .cp-sgl{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:baseline;font-size:13px;padding:5px 0;color:var(--text-hi)}
+#vCompras .cp-sgln{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#vCompras .cp-sglq{white-space:nowrap}
+#vCompras .cp-sglp{white-space:nowrap;color:var(--text-2);min-width:72px;text-align:right;font-variant-numeric:tabular-nums}
+#vCompras .cp-sgx .cp-chips{margin-top:8px}
+#vCompras .cp-sgsub{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-2);padding:10px 0 4px}
+#vCompras .cp-sgsub .cp-g{text-transform:none;letter-spacing:0;font-weight:400}
+#vCompras .cp-sgsub:first-child{padding-top:2px}
+#vCompras .cp-sgb{display:flex;justify-content:flex-end;margin-top:10px}
+#vCompras .cp-sgb .cp-btnar{flex:0 0 auto;min-width:0;padding:9px 18px;font-size:13.5px;min-height:40px}
 #vCompras .cp-chips{display:flex;flex-wrap:wrap;gap:6px}
 #vCompras .cp-chip{font-size:12px;padding:3px 9px;border-radius:999px;background:var(--wash-3);color:var(--text-2);line-height:1.4}
 #vCompras .cp-chip-a{background:var(--warn-wash);color:var(--warn)}
@@ -21175,19 +21197,48 @@ function _cpChipsHtml(g, filas, AP){
   return '<div class="cp-chips">'+ch.slice(0,3).map(function(c){ return '<span class="cp-chip cp-chip-'+c[0]+'">'+esc(c[1])+'</span>'; }).join('')
     +(ch.length>3?('<span class="cp-chip">+'+(ch.length-3)+'</span>'):'')+'</div>';
 }
-function _cpSugCardHtml(g){
-  const A=_cpAlc, gi=A.grupos.indexOf(g), its=_cpItemsComprar(g), F=_cpFechasPedido(g);
-  const filas=_cpFilasPedido(g), v={}; filas.forEach(function(f){ v[f.pid]=_cpSugPaq(f); });
-  const AP=_cpAlcPedido(g, filas, v), T=_cpTotalEstimado({filas:filas, valores:v}), cu=_cpCuandoTxt(g);
-  return '<div class="cp-card cp-sug">'
-    +'<div class="cp-sug1"><span class="cp-sugn">'+esc(_cpGrupoNom(g))+'</span>'
-    +'<span class="cp-sugc'+((g.limite||A.hoy)<=A.hoy?' cp-amb3':'')+'">'+esc(cu)+'</span></div>'
-    +'<div class="cp-sug2">'+its.length+' insumo'+(its.length===1?'':'s')
-    +(g.canal==='tienda'?'':(' · llega '+_fechaCorta(F.entrega)))+'</div>'
-    +_cpChipsHtml(g, filas, AP)
-    +'<div class="cp-sug3"><span class="cp-sugt">₡'+_rzN(T.t, 0)+' <span class="cp-g">sin IVA'+(T.falta?' + sin precio':'')+'</span></span>'
-    +(_socia===true?('<button class="cp-btn cp-btnp cp-btnar" onclick="cpAbrirPedido('+gi+')">Armar</button>'):'')+'</div></div>';
+// SUGERIDO, limpio (Andrea, 15-oct): una LISTA, un renglón por pedido. Cerrado: proveedor, cuántos insumos
+// y cuándo llega; a la derecha el total y cuándo pedir. Al tocarlo se abre AHÍ lo que sugiere —insumo,
+// cantidad en su unidad, subtotal—, los avisos y recién ahí «Armar». Nada de tarjetas grandes.
+// Lo que sugiere UN pedido (proveedor y entrega): sus líneas, total, avisos y alcance.
+function _cpSugDatos(g){
+  const A=_cpAlc, filas=_cpFilasPedido(g), v={}; filas.forEach(function(f){ v[f.pid]=_cpSugPaq(f); });
+  const its=_cpItemsComprar(g), F=_cpFechasPedido(g);
+  return {g:g, gi:A.grupos.indexOf(g), its:its, F:F, filas:filas, v:v, AP:_cpAlcPedido(g, filas, v),
+          T:_cpTotalEstimado({filas:filas, valores:v}),
+          frio:its.length>0 && its.every(function(f){ return (_cpCfgIns(f.pid)||{}).tipo==='frio'; }),
+          rojo:its.some(function(f){ return f.color==='rojo' && !_cpEsOdoo(f, f); })};
 }
+// UN renglón por PROVEEDOR (Andrea, 15-oct: «agrupame los sugeridos de BIO»). Si el proveedor tiene dos
+// entregas (BIO: seco el lunes, frío el jueves), adentro van los dos bloques; hasta la parte 4 cada uno
+// se arma por su lado, porque /pedir acepta una entrega por propuesta.
+function _cpSugFilaHtml(gs){
+  const A=_cpAlc, D=gs.map(_cpSugDatos), k='sp'+gs[0].proveedor_id, ab=!!_cpAbiertos[k];
+  const n=D.reduce(function(a,d){ return a+d.its.length; },0), tot=D.reduce(function(a,d){ return a+d.T.t; },0), falta=D.some(function(d){ return d.T.falta; });
+  const prim=gs.slice().sort(function(a,b){ return (a.limite||A.hoy).localeCompare(b.limite||A.hoy); })[0];
+  const urge=(prim.limite||A.hoy)<=A.hoy, rojo=D.some(function(d){ return d.rojo; });
+  const llegas=D.filter(function(d){ return d.g.canal!=='tienda'; }).map(function(d){ return _fechaCorta(d.F.entrega); });
+  const pr=(_rzCtx.dfDatos&&_rzCtx.dfDatos.precios)||{};
+  let h='<div class="cp-sgr'+(ab?' abierto':'')+'"><button class="cp-sgc" aria-expanded="'+ab+'" onclick="cpSugToggle(\''+k+'\')">'
+    +'<span class="cp-sgi"><span class="cp-sgn">'+(rojo?'<span class="cp-dot cp-dot-rojo"></span>':'')+esc(gs.length>1?_cpProvCorto(gs[0]):_cpGrupoNom(gs[0]))+'</span>'
+    +'<span class="cp-sgs">'+n+' insumo'+(n===1?'':'s')+(llegas.length?(' · llega '+llegas.join(' y ')):'')+'</span></span>'
+    +'<span class="cp-sgd"><span class="cp-sgt">₡'+_rzN(tot, 0)+(falta?'*':'')+'</span>'
+    +'<span class="cp-sgs'+(urge?' cp-amb3':'')+'">'+esc(_cpCuandoTxt(prim))+'</span></span>'
+    +'<span class="cp-fl'+(ab?' abierto':'')+'" aria-hidden="true">›</span></button>';
+  if(ab){
+    h+='<div class="cp-sgx">'+D.map(function(d){
+      return (gs.length>1?('<div class="cp-sgsub"><span>'+(d.frio?'Frío':'Seco')+'</span><span class="cp-g">llega '+_fechaCorta(d.F.entrega)+' · ₡'+_rzN(d.T.t,0)+'</span></div>'):'')
+        +d.filas.filter(function(f){ return d.v[f.pid]>0; }).map(function(f){
+          const q=_dfDesdePanel(f, d.v[f.pid]), sub=(pr[f.pid]!=null)?q*pr[f.pid]:null;
+          return '<div class="cp-sgl"><span class="cp-sgln">'+esc(f.nombre)+'</span><span class="cp-sglq">'+esc(_cpCantPanel(f, d.v[f.pid]))+'</span>'
+            +'<span class="cp-sglp">'+(sub!=null?('₡'+_rzN(sub,0)):'sin precio')+'</span></div>'; }).join('')
+        +_cpChipsHtml(d.g, d.filas, d.AP)
+        +(_socia===true?('<div class="cp-sgb"><button class="cp-btn cp-btnp cp-btnar" onclick="cpAbrirPedido('+d.gi+')">Armar'+(gs.length>1?(' '+(d.frio?'frío':'seco')):'')+'</button></div>'):''); }).join('')
+      +'</div>';
+  }
+  return h+'</div>';
+}
+function cpSugToggle(k){ _cpAbiertos[k]=!_cpAbiertos[k]; cpRender(); }
 // «Armar desde cero»: el canal y la demora, o los días de pedido y entrega.
 function _cpProvLinea(pv){
   if(pv.pide||pv.llega) return 'pide '+_cpDiaTxt(pv.pide)+' · llega '+_cpDiaTxt(pv.llega);
@@ -21218,8 +21269,12 @@ function cpComprarHtml(){
   let h='<div class="cp-cmp">';
   // SUGERIDO
   const nec=_cpGruposPorComprar(A);
-  h+='<details class="cp-pl"'+abre('secSug', true)+' ontoggle="_cpAbiertos.secSug=this.open"><summary class="cp-sec cp-sec-f"><span>Sugerido'+(nec.length?(' · '+nec.length):'')+'</span></summary>';
-  if(nec.length) h+='<div class="cp-sugs">'+nec.map(_cpSugCardHtml).join('')+'</div>';
+  const nProv=nec.filter(function(g,i){ return nec.findIndex(function(x){ return x.proveedor_id===g.proveedor_id; })===i; }).length;
+  h+='<details class="cp-pl"'+abre('secSug', true)+' ontoggle="_cpAbiertos.secSug=this.open"><summary class="cp-sec cp-sec-f"><span>Sugerido'+(nProv?(' · '+nProv):'')+'</span>'
+    +(nec.length?'<span class="cp-g">sin IVA</span>':'')+'</summary>';
+  // Agrupado por proveedor, en el orden en que aparece el primero de cada uno (el más urgente arriba).
+  const porProv=[]; nec.forEach(function(g){ const o=porProv.find(function(x){ return x[0].proveedor_id===g.proveedor_id; }); if(o) o.push(g); else porProv.push([g]); });
+  if(nec.length) h+='<div class="cp-card cp-sgl0">'+porProv.map(_cpSugFilaHtml).join('')+'</div>';
   else h+='<div class="cp-card cp-sug0">No hace falta comprar nada'+(A.proximo?(' hasta el '+_fechaCorta(A.proximo)):' en 4 semanas')+'.</div>';
   h+='</details>';
   // PERSONALIZADO (solo socias: arman pedidos)
