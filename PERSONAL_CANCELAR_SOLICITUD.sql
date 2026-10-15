@@ -177,10 +177,21 @@ begin
 
     -- `resuelto_por` y `resuelto_en` los pone el trigger rrhh_permiso_sella, que
     -- dispara porque el estado cambia y no queda en 'pendiente'. No se tocan aca.
-    update rrhh_permiso
+    -- ⚠️ EL ALIAS `pm` NO ES ESTILO: SIN EL, ESTO NO CORRE.
+    -- Los cinco nombres de `returns table (tipo, id, estado, resuelto_por,
+    -- resuelto_en)` son VARIABLES en alcance dentro de la funcion, y los cinco
+    -- coinciden con columnas de las tablas que esta funcion toca. Asi que
+    -- `where id = p_id and estado = 'pendiente'` no dice si `id` es la columna o
+    -- la variable: PL/pgSQL corta con 42702, column reference "id" is ambiguous.
+    -- Lo encontro el ensayo del 15-oct (fila 2). La rama de vacaciones paso de
+    -- casualidad, porque ahi cada referencia ya estaba calificada — el riesgo
+    -- estaba igual, solo que dormido.
+    -- En el `set` NO se califica: ahi Postgres solo admite una columna, y
+    -- `set pm.estado` es error de sintaxis. La ambiguedad vive en el WHERE.
+    update rrhh_permiso pm
        set estado = 'cancelado',
            resolucion_nota = coalesce(nullif(btrim(p_motivo),''), 'Cancelada por quien la pidió')
-     where id = p_id and estado = 'pendiente';
+     where pm.id = p_id and pm.estado = 'pendiente';
     get diagnostics v_n = row_count;
     if v_n <> 1 then
       raise exception 'No se pudo cancelar: alguien lo resolvió justo en este momento. '

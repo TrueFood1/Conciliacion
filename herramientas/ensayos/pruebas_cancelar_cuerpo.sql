@@ -262,43 +262,53 @@ end $$;
 
 
 -- ── 6 · LA TABLA ────────────────────────────────────────────────────────
-select t.orden, t.prueba, t.esperado, t.obtenido,
+-- ── LA TABLA ────────────────────────────────────────────────────────────
+-- EL VEREDICTO VA SEGUNDO, no último, y no es cosmética: el aviso de Supabase
+-- tapó el final de varias filas el 15-oct, incluida la 19, así que la columna
+-- que dice si pasó o no quedaba fuera de vista. Lo que importa va a la
+-- izquierda; el texto largo, a la derecha, donde se puede perder sin costo.
+--
+-- Y los textos se MUESTRAN cortos pero se COMPARAN completos: `left(...)` va
+-- solo en la columna `obtenido`. Recortar antes de comparar habría debilitado
+-- la aserción para que entre en la pantalla, que es al revés de lo que se quiere.
+select t.orden,
        case when t.prueba like 'INFO%' then 'INFO'
             when t.obtenido like 'SIN PROBAR%' then 'SIN PROBAR'
-            when t.ok then 'OK' else 'FALLA' end as veredicto
+            when t.ok then 'OK' else 'FALLA' end as veredicto,
+       t.prueba, t.esperado, left(t.obtenido, 34) as obtenido
   from (
-  select 1 as orden, 'el dueño cancela su VACACION pendiente'::text as prueba,
+  select 1 as orden, 'dueño cancela su VACACION pendiente'::text as prueba,
          'anulado'::text as esperado,
          coalesce(current_setting('cc.r1',true),'SIN CAPTURAR') as obtenido,
          current_setting('cc.r1',true) = 'anulado' as ok
   union all
-  select 2, 'el dueño cancela su PERMISO pendiente', 'cancelado',
+  select 2, 'dueño cancela su PERMISO pendiente', 'cancelado',
          coalesce(current_setting('cc.r2',true),'SIN CAPTURAR'),
          current_setting('cc.r2',true) = 'cancelado'
   union all
-  select 3, 'y resuelto_por queda con el correo DEL EMPLEADO, no de una socia',
+  select 3, 'resuelto_por = el correo del EMPLEADO',
          'zz-a@example.invalid',
          coalesce(nullif(current_setting('cc.r2_por',true),''),'VACIO'),
          current_setting('cc.r2_por',true) = 'zz-a@example.invalid'
   union all
   -- LA ANULACION, POR SU VALOR LITERAL. Es la asercion que distingue «la funcion
   -- devolvio OK» de «la base quedo como tiene que quedar».
-  select 4, 'la anulacion se inserto con anulada = TRUE explicito', 'true',
+  select 4, 'anulacion con anulada = TRUE explicito', 'true',
          coalesce(current_setting('cc.d_anulada',true),'SIN CAPTURAR'),
          current_setting('cc.d_anulada',true) = 'true'
   union all
-  select 5, 'y es UNA sola fila de anulacion, no varias', '1',
+  select 5, 'UNA sola fila de anulacion', '1',
          coalesce(current_setting('cc.d_anulada_n',true),'SIN CAPTURAR'),
          nullif(current_setting('cc.d_anulada_n',true),'')::numeric = 1
   union all
   -- ESA solicitud, POR SU ID, en cada vista: estaba (1) y ya no esta (0).
-  select 6, 'ESA solicitud estaba en el CALENDARIO y ya no esta', '1 -> 0',
+  select 6, 'ESA solicitud sale del CALENDARIO', '1 -> 0',
          coalesce(current_setting('cc.a_e1_cal',true),'?') || ' -> '
            || coalesce(current_setting('cc.d_e1_cal',true),'?'),
          nullif(current_setting('cc.a_e1_cal',true),'')::numeric = 1
            and nullif(current_setting('cc.d_e1_cal',true),'')::numeric = 0
   union all
-  select 7, 'estaba en la BANDEJA y ya no esta', '1 -> 0',
+  select 7, 'ESA solicitud sale de la BANDEJA', '1 -> 0',
          coalesce(current_setting('cc.a_e1_band',true),'?') || ' -> '
            || coalesce(current_setting('cc.d_e1_band',true),'?'),
          nullif(current_setting('cc.a_e1_band',true),'')::numeric = 1
@@ -307,59 +317,59 @@ select t.orden, t.prueba, t.esperado, t.obtenido,
   -- EL SALDO. Lo que una PENDIENTE mueve en «Mis vacaciones» son los dias
   -- PENDIENTES, no los tomados: una pendiente nunca conto como tomada. Se miden
   -- las dos cosas, y de paso que nunca entro en v_rrhh_evento (los tomados).
-  select 8, 'los DIAS PENDIENTES del saldo bajan en 1',
+  select 8, 'los DIAS PENDIENTES del saldo bajan 1',
          coalesce((nullif(current_setting('cc.a_pend_dias',true),'')::numeric - 1)::text,'?'),
          coalesce(current_setting('cc.d_pend_dias',true),'SIN DATO'),
          nullif(current_setting('cc.d_pend_dias',true),'')::numeric
            = nullif(current_setting('cc.a_pend_dias',true),'')::numeric - 1
   union all
-  select 9, 'y nunca entra en v_rrhh_evento, la fuente de los TOMADOS', '0 -> 0',
+  select 9, 'nunca entra en v_rrhh_evento (TOMADOS)', '0 -> 0',
          coalesce(current_setting('cc.a_e1_saldo',true),'?') || ' -> '
            || coalesce(current_setting('cc.d_e1_saldo',true),'?'),
          nullif(current_setting('cc.a_e1_saldo',true),'')::numeric = 0
            and nullif(current_setting('cc.d_e1_saldo',true),'')::numeric = 0
   union all
-  select 10, 'los dias TOMADOS no se mueven (una pendiente nunca contaba)',
+  select 10, 'los dias TOMADOS no se mueven',
          coalesce(nullif(current_setting('cc.a_tom',true),''),'?'),
          coalesce(nullif(current_setting('cc.d_tom',true),''),'SIN DATO'),
          nullif(current_setting('cc.d_tom',true),'')::numeric
            = nullif(current_setting('cc.a_tom',true),'')::numeric
   union all
-  select 11, 'y el estado de la cancelada es anulado', 'anulado',
+  select 11, 'el estado de la cancelada es anulado', 'anulado',
          coalesce(nullif(current_setting('cc.d_e1',true),''),'SIN DATO'),
          current_setting('cc.d_e1',true) = 'anulado'
   union all
-  select 12, 'OTRO empleado intenta cancelar la ajena -> rechazado', 'RECHAZA 42501',
+  select 12, 'OTRO empleado cancela la ajena: NO', 'RECHAZA 42501',
          coalesce(current_setting('cc.r4',true),'SIN CAPTURAR'),
          coalesce(current_setting('cc.r4',true),'') like 'RECHAZA 42501%'
   union all
-  select 13, 'cancelar una APROBADA -> rechazado, con el estado en el mensaje', 'RECHAZA 55000',
+  select 13, 'cancelar una APROBADA: NO, y lo dice', 'RECHAZA 55000',
          coalesce(current_setting('cc.r5a',true),'SIN CAPTURAR'),
          coalesce(current_setting('cc.r5a',true),'') like 'RECHAZA 55000%'
            and coalesce(current_setting('cc.r5a',true),'') like '%aprobado%'
   union all
-  select 14, 'cancelar una RECHAZADA -> rechazado', 'RECHAZA 55000',
+  select 14, 'cancelar una RECHAZADA: NO', 'RECHAZA 55000',
          coalesce(current_setting('cc.r5b',true),'SIN CAPTURAR'),
          coalesce(current_setting('cc.r5b',true),'') like 'RECHAZA 55000%'
   union all
-  select 15, 'cancelar una YA CANCELADA -> rechazado (es la carrera, en diferido)',
+  select 15, 'cancelar una YA CANCELADA: NO',
          'RECHAZA 55000',
          coalesce(current_setting('cc.r5c',true),'SIN CAPTURAR'),
          coalesce(current_setting('cc.r5c',true),'') like 'RECHAZA 55000%'
   union all
-  select 16, 'ANON intenta cancelar -> rechazado', 'RECHAZA 42501',
+  select 16, 'ANON cancela: NO', 'RECHAZA 42501',
          coalesce(current_setting('cc.r6',true),'SIN CAPTURAR'),
          coalesce(current_setting('cc.r6',true),'') like 'RECHAZA 42501%'
   union all
-  select 17, 'la REPETIDA de una pendiente -> rechazada', 'RECHAZA 23505',
+  select 17, 'la REPETIDA de una pendiente: NO', 'RECHAZA 23505',
          coalesce(current_setting('cc.r7a',true),'SIN CAPTURAR'),
          coalesce(current_setting('cc.r7a',true),'') like 'RECHAZA 23505%'
   union all
-  select 18, 'pedir de nuevo DESPUES de cancelar -> permitido', 'ENTRO (correcto)',
+  select 18, 'pedir de nuevo tras cancelar: SI', 'ENTRO (correcto)',
          coalesce(current_setting('cc.r7b',true),'SIN CAPTURAR'),
          current_setting('cc.r7b',true) = 'ENTRO (correcto)'
   union all
-  select 19, 'las filas de Daniel en rrhh_evento, intactas',
+  select 19, 'filas de Daniel en rrhh_evento: igual',
          case when coalesce(current_setting('cc.daniel',true),'')=''
               then 'SIN PROBAR' else coalesce(current_setting('cc.a_daniel_ev',true),'?') end,
          case when coalesce(current_setting('cc.daniel',true),'')=''
@@ -368,7 +378,7 @@ select t.orden, t.prueba, t.esperado, t.obtenido,
          coalesce(current_setting('cc.d_daniel_ev',true),'x')
            = coalesce(current_setting('cc.a_daniel_ev',true),'y')
   union all
-  select 20, 'las filas de Daniel en rrhh_permiso, intactas',
+  select 20, 'filas de Daniel en rrhh_permiso: igual',
          case when coalesce(current_setting('cc.daniel',true),'')=''
               then 'SIN PROBAR' else coalesce(current_setting('cc.a_daniel_pm',true),'?') end,
          case when coalesce(current_setting('cc.daniel',true),'')=''
