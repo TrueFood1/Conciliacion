@@ -4855,6 +4855,9 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 #vCompras .cp-filtro{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
 #vCompras .cp-fil{border:.5px solid var(--border-strong);background:transparent;color:var(--text-2);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;min-height:32px}
 #vCompras .cp-fil.on{border-color:var(--m-comp);color:var(--m-comp);font-weight:600}
+#vCompras .cp-filsel{position:relative;display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:0 14px;background:var(--surface);border:.5px solid var(--border);border-radius:10px;min-height:42px;font-size:13.5px}
+#vCompras .cp-filsel select{flex:1;appearance:none;-webkit-appearance:none;background:transparent;border:0;color:var(--text);font:inherit;padding:10px 22px 10px 0;cursor:pointer;outline:none}
+#vCompras .cp-filfl{position:absolute;right:14px;pointer-events:none;color:var(--text-2);transform:rotate(90deg)}
 #vCompras .cp-selr{border-top:.5px solid var(--line);padding:2px 0}
 #vCompras .cp-selr:first-child{border-top:none}
 #vCompras .cp-selb{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:9px 0;font:inherit;font-size:14px;color:var(--text);cursor:pointer;text-align:left;min-height:44px}
@@ -21750,10 +21753,10 @@ function _cpArmadoHtml(P){
   const pr=(_rzCtx.dfDatos&&_rzCtx.dfDatos.precios)||{};
   let h='<div class="cp-reg cp-arm">'
     +'<div class="cp-arh"><button class="cp-atras" onclick="cpIr(\'comprar\')" aria-label="Volver a Comprar">‹</button>'
-    +'<span class="cp-arn">'+esc(multi?_cpProvCorto(g):_cpGrupoNom(g))+'</span></div>'
-    +'<div class="cp-seg" role="group" aria-label="Pedido nuevo o compra que ya llegó">'
-    +'<button class="'+(P.llego?'':'on')+'" aria-pressed="'+(!P.llego)+'" onclick="cpModo(false)">'+(tienda?'Compra de hoy':'Pedir')+'</button>'
-    +'<button class="'+(P.llego?'on':'')+'" aria-pressed="'+(!!P.llego)+'" onclick="cpModo(true)">Ya llegó</button></div>';
+    +'<span class="cp-arn">'+esc(multi?_cpProvCorto(g):_cpGrupoNom(g))+'</span></div>';
+  // SIN «YA LLEGÓ» (Andrea, 15-oct: «no lo entiendo, ya tenemos Pedidos con el historial»). Revierte el
+  // interruptor Pedir / Ya llegó de la etapa 1 (13-oct): el armado solo pide. El servicio sigue aceptando
+  // el modo «llego» (no se tocó), pero ninguna pantalla lo manda; `P.llego` queda siempre en false.
   if(P.llego) h+='<div class="cp-llego"><input type="date" class="cp-inp" id="cpLlegoDia" aria-label="Día que llegó" value="'+esc(P.llegoDia)
       +'" min="'+_dfAdd(_rzCtx.hoyStr,-CP_LLEGO_DIAS)+'" max="'+_rzCtx.hoyStr+'" onchange="cpRegCampo(\'llegoDia\',this.value);cpRenderRegistro()">'
       +'<input type="text" class="cp-inp cp-inp-fe" id="cpFe" inputmode="numeric" maxlength="20" placeholder="Consecutivo de la FE (20 dígitos)" aria-label="Consecutivo de la FE" value="'+esc(P.fe)
@@ -22138,9 +22141,10 @@ async function cpPedidos(){
   const fp=_cpAbiertos.recProv||null, HF=fp ? H.filter(function(p){ return p.partner_id&&p.partner_id[0]===fp; }) : H;
   h+='<details class="cp-pl"'+abre('secRecibidos', false)+' ontoggle="_cpAbiertos.secRecibidos=this.open">'
     +'<summary class="cp-sec cp-sec-f"><span>Recibidos · '+CP_RECIBIDOS_DIAS+' días</span><span class="cp-g">'+HF.length+'</span></summary>';
-  if(provs.length>1) h+='<div class="cp-filtro" role="group" aria-label="Filtrar por proveedor">'
-    +[[null,'Todos']].concat(provs).map(function(x){ const on=(x[0]===fp);
-      return '<button class="cp-fil'+(on?' on':'')+'" aria-pressed="'+on+'" onclick="cpRecFiltro('+(x[0]==null?'null':x[0])+')">'+esc(x[1])+'</button>'; }).join('')+'</div>';
+  // Un desplegable (Andrea, 15-oct): en el teléfono abre la lista nativa; nada de botones en fila.
+  if(provs.length>1) h+='<label class="cp-filsel"><span class="cp-g">Proveedor</span><select onchange="cpRecFiltro(this.value?+this.value:null)" aria-label="Filtrar por proveedor">'
+    +[['','Todos']].concat(provs).map(function(x){ return '<option value="'+(x[0]==null?'':x[0])+'"'+((x[0]||null)===fp?' selected':'')+'>'+esc(x[1])+'</option>'; }).join('')
+    +'</select><span class="cp-filfl" aria-hidden="true">›</span></label>';
   if(!HF.length) h+='<div class="cp-card cp-card-s"><div class="cp-it cp-it-cab"><span class="cp-in cp-g">Nada recibido</span></div></div>';
   else h+='<div class="cp-card cp-card-s"><div class="cp-lista cp-lista0">'+HF.map(function(p){
     const ab=!!_cpAbiertos['pr'+p.id];
