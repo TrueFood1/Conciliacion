@@ -6846,6 +6846,14 @@ let _solTipo='vacaciones', _solSaldo=null, _solMias=null;
 // `_solMod` arranca en null A PROPÓSITO: es una decisión de PLATA, y un default
 // la tomaría en silencio por quien pide. Sin elegir, solEnviar() no deja enviar.
 let _solDur='dia', _solMod=null, _solOrigen=null;
+// ANTI DOBLE TOQUE. Daniel mando la misma solicitud DOS VECES con 0,13 s de
+// diferencia: dos toques del dedo sobre el mismo boton, no dos decisiones. En
+// ese intervalo no hay nada que frene al segundo — el primero todavia esta
+// viajando, asi que no hubo error ni respuesta que apague el boton.
+// La bandera va a nivel de modulo y NO solo en el `disabled` del boton, porque
+// el boton se redibuja (solCargar -> _solForm) y un redibujo en el medio lo
+// devolveria habilitado con el primer envio aun en vuelo.
+let _solEnviando=false;
 
 function irASolicitar(){
   _modShow('vSolicitar'); crumbSet('Personal','Pedir días'); _perTabs('pedir');
@@ -7033,8 +7041,8 @@ async function solEnviar(){
   const ini=(document.getElementById('solIni')||{}).value||'';
   const fin=(document.getElementById('solFin')||{}).value||ini;
   const mot=((document.getElementById('solMotivo')||{}).value||'').trim();
-  if(!ini) return _perAviso('solStatus','s-warn','Falta la fecha de inicio.');
-  if(fin<ini) return _perAviso('solStatus','s-warn','La fecha final es anterior a la inicial.');
+  if(!ini) return _perAviso('solStatusBajo','s-warn','Falta la fecha de inicio.');
+  if(fin<ini) return _perAviso('solStatusBajo','s-warn','La fecha final es anterior a la inicial.');
   const dias=_perDias(ini,fin);
   // LA COMPENSACIÓN ES OBLIGATORIA EN EL PERMISO, y se frena acá en vez de
   // mandar null: null significa "no descuenta" en el cálculo de la quincena
@@ -7042,24 +7050,32 @@ async function solEnviar(){
   // decidir" — es decidir que no se descuenta, y en silencio.
   let horas=null, origen=null, boleta=null;
   if(_solTipo==='permiso'){
-    if(!_solMod) return _perAviso('solStatus','s-warn','Falta elegir cómo se compensa el permiso: se descuenta del pago, reponés las horas, o es una incapacidad.');
+    if(!_solMod) return _perAviso('solStatusBajo','s-warn','Falta elegir cómo se compensa el permiso: se descuenta del pago, reponés las horas, o es una incapacidad.');
     if(_solMod==='incapacidad'){
       // Las tres condiciones del CHECK `rrhh_permiso_incap_ok`, comprobadas acá
       // para no gastar un viaje en un rechazo que la pantalla ya podía evitar.
-      if(!_solOrigen) return _perAviso('solStatus','s-warn','Falta decir de qué es la incapacidad: enfermedad (CCSS) o accidente de trabajo (INS).');
+      if(!_solOrigen) return _perAviso('solStatusBajo','s-warn','Falta decir de qué es la incapacidad: enfermedad (CCSS) o accidente de trabajo (INS).');
       origen=_solOrigen;
       boleta=((document.getElementById('solBoleta')||{}).value||'').trim()||null;
       horas=null;   // una incapacidad se paga por días: el servidor la rechaza con horas
     }
     if(_solMod!=='incapacidad' && _solDur==='horas'){
       horas=Number((document.getElementById('solHoras')||{}).value)||0;
-      if(!(horas>0 && horas<=8)) return _perAviso('solStatus','s-warn','Las horas tienen que estar entre 0,5 y 8 (la jornada es de 8 h).');
+      if(!(horas>0 && horas<=8)) return _perAviso('solStatusBajo','s-warn','Las horas tienen que estar entre 0,5 y 8 (la jornada es de 8 h).');
       // El CHECK del servidor exige fecha_fin = fecha_inicio. Se iguala acá para
       // no gastar un viaje en un rechazo que la pantalla ya podía evitar.
-      if(fin!==ini) return _perAviso('solStatus','s-warn','Un permiso por horas es de un solo día: poné la misma fecha en «Del» y en «Al».');
+      if(fin!==ini) return _perAviso('solStatusBajo','s-warn','Un permiso por horas es de un solo día: poné la misma fecha en «Del» y en «Al».');
     }
   }
-  _perAviso('solStatus','s-info','<span class="spin"></span>Enviando…');
+  // EL CANDADO. Se cierra ANTES de salir a la red y se abre en el `finally`, asi
+  // que se abre pase lo que pase — con error, sin red, o con exito. Sin el
+  // finally, un fallo dejaria el boton muerto y habria que recargar la pagina.
+  if(_solEnviando) return;
+  _solEnviando=true;
+  const _btn=document.getElementById('solBtn');
+  const _btnTxt=_btn?_btn.textContent:'';
+  if(_btn){ _btn.disabled=true; _btn.textContent='Enviando…'; }
+  _perAviso('solStatusBajo','s-info','<span class="spin"></span>Enviando…');
   try{
     const c=sbClient(); if(!c) throw new Error('no hay conexión a Supabase');
     const em=await perEmail();
@@ -7086,9 +7102,15 @@ async function solEnviar(){
     const bb=document.getElementById('solBoleta'); if(bb) bb.value='';
     _calDatos=null; _calPend=null;
     await solCargar(false);
-    _perAviso('solStatus','s-ok','Pedido. Queda esperando el visto bueno de Andrea o Lorena.');
+    _perAviso('solStatusBajo','s-ok','Pedido. Queda esperando el visto bueno de Andrea o Lorena.');
   }catch(e){
-    _perAviso('solStatus','s-err','No pude enviar la solicitud: '+esc(_perErr(e)));
+    _perAviso('solStatusBajo','s-err','No pude enviar la solicitud: '+esc(_perErr(e)));
+  }finally{
+    // El boton puede haber sido redibujado por solCargar() mientras esto
+    // esperaba, asi que se vuelve a buscar en vez de confiar en la referencia.
+    _solEnviando=false;
+    const b=document.getElementById('solBtn');
+    if(b){ b.disabled=false; b.textContent=(_btnTxt||'Enviar solicitud'); }
   }
 }
 // MIS SOLICITUDES. Lo pedido y sin aprobar no baja el saldo (misma advertencia
