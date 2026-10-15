@@ -75,8 +75,10 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
   congelador. Cuando se contradicen, manda el Excel.** Son dos hechos distintos y
   Odoo solo conoce el primero: los seis terminados están con `tracking = none`, y
   una factura se anula por razones administrativas que no tienen nada que ver con
-  el inventario (en 2026: 37 reversiones administrativas contra 6 devoluciones
-  reales). El 26-ago-2026 se concluyó que el despacho 11 —Mentha y limón,
+  el inventario (en 2026: **42** facturas revertidas con nota de crédito al 14-oct,
+  casi todas administrativas —error de producto, precio o cliente, duplicadas,
+  pedido cancelado—; el 37 que se citaba antes era una medición anterior, cuando
+  además se contaban 6 devoluciones reales). El 26-ago-2026 se concluyó que el despacho 11 —Mentha y limón,
   19-ago— "nunca ocurrió" porque su factura ...3484 estaba anulada y su traslado
   `WH/OUT/02319` en `cancel`, y se escribió un SQL que lo anuló. Era falso: el
   Excel tenía el bloque `19 ago 26 · Mentha y limón · Blanco 6 Uds 202-1/27 ·

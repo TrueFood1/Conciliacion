@@ -540,7 +540,7 @@ otro descontaría esos lotes dos veces.
 Hoy no hay forma. El botón "Vincular factura" de Pendientes solo aparece para los
 despachos que **no tienen ninguna**: es para llenar un hueco, no para reemplazar.
 
-Con **37 reversiones administrativas al año**, esto vuelve.
+Con **42 facturas revertidas en 2026** (al 14-oct; antes se citaba 37), esto vuelve.
 
 ### La buena noticia: el dato ya sabe hacerlo
 
