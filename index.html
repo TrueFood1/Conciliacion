@@ -4855,7 +4855,19 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 #vCompras .cp-filtro{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
 #vCompras .cp-fil{border:.5px solid var(--border-strong);background:transparent;color:var(--text-2);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;min-height:32px}
 #vCompras .cp-fil.on{border-color:var(--m-comp);color:var(--m-comp);font-weight:600}
-#vCompras .cp-selr .cp-in{display:flex;align-items:center;gap:10px}
+#vCompras .cp-selr{border-top:.5px solid var(--line);padding:2px 0}
+#vCompras .cp-selr:first-child{border-top:none}
+#vCompras .cp-selb{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:9px 0;font:inherit;font-size:14px;color:var(--text);cursor:pointer;text-align:left;min-height:44px}
+#vCompras .cp-seln{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#vCompras .cp-selb .cp-g{white-space:nowrap;font-size:12.5px}
+#vCompras .cp-selr.on{display:flex;flex-wrap:wrap;align-items:center;column-gap:8px}
+#vCompras .cp-selr.on .cp-selb{flex:1;min-width:0}
+#vCompras .cp-selr.on .cp-selb .cp-g{display:none}
+#vCompras .cp-selq{flex:0 0 auto}
+#vCompras .cp-selq .cp-pm{width:34px;height:34px;font-size:17px}
+#vCompras .cp-selq .cp-n{min-width:58px;font-size:13px}
+#vCompras .cp-selav{flex-basis:100%;margin:0 0 10px}
+#vCompras .cp-selt{font-size:12.5px;font-weight:400;margin-left:6px}
 #vCompras .cp-chk{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:6px;border:.5px solid var(--border-strong);color:var(--m-comp);flex:0 0 auto}
 #vCompras .cp-selr.on .cp-chk{border-color:var(--m-comp)}
 #vCompras .cp-selg{margin:10px 0}
@@ -21304,46 +21316,66 @@ function cpComprarHtml(){
   return h+'</div>';
 }
 function cpModoPers(m){ _cpModoPers=(m==='prod')?'prod':'prov'; cpRender(); if(m==='prod'){ const e=document.getElementById('cpBusq'); if(e) try{ e.focus(); }catch(_){} } }
-// POR PRODUCTO: todos los insumos (el buscador filtra), se tocan para elegirlos. Se redibujan solo las dos
-// listas: redibujar la pantalla le quitaría el foco al buscador.
+// POR PRODUCTO: todos los insumos (el buscador filtra), se tocan para elegirlos. Al elegir uno aparece su
+// CANTIDAD con − y + (Andrea, 15-oct), en la unidad del armado: arranca en lo sugerido o en el mínimo.
+// `_cpSel` = {pid: cantidad}. Se redibujan solo las dos listas: redibujar la pantalla le quitaría el foco
+// al buscador.
+const _cpSelInicial=function(f){ const s=_cpSugPaq(f), m=_cpMult(f.pid); return s>0 ? s : (m ? (m.min||m.mult) : (_cpPE(f.pid) ? 1 : _cpPaso(f))); };
 function _cpBusResHtml(){
   const A=_cpAlc; if(!A || A.error) return '';
   const q=_cpNorm(_cpBusq).trim();
   const rs=A.filas.filter(function(f){ return _cpGrupoDe(f) && (!q || _cpNorm(f.nombre).indexOf(q)>=0); })
     .sort(function(a,b){ return _cpNorm(a.nombre).localeCompare(_cpNorm(b.nombre)); });
   if(!rs.length) return '<div class="cp-busv">Ningún insumo con «'+esc(_cpBusq.trim())+'».</div>';
-  return '<div class="cp-card cp-busl">'+rs.map(function(f){ const on=!!_cpSel[f.pid], g=_cpGrupoDe(f);
-      return '<button class="cp-busr cp-selr'+(on?' on':'')+'" aria-pressed="'+on+'" onclick="cpSelToggle('+f.pid+')">'
-        +'<span class="cp-in"><span class="cp-chk">'+(on?_CP_CHK:'')+'</span>'+esc(f.nombre)+'</span>'
-        +'<span class="cp-g">'+esc(_cpProvCorto(g))+'</span></button>'; }).join('')+'</div>';
+  return '<div class="cp-card cp-busl">'+rs.map(function(f){ const n=_cpSel[f.pid], on=(n>0), g=_cpGrupoDe(f);
+      return '<div class="cp-selr'+(on?' on':'')+'"><button class="cp-selb" aria-pressed="'+on+'" onclick="cpSelToggle('+f.pid+')">'
+        +'<span class="cp-chk">'+(on?_CP_CHK:'')+'</span><span class="cp-seln">'+esc(f.nombre)+'</span>'
+        +'<span class="cp-g">'+esc(_cpProvCorto(g))+'</span></button>'
+        +(on?('<div class="cp-lq cp-selq"><button class="cp-pm" onclick="cpSelMas('+f.pid+',-1)" aria-label="Menos '+esc(f.nombre)+'">−</button>'
+          +'<span class="cp-n">'+esc(_cpCantPanel(f, n))+'</span>'
+          +'<button class="cp-pm" onclick="cpSelMas('+f.pid+',1)" aria-label="Más '+esc(f.nombre)+'">+</button></div>'):'')
+        +(on && _cpBajoMinimo(f, n)?('<div class="cp-lav cp-lav-a cp-selav">Debajo del mínimo de '+esc(_cpProvCorto(g))+' ('+esc(_cpBajoMinimo(f, n))+'). Podés pedirlo igual.</div>'):'')
+        +'</div>'; }).join('')+'</div>';
 }
 // Lo elegido, juntado por pedido (proveedor y entrega): un renglón con «Armar» por cada uno.
 function _cpSelPorGrupo(){
   const A=_cpAlc, out=[]; if(!A) return out;
   Object.keys(_cpSel).forEach(function(k){ const pid=+k, f=A.filas.find(function(x){ return x.pid===pid; }), g=f&&_cpGrupoDe(f);
-    if(!g) return; const gi=A.grupos.indexOf(g); let o=out.find(function(x){ return x.gi===gi; });
+    if(!g || !(_cpSel[pid]>0)) return; const gi=A.grupos.indexOf(g); let o=out.find(function(x){ return x.gi===gi; });
     if(!o){ o={gi:gi, g:g, filas:[]}; out.push(o); } o.filas.push(f); });
   return out;
 }
 function _cpSelHtml(){
   const G=_cpSelPorGrupo(); if(!G.length) return '';
+  const pr=(_rzCtx.dfDatos&&_rzCtx.dfDatos.precios)||{};
   return '<div class="cp-card cp-selg">'+G.map(function(o){
-    return '<div class="cp-selp"><div class="cp-in"><div class="cp-sugn">'+esc(_cpGrupoNom(o.g))+'</div>'
-      +'<div class="cp-g cp-sels">'+esc(o.filas.map(function(f){ return f.nombre; }).join(' · '))+'</div></div>'
+    let t=0, falta=false; o.filas.forEach(function(f){ const q=_dfDesdePanel(f, _cpSel[f.pid]); if(pr[f.pid]==null) falta=true; else t+=q*pr[f.pid]; });
+    return '<div class="cp-selp"><div class="cp-in"><div class="cp-sgn">'+esc(_cpGrupoNom(o.g))+' <span class="cp-g cp-selt">₡'+_rzN(t,0)+(falta?'*':'')+' sin IVA</span></div>'
+      +'<div class="cp-g cp-sels">'+esc(o.filas.map(function(f){ return f.nombre+' '+_cpCantPanel(f, _cpSel[f.pid]); }).join(' · '))+'</div></div>'
       +'<button class="cp-btn cp-btnp cp-btnar" onclick="cpSelArmar('+o.gi+')">Armar</button></div>'; }).join('')+'</div>';
 }
-function cpSelToggle(pid){ if(_cpSel[pid]) delete _cpSel[pid]; else _cpSel[pid]=true;
-  const r=document.getElementById('cpBusRes'), s=document.getElementById('cpSelRes');
+function _cpSelPintar(){ const r=document.getElementById('cpBusRes'), s=document.getElementById('cpSelRes');
   if(r) r.innerHTML=_cpBusResHtml(); if(s) s.innerHTML=_cpSelHtml(); }
+function cpSelToggle(pid){ const f=_cpAlc&&_cpAlc.filas.find(function(x){ return x.pid===pid; }); if(!f) return;
+  if(_cpSel[pid]>0) delete _cpSel[pid]; else _cpSel[pid]=_cpSelInicial(f);
+  _cpSelPintar(); }
+// Mismo paso que el armado: de múltiplo en múltiplo o de empaque en empaque; desde 0 salta al mínimo.
+// Bajar a 0 lo saca de la lista. El mínimo AVISA, no frena.
+function cpSelMas(pid, d){
+  const f=_cpAlc&&_cpAlc.filas.find(function(x){ return x.pid===pid; }); if(!f) return;
+  const v0=+_cpSel[pid]||0; let n=Math.max(0, Math.round((v0+d*_cpPaso(f))*10)/10);
+  const m=_cpMult(pid); if(m && d>0 && !(v0>1e-9) && n<m.min-1e-9) n=m.min;
+  if(n>1e-9) _cpSel[pid]=n; else delete _cpSel[pid];
+  _cpSelPintar(); }
 function cpBuscar(v){ _cpBusq=v; const e=document.getElementById('cpBusRes'); if(e) e.innerHTML=_cpBusResHtml(); }
-// El armado de ese pedido con SOLO lo elegido: lo sugerido, o el mínimo si no sugiere nada; el resto en 0.
+// El armado de ese pedido con SOLO lo elegido y en la cantidad elegida; el resto en 0.
 function cpSelArmar(gi){
-  const A=_cpAlc, o=_cpSelPorGrupo().find(function(x){ return x.gi===gi; }); if(!o || _socia!==true) return;
+  const o=_cpSelPorGrupo().find(function(x){ return x.gi===gi; }); if(!o || _socia!==true) return;
+  const cant={}; o.filas.forEach(function(f){ cant[f.pid]=_cpSel[f.pid]; });
   cpAbrirPedido(gi);
   const P=_cpReg; if(!P) return;
   Object.keys(P.valores).forEach(function(k){ P.valores[k]=0; });
-  o.filas.forEach(function(f){ const s=_cpSugPaq(f), m=_cpMult(f.pid);
-    P.valores[f.pid]=s>0 ? s : (m ? (m.min||m.mult) : (_cpPE(f.pid) ? 1 : _cpPaso(f))); delete _cpSel[f.pid]; });
+  o.filas.forEach(function(f){ P.valores[f.pid]=cant[f.pid]; delete _cpSel[f.pid]; });
   _cpBusq=''; cpRenderRegistro();
 }
 // Del buscador viejo (lo usan otras puertas): el armado de su pedido con esa línea cargada.
