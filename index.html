@@ -4806,6 +4806,7 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 #vCompras .cp-sgn .cp-dot{margin-right:6px}
 #vCompras .cp-sgt{font-size:14px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
 #vCompras .cp-sgs{font-size:12px;color:var(--text-2);white-space:nowrap}
+#vCompras .cp-sgi .cp-sgs{white-space:normal;line-height:1.35}
 #vCompras .cp-sgx{padding:0 0 12px}
 #vCompras .cp-sgl{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:baseline;font-size:13px;padding:5px 0;color:var(--text-hi)}
 #vCompras .cp-sgln{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -5365,7 +5366,7 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 15 oct 2026 · b100';
+const BUILD = 'v 15 oct 2026 · b101';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -20086,7 +20087,7 @@ async function lobbyAlertas(){
   const A=_cpAlc;
   if(!_rzCtx || !A || A.error){ _lobAl('homeOpsAlerta',''); _lobAl('homeComAlerta',''); return; }
   // Igual que la franja de Compras (4-oct): lo que «falta hoy» solo en Odoo no cuenta como faltante.
-  const roj=A.filas.filter(function(f){ return f.color==='rojo' && !_cpEsOdoo(f, f); });
+  const roj=A.filas.filter(_cpRojoDeVerdad);
   const aCompras=function(){ irACompras('comprar'); };
   if(roj.length===1) _lobAl('homeOpsAlerta', 'Falta '+_cpMin(roj[0].nombre), 'rojo', aCompras);
   else if(roj.length>1) _lobAl('homeOpsAlerta', 'Faltan '+roj.length+' insumos', 'rojo', aCompras);
@@ -21129,6 +21130,19 @@ async function cpAlcance(){
     else { U=_dfAdd(hoy, +pv.demora||0); llega=U; }
     // ámbar = se acaba antes de que llegue la compra SIGUIENTE (cada `cada` semanas): va en esta.
     const color=(fallaC && fallaC<U) ? 'rojo' : (fallaC && fallaC<_dfAdd(U, 7*cada)) ? 'ambar' : 'verde';
+    // LLEGA EL MISMO DÍA QUE SE ACABA (Andrea, 15-oct, avena): ya hay algo pedido que llega el día del faltante
+    // y, si llegara antes de consumir ese día, no faltaría nada. El hueco es de horas (medición a la mañana,
+    // BIO a mediodía): sigue siendo `rojo` para el cálculo, pero se MUESTRA en ámbar y no prende «Falta MP
+    // para producción» ni «Falta …» en el inicio. Lo dicen `_cpRojoDeVerdad` y `_cpDotCls`.
+    let hueco=false;
+    if(color==='rojo' && fijo && (D.pedido[pid]||0)>1e-9 && fallaC && fallaC===llega){
+      let s1=deficit?0:st; hueco=true;
+      // Mismo horizonte que el color: hasta antes de U (lo de U lo cubre el pedido siguiente).
+      for(const d of dias){ if(d>=U) break;
+        if(d===llega) s1+=((rec[pid]||{})[d]||0);
+        const c=((cons[d]&&cons[d][pid])||0)-(deficit&&d===hoy?sinCargar:0);
+        if(c>1e-9){ if(s1-c<-1e-9){ hueco=false; break; } s1-=c; }
+        if(d!==llega) s1+=((rec[pid]||{})[d]||0); } }
     const comprarAntes=(!fijo && fallaC) ? _dfAdd(fallaC, -(+pv.demora||0)) : null;
     const h=D.hist[pid]||{prom:0, margen:0};
     // Lo sugerido. Día fijo: el del motor de la tarjeta de BIO para ESE ciclo (validado con Lorena).
@@ -21148,7 +21162,7 @@ async function cpAlcance(){
     return {pid:pid, nombre:(inf.name||i.nombre||('id '+pid)).replace(/^\[[^\]]*\]\s*/,'').trim(), uom:uom, proveedor_id:+i.proveedor_id,
             sinCargar:sinCargar, deficit:deficit, fallaC:fallaC,
             stock:st, falla:falla, ultimo:ultimo, color:color, U:U, llega:llega, pedirEl:pedirEl, comprarAntes:comprarAntes,
-            fijo:!!fijo, ci:ci, sug:sug, falta:falta, cada:cada, margen:h.margen, ya:D.pedido[pid]||0}; });
+            fijo:!!fijo, ci:ci, sug:sug, falta:falta, cada:cada, margen:h.margen, ya:D.pedido[pid]||0, hueco:hueco}; });
   // 5 · por pedido: proveedor + entrega (BIO tiene dos: lo del lunes y el huevo líquido del jueves)
   const grupos=[], gk={};
   filas.forEach(function(f){ const pv=_cpCfgProv(f.proveedor_id)||{};
@@ -21158,7 +21172,7 @@ async function cpAlcance(){
       alcanzaHasta:_dfAdd(f.llega, 7*f.cada), items:[]}; grupos.push(g); }
     g.items.push(f); });
   grupos.forEach(function(g){
-    g.rojo=g.items.some(function(f){ return f.color==='rojo'; });
+    g.rojo=g.items.some(_cpRojoDeVerdad);
     g.ambar=g.items.some(function(f){ return f.color==='ambar'; });
     g.necesita=g.items.some(function(f){ return f.sug>1e-9; }) || g.rojo;
     const ca=g.items.map(function(f){ return f.comprarAntes; }).filter(Boolean).sort();
@@ -21228,9 +21242,21 @@ function _cpCuandoTxt(g){
 }
 // Los avisos de una tarjeta, como chips: rojo (ya no llega a tiempo), gris punteado (por cargar),
 // ámbar (con lo sugerido no llega a la compra siguiente). De a tres; el resto, «+N».
+// LO QUE YA VIENE Y NO LLEGA A TIEMPO (Andrea, 15-oct, caso avena): un insumo con algo ya pedido para este
+// ciclo (`ya`) que igual se acaba antes de que llegue —la medición del lunes es a la mañana y BIO llega a
+// mediodía— dice QUÉ viene, CUÁNDO llega y CUÁNDO se acaba: «136,08 kg en camino, llegan lun 19 al
+// mediodía; se acaba lun 19 en la mañana». Sin nada pedido, sigue el «falta …» de siempre. '' = no aplica.
+function _cpEnCaminoTxt(f){
+  if(!(f && f.fijo && f.ya>1e-9 && f.llega && f.falla)) return '';
+  const pv=_cpCfgProv(f.proveedor_id)||{}, h=String(pv.llega_hora||'').trim();
+  const hora=!h ? '' : (/^mediod[ií]a$/i.test(h) ? ' al mediodía' : (' ('+h+')'));
+  const g=(f.uom==='g'), v=g?f.ya/1000:f.ya, q=_rzN(v, Math.abs(v-Math.round(v))>1e-9?2:0)+' '+(g?'kg':_cpUni(f.uom));   // «136,08 kg», con sus decimales
+  return q+' en camino, '+(Math.abs(f.ya-1)<1e-9?'llega ':'llegan ')+_cpDia(f.llega)+hora+'; se acaba '+_cpDia(f.falla)+' en la mañana';
+}
 function _cpChipsHtml(g, filas, AP){
   const ch=[], its=_cpItemsComprar(g);
-  its.forEach(function(f){ if(f.color==='rojo' && !_cpEsOdoo(f, f)) ch.push(['r', _cpNomFrase(f.nombre)+': falta '+_cpDia(f.falla)]); });
+  its.forEach(function(f){ if(f.color==='rojo' && !_cpEsOdoo(f, f)){ const ec=_cpEnCaminoTxt(f);
+    ch.push([f.hueco?'a':'r', _cpNomFrase(f.nombre)+': '+(ec || ('falta '+_cpDia(f.falla)))]); } });
   its.forEach(function(f){ if(_cpEsOdoo(f, f)) ch.push(['o', _cpNomFrase(f.nombre)+': por cargar']); });
   // El ámbar NO se repite sobre un insumo que ya está en rojo: la avena del 14-oct salía «falta lun 19»
   // y «justa hasta el mié 14» a la vez — lo segundo era el mismo faltante dicho peor (llega a
@@ -21253,21 +21279,24 @@ function _cpSugDatos(g){
   return {g:g, gi:A.grupos.indexOf(g), its:its, F:F, filas:filas, v:v, AP:_cpAlcPedido(g, filas, v),
           T:_cpTotalEstimado({filas:filas, valores:v}),
           frio:its.length>0 && its.every(function(f){ return (_cpCfgIns(f.pid)||{}).tipo==='frio'; }),
-          rojo:its.some(function(f){ return f.color==='rojo' && !_cpEsOdoo(f, f); })};
+          rojo:its.some(_cpRojoDeVerdad)};
 }
 // UN renglón por PROVEEDOR (Andrea, 15-oct: «agrupame los sugeridos de BIO»). Si el proveedor tiene dos
 // entregas (BIO: seco el lunes, frío el jueves), adentro van los dos bloques; hasta la parte 4 cada uno
 // se arma por su lado, porque /pedir acepta una entrega por propuesta.
 function _cpSugFilaHtml(gs){
   const A=_cpAlc, D=gs.map(_cpSugDatos), k='sp'+gs[0].proveedor_id, ab=!!_cpAbiertos[k];
-  const n=D.reduce(function(a,d){ return a+d.its.length; },0), tot=D.reduce(function(a,d){ return a+d.T.t; },0), falta=D.some(function(d){ return d.T.falta; });
+  // «3 insumos» con 2 líneas confundía (15-oct): se cuenta lo que tiene algo para pedir; lo que ya viene
+  // y no pide más va aparte como «en camino».
+  const n=D.reduce(function(a,d){ return a+d.filas.filter(function(f){ return d.v[f.pid]>0; }).length; },0);
+  const nc=D.reduce(function(a,d){ return a+d.its.filter(function(f){ return !(d.v[f.pid]>0) && f.ya>1e-9; }).length; },0), tot=D.reduce(function(a,d){ return a+d.T.t; },0), falta=D.some(function(d){ return d.T.falta; });
   const prim=gs.slice().sort(function(a,b){ return (a.limite||A.hoy).localeCompare(b.limite||A.hoy); })[0];
   const urge=(prim.limite||A.hoy)<=A.hoy, rojo=D.some(function(d){ return d.rojo; });
   const llegas=D.filter(function(d){ return d.g.canal!=='tienda'; }).map(function(d){ return _fechaCorta(d.F.entrega); });
   const pr=(_rzCtx.dfDatos&&_rzCtx.dfDatos.precios)||{};
   let h='<div class="cp-sgr'+(ab?' abierto':'')+'"><button class="cp-sgc" aria-expanded="'+ab+'" onclick="cpSugToggle(\''+k+'\')">'
     +'<span class="cp-sgi"><span class="cp-sgn">'+(rojo?'<span class="cp-dot cp-dot-rojo"></span>':'')+esc(gs.length>1?_cpProvCorto(gs[0]):_cpGrupoNom(gs[0]))+'</span>'
-    +'<span class="cp-sgs">'+n+' insumo'+(n===1?'':'s')+(llegas.length?(' · llega '+llegas.join(' y ')):'')+'</span></span>'
+    +'<span class="cp-sgs">'+(n?(n+' por pedir'):'')+(n&&nc?' · ':'')+(nc?(nc+' en camino'):'')+(llegas.length&&n?(' · llega '+llegas.join(' y ')):'')+'</span></span>'
     +'<span class="cp-sgd"><span class="cp-sgt">₡'+_rzN(tot, 0)+(falta?'*':'')+'</span>'
     +'<span class="cp-sgs'+(urge?' cp-amb3':'')+'">'+esc(_cpCuandoTxt(prim))+'</span></span>'
     +'<span class="cp-fl'+(ab?' abierto':'')+'" aria-hidden="true">›</span></button>';
@@ -21300,7 +21329,7 @@ function _cpMpTablaHtml(A){
   return '<table class="cp-mp cp-mp-s"><thead><tr><th>Insumo</th><th>Hay</th><th>Alcanza hasta</th></tr></thead><tbody>'
     +filas.map(function(f){ return '<tr><td><span class="cp-dot cp-dot-'+_cpDotCls(f)+'"></span>'+esc(f.nombre)+'</td>'
       +'<td>'+esc(_cpCant(f.stock, f.uom))+'</td>'+(_cpEsOdoo(f, f) ? '<td class="cp-odoo" title="'+esc(CP_ODOO_TXT)+'">por cargar</td>'
-        : '<td class="'+(f.color==='rojo'?'cp-r':'')+'">'+esc(_cpAlcTxt(f))+'</td>')+'</tr>'; }).join('')
+        : '<td class="'+(f.color==='rojo'?(f.hueco?'cp-amb3':'cp-r'):'')+'">'+esc(_cpAlcTxt(f))+'</td>')+'</tr>'; }).join('')
     +'</tbody></table>';
 }
 // COMPRAR v2 (Andrea, 15-oct): dos secciones plegables. «SUGERIDO» = lo que Truefie calcula (antes «Truefie
@@ -21549,7 +21578,7 @@ function _cpUrgencia(A){
   _cpGruposPorComprar(A).forEach(function(g){
     const its=g.items.filter(function(f){ return (f.sug>1e-9 || f.color==='rojo') && !_cpEsOdoo(f, f); });
     if(!its.length) return;
-    if(its.some(function(f){ return f.color==='rojo'; })) tarde=true;
+    if(its.some(_cpRojoDeVerdad)) tarde=true;
     const ca=its.map(function(f){ return f.comprarAntes; }).filter(Boolean).sort();
     const lim=g.fijo ? g.pedirEl : (ca.length ? (ca[0]<hoy ? hoy : ca[0]) : null);
     if(lim && lim<=hoy){ if(!deHoy.some(function(x){ return x.proveedor_id===g.proveedor_id; })) deHoy.push(g); }
@@ -21610,7 +21639,9 @@ function _cpAlcPedido(g, filas, valores){
 // Una fila que «falta hoy» solo porque Odoo tiene menos de lo que ya se usó.
 const _cpEsOdoo=function(f, r){ return !!(f.deficit && r.falla && r.falla<=_cpAlc.hoy); };
 const CP_ODOO_TXT='Odoo tiene menos de lo que ya se usó: faltan compras por cargar';
-const _cpDotCls=function(f){ return _cpEsOdoo(f, f) ? 'odoo' : f.color; };
+const _cpDotCls=function(f){ return _cpEsOdoo(f, f) ? 'odoo' : (f.hueco ? 'ambar' : f.color); };
+// Rojo que de verdad no llega (ni «por cargar» ni el hueco de horas de lo que llega el mismo día).
+function _cpRojoDeVerdad(f){ return f.color==='rojo' && !f.hueco && !_cpEsOdoo(f, f); }
 // Para la columna angosta: la fecha sola; si no alcanza ni el primer día, la fecha en que falta (va en rojo).
 const _cpAlcCorto=function(r){ return !r.falla ? '+4 sem' : (r.ultimo ? _fechaCorta(r.ultimo) : _cpDia(r.falla)); };
 
@@ -21736,7 +21767,8 @@ function _cpAvisosLinea(P, g, F, f, r, q){
   const bm=_cpBajoMinimo(f, +P.valores[f.pid]||0);
   if(bm) av.push(['a', 'Debajo del mínimo de '+_cpProvCorto(g)+' ('+bm+'). Podés pedirlo igual.']);
   if(_cpEsOdoo(f, r)) av.push(['o', 'Por cargar: Odoo tiene menos de lo que ya se usó.']);
-  else if(_cpFaltaAntes(g, F, r)) av.push(['r', 'Falta '+(_cpDia(r.falla)==='hoy'?'hoy':('el '+_fechaCorta(r.falla)))+', antes de que llegue.']);
+  else if(_cpFaltaAntes(g, F, r)){ const ec=_cpEnCaminoTxt(f);
+    av.push([f.hueco?'a':'r', ec ? _cpMay(ec)+'.' : ('Falta '+(_cpDia(r.falla)==='hoy'?'hoy':('el '+_fechaCorta(r.falla)))+', antes de que llegue.')]); }
   else if(r.falla && r.falla<=g.alcanzaHasta) av.push(['a', 'Con esto alcanza hasta el '+_fechaCorta(r.ultimo||r.falla)+': no llega a la compra siguiente.']);
   return av.map(function(a){ return '<div class="cp-lav cp-lav-'+a[0]+'">'+esc(a[1])+'</div>'; }).join('');
 }
@@ -22099,7 +22131,10 @@ async function cpPedidos(){
     }catch(e){ b.innerHTML='<div class="cp-err">No pude leer las órdenes: '+esc(e&&e.message||e)+'</div>'; return; }
   }
   if(_cpVista!=='pedidos'||_cpReg) return;
-  const C=_cpPedidos.camino, H=_cpPedidos.recibidos, hoy=_rzCtx.hoyStr;
+  // `_rzCtx` puede no estar todavía: si se toca «Pedidos» mientras Compras lee el plan, esta vista llega
+  // antes (15-oct: «null is not an object (evaluating '_rzCtx.hoyStr')» en la consola). Pedidos no lo
+  // necesita para leer Odoo: el día sale del reloj, y al terminar la carga irACompras vuelve a pintar.
+  const C=_cpPedidos.camino, H=_cpPedidos.recibidos, hoy=(_rzCtx&&_rzCtx.hoyStr)||_ymd(new Date());
   // El nombre corto sale de la configuración (BIO), no del de Odoo («BIO INGREDIENTS SOCIEDAD ANONIMA»).
   const nomDe=function(p){ const pv=_cpCfgProv(p.partner_id&&p.partner_id[0]);
     return _cpNomCorto(pv?pv.nombre:String(p.partner_id&&p.partner_id[1]||'')); };
@@ -22363,7 +22398,7 @@ async function cpProvGuardar(){
 function rzComprasAvisoHtml(){
   const A=_cpAlc;
   if(A && !A.error){
-    const r=A.filas.filter(function(f){ return f.color==='rojo'; });
+    const r=A.filas.filter(_cpRojoDeVerdad);
     if(!r.length) return '';
     // Un insumo por línea (Andrea, 3-oct), igual que en Compras.
     return '<div class="rz-cpaviso" onclick="irACompras(\'comprar\')"><div class="cp-fr-l">'
