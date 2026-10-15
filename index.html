@@ -22099,7 +22099,10 @@ async function cpPedidos(){
     }catch(e){ b.innerHTML='<div class="cp-err">No pude leer las órdenes: '+esc(e&&e.message||e)+'</div>'; return; }
   }
   if(_cpVista!=='pedidos'||_cpReg) return;
-  const C=_cpPedidos.camino, H=_cpPedidos.recibidos, hoy=_rzCtx.hoyStr;
+  // `_rzCtx` puede no estar todavía: si se toca «Pedidos» mientras Compras lee el plan, esta vista llega
+  // antes (15-oct: «null is not an object (evaluating '_rzCtx.hoyStr')» en la consola). Pedidos no lo
+  // necesita para leer Odoo: el día sale del reloj, y al terminar la carga irACompras vuelve a pintar.
+  const C=_cpPedidos.camino, H=_cpPedidos.recibidos, hoy=(_rzCtx&&_rzCtx.hoyStr)||_ymd(new Date());
   // El nombre corto sale de la configuración (BIO), no del de Odoo («BIO INGREDIENTS SOCIEDAD ANONIMA»).
   const nomDe=function(p){ const pv=_cpCfgProv(p.partner_id&&p.partner_id[0]);
     return _cpNomCorto(pv?pv.nombre:String(p.partner_id&&p.partner_id[1]||'')); };
