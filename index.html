@@ -4799,6 +4799,22 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 #vCompras .cp-chip-r{background:var(--err-wash);color:var(--stop-tx)}
 #vCompras .cp-chip-o{background:transparent;box-shadow:inset 0 0 0 1px var(--odoo);color:var(--odoo);font-style:italic}
 #vCompras .cp-chip-m{color:var(--m-comp)}
+/* Ajustes (parte 3, 15-oct) */
+#vCompras .cp-ver{font-size:12px;color:var(--text-3);margin:0 2px 10px}
+#vCompras .cp-prov-det .cp-ver{margin:2px 0 6px}
+#vCompras .cp-cam{display:flex;align-items:baseline;gap:10px;font-size:13px;color:var(--text-hi);padding:4px 0;flex-wrap:wrap}
+#vCompras .cp-camt{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-2);min-width:38px}
+#vCompras .cp-camv{min-width:0}
+#vCompras .cp-ins{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:.5px solid var(--line);font-size:14px;color:var(--text-hi)}
+#vCompras .cp-ins[onclick]{cursor:pointer}
+#vCompras .cp-insn{flex:1;min-width:0}
+#vCompras .cp-inss{font-size:12px;margin-top:2px}
+#vCompras .cp-insed{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:2px 0 12px;font-size:13px;color:var(--text-2)}
+#vCompras .cp-insed label{display:flex;align-items:center;gap:6px}
+#vCompras .cp-inpn{width:72px;text-align:right}
+#vCompras .cp-seg-s{margin:0;flex:0 0 auto}
+#vCompras .cp-seg-s button{min-height:34px;padding:6px 14px;font-size:13px}
+#vCompras .cp-inserr{flex-basis:100%;font-size:12.5px}
 /* Pedidos (parte 2, 15-oct): tarjeta por orden en camino */
 #vCompras .cp-sec-f{display:flex;justify-content:space-between;align-items:baseline}
 #vCompras .cp-sec-f .cp-g{text-transform:none;letter-spacing:0;font-weight:400}
@@ -21428,7 +21444,8 @@ function _cpPaso(f){ const m=_cpMult(f.pid); if(m) return m.mult; return _cpPE(f
 function cpMas(pid, d){
   const P=_cpReg; if(!P) return; const f=P.filas.find(function(x){ return x.pid===pid; }); if(!f) return;
   let n=Math.max(0, Math.round(((+P.valores[pid]||0)+d*_cpPaso(f))*10)/10);
-  const m=_cpMult(pid); if(m && n>1e-9 && n<m.min-1e-9) n=(d>0 ? m.min : 0);     // nunca entre 0 y el mínimo
+  // Desde 0, el «+» salta al mínimo (lo normal). Bajar de ahí se puede: el mínimo AVISA, no frena (C, 15-oct).
+  const m=_cpMult(pid); if(m && d>0 && !((+P.valores[pid]||0)>1e-9) && n<m.min-1e-9) n=m.min;
   P.valores[pid]=n;
   P.previa=null; P.propuestaId=null; cpRenderRegistro();
 }
@@ -21494,6 +21511,13 @@ function _cpFaltaAntes(g, F, r){
   const antes=!g.fijo && F.entrega<=_cpAlc.hoy;
   return r.falla<F.entrega || (!antes && r.falla===F.entrega);
 }
+// C · aviso bajo mínimo (15-oct): el mínimo de compras_config está en la unidad del panel (kg, L, u…).
+// Con múltiplo propio el panel ya va en esa unidad; si va en empaques, se pasa con el empaque. '' = no avisa.
+function _cpBajoMinimo(f, n){
+  const i=_cpCfgIns(f.pid); if(!i || !(+i.minimo>0) || !(n>1e-9)) return '';
+  const e=_cpEmpPanel(i), q=_cpMult(f.pid) ? n : (e!=null ? n*e : null);
+  return (q!=null && q<+i.minimo-1e-9) ? (_cpNumTxt(i.minimo)+' '+_cpUniPanel(i)) : '';
+}
 function _cpAvisosLinea(P, g, F, f, r, q){
   const av=[], T=P.topes&&P.topes[f.pid];
   if(T && q>T.tope+1e-9){
@@ -21502,6 +21526,8 @@ function _cpAvisosLinea(P, g, F, f, r, q){
     av.push([fuerte?'r':'a', veces!=null ? ('Es '+_rzN(veces, veces%1?1:0)+' veces el tope ('+_cpCant(T.tope, f.uom)+'). Podés pedirlo igual.')
                                         : 'Sin consumo con qué comparar. Podés pedirlo igual.']);
   }
+  const bm=_cpBajoMinimo(f, +P.valores[f.pid]||0);
+  if(bm) av.push(['a', 'Debajo del mínimo de '+_cpProvCorto(g)+' ('+bm+'). Podés pedirlo igual.']);
   if(_cpEsOdoo(f, r)) av.push(['o', 'Por cargar: Odoo tiene menos de lo que ya se usó.']);
   else if(_cpFaltaAntes(g, F, r)) av.push(['r', 'Falta '+(_cpDia(r.falla)==='hoy'?'hoy':('el '+_fechaCorta(r.falla)))+', antes de que llegue.']);
   else if(r.falla && r.falla<=g.alcanzaHasta) av.push(['a', 'Con esto alcanza hasta el '+_fechaCorta(r.ultimo||r.falla)+': no llega a la compra siguiente.']);
@@ -21793,58 +21819,161 @@ function _cpProvCab(pv){
 function _cpPrecioTxt(p, uom){ const g=(uom==='g'); const v=g?p*1000:p;
   const u=g?'kg':(/^(unidades|units)$/i.test(uom)?'u':String(uom||'').replace(/ \(EE\. UU\.\)$/,''));
   return '₡'+_rzN(v, v<10?2:0)+'/'+esc(u); }
+// ── AJUSTES (parte 3, 15-oct-2026): lo que hasta hoy se cambiaba con SQL, editable por SOCIAS ──────
+// Por proveedor: los días del camión (o la demora y cada cuántas semanas). Por insumo (B): mínimo,
+// múltiplo y —solo en BIO— seco/frío. Cada «Guardar» es una VERSIÓN NUEVA de compras_config (37 → 38…):
+// otra fila de plan_config, append-only, con `usuario` y `creado_en`. La base exige socia y que `usuario`
+// sea el correo del token (política plan_config_ins), así que nadie firma por otra. Antes de guardar se
+// relee la última versión: si cambió mientras tanto, no se pisa.
+// El mínimo es AVISO, nunca bloqueo (C, Andrea 13-oct): lo dice el armado debajo de la línea.
+// FRÍO Y SECO SOLO EN BIO (Andrea, 13-oct). El camión de frío vive en los insumos de frío (`pide`/`llega`
+// propios, la forma que ya lee nivPlanConfig → diaFijo): cambiarlo acá lo escribe en todos los de frío.
+// La tarifa NO se edita a mano: la pone «Tarifas de BIO» desde las facturas (carril /tarifas). Acá se ve.
+const CP_PROV_FRIO=948;                                   // BIO
+const _cpUniPanel=function(i){ const u=_cpUni(i.empaque_uom); return u==='g'?'kg':(u||''); };
+const _cpNumTxt=function(n){ return (n==null||n==='')?'':String(+n).replace('.',','); };
+// es-CR: «22,68». Vacío = sin valor (null); basura = NaN (no se guarda).
+const _cpNumLee=function(t){ t=String(t==null?'':t).trim().replace(/\s/g,'').replace(',','.'); if(t==='') return null; const n=+t; return isFinite(n)?n:NaN; };
+function _cpInsSub(i){
+  const u=_cpUniPanel(i), r=[];
+  if(i.empaque!=null && i.empaque_nombre && i.empaque_nombre!==u) r.push(i.empaque_nombre+' de '+_cpNumTxt(i.empaque)+' '+_cpUni(i.empaque_uom));
+  if(+i.minimo>0) r.push('mín '+_cpNumTxt(i.minimo)+' '+u);
+  if(+i.multiplo>0) r.push('de '+_cpNumTxt(i.multiplo)+' en '+_cpNumTxt(i.multiplo));
+  if(!(+i.minimo>0) && !(+i.multiplo>0)) r.push('sin mínimo');
+  return r.join(' · ');
+}
+// El camión de frío: el de los insumos de frío con día propio. Si no coinciden entre ellos, null.
+function _cpCamionFrio(cfg, pid){
+  const fr=cfg.insumos.filter(function(i){ return +i.proveedor_id===+pid && i.tipo==='frio' && i.llega!=null; });
+  if(!fr.length) return {pide:null, llega:null};
+  const a=fr[0]; return fr.every(function(i){ return i.llega===a.llega && (i.pide||null)===(a.pide||null); }) ? {pide:a.pide||null, llega:a.llega} : null;
+}
+// Cuántas cosas cambiaron respecto de la versión vigente (para la barra de guardar).
+function _cpCambios(P){
+  const o=JSON.parse(P.orig); let c=0;
+  P.cfg.proveedores.forEach(function(pv){ const v=o.proveedores.find(function(x){ return +x.id===+pv.id; }); if(JSON.stringify(v)!==JSON.stringify(pv)) c++; });
+  P.cfg.insumos.forEach(function(i){ const v=o.insumos.find(function(x){ return +x.producto_id===+i.producto_id; }); if(JSON.stringify(v)!==JSON.stringify(i)) c++; });
+  return c;
+}
+async function _cpVerLeer(){
+  const P=_cpProv; if(!P || P.ver!==undefined) return; P.ver=null;
+  try{ const c=sbClient(); if(!c) return;
+    const {data,error}=await c.from('plan_config').select('id,usuario,creado_en').eq('clave','compras_config').order('creado_en',{ascending:false}).limit(1);
+    if(!error && data && data[0]) P.ver=data[0];
+  }catch(e){}
+  if(_cpVista==='ajustes' && !_cpReg) cpProveedores();
+}
+function _cpVerTxt(v){
+  if(!v) return '';
+  const ms=Date.parse(v.creado_en), d=new Date(ms-6*3600000);
+  const hh=String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0');
+  return 'Versión '+v.id+' · '+String(v.usuario||'').split('@')[0]+' · '+d.getUTCDate()+' '+_MESAB[d.getUTCMonth()]+' '+hh;
+}
 async function cpProveedores(){
   const b=document.getElementById('cpBody');
   const C=_rzCtx&&_rzCtx.cfg&&_rzCtx.cfg.compras;
   if(!C){ b.innerHTML='<div class="cp-vacio">Falta cargar la configuración de Compras (compras_config).</div>'; return; }
-  if(!_cpProv) _cpProv={orig:JSON.stringify(C), cfg:JSON.parse(JSON.stringify(C)), edit:false, msg:'', cls:''};
+  if(!_cpProv) _cpProv={orig:JSON.stringify(C), cfg:JSON.parse(JSON.stringify(C)), insSel:null, msg:'', cls:''};
   const P=_cpProv, socia=_socia===true, pr=(_rzCtx.dfDatos&&_rzCtx.dfDatos.precios)||{}, D=_rzCtx.dfDatos||{};
-  const sucio=JSON.stringify(P.cfg)!==P.orig;
-  // Ajustes provisorio (parte 1, Andrea 14-oct): las tarifas de BIO arriba y la lista de proveedores.
-  b.innerHTML=cpTarifasHtml()+'<div class="cp-grid">'+P.cfg.proveedores.map(function(pv){
-    const ins=P.cfg.insumos.filter(function(i){ return +i.proveedor_id===+pv.id; }), ab=(+_cpProvSel===+pv.id);
-    let r='<div class="cp-card cp-card-s"><div class="cp-it cp-it-cab" onclick="cpProvAbrir('+(+pv.id)+')"><span class="cp-in cp-in1">'+esc(_cpNomCorto(pv.nombre))+'</span>'
+  if(P.ver===undefined) _cpVerLeer();
+  const nCamb=socia?_cpCambios(P):0;
+  const sel=function(fn, actual, ops){ return '<select class="cp-sel" onclick="event.stopPropagation()" onchange="'+fn+'">'
+    +ops.map(function(o){ return '<option value="'+o[0]+'"'+(String(actual==null?'':actual)===String(o[0])?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select>'; };
+  const dias=function(conVacio){ return (conVacio?[['','—']]:[]).concat(CP_DIAS.map(function(d){ return [d,_cpDiaTxt(d)]; })); };
+  let h=(socia?cpTarifasHtml():'')+(P.ver?('<div class="cp-ver">'+esc(_cpVerTxt(P.ver))+'</div>'):'');
+  h+='<div class="cp-grid">'+P.cfg.proveedores.map(function(pv){
+    const id=+pv.id, ins=P.cfg.insumos.filter(function(i){ return +i.proveedor_id===id; }), ab=(+_cpProvSel===id), bio=(id===CP_PROV_FRIO);
+    let r='<div class="cp-card cp-card-s"><div class="cp-it cp-it-cab" onclick="cpProvAbrir('+id+')"><span class="cp-in cp-in1">'+esc(_cpNomCorto(pv.nombre))+'</span>'
       +'<span class="cp-g">'+esc(_cpProvResumen(pv, ins.length))+' <span class="cp-fl'+(ab?' abierto':'')+'">›</span></span></div>';
     if(!ab) return r+'</div>';
-    r+='<div class="cp-prov-det"><div class="cp-ciclo cp-wrap2">'+esc(_cpProvCab(pv))+'</div>'
-      +ins.map(function(i){ const inf=(D.info||{})[+i.producto_id]||{}, uom=(D.uomNom||{})[inf.uom]||'';
-        return '<div class="cp-pol"><span>'+esc((inf.name||i.nombre).replace(/^\[[^\]]*\]\s*/,'').trim())+'</span>'
-          +'<span class="cp-g">'+(pr[+i.producto_id]!=null?_cpPrecioTxt(pr[+i.producto_id], uom):'sin compra')+'</span></div>'; }).join('');
-    if(socia && P.edit){
-      const fijo=!!(pv.pide||pv.llega);
-      const sel=function(campo, ops){ return '<select class="cp-sel" onclick="event.stopPropagation()" onchange="cpProvCambia(\''+campo+'\',this.value)">'
-        +ops.map(function(o){ return '<option value="'+o[0]+'"'+(String(pv[campo]==null?'':pv[campo])===String(o[0])?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select>'; };
-      r+='<div class="cp-det cp-edit">'+(fijo
-        ? ('pide '+sel('pide',[['','—']].concat(CP_DIAS.map(function(d){ return [d,_cpDiaTxt(d)]; })))+' llega '+sel('llega',CP_DIAS.map(function(d){ return [d,_cpDiaTxt(d)]; })))
-        : ('pedir '+sel('demora',[0,1,2,3,4,5,7,10,14].map(function(n){ return [n, n+' día'+(n===1?'':'s')]; }))+' antes'))
-        +' · '+sel('cada_semanas',[1,2,3,4,6,8].map(function(n){ return [n, n===1?'cada semana':('cada '+n+' semanas')]; }))+'</div>';
-    }
-    let gi=-1; if(_cpAlc&&_cpAlc.grupos) _cpAlc.grupos.forEach(function(g, k){ if(g.proveedor_id===+pv.id && (gi<0 || g.items.length>_cpAlc.grupos[gi].items.length)) gi=k; });
-    // Sin botón «Días» (Andrea, 3-oct): por ahora los días se cambian por configuración (compras_config).
+    r+='<div class="cp-prov-det">';
+    // Camiones. BIO: seco (el del proveedor) y frío (el de sus insumos de frío).
+    const fijo=!!(pv.pide||pv.llega);
+    const camSeco=socia
+      ? (fijo ? ('pide '+sel("cpProvCambia('pide',this.value)", pv.pide, dias(true))+' llega '+sel("cpProvCambia('llega',this.value)", pv.llega, dias(false)))
+              : ('pedir '+sel("cpProvCambia('demora',this.value)", pv.demora, [0,1,2,3,4,5,7,10,14].map(function(n){ return [n, n+' día'+(n===1?'':'s')]; }))+' antes'))
+        +' · '+sel("cpProvCambia('cada_semanas',this.value)", pv.cada_semanas||1, [1,2,3,4,6,8].map(function(n){ return [n, n===1?'cada semana':('cada '+n+' semanas')]; }))
+      : esc(_cpProvCab(pv));
+    if(bio){
+      const F=_cpCamionFrio(P.cfg, id), sinDia=ins.filter(function(i){ return i.tipo==='frio' && i.llega==null; });
+      const camFrio=F==null ? '<span class="cp-amb2">los insumos de frío tienen días distintos</span>'
+        : socia ? ('pide '+sel("cpFrioCambia('pide',this.value)", F.pide, dias(true))+' llega '+sel("cpFrioCambia('llega',this.value)", F.llega, dias(true)))
+        : (F.llega ? ((F.pide?('pide '+_cpDiaTxt(F.pide)+' · '):'')+'llega '+_cpDiaTxt(F.llega)) : 'con el seco');
+      r+='<div class="cp-cam"><span class="cp-camt">Seco</span><span class="cp-camv">'+camSeco+'</span></div>'
+        +'<div class="cp-cam"><span class="cp-camt">Frío</span><span class="cp-camv">'+camFrio+'</span></div>'
+        +(sinDia.length&&F&&F.llega?('<div class="cp-ver">'+esc(sinDia.map(function(i){ return i.nombre; }).join(', '))+' llega con el seco</div>'):'');
+    } else r+='<div class="cp-cam"><span class="cp-camv">'+camSeco+'</span></div>';
+    // Insumos (B): mínimo, múltiplo y seco/frío. Se abre uno a la vez.
+    r+='<div class="cp-lista cp-lista0">'+ins.map(function(i){
+      const pid=+i.producto_id, inf=(D.info||{})[pid]||{}, uom=(D.uomNom||{})[inf.uom]||'', abI=(+P.insSel===pid);
+      const nom=(inf.name||i.nombre).replace(/^\[[^\]]*\]\s*/,'').trim();
+      let x='<div class="cp-ins'+(abI?' abierto':'')+'"'+(socia?(' onclick="cpInsAbrir('+pid+')"'):'')+'><div class="cp-insn"><div>'+esc(nom)+'</div>'
+        +'<div class="cp-g cp-inss">'+esc(_cpInsSub(i))+' · '+(pr[pid]!=null?_cpPrecioTxt(pr[pid], uom):'sin compra')+'</div></div>'
+        +(bio?('<span class="cp-chip'+(i.tipo==='frio'?' cp-chip-m':'')+'">'+(i.tipo==='frio'?'frío':'seco')+'</span>'):'')
+        +(socia?'<span class="cp-fl'+(abI?' abierto':'')+'">›</span>':'')+'</div>';
+      if(socia && abI){
+        const u=_cpUniPanel(i), e=P.insErr||{};
+        x+='<div class="cp-insed" onclick="event.stopPropagation()">'
+          +'<label>Mínimo <input class="cp-inp cp-inpn" inputmode="decimal" value="'+esc(_cpNumTxt(i.minimo))+'" placeholder="—" onchange="cpInsCambia('+pid+',\'minimo\',this.value)"> '+esc(u)+'</label>'
+          +'<label>De a <input class="cp-inp cp-inpn" inputmode="decimal" value="'+esc(_cpNumTxt(i.multiplo))+'" placeholder="—" onchange="cpInsCambia('+pid+',\'multiplo\',this.value)"> '+esc(u)+'</label>'
+          +(bio?('<div class="cp-seg cp-seg-s" role="group" aria-label="Seco o frío">'
+            +'<button class="'+(i.tipo!=='frio'?'on':'')+'" aria-pressed="'+(i.tipo!=='frio')+'" onclick="cpInsCambia('+pid+',\'tipo\',\'seco\')">Seco</button>'
+            +'<button class="'+(i.tipo==='frio'?'on':'')+'" aria-pressed="'+(i.tipo==='frio')+'" onclick="cpInsCambia('+pid+',\'tipo\',\'frio\')">Frío</button></div>'):'')
+          +(e.pid===pid?('<div class="cp-mal cp-inserr">'+esc(e.txt)+'</div>'):'')+'</div>';
+      }
+      return x; }).join('')+'</div>';
+    let gi=-1; if(_cpAlc&&_cpAlc.grupos) _cpAlc.grupos.forEach(function(g, k){ if(g.proveedor_id===id && (gi<0 || g.items.length>_cpAlc.grupos[gi].items.length)) gi=k; });
     r+='<div class="cp-btns cp-btns-d">'
-      +(socia&&gi>=0?('<button class="cp-btn cp-btnp" onclick="cpAbrirPedido('+gi+')">'+(pv.canal==='tienda'?'Registrar compra':'Armar pedido')+'</button>'):'')+'</div>'
-      +'<div class="cp-msg'+(P.cls?(' '+P.cls):'')+'">'+esc(P.msg||'')+'</div></div>';
+      +(socia&&gi>=0&&!nCamb?('<button class="cp-btn cp-btnp" onclick="cpAbrirPedido('+gi+')">'+(pv.canal==='tienda'?'Registrar compra':'Armar pedido')+'</button>'):'')+'</div></div>';
     return r+'</div>'; }).join('')+'</div>';
+  // La barra de guardar aparece solo con cambios. El mensaje del último guardado queda debajo.
+  if(socia && nCamb) h+='<div class="cp-pie"><div class="cp-art"><div class="cp-art1">'+nCamb+' cambio'+(nCamb===1?'':'s')+'</div>'
+    +(P.ver?('<div class="cp-art3">versión '+(+P.ver.id+1)+'</div>'):'')+'</div>'
+    +'<button class="cp-btn" onclick="cpProvDescartar()">Descartar</button>'
+    +'<button class="cp-btn cp-btnp"'+(P.guardando?' disabled':'')+' onclick="cpProvGuardar()">Guardar</button></div>';
+  h+='<div class="cp-msg'+(P.cls?(' '+P.cls):'')+'">'+esc(P.msg||'')+'</div>';
+  b.innerHTML=h;
 }
-function cpProvAbrir(id){ _cpProvSel=(id!=null && +_cpProvSel===+id)?null:id; if(_cpProv){ _cpProv.edit=false; _cpProv.msg=''; } cpProveedores(); }
-function cpProvEditar(){ if(!_cpProv) return; _cpProv.edit=!_cpProv.edit; cpProveedores(); }
+function cpProvAbrir(id){ _cpProvSel=(id!=null && +_cpProvSel===+id)?null:id; if(_cpProv){ _cpProv.insSel=null; _cpProv.insErr=null; } cpProveedores(); }
+function cpInsAbrir(pid){ const P=_cpProv; if(!P) return; P.insSel=(+P.insSel===+pid)?null:pid; P.insErr=null; cpProveedores(); }
 function cpProvCambia(campo, v){ if(!_cpProv) return; const pv=_cpProv.cfg.proveedores.find(function(x){ return +x.id===+_cpProvSel; }); if(!pv) return;
-  pv[campo]=(campo==='demora')?(+v||0):(v===''?null:v); _cpProv.msg=''; cpProveedores(); }
+  pv[campo]=(campo==='demora'||campo==='cada_semanas')?(+v||0):(v===''?null:v); _cpProv.msg=''; cpProveedores(); }
+// El camión de frío se escribe en TODOS los insumos de frío del proveedor (es uno solo).
+function cpFrioCambia(campo, v){ const P=_cpProv; if(!P) return; const F=_cpCamionFrio(P.cfg, _cpProvSel)||{};
+  P.cfg.insumos.forEach(function(i){ if(+i.proveedor_id!==+_cpProvSel || i.tipo!=='frio') return;
+    i.pide=(campo==='pide')?(v||null):(F.pide||null); i.llega=(campo==='llega')?(v||null):(F.llega||null);
+    if(i.llega==null){ delete i.llega; delete i.pide; } });
+  P.msg=''; cpProveedores(); }
+function cpInsCambia(pid, campo, v){
+  const P=_cpProv; if(!P) return; const i=P.cfg.insumos.find(function(x){ return +x.producto_id===+pid; }); if(!i) return;
+  P.insErr=null; P.msg='';
+  if(campo==='tipo'){
+    const F=_cpCamionFrio(P.cfg, i.proveedor_id);
+    if(v==='frio'){ i.tipo='frio'; if(F && F.llega){ i.llega=F.llega; i.pide=F.pide||null; } }
+    else { delete i.tipo; delete i.pide; delete i.llega; }        // seco = el camión del proveedor
+    return cpProveedores(); }
+  const n=_cpNumLee(v);
+  if(n!==null && !(n>0)){ P.insErr={pid:+pid, txt:'Tiene que ser un número mayor que 0, o vacío.'}; return cpProveedores(); }
+  if(n===null) delete i[campo]; else i[campo]=n;
+  cpProveedores();
+}
+function cpProvDescartar(){ const P=_cpProv; if(!P) return; P.cfg=JSON.parse(P.orig); P.insErr=null; P.msg=''; P.cls=''; cpProveedores(); }
 async function cpProvGuardar(){
-  const P=_cpProv; if(!P||_socia!==true) return;
+  const P=_cpProv; if(!P||_socia!==true||P.guardando) return;
+  P.guardando=true; P.msg='Guardando…'; P.cls=''; cpProveedores();
   try{
     const c=sbClient();
-    const {data:ult,error:e1}=await c.from('plan_config').select('valor').eq('clave','compras_config').order('creado_en',{ascending:false}).limit(1);
+    const {data:ult,error:e1}=await c.from('plan_config').select('id,valor').eq('clave','compras_config').order('creado_en',{ascending:false}).limit(1);
     if(e1) throw new Error(e1.message||e1);
-    if(JSON.stringify((ult&&ult[0]&&ult[0].valor)||null)!==P.orig){ P.msg='Alguien cambió la configuración mientras tanto: no se guardó. Volvé a abrir Compras.'; P.cls='cp-mal'; return cpProveedores(); }
+    if(JSON.stringify((ult&&ult[0]&&ult[0].valor)||null)!==P.orig){ P.guardando=false; P.msg='Alguien guardó otra versión mientras tanto: no se guardó. Volvé a abrir Compras.'; P.cls='cp-mal'; return cpProveedores(); }
     const {data:{user}}=await c.auth.getUser();
     // `.select('id')`: sin él, un insert que la RLS rechaza puede volver sin error (17-sep).
-    const {data,error}=await c.from('plan_config').insert({clave:'compras_config', valor:P.cfg, usuario:(user&&user.email)||null}).select('id');
+    const {data,error}=await c.from('plan_config').insert({clave:'compras_config', valor:P.cfg, usuario:(user&&user.email)||null}).select('id,usuario,creado_en');
     if(error) throw new Error(error.message||error);
     if(!data||!data.length) throw new Error('la base no devolvió la fila. No se guardó.');
     _rzCtx.cfg.compras=JSON.parse(JSON.stringify(P.cfg)); _rzCtx.cargadoEn=0;
-    _cpProv={orig:JSON.stringify(P.cfg), cfg:JSON.parse(JSON.stringify(P.cfg)), edit:false, msg:'Guardado. Se recalcula al volver a abrir Compras.', cls:'cp-ok'};
-  }catch(e){ P.msg='No se guardó: '+String(e&&e.message||e); P.cls='cp-mal'; }
+    _cpProv={orig:JSON.stringify(P.cfg), cfg:JSON.parse(JSON.stringify(P.cfg)), insSel:P.insSel, ver:data[0], msg:'Guardado como versión '+data[0].id+'. Comprar lo usa al volver a abrir Compras.', cls:'cp-ok'};
+  }catch(e){ P.guardando=false; P.msg='No se guardó: '+String(e&&e.message||e); P.cls='cp-mal'; }
   cpProveedores();
 }
 
