@@ -105,6 +105,19 @@ begin
   perform set_config('cc.a_pend_dias',
     (select coalesce(sum(dias),0)::text from v_rrhh_solicitud
       where persona_id = current_setting('cc.pa',true)::bigint), true);
+  -- LOS DIAS DE LA SOLICITUD QUE SE VA A CANCELAR, leidos del evento. El
+  -- esperado de la fila 8 se calcula con ESTO, no con un 1 escrito a mano: si
+  -- alguien cambia el armado a una solicitud de 3 dias, la asercion lo sigue.
+  perform set_config('cc.e1_dias',
+    (select dias::text from rrhh_evento where id = current_setting('cc.e1',true)::bigint), true);
+  -- Y los CONTEOS de filas, que es lo que prueba que se cancelo UNA sola.
+  perform set_config('cc.a_pend_n',
+    (select count(*)::text from v_rrhh_solicitud
+      where persona_id = current_setting('cc.pa',true)::bigint), true);
+  perform set_config('cc.a_anul_n',
+    (select count(*)::text from rrhh_evento_anulado an
+      join rrhh_evento e on e.id = an.evento_id
+     where e.persona_id = current_setting('cc.pa',true)::bigint), true);
 end $$;
 select set_config('role','postgres', true);
 
@@ -130,6 +143,25 @@ begin
   exception when others then
     perform set_config('cc.r1', 'ERROR '||sqlstate||' · '||left(sqlerrm,45), true);
   end;
+
+  -- ⚠️ LA MEDICION VA ACA, JUSTO DESPUES DE CANCELAR, y no al final de todo.
+  -- Aca fallo la version anterior (fila 8: esperado 1, obtenido 2). La
+  -- cancelacion estaba bien y la solicitud era de 1 dia; lo que estaba mal era
+  -- el MOMENTO de medir: la captura vivia en la seccion 5, DESPUES del escenario
+  -- 7b, que inserta a proposito una solicitud nueva en la misma fecha para
+  -- probar que tras cancelar se puede volver a pedir. Esa solicitud nueva vuelve
+  -- a sumar 1 dia pendiente: 2 - 1 + 1 = 2. Medir «al final» no responde la
+  -- pregunta «¿que hizo la cancelacion?».
+  perform set_config('cc.i_pend_dias',
+    (select coalesce(sum(dias),0)::text from v_rrhh_solicitud
+      where persona_id = current_setting('cc.pa',true)::bigint), true);
+  perform set_config('cc.i_pend_n',
+    (select count(*)::text from v_rrhh_solicitud
+      where persona_id = current_setting('cc.pa',true)::bigint), true);
+  perform set_config('cc.i_anul_n',
+    (select count(*)::text from rrhh_evento_anulado an
+      join rrhh_evento e on e.id = an.evento_id
+     where e.persona_id = current_setting('cc.pa',true)::bigint), true);
 
   -- 2 · el permiso pendiente
   begin
@@ -317,59 +349,85 @@ select t.orden,
   -- EL SALDO. Lo que una PENDIENTE mueve en «Mis vacaciones» son los dias
   -- PENDIENTES, no los tomados: una pendiente nunca conto como tomada. Se miden
   -- las dos cosas, y de paso que nunca entro en v_rrhh_evento (los tomados).
-  select 8, 'los DIAS PENDIENTES del saldo bajan 1',
-         coalesce((nullif(current_setting('cc.a_pend_dias',true),'')::numeric - 1)::text,'?'),
-         coalesce(current_setting('cc.d_pend_dias',true),'SIN DATO'),
-         nullif(current_setting('cc.d_pend_dias',true),'')::numeric
-           = nullif(current_setting('cc.a_pend_dias',true),'')::numeric - 1
+  -- EL ESPERADO SE CALCULA CON LOS DIAS DE LA SOLICITUD, leidos del evento. Y se
+  -- mide JUSTO DESPUES de cancelar, no al final del ensayo.
+  select 8, 'DIAS PENDIENTES bajan en los dias de ella',
+         coalesce((nullif(current_setting('cc.a_pend_dias',true),'')::numeric
+                   - nullif(current_setting('cc.e1_dias',true),'')::numeric)::text,'?'),
+         coalesce(current_setting('cc.i_pend_dias',true),'SIN DATO'),
+         nullif(current_setting('cc.i_pend_dias',true),'')::numeric
+           = nullif(current_setting('cc.a_pend_dias',true),'')::numeric
+             - nullif(current_setting('cc.e1_dias',true),'')::numeric
   union all
-  select 9, 'nunca entra en v_rrhh_evento (TOMADOS)', '0 -> 0',
+  -- SE CANCELO UNA SOLA. Los dias podrian cuadrar con dos solicitudes de medio
+  -- dia cada una; los CONTEOS de filas no se dejan enganar asi.
+  select 9, 'y sale UNA sola solicitud de pendientes',
+         coalesce((nullif(current_setting('cc.a_pend_n',true),'')::numeric - 1)::text,'?'),
+         coalesce(current_setting('cc.i_pend_n',true),'SIN DATO'),
+         nullif(current_setting('cc.i_pend_n',true),'')::numeric
+           = nullif(current_setting('cc.a_pend_n',true),'')::numeric - 1
+  union all
+  select 10, 'y aparece UNA sola fila de anulacion',
+         coalesce((nullif(current_setting('cc.a_anul_n',true),'')::numeric + 1)::text,'?'),
+         coalesce(current_setting('cc.i_anul_n',true),'SIN DATO'),
+         nullif(current_setting('cc.i_anul_n',true),'')::numeric
+           = nullif(current_setting('cc.a_anul_n',true),'')::numeric + 1
+  union all
+  -- INFO · por que al FINAL los pendientes vuelven a subir: el escenario 7b
+  -- (14) pide de nuevo la misma fecha a proposito. Esta fila existe para que ese
+  -- numero no vuelva a parecer un error.
+  select 11, 'INFO · pendientes al final (7b pide de nuevo)',
+         coalesce((nullif(current_setting('cc.i_pend_dias',true),'')::numeric + 1)::text,'?'),
+         coalesce(current_setting('cc.d_pend_dias',true),'SIN DATO'),
+         true
+  union all
+  select 12, 'nunca entra en v_rrhh_evento (TOMADOS)', '0 -> 0',
          coalesce(current_setting('cc.a_e1_saldo',true),'?') || ' -> '
            || coalesce(current_setting('cc.d_e1_saldo',true),'?'),
          nullif(current_setting('cc.a_e1_saldo',true),'')::numeric = 0
            and nullif(current_setting('cc.d_e1_saldo',true),'')::numeric = 0
   union all
-  select 10, 'los dias TOMADOS no se mueven',
+  select 13, 'los dias TOMADOS no se mueven',
          coalesce(nullif(current_setting('cc.a_tom',true),''),'?'),
          coalesce(nullif(current_setting('cc.d_tom',true),''),'SIN DATO'),
          nullif(current_setting('cc.d_tom',true),'')::numeric
            = nullif(current_setting('cc.a_tom',true),'')::numeric
   union all
-  select 11, 'el estado de la cancelada es anulado', 'anulado',
+  select 14, 'el estado de la cancelada es anulado', 'anulado',
          coalesce(nullif(current_setting('cc.d_e1',true),''),'SIN DATO'),
          current_setting('cc.d_e1',true) = 'anulado'
   union all
-  select 12, 'OTRO empleado cancela la ajena: NO', 'RECHAZA 42501',
+  select 15, 'OTRO empleado cancela la ajena: NO', 'RECHAZA 42501',
          coalesce(current_setting('cc.r4',true),'SIN CAPTURAR'),
          coalesce(current_setting('cc.r4',true),'') like 'RECHAZA 42501%'
   union all
-  select 13, 'cancelar una APROBADA: NO, y lo dice', 'RECHAZA 55000',
+  select 16, 'cancelar una APROBADA: NO, y lo dice', 'RECHAZA 55000',
          coalesce(current_setting('cc.r5a',true),'SIN CAPTURAR'),
          coalesce(current_setting('cc.r5a',true),'') like 'RECHAZA 55000%'
            and coalesce(current_setting('cc.r5a',true),'') like '%aprobado%'
   union all
-  select 14, 'cancelar una RECHAZADA: NO', 'RECHAZA 55000',
+  select 17, 'cancelar una RECHAZADA: NO', 'RECHAZA 55000',
          coalesce(current_setting('cc.r5b',true),'SIN CAPTURAR'),
          coalesce(current_setting('cc.r5b',true),'') like 'RECHAZA 55000%'
   union all
-  select 15, 'cancelar una YA CANCELADA: NO',
+  select 18, 'cancelar una YA CANCELADA: NO',
          'RECHAZA 55000',
          coalesce(current_setting('cc.r5c',true),'SIN CAPTURAR'),
          coalesce(current_setting('cc.r5c',true),'') like 'RECHAZA 55000%'
   union all
-  select 16, 'ANON cancela: NO', 'RECHAZA 42501',
+  select 19, 'ANON cancela: NO', 'RECHAZA 42501',
          coalesce(current_setting('cc.r6',true),'SIN CAPTURAR'),
          coalesce(current_setting('cc.r6',true),'') like 'RECHAZA 42501%'
   union all
-  select 17, 'la REPETIDA de una pendiente: NO', 'RECHAZA 23505',
+  select 20, 'la REPETIDA de una pendiente: NO', 'RECHAZA 23505',
          coalesce(current_setting('cc.r7a',true),'SIN CAPTURAR'),
          coalesce(current_setting('cc.r7a',true),'') like 'RECHAZA 23505%'
   union all
-  select 18, 'pedir de nuevo tras cancelar: SI', 'ENTRO (correcto)',
+  select 21, 'pedir de nuevo tras cancelar: SI', 'ENTRO (correcto)',
          coalesce(current_setting('cc.r7b',true),'SIN CAPTURAR'),
          current_setting('cc.r7b',true) = 'ENTRO (correcto)'
   union all
-  select 19, 'filas de Daniel en rrhh_evento: igual',
+  select 22, 'filas de Daniel en rrhh_evento: igual',
          case when coalesce(current_setting('cc.daniel',true),'')=''
               then 'SIN PROBAR' else coalesce(current_setting('cc.a_daniel_ev',true),'?') end,
          case when coalesce(current_setting('cc.daniel',true),'')=''
@@ -378,7 +436,7 @@ select t.orden,
          coalesce(current_setting('cc.d_daniel_ev',true),'x')
            = coalesce(current_setting('cc.a_daniel_ev',true),'y')
   union all
-  select 20, 'filas de Daniel en rrhh_permiso: igual',
+  select 23, 'filas de Daniel en rrhh_permiso: igual',
          case when coalesce(current_setting('cc.daniel',true),'')=''
               then 'SIN PROBAR' else coalesce(current_setting('cc.a_daniel_pm',true),'?') end,
          case when coalesce(current_setting('cc.daniel',true),'')=''
