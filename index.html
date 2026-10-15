@@ -4798,6 +4798,17 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 #vCompras .cp-chip-a{background:var(--warn-wash);color:var(--warn)}
 #vCompras .cp-chip-r{background:var(--err-wash);color:var(--stop-tx)}
 #vCompras .cp-chip-o{background:transparent;box-shadow:inset 0 0 0 1px var(--odoo);color:var(--odoo);font-style:italic}
+#vCompras .cp-chip-m{color:var(--m-comp)}
+/* Pedidos (parte 2, 15-oct): tarjeta por orden en camino */
+#vCompras .cp-sec-f{display:flex;justify-content:space-between;align-items:baseline}
+#vCompras .cp-sec-f .cp-g{text-transform:none;letter-spacing:0;font-weight:400}
+#vCompras .cp-oc{display:flex;flex-direction:column;gap:7px;cursor:pointer}
+#vCompras .cp-po-cab{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+#vCompras .cp-po-nom{font-size:15px;font-weight:600;color:var(--text)}
+#vCompras .cp-po-cab .cp-chip{white-space:nowrap}
+#vCompras .cp-po-lin{font-size:13.5px;color:var(--text-hi);line-height:1.45}
+#vCompras .cp-po-pie{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--text-2)}
+#vCompras .cp-oc .cp-po-det{border-top:.5px solid var(--line);padding-top:6px;margin-top:2px}
 #vCompras .cp-cero{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 #vCompras .cp-cero-b{display:flex;flex-direction:column;gap:2px;text-align:left;background:var(--surface);border:.5px solid var(--border);border-radius:12px;padding:12px 14px;font:inherit;cursor:pointer;min-height:56px}
 #vCompras .cp-cero-b:hover{border-color:var(--m-comp)}
@@ -5258,7 +5269,7 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 14 oct 2026 · b97';
+const BUILD = 'v 15 oct 2026 · b99';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -21657,48 +21668,96 @@ async function cpConfirmar(){
   cpRenderRegistro(); try{ window.scrollTo(0,0); }catch(e){}
 }
 
-// ── PEDIDOS: una línea por orden abierta, hasta que se valida la recepción ─────
+// ── PEDIDOS (parte 2, 15-oct-2026): «En camino» arriba y «Recibidos» abajo. SOLO LECTURA ─────
+// Recepción y factura siguen con Keylor en Odoo: esta pestaña no escribe nada.
+// · En camino = órdenes confirmadas de MATERIA PRIMA con recepción `pending` o `partial`, SIN ventana
+//   de fecha (la versión anterior miraba 45 días de `date_planned` y una orden muy atrasada desaparecía
+//   justo cuando más importa). `receipt_status` vacío = la orden no tiene recepción que esperar: medido
+//   el 15-oct: 50+ órdenes de 2023–2025 así (sin recepción, o con la recepción cancelada como
+//   P00375) habrían quedado «en camino» para siempre. Ámbar si la fecha ya pasó.
+// · Recibidos = recepción completa en los últimos 60 días, por `effective_date` (la llegada real).
+// MATERIA PRIMA = categoría «Todos / Materia Prima» de Odoo (CP_CATEG_MP). Medido el 15-oct sobre las
+// 170 órdenes de 2026: las 21 MP de compras_config están ahí, y las únicas líneas de otra categoría
+// son «Envio» (gasto), siempre junto a MP. La categoría (y no la lista de compras_config) deja
+// entrar «Huevos (viejo)» [465], que es MP y ya no está en la configuración.
+const CP_CATEG_MP=4, CP_RECIBIDOS_DIAS=60;
+const _cpOdooOC=function(id){ return 'https://truefood.odoo.com/web#id='+id+'&model=purchase.order&view_type=form'; };
+const _cpLinNom=function(l){ return String(l.product_id&&l.product_id[1]||'').replace(/^\[[^\]]*\]\s*/,'').trim(); };
+const _cpLinCant=function(q, l){ return _rzN(q, q%1?2:0)+' '+esc(String(l.product_uom&&l.product_uom[1]||'')); };
+// «7 oct»: Recibidos abarca dos meses, así que el día de la semana solo no alcanza.
+const _cpDiaMes=function(ds){ const d=new Date(ds+'T00:00:00'); return d.getDate()+' '+_MESAB[d.getMonth()]; };
+// La FE que deja «Ya llegó» en `partner_ref` (consecutivo de 20 dígitos o clave de 50).
+const _cpFE=function(p){ const r=String(p.partner_ref||'').replace(/\D/g,''); return (r.length===20||r.length===50) ? r : ''; };
 async function cpPedidos(){
   const b=document.getElementById('cpBody');
   if(!_cpPedidos){
     b.innerHTML='<div class="cp-load">Leyendo las órdenes de compra…</div>';
     try{
-      const d=new Date(); d.setDate(d.getDate()-45);
-      const ps=await odooCall('purchase.order','search_read',[[['state','in',['purchase','to approve']],['date_planned','>=',_ymd(d)]]],
-        {fields:['name','partner_id','date_order','date_planned','receipt_status','amount_untaxed'],order:'date_planned asc',limit:200});
-      _cpPedidos=ps.filter(function(p){ return p.receipt_status!=='full'; });
+      const CAMPOS=['name','partner_id','partner_ref','date_order','date_planned','effective_date','receipt_status','amount_total'];
+      const mp=['order_line.product_id.categ_id','child_of',CP_CATEG_MP];
+      const d=new Date(); d.setDate(d.getDate()-CP_RECIBIDOS_DIAS);
+      const R=await Promise.all([
+        odooCall('purchase.order','search_read',[[['state','in',['purchase','to approve']],['receipt_status','in',['pending','partial']],mp]],
+          {fields:CAMPOS,order:'date_planned asc',limit:200}),
+        // effective_date viene en UTC: el día CR empieza a las 06:00 UTC.
+        odooCall('purchase.order','search_read',[[['state','=','purchase'],['receipt_status','=','full'],['effective_date','>=',_ymd(d)+' 06:00:00'],mp]],
+          {fields:CAMPOS,order:'effective_date desc',limit:200})]);
+      const camino=R[0], ids=camino.map(function(p){ return p.id; });
+      const L=ids.length ? await odooCall('purchase.order.line','search_read',[[['order_id','in',ids]]],
+          {fields:['order_id','product_id','product_qty','product_uom','qty_received'],limit:2000,context:{lang:'es_CR'}}) : [];
+      camino.forEach(function(p){ p._lineas=L.filter(function(l){ return l.order_id&&l.order_id[0]===p.id; }); });
+      _cpPedidos={camino:camino, recibidos:R[1]};
     }catch(e){ b.innerHTML='<div class="cp-err">No pude leer las órdenes: '+esc(e&&e.message||e)+'</div>'; return; }
   }
   if(_cpVista!=='pedidos'||_cpReg) return;
-  if(!_cpPedidos.length){ b.innerHTML='<div class="cp-card"><div class="cp-lista"><div class="cp-it cp-it0"><span class="cp-in">Nada en camino</span></div></div></div>'; return; }
-  const est={pending:'por recibir', partial:'recibida en parte', no:'sin recepción'};
-  // Cada orden se toca y se despliega AHÍ MISMO (Andrea, 3-oct): productos, cantidades, estado de
-  // la recepción y el enlace a la orden en Odoo. Las líneas se leen al abrirla, una vez.
-  // Una tarjeta por orden en grilla: dos por fila en escritorio, una en el teléfono.
-  b.innerHTML='<div class="cp-grid">'+_cpPedidos.map(function(p){
-    const ds=_crDate(p.date_planned), atras=ds<_rzCtx.hoyStr, ab=!!_cpAbiertos['po'+p.id];
-    // El nombre corto sale de la configuración (BIO), no del de Odoo («BIO INGREDIENTS SOCIEDAD ANONIMA»).
-    const pv=_cpCfgProv(p.partner_id&&p.partner_id[0]), nom=pv?pv.nombre:String(p.partner_id&&p.partner_id[1]||'');
-    let r='<div class="cp-card cp-card-s"><div class="cp-it cp-it-cab" onclick="cpPedidoToggle('+p.id+')"><span class="cp-in"><span class="cp-pon cp-pon-m">'+esc(p.name)+'</span> · '+esc(_cpNomCorto(nom))+'</span>'
-      +'<span class="cp-g">'+_fechaCorta(_crDate(p.date_order))+' › <span'+(atras?' class="cp-r"':'')+'>'+_fechaCorta(ds)+'</span> <span class="cp-fl'+(ab?' abierto':'')+'">›</span></span></div>';
-    if(ab){ const L=p._lineas;
-      r+='<div class="cp-det cp-po-det">'
-        +(L==null?'Leyendo…':(L.error?('<span class="cp-r">No pude leer las líneas: '+esc(L.error)+'</span>')
-          :L.map(function(l){ return '<div class="cp-pol"><span>'+esc(String(l.product_id&&l.product_id[1]||'').replace(/^\[[^\]]*\]\s*/,''))+'</span>'
-              +'<span>'+_rzN(l.product_qty, l.product_qty%1?2:0)+' '+esc(String(l.product_uom&&l.product_uom[1]||''))
-              +(l.qty_received>1e-9?(' <span class="cp-g">· recibido '+_rzN(l.qty_received, l.qty_received%1?2:0)+'</span>'):'')+'</span></div>'; }).join('')))
-        +'<div class="cp-pol"><span class="cp-g">Recepción: '+esc(est[p.receipt_status]||p.receipt_status||'—')+' · ₡'+_rzN(p.amount_untaxed||0,0)+' sin IVA</span>'
-        +'<a class="cp-link" href="https://truefood.odoo.com/web#id='+p.id+'&model=purchase.order&view_type=form" target="_blank" rel="noopener">Abrir en Odoo ›</a></div></div>';
-    }
-    return r+'</div>'; }).join('')+'</div>';
+  const C=_cpPedidos.camino, H=_cpPedidos.recibidos, hoy=_rzCtx.hoyStr;
+  // El nombre corto sale de la configuración (BIO), no del de Odoo («BIO INGREDIENTS SOCIEDAD ANONIMA»).
+  const nomDe=function(p){ const pv=_cpCfgProv(p.partner_id&&p.partner_id[0]);
+    return _cpNomCorto(pv?pv.nombre:String(p.partner_id&&p.partner_id[1]||'')); };
+  // Seco / Frío solo donde la configuración tiene insumos de frío (hoy, BIO). Mezclada: sin rótulo.
+  const tipoDe=function(p){
+    const C2=_rzCtx&&_rzCtx.cfg&&_rzCtx.cfg.compras, pid=p.partner_id&&p.partner_id[0];
+    if(!C2 || !C2.insumos.some(function(i){ return +i.proveedor_id===+pid && i.tipo==='frio'; })) return '';
+    const t=(p._lineas||[]).filter(function(l){ return _cpCfgIns(l.product_id&&l.product_id[0]); })
+      .map(function(l){ return (_cpCfgIns(l.product_id[0]).tipo==='frio')?'Frío':'Seco'; });
+    return (t.length && t.every(function(x){ return x===t[0]; })) ? t[0] : ''; };
+  const detalle=function(p, L){
+    return '<div class="cp-det cp-po-det">'
+      +(L==null?'Leyendo…':(L.error?('<span class="cp-r">No pude leer las líneas: '+esc(L.error)+'</span>')
+        :L.map(function(l){ return '<div class="cp-pol"><span>'+esc(_cpLinNom(l))+'</span><span>'+_cpLinCant(l.product_qty, l)
+            +(l.qty_received>1e-9 && l.qty_received<l.product_qty-1e-9?(' <span class="cp-g">· recibido '+_rzN(l.qty_received, l.qty_received%1?2:0)+'</span>'):'')+'</span></div>'; }).join('')))
+      +'<div class="cp-pol"><span></span><a class="cp-link" href="'+_cpOdooOC(p.id)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">Abrir en Odoo ›</a></div></div>'; };
+  let h='<div class="cp-sec cp-sec-f"><span>En camino</span><span class="cp-g">con IVA</span></div>';
+  if(!C.length) h+='<div class="cp-card cp-card-s"><div class="cp-it cp-it-cab"><span class="cp-in cp-g">Nada en camino</span></div></div>';
+  else h+='<div class="cp-grid">'+C.map(function(p){
+    const ds=_crDate(p.date_planned), fe=_cpFE(p), ab=!!_cpAbiertos['po'+p.id], t=tipoDe(p);
+    // Ámbar si la fecha prevista ya pasó y falta recibir. Con FE es «Ya llegó»: llegó, no «llegaba».
+    const chip=(ds && ds<hoy) ? '<span class="cp-chip cp-chip-a">'+(fe?'llegó ':'llegaba ')+_fechaCorta(ds)+' · falta recibir</span>'
+      : (p.receipt_status==='partial' ? '<span class="cp-chip">recibida en parte</span>'
+      : '<span class="cp-chip cp-chip-m">llega '+(ds===hoy?'hoy':_fechaCorta(ds))+'</span>');
+    const od=_crDate(p.date_order);
+    return '<div class="cp-card cp-oc" onclick="cpPedidoToggle(\'c\','+p.id+')">'
+      +'<div class="cp-po-cab"><span class="cp-po-nom">'+esc(nomDe(p))+(t?(' · '+t):'')+'</span>'+chip+'</div>'
+      +'<div class="cp-po-lin">'+(p._lineas||[]).map(function(l){ return esc(_cpLinNom(l))+' '+_cpLinCant(l.product_qty, l); }).join(' · ')+'</div>'
+      +'<div class="cp-po-pie"><span>'+esc(p.name)+' · pedido '+(od===hoy?'hoy':_fechaCorta(od))+(fe?(' · FE …'+fe.slice(-4)):'')+'</span><span>₡'+_rzN(p.amount_total||0,0)+'</span></div>'
+      +(ab?detalle(p, p._lineas):'')+'</div>'; }).join('')+'</div>';
+  h+='<div class="cp-sec">Recibidos · '+CP_RECIBIDOS_DIAS+' días</div>';
+  if(!H.length) h+='<div class="cp-card cp-card-s"><div class="cp-it cp-it-cab"><span class="cp-in cp-g">Nada recibido</span></div></div>';
+  else h+='<div class="cp-card cp-card-s"><div class="cp-lista cp-lista0">'+H.map(function(p){
+    const ab=!!_cpAbiertos['pr'+p.id];
+    return '<div class="cp-it" onclick="cpPedidoToggle(\'r\','+p.id+')"><span class="cp-in">'+esc(nomDe(p))+' · '+esc(p.name)+'</span>'
+      +'<span class="cp-g">'+_cpDiaMes(_crDate(p.effective_date))+' · ₡'+_rzN(p.amount_total||0,0)+' <span class="cp-fl'+(ab?' abierto':'')+'">›</span></span></div>'
+      +(ab?detalle(p, p._lineas):''); }).join('')+'</div></div>';
+  b.innerHTML=h;
 }
-async function cpPedidoToggle(id){
-  const k='po'+id; _cpAbiertos[k]=!_cpAbiertos[k];
-  const p=(_cpPedidos||[]).find(function(x){ return x.id===id; });
+// En camino ya trae sus líneas; Recibidos las lee al abrir, una vez.
+async function cpPedidoToggle(cual, id){
+  const k=(cual==='r'?'pr':'po')+id; _cpAbiertos[k]=!_cpAbiertos[k];
+  const p=((_cpPedidos&&(cual==='r'?_cpPedidos.recibidos:_cpPedidos.camino))||[]).find(function(x){ return x.id===id; });
   if(_cpAbiertos[k] && p && p._lineas==null){
     cpPedidos();
     try{ p._lineas=await odooCall('purchase.order.line','search_read',[[['order_id','=',id]]],
-           {fields:['product_id','product_qty','product_uom','qty_received'],limit:100}); }
+           {fields:['product_id','product_qty','product_uom','qty_received'],limit:100,context:{lang:'es_CR'}}); }
     catch(e){ p._lineas={error:String(e&&e.message||e)}; }
   }
   cpPedidos();
