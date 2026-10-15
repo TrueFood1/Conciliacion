@@ -6427,11 +6427,25 @@ function _perAviso(id,tipo,html){
 }
 // Los errores de Postgres que la pantalla sabe traducir. El resto sale crudo:
 // un mensaje raro en pantalla se puede leer por teléfono; uno tragado, no.
+// ⚠️ LAS DOS CAUSAS COMPARTEN EL SQLSTATE 42501, asi que el CODIGO no sirve para
+// distinguirlas: el discriminador es el TEXTO del mensaje.
+//   · «violates row-level security policy» -> la RLS te freno a VOS con ESTE dato
+//     (es de otra persona, o ya fue resuelto). Arreglarlo es cosa de quien mira.
+//   · «permission denied for ...»           -> falta un GRANT. No es la cuenta:
+//     NINGUNA cuenta puede, socias incluidas. Arreglarlo es cosa de la base.
+// Mezclarlas en «tu cuenta no tiene permiso» costo una vuelta entera el 7-oct:
+// Lorena fue a revisar su perfil cuando lo que faltaba era un privilegio que
+// rrhh_resolver_evento() necesitaba y el pegado 4 le habia quitado. Mandar a
+// mirar el lugar equivocado es peor que no decir nada.
 function _perErr(e){
   const m=String((e&&(e.message||e.msg))||e||'');
   if(/sin_solape|23P01|exclu/i.test(m)) return 'Ese día ya está cargado — se pisa con otro día cerrado.';
-  if(/row-level security|violates row-level|42501|permission denied/i.test(m))
-    return 'Tu cuenta no tiene permiso para esto (lo revisa Andrea).';
+  if(/repetida|ya hay una solicitud/i.test(m)) return m;   // el mensaje del servidor ya es claro
+  if(/violates row-level security|row-level security policy/i.test(m))
+    return 'Tu cuenta no puede hacer esto con este dato: o es de otra persona, o ya fue resuelto.';
+  if(/permission denied/i.test(m))
+    return 'Falta un permiso en la base para esta operación. No es tu cuenta: ninguna puede, '
+         + 'ni las socias. Pasale el aviso a Andrea.';
   return m;
 }
 
@@ -6574,7 +6588,10 @@ function _calBandejaRender(){
   const p=(_calPend||[]).slice().sort(function(a,b){ return String(a.ini).localeCompare(String(b.ini)); });
   // Sin pendientes no se dibuja nada. "Todo al día" es la primera de las cinco
   // reglas: informar no es alertar, y una lista vacía es ruido con marco.
-  if(!p.length){ box.innerHTML=''; return; }
+  if(!p.length){
+    box.innerHTML='<div id="calBandejaStatus" class="status hidden" style="margin-top:4px"></div>';
+    return;
+  }
   let h='<div class="m3title" style="font-size:16px">'+(_perEsSocia?'Esperando tu visto bueno':'Solicitudes sin resolver')+'</div>'
        +'<div class="per-cnt">'+p.length+(p.length===1?' solicitud':' solicitudes')+' sin resolver.</div>';
   p.forEach(function(s){
@@ -6593,6 +6610,12 @@ function _calBandejaRender(){
       +  '</div>') : '')
       +'</div>';
   });
+  // EL AVISO VA AL PIE DE LA BANDEJA. `#calStatus` vive ARRIBA del calendario y
+  // la bandeja esta abajo, asi que el resultado de un Aprobar salia a una
+  // pantalla de distancia del boton que se apreto — en el telefono, invisible.
+  // Fue lo que hizo que Lorena viera "no pasó nada" cuando en realidad el
+  // servidor estaba contestando con un error.
+  h+='<div id="calBandejaStatus" class="status hidden" style="margin-top:14px"></div>';
   box.innerHTML=h;
 }
 
@@ -6650,7 +6673,7 @@ function perModPick(id,m){
   // explícitamente sin descuento, y sin ella la única salida sería rechazarlo.
   const s=(_calPend||[]).filter(function(x){ return x.fuente==='permiso' && x.id===id; })[0];
   if(m==='incapacidad' && s && s.horas){
-    return _perAviso('calStatus','s-warn','Ese permiso se pidió por horas y una incapacidad '
+    return _perAviso('calBandejaStatus','s-warn','Ese permiso se pidió por horas y una incapacidad '
       +'se paga por días. No se puede convertir: hay que rechazarlo y volver a pedirlo por días.');
   }
   const cur=(_perModPick[id]!==undefined)?_perModPick[id]:(s&&s.mod);
@@ -6713,14 +6736,14 @@ async function perResolver(fuente,id,ok){
   // SE FRENA ANTES DEL CONFIRM. Preguntar "¿aprobar?" para después chocar contra
   // el CHECK del servidor hace que la socia crea que aprobó algo que no entró.
   if(ok && mod==='incapacidad' && !org){
-    return _perAviso('calStatus','s-warn','Falta decir de qué es la incapacidad '
+    return _perAviso('calBandejaStatus','s-warn','Falta decir de qué es la incapacidad '
       +'(enfermedad o accidente de trabajo) antes de aprobarla. El servidor no la acepta sin eso.');
   }
   let aviso='';
   if(ok){
-    _perAviso('calStatus','s-info','<span class="spin"></span>Revisando el día…');
+    _perAviso('calBandejaStatus','s-info','<span class="spin"></span>Revisando el día…');
     aviso=await _perChoqueMismoDia(s);
-    _perAviso('calStatus','');
+    _perAviso('calBandejaStatus','');
   }
   const comoSeCompensa=(fuente==='permiso' && ok)
     ? ('\n\nSe compensa: '+(mod==='descuento'?'SE DESCUENTA del pago de la quincena.'
@@ -6736,7 +6759,7 @@ async function perResolver(fuente,id,ok){
       +'\n\nUna vez resuelta no se cambia.')) return;
   let nota=null;
   if(!ok){ nota=prompt('Motivo del rechazo (opcional) — lo va a ver quien lo pidió:',''); }
-  _perAviso('calStatus','s-info','<span class="spin"></span>Registrando la decisión…');
+  _perAviso('calBandejaStatus','s-info','<span class="spin"></span>Registrando la decisión…');
   try{
     const c=sbClient(); if(!c) throw new Error('no hay conexión a Supabase');
     let filas=null;
@@ -6772,7 +6795,7 @@ async function perResolver(fuente,id,ok){
     if(!filas.length){ await _perYaResuelta(fuente,id); }
     else{ await _perTrasResolver('s-ok',(ok?'Aprobada.':'Rechazada.')+' Queda registrado a tu nombre.'); }
   }catch(e){
-    _perAviso('calStatus','s-err','No pude registrar la decisión: '+esc(_perErr(e)));
+    _perAviso('calBandejaStatus','s-err','No pude registrar la decisión: '+esc(_perErr(e)));
   }
 }
 
@@ -6784,7 +6807,7 @@ async function perResolver(fuente,id,ok){
 async function _perTrasResolver(tipo,msg){
   _calDatos=null; _calPend=null;
   await calCargar(true);
-  _perAviso('calStatus',tipo,msg);
+  _perAviso('calBandejaStatus',tipo,msg);
 }
 async function _perYaResuelta(fuente,id){
   let quien='', que='', cuando='';
@@ -6804,7 +6827,7 @@ async function _perYaResuelta(fuente,id){
   // quien lo intentó no es socia. Dos causas distintas para el mismo "0 filas",
   // y decir la equivocada manda a buscar el problema al lugar que no es.
   if(que==='pendiente'){
-    _perAviso('calStatus','s-warn','La solicitud sigue pendiente: tu cuenta no tiene permiso para resolverla. '
+    _perAviso('calBandejaStatus','s-warn','La solicitud sigue pendiente: tu cuenta no tiene permiso para resolverla. '
       +'Aprobar es de las socias.');
     return;
   }
@@ -6917,7 +6940,10 @@ function _solForm(){
    +   '</div>'
    + '</div>'
    + '<div id="solResumen" class="per-cnt" style="margin-bottom:12px"></div>'
-   + '<button class="btn per-go" onclick="solEnviar()">Enviar solicitud</button>';
+   + '<button class="btn per-go" id="solBtn" onclick="solEnviar()">Enviar solicitud</button>'
+   // Mismo motivo que en la bandeja: `#solStatus` esta arriba del formulario y el
+   // boton al final, asi que en el telefono el resultado quedaba fuera de vista.
+   + '<div id="solStatusBajo" class="status hidden" style="margin-top:12px"></div>';
   _solResumen();
 }
 // HORAS ES SIEMPRE DENTRO DE UN DÍA, y lo obliga el CHECK `rrhh_permiso_horas_ok`
