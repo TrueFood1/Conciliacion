@@ -69,14 +69,22 @@ aj as (
   select g.id,
          count(*) filter (where d.cual = 'actual')   as n_actual,
          count(*) filter (where d.cual = 'anterior') as n_anterior,
+         -- ⚠️ EL FILTRO VA EN EL `filter`, NO EN UN `where`. Con un LEFT JOIN un
+         -- `where d.cual is not null or a.id is null` descarta las filas de quien
+         -- tiene ajustes SOLO FUERA de la ventana, y si esos eran sus unicos
+         -- ajustes la persona se queda sin filas y el join del final LA SACA DEL
+         -- REPORTE. En un diagnostico que compara tres personas, que una se caiga
+         -- sin aviso se leeria como «no tiene nada raro» cuando no se la midio.
+         -- Sin `where`, el left join garantiza al menos una fila por persona y
+         -- los `filter` hacen el recorte sin perder a nadie.
          coalesce(string_agg(to_char(a.fecha,'DD-MM') || ' '
                              || case when a.monto < 0 then 'resta' else 'suma' end
                              || ' · ' || left(coalesce(a.nota,''), 22),
-                             ' | ' order by a.fecha), '—')          as det
+                             ' | ' order by a.fecha)
+                  filter (where d.cual is not null), '—')           as det
     from gente g
     left join rrhh_ajuste_manual a on a.persona_id = g.id
     left join dos d on a.fecha between d.ini and d.fin
-   where d.cual is not null or a.id is null
    group by g.id
 ),
 -- 3 · PERMISOS E INCAPACIDADES que CUENTAN en esas quincenas: aprobados, y por
