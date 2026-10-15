@@ -6215,7 +6215,15 @@ function _vacRender(){
   // devuelve null, la RLS no deja pasar ninguna fila y la pantalla queda en blanco
   // sin un solo error. Dicho, se arregla en un minuto; mudo, no se arregla nunca.
   if(!filas.length){
-    _vacAviso('s-warn','Tu cuenta no está enlazada a una persona en Personal, así que no hay saldo que mostrar. Lo enlaza Andrea.');
+    // Mismo criterio que «Pedir días»: una socia o el asistente no tienen fila de
+    // empleada, asi que CERO FILAS es lo normal para ellos y no un fallo. Para un
+    // empleado de verdad sigue siendo el fallo silencioso que este aviso caza.
+    _vacAviso(_perLectora ? 's-info' : 's-warn',
+      _perEsSocia
+        ? 'Esta pantalla es el saldo del equipo de producción. Vos no acumulás vacaciones acá.'
+        : _perLectora
+          ? 'Esta cuenta no es de una persona del equipo, así que no tiene saldo de vacaciones.'
+          : 'Tu cuenta todavía no está enlazada a una persona del equipo en Personal, así que no hay saldo que mostrar. Lo enlaza Andrea.');
     body.innerHTML=''; return;
   }
   _vacAviso('');
@@ -6295,11 +6303,22 @@ const PER_MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto'
                'setiembre','octubre','noviembre','diciembre'];
 const PER_DOW=['L','M','M','J','V','S','D'];
 // Solo socias: la última en `true`. La pestaña no se dibuja para el equipo.
-const PER_TABS=[['vacaciones','Mis vacaciones','irAVacaciones()',false],
-                ['calendario','Calendario','irACalendario()',false],
-                ['pedir','Pedir días','irASolicitar()',false],
-                ['cerrados','Días cerrados','irADiasCerrados()',true],
-                ['pago','Pago de quincena','irAPagoQuincena()',true]];
+// EL 4º ELEMENTO DEJA DE SER UN BOOLEANO Y PASA A DECIR QUIEN VE LA PESTAÑA.
+// Con dos estados no alcanzaba: dev (14-oct) hizo que `true` signifique
+// `_perLectora` —socias Y asistente—, y «Pago de quincena» entro en b81 con ese
+// mismo `true`. Resultado: el asistente VEIA la pestaña y `pagCargar` lo
+// rechazaba con un mensaje. Y no se arregla dejandolo leer: las vistas del pago
+// llevan `where acceso_es_socia()`, asi que para el asistente no hay datos ni en
+// solo lectura — veria una pantalla vacia sin explicacion.
+//   null      · todos los del modulo
+//   'lectora' · socias y asistente (ven, no actuan)
+//   'socia'   · solo socias
+// Decision de Lorena, 15-oct: el pago no se le dibuja al asistente.
+const PER_TABS=[['vacaciones','Mis vacaciones','irAVacaciones()',null],
+                ['calendario','Calendario','irACalendario()',null],
+                ['pedir','Pedir días','irASolicitar()',null],
+                ['cerrados','Días cerrados','irADiasCerrados()','lectora'],
+                ['pago','Pago de quincena','irAPagoQuincena()','socia']];
 const PER_TABS_CONT=['perTabsVac','perTabsCal','perTabsSol','perTabsFer','perTabsPago'];
 
 // _perLectora (14-oct, decisión de Andrea): socias y asistente VEN la bandeja y «Días cerrados»;
@@ -6315,7 +6334,8 @@ function _perTabs(activa){
   if(activa) _perTabActiva=activa;
   let h='';
   PER_TABS.forEach(function(t){
-    if(t[3] && !_perLectora) return;
+    if(t[3]==='socia'   && !_perEsSocia) return;
+    if(t[3]==='lectora' && !_perLectora) return;
     const on=(t[0]===_perTabActiva);
     h+='<button class="face'+(on?' on':'')+'"'+(on?'':' onclick="'+t[2]+'"')+'>'+t[1]+'</button>';
   });
@@ -6822,15 +6842,20 @@ async function solCargar(force){
   _perAviso('solStatus','s-info','<span class="spin"></span>Cargando…');
   try{
     const yo=await perYo();
-    // Una socia no es empleada: no tiene fila en `rrhh_persona` y por eso no
-    // puede pedirse días a sí misma. Se dice cuál de los dos casos es, porque
-    // "no podés pedir" a secas se lee como un error del sistema.
+    // TRES CASOS, NO DOS, y la diferencia importa: «tu cuenta no está enlazada»
+    // suena a algo roto que alguien tiene que arreglar, y para una socia o para
+    // el asistente no hay nada que arreglar — esa cuenta NO ES DE UN EMPLEADO y
+    // nunca va a pedir días. Decirle que espere a Andrea la manda a esperar algo
+    // que no va a pasar. El tercer caso —empleado de verdad, sin enlazar— SI es
+    // algo que Andrea arregla, y ese conserva su aviso.
     if(!yo){
       form.innerHTML='';
       document.getElementById('solMias').innerHTML='';
-      _perAviso('solStatus','s-warn', _perEsSocia
+      _perAviso('solStatus','s-info', _perEsSocia
         ? 'Esta pantalla es para el equipo de producción. Vos aprobás lo que piden, en el Calendario.'
-        : 'Tu cuenta no está enlazada a una persona en Personal, así que todavía no podés pedir días. Lo enlaza Andrea.');
+        : _perLectora
+          ? 'Esta cuenta no es de una persona del equipo, así que no pide días. Lo que sí ve es el Calendario.'
+          : 'Tu cuenta todavía no está enlazada a una persona del equipo en Personal. Lo enlaza Andrea.');
       return;
     }
     _perAviso('solStatus','');
