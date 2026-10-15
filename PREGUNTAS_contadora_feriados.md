@@ -60,6 +60,12 @@ cae en fin de semana), así que no urge — pero en 2027 sí va a pasar.
 | 01-12-2026 | Abolición del Ejército | **no obligatorio** | martes | no |
 | 25-12-2026 | Navidad | **OBLIGATORIO** | viernes | **sí** |
 
+⚠️ **Ojo con el día de la semana del 1 de diciembre.** El comunicado del MTSS que
+citamos abajo dice «el propio **lunes** 1º de diciembre», y es correcto —
+**pero es el comunicado de 2025**, y en 2025 el 1 de diciembre fue lunes. **En
+2026 cae martes.** La tabla de arriba está con el día de 2026. Si se vuelve a
+consultar esa fuente, hay que leerla con el año puesto.
+
 **Lo que queda del año tiene un solo feriado de pago obligatorio: el 25 de
 diciembre.** Y es el único que califica para pago doble si se trabaja.
 
@@ -71,6 +77,40 @@ Fuentes consultadas:
 - [MTSS · el 25 de diciembre y el 1 de enero son de pago obligatorio](https://www.mtss.go.cr/prensa/comunicados/2024/diciembre/cp_061_2024.html)
 - [Código de Trabajo de Costa Rica, art. 148 (PDF)](https://cuc.ac.cr/userfiles/files/normativa/externa/codigos/Codigo_Trabajo_RPL.pdf)
 - [CIJUL-UCR · El pago de los días feriados en Costa Rica](https://cijulenlinea.ucr.ac.cr/portal/descargar.php?q=MjQ4OA%3D%3D)
+
+---
+
+## Incapacidades · cómo quedó, y lo que sigue sin confirmar
+
+**Cómo lo dejamos** (decisión de Andrea, 15-oct):
+
+- La incapacidad **descuenta solo en días hábiles**: lunes a viernes que caigan
+  dentro de la incapacidad **y** dentro de la quincena. Sábados y domingos no.
+- Cada día descontado vale **neto ÷ días hábiles de la quincena**, exactamente
+  igual que un permiso. Un solo valor del día para todo.
+- **Un feriado dentro de una incapacidad no descuenta**, por la misma razón que un
+  permiso sobre un feriado: el feriado se paga igual. (Es la misma suposición de
+  la pregunta 1 de arriba, y se confirma junto con ella.)
+- Una incapacidad que cruza dos quincenas se reparte, y **cada quincena usa su
+  propio divisor**.
+
+**Lo que sigue sin confirmar, y es lo que decide cuánta plata es:** cuánto paga la
+empresa. Hoy el sistema tiene estos valores **provisionales**:
+
+| | valor de hoy | de dónde salió |
+|---|---|---|
+| primeros días que paga la empresa | **3** | art. 79 del Código de Trabajo, leído por nosotras |
+| porcentaje de esos días | **50 %** | ídem |
+| del día 4 en adelante | **0 %** (lo cubre la CCSS) | ídem |
+
+**Ninguno lo confirmó un contador.** Mientras siga así, la pantalla de pago
+muestra el aviso «reglas de incapacidad pendientes de confirmar» y nadie debería
+transferir contra ese número sin cuadrarlo a mano.
+
+Y sigue abierta la pregunta más grande, que ya está en
+[`PREGUNTAS_contadora_incapacidades.md`](PREGUNTAS_contadora_incapacidades.md):
+**¿la CCSS le deposita al trabajador o nos reembolsa a nosotras?** Si es lo
+segundo, el modelo de resta de este módulo no sirve tal como está.
 
 ---
 
