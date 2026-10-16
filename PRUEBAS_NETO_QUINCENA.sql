@@ -7,7 +7,7 @@
 --
 -- ⚠️ ADENTRO VA EL CUERPO REAL DE PERSONAL_NETO_QUINCENA.sql, extraido del
 -- archivo por estructura (el unico begin; y el unico commit;, sin incluirlos).
--- md5 del cuerpo extraido: fab1d94283d2041aa6987936e798e5c5
+-- md5 del cuerpo extraido: 45f49c4142520370b63733fe538925dd
 -- O sea que esto NO prueba una copia: prueba byte a byte lo que se va a pegar.
 -- Un ensayo que valida una copia se desincroniza en silencio — se arregla el
 -- pegado, el ensayo sigue validando lo viejo, y da verde.
@@ -603,7 +603,7 @@ declare
   v_anon int; v_inv int; v_rls boolean; v_pol int;
   v_div int; v_fer boolean; v_desc boolean;
   v_doble boolean; v_doble_sab boolean; v_doble_no boolean; v_oblig int;
-  v_pct numeric; v_nat numeric;
+  v_pct numeric; v_nat numeric; v_dx_pct text; v_dx_nat text;
 begin
   -- Ninguna de las tablas ni vistas nuevas puede quedar legible por anon.
   select count(*) into v_anon from (
@@ -648,10 +648,29 @@ begin
   v_doble_no  := rrhh_feriado_paga_doble(date '2026-12-01');
   select count(*) into v_oblig from rrhh_feriado where pago_obligatorio;
 
-  select valor into v_pct from rrhh_param where clave='rebaja_trabajador_pct'
-    order by vigente_desde desc, creado_en desc limit 1;
-  select valor into v_nat from rrhh_param where clave='incap_dias_naturales'
-    order by vigente_desde desc, creado_en desc limit 1;
+  -- ⚠️ POR rrhh_param(), NO POR UN SELECT PROPIO. La version anterior de este
+  -- candado hacia `order by vigente_desde desc limit 1`, que toma la ultima fila
+  -- de CUALQUIER fecha — incluso una con vigencia FUTURA. rrhh_param() toma la
+  -- ultima fila con vigencia <= la fecha que se le pide, y es lo que usan las
+  -- vistas. Medir por otro camino que el codigo no es medir: el candado podia
+  -- gritar con las vistas bien, o callarse con las vistas mal.
+  --
+  -- Y se pregunta en VARIAS fechas, no en una: un parametro apagado el 15 de
+  -- octubre y encendido el 1 de noviembre pasaria un candado de una sola fecha.
+  select coalesce(max(rrhh_param('rebaja_trabajador_pct', t.d)), -1) into v_pct
+    from (values (date '2026-10-15'), (date '2026-10-31'),
+                 (date '2026-11-30'), (date '2026-12-31')) t(d);
+  select coalesce(max(rrhh_param('incap_dias_naturales', t.d)), -1) into v_nat
+    from (values (date '2026-10-15'), (date '2026-10-31'),
+                 (date '2026-11-30'), (date '2026-12-31')) t(d);
+  -- Y si algo no cuadra, el mensaje tiene que decir QUE filas hay, no solo que
+  -- esta mal. Son porcentajes y banderas, no montos: se pueden imprimir.
+  select string_agg(format('%s = %s', to_char(vigente_desde,'DD-MM-YYYY'), valor),
+                    ' · ' order by vigente_desde)
+    into v_dx_pct from rrhh_param where clave = 'rebaja_trabajador_pct';
+  select string_agg(format('%s = %s', to_char(vigente_desde,'DD-MM-YYYY'), valor),
+                    ' · ' order by vigente_desde)
+    into v_dx_nat from rrhh_param where clave = 'incap_dias_naturales';
 
   if v_anon <> 0 then
     raise exception 'CANDADO: `anon` llega a % de las tablas/vistas nuevas. Aca hay NETO y '
@@ -694,13 +713,23 @@ begin
     raise exception 'CANDADO: el 1-dic-2026 (feriado de pago NO obligatorio, martes) califica '
       'para pago doble. La columna pago_obligatorio no esta frenando nada. NO SE APLICO NADA.';
   end if;
-  if coalesce(v_pct, -1) <> 0 then
-    raise exception 'CANDADO: la rebaja quedo en %% y tenia que quedar APAGADA en 0. '
-      'NO SE APLICO NADA.', v_pct;
+  -- ⚠️ NINGUN `%%` EN ESTOS MENSAJES, Y ES A PROPOSITO. En el formato de RAISE
+  -- `%%` es un porcentaje LITERAL, no un hueco: `raise ... 'quedo en %%', v_pct`
+  -- tiene cero huecos y un argumento, y Postgres contesta «too many parameters
+  -- specified for RAISE» en vez del mensaje. Y pasa solo cuando la rama se
+  -- dispara, o sea justo cuando el mensaje hacia falta. Se escribe «por ciento».
+  if v_pct <> 0 then
+    raise exception 'CANDADO: la rebaja del trabajador NO quedo apagada: en alguna quincena '
+      'de 2026 todavia vale % por ciento. Las filas de rrhh_param para esa clave son: %. '
+      'La fila que agrega este pegado tiene vigencia 01-10-2026, asi que una fila POSTERIOR '
+      'con valor distinto de 0 la tapa. Eso se arregla a mano, decidiendo que vigencia '
+      'corresponde — no desde aca. NO SE APLICO NADA.', v_pct, coalesce(v_dx_pct,'(ninguna)');
   end if;
-  if coalesce(v_nat, -1) <> 0 then
-    raise exception 'CANDADO: incap_dias_naturales quedo en % y tenia que quedar en 0 '
-      '(la incapacidad descuenta solo habiles). NO SE APLICO NADA.', v_nat;
+  if v_nat <> 0 then
+    raise exception 'CANDADO: incap_dias_naturales NO quedo en 0: en alguna quincena de 2026 '
+      'todavia vale %, o sea que la incapacidad seguiria descontando dias naturales. Las '
+      'filas de rrhh_param para esa clave son: %. NO SE APLICO NADA.',
+      v_nat, coalesce(v_dx_nat,'(ninguna)');
   end if;
 
   raise notice 'CANDADO OK: anon en 0 · 3 vistas invoker · RLS con 4 politicas · divisor 11 · '
@@ -738,10 +767,10 @@ select
   rrhh_es_dia_descontable(date '2026-10-03')                                 as sabado_descuenta,
   rrhh_feriado_paga_doble(date '2026-12-01')                                 as no_oblig_doble,
   (select count(*) from rrhh_feriado where pago_obligatorio)                 as feriados_obligatorios,
-  (select valor from rrhh_param where clave='rebaja_trabajador_pct'
-    order by vigente_desde desc, creado_en desc limit 1)                     as rebaja_apagada,
-  (select valor from rrhh_param where clave='incap_dias_naturales'
-    order by vigente_desde desc, creado_en desc limit 1)                     as incap_habiles,
+  -- Por rrhh_param() y en la ultima fecha de 2026, igual que el candado y que
+  -- las vistas. Un select propio aca mediria otra cosa que el codigo.
+  rrhh_param('rebaja_trabajador_pct', date '2026-12-31')                     as rebaja_apagada,
+  rrhh_param('incap_dias_naturales',  date '2026-12-31')                     as incap_habiles,
   (select count(*) from pg_policies where schemaname='public'
     and tablename in ('rrhh_neto_quincena','rrhh_feriado_trabajado'))        as politicas,
   (select count(*) from (select unnest(array['rrhh_neto_quincena','rrhh_feriado_trabajado',
