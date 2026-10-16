@@ -1,0 +1,61 @@
+# ─────────────────────────────────────────────────────────────────────────
+#  RE-FACTURAS AUTOMÁTICAS (15-oct-2026)
+#
+#  ⛔ ESTE ARCHIVO VA EN EL REPO PRIVADO TrueFood1/respaldo-truefie.
+#  Acá, en Conciliacion (público), está solo como PLANTILLA para copiar.
+#  Ningún secreto vive en este archivo: salen de la configuración del repo privado
+#  (ODOO_URL, ODOO_DB, ODOO_LECTOR_USER, ODOO_LECTOR_APIKEY, REFACTURA_DB_URL).
+#
+#  INTERRUPTOR: la VARIABLE del repo `REFACTURA_ENCENDIDA`. Solo con «si» escribe;
+#  sin ella (o con cualquier otra cosa) corre EN SECO y solo informa.
+# ─────────────────────────────────────────────────────────────────────────
+name: Re-facturas
+
+on:
+  schedule:
+    # Cada hora de 6:00 a 20:00 en Costa Rica (UTC-6) = 12:00 a 02:00 UTC, a las y 23
+    # (GitHub retrasa o descarta los de la hora en punto). 15 corridas por día.
+    - cron: '23 12-23 * * *'
+    - cron: '23 0-2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: refacturas
+  cancel-in-progress: false
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # El código vive en el repo PÚBLICO (Conciliacion), sin secretos. Hasta que Andrea dé el OK para
+      # main, se lee de `dev`.
+      - name: Traer el código de Truefie
+        uses: actions/checkout@v4
+        with:
+          repository: TrueFood1/Conciliacion
+          ref: dev
+          path: truefie
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar el cliente de Postgres
+        run: pip install --quiet 'psycopg[binary]'
+
+      - name: Revisar re-facturas
+        env:
+          ODOO_URL:            ${{ secrets.ODOO_URL }}
+          ODOO_DB:             ${{ secrets.ODOO_DB }}
+          ODOO_LECTOR_USER:    ${{ secrets.ODOO_LECTOR_USER }}
+          ODOO_LECTOR_APIKEY:  ${{ secrets.ODOO_LECTOR_APIKEY }}
+          REFACTURA_DB_URL:    ${{ secrets.REFACTURA_DB_URL }}
+          REFACTURA_ENCENDIDA: ${{ vars.REFACTURA_ENCENDIDA }}
+        run: |
+          set -euo pipefail
+          if [ "${REFACTURA_ENCENDIDA:-}" = "si" ]; then
+            python3 truefie/herramientas/refacturas/refacturas.py --escribir
+          else
+            python3 truefie/herramientas/refacturas/refacturas.py
+          fi
