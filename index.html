@@ -12848,7 +12848,12 @@ async function despReverificar(){
 
     // De las marcadas hay que averiguar la factura: la vista no la trae cuando el
     // estado es 'sin_verificar' (no se pudo mirar, así que no se guardó el id).
-    const marcadas=(pend.data||[]).filter(function(x){ return x.estado==='sin_verificar'; });
+    // LAS «ANULADA» TAMBIÉN, CONTRA LA FACTURA VIGENTE DEL PEDIDO (15-oct, caso pedido 185). Una salida contra
+    // una factura anulada NO se apaga sola mientras el pedido siga con esa factura: la relectura da otra vez
+    // «anulada» y no se escribe nada. Pero si el pedido se RE-LIGÓ a una factura válida (a mano o por las
+    // re-facturas automáticas), el problema está resuelto: queda una fila «vigente» nueva contra la factura
+    // vigente, con su detalle. Nada se borra: la «anulada» sigue en el historial.
+    const marcadas=(pend.data||[]).filter(function(x){ return x.estado==='sin_verificar' || x.estado==='anulada'; });
     let facDeSalida={};
     if(marcadas.length){
       // SE PIDEN POR ID, no por ventana de fecha ni con un `limit` de corte.
@@ -12871,7 +12876,7 @@ async function despReverificar(){
     const objetivos=[];
     marcadas.forEach(function(x){
       const f=facDeSalida[x.salida_id];
-      if(f) objetivos.push({salida_id:x.salida_id, factura_id:f, previo:'sin_verificar'});
+      if(f) objetivos.push({salida_id:x.salida_id, factura_id:f, previo:x.estado});
     });
     (vig.data||[]).forEach(function(x){
       objetivos.push({salida_id:x.salida_id, factura_id:x.factura_id, previo:'vigente'});
@@ -12897,13 +12902,16 @@ async function despReverificar(){
       const anulada=!!rev[o.factura_id];
       const nuevo=anulada?'anulada':'vigente';
       if(nuevo===o.previo) return;             // sin cambio: no se escribe
+      const nom=(mv.find(function(m){ return m.id===o.factura_id; })||{}).name;
       filas.push({salida_id:o.salida_id, estado:nuevo, factura_id:o.factura_id,
-                  detalle: anulada ? ('NC: '+(motivo[rev[o.factura_id]]||'sin motivo')) : null,
+                  detalle: anulada ? ('NC: '+(motivo[rev[o.factura_id]]||'sin motivo'))
+                         : (o.previo==='anulada' ? ('Re-factura: queda contra la vigente …'+String(nom||o.factura_id).slice(-4)) : null),
                   creado_por: quien});
     });
     if(filas.length){
       const {error}=await c.from('ent_salida_verificacion').insert(filas);
       if(error) throw error;
+      if(typeof _pd!=='undefined') _pd=null;   // Pendientes vuelve a leer: la alerta resuelta se va
       const gritan=filas.filter(function(f){ return f.estado==='anulada'; }).length;
       if(gritan) console.warn('reverificación: '+gritan+' salida(s) contra factura anulada');
     }
