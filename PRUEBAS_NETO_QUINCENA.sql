@@ -1457,21 +1457,94 @@ select set_config('request.jwt.claims',
 -- 32 · APPEND-ONLY, LAS DOS CERRADURAS. Ni grant de update ni politica de
 --      update: un neto corregido es una fila nueva, no un numero sobreescrito.
 --      De estos montos cuelga una transferencia que ya se hizo.
+-- ⚠️ ESTA PRUEBA SE REESCRIBIO DOS VECES, Y LAS DOS POR LA MISMA RAZON: medía
+-- permisos en vez de medir lo que pasa.
+--   v1 contaba `pg_policies` con cmd in ('UPDATE','DELETE') y esperaba 0. Daba
+--      FALLA: hay 2, pero son las RESTRICTIVAS del asistente, que no habilitan
+--      nada. Estaba contando candados a favor.
+--   v2 contaba solo las permisivas y preguntaba `has_table_privilege`. Pasaba,
+--      pero seguia sin probar lo unico que importa: que el dato no se pueda
+--      cambiar. Un permiso ausente es un indicio; una fila intacta es la prueba.
+--   v3, esta: INTENTA el update y el delete de verdad y mira FILAS AFECTADAS y
+--      CONTENIDO. Y los intenta DOS veces: tal como queda el pegado, y despues
+--      con el grant puesto a mano — que es el escenario que de verdad preocupa,
+--      el dia que alguien corra un `grant all` sobre el esquema.
+--
+-- Medido contra PostgreSQL 17 el 16-oct-2026: sin grant las dos operaciones dan
+-- 42501; con el grant puesto dan 0 FILAS AFECTADAS y ningun error. O sea que hay
+-- DOS cerraduras independientes, y la de abajo (las politicas) aguanta sola.
+-- ⚠️ Pero aguanta EN SILENCIO: 0 filas no es un error, y quien corra ese update
+-- creeria que funciono. Queda dicho; no se cambia el mecanismo, porque es el
+-- mismo que usan las otras nueve tablas del modulo y la consistencia vale mas
+-- que un candado suelto.
+do $$
+declare v_n int; v_antes numeric; v_despues numeric; v_filas int; v_res text := '';
+begin
+  select nq.neto into v_antes from rrhh_neto_quincena nq
+   where nq.persona_id = current_setting('cc.p1',true)::bigint;
+
+  -- 1 · TAL COMO QUEDA EL PEGADO: sin grant de update ni de delete.
+  begin
+    update rrhh_neto_quincena set neto = 1
+     where persona_id = current_setting('cc.p1',true)::bigint;
+    get diagnostics v_n = row_count;
+    v_res := v_res || v_n || ' filas';
+  exception when insufficient_privilege then v_res := v_res || 'denegado';
+           when others then v_res := v_res || 'error ' || sqlstate;
+  end;
+  begin
+    delete from rrhh_neto_quincena
+     where persona_id = current_setting('cc.p1',true)::bigint;
+    get diagnostics v_n = row_count;
+    v_res := v_res || ' · ' || v_n || ' filas';
+  exception when insufficient_privilege then v_res := v_res || ' · denegado';
+           when others then v_res := v_res || ' · error ' || sqlstate;
+  end;
+
+  -- 2 · Y AHORA CON EL GRANT, para ver si queda algo frenando.
+  perform set_config('role','postgres', true);
+  execute 'grant update, delete on rrhh_neto_quincena to authenticated';
+  perform set_config('role','authenticated', true);
+  begin
+    update rrhh_neto_quincena set neto = 1
+     where persona_id = current_setting('cc.p1',true)::bigint;
+    get diagnostics v_n = row_count;
+    v_res := v_res || ' · ' || v_n || ' filas';
+  exception when others then v_res := v_res || ' · error ' || sqlstate;
+  end;
+  begin
+    delete from rrhh_neto_quincena
+     where persona_id = current_setting('cc.p1',true)::bigint;
+    get diagnostics v_n = row_count;
+    v_res := v_res || ' · ' || v_n || ' filas';
+  exception when others then v_res := v_res || ' · error ' || sqlstate;
+  end;
+  perform set_config('role','postgres', true);
+  execute 'revoke update, delete on rrhh_neto_quincena from authenticated';
+  perform set_config('role','authenticated', true);
+
+  -- 3 · Y EL DATO. Cuatro intentos de escritura y el neto tiene que estar igual.
+  select nq.neto into v_despues from rrhh_neto_quincena nq
+   where nq.persona_id = current_setting('cc.p1',true)::bigint;
+  select count(*) into v_filas from rrhh_neto_quincena nq
+   where nq.persona_id = current_setting('cc.p1',true)::bigint;
+  insert into zz_res values (32,
+    'append-only CON FILAS · update y delete sin grant · los mismos con grant · el dato',
+    'denegado · denegado · 0 filas · 0 filas · igual',
+    v_res || ' · ' || case when v_despues = v_antes and v_filas = 1 then 'igual'
+                           when v_filas <> 1 then 'LO BORRO'
+                           else 'LO CAMBIO' end,
+    null);
+end $$;
+
+-- Y el permiso, aparte y como lo que es: un indicio, no la prueba.
 insert into zz_res
--- ⚠️ SOLO LAS PERMISIVAS. La version anterior contaba TODA politica de UPDATE o
--- DELETE y esperaba 0, pero el disparador del asistente pone dos RESTRICTIVAS
--- (asistente_no_actualiza y asistente_no_borra). Una restrictiva no habilita
--- nada: es un candado de mas. Lo que tiene que ser 0 son las PERMISIVAS, porque
--- sin ninguna permisiva la operacion no pasa para nadie — y eso es lo que
--- sostiene el append-only. La prueba vieja daba FALLA contando candados a favor.
-select 32, 'rrhh_neto_quincena append-only · update? · delete? · permisivas de upd/del · candados extra',
-       'f · f · 0 · 2',
+select 34, 'y los permisos, como indicio · authenticated puede update? · delete? · permisivas de upd/del',
+       'f · f · 0',
        left(has_table_privilege('authenticated','rrhh_neto_quincena','UPDATE')::text,1) || ' · ' ||
        left(has_table_privilege('authenticated','rrhh_neto_quincena','DELETE')::text,1) || ' · ' ||
        (select count(*) from pg_policies where tablename = 'rrhh_neto_quincena'
-         and cmd in ('UPDATE','DELETE') and permissive = 'PERMISSIVE') || ' · ' ||
-       (select count(*) from pg_policies where tablename = 'rrhh_neto_quincena'
-         and cmd in ('UPDATE','DELETE') and permissive = 'RESTRICTIVE'), null;
+         and cmd in ('UPDATE','DELETE') and permissive = 'PERMISSIVE'), null;
 
 -- 33 · ANON NO LLEGA A NADA. La anon key viaja dentro de index.html, que esta en
 --      un repo PUBLICO. Se mide llamando de verdad como anon, no leyendo grants.
@@ -1513,7 +1586,7 @@ update zz_res set veredicto =
   case when obtenido is null                              then 'SIN DATO'
        when btrim(obtenido) = btrim(esperado)             then 'OK'
        else 'FALLA' end
- where n between 1 and 33 or n = -1;
+ where n between 1 and 34 or n = -1;
 
 -- Y las filas que el ensayo tenia que producir y podrian no existir: si un
 -- `select ... from zz_pago(...)` no devuelve filas, el insert no inserta nada y
@@ -1521,7 +1594,7 @@ update zz_res set veredicto =
 insert into zz_res
 select n, 'ESTA PRUEBA NO CORRIO · la consulta no devolvio ninguna fila',
        'la fila existe', 'NO EXISTE', 'FALLA'
-  from generate_series(1,33) n
+  from generate_series(1,34) n
  where n not in (select r.n from zz_res r);
 
 select r.n                                          as "#",
@@ -1532,16 +1605,16 @@ select r.n                                          as "#",
   from zz_res r
 union all
 select 99, '── TOTAL ──',
-       (select count(*)::text || ' pruebas' from zz_res where n between 1 and 33),
+       (select count(*)::text || ' pruebas' from zz_res where n between 1 and 34),
        (select count(*) filter (where veredicto='OK')::text || ' OK · ' ||
                count(*) filter (where veredicto='FALLA')::text || ' FALLA · ' ||
                count(*) filter (where veredicto='SIN DATO')::text || ' SIN DATO'
-          from zz_res where n between 1 and 33),
-       (select case when count(*) < 33                    then 'FALTAN PRUEBAS · NO PEGAR'
+          from zz_res where n between 1 and 34),
+       (select case when count(*) < 34                    then 'FALTAN PRUEBAS · NO PEGAR'
                     when count(*) filter (where veredicto <> 'OK') = 0
                                                           then 'TODO VERDE'
                     else 'HAY ROJO · NO PEGAR' end
-          from zz_res where n between 1 and 33)
+          from zz_res where n between 1 and 34)
  order by 1;
 
 rollback;

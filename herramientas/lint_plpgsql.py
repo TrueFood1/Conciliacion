@@ -62,10 +62,19 @@ def revisar(path):
         n_lo    = len(re.findall(r'\bloop\b', c, re.I)) - n_endlo
         if n_lo != n_endlo:
             hall.append((etq, ln, 'loop=%d end loop=%d' % (n_lo, n_endlo)))
+        # ⚠️ UN `case ... end` DE SQL TAMBIEN TERMINA EN `end` PELADO. El `case`
+        # de plpgsql cierra con `end case`, pero la EXPRESION case —la que se usa
+        # en un select o en una asignacion— cierra con `end` a secas, y entonces
+        # parece el cierre de un bloque. Sin descontarlos, todo bloque con una
+        # expresion case sale descuadrado: eso es un falso positivo, y un linter
+        # con falsos positivos enseña a ignorarlo.
+        n_case_expr = len(re.findall(r'\bcase\b', c, re.I)) - \
+                      len(re.findall(r'\bend\s+case\b', c, re.I))
         n_beg = len(re.findall(r'\bbegin\b', c, re.I))
-        n_end = len(re.findall(r'\bend\b(?!\s*(if|loop|case))', c, re.I))
+        n_end = len(re.findall(r'\bend\b(?!\s*(if|loop|case))', c, re.I)) - n_case_expr
         if n_beg != n_end:
-            hall.append((etq, ln, 'begin=%d end=%d' % (n_beg, n_end)))
+            hall.append((etq, ln, 'begin=%d end=%d (descontadas %d expresiones case)'
+                                  % (n_beg, n_end, n_case_expr)))
         # variables: declaradas entre `declare` y el primer `begin`
         mdec = re.match(r'\s*declare\b(.*?)\bbegin\b', c, re.I|re.S)
         decl = set()
