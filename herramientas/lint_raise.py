@@ -117,6 +117,11 @@ def revisar(path):
         ln = s.count('\n', 0, m.start()) + 1
         if h != a:
             hallazgos.append((ln, m.group(1).lower(), h, a, fmt[:70], nota))
+        elif re.search(r'%[sIL]', fmt):
+            # Cuadra en cantidad pero el mensaje sale mal: `%s` imprime el
+            # argumento y despues una `s` de regalo.
+            hallazgos.append((ln, m.group(1).lower(), h, a, fmt[:70],
+                              'usa %s/%I/%L, que en RAISE no son especificadores'))
     return total, hallazgos
 
 def revisar_format(path):
@@ -153,6 +158,9 @@ for path in sys.argv[1:]:
         print('   ❌ linea %-5d raise %-9s huecos=%d argumentos=%d%s'
               % (ln, niv, h, a, '  (%s)' % nota if nota else ''))
         print('      %s…' % fmt.replace('\n', ' '))
+        if re.search(r'%[sIL]', fmt):
+            print('      → OJO: en RAISE el hueco es `%` solo. `%s` es de format(): '
+                  'el `%` consume el argumento y la `s` se imprime suelta.')
         if h == 0 and a > 0 and '%%' in fmt:
             print('      → el `%%` es un porcentaje LITERAL, no un hueco. '
                   'Postgres dira «too many parameters specified for RAISE».')

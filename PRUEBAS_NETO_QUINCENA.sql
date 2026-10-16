@@ -7,7 +7,7 @@
 --
 -- ⚠️ ADENTRO VA EL CUERPO REAL DE PERSONAL_NETO_QUINCENA.sql, extraido del
 -- archivo por estructura (el unico begin; y el unico commit;, sin incluirlos).
--- md5 del cuerpo extraido: 45f49c4142520370b63733fe538925dd
+-- md5 del cuerpo extraido: c4ebe5bc6b1bd15f3f8b24a757294573
 -- O sea que esto NO prueba una copia: prueba byte a byte lo que se va a pegar.
 -- Un ensayo que valida una copia se desincroniza en silencio — se arregla el
 -- pegado, el ensayo sigue validando lo viejo, y da verde.
@@ -601,6 +601,7 @@ grant execute on function rrhh_feriado_paga_doble(date) to authenticated;
 do $candado$
 declare
   v_anon int; v_inv int; v_rls boolean; v_pol int;
+  v_pol_hay text; v_pol_debe text;
   v_div int; v_fer boolean; v_desc boolean;
   v_doble boolean; v_doble_sab boolean; v_doble_no boolean; v_oblig int;
   v_pct numeric; v_nat numeric; v_dx_pct text; v_dx_nat text;
@@ -619,8 +620,22 @@ begin
 
   select c.relrowsecurity into v_rls from pg_class c join pg_namespace n on n.oid=c.relnamespace
    where n.nspname='public' and c.relname='rrhh_neto_quincena';
+  -- LAS POLITICAS, POR NOMBRE Y COMANDO, NO POR CANTIDAD.
+  -- ⚠️ Contar no alcanzaba, y el agujero era grande: «4 politicas» se cumple
+  -- igual con un SELECT y un INSERT en una tabla y un UPDATE y un DELETE en la
+  -- otra — o sea exactamente lo contrario del append-only que este pegado dice
+  -- garantizar. Un numero te dice que algo esta mal; el conjunto te dice QUE.
   select count(*) into v_pol from pg_policies
    where schemaname='public' and tablename in ('rrhh_neto_quincena','rrhh_feriado_trabajado');
+  select string_agg(tablename || '.' || policyname || ' (' || cmd || ')',
+                    ' · ' order by tablename, policyname)
+    into v_pol_hay
+    from pg_policies
+   where schemaname='public' and tablename in ('rrhh_neto_quincena','rrhh_feriado_trabajado');
+  v_pol_debe := 'rrhh_feriado_trabajado.rrhh_feriado_trabajado_ins (INSERT) · '
+             || 'rrhh_feriado_trabajado.rrhh_feriado_trabajado_sel (SELECT) · '
+             || 'rrhh_neto_quincena.rrhh_neto_quincena_ins (INSERT) · '
+             || 'rrhh_neto_quincena.rrhh_neto_quincena_sel (SELECT)';
 
   -- LAS REGLAS, MEDIDAS CONTRA EL CALENDARIO REAL. No se confia en el texto de
   -- la funcion: se la llama.
@@ -684,9 +699,13 @@ begin
       '`authenticated`, o sea todo el equipo: sin RLS cualquiera leeria el neto de todos. '
       'NO SE APLICO NADA.';
   end if;
-  if v_pol <> 4 then
-    raise exception 'CANDADO: hay % politicas en las dos tablas nuevas, tenian que ser 4. '
-      'NO SE APLICO NADA.', v_pol;
+  if coalesce(v_pol_hay,'') <> v_pol_debe then
+    raise exception E'CANDADO: las politicas de las dos tablas nuevas no son exactamente las '
+      'cuatro que este pegado declara. Aca hay NETO, y las politicas PERMISIVAS del mismo '
+      'comando se SUMAN: una de mas ABRE la puerta, no la cierra. NO SE APLICO NADA.'
+      '\n  HAY           (%): %'
+      '\n  TENIA QUE SER (4): %',
+      v_pol, coalesce(v_pol_hay,'(ninguna)'), v_pol_debe;
   end if;
   -- EL DIVISOR, CONTRA EL DATO QUE CONFIRMO LORENA.
   if v_div <> 11 then
