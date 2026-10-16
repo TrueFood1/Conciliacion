@@ -457,6 +457,20 @@ de planta en tramos para que los dos feriados existan como filas propias
 del pago doble sin poder dispararse. Se ve en la pantalla «Días cerrados», así que
 no es un efecto secundario de un pegado.
 
+> **16-oct-2026 · Lorena eligió PARTIR EL CIERRE (opción A).** Esto **reemplaza** el
+> párrafo de arriba, que dejaba la segunda salida abierta (opción B: no partirlo y
+> que la regla del pago doble no pudiera dispararse). El párrafo queda a la vista a
+> propósito: sin él no se entiende contra qué se decidió.
+>
+> Los cinco tramos, como los fijó: **18–24 dic** (cierre) · **25-dic** (feriado,
+> `pago_obligatorio = true`) · **26–31 dic** (cierre) · **1-ene-2027** (feriado,
+> `pago_obligatorio = true`) · **2–11 ene** (cierre). Los tres tramos de cierre
+> conservan el tratamiento que tienen hoy.
+>
+> Va en un pegado **aparte y posterior** al de la fórmula, porque necesita la
+> columna `pago_obligatorio`: `PERSONAL_CIERRE_TRAMOS.sql`. Escrito y ensayado el
+> 16-oct, **sin aplicar**.
+
 ### Lo que sí quedó arreglado
 
 El ensayo ahora mide el caso «feriado» con el **1-dic-2026**, que es martes y sí

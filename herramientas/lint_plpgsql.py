@@ -27,12 +27,12 @@ def bloques(s):
     """Devuelve (etiqueta, linea_inicial, cuerpo) de cada do $x$...$x$ y de cada
     cuerpo de funcion plpgsql."""
     out = []
-    for m in re.finditer(r'\bdo\s+(\$[A-Za-z_]*\$)', s, re.I):
+    for m in re.finditer(r'\bdo\s+(\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$)', s, re.I):
         tag = m.group(1)
         j = s.find(tag, m.end())
         if j < 0: continue
         out.append(('DO %s' % tag, s.count('\n',0,m.start())+1, s[m.end():j]))
-    for m in re.finditer(r'language\s+plpgsql[^;]*?\bas\s+(\$[A-Za-z_]*\$)', s, re.I|re.S):
+    for m in re.finditer(r'language\s+plpgsql[^;]*?\bas\s+(\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$)', s, re.I|re.S):
         tag = m.group(1)
         j = s.find(tag, m.end())
         if j < 0: continue

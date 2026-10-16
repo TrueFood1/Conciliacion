@@ -40,7 +40,7 @@ def cuerpos_plpgsql(s):
     devuelve nada.
     """
     out = []
-    for m in re.finditer(r'\bdo\s+(\$[A-Za-z_]*\$)', s, re.I):
+    for m in re.finditer(r'\bdo\s+(\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$)', s, re.I):
         tag = m.group(1); j = s.find(tag, m.end())
         if j < 0: continue
         out.append(('bloque DO %s' % tag, linea_de(s, m.start()),
@@ -48,7 +48,7 @@ def cuerpos_plpgsql(s):
                     '$compila$' + s[m.end():j] + '$compila$;'))
     for m in re.finditer(r'\bcreate\s+(?:or\s+replace\s+)?function\b', s, re.I):
         # El final de la sentencia es el cierre de su propio $tag$.
-        mt = re.search(r'\bas\s+(\$[A-Za-z_]*\$)', s[m.start():], re.I | re.S)
+        mt = re.search(r'\bas\s+(\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$)', s[m.start():], re.I | re.S)
         if not mt: continue
         tag = mt.group(1)
         ini_cuerpo = m.start() + mt.end()
