@@ -5366,7 +5366,7 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 15 oct 2026 · b102';
+const BUILD = 'v 15 oct 2026 · b103';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -21610,11 +21610,16 @@ function _cpUrgencia(A){
   return A.proximo ? {txt:'Próximo: '+_fechaCorta(A.proximo), cls:''} : {txt:'Al día', cls:''};
 }
 // El texto para el proveedor (saludo con el campo `contacto` de compras_config: «Hola <contacto>»).
+// SALUDO SIN NOMBRE donde el mensaje no siempre lo lee esa persona (Andrea, 15-oct): a Luis Diego (huevos)
+// no siempre le llega a él → «Hola! Pedido de True Food…». El resto del mensaje, igual.
+const CP_SALUDO_FIJO={1102:'Hola!'};
+function _cpSaludo(provId, contacto){ const s=CP_SALUDO_FIJO[+provId];
+  return s ? (s+' Pedido') : ('Hola'+(contacto?(' '+contacto):'')+', pedido'); }
 function _cpMensaje(g, cant){
   const F=_cpFechasPedido(g);
   const lin=g.items.map(function(f){ const q=cant(f); return q>1e-9 ? ('• '+f.nombre+': '+_cpEmpTxt(f, q)) : ''; }).filter(Boolean);
   if(!lin.length) return '';
-  return 'Hola'+(g.contacto?(' '+g.contacto):'')+', pedido de True Food'+(g.fijo?(' para entregar el '+_fechaLarga(F.entrega).replace(/ \d{4}$/,'')):'')
+  return _cpSaludo(g.proveedor_id, g.contacto)+' de True Food'+(g.fijo?(' para entregar el '+_fechaLarga(F.entrega).replace(/ \d{4}$/,'')):'')
     +':\n'+lin.join('\n')+'\nGracias.';
 }
 // «Alcanza hasta» con una llegada EXTRA (lo que se está armando) el día de la entrega. Mismo
@@ -21915,7 +21920,7 @@ function _cpRegMsg(txt, cls){ if(_cpReg){ _cpReg.msg=txt; _cpReg.cls=cls||''; } 
 // proveedores más adelante, con números verificados (los teléfonos se siguen leyendo en `telefonos`).
 async function cpWhatsApp(){
   const P=_cpReg; if(!P) return; if(P.multi) return cpWhatsAppMulti(); const g=_cpAlc.grupos[P.gi];
-  const txt=_cpMensaje({items:P.filas, contacto:g.contacto, fijo:g.fijo, demora:g.demora, ci:g.ci}, function(f){ return _dfDesdePanel(f, +P.valores[f.pid]||0); });
+  const txt=_cpMensaje({items:P.filas, proveedor_id:g.proveedor_id, contacto:g.contacto, fijo:g.fijo, demora:g.demora, ci:g.ci}, function(f){ return _dfDesdePanel(f, +P.valores[f.pid]||0); });
   if(!txt){ _cpRegMsg('No hay nada para pedir.','cp-mal'); return; }
   try{ await navigator.clipboard.writeText(txt); _cpRegMsg('Mensaje copiado: pegalo en la conversación.','cp-ok'); }
   catch(e){ window.prompt('Copiá este texto:', txt); }
@@ -22098,7 +22103,7 @@ function _cpMensajeMulti(P){
     if(!lin.length) return '';
     return (o.frio?'Lo frío, para el ':'Para el ')+_fechaLarga(o.previa.entrega_dia).replace(/ \d{4}$/,'')+':\n'+lin.join('\n'); }).filter(Boolean);
   if(!bloques.length) return '';
-  return 'Hola'+(g.contacto?(' '+g.contacto):'')+', pedido de True Food:\n'+bloques.join('\n\n')+'\nGracias.';
+  return _cpSaludo(g.proveedor_id, g.contacto)+' de True Food:\n'+bloques.join('\n\n')+'\nGracias.';
 }
 async function cpWhatsAppMulti(){
   const txt=_cpMensajeMulti(_cpReg);
