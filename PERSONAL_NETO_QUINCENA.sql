@@ -35,8 +35,9 @@
 -- ════════════════════════════════════════════════════════════════════════
 -- DOS CONCEPTOS QUE ANTES ERAN UNO
 -- ════════════════════════════════════════════════════════════════════════
---   DIA DEL DIVISOR   lunes a viernes, FERIADOS INCLUIDOS.  1-15 oct = 11
---   DIA DESCONTABLE   lunes a viernes y NO feriado.
+--   DIA DEL DIVISOR   lunes a viernes, TODOS los feriados incluidos. 1-15 oct = 11
+--   DIA DESCONTABLE   lunes a viernes, y NO un feriado de PAGO OBLIGATORIO
+--                     (ni un dia de cierre de planta, que sigue como estaba).
 --
 -- Hasta hoy habia UNA sola bandera `habil` (L-V y no feriado) y alcanzaba,
 -- porque el divisor era 30 y nunca la usaba. Con el divisor nuevo los dos
@@ -45,10 +46,12 @@
 -- Si manana el sabado pasa a ser habil, se cambia UNA linea.
 --
 -- ⚠️ SUPOSICION DE ANDREA, SIN CONFIRMAR POR LA CONTADORA: una ausencia, un
--- permiso sin goce o un dia de incapacidad que caigan en un FERIADO no
--- descuentan nada ese dia, porque el feriado se paga igual. De ahi que
--- `descontable` excluya los feriados. Si la contadora dice lo contrario, se
--- cambia esa funcion y nada mas. Ver PREGUNTAS_contadora_feriados.md.
+-- permiso sin goce o un dia de incapacidad que caigan en un feriado de PAGO
+-- OBLIGATORIO no descuentan nada ese dia, porque ese dia se paga igual. Un
+-- feriado NO obligatorio si descuenta (decision de Lorena, 16-oct): la empresa no
+-- esta obligada a pagarlo, asi que es un dia como cualquier otro.
+-- Si la contadora dice lo contrario, se cambia esa funcion y nada mas.
+-- Ver PREGUNTAS_contadora_feriados.md.
 --
 -- ════════════════════════════════════════════════════════════════════════
 -- FERIADO TRABAJADO
@@ -185,17 +188,37 @@ comment on function rrhh_es_dia_divisor(date) is
 -- rrhh_feriado, el `not exists` daria true y la funcion diria que el dia SI
 -- descuenta: un error silencioso, y en la direccion que le cuesta plata a una
 -- persona. Los feriados no son dato sensible («no son de nadie», pegado 4).
+-- ⚠️ REGLA NUEVA, 16-oct-2026, decision de Lorena: lo que no descuenta es el
+-- feriado de PAGO OBLIGATORIO. Un feriado NO obligatorio se trata como un dia
+-- normal y SI descuenta. Antes esta funcion excluia cualquier fila de
+-- rrhh_feriado, obligatoria o no.
+--
+-- ⚠️ Y EL `or f.tipo = 'cierre'` NO ES UN DESCUIDO, ES EL PEDIDO EXPLICITO.
+-- Si la condicion fuera solo `pago_obligatorio`, los dias del cierre de planta
+-- —que son `pago_obligatorio = false`— pasarian a DESCONTAR, y el cierre del
+-- 18-dic al 11-ene descontaria 17 dias habiles a cada persona. Lorena pidio que
+-- el cierre siga tratandose como hoy porque su caso sigue pendiente de decision
+-- (PENDIENTES.md P3), asi que se lo deja afuera aparte.
+--
+-- Los tres casos, entonces:
+--   feriado con pago_obligatorio = true  ->  NO descuenta
+--   feriado con pago_obligatorio = false ->  descuenta, como un dia cualquiera
+--   dia dentro de un cierre de planta    ->  NO descuenta  (sin cambios)
 create or replace function rrhh_es_dia_descontable(p_dia date) returns boolean
 language sql stable security definer set search_path = public as $$
   select extract(isodow from p_dia) <= 5
      and not exists (select 1 from rrhh_feriado f
-                      where daterange(f.fecha, coalesce(f.fecha_fin, f.fecha), '[]') @> p_dia);
+                      where daterange(f.fecha, coalesce(f.fecha_fin, f.fecha), '[]') @> p_dia
+                        and (f.pago_obligatorio or f.tipo = 'cierre'));
 $$;
 comment on function rrhh_es_dia_descontable(date) is
-  'Dia que DESCUENTA si hay ausencia, permiso sin goce o incapacidad: lunes a viernes '
-  'y que NO sea feriado ni cierre de planta. ⚠️ Que el feriado no descuente es una '
-  'SUPOSICION de Andrea (el feriado se paga igual), SIN CONFIRMAR por la contadora. '
-  'Si se confirma al revés, se cambia SOLO esta funcion.';
+  'Dia que DESCUENTA si hay ausencia, permiso sin goce o incapacidad: lunes a viernes, '
+  'que NO sea feriado de PAGO OBLIGATORIO y que NO caiga dentro de un cierre de planta. '
+  'Decision de Lorena, 16-oct-2026: un feriado NO obligatorio se trata como dia normal y '
+  'si descuenta. El cierre de planta sigue sin descontar, igual que antes, porque su caso '
+  'esta pendiente (PENDIENTES.md P3). ⚠️ Que el feriado obligatorio no descuente sigue '
+  'siendo SUPOSICION de Andrea, SIN CONFIRMAR por la contadora. Si se confirma al revés, '
+  'se cambia SOLO esta funcion.';
 
 -- 4.3 · EL DIVISOR DE UNA QUINCENA.
 create or replace function rrhh_dias_divisor(p_ini date, p_fin date) returns integer

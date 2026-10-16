@@ -400,6 +400,17 @@ descuenta el día.** Si para True Food ese día fue feriado, el descuento está 
 Y hacia adelante es peor que un error puntual: los feriados de 2027 no están
 cargados tampoco. El primero que caiga en lunes a viernes va a descontar.
 
+### ⚠️ Lo que cambió el 16-oct, y acota este pendiente
+
+Desde la decisión de Lorena de ese día, **lo que no descuenta es el feriado de
+pago obligatorio**; uno no obligatorio se trata como día normal. El 12-oct es **no
+obligatorio**, así que **cargarlo ya no cambiaría el descuento**: a quien faltó ese
+día se le descuenta igual, esté cargado o no.
+
+Eso no cierra el pendiente, lo acota. Lo que sigue abierto es el **calendario**
+—que el día aparezca pintado y que la lista de la base y la del `index.html` dejen
+de ser dos— y los feriados **obligatorios** de 2027, que sí cambian plata.
+
 ### Qué hay que decidir, y no lo decide un script
 
 1. **¿El 12-oct-2026 fue día cerrado en la planta?** Si sí, cargarlo y revisar si

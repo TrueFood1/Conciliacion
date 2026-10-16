@@ -7,7 +7,7 @@
 --
 -- ⚠️ ADENTRO VA EL CUERPO REAL DE PERSONAL_NETO_QUINCENA.sql, extraido del
 -- archivo por estructura (el unico begin; y el unico commit;, sin incluirlos).
--- md5 del cuerpo extraido: c64630bb3638a362ad50a854932530e8
+-- md5 del cuerpo extraido: 6bfda2acbcbf91f3eb862e078cc177bf
 -- O sea que esto NO prueba una copia: prueba byte a byte lo que se va a pegar.
 -- Un ensayo que valida una copia se desincroniza en silencio — se arregla el
 -- pegado, el ensayo sigue validando lo viejo, y da verde.
@@ -216,17 +216,37 @@ comment on function rrhh_es_dia_divisor(date) is
 -- rrhh_feriado, el `not exists` daria true y la funcion diria que el dia SI
 -- descuenta: un error silencioso, y en la direccion que le cuesta plata a una
 -- persona. Los feriados no son dato sensible («no son de nadie», pegado 4).
+-- ⚠️ REGLA NUEVA, 16-oct-2026, decision de Lorena: lo que no descuenta es el
+-- feriado de PAGO OBLIGATORIO. Un feriado NO obligatorio se trata como un dia
+-- normal y SI descuenta. Antes esta funcion excluia cualquier fila de
+-- rrhh_feriado, obligatoria o no.
+--
+-- ⚠️ Y EL `or f.tipo = 'cierre'` NO ES UN DESCUIDO, ES EL PEDIDO EXPLICITO.
+-- Si la condicion fuera solo `pago_obligatorio`, los dias del cierre de planta
+-- —que son `pago_obligatorio = false`— pasarian a DESCONTAR, y el cierre del
+-- 18-dic al 11-ene descontaria 17 dias habiles a cada persona. Lorena pidio que
+-- el cierre siga tratandose como hoy porque su caso sigue pendiente de decision
+-- (PENDIENTES.md P3), asi que se lo deja afuera aparte.
+--
+-- Los tres casos, entonces:
+--   feriado con pago_obligatorio = true  ->  NO descuenta
+--   feriado con pago_obligatorio = false ->  descuenta, como un dia cualquiera
+--   dia dentro de un cierre de planta    ->  NO descuenta  (sin cambios)
 create or replace function rrhh_es_dia_descontable(p_dia date) returns boolean
 language sql stable security definer set search_path = public as $$
   select extract(isodow from p_dia) <= 5
      and not exists (select 1 from rrhh_feriado f
-                      where daterange(f.fecha, coalesce(f.fecha_fin, f.fecha), '[]') @> p_dia);
+                      where daterange(f.fecha, coalesce(f.fecha_fin, f.fecha), '[]') @> p_dia
+                        and (f.pago_obligatorio or f.tipo = 'cierre'));
 $$;
 comment on function rrhh_es_dia_descontable(date) is
-  'Dia que DESCUENTA si hay ausencia, permiso sin goce o incapacidad: lunes a viernes '
-  'y que NO sea feriado ni cierre de planta. ⚠️ Que el feriado no descuente es una '
-  'SUPOSICION de Andrea (el feriado se paga igual), SIN CONFIRMAR por la contadora. '
-  'Si se confirma al revés, se cambia SOLO esta funcion.';
+  'Dia que DESCUENTA si hay ausencia, permiso sin goce o incapacidad: lunes a viernes, '
+  'que NO sea feriado de PAGO OBLIGATORIO y que NO caiga dentro de un cierre de planta. '
+  'Decision de Lorena, 16-oct-2026: un feriado NO obligatorio se trata como dia normal y '
+  'si descuenta. El cierre de planta sigue sin descontar, igual que antes, porque su caso '
+  'esta pendiente (PENDIENTES.md P3). ⚠️ Que el feriado obligatorio no descuente sigue '
+  'siendo SUPOSICION de Andrea, SIN CONFIRMAR por la contadora. Si se confirma al revés, '
+  'se cambia SOLO esta funcion.';
 
 -- 4.3 · EL DIVISOR DE UNA QUINCENA.
 create or replace function rrhh_dias_divisor(p_ini date, p_fin date) returns integer
@@ -902,7 +922,7 @@ select
 --   1100 ÷ 11 (divisor 1-15 oct)  = 100   -> valor hora 100 ÷ 8 = 12.5
 --   1100 ÷ 11 (divisor 16-31 oct) = 100
 --   1100 ÷ 10 (divisor 1-15 nov)  = 110
---   1200 ÷ 12 (divisor 16-31 dic) = 100
+--   1200 ÷ 12 (divisor 16-31 dic) = 100   (personas 4, 6, 7, 8 y 9)
 --
 -- Ninguno de los esperados sale de correr la funcion que se esta probando: estan
 -- escritos a mano abajo, derivados del calendario. Si el ensayo da rojo, el
@@ -933,7 +953,7 @@ update rrhh_persona set email = 'zz-equipo@example.invalid'
 -- EL NETO. Vigencia 2026-10-01, igual que en produccion.
 insert into rrhh_neto_quincena (persona_id, neto, vigente_desde, nota, creado_por)
 select current_setting('cc.p'||k,true)::bigint,
-       case when k in (6,7,8,9) then 1200 else 1100 end,
+       case when k in (4,6,7,8,9) then 1200 else 1100 end,
        '2026-10-01', 'FICTICIO · ensayo', 'ensayo-neto'
   from generate_series(1,15) k
  where k <> 14;   -- la 14 queda SIN neto a proposito (escenario 14)
@@ -956,12 +976,15 @@ insert into rrhh_permiso (persona_id, fecha_inicio, fecha_fin, motivo, estado,
   -- 3 · ausencia en sabado y domingo (3 y 4 oct)
   (current_setting('cc.p3',true)::bigint,'2026-10-03','2026-10-04','zz',
    'aprobado','zz-socia@example.invalid',now(),'descuento',null,null,'ensayo-neto'),
-  -- 4 · ausencia justo sobre un feriado DE VERDAD: el 1-dic-2026 (martes).
-  --     ⚠️ Antes esta prueba usaba el 12-oct-2026, y el 12-oct NO ESTA CARGADO
-  --     en rrhh_feriado: la semilla de PERSONAL_CALENDARIO.sql trae 31-ago,
-  --     15-sep, 1-dic y el cierre de planta, y nada mas. La prueba medía contra
-  --     un feriado inexistente y daba FALLA con razon.
-  (current_setting('cc.p4',true)::bigint,'2026-12-01','2026-12-01','zz',
+  -- 4 · ausencia justo sobre un feriado de PAGO OBLIGATORIO: el 25-dic-2026,
+  --     que cae VIERNES. Esta prueba ya se mudo dos veces, y cada mudanza fue
+  --     porque la premisa estaba mal, no el numero:
+  --       · empezo en el 12-oct-2026, que NO esta cargado en rrhh_feriado;
+  --       · paso al 1-dic-2026, que si esta cargado — pero con la regla del
+  --         16-oct un feriado NO obligatorio descuenta como un dia normal, asi
+  --         que ya no sirve para probar «el feriado no descuenta»;
+  --       · ahora el 25-dic, que es el unico obligatorio del año.
+  (current_setting('cc.p4',true)::bigint,'2026-12-25','2026-12-25','zz',
    'aprobado','zz-socia@example.invalid',now(),'descuento',null,null,'ensayo-neto'),
   -- 5 · la quincena 16-31 oct ENTERA ausente (esa quincena no tiene feriados)
   (current_setting('cc.p5',true)::bigint,'2026-10-16','2026-10-31','zz',
@@ -1109,7 +1132,7 @@ select 1, 'divisor · 1-15 oct · 16-31 oct · 1-15 nov · 16-31 dic',
 -- ⚠️ Antes comparaba 1-15 oct contra 16-31 oct: NINGUNA de las dos tiene feriado
 -- cargado, asi que la prueba pasaba sin probar nada.
 insert into zz_res
-select 2, 'quincena CON feriado (1-15 dic) y quincena SIN feriado (16-31 oct): mismo divisor',
+select 2, 'quincena con feriado NO obligatorio (1-15 dic) y sin feriados (16-31 oct): mismo divisor',
        'si · 11 = 11',
        case when rrhh_dias_divisor('2026-12-01','2026-12-15')
                = rrhh_dias_divisor('2026-10-16','2026-10-31') then 'si · ' else 'NO · ' end
@@ -1118,30 +1141,46 @@ select 2, 'quincena CON feriado (1-15 dic) y quincena SIN feriado (16-31 oct): m
 
 -- 3 · Los dos conceptos NO son el mismo. 1-15 oct tiene 11 dias de divisor pero
 --     solo 10 descontables, porque el 12-oct es feriado.
+-- Las dos quincenas de diciembre, una al lado de la otra, porque juntas dicen la
+-- regla entera:
+--   1-15 dic  · divisor 11 · descontables 11 → el feriado del 1-dic NO es
+--               obligatorio, asi que descuenta como cualquier dia: los dos
+--               numeros coinciden y el feriado no se nota.
+--   16-31 dic · divisor 12 · descontables 11 → el 25-dic SI es obligatorio: esta
+--               en el divisor pero no descuenta. Ahi se separan los conceptos.
 insert into zz_res
-select 3, 'divisor (11) y dias descontables (10) de 1-15 DIC · el feriado separa los dos',
-       '11 · 10',
+select 3, 'los dos conceptos · 1-15 dic (sin obligatorios) y 16-31 dic (con el 25-dic)',
+       '11 · 11 · 12 · 11',
        rrhh_dias_divisor('2026-12-01','2026-12-15') || ' · ' ||
        (select count(*) from generate_series(0,14) g(i)
-         where rrhh_es_dia_descontable(date '2026-12-01' + g.i)), null;
+         where rrhh_es_dia_descontable(date '2026-12-01' + g.i)) || ' · ' ||
+       rrhh_dias_divisor('2026-12-16','2026-12-31') || ' · ' ||
+       (select count(*) from generate_series(0,15) g(i)
+         where rrhh_es_dia_descontable(date '2026-12-16' + g.i)), null;
 
 -- 4 · Dia por dia, los casos de borde del divisor: sabado, domingo, feriado.
+-- El divisor NO MIRA los feriados, ni los obligatorios ni los otros: los dos
+-- ultimos dan `t`. Es lo que sostiene que el divisor no cambie con la regla nueva.
 insert into zz_res
-select 4, 'es_dia_divisor: jue 1 oct · sab 3 · dom 4 · feriado mar 1 dic',
-       't · f · f · t',
+select 4, 'es_dia_divisor: jue 1 oct · sab 3 · dom 4 · no oblig mar 1 dic · OBLIG vie 25 dic',
+       't · f · f · t · t',
        concat_ws(' · ', left(rrhh_es_dia_divisor('2026-10-01')::text,1),
                         left(rrhh_es_dia_divisor('2026-10-03')::text,1),
                         left(rrhh_es_dia_divisor('2026-10-04')::text,1),
-                        left(rrhh_es_dia_divisor('2026-12-01')::text,1)), null;
+                        left(rrhh_es_dia_divisor('2026-12-01')::text,1),
+                        left(rrhh_es_dia_divisor('2026-12-25')::text,1)), null;
 
 -- 5 · Y del descontable: el feriado NO descuenta (suposicion de Andrea).
+-- LA REGLA NUEVA, EN UNA FILA. El feriado no obligatorio del 1-dic pasa a dar
+-- `t` (descuenta, como un dia normal) y el obligatorio del 25-dic da `f`.
 insert into zz_res
-select 5, 'es_dia_descontable: jue 1 oct · sab 3 · dom 4 · feriado mar 1 dic',
-       't · f · f · f',
+select 5, 'es_dia_descontable: jue 1 oct · sab 3 · dom 4 · no oblig mar 1 dic · OBLIG vie 25 dic',
+       't · f · f · t · f',
        concat_ws(' · ', left(rrhh_es_dia_descontable('2026-10-01')::text,1),
                         left(rrhh_es_dia_descontable('2026-10-03')::text,1),
                         left(rrhh_es_dia_descontable('2026-10-04')::text,1),
-                        left(rrhh_es_dia_descontable('2026-12-01')::text,1)), null;
+                        left(rrhh_es_dia_descontable('2026-12-01')::text,1),
+                        left(rrhh_es_dia_descontable('2026-12-25')::text,1)), null;
 
 
 -- ════════════════════════════════════════════════════════════════════════
@@ -1198,11 +1237,13 @@ select 9, 'ausencia en sab 3 y dom 4 oct · final · descuento',
 --      ⚠️ Esto es la SUPOSICION de Andrea (el feriado se paga igual), SIN
 --      CONFIRMAR por la contadora. Si se confirma al revés el esperado de esta
 --      fila cambia a 1000 · -100, y se arregla rrhh_es_dia_descontable().
+-- Neto 1200, divisor de 16-31 dic = 12, valor del dia 100. El permiso es de un
+-- solo dia y ese dia no descuenta, asi que el final es el neto entero.
 insert into zz_res
-select 10, 'ausencia justo el feriado del 1 dic · final · descuento · SIN CONFIRMAR',
-       '1100 · 0',
+select 10, 'ausencia el 25-dic (feriado OBLIGATORIO, viernes) · final · descuento · SIN CONFIRMAR',
+       '1200 · 0',
        concat_ws(' · ', zz_n(final), zz_n(descuentos))
-  from zz_pago('4','2026-12-Q1');
+  from zz_pago('4','2026-12-Q2');
 
 -- 11 · LA QUINCENA ENTERA AUSENTE = cero, exacto. 16-31 oct no tiene feriados,
 --      asi que los 11 dias del divisor son los 11 descontables: 11 × 100 = 1100.
@@ -1317,6 +1358,21 @@ select 21, 'feriado trabajado 25-dic · 4 horas · final · suma',
        '1250 · 50',
        concat_ws(' · ', zz_n(final), zz_n(feriados))
   from zz_pago('7','2026-12-Q2');
+
+-- 11b · EL DIA DE LA SEMANA, COMPROBADO Y NO SUPUESTO. La fila 10 y las 20 y 21
+--       dependen de que el 25-dic-2026 caiga de lunes a viernes; si cayera fin de
+--       semana no serian las pruebas que dicen ser.
+-- ⚠️ POR NUMERO DE DIA, NO POR NOMBRE. La primera version usaba
+-- `to_char(fecha,'TMDy')` y esperaba «vie · sab»: eso depende del idioma del
+-- SERVIDOR (lc_time), no del dato. En la base local dio «Fri · Sat» y la prueba
+-- fallo sin que nada estuviera mal. isodow es un numero y no habla ningun idioma:
+-- 1 = lunes ... 5 = viernes, 6 = sabado, 7 = domingo.
+insert into zz_res
+select 35, 'el dia de la semana · 25-dic-2026 (5 = viernes) · 26-dic-2026 (6 = sabado)',
+       '5 · 6',
+       extract(isodow from date '2026-12-25')::text || ' · ' ||
+       extract(isodow from date '2026-12-26')::text, null;
+
 
 -- 22 · UN FERIADO QUE NO ES DE PAGO OBLIGATORIO NO SUMA NADA, y el intento NO
 --      queda guardado en cero: se RECHAZA. El 1-dic-2026 es martes y de pago no
@@ -1641,7 +1697,7 @@ update zz_res set veredicto =
   case when obtenido is null                              then 'SIN DATO'
        when btrim(obtenido) = btrim(esperado)             then 'OK'
        else 'FALLA' end
- where n between 1 and 34 or n = -1;
+ where n between 1 and 35 or n = -1;
 
 -- Y las filas que el ensayo tenia que producir y podrian no existir: si un
 -- `select ... from zz_pago(...)` no devuelve filas, el insert no inserta nada y
@@ -1649,7 +1705,7 @@ update zz_res set veredicto =
 insert into zz_res
 select n, 'ESTA PRUEBA NO CORRIO · la consulta no devolvio ninguna fila',
        'la fila existe', 'NO EXISTE', 'FALLA'
-  from generate_series(1,34) n
+  from generate_series(1,35) n
  where n not in (select r.n from zz_res r);
 
 -- EL VEREDICTO VA PRIMERO, y las filas que no estan en OK van arriba.
@@ -1677,17 +1733,17 @@ select t.veredicto                                   as "veredicto",
                 else 3 end                           as grupo
       from zz_res r
     union all
-    select (select case when count(*) < 34                    then 'FALTAN PRUEBAS · NO PEGAR'
+    select (select case when count(*) < 35                    then 'FALTAN PRUEBAS · NO PEGAR'
                         when count(*) filter (where veredicto <> 'OK') = 0
                                                               then 'TODO VERDE'
                         else 'HAY ROJO · NO PEGAR' end
-              from zz_res where n between 1 and 34),
+              from zz_res where n between 1 and 35),
            99, '── TOTAL ──',
-           (select count(*)::text || ' pruebas' from zz_res where n between 1 and 34),
+           (select count(*)::text || ' pruebas' from zz_res where n between 1 and 35),
            (select count(*) filter (where veredicto='OK')::text || ' OK · ' ||
                    count(*) filter (where veredicto='FALLA')::text || ' FALLA · ' ||
                    count(*) filter (where veredicto='SIN DATO')::text || ' SIN DATO'
-              from zz_res where n between 1 and 34),
+              from zz_res where n between 1 and 35),
            0
   ) t
  order by t.grupo, t.n;
