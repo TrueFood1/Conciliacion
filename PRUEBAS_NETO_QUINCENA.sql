@@ -7,7 +7,7 @@
 --
 -- ⚠️ ADENTRO VA EL CUERPO REAL DE PERSONAL_NETO_QUINCENA.sql, extraido del
 -- archivo por estructura (el unico begin; y el unico commit;, sin incluirlos).
--- md5 del cuerpo extraido: c4ebe5bc6b1bd15f3f8b24a757294573
+-- md5 del cuerpo extraido: ae3004aa52c08659a705f4e6f32efe3e
 -- O sea que esto NO prueba una copia: prueba byte a byte lo que se va a pegar.
 -- Un ensayo que valida una copia se desincroniza en silencio — se arregla el
 -- pegado, el ensayo sigue validando lo viejo, y da verde.
@@ -601,7 +601,7 @@ grant execute on function rrhh_feriado_paga_doble(date) to authenticated;
 do $candado$
 declare
   v_anon int; v_inv int; v_rls boolean; v_pol int;
-  v_pol_hay text; v_pol_debe text;
+  v_pol_dif text;
   v_div int; v_fer boolean; v_desc boolean;
   v_doble boolean; v_doble_sab boolean; v_doble_no boolean; v_oblig int;
   v_pct numeric; v_nat numeric; v_dx_pct text; v_dx_nat text;
@@ -627,15 +627,42 @@ begin
   -- garantizar. Un numero te dice que algo esta mal; el conjunto te dice QUE.
   select count(*) into v_pol from pg_policies
    where schemaname='public' and tablename in ('rrhh_neto_quincena','rrhh_feriado_trabajado');
-  select string_agg(tablename || '.' || policyname || ' (' || cmd || ')',
-                    ' · ' order by tablename, policyname)
-    into v_pol_hay
-    from pg_policies
-   where schemaname='public' and tablename in ('rrhh_neto_quincena','rrhh_feriado_trabajado');
-  v_pol_debe := 'rrhh_feriado_trabajado.rrhh_feriado_trabajado_ins (INSERT) · '
-             || 'rrhh_feriado_trabajado.rrhh_feriado_trabajado_sel (SELECT) · '
-             || 'rrhh_neto_quincena.rrhh_neto_quincena_ins (INSERT) · '
-             || 'rrhh_neto_quincena.rrhh_neto_quincena_sel (SELECT)';
+  --
+  -- ⚠️ SON CATORCE, NO CUATRO, Y NO ES UN ERROR. Este pegado escribe 2 politicas
+  -- por tabla. Las otras 5 por tabla las pone SOLO el disparador de eventos
+  -- `asistente_politicas` (ASISTENTE_ROL.sql §7), que corre en cada `create
+  -- table` de public y llama a `asistente_crear_politicas()`. O sea que aparecen
+  -- en el mismo instante en que este pegado crea las tablas, sin que este pegado
+  -- las pida. 2 + 5 = 7 por tabla, 14 en total.
+  --
+  -- El candado viejo esperaba 4 y abortaba. Contaba las politicas de otro, y
+  -- encima contar no distingue: 14 se cumple igual con cinco de UPDATE y DELETE
+  -- donde no tiene que haber ninguna. Asi que ahora se compara el CONJUNTO exacto
+  -- de tabla + politica + comando, y el mensaje dice que FALTA y que SOBRA.
+  v_pol_dif := (
+    with asis(politica, comando) as (values
+      ('asistente_lee','SELECT'), ('asistente_ve_todo','SELECT'),
+      ('asistente_no_inserta','INSERT'), ('asistente_no_actualiza','UPDATE'),
+      ('asistente_no_borra','DELETE')),
+    tab(tabla) as (values ('rrhh_neto_quincena'), ('rrhh_feriado_trabajado')),
+    esperado(tabla, politica, comando) as (
+      select t.tabla, a.politica, a.comando from tab t cross join asis a
+      union all
+      values ('rrhh_neto_quincena',    'rrhh_neto_quincena_sel',     'SELECT'),
+             ('rrhh_neto_quincena',    'rrhh_neto_quincena_ins',     'INSERT'),
+             ('rrhh_feriado_trabajado','rrhh_feriado_trabajado_sel', 'SELECT'),
+             ('rrhh_feriado_trabajado','rrhh_feriado_trabajado_ins', 'INSERT')),
+    hay(tabla, politica, comando) as (
+      select tablename::text, policyname::text, cmd::text from pg_policies
+       where schemaname = 'public'
+         and tablename in ('rrhh_neto_quincena','rrhh_feriado_trabajado')),
+    dif(que, tabla, politica, comando) as (
+      select 'FALTA', e.* from (select * from esperado except select * from hay) e
+      union all
+      select 'SOBRA', h.* from (select * from hay except select * from esperado) h)
+    select string_agg(que || ' ' || tabla || '.' || politica || ' (' || comando || ')',
+                      ' · ' order by que, tabla, politica)
+      from dif);
 
   -- LAS REGLAS, MEDIDAS CONTRA EL CALENDARIO REAL. No se confia en el texto de
   -- la funcion: se la llama.
@@ -699,13 +726,11 @@ begin
       '`authenticated`, o sea todo el equipo: sin RLS cualquiera leeria el neto de todos. '
       'NO SE APLICO NADA.';
   end if;
-  if coalesce(v_pol_hay,'') <> v_pol_debe then
-    raise exception E'CANDADO: las politicas de las dos tablas nuevas no son exactamente las '
-      'cuatro que este pegado declara. Aca hay NETO, y las politicas PERMISIVAS del mismo '
-      'comando se SUMAN: una de mas ABRE la puerta, no la cierra. NO SE APLICO NADA.'
-      '\n  HAY           (%): %'
-      '\n  TENIA QUE SER (4): %',
-      v_pol, coalesce(v_pol_hay,'(ninguna)'), v_pol_debe;
+  if v_pol_dif is not null then
+    raise exception E'CANDADO: las politicas de las dos tablas nuevas no son las 14 esperadas '
+      '(2 de este pegado y 5 del disparador del asistente, por tabla). Aca hay NETO, y las '
+      'politicas PERMISIVAS del mismo comando se SUMAN: una de mas ABRE la puerta, no la '
+      'cierra. NO SE APLICO NADA.\n  HAY % en total.\n  DIFERENCIAS: %', v_pol, v_pol_dif;
   end if;
   -- EL DIVISOR, CONTRA EL DATO QUE CONFIRMO LORENA.
   if v_div <> 11 then
@@ -770,7 +795,10 @@ $candado$;
 
 -- ── 9 · LA FILA DE CONTROL ──────────────────────────────────────────────
 -- Regla 🔴 de CLAUDE.md: un "Success" del editor no es evidencia de nada.
--- ESPERADO:  1 · 1 · 1 · 11 · t · f · f · 0 · 0 · 0 · 4 · 0
+-- ESPERADO:  1 · 1 · 1 · 11 · t · f · f · 0 · 0 · 0 · 14 · 0
+-- ⚠️ `politicas_14` son 14 y no 4: 2 por tabla las escribe este pegado y 5 por
+-- tabla las agrega el disparador `asistente_politicas` al crear cada tabla. El
+-- conjunto exacto lo verifica el candado; este numero es solo la señal de humo.
 -- ⚠️ `feriados_obligatorios` en 0 es lo esperado HOY, y es el pendiente de la
 -- seccion 1, no una falla. Las dos ramas de la regla del pago doble las prueba el
 -- candado de arriba, que para eso crea y borra una fila de 2099.
@@ -791,7 +819,7 @@ select
   rrhh_param('rebaja_trabajador_pct', date '2026-12-31')                     as rebaja_apagada,
   rrhh_param('incap_dias_naturales',  date '2026-12-31')                     as incap_habiles,
   (select count(*) from pg_policies where schemaname='public'
-    and tablename in ('rrhh_neto_quincena','rrhh_feriado_trabajado'))        as politicas,
+    and tablename in ('rrhh_neto_quincena','rrhh_feriado_trabajado'))        as politicas_14,
   (select count(*) from (select unnest(array['rrhh_neto_quincena','rrhh_feriado_trabajado',
       'v_rrhh_pago_detalle','v_rrhh_pago']) as t) x
     where has_table_privilege('anon','public.'||x.t,'SELECT'))               as anon_debe_ser_0;

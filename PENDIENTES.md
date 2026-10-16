@@ -320,3 +320,60 @@ decisión la autorice.
 4. **Y dejarla en `CLAUDE.md`**, junto a la de credenciales, para que el chequeo
    de secretos del cierre técnico tenga contra qué medir. Hoy ese paso busca
    claves y tokens, no datos de clientes.
+
+---
+
+## P2 · ✅ DECIDIDO · Instinct lee el neto de quincena y los feriados trabajados
+
+Decisión de Lorena, **16-oct-2026**. No es un pendiente de construcción: es una
+decisión tomada, anotada acá para que no haya que volver a discutirla y para que
+nadie la "corrija" por creerla un descuido.
+
+> **Instinct puede leer el neto de quincena y los feriados trabajados en la base
+> (solo lectura); la pestaña de Pago sigue escondida en la pantalla para el
+> perfil asistente.**
+
+### Cómo apareció
+
+El candado del pegado 10 (`PERSONAL_NETO_QUINCENA.sql`) abortó diciendo «hay 14
+políticas en las dos tablas nuevas, tenían que ser 4». El pegado escribe 2 por
+tabla. Las otras 5 por tabla las pone **solo** el disparador de eventos
+`asistente_politicas` (`ASISTENTE_ROL.sql` §7), que corre en cada `create table`
+de `public` y llama a `asistente_crear_politicas()`. O sea que aparecen en el
+mismo instante en que el pegado crea las tablas, sin que el pegado las pida.
+
+**El error era del candado, no de las reglas.** Contaba un número fijo —y encima
+contaba políticas de otro. Ahora compara el **conjunto exacto** de tabla +
+política + comando, así que sigue detectando una de más, una de menos o una
+cambiada, pero ya no se pelea con el disparador.
+
+### Las dos tablas nuevas quedan así, y es lo que Lorena decidió
+
+| política | tipo | comando | efecto sobre el asistente |
+|---|---|---|---|
+| `rrhh_*_sel` (propia) | permisiva | SELECT | nada: pide socia |
+| `rrhh_*_ins` (propia) | permisiva | INSERT | **lo frena** |
+| `asistente_ve_todo` | permisiva | SELECT | **le abre la lectura** |
+| `asistente_lee` | restrictiva | SELECT | lo deja leer **solo con el interruptor encendido** |
+| `asistente_no_inserta` | restrictiva | INSERT | **lo frena** |
+| `asistente_no_actualiza` | restrictiva | UPDATE | lo frena |
+| `asistente_no_borra` | restrictiva | DELETE | lo frena |
+
+Siete por tabla, catorce en total.
+
+### Lo que NO hay que perder de vista al retomar esto
+
+- **La lectura depende del interruptor.** `asistente_lee` es restrictiva y dice
+  `not acceso_es_asistente() or asistente_encendido()`. Con Instinct apagado,
+  Instinct **no** lee estas dos tablas, aunque `asistente_ve_todo` se lo permita:
+  las restrictivas se exigen TODAS. No es un acceso permanente.
+- **Nadie actualiza ni borra, tampoco las socias.** No hay ninguna política
+  permisiva de UPDATE ni de DELETE en estas dos tablas, y `authenticated` no
+  tiene el grant. Eso es lo que sostiene el append-only del neto, de donde
+  cuelgan transferencias ya hechas. Si alguna vez hace falta corregir un neto,
+  se agrega una fila con otra vigencia — no se edita la vieja.
+- **La pantalla y la base dicen cosas distintas, a propósito.** En
+  `index.html:6321` la pestaña «Pago de quincena» pide perfil `socia`, así que el
+  asistente no la ve. Que pueda leer la tabla por SQL y no ver la pestaña es la
+  decisión, no una inconsistencia: si algún día se le quiere mostrar la pantalla,
+  hay que cambiar `PER_TABS` a mano y eso es otra decisión de Lorena.
