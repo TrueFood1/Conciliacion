@@ -5366,7 +5366,7 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 15 oct 2026 · b101';
+const BUILD = 'v 15 oct 2026 · b102';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -21159,6 +21159,10 @@ async function cpAlcance(){
       const stQ=deficit?0:st; if(deficit) q-=sinCargar;
       falta=Math.max(0, q-stQ-r);
       if(color!=='verde') sug=Math.max(0, q+h.margen-stQ-r); }
+    // SOLO MARGEN Y MENOS DE MEDIO SACO → NO SE SUGIERE (Andrea, 15-oct, caso almidón: 2,84 kg de margen se
+    // volvían 1 saco de 25 kg). `falta` es lo que no alcanza SIN margen: si es 0, lo sugerido es puro margen,
+    // y si además es menos de la mitad de la unidad de compra (saco, múltiplo), no vale un empaque entero.
+    if(sug>1e-9 && !(falta>1e-9)){ const paso=_cpPasoProd(pid, uom); if(paso && sug<paso/2-1e-9) sug=0; }
     return {pid:pid, nombre:(inf.name||i.nombre||('id '+pid)).replace(/^\[[^\]]*\]\s*/,'').trim(), uom:uom, proveedor_id:+i.proveedor_id,
             sinCargar:sinCargar, deficit:deficit, fallaC:fallaC,
             stock:st, falla:falla, ultimo:ultimo, color:color, U:U, llega:llega, pedirEl:pedirEl, comprarAntes:comprarAntes,
@@ -21179,6 +21183,10 @@ async function cpAlcance(){
     g.limite=g.fijo ? g.pedirEl : (ca.length ? (ca[0]<hoy?hoy:ca[0]) : null);
     g.urgente=g.rojo || g.ambar || (g.fijo && g.pedirEl<=_dfAdd(hoy,1));
     g.sinPedido=g.fijo && g.pedirEl!==g.ci.P;   // "antes del" (huevo líquido) y no "el"
+    // Ya hay orden de este ciclo (lo pedido para esta entrega, `ya`): el servidor no acepta otra para la
+    // misma entrega (`ya_creado_ciclo`), así que no se dice «pedir hoy» ni urge.
+    g.pedido=g.fijo && g.items.some(function(f){ return f.ya>1e-9; });
+    if(g.pedido) g.urgente=g.rojo;
   });
   grupos.sort(function(a,b){ return (a.limite||'9999').localeCompare(b.limite||'9999'); });
   // Lo próximo, si hoy no hace falta nada: la primera fecha en que algo pasa a necesitar pedido.
@@ -21233,8 +21241,17 @@ function _cpGrupoNom(g){
   const propio=g.items.length===1 && (_cpCfgIns(g.items[0].pid)||{}).llega;
   return n+' · '+(propio ? _cpMin(g.items[0].nombre).trim() : _cpDiaLargo((_cpCfgProv(g.proveedor_id)||{}).llega));
 }
-// Cuándo hay que pedir: «pide jue 15», «pedir hoy», «comprar antes del sáb 17».
+// La unidad de compra (un saco, un múltiplo) en la unidad del PRODUCTO (g o kg, L, u). null si no hay.
+function _cpPasoProd(pid, uom){
+  const m=_cpMult(pid), pe=m?null:_cpPE(pid); let v, u;
+  if(m){ v=m.mult; u=(uom==='g')?'kg':uom; } else if(pe){ v=pe.peso; u=_cpUni(pe.unidad); } else return null;
+  uom=_cpUni(uom);
+  return (u===uom) ? v : (u==='kg'&&uom==='g') ? v*1000 : (u==='g'&&uom==='kg') ? v/1000 : null;
+}
+// Cuándo hay que pedir: «pide jue 15», «pedir hoy», «comprar antes del sáb 17». Con la orden del ciclo
+// ya hecha (Andrea, 15-oct), nunca «pedir hoy»: «pedido · llega lun 19».
 function _cpCuandoTxt(g){
+  if(g.pedido) return 'pedido · llega '+_fechaCorta(g.llega);
   const hoy=_cpAlc.hoy, l=g.limite||hoy, t=(g.canal==='tienda');
   if(l<=hoy) return t?'comprar hoy':'pedir hoy';
   if(g.fijo && !g.sinPedido) return 'pide '+_fechaCorta(l);
@@ -21290,8 +21307,9 @@ function _cpSugFilaHtml(gs){
   // y no pide más va aparte como «en camino».
   const n=D.reduce(function(a,d){ return a+d.filas.filter(function(f){ return d.v[f.pid]>0; }).length; },0);
   const nc=D.reduce(function(a,d){ return a+d.its.filter(function(f){ return !(d.v[f.pid]>0) && f.ya>1e-9; }).length; },0), tot=D.reduce(function(a,d){ return a+d.T.t; },0), falta=D.some(function(d){ return d.T.falta; });
-  const prim=gs.slice().sort(function(a,b){ return (a.limite||A.hoy).localeCompare(b.limite||A.hoy); })[0];
-  const urge=(prim.limite||A.hoy)<=A.hoy, rojo=D.some(function(d){ return d.rojo; });
+  const libres=gs.filter(function(x){ return !x.pedido; });
+  const prim=(libres.length?libres:gs).slice().sort(function(a,b){ return (a.limite||A.hoy).localeCompare(b.limite||A.hoy); })[0];
+  const urge=!prim.pedido && (prim.limite||A.hoy)<=A.hoy, rojo=D.some(function(d){ return d.rojo; });
   const llegas=D.filter(function(d){ return d.g.canal!=='tienda'; }).map(function(d){ return _fechaCorta(d.F.entrega); });
   const pr=(_rzCtx.dfDatos&&_rzCtx.dfDatos.precios)||{};
   let h='<div class="cp-sgr'+(ab?' abierto':'')+'"><button class="cp-sgc" aria-expanded="'+ab+'" onclick="cpSugToggle(\''+k+'\')">'
@@ -21580,7 +21598,7 @@ function _cpUrgencia(A){
     if(!its.length) return;
     if(its.some(_cpRojoDeVerdad)) tarde=true;
     const ca=its.map(function(f){ return f.comprarAntes; }).filter(Boolean).sort();
-    const lim=g.fijo ? g.pedirEl : (ca.length ? (ca[0]<hoy ? hoy : ca[0]) : null);
+    const lim=g.pedido ? null : g.fijo ? g.pedirEl : (ca.length ? (ca[0]<hoy ? hoy : ca[0]) : null);
     if(lim && lim<=hoy){ if(!deHoy.some(function(x){ return x.proveedor_id===g.proveedor_id; })) deHoy.push(g); }
     else if(lim && (!prox || lim<prox.lim)) prox={g:g, lim:lim};
   });
