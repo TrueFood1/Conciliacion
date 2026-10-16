@@ -118,8 +118,12 @@ grant select, insert, update on zz_res to public;
 -- verdad —un dia de mas, un divisor equivocado, un porcentaje mal aplicado— mueve
 -- el numero en decenas, no en milmillonesimas. Esta ahi para que un artefacto de
 -- escala no haga fallar una fila que esta bien, no para suavizar un desvio.
+-- Se recortan los ceros SOLO despues de un punto decimal. Un `'0+$'` a secas
+-- convertiria 100 en 1, y nadie lo veria venir.
 create or replace function zz_n(p numeric) returns text
-language sql immutable as $zz$ select trim_scale(round(p, 10))::text $zz$;
+language sql immutable as $zz$
+  select regexp_replace(regexp_replace(round(p, 10)::text, '(\.\d*?)0+$', '\1'), '\.$', '')
+$zz$;
 
 create or replace function zz_pago(p_k text, p_q text)
   returns table (final numeric, base numeric, divisor numeric, valor_dia numeric,
@@ -146,6 +150,18 @@ begin
       'daria «0 = 0» en verde sin haber probado nada.';
   end if;
 end $$;
+
+
+-- 0 · QUE TUVO QUE TOCAR EL PROLOGO. No es una prueba: es informacion, y la
+--     parte que Lorena tiene que decidir. Si dice «1 quitado(s): Cierre de planta
+--     de fin de año», significa que el 25-dic no existe como feriado en
+--     produccion y que el pago doble no puede dispararse hasta que eso se arregle.
+--     El rollback devuelve el cierre como estaba.
+insert into zz_res values (0,
+  'INFO · dias cerrados que el prologo tuvo que quitar para poder probar el 25-dic',
+  '(lo que diga, no es una falla)',
+  coalesce(nullif(current_setting('cc.prologo', true),''), '(el prologo no corrio)'),
+  'INFO');
 
 
 -- ════════════════════════════════════════════════════════════════════════
@@ -599,7 +615,8 @@ select set_config('role','postgres', true);
 update zz_res set veredicto =
   case when obtenido is null                              then 'SIN DATO'
        when btrim(obtenido) = btrim(esperado)             then 'OK'
-       else 'FALLA' end;
+       else 'FALLA' end
+ where n between 1 and 33;
 
 -- Y las filas que el ensayo tenia que producir y podrian no existir: si un
 -- `select ... from zz_pago(...)` no devuelve filas, el insert no inserta nada y
@@ -618,12 +635,14 @@ select r.n                                          as "#",
   from zz_res r
 union all
 select 99, '── TOTAL ──',
-       (select count(*)::text || ' pruebas' from zz_res),
+       (select count(*)::text || ' pruebas' from zz_res where n between 1 and 33),
        (select count(*) filter (where veredicto='OK')::text || ' OK · ' ||
                count(*) filter (where veredicto='FALLA')::text || ' FALLA · ' ||
-               count(*) filter (where veredicto='SIN DATO')::text || ' SIN DATO' from zz_res),
-       (select case when count(*) < 33          then 'FALTAN PRUEBAS · NO PEGAR'
+               count(*) filter (where veredicto='SIN DATO')::text || ' SIN DATO'
+          from zz_res where n between 1 and 33),
+       (select case when count(*) < 33                    then 'FALTAN PRUEBAS · NO PEGAR'
                     when count(*) filter (where veredicto <> 'OK') = 0
-                                                    then 'TODO VERDE'
-                    else 'HAY ROJO · NO PEGAR' end from zz_res)
+                                                          then 'TODO VERDE'
+                    else 'HAY ROJO · NO PEGAR' end
+          from zz_res where n between 1 and 33)
  order by 1;

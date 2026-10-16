@@ -7,7 +7,7 @@
 --
 -- ⚠️ ADENTRO VA EL CUERPO REAL DE PERSONAL_NETO_QUINCENA.sql, extraido del
 -- archivo por estructura (el unico begin; y el unico commit;, sin incluirlos).
--- md5 del cuerpo extraido: 4b12f9f27a5a1c17db23fa7722ffebaa
+-- md5 del cuerpo extraido: fab1d94283d2041aa6987936e798e5c5
 -- O sea que esto NO prueba una copia: prueba byte a byte lo que se va a pegar.
 -- Un ensayo que valida una copia se desincroniza en silencio — se arregla el
 -- pegado, el ensayo sigue validando lo viejo, y da verde.
@@ -36,6 +36,50 @@
 begin;
 
 -- ╔══════════════════════════════════════════════════════════════════════╗
+-- ║  PROLOGO · la precondicion de datos que el pegado NO puede arreglar   ║
+-- ╚══════════════════════════════════════════════════════════════════════╝
+-- Va ANTES del cuerpo del pegado, y no es parte de el: el pegado se aplica tal
+-- cual, byte a byte, mas abajo.
+--
+-- POR QUE EXISTE. El 25-dic-2026 no esta cargado en rrhh_feriado: el cierre de
+-- planta del 18-dic al 11-ene lo contiene, y la exclusion de rangos solapados no
+-- deja que un feriado viva adentro de un cierre. Sin esto, el ensayo NO LLEGA A
+-- CORRER: los dos insert de feriado trabajado chocan con el trigger (23514) y la
+-- transaccion muere en el armado, sin devolver ni una fila de resultados.
+--
+-- Entonces el ensayo se ARMA la precondicion: quita los dias cerrados que se
+-- pisan con el 24-27 de diciembre y carga el 25 como feriado propio. Todo
+-- adentro de la transaccion — el `rollback;` del final devuelve el cierre de
+-- planta exactamente como estaba. Lo que se quito queda reportado en la fila 0.
+--
+-- ⚠️ ESTO NO ES LA SOLUCION, ES EL ANDAMIO. Que el 25-dic exista como feriado de
+-- pago obligatorio en produccion lo decide Lorena, porque implica partir el
+-- cierre de planta y eso se ve en la pantalla «Dias cerrados».
+do $prologo$
+declare v_quitados int; v_que text; v_navidad int;
+begin
+  select count(*), coalesce(string_agg(descripcion, ' · '), '(ninguno)')
+    into v_quitados, v_que
+    from rrhh_feriado
+   where daterange(fecha, coalesce(fecha_fin, fecha), '[]')
+      && daterange(date '2026-12-24', date '2026-12-27', '[]');
+  delete from rrhh_feriado
+   where daterange(fecha, coalesce(fecha_fin, fecha), '[]')
+      && daterange(date '2026-12-24', date '2026-12-27', '[]');
+  insert into rrhh_feriado (fecha, descripcion, tipo, creado_por)
+  values (date '2026-12-25', 'Navidad', 'feriado', 'ensayo-neto');
+  select count(*) into v_navidad from rrhh_feriado
+   where fecha = date '2026-12-25' and tipo = 'feriado';
+  if v_navidad <> 1 then
+    raise exception 'ENSAYO ABORTADO: el prologo no pudo dejar el 25-dic-2026 como un '
+      'feriado propio (quedaron % filas). Sin eso las pruebas 20, 21, 24 y 26 no '
+      'probarian nada y darian FALLA por una causa que no es la que se esta midiendo.', v_navidad;
+  end if;
+  perform set_config('cc.prologo', v_quitados || ' quitado(s): ' || v_que, true);
+end
+$prologo$;
+
+-- ╔══════════════════════════════════════════════════════════════════════╗
 -- ║  CUERPO DE PERSONAL_NETO_QUINCENA.sql — pegado tal cual              ║
 -- ╚══════════════════════════════════════════════════════════════════════╝
 
@@ -52,7 +96,23 @@ comment on column rrhh_feriado.pago_obligatorio is
   'UNICO obligatorio es el 25-dic. El 12-oct y el 1-dic son de pago NO obligatorio. '
   'Se corrige desde la pantalla «Dias cerrados».';
 
--- El unico obligatorio que queda en 2026. Idempotente: si ya esta marcado, no hace nada.
+-- ⚠️ HALLAZGO, Y NO SE ARREGLA DESDE ACA.
+-- El 25-dic-2026 NO esta cargado en rrhh_feriado, y hoy NO SE PUEDE cargar: el
+-- cierre de planta del 18-dic-2026 al 11-ene-2027 (PERSONAL_CALENDARIO.sql, fila
+-- semilla) lo CONTIENE, y rrhh_feriado tiene una exclusion por rangos solapados
+-- que impide que un feriado viva adentro de un cierre. La semilla ni lo intento:
+-- su `where not exists` se salta en silencio cualquier fila que se pise.
+--
+-- Operativamente hoy da igual —si la planta esta cerrada nadie trabaja el 25 y
+-- nadie cobra doble— pero deja una regla que NO PUEDE DISPARARSE NUNCA, y eso es
+-- peor que no tenerla: la pantalla ofreceria cargar un feriado trabajado que el
+-- trigger va a rechazar siempre.
+--
+-- Partir o no el cierre de planta es DECISION DE LORENA, no un efecto secundario
+-- de este pegado: ese rango se ve en la pantalla «Dias cerrados» y lo usa el
+-- calendario. Este update queda igual, idempotente, para el dia en que se
+-- decida: en cuanto el 25-dic exista como feriado propio, marcarlo es correr
+-- esta linea.
 update rrhh_feriado set pago_obligatorio = true
  where fecha = date '2026-12-25' and tipo = 'feriado' and not pago_obligatorio;
 
@@ -541,7 +601,8 @@ grant execute on function rrhh_feriado_paga_doble(date) to authenticated;
 do $candado$
 declare
   v_anon int; v_inv int; v_rls boolean; v_pol int;
-  v_div int; v_fer boolean; v_desc boolean; v_doble boolean;
+  v_div int; v_fer boolean; v_desc boolean;
+  v_doble boolean; v_doble_sab boolean; v_doble_no boolean; v_oblig int;
   v_pct numeric; v_nat numeric;
 begin
   -- Ninguna de las tablas ni vistas nuevas puede quedar legible por anon.
@@ -566,7 +627,26 @@ begin
   v_div   := rrhh_dias_divisor(date '2026-10-01', date '2026-10-15');
   v_fer   := rrhh_es_dia_divisor(date '2026-10-12');     -- feriado, lunes -> en el divisor
   v_desc  := rrhh_es_dia_descontable(date '2026-10-03'); -- sabado -> no descuenta
-  v_doble := rrhh_feriado_paga_doble(date '2026-12-25'); -- obligatorio y viernes -> si
+  -- LA REGLA DEL PAGO DOBLE, LAS DOS RAMAS, con una fila que se crea y se borra
+  -- aca mismo. La version anterior de este candado preguntaba por el 25-dic-2026
+  -- y habria abortado el pegado entero: ese dia NO esta cargado ni puede estarlo
+  -- (ver el hallazgo de la seccion 1). Un candado que exige un dato imposible no
+  -- es un candado, es una puerta tapiada.
+  -- Y se prueban LAS DOS ramas: una funcion que siempre dijera «no» pasaria un
+  -- candado que solo mire el «no». El 3-jul-2099 es viernes y el 4 es sabado.
+  insert into rrhh_feriado (fecha, fecha_fin, descripcion, tipo, pago_obligatorio, creado_por)
+  values (date '2099-07-03', date '2099-07-04',
+          'CANDADO del pegado 10 · se borra cuatro lineas mas abajo', 'feriado', true, 'pegado-10');
+  v_doble     := rrhh_feriado_paga_doble(date '2099-07-03');  -- viernes obligatorio -> si
+  v_doble_sab := rrhh_feriado_paga_doble(date '2099-07-04');  -- sabado  obligatorio -> no
+  delete from rrhh_feriado where fecha = date '2099-07-03' and creado_por = 'pegado-10';
+  if exists (select 1 from rrhh_feriado where creado_por = 'pegado-10') then
+    raise exception 'CANDADO: la fila de prueba de 2099 no se borro. NO SE APLICO NADA.';
+  end if;
+  -- Y la rama del «no obligatorio», contra un dia que SI esta cargado: el
+  -- 1-dic-2026 es feriado de pago no obligatorio y cae martes.
+  v_doble_no  := rrhh_feriado_paga_doble(date '2026-12-01');
+  select count(*) into v_oblig from rrhh_feriado where pago_obligatorio;
 
   select valor into v_pct from rrhh_param where clave='rebaja_trabajador_pct'
     order by vigente_desde desc, creado_en desc limit 1;
@@ -603,8 +683,16 @@ begin
       'contar. NO SE APLICO NADA.';
   end if;
   if not v_doble then
-    raise exception 'CANDADO: el 25-dic no califica para pago doble. O no quedo marcado como '
-      'pago_obligatorio, o no esta cargado en rrhh_feriado. NO SE APLICO NADA.';
+    raise exception 'CANDADO: un feriado de pago obligatorio en VIERNES no califica para pago '
+      'doble, y tendria que calificar. La regla esta al reves. NO SE APLICO NADA.';
+  end if;
+  if v_doble_sab then
+    raise exception 'CANDADO: un feriado de pago obligatorio en SABADO califica para pago doble, '
+      'y hoy no tendria que calificar. NO SE APLICO NADA.';
+  end if;
+  if v_doble_no then
+    raise exception 'CANDADO: el 1-dic-2026 (feriado de pago NO obligatorio, martes) califica '
+      'para pago doble. La columna pago_obligatorio no esta frenando nada. NO SE APLICO NADA.';
   end if;
   if coalesce(v_pct, -1) <> 0 then
     raise exception 'CANDADO: la rebaja quedo en %% y tenia que quedar APAGADA en 0. '
@@ -616,14 +704,28 @@ begin
   end if;
 
   raise notice 'CANDADO OK: anon en 0 · 3 vistas invoker · RLS con 4 politicas · divisor 11 · '
-    'feriado en el divisor · sabado no descuenta · 25-dic paga doble · rebaja 0 · incap habiles';
+    'feriado en el divisor · sabado no descuenta · la regla del pago doble funciona en las dos '
+    'ramas · rebaja 0 · incap habiles';
+
+  -- AVISO, NO EXCEPCION. Que no haya ningun feriado obligatorio cargado no es un
+  -- error del pegado: es el hallazgo de la seccion 1 esperando decision. Se
+  -- aplica igual, y queda dicho en voz alta.
+  if v_oblig = 0 then
+    raise notice '⚠️ PENDIENTE: no hay NINGUN feriado de pago obligatorio cargado, asi que el '
+      'pago doble no puede dispararse todavia. El unico de 2026 es el 25-dic y esta adentro del '
+      'cierre de planta del 18-dic al 11-ene, que la exclusion de rangos no deja partir. Lo '
+      'decide Lorena.';
+  end if;
 end
 $candado$;
 
 
 -- ── 9 · LA FILA DE CONTROL ──────────────────────────────────────────────
 -- Regla 🔴 de CLAUDE.md: un "Success" del editor no es evidencia de nada.
--- ESPERADO:  1 · 1 · 1 · 11 · t · f · t · 0 · 0 · 4 · 0
+-- ESPERADO:  1 · 1 · 1 · 11 · t · f · f · 0 · 0 · 0 · 4 · 0
+-- ⚠️ `feriados_obligatorios` en 0 es lo esperado HOY, y es el pendiente de la
+-- seccion 1, no una falla. Las dos ramas de la regla del pago doble las prueba el
+-- candado de arriba, que para eso crea y borra una fila de 2099.
 select
   (select count(*) from information_schema.columns where table_schema='public'
     and table_name='rrhh_feriado' and column_name='pago_obligatorio')        as col_feriado,
@@ -634,7 +736,8 @@ select
   rrhh_dias_divisor(date '2026-10-01', date '2026-10-15')                    as divisor_oct_q1,
   rrhh_es_dia_divisor(date '2026-10-12')                                     as feriado_en_divisor,
   rrhh_es_dia_descontable(date '2026-10-03')                                 as sabado_descuenta,
-  rrhh_feriado_paga_doble(date '2026-12-25')                                 as navidad_doble,
+  rrhh_feriado_paga_doble(date '2026-12-01')                                 as no_oblig_doble,
+  (select count(*) from rrhh_feriado where pago_obligatorio)                 as feriados_obligatorios,
   (select valor from rrhh_param where clave='rebaja_trabajador_pct'
     order by vigente_desde desc, creado_en desc limit 1)                     as rebaja_apagada,
   (select valor from rrhh_param where clave='incap_dias_naturales'
@@ -769,8 +872,12 @@ grant select, insert, update on zz_res to public;
 -- verdad —un dia de mas, un divisor equivocado, un porcentaje mal aplicado— mueve
 -- el numero en decenas, no en milmillonesimas. Esta ahi para que un artefacto de
 -- escala no haga fallar una fila que esta bien, no para suavizar un desvio.
+-- Se recortan los ceros SOLO despues de un punto decimal. Un `'0+$'` a secas
+-- convertiria 100 en 1, y nadie lo veria venir.
 create or replace function zz_n(p numeric) returns text
-language sql immutable as $zz$ select trim_scale(round(p, 10))::text $zz$;
+language sql immutable as $zz$
+  select regexp_replace(regexp_replace(round(p, 10)::text, '(\.\d*?)0+$', '\1'), '\.$', '')
+$zz$;
 
 create or replace function zz_pago(p_k text, p_q text)
   returns table (final numeric, base numeric, divisor numeric, valor_dia numeric,
@@ -797,6 +904,18 @@ begin
       'daria «0 = 0» en verde sin haber probado nada.';
   end if;
 end $$;
+
+
+-- 0 · QUE TUVO QUE TOCAR EL PROLOGO. No es una prueba: es informacion, y la
+--     parte que Lorena tiene que decidir. Si dice «1 quitado(s): Cierre de planta
+--     de fin de año», significa que el 25-dic no existe como feriado en
+--     produccion y que el pago doble no puede dispararse hasta que eso se arregle.
+--     El rollback devuelve el cierre como estaba.
+insert into zz_res values (0,
+  'INFO · dias cerrados que el prologo tuvo que quitar para poder probar el 25-dic',
+  '(lo que diga, no es una falla)',
+  coalesce(nullif(current_setting('cc.prologo', true),''), '(el prologo no corrio)'),
+  'INFO');
 
 
 -- ════════════════════════════════════════════════════════════════════════
@@ -1250,7 +1369,8 @@ select set_config('role','postgres', true);
 update zz_res set veredicto =
   case when obtenido is null                              then 'SIN DATO'
        when btrim(obtenido) = btrim(esperado)             then 'OK'
-       else 'FALLA' end;
+       else 'FALLA' end
+ where n between 1 and 33;
 
 -- Y las filas que el ensayo tenia que producir y podrian no existir: si un
 -- `select ... from zz_pago(...)` no devuelve filas, el insert no inserta nada y
@@ -1269,14 +1389,16 @@ select r.n                                          as "#",
   from zz_res r
 union all
 select 99, '── TOTAL ──',
-       (select count(*)::text || ' pruebas' from zz_res),
+       (select count(*)::text || ' pruebas' from zz_res where n between 1 and 33),
        (select count(*) filter (where veredicto='OK')::text || ' OK · ' ||
                count(*) filter (where veredicto='FALLA')::text || ' FALLA · ' ||
-               count(*) filter (where veredicto='SIN DATO')::text || ' SIN DATO' from zz_res),
-       (select case when count(*) < 33          then 'FALTAN PRUEBAS · NO PEGAR'
+               count(*) filter (where veredicto='SIN DATO')::text || ' SIN DATO'
+          from zz_res where n between 1 and 33),
+       (select case when count(*) < 33                    then 'FALTAN PRUEBAS · NO PEGAR'
                     when count(*) filter (where veredicto <> 'OK') = 0
-                                                    then 'TODO VERDE'
-                    else 'HAY ROJO · NO PEGAR' end from zz_res)
+                                                          then 'TODO VERDE'
+                    else 'HAY ROJO · NO PEGAR' end
+          from zz_res where n between 1 and 33)
  order by 1;
 
 rollback;
