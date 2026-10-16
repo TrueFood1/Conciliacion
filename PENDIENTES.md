@@ -532,3 +532,51 @@ salarios de un solo comando, y no hay nada que lo registre.
 Medir, no suponer: `select relname, has_table_privilege('authenticated',
 oid,'TRUNCATE') from pg_class where relnamespace='public'::regnamespace and
 relkind='r'` dice exactamente cuántas tablas están así.
+
+---
+
+## P5 · 🟡 DECIDE LORENA · Qué hacer con `PEGADO_NETO_QUINCENA.sql`, que ya se usó
+
+Anotado el **16-oct-2026**, el día que se aplicó. **No es una tarea técnica: es una
+decisión de Lorena.**
+
+### Qué es ese archivo
+
+El que cargó los tres netos de quincena en producción, con vigencia 1-oct-2026.
+**Tiene los tres sueldos adentro**, en texto plano, y el candado que exigió que la
+quincena 1–15 de octubre cuadrara al colón con lo que Lorena transfiere.
+
+Ya corrió y ya cumplió. Lo que sigue abierto es dónde vive de acá en adelante.
+
+### Por qué no está en el repo, y tiene que seguir así
+
+El repo de Truefie es **público** y sirve GitHub Pages. Tres sueldos en un commit
+quedan en el historial de GitHub para siempre, y un `git rm` después **no los
+borra**: siguen en los objetos de git y en cualquier copia que alguien haya
+clonado. Por eso el patrón `PEGADO_*.sql` está en `.gitignore` (línea 14), y por
+eso este archivo nunca entró.
+
+**Está en el disco local, en la carpeta del proyecto, y ahí sigue.** No se borró
+ni se movió: borrarlo perdería el registro de con qué números y con qué vigencia
+se cargó, que es justamente lo que hace reconstruible una transferencia ya hecha.
+
+### Las tres salidas, y ninguna es «no hacer nada»
+
+1. **Guardarlo donde van los datos de salarios** — junto a la planilla, en el
+   lugar privado que ya use Lorena. Es lo más coherente: el archivo es un
+   documento de planilla, no código.
+2. **Archivarlo cifrado** en la máquina, fuera de la carpeta del repo. Saca el
+   riesgo de que un `git add -f` o una herramienta que ignore `.gitignore` lo
+   levante por error.
+3. **Dejarlo donde está**, sabiendo que depende de una sola línea de `.gitignore`.
+   Funciona hoy —verificado con `git check-ignore` cada vez que se tocó— pero es
+   una sola capa, y la regla del proyecto es no depender de una sola.
+
+### Lo que no hay que hacer
+
+- **No borrarlo** sin haber guardado los números en otro lado.
+- **No commitearlo**, ni con `git add -f`, ni «solo para tenerlo versionado».
+- **No pegarlo en un chat.** La primera línea del archivo lo dice.
+
+Y el mismo criterio vale para cualquier `PEGADO_*.sql` que venga: son archivos de
+carga con datos reales, de un solo uso, y el repo no es su lugar.
