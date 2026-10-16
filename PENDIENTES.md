@@ -418,3 +418,57 @@ está cargado, así que la prueba se apoya en un dato real. Y el candado del peg
 10 también: preguntaba por el 12-oct y **pasaba porque el 12-oct es lunes**, no
 porque fuera feriado — una salvaguarda que pasa por el motivo equivocado no está
 probando lo que dice probar.
+
+---
+
+## P4 · 🔴 ABIERTO · Cualquier cuenta con sesión puede VACIAR nueve tablas de Personal
+
+Encontrado el **16-oct-2026**, reproducido contra PostgreSQL 17 con la
+configuración de Supabase. Es lo más grave anotado en este archivo.
+
+### Qué pasa
+
+Supabase trae configurado `alter default privileges in schema public grant all on
+tables to anon, authenticated, service_role`. **Toda tabla nueva nace con TODOS
+los privilegios** para esos tres roles. Un `grant select, insert` después no quita
+nada: agrega sobre lo que ya estaba.
+
+`PERSONAL_ESQUEMA.sql:663` revoca **solo de `anon`**. Así que `authenticated` —el
+rol de cualquier persona con sesión abierta, sea del equipo o socia— conserva
+`UPDATE`, `DELETE` y `TRUNCATE` sobre las nueve tablas de Personal, incluida
+`rrhh_salario`.
+
+### Por qué el `truncate` es distinto del resto
+
+Para `update` y `delete` da igual: sin política permisiva afectan **0 filas**. La
+seguridad por filas aguanta.
+
+**El `truncate` no lo frena la seguridad por filas.** No borra filas una por una:
+vacía la tabla, y las políticas no lo ven pasar. Medido:
+
+```
+update → 0 filas · delete → 0 filas · TRUNCATE → PASÓ, la tabla quedó vacía
+```
+
+O sea: una cuenta del equipo con sesión abierta puede vaciar el histórico de
+salarios de un solo comando, y no hay nada que lo registre.
+
+### Qué falta, y qué ya está hecho
+
+- **Hecho:** `PERSONAL_NETO_QUINCENA.sql` (pegado 10, sin aplicar) revoca de
+  `anon` **y de `authenticated`**, y su candado verifica los tres privilegios en
+  las dos tablas nuevas. Las dos tablas del neto nacen cerradas.
+- **Falta:** el mismo `revoke` sobre las nueve tablas ya aplicadas. Es un pegado
+  propio, corto, y hay que revisar antes si algún camino del código escribe por
+  `update` en alguna de ellas — `rrhh_permiso` sí tiene política de `UPDATE`
+  (`rrhh_permiso_upd`), así que ahí el `revoke` tiene que dejar el `update` puesto
+  y quitar solo `delete` y `truncate`.
+- **Y revisar los otros módulos:** Entregas, Compras, Finanzas y Tickets tienen
+  tablas en el mismo esquema, creadas con el mismo default. El problema no es de
+  Personal, es del esquema entero.
+
+### Lo primero al retomarlo
+
+Medir, no suponer: `select relname, has_table_privilege('authenticated',
+oid,'TRUNCATE') from pg_class where relnamespace='public'::regnamespace and
+relkind='r'` dice exactamente cuántas tablas están así.

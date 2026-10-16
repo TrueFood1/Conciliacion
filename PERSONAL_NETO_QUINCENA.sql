@@ -566,8 +566,24 @@ select quincena, persona_id, nombre,
 
 -- ── 7 · GRANTS ──────────────────────────────────────────────────────────
 -- Aca hay NETO: la anon key es publica y va dentro de index.html.
-revoke all on rrhh_neto_quincena, rrhh_feriado_trabajado from anon;
-revoke all on v_rrhh_permiso_dia, v_rrhh_pago_detalle, v_rrhh_pago from anon;
+-- ⚠️ Y TAMBIEN DE `authenticated`, QUE ES EL ARREGLO DE FONDO DE ESTA SECCION.
+-- Supabase trae configurado `alter default privileges in schema public grant all
+-- on tables to anon, authenticated, service_role`, asi que TODA TABLA NUEVA NACE
+-- CON TODOS LOS PRIVILEGIOS para los tres roles. Un `grant select, insert` no
+-- quita nada: agrega sobre lo que ya estaba.
+--
+-- Las otras nueve tablas de Personal revocan solo de `anon` (PERSONAL_ESQUEMA.sql
+-- linea 663), asi que `authenticated` conserva UPDATE, DELETE y TRUNCATE sobre
+-- ellas. Para el update y el delete da igual: sin politica permisiva afectan 0
+-- filas. Pero EL TRUNCATE NO LO FRENA LA SEGURIDAD POR FILAS — no borra filas una
+-- por una, vacia la tabla, y las politicas no lo ven pasar. Medido contra
+-- PostgreSQL 17 el 16-oct-2026: cualquier cuenta del equipo con sesion abierta
+-- podia vaciar la tabla del neto de un solo comando.
+--
+-- Esta tabla nace cerrada. Las otras nueve quedan como estan: arreglarlas es otro
+-- pegado y toca otros modulos — ver PENDIENTES.md P4.
+revoke all on rrhh_neto_quincena, rrhh_feriado_trabajado from anon, authenticated;
+revoke all on v_rrhh_permiso_dia, v_rrhh_pago_detalle, v_rrhh_pago from anon, authenticated;
 grant select on rrhh_neto_quincena, rrhh_feriado_trabajado to authenticated;
 grant insert on rrhh_neto_quincena, rrhh_feriado_trabajado to authenticated;
 grant select on v_rrhh_permiso_dia, v_rrhh_pago_detalle, v_rrhh_pago to authenticated;
@@ -588,7 +604,7 @@ grant execute on function rrhh_feriado_paga_doble(date) to authenticated;
 do $candado$
 declare
   v_anon int; v_inv int; v_rls boolean; v_pol int;
-  v_pol_dif text;
+  v_pol_dif text; v_esc int;
   v_div int; v_fer boolean; v_desc boolean;
   v_doble boolean; v_doble_sab boolean; v_doble_no boolean; v_oblig int;
   v_pct numeric; v_nat numeric; v_dx_pct text; v_dx_nat text;
@@ -650,6 +666,17 @@ begin
     select string_agg(que || ' ' || tabla || '.' || politica || ' (' || comando || ')',
                       ' · ' order by que, tabla, politica)
       from dif);
+
+  -- NADIE MAS QUE EL DUEÑO PUEDE ESCRIBIR ENCIMA NI VACIAR. Se pregunta por los
+  -- TRES privilegios, y TRUNCATE es el que importa: es el unico que la seguridad
+  -- por filas no frena. Sin esta comprobacion, un `grant all` futuro —o el
+  -- default de Supabase, que es justo eso— deja la tabla del neto a merced de
+  -- cualquier cuenta con sesion.
+  select count(*) into v_esc
+    from (select unnest(array['rrhh_neto_quincena','rrhh_feriado_trabajado']) as t) x
+   cross join unnest(array['UPDATE','DELETE','TRUNCATE']) as p(priv)
+   where has_table_privilege('authenticated','public.'||x.t, p.priv)
+      or has_table_privilege('anon','public.'||x.t, p.priv);
 
   -- LAS REGLAS, MEDIDAS CONTRA EL CALENDARIO REAL. No se confia en el texto de
   -- la funcion: se la llama.
@@ -718,6 +745,12 @@ begin
     raise exception 'CANDADO: rrhh_neto_quincena quedo SIN RLS. El grant de select es para '
       '`authenticated`, o sea todo el equipo: sin RLS cualquiera leeria el neto de todos. '
       'NO SE APLICO NADA.';
+  end if;
+  if v_esc <> 0 then
+    raise exception 'CANDADO: `authenticated` o `anon` conservan % privilegio(s) de UPDATE, '
+      'DELETE o TRUNCATE sobre las dos tablas nuevas. El TRUNCATE no lo frena la seguridad '
+      'por filas: vacia la tabla y las politicas no lo ven pasar. Aca hay NETO. '
+      'NO SE APLICO NADA.', v_esc;
   end if;
   if v_pol_dif is not null then
     raise exception E'CANDADO: las politicas de las dos tablas nuevas no son las 14 esperadas '
@@ -788,7 +821,7 @@ $candado$;
 
 -- ── 9 · LA FILA DE CONTROL ──────────────────────────────────────────────
 -- Regla 🔴 de CLAUDE.md: un "Success" del editor no es evidencia de nada.
--- ESPERADO:  1 · 1 · 1 · 11 · t · f · f · 0 · 0 · 0 · 14 · 0
+-- ESPERADO:  1 · 1 · 1 · 11 · t · f · f · 0 · 0 · 0 · 14 · 0 · 0
 -- ⚠️ `politicas_14` son 14 y no 4: 2 por tabla las escribe este pegado y 5 por
 -- tabla las agrega el disparador `asistente_politicas` al crear cada tabla. El
 -- conjunto exacto lo verifica el candado; este numero es solo la señal de humo.
@@ -815,7 +848,13 @@ select
     and tablename in ('rrhh_neto_quincena','rrhh_feriado_trabajado'))        as politicas_14,
   (select count(*) from (select unnest(array['rrhh_neto_quincena','rrhh_feriado_trabajado',
       'v_rrhh_pago_detalle','v_rrhh_pago']) as t) x
-    where has_table_privilege('anon','public.'||x.t,'SELECT'))               as anon_debe_ser_0;
+    where has_table_privilege('anon','public.'||x.t,'SELECT'))               as anon_debe_ser_0,
+  -- Y el que de verdad protege el dato: nadie escribe encima ni vacia.
+  (select count(*)
+     from (select unnest(array['rrhh_neto_quincena','rrhh_feriado_trabajado']) as t) x
+    cross join unnest(array['UPDATE','DELETE','TRUNCATE']) as p(priv)
+    where has_table_privilege('authenticated','public.'||x.t, p.priv)
+       or has_table_privilege('anon','public.'||x.t, p.priv))                as escritura_debe_ser_0;
 
 commit;
 

@@ -665,18 +665,28 @@ begin
     v_res := v_res || ' · ' || v_n || ' filas';
   exception when others then v_res := v_res || ' · error ' || sqlstate;
   end;
+  -- 3 · Y EL TRUNCATE, que es el que no frena ninguna politica: no borra filas
+  --     una por una, vacia la tabla, y la seguridad por filas no lo ve pasar. Lo
+  --     unico que lo detiene es NO TENER EL PRIVILEGIO. Por eso el pegado revoca
+  --     de `authenticated` y no solo de `anon`.
+  begin
+    execute 'truncate rrhh_neto_quincena';
+    v_res := v_res || ' · truncate PASO';
+  exception when insufficient_privilege then v_res := v_res || ' · truncate denegado';
+           when others then v_res := v_res || ' · truncate error ' || sqlstate;
+  end;
   perform set_config('role','postgres', true);
   execute 'revoke update, delete on rrhh_neto_quincena from authenticated';
   perform set_config('role','authenticated', true);
 
-  -- 3 · Y EL DATO. Cuatro intentos de escritura y el neto tiene que estar igual.
+  -- 4 · Y EL DATO. Cuatro intentos de escritura y el neto tiene que estar igual.
   select nq.neto into v_despues from rrhh_neto_quincena nq
    where nq.persona_id = current_setting('cc.p1',true)::bigint;
   select count(*) into v_filas from rrhh_neto_quincena nq
    where nq.persona_id = current_setting('cc.p1',true)::bigint;
   insert into zz_res values (32,
-    'append-only CON FILAS · update y delete sin grant · los mismos con grant · el dato',
-    'denegado · denegado · 0 filas · 0 filas · igual',
+    'append-only CON FILAS · update y delete sin grant · con grant · truncate · el dato',
+    'denegado · denegado · 0 filas · 0 filas · truncate denegado · igual',
     v_res || ' · ' || case when v_despues = v_antes and v_filas = 1 then 'igual'
                            when v_filas <> 1 then 'LO BORRO'
                            else 'LO CAMBIO' end,
@@ -685,12 +695,18 @@ end $$;
 
 -- Y el permiso, aparte y como lo que es: un indicio, no la prueba.
 insert into zz_res
-select 34, 'y los permisos, como indicio · authenticated puede update? · delete? · permisivas de upd/del',
-       'f · f · 0',
+-- ⚠️ ESTA FILA ES LA QUE DESTAPO EL HUECO. Antes del 16-oct decia `f · f` en mi
+-- base local y `t · t` en Supabase, y la diferencia era que mi base no tenia
+-- configurado el `alter default privileges ... grant all` que Supabase si trae:
+-- toda tabla nueva nace con TODOS los privilegios para authenticated. Ahora el
+-- pegado los revoca, asi que tiene que dar f en los tres lados — y el TRUNCATE es
+-- el que importa, porque es el unico que la seguridad por filas no frena.
+select 34, 'privilegios de escritura · authenticated upd · del · truncate · anon truncate',
+       'f · f · f · f',
        left(has_table_privilege('authenticated','rrhh_neto_quincena','UPDATE')::text,1) || ' · ' ||
        left(has_table_privilege('authenticated','rrhh_neto_quincena','DELETE')::text,1) || ' · ' ||
-       (select count(*) from pg_policies where tablename = 'rrhh_neto_quincena'
-         and cmd in ('UPDATE','DELETE') and permissive = 'PERMISSIVE'), null;
+       left(has_table_privilege('authenticated','rrhh_neto_quincena','TRUNCATE')::text,1) || ' · ' ||
+       left(has_table_privilege('anon','rrhh_neto_quincena','TRUNCATE')::text,1), null;
 
 -- 33 · ANON NO LLEGA A NADA. La anon key viaja dentro de index.html, que esta en
 --      un repo PUBLICO. Se mide llamando de verdad como anon, no leyendo grants.
@@ -743,22 +759,42 @@ select n, 'ESTA PRUEBA NO CORRIO · la consulta no devolvio ninguna fila',
   from generate_series(1,34) n
  where n not in (select r.n from zz_res r);
 
-select r.n                                          as "#",
-       r.escenario                                  as "escenario",
-       r.esperado                                   as "esperado",
-       coalesce(r.obtenido,'(nada)')                as "obtenido",
-       r.veredicto                                  as "veredicto"
-  from zz_res r
-union all
-select 99, '── TOTAL ──',
-       (select count(*)::text || ' pruebas' from zz_res where n between 1 and 34),
-       (select count(*) filter (where veredicto='OK')::text || ' OK · ' ||
-               count(*) filter (where veredicto='FALLA')::text || ' FALLA · ' ||
-               count(*) filter (where veredicto='SIN DATO')::text || ' SIN DATO'
-          from zz_res where n between 1 and 34),
-       (select case when count(*) < 34                    then 'FALTAN PRUEBAS · NO PEGAR'
-                    when count(*) filter (where veredicto <> 'OK') = 0
-                                                          then 'TODO VERDE'
-                    else 'HAY ROJO · NO PEGAR' end
-          from zz_res where n between 1 and 34)
- order by 1;
+-- EL VEREDICTO VA PRIMERO, y las filas que no estan en OK van arriba.
+-- Pedido de Lorena el 16-oct: con el veredicto en la ultima columna hay que
+-- arrastrar la tabla a la derecha para saber si algo fallo, y con 36 filas hacen
+-- falta cuatro fotos. Asi se confirma con una.
+--
+-- El orden es: el TOTAL arriba de todo, despues lo que FALLA o quedo SIN DATO,
+-- despues las INFO, y al final las OK en su numero. Si todo esta bien, la primera
+-- fila dice TODO VERDE y lo que sigue son las dos informativas y las 34 en orden.
+--
+-- Va envuelto en una subconsulta porque el `order by` de un UNION solo entiende
+-- posiciones, y `grupo` no se muestra: ordenar por algo que no se ve, mostrando
+-- otra cosa, es como se arma una tabla que miente.
+select t.veredicto                                   as "veredicto",
+       t.n                                           as "#",
+       t.escenario                                   as "escenario",
+       t.esperado                                    as "esperado",
+       t.obtenido                                    as "obtenido"
+  from (
+    select r.veredicto, r.n, r.escenario, r.esperado,
+           coalesce(r.obtenido,'(nada)')             as obtenido,
+           case when r.veredicto in ('FALLA','SIN DATO') then 1
+                when r.veredicto = 'INFO'                then 2
+                else 3 end                           as grupo
+      from zz_res r
+    union all
+    select (select case when count(*) < 34                    then 'FALTAN PRUEBAS · NO PEGAR'
+                        when count(*) filter (where veredicto <> 'OK') = 0
+                                                              then 'TODO VERDE'
+                        else 'HAY ROJO · NO PEGAR' end
+              from zz_res where n between 1 and 34),
+           99, '── TOTAL ──',
+           (select count(*)::text || ' pruebas' from zz_res where n between 1 and 34),
+           (select count(*) filter (where veredicto='OK')::text || ' OK · ' ||
+                   count(*) filter (where veredicto='FALLA')::text || ' FALLA · ' ||
+                   count(*) filter (where veredicto='SIN DATO')::text || ' SIN DATO'
+              from zz_res where n between 1 and 34),
+           0
+  ) t
+ order by t.grupo, t.n;
