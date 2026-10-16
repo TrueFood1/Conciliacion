@@ -52,7 +52,17 @@ NUEVAS = {
     'v_rrhh_pago_detalle':['quincena', 'persona_id', 'concepto', 'monto', 'nota'],
     'v_rrhh_pago':        ['quincena', 'persona_id', 'base', 'descuentos',
                            'ajustes', 'final', 'incapacidades', 'incap_n',
-                           'rebaja', 'subtotal'],
+                           'rebaja', 'subtotal',
+                           # pegado 10
+                           'feriados_trab', 'feriados_trab_n', 'divisor', 'valor_dia'],
+    # ── pegado 10 · neto fijo de quincena. Hasta que el pegado se aplique estas
+    # salen «NO EXISTE», y esta bien: lo que no puede pasar nunca es que salgan
+    # «ABIERTA A ANON». Aca hay NETO y la anon key viaja dentro de index.html.
+    'rrhh_neto_quincena':     ['id', 'persona_id', 'neto', 'vigente_desde', 'nota',
+                               'creado_por', 'creado_en'],
+    'rrhh_feriado_trabajado': ['id', 'persona_id', 'fecha', 'horas', 'nota',
+                               'creado_por', 'creado_en'],
+    'rrhh_feriado':           ['fecha', 'pago_obligatorio'],
 }
 
 def conexion():

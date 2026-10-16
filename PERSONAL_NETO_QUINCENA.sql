@@ -1,0 +1,690 @@
+-- SOLO SE PEGA DESPUES DEL ENSAYO · PERSONAL_NETO_QUINCENA.sql
+-- ════════════════════════════════════════════════════════════════════════
+-- MODULO PERSONAL · NETO FIJO DE QUINCENA + VALOR DEL DIA  (PEGADO 10)
+-- Preparado el 15-oct-2026. NO SE CORRIO.
+-- Va DESPUES de los pegados 5, 6 y 7, todos aplicados. NO toca ninguno.
+--
+-- ════════════════════════════════════════════════════════════════════════
+-- EL CAMBIO DE FONDO, Y POR QUE
+-- ════════════════════════════════════════════════════════════════════════
+-- Hasta hoy el pago se derivaba del salario mensual: base = salario/2 y la
+-- tarifa = salario/30/8, con una rebaja porcentual encima para llegar al neto.
+-- Ese porcentaje (6,49%) salia de una observacion, no de una tasa, y nunca calzo
+-- para las tres personas: el neto de Daniela no daba.
+--
+-- Decision de Lorena (15-oct): EL NETO DE LA QUINCENA PASA A SER UN DATO, no un
+-- calculo. Se guarda por persona, con vigencia, y de ahi sale todo:
+--     valor del dia  = neto de la quincena ÷ dias habiles de ESA quincena
+--     valor de la hora = valor del dia ÷ jornada (8 h)
+-- Ya no se usa ÷15, ni ÷30, ni la rebaja %.
+--
+-- LO QUE NO SE TOCA, Y ES A PROPOSITO:
+--   · `rrhh_salario` queda intacta. No se borra, no se reemplaza, no se migra.
+--     Sigue siendo la historia del salario bruto y la usa `v_rrhh_evento` para
+--     las horas extra del aparato viejo. Que el pago ya no la lea no la vuelve
+--     basura: es el unico registro de cuanto gana cada persona.
+--   · La rebaja % NO se borra. Se APAGA poniendo el parametro en 0 con una fila
+--     nueva. Asi el renglon desaparece del desglose y el historico de como se
+--     calculo en octubre sigue siendo reconstruible. Borrar la fila vieja
+--     romperia eso.
+--
+-- ⚠️ TODO APPEND-ONLY. `rrhh_neto_quincena` no se edita ni se borra: un neto
+-- nuevo es una fila nueva con otra vigencia. Es la misma razon que en
+-- `rrhh_salario` — de estos numeros cuelga una transferencia que ya se hizo.
+--
+-- ════════════════════════════════════════════════════════════════════════
+-- DOS CONCEPTOS QUE ANTES ERAN UNO
+-- ════════════════════════════════════════════════════════════════════════
+--   DIA DEL DIVISOR   lunes a viernes, FERIADOS INCLUIDOS.  1-15 oct = 11
+--   DIA DESCONTABLE   lunes a viernes y NO feriado.
+--
+-- Hasta hoy habia UNA sola bandera `habil` (L-V y no feriado) y alcanzaba,
+-- porque el divisor era 30 y nunca la usaba. Con el divisor nuevo los dos
+-- conceptos se cruzan y hacen falta dos. Cada uno vive en UNA funcion:
+--     rrhh_es_dia_divisor()      ·  rrhh_es_dia_descontable()
+-- Si manana el sabado pasa a ser habil, se cambia UNA linea.
+--
+-- ⚠️ SUPOSICION DE ANDREA, SIN CONFIRMAR POR LA CONTADORA: una ausencia, un
+-- permiso sin goce o un dia de incapacidad que caigan en un FERIADO no
+-- descuentan nada ese dia, porque el feriado se paga igual. De ahi que
+-- `descontable` excluya los feriados. Si la contadora dice lo contrario, se
+-- cambia esa funcion y nada mas. Ver PREGUNTAS_contadora_feriados.md.
+--
+-- ════════════════════════════════════════════════════════════════════════
+-- FERIADO TRABAJADO
+-- ════════════════════════════════════════════════════════════════════════
+-- Suma UNA vez (un dia, o las horas × valor de hora), porque el feriado ya viene
+-- pagado dentro del neto: con el adicional el dia queda al doble.
+-- Califica SOLO si el feriado es de PAGO OBLIGATORIO y cae de lunes a viernes.
+-- Esa condicion vive en `rrhh_feriado_paga_doble()`, en un solo lugar.
+--
+-- ⚠️ PENDIENTE, NO IMPLEMENTADO: un feriado obligatorio que cae en sabado o
+-- domingo NO suma nada hoy. La ley podria exigir el dia sencillo igual. En lo que
+-- queda de 2026 el caso no se presenta (los tres feriados caen L-V). Pendiente de
+-- la contadora.
+-- ⚠️ PENDIENTE, NO IMPLEMENTADO: si un feriado OBLIGATORIO no trabajado suma un
+-- dia sencillo de todos modos. Hay dos fuentes que no coinciden; esta en el
+-- documento de preguntas.
+-- ════════════════════════════════════════════════════════════════════════
+
+begin;
+
+-- ── 1 · rrhh_feriado SABE SI ES DE PAGO OBLIGATORIO ─────────────────────
+-- `default false` es lo que no rompe nada: las filas que ya existen pasan a «no
+-- obligatorio», que es el caso que NO suma plata. Un default true habria vuelto
+-- obligatorios todos los feriados y cierres cargados, en silencio.
+alter table rrhh_feriado add column if not exists pago_obligatorio boolean not null default false;
+
+comment on column rrhh_feriado.pago_obligatorio is
+  'true = feriado de pago obligatorio del art. 148 del Codigo de Trabajo. Solo estos '
+  'pagan doble si se trabajan, y solo si caen de lunes a viernes. Verificado el '
+  '15-oct-2026 contra el art. 148 y comunicados del MTSS: de lo que queda de 2026 el '
+  'UNICO obligatorio es el 25-dic. El 12-oct y el 1-dic son de pago NO obligatorio. '
+  'Se corrige desde la pantalla «Dias cerrados».';
+
+-- El unico obligatorio que queda en 2026. Idempotente: si ya esta marcado, no hace nada.
+update rrhh_feriado set pago_obligatorio = true
+ where fecha = date '2026-12-25' and tipo = 'feriado' and not pago_obligatorio;
+
+
+-- ── 2 · EL NETO DE QUINCENA, COMO DATO ──────────────────────────────────
+-- Espejo de `rrhh_salario`: historia, no valor actual. El neto de una quincena
+-- vieja tiene que poder reconstruirse tal como se pago.
+create table if not exists rrhh_neto_quincena (
+  id            bigint generated always as identity primary key,
+  persona_id    bigint  not null references rrhh_persona(id),
+  neto          numeric not null check (neto > 0),
+  vigente_desde date    not null,
+  nota          text,
+  creado_en     timestamptz not null default now(),
+  creado_por    text    not null
+);
+create index if not exists rrhh_neto_quincena_persona_idx
+  on rrhh_neto_quincena (persona_id, vigente_desde desc);
+
+comment on table rrhh_neto_quincena is
+  'El NETO que se transfiere por quincena, por persona, con vigencia. Append-only: '
+  'un neto nuevo es una fila nueva, nunca un update. Desde el 15-oct-2026 ES LA BASE '
+  'del calculo del pago, en lugar de salario_mensual/2 con rebaja porcentual. '
+  'rrhh_salario NO se reemplaza: sigue siendo la historia del bruto.';
+
+alter table rrhh_neto_quincena enable row level security;
+-- SOLO SOCIAS, de los dos lados. Es dato salarial, con el mismo criterio que
+-- rrhh_salario y rrhh_aguinaldo: el equipo no lo necesita para usar el modulo.
+drop policy if exists rrhh_neto_quincena_sel on rrhh_neto_quincena;
+create policy rrhh_neto_quincena_sel on rrhh_neto_quincena for select to authenticated
+  using (acceso_es_socia());
+drop policy if exists rrhh_neto_quincena_ins on rrhh_neto_quincena;
+create policy rrhh_neto_quincena_ins on rrhh_neto_quincena for insert to authenticated
+  with check (acceso_es_socia());
+-- Sin politica de update ni delete: sin politica la operacion no pasa aunque
+-- alguien le diera el grant por error. Dos candados para el append-only.
+
+
+-- ── 3 · FERIADO TRABAJADO, TIPO DE MOVIMIENTO PROPIO ────────────────────
+-- Tabla aparte y no un tipo mas de `rrhh_ajuste_manual`, por dos razones: lleva
+-- dias u horas (el ajuste lleva un monto suelto), y Lorena lo quiere VER separado
+-- de las horas extra normales en el desglose.
+create table if not exists rrhh_feriado_trabajado (
+  id          bigint generated always as identity primary key,
+  persona_id  bigint  not null references rrhh_persona(id),
+  fecha       date    not null,
+  horas       numeric check (horas > 0 and horas <= 24),  -- null = dia completo
+  nota        text,
+  creado_por  text    not null,
+  creado_en   timestamptz not null default now(),
+  constraint rrhh_feriado_trabajado_unico unique (persona_id, fecha)
+);
+comment on table rrhh_feriado_trabajado is
+  'Dias (o horas) trabajados en un feriado de PAGO OBLIGATORIO que cae de lunes a '
+  'viernes. SUMA una vez al neto: el feriado ya viene pagado, asi que el dia queda al '
+  'doble. Append-only. El unique (persona_id, fecha) impide cargar dos veces el mismo '
+  'feriado a la misma persona, que seria pagarlo triple.';
+
+alter table rrhh_feriado_trabajado enable row level security;
+drop policy if exists rrhh_feriado_trabajado_sel on rrhh_feriado_trabajado;
+create policy rrhh_feriado_trabajado_sel on rrhh_feriado_trabajado for select to authenticated
+  using (acceso_es_socia() or persona_id = rrhh_mi_persona());
+drop policy if exists rrhh_feriado_trabajado_ins on rrhh_feriado_trabajado;
+create policy rrhh_feriado_trabajado_ins on rrhh_feriado_trabajado for insert to authenticated
+  with check (acceso_es_socia());
+
+
+-- ── 4 · LAS CUATRO REGLAS, CADA UNA EN UN SOLO LUGAR ────────────────────
+-- Si manana el sabado pasa a ser habil, o los feriados pasan a descontar, se
+-- cambia UNA de estas funciones y todo el modulo lo sigue.
+
+-- 4.1 · DIA DEL DIVISOR: lunes a viernes, feriados INCLUIDOS.
+create or replace function rrhh_es_dia_divisor(p_dia date) returns boolean
+language sql immutable set search_path = public as $$
+  select extract(isodow from p_dia) <= 5;
+$$;
+comment on function rrhh_es_dia_divisor(date) is
+  'Dia que CUENTA EN EL DIVISOR: lunes a viernes, feriados incluidos. Decision de '
+  'Lorena, 15-oct-2026: el feriado se paga, asi que esta en el divisor. 1-15 oct = 11.';
+
+-- 4.2 · DIA DESCONTABLE: lunes a viernes y NO feriado.
+-- SECURITY DEFINER a proposito. Si fuera invoker y quien llama no pudiera leer
+-- rrhh_feriado, el `not exists` daria true y la funcion diria que el dia SI
+-- descuenta: un error silencioso, y en la direccion que le cuesta plata a una
+-- persona. Los feriados no son dato sensible («no son de nadie», pegado 4).
+create or replace function rrhh_es_dia_descontable(p_dia date) returns boolean
+language sql stable security definer set search_path = public as $$
+  select extract(isodow from p_dia) <= 5
+     and not exists (select 1 from rrhh_feriado f
+                      where daterange(f.fecha, coalesce(f.fecha_fin, f.fecha), '[]') @> p_dia);
+$$;
+comment on function rrhh_es_dia_descontable(date) is
+  'Dia que DESCUENTA si hay ausencia, permiso sin goce o incapacidad: lunes a viernes '
+  'y que NO sea feriado ni cierre de planta. ⚠️ Que el feriado no descuente es una '
+  'SUPOSICION de Andrea (el feriado se paga igual), SIN CONFIRMAR por la contadora. '
+  'Si se confirma al revés, se cambia SOLO esta funcion.';
+
+-- 4.3 · EL DIVISOR DE UNA QUINCENA.
+create or replace function rrhh_dias_divisor(p_ini date, p_fin date) returns integer
+language sql immutable set search_path = public as $$
+  select count(*)::int from generate_series(0, (p_fin - p_ini)) g(i)
+   where rrhh_es_dia_divisor(p_ini + g.i);
+$$;
+comment on function rrhh_dias_divisor(date, date) is
+  'Cuantos dias del divisor tiene el rango. Serie de ENTEROS y no de fechas: '
+  'generate_series(date,date,interval) vuelve como timestamptz y el ::date dependeria '
+  'del timezone de la sesion. Oct Q1 = 11 · Nov Q1 = 10 · Dic Q2 (16-31) = 12.';
+
+-- 4.4 · ¿ESTE FERIADO PAGA DOBLE SI SE TRABAJA?
+create or replace function rrhh_feriado_paga_doble(p_dia date) returns boolean
+language sql stable security definer set search_path = public as $$
+  select extract(isodow from p_dia) <= 5
+     and exists (select 1 from rrhh_feriado f
+                  where f.tipo = 'feriado' and f.pago_obligatorio
+                    and daterange(f.fecha, coalesce(f.fecha_fin, f.fecha), '[]') @> p_dia);
+$$;
+comment on function rrhh_feriado_paga_doble(date) is
+  'true solo si el dia es feriado de PAGO OBLIGATORIO y cae de lunes a viernes. '
+  '⚠️ PENDIENTE: un feriado obligatorio en sabado o domingo devuelve false y NO suma '
+  'nada. La ley podria exigir el dia sencillo igual — pendiente de la contadora. En '
+  'lo que queda de 2026 el caso no se presenta.';
+
+-- Y el guardia: no se puede cargar un feriado trabajado sobre un dia que no
+-- califica. Sin esto, un error de dedo paga doble un martes cualquiera.
+create or replace function rrhh_feriado_trabajado_valida() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if not rrhh_feriado_paga_doble(new.fecha) then
+    raise exception 'El % no es un feriado de pago obligatorio de lunes a viernes, asi que '
+      'no paga doble. Si es un dia extra o una hora extra comun, va por otro camino.',
+      to_char(new.fecha,'DD-MM-YYYY') using errcode = '23514';
+  end if;
+  return new;
+end $$;
+drop trigger if exists rrhh_feriado_trabajado_valida_tg on rrhh_feriado_trabajado;
+create trigger rrhh_feriado_trabajado_valida_tg before insert on rrhh_feriado_trabajado
+  for each row execute function rrhh_feriado_trabajado_valida();
+
+
+-- ── 5 · LOS PARAMETROS · FILAS NUEVAS, NADA BORRADO ─────────────────────
+-- Vigencia 2026-10-01 para los dos, que es desde cuando rige el neto fijo. Las
+-- filas viejas QUEDAN: asi el calculo de una quincena anterior sigue siendo
+-- reconstruible con los valores que regian entonces.
+insert into rrhh_param (clave, valor, vigente_desde, nota, creado_por) values
+  ('rebaja_trabajador_pct', 0.0, '2026-10-01',
+   'APAGADA desde el 15-oct-2026. El neto ya no se deriva del bruto con un porcentaje: '
+   'sale de rrhh_neto_quincena. La fila anterior (6,49) NO se borra — sin ella no se '
+   'podria reconstruir como se calculo antes de este cambio.', 'pegado-10'),
+  ('incap_dias_naturales', 0.0, '2026-10-01',
+   'Decision de Lorena, 15-oct-2026: la incapacidad descuenta solo en dias HABILES '
+   '(lunes a viernes y no feriado), igual que un permiso. Antes era 1 (dias naturales). '
+   'La fila anterior NO se borra.', 'pegado-10');
+
+
+-- ── 6 · LAS VISTAS ──────────────────────────────────────────────────────
+-- `habil` de v_rrhh_permiso_dia pasa a calcularse con rrhh_es_dia_descontable().
+-- Significa lo MISMO que antes (L-V y no feriado), pero ahora la regla vive en la
+-- funcion y no repetida en la vista. No se agregan ni se quitan columnas.
+create or replace view v_rrhh_permiso_dia with (security_invoker = true) as
+select pm.id                                     as permiso_id,
+       pm.persona_id,
+       p.nombre,
+       pm.modalidad_descuento,
+       pm.horas,
+       (pm.fecha_inicio + g.i)                   as dia,
+       rrhh_quincena(pm.fecha_inicio + g.i)      as quincena,
+       rrhh_es_dia_descontable(pm.fecha_inicio + g.i) as habil,
+       -- `dia_n` sigue contando DIAS NATURALES desde el inicio: el plazo del
+       -- art. 79 («los primeros 3 dias») corre en calendario. Un fin de semana
+       -- no descuenta pero igual consume plazo.
+       (g.i + 1)                                 as dia_n,
+       pm.incapacidad_origen
+  from rrhh_permiso pm
+  join rrhh_persona p on p.id = pm.persona_id
+  cross join lateral generate_series(0, (pm.fecha_fin - pm.fecha_inicio)) as g(i)
+ where pm.estado = 'aprobado'
+   and acceso_es_socia();
+
+
+-- EL DESGLOSE. Seis conceptos: base · incapacidad · descuento_permiso ·
+-- feriado_trabajado · rebaja · ajuste.
+create or replace view v_rrhh_pago_detalle with (security_invoker = true) as
+with rango as (
+  -- Los dos extremos en su propio CTE: una subconsulta agregada como ARGUMENTO
+  -- de generate_series dentro del FROM es sintaxis discutible segun la version,
+  -- y esto no deja lugar a duda.
+  --
+  -- ⚠️ EL UNIVERSO TIENE QUE CUBRIR TAMBIEN AJUSTES Y PERMISOS, no solo salarios.
+  -- La rama de ajustes de abajo hace `join q`, asi que un ajuste fuera del rango
+  -- NO SALE EN NINGUNA PANTALLA — se guarda y desaparece. Y el rango se puede
+  -- quedar corto de los dos lados: un ajuste con fecha anterior al primer salario
+  -- cargado, o uno adelantado al mes que viene. Plata que existe y no se ve es
+  -- peor que plata mal calculada, porque nada avisa.
+  -- `least`/`greatest` de Postgres IGNORAN los nulls, asi que una tabla vacia no
+  -- arrastra todo a null; si las tres estan vacias, d0 queda null, generate_series
+  -- no devuelve filas y la vista sale vacia — la respuesta correcta.
+  --
+  -- ⚠️ AGREGADO EN EL PEGADO 10, y no es cosmetico: desde ahora la BASE del pago
+  -- sale de rrhh_neto_quincena. Si el universo siguiera midiendose solo con
+  -- rrhh_salario, una persona con neto cargado y sin salario quedaria fuera del
+  -- rango y su pago no apareceria en ninguna pantalla — guardado y mudo. Lo
+  -- mismo con un feriado trabajado adelantado a diciembre.
+  select date_trunc('month', least(
+           (select min(vigente_desde) from rrhh_salario),
+           (select min(vigente_desde) from rrhh_neto_quincena),
+           (select min(fecha)         from rrhh_feriado_trabajado),
+           (select min(fecha)         from rrhh_ajuste_manual),
+           (select min(fecha_inicio)  from rrhh_permiso)))::date            as desde,
+         (date_trunc('month', greatest(
+           current_date,
+           (select max(vigente_desde) from rrhh_salario),
+           (select max(vigente_desde) from rrhh_neto_quincena),
+           (select max(fecha)      from rrhh_feriado_trabajado),
+           (select max(fecha)      from rrhh_ajuste_manual),
+           (select max(fecha_fin)  from rrhh_permiso)))
+          + interval '1 month - 1 day')::date                              as hasta
+),
+q as (
+  -- Serie de ENTEROS por la misma razon que en v_rrhh_permiso_dia: una serie de
+  -- fechas con `interval` vuelve como timestamptz y el `::date` dependeria del
+  -- timezone de la sesion. `date + integer` no toca ningun huso.
+  select rrhh_quincena(r.desde + g.i) as quincena,
+         min(r.desde + g.i)           as ini,
+         max(r.desde + g.i)           as fin
+    from rango r
+    cross join lateral generate_series(0, (r.hasta - r.desde)) as g(i)
+   group by 1
+),
+-- QUIÉN ENTRA EN CADA QUINCENA. Se excluye a quien todavía no había ingresado y
+-- a quien ya estaba de baja antes de que la quincena empezara. La quincena en
+-- la que alguien se va SÍ aparece, completa: prorratearla es una decisión de
+-- plata que le toca a la socia, y la hace con un ajuste manual a la vista.
+persona_q as (
+  select p.id as persona_id, p.nombre, q.quincena, q.ini, q.fin
+    from rrhh_persona p
+    cross join q
+    left join lateral (select b.anulada, b.fecha from rrhh_persona_baja b
+                        where b.persona_id = p.id
+                        order by b.creado_en desc limit 1) ba on true
+   where (p.ingreso is null or p.ingreso <= q.fin)
+     and (ba.fecha is null or ba.anulada or ba.fecha >= q.ini)
+),
+-- EL SALARIO VIGENTE EL ÚLTIMO DÍA DE LA QUINCENA, y de ahí las dos tarifas.
+-- Mismo patrón que `v_rrhh_evento` (lateral + order by vigente_desde desc,
+-- creado_en desc limit 1), para que dos filas con la misma vigencia desempaten
+-- igual en los dos lados del módulo.,
+-- EL NETO FIJO, vigente el ULTIMO dia de la quincena. Reemplaza al CTE `sal`,
+-- que derivaba todo de salario_mensual. Mismo patron de desempate que
+-- rrhh_salario (vigente_desde desc, creado_en desc) para que los dos lados del
+-- modulo resuelvan igual una vigencia repetida.
+neto as (
+  select pq.persona_id, pq.nombre, pq.quincena, pq.ini, pq.fin,
+         n.neto, n.vigente_desde,
+         rrhh_dias_divisor(pq.ini, pq.fin)                          as divisor,
+         n.neto / nullif(rrhh_dias_divisor(pq.ini, pq.fin), 0)      as valor_dia,
+         n.neto / nullif(rrhh_dias_divisor(pq.ini, pq.fin), 0)
+                / rrhh_param('jornada_horas', pq.fin)               as valor_hora
+    from persona_q pq
+    left join lateral (select nq.neto, nq.vigente_desde from rrhh_neto_quincena nq
+                        where nq.persona_id = pq.persona_id and nq.vigente_desde <= pq.fin
+                        order by nq.vigente_desde desc, nq.creado_en desc limit 1) n on true
+),
+-- PERMISOS CON DESCUENTO. `pd.habil` ya es «descontable», asi que un dia sobre un
+-- feriado no entra en la cuenta.
+perm as (
+  select n.quincena, n.ini, n.fin, n.persona_id, n.nombre,
+         n.valor_dia, n.valor_hora, pd.permiso_id,
+         min(pd.dia) as dia_ini, max(pd.dia) as dia_fin,
+         count(*) filter (where pd.habil) as dias,
+         max(pd.horas)                    as horas
+    from neto n
+    join v_rrhh_permiso_dia pd
+      on pd.persona_id = n.persona_id and pd.dia between n.ini and n.fin
+   where pd.modalidad_descuento = 'descuento'
+     and n.neto is not null
+   group by n.quincena, n.ini, n.fin, n.persona_id, n.nombre,
+            n.valor_dia, n.valor_hora, pd.permiso_id
+),
+-- INCAPACIDADES. Que cuenten solo los dias descontables o todos los naturales lo
+-- decide `incap_dias_naturales`, que el pegado puso en 0 (= solo habiles). El
+-- parametro SE SIGUE LEYENDO a proposito: si dejara de consultarse, volverlo a 1
+-- no haria nada y nadie se enteraria. La regla vive ahi, en un solo lugar.
+-- El porcentaje del patrono depende del numero de dia DENTRO de la incapacidad
+-- (dia_n, dias NATURALES: el plazo del art. 79 corre en calendario), no del dia
+-- de la quincena.
+incap as (
+  select n.quincena, n.ini, n.fin, n.persona_id, n.nombre, n.valor_dia,
+         pd.permiso_id, max(pd.incapacidad_origen) as origen,
+         min(pd.dia) as dia_ini, max(pd.dia) as dia_fin,
+         count(*) filter (where rrhh_param('incap_dias_naturales', n.fin) = 1
+                             or pd.habil)                   as dias,
+         sum(case when rrhh_param('incap_dias_naturales', n.fin) = 1 or pd.habil
+                  then n.valor_dia * (1 -
+                         (case when pd.dia_n <= rrhh_param('incap_dias_patrono', n.fin)
+                               then rrhh_param('incap_patrono_pct_dias_1_3',        n.fin)
+                               else rrhh_param('incap_patrono_pct_dia_4_en_adelante', n.fin)
+                          end) / 100.0)
+                  else 0 end)             as descuento
+    from neto n
+    join v_rrhh_permiso_dia pd
+      on pd.persona_id = n.persona_id and pd.dia between n.ini and n.fin
+   where pd.modalidad_descuento = 'incapacidad'
+     and n.neto is not null
+   group by n.quincena, n.ini, n.fin, n.persona_id, n.nombre, n.valor_dia, pd.permiso_id
+),
+-- FERIADO TRABAJADO. Suma. La vista vuelve a preguntar si el dia califica aunque
+-- el trigger ya lo valido al insertar: si alguien desmarca `pago_obligatorio`
+-- despues, el adicional tiene que dejar de pagarse.
+fert as (
+  select n.quincena, n.ini, n.fin, n.persona_id, n.nombre,
+         n.valor_dia, n.valor_hora, ft.id as ft_id, ft.fecha, ft.horas, ft.nota
+    from neto n
+    join rrhh_feriado_trabajado ft
+      on ft.persona_id = n.persona_id and ft.fecha between n.ini and n.fin
+   where n.neto is not null
+     and rrhh_feriado_paga_doble(ft.fecha)
+),
+renglones as (
+-- LA BASE: el neto fijo. El divisor va a la vista en `cantidad`, que es lo que
+-- vuelve auditable el valor del dia sin abrir la base.
+select n.quincena, n.ini, n.fin, n.persona_id, n.nombre,
+       'base'::text                          as concepto,
+       null::bigint                          as ref_id,
+       n.ini                                 as dia,
+       n.divisor::numeric                    as cantidad,
+       'dias habiles'::text                  as unidad,
+       n.valor_dia                           as tarifa,
+       n.neto                                as monto,
+       ('Neto de quincena vigente desde ' || to_char(n.vigente_desde,'DD-MM-YYYY')
+        || ' · divisor ' || n.divisor)        as nota
+  from neto n
+ where n.neto is not null
+   and acceso_es_socia()
+
+union all
+
+select p.quincena, p.ini, p.fin, p.persona_id, p.nombre,
+       'descuento_permiso'::text             as concepto,
+       p.permiso_id                          as ref_id,
+       p.dia_ini                             as dia,
+       case when p.horas is not null
+            then case when p.dias > 0 then p.horas else 0 end
+            else p.dias::numeric end         as cantidad,
+       case when p.horas is not null then 'horas' else 'dias' end as unidad,
+       case when p.horas is not null then p.valor_hora else p.valor_dia end as tarifa,
+       - (case when p.horas is not null
+               then case when p.dias > 0 then p.horas else 0 end * p.valor_hora
+               else p.dias * p.valor_dia end) as monto,
+       ('Permiso ' || to_char(p.dia_ini,'DD-MM')
+          || case when p.dia_fin > p.dia_ini then ' al ' || to_char(p.dia_fin,'DD-MM') else '' end
+          || case when p.dias = 0 then ' · sin dias descontables' else '' end) as nota
+  from perm p
+ where acceso_es_socia()
+
+union all
+
+select i.quincena, i.ini, i.fin, i.persona_id, i.nombre,
+       'incapacidad'::text                   as concepto,
+       i.permiso_id                          as ref_id,
+       i.dia_ini                             as dia,
+       i.dias::numeric                       as cantidad,
+       'dias'::text                          as unidad,
+       i.valor_dia                           as tarifa,
+       - i.descuento                         as monto,
+       ('Incapacidad'
+        || case when i.origen = 'accidente_trabajo' then ' (accidente de trabajo)'
+                when i.origen = 'enfermedad_comun'  then ' (enfermedad comun)' else '' end
+        || ': ' || i.dias::text || case when i.dias = 1 then ' dia habil' else ' dias habiles' end
+        || ' · ' || to_char(i.dia_ini,'DD-MM')
+        || case when i.dia_fin > i.dia_ini then ' al ' || to_char(i.dia_fin,'DD-MM') else '' end
+        || case when rrhh_param('incapacidad_reglas_confirmadas', i.fin) = 1 then ''
+                else ' · REGLAS SIN CONFIRMAR' end) as nota
+  from incap i
+ where acceso_es_socia()
+
+union all
+
+-- FERIADO TRABAJADO · suma, y sale como su propio concepto para que Lorena lo vea
+-- separado de cualquier otra cosa.
+select f.quincena, f.ini, f.fin, f.persona_id, f.nombre,
+       'feriado_trabajado'::text             as concepto,
+       f.ft_id                               as ref_id,
+       f.fecha                               as dia,
+       coalesce(f.horas, 1)                  as cantidad,
+       case when f.horas is not null then 'horas' else 'dias' end as unidad,
+       case when f.horas is not null then f.valor_hora else f.valor_dia end as tarifa,
+       case when f.horas is not null then f.horas * f.valor_hora else f.valor_dia end as monto,
+       ('Feriado trabajado ' || to_char(f.fecha,'DD-MM')
+        || case when f.horas is not null then ' · ' || f.horas::text || ' h' else ' · dia completo' end
+        || ' · el dia queda al doble'
+        || case when coalesce(f.nota,'') <> '' then ' · ' || f.nota else '' end) as nota
+  from fert f
+ where acceso_es_socia()
+
+union all
+
+select rrhh_quincena(a.fecha)                as quincena,
+       q.ini, q.fin,
+       a.persona_id, p.nombre,
+       'ajuste'::text                        as concepto,
+       a.id                                  as ref_id,
+       a.fecha                               as dia,
+       1::numeric                            as cantidad,
+       null::text                            as unidad,
+       null::numeric                         as tarifa,
+       a.monto                               as monto,
+       a.nota                                as nota
+  from rrhh_ajuste_manual a
+  join rrhh_persona p on p.id = a.persona_id
+  join q on q.quincena = rrhh_quincena(a.fecha)
+ where acceso_es_socia()
+),
+-- LA REBAJA sigue existiendo, apagada. Con el pct en 0 el renglon NO se emite:
+-- un «-₡0» es ruido en la unica pantalla que tiene que leerse entera. El concepto
+-- queda para poder reconstruir una quincena vieja.
+reb as (
+  select r.quincena, r.persona_id, r.nombre,
+         min(r.ini) as ini, max(r.fin) as fin,
+         sum(case when r.concepto in ('base','descuento_permiso','incapacidad')
+                  then r.monto else 0 end) as sujeto
+    from renglones r
+   group by r.quincena, r.persona_id, r.nombre
+)
+select * from renglones
+
+union all
+
+select b.quincena, b.ini, b.fin, b.persona_id, b.nombre,
+       'rebaja'::text, null::bigint, b.ini,
+       rrhh_param('rebaja_trabajador_pct', b.fin),
+       'pct'::text, null::numeric,
+       - (b.sujeto * rrhh_param('rebaja_trabajador_pct', b.fin) / 100.0),
+       ('Rebajas del trabajador ('
+        || trim(to_char(rrhh_param('rebaja_trabajador_pct', b.fin), 'FM999990.00')) || '%)')
+  from reb b
+ where acceso_es_socia()
+   and coalesce(rrhh_param('rebaja_trabajador_pct', b.fin), 0) <> 0
+   and b.sujeto <> 0;
+
+
+-- EL NUMERO A TRANSFERIR. Las columnas nuevas van AL FINAL: `create or replace
+-- view` solo permite agregar.
+create or replace view v_rrhh_pago with (security_invoker = true) as
+select quincena, persona_id, nombre,
+       min(ini) as ini, max(fin) as fin,
+       coalesce(sum(monto) filter (where concepto = 'base'), 0)              as base,
+       coalesce(sum(monto) filter (where concepto = 'descuento_permiso'), 0) as descuentos,
+       coalesce(sum(monto) filter (where concepto = 'ajuste'), 0)            as ajustes,
+       coalesce(sum(monto), 0)                                               as final,
+       count(*) filter (where concepto = 'descuento_permiso')                as permisos,
+       count(*) filter (where concepto = 'ajuste')                           as ajustes_n,
+       coalesce(sum(monto) filter (where concepto = 'incapacidad'), 0)       as incapacidades,
+       count(*) filter (where concepto = 'incapacidad')                      as incap_n,
+       coalesce(sum(monto) filter (where concepto = 'rebaja'), 0)            as rebaja,
+       coalesce(sum(monto) filter (where concepto <> 'rebaja'), 0)           as subtotal,
+       coalesce(sum(monto) filter (where concepto = 'feriado_trabajado'), 0) as feriados_trab,
+       count(*) filter (where concepto = 'feriado_trabajado')                as feriados_trab_n,
+       max(cantidad) filter (where concepto = 'base')                        as divisor,
+       max(tarifa)   filter (where concepto = 'base')                        as valor_dia
+  from v_rrhh_pago_detalle
+ where acceso_es_socia()
+ group by quincena, persona_id, nombre;
+
+
+-- ── 7 · GRANTS ──────────────────────────────────────────────────────────
+-- Aca hay NETO: la anon key es publica y va dentro de index.html.
+revoke all on rrhh_neto_quincena, rrhh_feriado_trabajado from anon;
+revoke all on v_rrhh_permiso_dia, v_rrhh_pago_detalle, v_rrhh_pago from anon;
+grant select on rrhh_neto_quincena, rrhh_feriado_trabajado to authenticated;
+grant insert on rrhh_neto_quincena, rrhh_feriado_trabajado to authenticated;
+grant select on v_rrhh_permiso_dia, v_rrhh_pago_detalle, v_rrhh_pago to authenticated;
+-- Las funciones de regla: ejecutarlas no revela nada, pero `execute` se le da a
+-- PUBLIC por defecto y las dos definer correrian como su dueño. No se depende de
+-- una sola capa.
+revoke all on function rrhh_es_dia_divisor(date)      from anon, public;
+revoke all on function rrhh_es_dia_descontable(date)  from anon, public;
+revoke all on function rrhh_dias_divisor(date, date)  from anon, public;
+revoke all on function rrhh_feriado_paga_doble(date)  from anon, public;
+grant execute on function rrhh_es_dia_divisor(date)     to authenticated;
+grant execute on function rrhh_es_dia_descontable(date) to authenticated;
+grant execute on function rrhh_dias_divisor(date, date) to authenticated;
+grant execute on function rrhh_feriado_paga_doble(date) to authenticated;
+
+
+-- ── 8 · EL CANDADO ──────────────────────────────────────────────────────
+do $candado$
+declare
+  v_anon int; v_inv int; v_rls boolean; v_pol int;
+  v_div int; v_fer boolean; v_desc boolean; v_doble boolean;
+  v_pct numeric; v_nat numeric;
+begin
+  -- Ninguna de las tablas ni vistas nuevas puede quedar legible por anon.
+  select count(*) into v_anon from (
+    select unnest(array['rrhh_neto_quincena','rrhh_feriado_trabajado',
+                        'v_rrhh_permiso_dia','v_rrhh_pago_detalle','v_rrhh_pago']) as t) x
+   where has_table_privilege('anon','public.'||x.t,'SELECT')
+      or has_table_privilege('anon','public.'||x.t,'INSERT');
+
+  select count(*) into v_inv from pg_class c join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public'
+     and c.relname in ('v_rrhh_permiso_dia','v_rrhh_pago_detalle','v_rrhh_pago')
+     and c.reloptions::text like '%security_invoker=true%';
+
+  select c.relrowsecurity into v_rls from pg_class c join pg_namespace n on n.oid=c.relnamespace
+   where n.nspname='public' and c.relname='rrhh_neto_quincena';
+  select count(*) into v_pol from pg_policies
+   where schemaname='public' and tablename in ('rrhh_neto_quincena','rrhh_feriado_trabajado');
+
+  -- LAS REGLAS, MEDIDAS CONTRA EL CALENDARIO REAL. No se confia en el texto de
+  -- la funcion: se la llama.
+  v_div   := rrhh_dias_divisor(date '2026-10-01', date '2026-10-15');
+  v_fer   := rrhh_es_dia_divisor(date '2026-10-12');     -- feriado, lunes -> en el divisor
+  v_desc  := rrhh_es_dia_descontable(date '2026-10-03'); -- sabado -> no descuenta
+  v_doble := rrhh_feriado_paga_doble(date '2026-12-25'); -- obligatorio y viernes -> si
+
+  select valor into v_pct from rrhh_param where clave='rebaja_trabajador_pct'
+    order by vigente_desde desc, creado_en desc limit 1;
+  select valor into v_nat from rrhh_param where clave='incap_dias_naturales'
+    order by vigente_desde desc, creado_en desc limit 1;
+
+  if v_anon <> 0 then
+    raise exception 'CANDADO: `anon` llega a % de las tablas/vistas nuevas. Aca hay NETO y '
+      'la anon key es PUBLICA. NO SE APLICO NADA.', v_anon;
+  end if;
+  if v_inv <> 3 then
+    raise exception 'CANDADO: solo % de 3 vistas con security_invoker. NO SE APLICO NADA.', v_inv;
+  end if;
+  if not coalesce(v_rls,false) then
+    raise exception 'CANDADO: rrhh_neto_quincena quedo SIN RLS. El grant de select es para '
+      '`authenticated`, o sea todo el equipo: sin RLS cualquiera leeria el neto de todos. '
+      'NO SE APLICO NADA.';
+  end if;
+  if v_pol <> 4 then
+    raise exception 'CANDADO: hay % politicas en las dos tablas nuevas, tenian que ser 4. '
+      'NO SE APLICO NADA.', v_pol;
+  end if;
+  -- EL DIVISOR, CONTRA EL DATO QUE CONFIRMO LORENA.
+  if v_div <> 11 then
+    raise exception 'CANDADO: el divisor del 1-15 de octubre da % y tiene que dar 11. '
+      'Lorena lo confirmo con «neto - neto/11». NO SE APLICO NADA.', v_div;
+  end if;
+  if not v_fer then
+    raise exception 'CANDADO: el 12-oct (feriado, lunes) NO cuenta en el divisor, y tiene '
+      'que contar. NO SE APLICO NADA.';
+  end if;
+  if v_desc then
+    raise exception 'CANDADO: el sabado 3-oct cuenta como descontable, y no tiene que '
+      'contar. NO SE APLICO NADA.';
+  end if;
+  if not v_doble then
+    raise exception 'CANDADO: el 25-dic no califica para pago doble. O no quedo marcado como '
+      'pago_obligatorio, o no esta cargado en rrhh_feriado. NO SE APLICO NADA.';
+  end if;
+  if coalesce(v_pct, -1) <> 0 then
+    raise exception 'CANDADO: la rebaja quedo en %% y tenia que quedar APAGADA en 0. '
+      'NO SE APLICO NADA.', v_pct;
+  end if;
+  if coalesce(v_nat, -1) <> 0 then
+    raise exception 'CANDADO: incap_dias_naturales quedo en % y tenia que quedar en 0 '
+      '(la incapacidad descuenta solo habiles). NO SE APLICO NADA.', v_nat;
+  end if;
+
+  raise notice 'CANDADO OK: anon en 0 · 3 vistas invoker · RLS con 4 politicas · divisor 11 · '
+    'feriado en el divisor · sabado no descuenta · 25-dic paga doble · rebaja 0 · incap habiles';
+end
+$candado$;
+
+
+-- ── 9 · LA FILA DE CONTROL ──────────────────────────────────────────────
+-- Regla 🔴 de CLAUDE.md: un "Success" del editor no es evidencia de nada.
+-- ESPERADO:  1 · 1 · 1 · 11 · t · f · t · 0 · 0 · 4 · 0
+select
+  (select count(*) from information_schema.columns where table_schema='public'
+    and table_name='rrhh_feriado' and column_name='pago_obligatorio')        as col_feriado,
+  (select count(*) from information_schema.tables where table_schema='public'
+    and table_name='rrhh_neto_quincena')                                     as tabla_neto,
+  (select count(*) from information_schema.tables where table_schema='public'
+    and table_name='rrhh_feriado_trabajado')                                 as tabla_fer_trab,
+  rrhh_dias_divisor(date '2026-10-01', date '2026-10-15')                    as divisor_oct_q1,
+  rrhh_es_dia_divisor(date '2026-10-12')                                     as feriado_en_divisor,
+  rrhh_es_dia_descontable(date '2026-10-03')                                 as sabado_descuenta,
+  rrhh_feriado_paga_doble(date '2026-12-25')                                 as navidad_doble,
+  (select valor from rrhh_param where clave='rebaja_trabajador_pct'
+    order by vigente_desde desc, creado_en desc limit 1)                     as rebaja_apagada,
+  (select valor from rrhh_param where clave='incap_dias_naturales'
+    order by vigente_desde desc, creado_en desc limit 1)                     as incap_habiles,
+  (select count(*) from pg_policies where schemaname='public'
+    and tablename in ('rrhh_neto_quincena','rrhh_feriado_trabajado'))        as politicas,
+  (select count(*) from (select unnest(array['rrhh_neto_quincena','rrhh_feriado_trabajado',
+      'v_rrhh_pago_detalle','v_rrhh_pago']) as t) x
+    where has_table_privilege('anon','public.'||x.t,'SELECT'))               as anon_debe_ser_0;
+
+commit;
+
+
+-- ════════════════════════════════════════════════════════════════════════
+-- DESPUES DEL COMMIT
+-- ════════════════════════════════════════════════════════════════════════
+--   1. PRUEBAS_NETO_QUINCENA.sql — el ensayo, con el cuerpo de ESTE archivo
+--      adentro y ROLLBACK.
+--   2. Cargar los netos reales con PEGADO_NETO_QUINCENA.sql, que NO va al repo
+--      (PEGADO_*.sql esta en .gitignore porque el repo es PUBLICO).
+--   3. esquema_check.py y sonda_columnas.py --nuevas.
+--   4. Y el cuadre que ningun script da: la quincena 1-15 de octubre, limpia,
+--      tiene que dar exactamente el neto cargado de cada persona.
