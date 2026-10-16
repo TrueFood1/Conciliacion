@@ -5395,7 +5395,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 15 oct 2026 · b105';
+const BUILD = 'v 15 oct 2026 · b106';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -12648,11 +12648,40 @@ async function despYaEntregado(mv, porLinea){
 
 // Facturas posted del período con al menos una línea de los 6 terminados, menos
 // las que ya tienen despacho confirmado.
+// {id_factura: 'motivo'} de las facturas que son re-factura de un pedido ya despachado (ver arriba).
+// Si Odoo o Supabase fallan devuelve lo que alcanzó a saber: el modo de falla de las apartadas.
+async function despRefacturasEnDuda(mv, ya){
+  const out={}, corto=function(n){ return '…'+String(n||'').slice(-4); };
+  try{
+    const cand=mv.filter(function(m){ return !ya[m.id] && !(m.reversal_move_id||[]).length && m.invoice_origin; });
+    if(!cand.length) return out;
+    const origs=[...new Set(cand.map(function(m){ return m.invoice_origin; }))];
+    const viejas=await odooCall('account.move','search_read',
+      [[['move_type','=','out_invoice'],['state','=','posted'],['invoice_origin','in',origs],['reversal_move_id','!=',false]]],
+      {fields:['id','name','invoice_origin'],limit:500,context:{lang:'es_CR'}});
+    const porOrig={};
+    viejas.forEach(function(v){ if(ya[v.id]) (porOrig[v.invoice_origin]=porOrig[v.invoice_origin]||[]).push(v); });
+    if(!Object.keys(porOrig).length) return out;
+    // Lo que ya revisó el trabajo (la más reciente por factura nueva): si la apartó, su motivo en palabras.
+    const rf={};
+    try{ const c=sbClient();
+      if(c){ const {data}=await c.from('ent_refactura').select('factura_nueva_id,resultado,motivo,creado_en').order('creado_en',{ascending:true});
+             (data||[]).forEach(function(r){ rf[r.factura_nueva_id]=r; }); } }catch(e){}
+    cand.forEach(function(m){
+      const vs=porOrig[m.invoice_origin]; if(!vs) return;
+      const v=vs[0], ped=ya[v.id], r=rf[m.id];
+      out[m.id]=(r && r.resultado==='apartada')
+        ? ('Re-factura del pedido #'+ped+' (reemplaza '+corto(v.name)+'), apartada: '+r.motivo)
+        : ('Re-factura del pedido #'+ped+' (reemplaza '+corto(v.name)+'): se liga sola si cumple las 4 reglas; no se prepara');
+    });
+  }catch(e){ try{ console.warn('[Truefie] re-facturas en duda', (e&&e.message)||e); }catch(_){} }
+  return out;
+}
 async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
   const mv=await odooCall('account.move','search_read',
     [[['move_type','=','out_invoice'],['state','=','posted'],
       ['invoice_date','>=',desdeTodo],['invoice_date','<=',hasta]]],
-    {fields:['id','name','invoice_date','partner_id','reversal_move_id'],limit:500,
+    {fields:['id','name','invoice_date','partner_id','reversal_move_id','invoice_origin'],limit:500,
      order:'invoice_date desc, id desc',context:{lang:'es_CR'}});
   if(!mv.length) return [];
   // Las anuladas por nota de crédito NO van a "Por preparar": preparar contra una
@@ -12674,9 +12703,16 @@ async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
   let ya={};
   try{
     const c=sbClient();
-    if(c){ const {data}=await c.from('v_ent_factura_despachada').select('factura_id');
-           (data||[]).forEach(function(r){ ya[r.factura_id]=1; }); }
+    if(c){ const {data}=await c.from('v_ent_factura_despachada').select('factura_id,pedido_id');
+           (data||[]).forEach(function(r){ ya[r.factura_id]=r.pedido_id||1; }); }
   }catch(e){}
+  // ── RE-FACTURAS EN DUDA (15-oct, Andrea: automático) ─────────────────
+  // Una factura nueva del MISMO pedido de venta que una factura ANULADA que ya está despachada en
+  // Truefie es una re-factura. El trabajo de cada hora la liga sola si cumple las 4 reglas (y entonces
+  // ya está en `ya` y no llega acá) o la deja apartada con su motivo. Mientras tanto NUNCA entra a
+  // «Por preparar» de Daniel: va a las apartadas, con el motivo y los botones de siempre.
+  const refac=await despRefacturasEnDuda(mv, ya);
+  Object.keys(refac).forEach(function(id){ if(!sinDesp[id]) sinDesp[id]=refac[id]; });
   // ── LO QUE UN HUMANO YA DECIDIÓ sobre las apartadas ───────────────────
   // 'revisado'  → la miró y está bien apartada: sale de las DOS listas.
   // 'despachar' → el filtro se equivocó: va a la bandeja como cualquier otra.
@@ -17788,8 +17824,35 @@ async function irAPendientes(){
   // cuesta nada: despCargar sale por el camino corto.
   try{ despCargar(false); }catch(e){}
 }
+// ── RE-FACTURAS LIGADAS SOLAS (15-oct) · aviso a las socias ──────────────
+// Lo que el trabajo de cada hora ligó solo en los últimos 7 días, desde `ent_refactura`. Se va sola a los
+// 7 días (regla 3 de las alertas: nada de «marcar como visto»). Las APARTADAS no van acá: ya salen en
+// «Facturas sin despacho pendiente» con su motivo y sus botones.
+let _pdRefac=null;
+async function pdRefacCargar(){
+  try{
+    if(!(await accesoSocia())){ _pdRefac=[]; return; }
+    const c=sbClient(); if(!c){ _pdRefac=[]; return; }
+    const desde=new Date(Date.now()-7*86400000).toISOString();
+    const {data,error}=await c.from('ent_refactura').select('pedido_id,factura_vieja_nombre,factura_nueva_nombre,creado_en')
+      .eq('resultado','ligada').gte('creado_en',desde).order('creado_en',{ascending:false});
+    if(error) throw error;
+    _pdRefac=data||[];
+  }catch(e){ _pdRefac=[]; try{ console.warn('[Truefie] re-facturas ligadas', (e&&e.message)||e); }catch(_){} }
+  if(_pd) pdRender();
+}
+function pdRefacHTML(){
+  const L=_pdRefac||[]; if(!L.length) return '';
+  const corto=function(n){ return '…'+String(n||'').slice(-4); };
+  return '<div class="card rp-z"><div class="card-title">Re-facturas ligadas solas <span class="pd-cnt on">'+L.length+'</span></div>'
+    +L.map(function(r){ const d=new Date(r.creado_en);
+      return '<div class="pd-fila"><div class="pd-fila-c"><div class="pd-quien">Re-factura del pedido #'+esc(String(r.pedido_id))+'</div>'
+        +'<div class="pd-meta">'+esc(corto(r.factura_vieja_nombre))+' → '+esc(corto(r.factura_nueva_nombre))+' · ligada sola el '
+        +_fechaCorta(_ymd(d))+'</div></div></div>'; }).join('')+'</div>';
+}
 async function pdCargar(force){
   const st=document.getElementById('pdStatus'), body=document.getElementById('pdBody');
+  pdRefacCargar();
   if(_pd && !force){ pdRender(); pdCuadreCargar(false); return; }
   st.className='status s-info'; st.classList.remove('hidden');
   st.innerHTML='<span class="spin"></span>Leyendo despachos y su estado…';
@@ -18072,6 +18135,7 @@ function pdRender(){
   h+=pdExcHTML();
   h+=pdOdooHTML();      // las dos alertas de Odoo, al lado de «Por resolver»
   h+=pdvHTML();        // «Validar entrega en Odoo» · reemplaza al cuadre y a la marca manual (1-oct)
+  h+=pdRefacHTML();    // «Re-facturas ligadas solas» · aviso a las socias (15-oct)
   h+=secc('Salida sin clasificar',
     'Daniel registró la salida; falta que las socias digan qué fue. El pendiente es un estado con nombre, no un hueco.',
     _pd.l3, function(it){ return '<button class="btn btn-sm pd-acc" onclick="pdClasifUI('+it.id+')">Clasificar</button>'; }, true);
