@@ -545,6 +545,34 @@ relkind='r'` dice exactamente cuántas tablas están así.
 
 ---
 
+## P6 · ✅ APLICADO · La fórmula del neto, los netos reales y el cierre en cinco tramos
+
+**16-oct-2026 · aplicado en producción por Lorena, en este orden y con su fila de
+control verificada cada uno.** Nada de esto está publicado en `main`: lo que
+cambió es la **base**, no la pantalla.
+
+| paso | archivo | qué quedó | cómo se verificó |
+|---|---|---|---|
+| 2 | `PERSONAL_NETO_QUINCENA.sql` | el neto de quincena pasa a ser un **dato**; valor del día = neto ÷ días hábiles de esa quincena | fila de control completa + ensayo de 35 pruebas, todo verde |
+| 3 | `PEGADO_NETO_QUINCENA.sql` *(no está en el repo)* | los tres netos cargados con vigencia **1-oct-2026** | `cuadra = sí` en las tres personas, divisor **11** |
+| 5 | `PERSONAL_CIERRE_TRAMOS.sql` | el cierre partido en **cinco tramos**; el 25-dic y el 1-ene como feriados de pago obligatorio | **25 días** cerrados antes y después, sin cambios · ensayo de 12 pruebas, todo verde |
+
+El paso 1 y el 4 eran los ensayos con `rollback` de cada pegado, y los dos dieron
+verde en producción antes de aplicar nada.
+
+**Lo que esto cambió de fondo:** se fue el `÷15`, el `÷30` y la rebaja del 6,49 %
+que salía de una observación y nunca cuadró para las tres personas. Ahora el neto
+es el dato y de ahí sale todo. `rrhh_salario` quedó intacta: sigue siendo la
+historia del bruto.
+
+**Lo que queda abierto, y está anotado aparte:** P5 (dónde vive el archivo con los
+tres sueldos), P3 (los feriados sin cargar y las dos listas que no coinciden) y
+P4 (el `truncate` en las nueve tablas ya aplicadas). Y en la pantalla: la pestaña
+de Pago todavía no lee las columnas nuevas y el renglón de «feriado trabajado» se
+rotula como «Ajuste» — ver el final de esta nota en la rama `mis-solicitudes-b98`.
+
+---
+
 ## P5 · 🟡 DECIDE LORENA · Qué hacer con `PEGADO_NETO_QUINCENA.sql`, que ya se usó
 
 Anotado el **16-oct-2026**, el día que se aplicó. **No es una tarea técnica: es una
