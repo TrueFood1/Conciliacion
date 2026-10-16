@@ -205,12 +205,19 @@ select 10, 'el 25-dic trabajado suma un dia · final · suma · cuantos',
   from v_rrhh_pago v
  where v.persona_id = current_setting('cc.dic',true)::bigint and v.quincena = '2026-12-Q2';
 
--- 11 · NADA FUERA DEL CIERRE CAMBIO. Las tres filas de feriado que estaban antes
---      siguen igual, con su pago_obligatorio en false, y ningun dia de octubre o
---      noviembre se volvio cerrado.
+-- 11 · NADA FUERA DEL CIERRE CAMBIO · ANTES CONTRA DESPUES, SIN NUMEROS FIJOS.
+--      El esperado SALE DE LA FOTO que el prologo tomo antes de tocar la tabla, y
+--      el obtenido se mide ahora. Si el pegado hubiera tocado una fila de fuera,
+--      los dos textos dejarian de coincidir — con el calendario que sea.
+--
+--      ⚠️ La version anterior comparaba contra un '3 · 0 · 0' escrito a mano,
+--      sacado de la semilla del repo. En produccion el primer numero da 10,
+--      porque el calendario lleva un año de uso y esa tabla se edita desde la
+--      pantalla. La prueba fallaba sin que nada estuviera mal: medía cuanto
+--      calendario hay, no si el pegado cambio algo.
 insert into zz_res
-select 11, 'fuera del cierre · filas de 2026 antes de dic · obligatorias · dias cerrados en oct y nov',
-       '3 · 0 · 0',
+select 11, 'fuera del cierre, antes contra despues · filas · obligatorias · dias en oct y nov',
+       (select filas || ' · ' || obligatorias || ' · ' || dias_oct_nov from zz_antes_fuera),
        (select count(*) from rrhh_feriado where fecha < date '2026-12-18')
        || ' · ' ||
        (select count(*) from rrhh_feriado where fecha < date '2026-12-18' and pago_obligatorio)
@@ -232,11 +239,26 @@ select 12, 'el primer tramo conserva la fila original · cargado_por · y los ot
            and f.creado_por = 'pegado-11') || ' de pegado-11', null;
 
 
+-- 13 · INFO · QUE HAY CARGADO FUERA DEL CIERRE. No es una prueba y no puede
+--      fallar: esta para VER el calendario real, que es lo que la version
+--      anterior de la 11 daba por sabido. Las fechas no son dato sensible —
+--      «los dias cerrados no son de nadie», dice el pegado 4.
+insert into zz_res values (13,
+  'INFO · dias cerrados cargados ANTES del 18-dic · cuantos · obligatorios · en oct-nov · cuales',
+  '(lo que diga, no es una falla)',
+  (select filas || ' filas · ' || obligatorias || ' obligatoria(s) · ' || dias_oct_nov
+          || ' dia(s) en oct-nov · ' || coalesce(cuales,'(ninguna)')
+     from zz_antes_fuera),
+  'INFO');
+
+
 -- ── EL VEREDICTO ────────────────────────────────────────────────────────
+-- La fila 13 queda fuera: ya trae su veredicto y no se compara contra nada.
 update zz_res set veredicto =
   case when obtenido is null                  then 'SIN DATO'
        when btrim(obtenido) = btrim(esperado) then 'OK'
-       else 'FALLA' end;
+       else 'FALLA' end
+ where n between 1 and 12;
 
 insert into zz_res
 select n, 'ESTA PRUEBA NO CORRIO · la consulta no devolvio ninguna fila',
@@ -251,7 +273,9 @@ select t.veredicto as "veredicto", t.n as "#", t.escenario as "escenario",
   from (
     select r.veredicto, r.n, r.escenario, r.esperado,
            coalesce(r.obtenido,'(nada)') as obtenido,
-           case when r.veredicto in ('FALLA','SIN DATO') then 1 else 3 end as grupo
+           case when r.veredicto in ('FALLA','SIN DATO') then 1
+                when r.veredicto = 'INFO'                then 2
+                else 3 end                                              as grupo
       from zz_res r
     union all
     select (select case when count(*) < 12 then 'FALTAN PRUEBAS · NO PEGAR'
