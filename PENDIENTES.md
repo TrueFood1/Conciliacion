@@ -411,6 +411,41 @@ cargados tampoco. El primero que caiga en lunes a viernes va a descontar.
    coinciden del todo (a la del HTML le falta el 25-dic). Una de las dos tiene
    que desaparecer; la de la base es la que puede editarse sin publicar.
 
+### Y el 1 de enero de 2027, que es el caso urgente
+
+Agregado el **16-oct-2026** por decisión de Lorena. **No implementado.**
+
+El **1-ene-2027 es viernes** y es feriado de **pago obligatorio** (art. 148 del
+Código de Trabajo). Tiene exactamente el mismo conflicto que el 25-dic:
+
+| | 25-dic-2026 | 1-ene-2027 |
+|---|---|---|
+| día de la semana | viernes | **viernes** |
+| pago obligatorio | sí | **sí** |
+| ¿está cargado en `rrhh_feriado`? | **no** | **no** |
+| por qué no se puede cargar | está dentro del cierre de planta | **está dentro del cierre de planta** |
+
+El cierre va del 18-dic-2026 al 11-ene-2027, así que **contiene a los dos**, y la
+exclusión por rangos solapados de `rrhh_feriado` no deja que un feriado viva
+adentro de un cierre. Los dos quedan fuera de la tabla por el mismo motivo.
+
+**Por qué es el caso urgente y el 12-oct no.** El 12-oct ya pasó: lo que haya
+quedado mal es un descuento a revisar hacia atrás. El 1-ene todavía no, y es el
+primer feriado de pago obligatorio del año nuevo. Mientras no esté cargado:
+
+- `rrhh_feriado_paga_doble('2027-01-01')` devuelve **false**, así que si alguien
+  trabaja ese día el pago doble **no se puede cargar** — el trigger lo rechaza;
+- y `rrhh_es_dia_descontable('2027-01-01')` devuelve **true**, así que a quien
+  falte ese día **se le descuenta**, siendo un feriado pagado.
+
+Las dos cosas van en la dirección que le cuesta plata a la persona.
+
+**La decisión es la misma que para el 25-dic, y es de Lorena:** partir el cierre
+de planta en tramos para que los dos feriados existan como filas propias
+(18–24 dic · **25-dic** · 26-dic–31-dic · **1-ene** · 2–11 ene), o dejar la regla
+del pago doble sin poder dispararse. Se ve en la pantalla «Días cerrados», así que
+no es un efecto secundario de un pegado.
+
 ### Lo que sí quedó arreglado
 
 El ensayo ahora mide el caso «feriado» con el **1-dic-2026**, que es martes y sí
