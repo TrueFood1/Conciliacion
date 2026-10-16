@@ -377,3 +377,44 @@ Siete por tabla, catorce en total.
   asistente no la ve. Que pueda leer la tabla por SQL y no ver la pestaña es la
   decisión, no una inconsistencia: si algún día se le quiere mostrar la pantalla,
   hay que cambiar `PER_TABS` a mano y eso es otra decisión de Lorena.
+
+---
+
+## P3 · 🟠 ABIERTO · El 12-oct-2026 no está cargado como feriado en ninguna parte
+
+Encontrado el **16-oct-2026** corriendo el ensayo del pegado 10 contra un
+PostgreSQL local. Cuatro pruebas daban rojo y las cuatro por lo mismo: yo había
+escrito los esperados dando por hecho que el 12 de octubre era feriado.
+
+**No lo es, en los datos.** La semilla de `PERSONAL_CALENDARIO.sql` carga cuatro
+filas en `rrhh_feriado`: 31-ago, 15-sep, 1-dic y el cierre de planta. La lista
+`FERIADOS` del `index.html:9584` tiene las mismas tres fechas. El 12-oct aparece
+**solo** en la tabla de `PREGUNTAS_contadora_feriados.md`, marcado «ya pasó».
+
+### Por qué importa, aunque ya pasó
+
+Mientras el día no esté en `rrhh_feriado`, `rrhh_es_dia_descontable()` lo
+considera un día hábil común. O sea: **a quien faltó el 12 de octubre se le
+descuenta el día.** Si para True Food ese día fue feriado, el descuento está mal.
+
+Y hacia adelante es peor que un error puntual: los feriados de 2027 no están
+cargados tampoco. El primero que caiga en lunes a viernes va a descontar.
+
+### Qué hay que decidir, y no lo decide un script
+
+1. **¿El 12-oct-2026 fue día cerrado en la planta?** Si sí, cargarlo y revisar si
+   alguien tuvo una ausencia ese día.
+2. **Cargar los feriados de 2027** antes de que empiece el año. Son datos, no
+   código: van por la pantalla «Días cerrados» o por un pegado de semilla.
+3. **Y las dos listas tienen que dejar de ser dos.** `rrhh_feriado` y la constante
+   `FERIADOS` del `index.html` se mantienen a mano, por separado, y ya no
+   coinciden del todo (a la del HTML le falta el 25-dic). Una de las dos tiene
+   que desaparecer; la de la base es la que puede editarse sin publicar.
+
+### Lo que sí quedó arreglado
+
+El ensayo ahora mide el caso «feriado» con el **1-dic-2026**, que es martes y sí
+está cargado, así que la prueba se apoya en un dato real. Y el candado del pegado
+10 también: preguntaba por el 12-oct y **pasaba porque el 12-oct es lunes**, no
+porque fuera feriado — una salvaguarda que pasa por el motivo equivocado no está
+probando lo que dice probar.

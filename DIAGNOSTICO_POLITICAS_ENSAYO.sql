@@ -66,7 +66,8 @@ comment on column rrhh_feriado.pago_obligatorio is
   'true = feriado de pago obligatorio del art. 148 del Codigo de Trabajo. Solo estos '
   'pagan doble si se trabajan, y solo si caen de lunes a viernes. Verificado el '
   '15-oct-2026 contra el art. 148 y comunicados del MTSS: de lo que queda de 2026 el '
-  'UNICO obligatorio es el 25-dic. El 12-oct y el 1-dic son de pago NO obligatorio. '
+  'UNICO obligatorio es el 25-dic. El 1-dic es de pago NO obligatorio. (El 12-oct '
+  'tampoco lo es, pero ademas NO esta cargado en esta tabla: ver PENDIENTES.md P3.) '
   'Se corrige desde la pantalla «Dias cerrados».';
 
 -- ⚠️ HALLAZGO, Y NO SE ARREGLA DESDE ACA.

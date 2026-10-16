@@ -7,7 +7,7 @@
 --
 -- ⚠️ ADENTRO VA EL CUERPO REAL DE PERSONAL_NETO_QUINCENA.sql, extraido del
 -- archivo por estructura (el unico begin; y el unico commit;, sin incluirlos).
--- md5 del cuerpo extraido: ae3004aa52c08659a705f4e6f32efe3e
+-- md5 del cuerpo extraido: 42474f8e55418ecc954c5cce882af1c2
 -- O sea que esto NO prueba una copia: prueba byte a byte lo que se va a pegar.
 -- Un ensayo que valida una copia se desincroniza en silencio — se arregla el
 -- pegado, el ensayo sigue validando lo viejo, y da verde.
@@ -34,6 +34,23 @@
 -- ════════════════════════════════════════════════════════════════════════
 
 begin;
+
+-- ── 0 · ¿QUEDO ALGO DE UNA CORRIDA ANTERIOR? ────────────────────────────
+-- Se mide ANTES que todo lo demas, porque es el unico momento en que la
+-- pregunta tiene sentido: tres lineas mas abajo el pegado crea las dos tablas y
+-- las dos funciones, y entonces ya no se sabe si estaban de antes.
+-- Sale como la PRIMERA FILA de la tabla de resultados (la -1), porque el editor
+-- de Supabase muestra solo el ultimo resultado y una consulta suelta aca arriba
+-- se perderia de vista.
+select set_config('cc.residuo', concat_ws(' · ',
+  (select count(*) from information_schema.tables where table_schema = 'public'
+    and table_name = 'rrhh_neto_quincena'),
+  (select count(*) from information_schema.tables where table_schema = 'public'
+    and table_name = 'rrhh_feriado_trabajado'),
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'rrhh_es_dia_divisor'),
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'rrhh_es_dia_descontable')), true);
 
 -- ╔══════════════════════════════════════════════════════════════════════╗
 -- ║  PROLOGO · la precondicion de datos que el pegado NO puede arreglar   ║
@@ -93,7 +110,8 @@ comment on column rrhh_feriado.pago_obligatorio is
   'true = feriado de pago obligatorio del art. 148 del Codigo de Trabajo. Solo estos '
   'pagan doble si se trabajan, y solo si caen de lunes a viernes. Verificado el '
   '15-oct-2026 contra el art. 148 y comunicados del MTSS: de lo que queda de 2026 el '
-  'UNICO obligatorio es el 25-dic. El 12-oct y el 1-dic son de pago NO obligatorio. '
+  'UNICO obligatorio es el 25-dic. El 1-dic es de pago NO obligatorio. (El 12-oct '
+  'tampoco lo es, pero ademas NO esta cargado en esta tabla: ver PENDIENTES.md P3.) '
   'Se corrige desde la pantalla «Dias cerrados».';
 
 -- ⚠️ HALLAZGO, Y NO SE ARREGLA DESDE ACA.
@@ -667,7 +685,13 @@ begin
   -- LAS REGLAS, MEDIDAS CONTRA EL CALENDARIO REAL. No se confia en el texto de
   -- la funcion: se la llama.
   v_div   := rrhh_dias_divisor(date '2026-10-01', date '2026-10-15');
-  v_fer   := rrhh_es_dia_divisor(date '2026-10-12');     -- feriado, lunes -> en el divisor
+  -- ⚠️ CON UN FERIADO QUE EXISTE DE VERDAD. Antes esto preguntaba por el
+  -- 12-oct-2026, que NO esta cargado en rrhh_feriado (la semilla trae 31-ago,
+  -- 15-sep, 1-dic y el cierre de planta, nada mas): la comprobacion pasaba
+  -- porque el 12-oct es lunes, no porque fuera feriado. Una salvaguarda que pasa
+  -- por el motivo equivocado no esta probando lo que dice probar.
+  -- El 1-dic-2026 es martes Y esta cargado como feriado.
+  v_fer   := rrhh_es_dia_divisor(date '2026-12-01');
   v_desc  := rrhh_es_dia_descontable(date '2026-10-03'); -- sabado -> no descuenta
   -- LA REGLA DEL PAGO DOBLE, LAS DOS RAMAS, con una fila que se crea y se borra
   -- aca mismo. La version anterior de este candado preguntaba por el 25-dic-2026
@@ -738,8 +762,8 @@ begin
       'Lorena lo confirmo con «neto - neto/11». NO SE APLICO NADA.', v_div;
   end if;
   if not v_fer then
-    raise exception 'CANDADO: el 12-oct (feriado, lunes) NO cuenta en el divisor, y tiene '
-      'que contar. NO SE APLICO NADA.';
+    raise exception 'CANDADO: el 1-dic-2026 (feriado cargado, martes) NO cuenta en el divisor, '
+      'y tiene que contar: la decision de Lorena es que el feriado se paga. NO SE APLICO NADA.';
   end if;
   if v_desc then
     raise exception 'CANDADO: el sabado 3-oct cuenta como descontable, y no tiene que '
@@ -810,7 +834,7 @@ select
   (select count(*) from information_schema.tables where table_schema='public'
     and table_name='rrhh_feriado_trabajado')                                 as tabla_fer_trab,
   rrhh_dias_divisor(date '2026-10-01', date '2026-10-15')                    as divisor_oct_q1,
-  rrhh_es_dia_divisor(date '2026-10-12')                                     as feriado_en_divisor,
+  rrhh_es_dia_divisor(date '2026-12-01')                                     as feriado_en_divisor,
   rrhh_es_dia_descontable(date '2026-10-03')                                 as sabado_descuenta,
   rrhh_feriado_paga_doble(date '2026-12-01')                                 as no_oblig_doble,
   (select count(*) from rrhh_feriado where pago_obligatorio)                 as feriados_obligatorios,
@@ -893,8 +917,12 @@ insert into rrhh_permiso (persona_id, fecha_inicio, fecha_fin, motivo, estado,
   -- 3 · ausencia en sabado y domingo (3 y 4 oct)
   (current_setting('cc.p3',true)::bigint,'2026-10-03','2026-10-04','zz',
    'aprobado','zz-socia@example.invalid',now(),'descuento',null,null,'ensayo-neto'),
-  -- 4 · ausencia justo sobre el feriado del 12 oct (lunes)
-  (current_setting('cc.p4',true)::bigint,'2026-10-12','2026-10-12','zz',
+  -- 4 · ausencia justo sobre un feriado DE VERDAD: el 1-dic-2026 (martes).
+  --     ⚠️ Antes esta prueba usaba el 12-oct-2026, y el 12-oct NO ESTA CARGADO
+  --     en rrhh_feriado: la semilla de PERSONAL_CALENDARIO.sql trae 31-ago,
+  --     15-sep, 1-dic y el cierre de planta, y nada mas. La prueba medía contra
+  --     un feriado inexistente y daba FALLA con razon.
+  (current_setting('cc.p4',true)::bigint,'2026-12-01','2026-12-01','zz',
    'aprobado','zz-socia@example.invalid',now(),'descuento',null,null,'ensayo-neto'),
   -- 5 · la quincena 16-31 oct ENTERA ausente (esa quincena no tiene feriados)
   (current_setting('cc.p5',true)::bigint,'2026-10-16','2026-10-31','zz',
@@ -931,6 +959,23 @@ create table zz_res (
   n int, escenario text, esperado text, obtenido text, veredicto text
 );
 grant select, insert, update on zz_res to public;
+-- ⚠️ Y SE LE APAGA LA SEGURIDAD POR FILAS. Sin esta linea el ensayo MUERE en la
+-- primera prueba, y el motivo no se ve leyendo el archivo.
+--
+-- En esta base hay un disparador de eventos, `ensure_rls`, que le PRENDE la
+-- seguridad por filas a toda tabla nueva de public — y otro,
+-- `asistente_politicas`, que le pone las cinco politicas del asistente. O sea
+-- que `zz_res` nace protegida, igual que una tabla de sueldos. Y protegida
+-- significa: sin ninguna politica PERMISIVA de insercion, nadie inserta. Las
+-- mediciones de abajo corren como `authenticated` (las vistas son
+-- security_invoker y exigen acceso_es_socia()), asi que cada `insert into
+-- zz_res` se caia con 42501 «new row violates row-level security policy».
+--
+-- De las tres salidas posibles —tabla temporal, apagar la seguridad, o escribir
+-- desde una funcion `security definer`— esta es la mas simple y la mas facil de
+-- defender: zz_res es un papel borrador con los resultados de una prueba, no
+-- tiene un solo dato de nadie, y vive lo que dura la transaccion.
+alter table zz_res disable row level security;
 
 -- DOS AYUDANTES, creados todavia como postgres: `authenticated` no puede crear
 -- funciones en el esquema public.
@@ -982,6 +1027,17 @@ begin
 end $$;
 
 
+-- -1 · ¿QUEDO RESIDUO DE UNA CORRIDA ANTERIOR? Medido ANTES de que el pegado
+--      cree nada, que es el unico momento en que la pregunta tiene sentido. Si
+--      da algo distinto de cuatro ceros, un ensayo anterior NO se deshizo y hay
+--      que avisar antes de seguir: el pegado 10 todavia no se aplico nunca.
+insert into zz_res values (-1,
+  'residuo antes de empezar · tabla neto · tabla feriado trabajado · funcion divisor · funcion descontable',
+  '0 · 0 · 0 · 0',
+  coalesce(nullif(current_setting('cc.residuo', true),''), '(no se midio)'),
+  null);
+
+
 -- 0 · QUE TUVO QUE TOCAR EL PROLOGO. No es una prueba: es informacion, y la
 --     parte que Lorena tiene que decidir. Si dice «1 quitado(s): Cierre de planta
 --     de fin de año», significa que el 25-dic no existe como feriado en
@@ -1010,40 +1066,43 @@ select 1, 'divisor · 1-15 oct · 16-31 oct · 1-15 nov · 16-31 dic',
 
 -- 2 · EL FERIADO ESTA EN EL DIVISOR. 1-15 oct TIENE feriado (12-oct) y 16-31 oct
 --     NO, y las dos dan 11: el feriado no se resta. Es la decision de Lorena.
+-- 1-15 dic TIENE feriado (el 1-dic) y 16-31 oct no, y las dos dan 11.
+-- ⚠️ Antes comparaba 1-15 oct contra 16-31 oct: NINGUNA de las dos tiene feriado
+-- cargado, asi que la prueba pasaba sin probar nada.
 insert into zz_res
-select 2, 'quincena con feriado y quincena sin feriado dan el MISMO divisor',
+select 2, 'quincena CON feriado (1-15 dic) y quincena SIN feriado (16-31 oct): mismo divisor',
        'si · 11 = 11',
-       case when rrhh_dias_divisor('2026-10-01','2026-10-15')
+       case when rrhh_dias_divisor('2026-12-01','2026-12-15')
                = rrhh_dias_divisor('2026-10-16','2026-10-31') then 'si · ' else 'NO · ' end
-       || rrhh_dias_divisor('2026-10-01','2026-10-15') || ' = '
+       || rrhh_dias_divisor('2026-12-01','2026-12-15') || ' = '
        || rrhh_dias_divisor('2026-10-16','2026-10-31'), null;
 
 -- 3 · Los dos conceptos NO son el mismo. 1-15 oct tiene 11 dias de divisor pero
 --     solo 10 descontables, porque el 12-oct es feriado.
 insert into zz_res
-select 3, 'divisor (11) y dias descontables (10) de 1-15 oct · el feriado separa los dos',
+select 3, 'divisor (11) y dias descontables (10) de 1-15 DIC · el feriado separa los dos',
        '11 · 10',
-       rrhh_dias_divisor('2026-10-01','2026-10-15') || ' · ' ||
+       rrhh_dias_divisor('2026-12-01','2026-12-15') || ' · ' ||
        (select count(*) from generate_series(0,14) g(i)
-         where rrhh_es_dia_descontable(date '2026-10-01' + g.i)), null;
+         where rrhh_es_dia_descontable(date '2026-12-01' + g.i)), null;
 
 -- 4 · Dia por dia, los casos de borde del divisor: sabado, domingo, feriado.
 insert into zz_res
-select 4, 'es_dia_divisor: jue 1 · sab 3 · dom 4 · feriado lun 12',
+select 4, 'es_dia_divisor: jue 1 oct · sab 3 · dom 4 · feriado mar 1 dic',
        't · f · f · t',
        concat_ws(' · ', left(rrhh_es_dia_divisor('2026-10-01')::text,1),
                         left(rrhh_es_dia_divisor('2026-10-03')::text,1),
                         left(rrhh_es_dia_divisor('2026-10-04')::text,1),
-                        left(rrhh_es_dia_divisor('2026-10-12')::text,1)), null;
+                        left(rrhh_es_dia_divisor('2026-12-01')::text,1)), null;
 
 -- 5 · Y del descontable: el feriado NO descuenta (suposicion de Andrea).
 insert into zz_res
-select 5, 'es_dia_descontable: jue 1 · sab 3 · dom 4 · feriado lun 12',
+select 5, 'es_dia_descontable: jue 1 oct · sab 3 · dom 4 · feriado mar 1 dic',
        't · f · f · f',
        concat_ws(' · ', left(rrhh_es_dia_descontable('2026-10-01')::text,1),
                         left(rrhh_es_dia_descontable('2026-10-03')::text,1),
                         left(rrhh_es_dia_descontable('2026-10-04')::text,1),
-                        left(rrhh_es_dia_descontable('2026-10-12')::text,1)), null;
+                        left(rrhh_es_dia_descontable('2026-12-01')::text,1)), null;
 
 
 -- ════════════════════════════════════════════════════════════════════════
@@ -1101,10 +1160,10 @@ select 9, 'ausencia en sab 3 y dom 4 oct · final · descuento',
 --      CONFIRMAR por la contadora. Si se confirma al revés el esperado de esta
 --      fila cambia a 1000 · -100, y se arregla rrhh_es_dia_descontable().
 insert into zz_res
-select 10, 'ausencia justo el feriado del 12 oct · final · descuento · SIN CONFIRMAR',
+select 10, 'ausencia justo el feriado del 1 dic · final · descuento · SIN CONFIRMAR',
        '1100 · 0',
        concat_ws(' · ', zz_n(final), zz_n(descuentos))
-  from zz_pago('4','2026-10-Q1');
+  from zz_pago('4','2026-12-Q1');
 
 -- 11 · LA QUINCENA ENTERA AUSENTE = cero, exacto. 16-31 oct no tiene feriados,
 --      asi que los 11 dias del divisor son los 11 descontables: 11 × 100 = 1100.
@@ -1157,13 +1216,13 @@ select 15, 'incapacidad que cubre toda la quincena 16-31 oct · descuento · fin
                  case when -incapacidades <= base then 'si' else 'MAS QUE EL NETO' end)
   from zz_pago('11','2026-10-Q2');
 
--- 16 · La MISMA incapacidad en la otra quincena, 1-15 oct. Aca si se cruzan las
---      dos cosas: el 12-oct es feriado y no descuenta (10 descontables, no 11), y
---      los dias 1 y 2 caen dentro de los 3 del patrono.
---      2 dias × 50 + 8 dias × 100 = 900.  Final 1100 − 900 = 200.
+-- 16 · La MISMA incapacidad en la otra quincena, 1-15 oct. Los 11 dias del
+--      divisor son los 11 descontables: 1-15 oct NO tiene ningun feriado cargado.
+--      Los dias naturales 1 y 2 (jue 1 y vie 2) caen dentro de los 3 del patrono.
+--      2 dias × 50 + 9 dias × 100 = 1000.  Final 1100 − 1000 = 100.
 insert into zz_res
 select 16, 'la misma incapacidad en 1-15 oct · descuento · final · SIN CONFIRMAR',
-       '-900 · 200',
+       '-1000 · 100',
        concat_ws(' · ', zz_n(incapacidades), zz_n(final))
   from zz_pago('11','2026-10-Q1');
 
@@ -1399,12 +1458,20 @@ select set_config('request.jwt.claims',
 --      update: un neto corregido es una fila nueva, no un numero sobreescrito.
 --      De estos montos cuelga una transferencia que ya se hizo.
 insert into zz_res
-select 32, 'rrhh_neto_quincena · authenticated puede update? · delete? · politicas de update',
-       'f · f · 0',
+-- ⚠️ SOLO LAS PERMISIVAS. La version anterior contaba TODA politica de UPDATE o
+-- DELETE y esperaba 0, pero el disparador del asistente pone dos RESTRICTIVAS
+-- (asistente_no_actualiza y asistente_no_borra). Una restrictiva no habilita
+-- nada: es un candado de mas. Lo que tiene que ser 0 son las PERMISIVAS, porque
+-- sin ninguna permisiva la operacion no pasa para nadie — y eso es lo que
+-- sostiene el append-only. La prueba vieja daba FALLA contando candados a favor.
+select 32, 'rrhh_neto_quincena append-only · update? · delete? · permisivas de upd/del · candados extra',
+       'f · f · 0 · 2',
        left(has_table_privilege('authenticated','rrhh_neto_quincena','UPDATE')::text,1) || ' · ' ||
        left(has_table_privilege('authenticated','rrhh_neto_quincena','DELETE')::text,1) || ' · ' ||
        (select count(*) from pg_policies where tablename = 'rrhh_neto_quincena'
-         and cmd in ('UPDATE','DELETE')), null;
+         and cmd in ('UPDATE','DELETE') and permissive = 'PERMISSIVE') || ' · ' ||
+       (select count(*) from pg_policies where tablename = 'rrhh_neto_quincena'
+         and cmd in ('UPDATE','DELETE') and permissive = 'RESTRICTIVE'), null;
 
 -- 33 · ANON NO LLEGA A NADA. La anon key viaja dentro de index.html, que esta en
 --      un repo PUBLICO. Se mide llamando de verdad como anon, no leyendo grants.
@@ -1446,7 +1513,7 @@ update zz_res set veredicto =
   case when obtenido is null                              then 'SIN DATO'
        when btrim(obtenido) = btrim(esperado)             then 'OK'
        else 'FALLA' end
- where n between 1 and 33;
+ where n between 1 and 33 or n = -1;
 
 -- Y las filas que el ensayo tenia que producir y podrian no existir: si un
 -- `select ... from zz_pago(...)` no devuelve filas, el insert no inserta nada y

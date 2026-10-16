@@ -79,7 +79,8 @@ comment on column rrhh_feriado.pago_obligatorio is
   'true = feriado de pago obligatorio del art. 148 del Codigo de Trabajo. Solo estos '
   'pagan doble si se trabajan, y solo si caen de lunes a viernes. Verificado el '
   '15-oct-2026 contra el art. 148 y comunicados del MTSS: de lo que queda de 2026 el '
-  'UNICO obligatorio es el 25-dic. El 12-oct y el 1-dic son de pago NO obligatorio. '
+  'UNICO obligatorio es el 25-dic. El 1-dic es de pago NO obligatorio. (El 12-oct '
+  'tampoco lo es, pero ademas NO esta cargado en esta tabla: ver PENDIENTES.md P3.) '
   'Se corrige desde la pantalla «Dias cerrados».';
 
 -- ⚠️ HALLAZGO, Y NO SE ARREGLA DESDE ACA.
@@ -653,7 +654,13 @@ begin
   -- LAS REGLAS, MEDIDAS CONTRA EL CALENDARIO REAL. No se confia en el texto de
   -- la funcion: se la llama.
   v_div   := rrhh_dias_divisor(date '2026-10-01', date '2026-10-15');
-  v_fer   := rrhh_es_dia_divisor(date '2026-10-12');     -- feriado, lunes -> en el divisor
+  -- ⚠️ CON UN FERIADO QUE EXISTE DE VERDAD. Antes esto preguntaba por el
+  -- 12-oct-2026, que NO esta cargado en rrhh_feriado (la semilla trae 31-ago,
+  -- 15-sep, 1-dic y el cierre de planta, nada mas): la comprobacion pasaba
+  -- porque el 12-oct es lunes, no porque fuera feriado. Una salvaguarda que pasa
+  -- por el motivo equivocado no esta probando lo que dice probar.
+  -- El 1-dic-2026 es martes Y esta cargado como feriado.
+  v_fer   := rrhh_es_dia_divisor(date '2026-12-01');
   v_desc  := rrhh_es_dia_descontable(date '2026-10-03'); -- sabado -> no descuenta
   -- LA REGLA DEL PAGO DOBLE, LAS DOS RAMAS, con una fila que se crea y se borra
   -- aca mismo. La version anterior de este candado preguntaba por el 25-dic-2026
@@ -724,8 +731,8 @@ begin
       'Lorena lo confirmo con «neto - neto/11». NO SE APLICO NADA.', v_div;
   end if;
   if not v_fer then
-    raise exception 'CANDADO: el 12-oct (feriado, lunes) NO cuenta en el divisor, y tiene '
-      'que contar. NO SE APLICO NADA.';
+    raise exception 'CANDADO: el 1-dic-2026 (feriado cargado, martes) NO cuenta en el divisor, '
+      'y tiene que contar: la decision de Lorena es que el feriado se paga. NO SE APLICO NADA.';
   end if;
   if v_desc then
     raise exception 'CANDADO: el sabado 3-oct cuenta como descontable, y no tiene que '
@@ -796,7 +803,7 @@ select
   (select count(*) from information_schema.tables where table_schema='public'
     and table_name='rrhh_feriado_trabajado')                                 as tabla_fer_trab,
   rrhh_dias_divisor(date '2026-10-01', date '2026-10-15')                    as divisor_oct_q1,
-  rrhh_es_dia_divisor(date '2026-10-12')                                     as feriado_en_divisor,
+  rrhh_es_dia_divisor(date '2026-12-01')                                     as feriado_en_divisor,
   rrhh_es_dia_descontable(date '2026-10-03')                                 as sabado_descuenta,
   rrhh_feriado_paga_doble(date '2026-12-01')                                 as no_oblig_doble,
   (select count(*) from rrhh_feriado where pago_obligatorio)                 as feriados_obligatorios,
