@@ -470,6 +470,16 @@ no es un efecto secundario de un pegado.
 > Va en un pegado **aparte y posterior** al de la fórmula, porque necesita la
 > columna `pago_obligatorio`: `PERSONAL_CIERRE_TRAMOS.sql`. Escrito y ensayado el
 > 16-oct, **sin aplicar**.
+>
+> **16-oct-2026 · el rango original, para que quede registrado:** el cierre de
+> planta era **una sola fila** de `rrhh_feriado`, del **18-dic-2026 al
+> 11-ene-2027** — 25 días corridos, sembrada por `PERSONAL_CALENDARIO.sql`. Se
+> parte en cinco tramos **para poder cargar el 25-dic y el 1-ene como feriados de
+> pago obligatorio**, que es lo único que la exclusión por rangos solapados no
+> permitía mientras fueran una fila. Los 25 días cerrados siguen siendo los
+> mismos: el candado los compara día por día antes y después, y el ensayo lo
+> verificó (prueba 1, `0 · 0 · 25`). Nada se borra de esta nota: el rango original
+> es el dato contra el que se compara si algún día hay que deshacerlo.
 
 ### Lo que sí quedó arreglado
 
