@@ -589,7 +589,84 @@ rotula como «Ajuste» — ver el final de esta nota en la rama `mis-solicitudes
 
 ---
 
-## P7 · 🟡 LISTO, SIN APLICAR · Instinct ve solo el total a pagar
+## P8 · ✅ PUBLICADO · Personal en main · BUILD b109 · 19-oct-2026
+
+**Publicado el 19-oct-2026.** `main` pasó de `4921e3f` (b108) a **`7d453fa`**, y
+GitHub Pages lo sirve: verificado desde afuera, el archivo servido es idéntico
+byte a byte al `index.html` de `main`.
+
+### La autorización
+
+> **OK de Andrea, relayed por Lorena, 19-oct**, para dos cosas:
+> **(a)** publicar la pantalla de Personal **sin más pruebas manuales**, y
+> **(b)** que Instinct (perfil asistente) vea la pestaña de Pago con **solo el
+> total a pagar por persona, sin explicación**.
+
+Queda anotado que llegó **relayed** y no de Andrea directo, porque es el dato que
+hace falta si alguna vez se discute qué se autorizó. La regla del proyecto —`main`
+solo se mueve con decisión explícita de Andrea— se cumplió por esa vía.
+
+### Qué se publicó
+
+| | |
+|---|---|
+| rama | `personal-b109` (también empujada a `origin` como respaldo) |
+| commit de `main` | **`7d453fa`** |
+| `BUILD` | `v 19 oct 2026 · b109: cancelar lo propio en «Mis solicitudes» · Pago de quincena con el neto fijo · Instinct ve solo el total` |
+| `main` anterior | `4921e3f` (b108) |
+
+**En la pantalla**, el diff de `index.html` son **28 hunks, todos de Personal**
+(revisados a mano los que el clasificador no reconoció: `vPagoQuincena` en
+`ACCESO_VISTAS` y el toggle de `solPerm`). Los otros tres archivos que sirve Pages
+—`prueba.html` y los dos `correr.js`— **sin cambios**.
+
+- «Mis solicitudes» gana el botón **Cancelar** en lo propio y pendiente, con
+  confirmación, anti doble toque por solicitud y «Cancelada por vos».
+- La pestaña de **Pago** lee el neto fijo (divisor, valor del día, feriado
+  trabajado), rotula «Feriado trabajado» en vez de «Ajuste» y se le fue el aviso
+  del 6,49 % que ya no aplica.
+- Y para el **asistente** dibuja una lista «persona · total» y nada más.
+
+### Lo que entró además, y conviene saberlo
+
+El merge trajo a `main` **80 archivos que no sirve Pages**: los `.sql` de los
+pegados y sus ensayos, las herramientas y la documentación. No cambian ninguna
+conducta, pero quedan en el historial público del repo, y entre ellos hay dos
+cosas que antes no estaban ahí:
+
+- **`instinct@truefoodcr.com`**, que antes estaba en 0 archivos de `main`
+  (`andrea@truefoodcr.com` ya estaba en 10, así que no es una clase nueva de
+  exposición, pero sí es nuevo);
+- **códigos CABYS y de proveedor** de los ensayos de Compras. Se verificó qué
+  eran: **no son datos bancarios**, son del catálogo CABYS, que es público.
+
+**Lo que NO entró:** ni un sueldo (`205000`/`180000`: cero apariciones en el
+diff), ni un JWT, ni `service_role`, ni cadenas de conexión.
+`PEGADO_NETO_QUINCENA.sql` sigue fuera de git — ver P5.
+
+Lo planteé antes de publicar porque el historial de git no se borra, y Andrea
+reafirmó la instrucción de publicar la rama completa. Queda dicho acá para que la
+decisión tenga fecha y motivo, no para reabrirla.
+
+### Lo que sostiene esto en la base, aplicado antes y por separado
+
+Pegado 10 (el neto de quincena como dato) · la carga de los tres netos · pegado 11
+(el cierre de planta en cinco tramos) · pegado 12 (la puerta angosta del
+asistente). Los cuatro con su ensayo en verde y su fila de control verificada
+columna por columna.
+
+### Chequeos, antes de tocar `main`
+
+`esquema_check.py` salida **0** —y `v_rrhh_pago_total` sale **cerrada a la anon
+key**— · `loadcheck.py` pasa · `sonda_columnas --nuevas`: **0** columnas abiertas
+a anon · **33** pruebas de render en verde.
+
+⚠️ **`dev` no se tocó.** Está en `5750edc` y quedó **atrás** de `main`: lo que se
+publicó no está ahí. Sincronizarla es una decisión aparte y no se tomó.
+
+---
+
+## P7 · ✅ APLICADO · Instinct ve solo el total a pagar
 
 **19-oct-2026.** Decidido por Andrea (que Instinct vea el Pago, dicho a Lorena) y
 precisado por Lorena el mismo día: **solo el total a pagar de cada persona por
@@ -597,7 +674,9 @@ quincena**, nada de la explicación. Ni descuentos, ni permisos, ni incapacidade
 ni ajustes, ni notas, ni tarifa, ni divisor, ni desglose.
 
 `PERSONAL_PAGO_ASISTENTE.sql` (pegado 12) y `PRUEBAS_PAGO_ASISTENTE.sql`
-—**14 de 14 en verde** contra PostgreSQL 17 local—, **sin aplicar**. La pantalla
+—**19 de 19 en verde**, el ensayo en producción— **aplicados el 19-oct**: la fila
+de control dio `2 · 0 · 3 · quincena,persona_id,nombre,total · t · f · f · 2 · 0`,
+igual a la esperada. La pantalla
 ya está en la rama `personal-b109`, y `esquema_check.py` **bloquea la publicación
 a propósito** hasta que el pegado entre: la pantalla pide `v_rrhh_pago_total` y
 esa vista todavía no existe. Ese es el orden que eligió Lorena (opción B).
