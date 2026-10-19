@@ -1,4 +1,8 @@
-# Instinct · escrituras con «sí + código» — PLAN (15-oct-2026, corregido el 19-oct, sin construir)
+# Instinct · escrituras con «sí + código» — PLAN (15-oct-2026, corregido y aprobado el 19-oct)
+
+> **Fase 2 CONSTRUIDA en la rama `instinct-fase2` (19-oct), sin publicar ni pegar:** `INSTINCT_FASE2.sql` + su ensayo
+> (sin correr), el carril en `truefie-escritura` (rama `instinct-fase2`, `INSUMO_ASISTENTE_ENCENDIDO` apagado) y la
+> lista «Hecho por Instinct» (b108). Al construir se corrigió un dato: la huella es de 16 caracteres (64 bits), no 64.
 
 > Nada de esto está hecho. No se tocó Render ni Supabase. Es para que Andrea lo apruebe.
 > Primera acción: **crear insumo** (fase 2). La misma forma sirve después para la fase 3: facturar, validar entregas y confirmar OC.
@@ -70,7 +74,8 @@ la equivocada, por tres razones:
    servidor la recalcula desde cero. El código solo se compara contra **esa** vista previa. Un «sí 4821» que vale para
    la propuesta A no hace nada sobre la propuesta B: B tiene su propio código y se compara contra el suyo.
 2. **Si la vista previa cambió entre que Instinct la leyó y el «sí», la frena la huella, no el código.** La huella es
-   un sha256 completo (64 caracteres), y cualquier cambio de dato da otra. Ese chequeo va **antes** que el del código,
+   los primeros 16 caracteres de un sha256 (64 bits: una coincidencia por azar es de 1 en 18 trillones), y
+   cualquier cambio de dato da otra. Ese chequeo va **antes** que el del código,
    así que una coincidencia de 4 dígitos nunca llega a importar.
 3. **Dentro de la misma propuesta no puede haber coincidencia.** Una vista previa nueva invalida las anteriores y
    tiene, por construcción, un código distinto de todos los de antes. Un «sí» dado a la vieja no pasa en la nueva.
