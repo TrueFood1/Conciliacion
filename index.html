@@ -842,6 +842,14 @@ tr.r-ing td{background:#eff6ff}
 .home-soon{opacity:.45;pointer-events:none;display:flex;flex-direction:column;align-items:center;width:100%;margin-top:2.25rem}
 .home-soon .home-search{margin-top:0}
 .home-sep{border-top:.5px solid var(--border);width:100%;margin:0}
+/* HECHO POR INSTINCT (b108, fase 2): lo que el asistente creó con «sí + código», hoy y 7 días atrás.
+   Una línea plegada; se despliega al tocarla. Sin filas, no existe. */
+.home-ins{width:100%;margin-top:14px;font-size:12px}
+.home-ins-cab{display:flex;justify-content:space-between;align-items:center;width:100%;padding:8px 0;background:none;
+  border:0;border-top:.5px solid var(--border);color:var(--text-2);font:inherit;cursor:pointer;text-align:left}
+.home-ins-cab span:last-child{color:var(--text-3)}
+.home-ins-fila{display:flex;justify-content:space-between;gap:10px;padding:6px 0;color:var(--text)}
+.home-ins-fila span:last-child{color:var(--text-3);white-space:nowrap}
 .home-modlabel{font-size:12px;font-weight:500;color:var(--text-3);letter-spacing:.5px;width:100%;margin:1.5rem 0 .9rem;text-align:left}
 /* LOBBY (b82, Andrea): el de escritorio "parecía carnaval" — fila de seis con bordes de colores y espacios
    grandes. Ahora es el MISMO del teléfono en todos lados: contenedor angosto centrado, dos columnas,
@@ -2115,6 +2123,7 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
          alertas al ENTRAR, y repetirlas afuera duplica. Verificado antes de
          sacarla que nada vivía solo acá — los tres contadores y las filas salían
          de pdLeer(), la misma función que alimenta Pendientes. -->
+    <div class="home-ins" id="homeInstinct" hidden></div>
     </div><!-- /home-bottom -->
     <div class="home-build" id="homeBuild"></div>
   </div>
@@ -5450,7 +5459,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 19 oct 2026 · b108: cancelar lo propio en «Mis solicitudes» · Pago de quincena con el neto fijo, feriado trabajado y el divisor a la vista';
+const BUILD = 'v 19 oct 2026 · b109: cancelar lo propio en «Mis solicitudes» · Pago de quincena con el neto fijo · Instinct ve solo el total';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -6086,6 +6095,7 @@ function accesoPintarLobby(){
   try{ tkContar(); }catch(e){}
   // Las alertas de cada módulo (v2, 3-oct): solo socias, con la caché de 5 minutos de cada lectura.
   try{ lobbyAlertas(); }catch(e){}
+  try{ lobbyInstinct(); }catch(e){}
 }
 async function setSaludo(){
   const el=document.getElementById('homeHi'); if(!el) return;
@@ -21160,6 +21170,37 @@ function _lobAl(id, txt, cls, ir){ const el=document.getElementById(id); if(!el)
   el.textContent=txt||''; el.className='home-mod-alerta'+(cls?(' '+cls):'');
   el.onclick=ir ? function(ev){ ev.stopPropagation(); ir(); } : null; }
 let _lobRzProm=null;
+// HECHO POR INSTINCT (b108, 19-oct · INSTINCT_FASE2_PLAN.md): lo que el asistente creó en Odoo con
+// «sí + código», leído del RASTRO (compra_insumo_odoo.hecho_por_asistente), no de lo que cuenta Instinct.
+// Un «sí» que Andrea no dio se ve acá al día siguiente. Solo socias. Mientras INSTINCT_FASE2.sql no esté
+// pegado la columna no existe: la lectura falla y la lista no aparece (sin ruido en pantalla).
+let _insAbierto=false, _insFilas=[];
+async function lobbyInstinct(){
+  const el=document.getElementById('homeInstinct'); if(!el) return;
+  if(!(await accesoSocia())){ el.hidden=true; return; }
+  try{
+    const desde=new Date(Date.now()-7*86400000).toISOString();
+    const {data,error}=await sbClient().from('compra_insumo_odoo').select('id,nombre,codigo,propuesta_id,creado_en')
+      .eq('hecho_por_asistente', true).gte('creado_en', desde).order('creado_en', {ascending:false}).limit(30);
+    if(error) throw error;
+    _insFilas=data||[];
+  }catch(e){ _insFilas=[]; try{ console.warn('[Truefie] Hecho por Instinct:', (e&&e.message)||e); }catch(_){} }
+  insPintar();
+}
+function insPintar(){
+  const el=document.getElementById('homeInstinct'); if(!el) return;
+  const F=_insFilas||[];
+  if(!F.length){ el.hidden=true; el.innerHTML=''; return; }
+  const cuando=function(t){ try{ return new Date(t).toLocaleString('es-CR',{weekday:'short', day:'numeric', month:'short',
+      hour:'2-digit', minute:'2-digit', timeZone:'America/Costa_Rica'}); }catch(e){ return ''; } };
+  el.hidden=false;
+  el.innerHTML='<button class="home-ins-cab" onclick="insAbrir()" aria-expanded="'+_insAbierto+'">'
+    +'<span>Hecho por Instinct · '+F.length+'</span><span>'+(_insAbierto?'▴':'▾')+'</span></button>'
+    +(_insAbierto?F.map(function(r){
+      return '<div class="home-ins-fila"><span>Insumo nuevo: '+esc(r.nombre||'')+'</span>'
+        +'<span>sí '+esc(r.codigo||'')+' · '+esc(cuando(r.creado_en))+'</span></div>'; }).join(''):'');
+}
+function insAbrir(){ _insAbierto=!_insAbierto; insPintar(); }
 async function lobbyAlertas(){
   const ids=['homeOpsAlerta','homeComAlerta','homeFinAlerta','homeConcAlerta'];
   if(!(await accesoLectora())){ ids.forEach(function(id){ _lobAl(id,''); }); cuadreLobby(); return; }
@@ -23056,7 +23097,7 @@ function _cpArmadoHtml(P){
     : AP.alc ? ('alcanza '+esc(AP.alc)) : ('<span class="cp-r">falta '+esc(_cpDia(AP.peor.falla))+'</span>');
   h+='<div class="cp-pie cp-arpie"><div class="cp-art"><div class="cp-art1">Total sin IVA'+(T.falta?' · sin precio':'')+'</div>'
     +'<div class="cp-art2">₡'+_rzN(T.t, 0)+'</div><div class="cp-art3'+(!ya&&!odoo&&AP.corto?' cp-amb3':'')+'">'+alc+'</div></div>'
-    +'<button class="cp-btn cp-btnp cp-btnrev" onclick="cpRevisar()">Revisar</button></div>';
+    +'<button class="cp-btn cp-btnp cp-btnrev" id="cpRev" onclick="cpRevisar()"'+(P.revisando?' disabled':'')+'>Revisar</button></div>';
   return h+'<div class="cp-msg'+(P.cls?(' '+P.cls):'')+'" id="cpRegMsg">'+esc(P.msg||'')+'</div></div>';
 }
 // REVISAR: lo que el servidor armaría en Odoo, en la unidad de Odoo, con IVA. Avisos todos juntos.
@@ -23119,7 +23160,18 @@ async function cpWhatsApp(){
   try{ await navigator.clipboard.writeText(txt); _cpRegMsg('Mensaje copiado: pegalo en la conversación.','cp-ok'); }
   catch(e){ window.prompt('Copiá este texto:', txt); }
 }
+// UN «Revisar» A LA VEZ (b107, 19-oct): cada «Revisar» guarda propuestas nuevas antes de preguntarle al
+// servidor, y el botón no se frenaba. El 19-oct el pedido de BIO corrió tres veces (dos a la vez) y dejó 4
+// propuestas sin orden (40, 41, 42, 44). Mientras trabaja, el botón queda deshabilitado y un segundo toque
+// no hace nada; se libera al terminar, salga bien o mal.
 async function cpRevisar(){
+  const P=_cpReg; if(!P||P.revisando) return;
+  P.revisando=true; _cpRevBtn(true);
+  try{ await _cpRevisarUna(); }
+  finally{ P.revisando=false; _cpRevBtn(false); }
+}
+function _cpRevBtn(on){ const b=document.getElementById('cpRev'); if(b) b.disabled=!!on; }
+async function _cpRevisarUna(){
   const P=_cpReg; if(!P) return; if(P.multi) return cpRevisarMulti(); const g=_cpAlc.grupos[P.gi], F=_cpFechasReg(P, g);
   if(P.llego){
     if(!/^[0-9]{20}$/.test(P.fe||'')){ _cpRegMsg('Falta el consecutivo de la FE: 20 dígitos.','cp-mal'); return; }

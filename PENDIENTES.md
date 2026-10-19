@@ -589,6 +589,59 @@ rotula como «Ajuste» — ver el final de esta nota en la rama `mis-solicitudes
 
 ---
 
+## P7 · 🟡 LISTO, SIN APLICAR · Instinct ve solo el total a pagar
+
+**19-oct-2026.** Decidido por Andrea (que Instinct vea el Pago, dicho a Lorena) y
+precisado por Lorena el mismo día: **solo el total a pagar de cada persona por
+quincena**, nada de la explicación. Ni descuentos, ni permisos, ni incapacidades,
+ni ajustes, ni notas, ni tarifa, ni divisor, ni desglose.
+
+`PERSONAL_PAGO_ASISTENTE.sql` (pegado 12) y `PRUEBAS_PAGO_ASISTENTE.sql`
+—**14 de 14 en verde** contra PostgreSQL 17 local—, **sin aplicar**. La pantalla
+ya está en la rama `personal-b109`, y `esquema_check.py` **bloquea la publicación
+a propósito** hasta que el pegado entre: la pantalla pide `v_rrhh_pago_total` y
+esa vista todavía no existe. Ese es el orden que eligió Lorena (opción B).
+
+### Relación con el ticket de Andrea «permisos por rol»
+
+Este pegado es **un caso particular resuelto a mano de lo que ese ticket quiere
+resolver en general.** Hoy el módulo tiene cuatro formas distintas de decir «quién
+puede ver qué», y ninguna sabe de las otras:
+
+| mecanismo | dónde vive | quién lo evalúa |
+|---|---|---|
+| `acceso_es_socia()` / `acceso_es_asistente()` | dentro del cuerpo de cada vista | el **JWT** |
+| políticas RLS | por tabla | el rol de Postgres + el JWT |
+| `grant` / `revoke` | por tabla y por rol | el **rol** de Postgres |
+| `PER_TABS` | la pantalla | `_perEsSocia` / `_perLectora` |
+
+**Lo que este pegado aprendió y el ticket debería heredar:** que `acceso_es_socia()`
+mira el **correo del JWT y no el rol**, así que una función `security definer` *no*
+esquiva esa guardia — fue el primer diseño y no servía. Y que las dos cosas se
+mezclan mal: con `security_invoker`, una vista pública que lee una interna sin
+grants choca contra el `revoke` **aunque quien pregunte tenga permiso sobre la
+pública**. Las dos las encontré midiendo, no leyendo.
+
+Mientras no exista «permisos por rol», **cada perfil nuevo cuesta un pegado como
+este**: una puerta angosta, con su candado y su ensayo. Funciona, y no escala.
+
+### Relación con P4
+
+P4 es el otro lado del mismo problema: `authenticated` conserva `UPDATE`,
+`DELETE` y `TRUNCATE` sobre nueve tablas porque el módulo revoca **solo de
+`anon`**. Este pegado **no lo arrastra** —las dos vistas `_calc` nacen sin un solo
+grant, y el candado lo verifica contra `anon` **y** `authenticated`— pero tampoco
+lo arregla para las nueve de antes.
+
+⚠️ **Y agrega una pieza que P4 tiene que mirar cuando se retome:** las dos vistas
+`_calc` corren **como su dueño**, así que **no pasan por la RLS**. Su único cierre
+es el `revoke`. Si el arreglo de P4 toca los grants del esquema en bloque, tiene
+que dejarlas afuera — un `grant select ... to authenticated` sobre ellas le
+mostraría a Instinct el desglose entero, que es justo lo que este pegado existe
+para evitar. Está dicho en el comentario de cada una, en el pegado.
+
+---
+
 ## P5 · 🟡 DECIDE LORENA · Qué hacer con `PEGADO_NETO_QUINCENA.sql`, que ya se usó
 
 Anotado el **16-oct-2026**, el día que se aplicó. **No es una tarea técnica: es una
