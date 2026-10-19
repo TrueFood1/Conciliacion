@@ -1,7 +1,17 @@
 -- SOLO SE PEGA DESPUES DEL ENSAYO · PERSONAL_PAGO_ASISTENTE.sql
 -- ════════════════════════════════════════════════════════════════════════
 -- MODULO PERSONAL · INSTINCT VE SOLO EL TOTAL A PAGAR  (PEGADO 12)
--- Preparado el 19-oct-2026. NO SE CORRIO.
+-- Preparado el 19-oct-2026. ✅ APLICADO EN PRODUCCION · 19-oct-2026.
+--
+-- COMO SE VERIFICO: la fila de control de la seccion 6 dio
+--     2 · 0 · quincena,persona_id,nombre,total · true · false · false · 2 · 0
+-- con `siguen_solo_socia_3` en 3, o sea lo esperado columna por columna. Las dos
+-- que importaban: `calc_abiertas_0` en 0 (ni anon ni authenticated leen las
+-- vistas _calc, que es lo UNICO que las cierra) y la puerta exponiendo
+-- exactamente cuatro columnas.
+--
+-- El ensayo PRUEBAS_PAGO_ASISTENTE.sql dio 19 de 19 en produccion antes de esto.
+--
 -- Va DESPUES del pegado 10 (aplicado el 16-oct). Es independiente del 11.
 --
 -- ════════════════════════════════════════════════════════════════════════
