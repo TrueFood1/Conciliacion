@@ -38,15 +38,15 @@ INTENTO = "insert into asistente_intento (vista_previa_id, creado_por) values ({
 # ── con el permiso APAGADO (no hay filas) ──
 p("A0", "Instinct propone un insumo con el permiso APAGADO", "asis", PROP.format(n="Cacao A0", por="v_asis", var="v_x"), "42501")
 p("S1", "una socia ENCIENDE crear_insumo", "socia",
-  "insert into asistente_permiso (accion, encendido, motivo, creado_por) values ('crear_insumo', true, 'ensayo', v_socia);")
+  "insert into asistente_permiso (capacidad, encendido, motivo, creado_por) values ('crear_insumo', true, 'ensayo', v_socia);")
 p("S2", "Instinct se enciende un permiso a sí mismo", "asis",
-  "insert into asistente_permiso (accion, encendido, motivo, creado_por) values ('facturar', true, 'ensayo', v_asis);", "42501")
+  "insert into asistente_permiso (capacidad, encendido, motivo, creado_por) values ('facturar', true, 'ensayo', v_asis);", "42501")
 p("S3", "alguien de equipo enciende un permiso", "equipo",
-  "insert into asistente_permiso (accion, encendido, motivo, creado_por) values ('crear_insumo', true, 'ensayo', v_equipo);", "42501")
+  "insert into asistente_permiso (capacidad, encendido, motivo, creado_por) values ('crear_insumo', true, 'ensayo', v_equipo);", "42501")
 p("S4", "una socia firma el permiso con OTRO nombre", "socia",
-  "insert into asistente_permiso (accion, encendido, motivo, creado_por) values ('crear_insumo', true, 'ensayo', v_equipo);", "42501")
-p("S5", "un permiso para una acción que no existe", "socia",
-  "insert into asistente_permiso (accion, encendido, motivo, creado_por) values ('borrar_todo', true, 'ensayo', v_socia);", "23514")
+  "insert into asistente_permiso (capacidad, encendido, motivo, creado_por) values ('crear_insumo', true, 'ensayo', v_equipo);", "42501")
+p("S5", "un permiso con una capacidad mal escrita (mayúsculas y espacio)", "socia",
+  "insert into asistente_permiso (capacidad, encendido, motivo, creado_por) values ('Crear Insumo', true, 'ensayo', v_socia);", "23514")
 # ── con el permiso ENCENDIDO ──
 p("P1", "Instinct propone el cacao con SU correo", "asis", PROP.format(n="Cacao P1", por="v_asis", var="v_pa"))
 p("P2", "Instinct propone firmando como la socia", "asis", PROP.format(n="Cacao P2", por="v_socia", var="v_x"), "42501")
@@ -110,12 +110,12 @@ p("R10", "Instinct deja el rastro de la vigente de P4 con su código", "asis",
 p("E1", "alguien de equipo propone un insumo", "equipo", PROP.format(n="Cacao E1", por="v_equipo", var="v_x"), "42501")
 # ── la socia apaga el permiso / el interruptor general ──
 p("S6", "la socia APAGA crear_insumo", "socia",
-  "insert into asistente_permiso (accion, encendido, motivo, creado_por) values ('crear_insumo', false, 'ensayo', v_socia);")
+  "insert into asistente_permiso (capacidad, encendido, motivo, creado_por) values ('crear_insumo', false, 'ensayo', v_socia);")
 p("A1", "con el permiso apagado, Instinct propone", "asis", PROP.format(n="Cacao A1", por="v_asis", var="v_x"), "42501")
 p("A2", "con el permiso apagado, Instinct anota una vista previa", "asis",
   VP.format(id="gen_random_uuid()", acc="crear_insumo", prop="v_pa", cod="6666", por="v_asis"), "42501")
 p("S7", "la socia vuelve a encender crear_insumo", "socia",
-  "insert into asistente_permiso (accion, encendido, motivo, creado_por) values ('crear_insumo', true, 'ensayo', v_socia);")
+  "insert into asistente_permiso (capacidad, encendido, motivo, creado_por) values ('crear_insumo', true, 'ensayo', v_socia);")
 p("S8", "la socia apaga el INTERRUPTOR GENERAL del asistente", "socia",
   "insert into asistente_interruptor (encendido, motivo, creado_por) values (false, 'ensayo', v_socia);")
 p("A3", "interruptor general apagado (permiso encendido): Instinct propone", "asis",

@@ -4,23 +4,27 @@
 -- Para saber si está aplicado, mirar la base: `select to_regclass('public.asistente_vista_previa')`.
 -- Plan: INSTINCT_FASE2_PLAN.md (aprobado el 19-oct).
 --
+-- LO QUE YA EXISTE Y SE USA TAL CUAL (ASISTENTE_ROL.sql, 12-oct; medido el 19-oct, vacía)
+--   asistente_permiso       un permiso POR CAPACIDAD (columna `capacidad`: 'crear_insumo'; después
+--                           'facturar', 'validar_entrega', 'confirmar_oc'). Append-only; manda la última
+--                           fila. Sin filas = apagado. Solo una socia lo enciende o lo apaga. NO se toca.
+--   asistente_puede(p_capacidad)  asistente + interruptor general + la última fila de esa capacidad.
+--   ⚠️ El plan del 15-oct las daba como nuevas. Eran de ASISTENTE_ROL.sql: la primera versión de este
+--   archivo las volvía a crear y el ensayo habría rebotado en el primer `create table` (19-oct).
+--
 -- QUÉ HACE
---   asistente_permiso       un permiso POR ACCIÓN para el asistente ('crear_insumo'; después 'facturar',
---                           'validar_entrega', 'confirmar_oc'). Append-only; manda la última fila de cada
---                           acción. Sin filas = apagado. Solo una socia lo enciende o lo apaga.
 --   asistente_vista_previa  cada vista previa que el servicio le dio al asistente: propuesta, huella y
 --                           el CÓDIGO de 4 dígitos. Vale solo la última de cada propuesta (columna `n`).
 --                           Único (acción, propuesta, código): dentro de una propuesta dos vistas
 --                           previas nunca comparten código.
 --   asistente_intento       una fila por código equivocado. Con 3, esa vista previa queda agotada.
---   asistente_puede(acción) asistente + interruptor general encendido + permiso de esa acción encendido.
 --
 --   compra_insumo_propuesta el asistente puede proponer, con su correo y con el permiso encendido.
 --   compra_insumo_odoo      columnas hecho_por_asistente · vista_previa_id · codigo. El asistente puede
 --                           dejar el rastro de SU propuesta solo con la vista previa vigente, sin agotar,
 --                           y su código. Una socia ya no puede firmar un rastro «hecho por Instinct».
 --
---   Nadie actualiza ni borra en ninguna de las cinco: solo SELECT e INSERT.
+--   Nadie actualiza ni borra en ninguna de las cuatro: solo SELECT e INSERT.
 --   El disparador `asistente_politicas` les pone a las tablas nuevas sus 5 políticas del asistente
 --   (no se escriben acá: chocan con 42710). En las cuatro donde el asistente SÍ inserta se cambia SOLO
 --   `asistente_no_inserta` por `asistente_inserta_con_permiso`. Las demás tablas de public, igual.
@@ -28,22 +32,18 @@
 begin;
 
 do $$ begin
-  if to_regclass('public.asistente_permiso') is not null or to_regclass('public.asistente_vista_previa') is not null
-     or to_regclass('public.asistente_intento') is not null then
-    raise exception 'asistente_permiso / asistente_vista_previa / asistente_intento ya existen: este archivo no se vuelve a pegar';
+  if to_regclass('public.asistente_vista_previa') is not null or to_regclass('public.asistente_intento') is not null then
+    raise exception 'asistente_vista_previa / asistente_intento ya existen: este archivo no se vuelve a pegar';
+  end if;
+  -- Lo que se reusa tiene que estar como se midió el 19-oct.
+  if to_regprocedure('public.asistente_puede(text)') is null
+     or not exists (select 1 from information_schema.columns where table_schema = 'public'
+                     and table_name = 'asistente_permiso' and column_name = 'capacidad') then
+    raise exception 'falta asistente_permiso(capacidad) o asistente_puede(text) de ASISTENTE_ROL.sql: parar y avisar';
   end if;
 end $$;
 
 -- ▼▼▼ BLOQUE DDL ▼▼▼
-create table public.asistente_permiso (
-  id          bigint generated always as identity primary key,
-  accion      text not null check (accion in ('crear_insumo', 'facturar', 'validar_entrega', 'confirmar_oc')),
-  encendido   boolean not null,
-  motivo      text not null check (length(btrim(motivo)) > 0),
-  creado_por  text not null,
-  creado_en   timestamptz not null default now()
-);
-
 create table public.asistente_vista_previa (
   id           uuid primary key,                                   -- lo genera el servicio (entra en el código)
   n            bigint generated always as identity unique,         -- el orden: vale la de n más alto
@@ -63,20 +63,13 @@ create table public.asistente_intento (
   creado_en       timestamptz not null default now()
 );
 
-alter table public.asistente_permiso enable row level security;
 alter table public.asistente_vista_previa enable row level security;
 alter table public.asistente_intento enable row level security;
-revoke all on public.asistente_permiso, public.asistente_vista_previa, public.asistente_intento from anon, authenticated;
-grant select, insert on public.asistente_permiso, public.asistente_vista_previa, public.asistente_intento to authenticated;
+revoke all on public.asistente_vista_previa, public.asistente_intento from anon, authenticated;
+grant select, insert on public.asistente_vista_previa, public.asistente_intento to authenticated;
 
 -- ── funciones (SECURITY DEFINER: leen por encima del RLS, solo devuelven sí o no) ──
-create function public.asistente_puede(p_accion text) returns boolean
-  language sql stable security definer set search_path = public as $f$
-  select acceso_es_asistente() and not asistente_bloqueado()
-         and coalesce((select p.encendido from asistente_permiso p where p.accion = p_accion
-                        order by p.id desc limit 1), false);
-$f$;
-
+-- asistente_puede(p_capacidad) ya existe (ASISTENTE_ROL.sql) y no se toca.
 create function public.asistente_propuesta_propia(p_accion text, p_propuesta bigint) returns boolean
   language sql stable security definer set search_path = public as $f$
   select case p_accion
@@ -105,18 +98,12 @@ create function public.asistente_rastro_ok(p_propuesta bigint, p_vp uuid, p_codi
                     and (select count(*) from asistente_intento i where i.vista_previa_id = v.id) < 3);
 $f$;
 
-revoke all on function public.asistente_puede(text), public.asistente_propuesta_propia(text, bigint),
+revoke all on function public.asistente_propuesta_propia(text, bigint),
                        public.asistente_vista_previa_propia(uuid), public.asistente_rastro_ok(bigint, uuid, text)
   from public, anon;
-grant execute on function public.asistente_puede(text), public.asistente_propuesta_propia(text, bigint),
+grant execute on function public.asistente_propuesta_propia(text, bigint),
                           public.asistente_vista_previa_propia(uuid), public.asistente_rastro_ok(bigint, uuid, text)
   to authenticated;
-
--- ── asistente_permiso: solo socias ──
-create policy asistente_permiso_sel on public.asistente_permiso
-  for select to authenticated using (acceso_es_socia());
-create policy asistente_permiso_ins on public.asistente_permiso
-  for insert to authenticated with check (acceso_es_socia() and creado_por = (auth.jwt() ->> 'email'));
 
 -- ── asistente_vista_previa: la inserta el asistente (por el servicio, con su token) ──
 create policy asistente_vista_previa_sel on public.asistente_vista_previa
@@ -177,13 +164,14 @@ create policy compra_insumo_odoo_ins_asistente on public.compra_insumo_odoo
 -- ▲▲▲ FIN BLOQUE DDL ▲▲▲
 
 -- CONTROL, adentro de la transacción y justo antes del commit. ESPERADO: una fila
---   3 · 7 · 7 · 7 · 9 · 9 · 1 · 0 · 4 · 0 · 3
---   (tablas nuevas con RLS · políticas de permiso, vista previa, intento, propuesta, rastro ·
---    `asistente_no_inserta` que quedan en permiso · y en las otras cuatro · funciones nuevas ·
---    grants a anon en las tablas nuevas · columnas nuevas del rastro)
+--   2 · 7 · 7 · 7 · 9 · 9 · 1 · 0 · 4 · 0 · 3
+--   (tablas nuevas con RLS · políticas de permiso (las 7 de siempre, sin tocar), vista previa,
+--    intento, propuesta, rastro · `asistente_no_inserta` que queda en permiso · y en las otras cuatro ·
+--    funciones (3 nuevas + asistente_puede, que ya estaba) · grants a anon en las tablas nuevas ·
+--    columnas nuevas del rastro)
 --   Si las políticas de las tablas nuevas dan 2, el disparador del asistente no está: avisar ANTES de seguir.
 select (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
-         where n.nspname = 'public' and c.relname in ('asistente_permiso', 'asistente_vista_previa', 'asistente_intento')
+         where n.nspname = 'public' and c.relname in ('asistente_vista_previa', 'asistente_intento')
            and c.relrowsecurity) as tablas_con_rls,
        (select count(*) from pg_policy where polrelid = 'public.asistente_permiso'::regclass) as pol_permiso,
        (select count(*) from pg_policy where polrelid = 'public.asistente_vista_previa'::regclass) as pol_vista_previa,

@@ -109,7 +109,8 @@ crea en Odoo ──► Rastro «hecho por Instinct · sí 4821» + aviso
 
 ### Supabase (un SQL con su ensayo)
 
-1. **`asistente_permiso`** (tabla nueva, append-only, igual que `asistente_interruptor`):
+1. **`asistente_permiso`** — ⚠️ corregido el 19-oct: **ya existe** (ASISTENTE_ROL.sql, 12-oct, vacía) con la columna
+   `capacidad`, y `asistente_puede(p_capacidad)` también. Se usan tal cual, sin tocarlas:
    - Columnas: `accion` ('crear_insumo'; más adelante 'facturar', 'validar_entrega', 'confirmar_oc'), `encendido`, `creado_por`, `creado_en`.
    - Solo una socia inserta. Sin filas = apagado.
    - `asistente_puede(accion)` exige además que `asistente_bloqueado()` sea falso: el interruptor general sigue mandando.

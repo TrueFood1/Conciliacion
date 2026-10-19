@@ -2,7 +2,7 @@
 -- ENSAYO_INSTINCT_FASE2.sql  ·  19-oct-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA (termina en rollback)
 -- Prueba INSTINCT_FASE2.sql: permiso por acción, vista previa con código, intentos y el rastro
 -- «hecho por Instinct». ⛔ NO SE CORRIÓ TODAVÍA. Lo arma herramientas/ensayos/armar_ensayo_instinct_fase2.py
--- (md5 del bloque DDL: bb31455421fd1f9ba9a3859fef229a02).
+-- (md5 del bloque DDL: 43ee85ef4bfe402859fa61101fdc5dd3).
 --
 -- CÓMO SE LEE
 --   Una tabla de 52 filas, TODAS con ok = true. Un RECHAZA da ok solo si el SQLSTATE esperado está
@@ -16,15 +16,6 @@
 begin;
 
 -- ▼▼▼ BLOQUE DDL (copia de INSTINCT_FASE2.sql) ▼▼▼
-create table public.asistente_permiso (
-  id          bigint generated always as identity primary key,
-  accion      text not null check (accion in ('crear_insumo', 'facturar', 'validar_entrega', 'confirmar_oc')),
-  encendido   boolean not null,
-  motivo      text not null check (length(btrim(motivo)) > 0),
-  creado_por  text not null,
-  creado_en   timestamptz not null default now()
-);
-
 create table public.asistente_vista_previa (
   id           uuid primary key,                                   -- lo genera el servicio (entra en el código)
   n            bigint generated always as identity unique,         -- el orden: vale la de n más alto
@@ -44,20 +35,13 @@ create table public.asistente_intento (
   creado_en       timestamptz not null default now()
 );
 
-alter table public.asistente_permiso enable row level security;
 alter table public.asistente_vista_previa enable row level security;
 alter table public.asistente_intento enable row level security;
-revoke all on public.asistente_permiso, public.asistente_vista_previa, public.asistente_intento from anon, authenticated;
-grant select, insert on public.asistente_permiso, public.asistente_vista_previa, public.asistente_intento to authenticated;
+revoke all on public.asistente_vista_previa, public.asistente_intento from anon, authenticated;
+grant select, insert on public.asistente_vista_previa, public.asistente_intento to authenticated;
 
 -- ── funciones (SECURITY DEFINER: leen por encima del RLS, solo devuelven sí o no) ──
-create function public.asistente_puede(p_accion text) returns boolean
-  language sql stable security definer set search_path = public as $f$
-  select acceso_es_asistente() and not asistente_bloqueado()
-         and coalesce((select p.encendido from asistente_permiso p where p.accion = p_accion
-                        order by p.id desc limit 1), false);
-$f$;
-
+-- asistente_puede(p_capacidad) ya existe (ASISTENTE_ROL.sql) y no se toca.
 create function public.asistente_propuesta_propia(p_accion text, p_propuesta bigint) returns boolean
   language sql stable security definer set search_path = public as $f$
   select case p_accion
@@ -86,18 +70,12 @@ create function public.asistente_rastro_ok(p_propuesta bigint, p_vp uuid, p_codi
                     and (select count(*) from asistente_intento i where i.vista_previa_id = v.id) < 3);
 $f$;
 
-revoke all on function public.asistente_puede(text), public.asistente_propuesta_propia(text, bigint),
+revoke all on function public.asistente_propuesta_propia(text, bigint),
                        public.asistente_vista_previa_propia(uuid), public.asistente_rastro_ok(bigint, uuid, text)
   from public, anon;
-grant execute on function public.asistente_puede(text), public.asistente_propuesta_propia(text, bigint),
+grant execute on function public.asistente_propuesta_propia(text, bigint),
                           public.asistente_vista_previa_propia(uuid), public.asistente_rastro_ok(bigint, uuid, text)
   to authenticated;
-
--- ── asistente_permiso: solo socias ──
-create policy asistente_permiso_sel on public.asistente_permiso
-  for select to authenticated using (acceso_es_socia());
-create policy asistente_permiso_ins on public.asistente_permiso
-  for insert to authenticated with check (acceso_es_socia() and creado_por = (auth.jwt() ->> 'email'));
 
 -- ── asistente_vista_previa: la inserta el asistente (por el servicio, con su token) ──
 create policy asistente_vista_previa_sel on public.asistente_vista_previa
@@ -191,7 +169,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('email', v_socia, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   begin
-    insert into asistente_permiso (accion, encendido, motivo, creado_por) values ('crear_insumo', true, 'ensayo', v_socia);
+    insert into asistente_permiso (capacidad, encendido, motivo, creado_por) values ('crear_insumo', true, 'ensayo', v_socia);
     v_res := v_res || jsonb_build_object('p','S1 una socia ENCIENDE crear_insumo','esperado','ENTRA','obtenido','ENTRA','ok',true);
   exception when others then
     v_res := v_res || jsonb_build_object('p','S1 una socia ENCIENDE crear_insumo','esperado','ENTRA','obtenido','RECHAZA: '||sqlstate||' · '||sqlerrm,'ok',false);
@@ -199,7 +177,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('email', v_asis, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   begin
-    insert into asistente_permiso (accion, encendido, motivo, creado_por) values ('facturar', true, 'ensayo', v_asis);
+    insert into asistente_permiso (capacidad, encendido, motivo, creado_por) values ('facturar', true, 'ensayo', v_asis);
     v_res := v_res || jsonb_build_object('p','S2 Instinct se enciende un permiso a sí mismo','esperado','RECHAZA · 42501','obtenido','ENTRA','ok',false);
   exception when others then
     v_res := v_res || jsonb_build_object('p','S2 Instinct se enciende un permiso a sí mismo','esperado','RECHAZA · 42501','obtenido','RECHAZA: '||sqlstate||' · '||sqlerrm,'ok',sqlstate='42501');
@@ -207,7 +185,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('email', v_equipo, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   begin
-    insert into asistente_permiso (accion, encendido, motivo, creado_por) values ('crear_insumo', true, 'ensayo', v_equipo);
+    insert into asistente_permiso (capacidad, encendido, motivo, creado_por) values ('crear_insumo', true, 'ensayo', v_equipo);
     v_res := v_res || jsonb_build_object('p','S3 alguien de equipo enciende un permiso','esperado','RECHAZA · 42501','obtenido','ENTRA','ok',false);
   exception when others then
     v_res := v_res || jsonb_build_object('p','S3 alguien de equipo enciende un permiso','esperado','RECHAZA · 42501','obtenido','RECHAZA: '||sqlstate||' · '||sqlerrm,'ok',sqlstate='42501');
@@ -215,7 +193,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('email', v_socia, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   begin
-    insert into asistente_permiso (accion, encendido, motivo, creado_por) values ('crear_insumo', true, 'ensayo', v_equipo);
+    insert into asistente_permiso (capacidad, encendido, motivo, creado_por) values ('crear_insumo', true, 'ensayo', v_equipo);
     v_res := v_res || jsonb_build_object('p','S4 una socia firma el permiso con OTRO nombre','esperado','RECHAZA · 42501','obtenido','ENTRA','ok',false);
   exception when others then
     v_res := v_res || jsonb_build_object('p','S4 una socia firma el permiso con OTRO nombre','esperado','RECHAZA · 42501','obtenido','RECHAZA: '||sqlstate||' · '||sqlerrm,'ok',sqlstate='42501');
@@ -223,10 +201,10 @@ begin
   perform set_config('request.jwt.claims', json_build_object('email', v_socia, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   begin
-    insert into asistente_permiso (accion, encendido, motivo, creado_por) values ('borrar_todo', true, 'ensayo', v_socia);
-    v_res := v_res || jsonb_build_object('p','S5 un permiso para una acción que no existe','esperado','RECHAZA · 23514','obtenido','ENTRA','ok',false);
+    insert into asistente_permiso (capacidad, encendido, motivo, creado_por) values ('Crear Insumo', true, 'ensayo', v_socia);
+    v_res := v_res || jsonb_build_object('p','S5 un permiso con una capacidad mal escrita (mayúsculas y espacio)','esperado','RECHAZA · 23514','obtenido','ENTRA','ok',false);
   exception when others then
-    v_res := v_res || jsonb_build_object('p','S5 un permiso para una acción que no existe','esperado','RECHAZA · 23514','obtenido','RECHAZA: '||sqlstate||' · '||sqlerrm,'ok',sqlstate='23514');
+    v_res := v_res || jsonb_build_object('p','S5 un permiso con una capacidad mal escrita (mayúsculas y espacio)','esperado','RECHAZA · 23514','obtenido','RECHAZA: '||sqlstate||' · '||sqlerrm,'ok',sqlstate='23514');
   end;
   perform set_config('request.jwt.claims', json_build_object('email', v_asis, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
@@ -513,7 +491,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('email', v_socia, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   begin
-    insert into asistente_permiso (accion, encendido, motivo, creado_por) values ('crear_insumo', false, 'ensayo', v_socia);
+    insert into asistente_permiso (capacidad, encendido, motivo, creado_por) values ('crear_insumo', false, 'ensayo', v_socia);
     v_res := v_res || jsonb_build_object('p','S6 la socia APAGA crear_insumo','esperado','ENTRA','obtenido','ENTRA','ok',true);
   exception when others then
     v_res := v_res || jsonb_build_object('p','S6 la socia APAGA crear_insumo','esperado','ENTRA','obtenido','RECHAZA: '||sqlstate||' · '||sqlerrm,'ok',false);
@@ -537,7 +515,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('email', v_socia, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   begin
-    insert into asistente_permiso (accion, encendido, motivo, creado_por) values ('crear_insumo', true, 'ensayo', v_socia);
+    insert into asistente_permiso (capacidad, encendido, motivo, creado_por) values ('crear_insumo', true, 'ensayo', v_socia);
     v_res := v_res || jsonb_build_object('p','S7 la socia vuelve a encender crear_insumo','esperado','ENTRA','obtenido','ENTRA','ok',true);
   exception when others then
     v_res := v_res || jsonb_build_object('p','S7 la socia vuelve a encender crear_insumo','esperado','ENTRA','obtenido','RECHAZA: '||sqlstate||' · '||sqlerrm,'ok',false);
