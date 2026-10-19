@@ -268,6 +268,20 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
   Actualizar la constante `BUILD` (inicio del bloque JS) en cada publicación.
 - Consultas Python: `odoo_read.py` + paquete `tf/` (`productos.py`,
   `clientes.py`, `odoo.py`).
+- **Cierre de planta de fin de año: 18-dic-2026 al 11-ene-2027** (25 días
+  corridos). Es el rango original, sembrado por `PERSONAL_CALENDARIO.sql` como
+  **una sola fila** de `rrhh_feriado`.
+  - **16-oct-2026:** se parte en **cinco tramos** —18–24 dic (cierre) · **25-dic**
+    (feriado, `pago_obligatorio = true`) · 26–31 dic (cierre) · **1-ene-2027**
+    (feriado, `pago_obligatorio = true`) · 2–11 ene (cierre)— para poder cargar
+    los dos feriados de pago obligatorio que el cierre contenía. `rrhh_feriado`
+    tiene una exclusión por rangos solapados, así que adentro de un cierre no
+    cabe un feriado: mientras fueran una sola fila, esos dos días no existían, el
+    pago doble no podía dispararse nunca y una ausencia ahí descontaba siendo un
+    día pagado. Los **25 días cerrados no cambian**: el candado del pegado los
+    compara día por día antes y después. `PERSONAL_CIERRE_TRAMOS.sql` (pegado 11).
+  - En la pantalla «Días cerrados» el período se ve en **cinco filas** en vez de
+    una, y dos dicen «Navidad» y «Año Nuevo».
 
 ## Odoo — trampas conocidas (leer antes de consultar)
 
