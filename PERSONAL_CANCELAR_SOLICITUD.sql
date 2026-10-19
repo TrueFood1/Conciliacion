@@ -1,8 +1,26 @@
 -- SOLO SE PEGA DESPUES DEL ENSAYO · PERSONAL_CANCELAR_SOLICITUD.sql
 -- ════════════════════════════════════════════════════════════════════════
 -- MODULO PERSONAL · CANCELAR LO PROPIO + ANTI REPETIDAS   (PEGADO 9)
--- Preparado el 15-oct-2026.
+-- Preparado el 15-oct-2026. ✅ APLICADO EN PRODUCCION · verificado el 19-oct-2026.
 --
+-- COMO SE VERIFICO: con la consulta de solo lectura que esta mas abajo en este
+-- mismo encabezado. Dio 1 · 1 · 2 — la funcion existe, el CHECK de `estado` ya
+-- acepta 'cancelado', y los dos triggers anti repetidas estan puestos. O sea:
+-- aplicado y completo, no a medias.
+--
+-- ⚠️ 19-oct-2026 · Y LA MARCA ANTERIOR ESTABA MAL. Decia «NO SE CORRIO», y lo
+-- decia porque yo la escribi el 15-oct y nunca la volvi a tocar. Durante cuatro
+-- dias este archivo afirmo algo falso sobre produccion, y de el dependia si se
+-- podia construir el boton «Cancelar». La leccion no es «actualizar las marcas»:
+-- es que una marca escrita a mano NO ES EVIDENCIA, y que lo unico que sirve es
+-- la consulta. Por eso la consulta se queda aca y la marca la cita.
+--
+-- ⚠️ NO VOLVER A PEGAR ESTE ARCHIVO sin leer antes la nota del final sobre
+-- correrlo dos veces. Es seguro —rehace el CHECK identico— pero toma un candado
+-- exclusivo sobre rrhh_permiso y no hace falta.
+--
+-- Lo que sigue es la nota de cuando no se sabia, que se deja porque explica
+-- contra que se verifico:
 -- ⚠️ 19-oct-2026 · CORRECCION DE ESTA MARCA. Hasta hoy esta linea decia «NO SE
 -- CORRIO» a secas, y eso era una AFIRMACION QUE NADIE VERIFICO. La escribi yo el
 -- 15-oct, cuando era cierta, y no se volvio a tocar en cuatro dias de trabajo

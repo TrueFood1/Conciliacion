@@ -560,6 +560,22 @@ cambió es la **base**, no la pantalla.
 El paso 1 y el 4 eran los ensayos con `rollback` de cada pegado, y los dos dieron
 verde en producción antes de aplicar nada.
 
+> **19-oct-2026 · `PERSONAL_CANCELAR_SOLICITUD.sql` (pegado 9) está APLICADO.**
+> Verificado con la consulta de solo lectura que vive en el encabezado de ese
+> archivo: dio **`1 · 1 · 2`** — la función `rrhh_cancelar_solicitud` existe, el
+> CHECK de `estado` ya acepta `'cancelado'`, y los dos triggers anti repetidas
+> están puestos. Aplicado y completo, no a medias.
+>
+> **Y durante cuatro días este repo dijo lo contrario.** El encabezado de ese
+> archivo decía «NO SE CORRIÓ» porque lo escribí el 15-oct y nunca lo volví a
+> tocar; en la respuesta del 19-oct lo di como «no consta que esté aplicado»
+> basándome en esa misma marca. Era falso, y de ese dato dependía si se podía
+> construir el botón «Cancelar» de «Mis solicitudes» — o sea que la marca mal
+> puesta **frenó trabajo** cuatro días. No se borra ninguna de las dos notas: la
+> lección es que **una marca escrita a mano no es evidencia**, y que lo único que
+> sirve es la consulta. Por eso la consulta se queda en el archivo y la marca la
+> cita, en vez de afirmar por su cuenta.
+
 **Lo que esto cambió de fondo:** se fue el `÷15`, el `÷30` y la rebaja del 6,49 %
 que salía de una observación y nunca cuadró para las tres personas. Ahora el neto
 es el dato y de ahí sale todo. `rrhh_salario` quedó intacta: sigue siendo la
