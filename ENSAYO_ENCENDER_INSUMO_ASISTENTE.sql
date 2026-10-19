@@ -1,7 +1,9 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ENSAYO_ENCENDER_INSUMO_ASISTENTE.sql  ·  19-oct-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA (termina en rollback)
 -- Prueba el encendido de 'crear_insumo' (PEGADO_ENCENDER_INSUMO_ASISTENTE.sql, local) y su apagado.
--- ⛔ NO SE CORRIÓ TODAVÍA. Los correos salen de la base (v_acceso_usuario), no de este archivo.
+-- ✅ CORRIDO el 19-oct-2026 por Andrea en producción: 12 de 12 ok = true, cada RECHAZA con 42501 por RLS.
+--    VERIFICADO desde afuera: el rollback no dejó nada (permiso vacío, sin propuestas «Ensayo», 0 vistas previas).
+-- Los correos salen de la base (v_acceso_usuario), no de este archivo.
 --
 -- CÓMO SE LEE: 12 filas, TODAS ok = true. Un RECHAZA vale solo con su SQLSTATE (42501 = RLS o permiso).
 -- ═══════════════════════════════════════════════════════════════════════════
