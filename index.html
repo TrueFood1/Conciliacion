@@ -5395,7 +5395,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 15 oct 2026 · b106';
+const BUILD = 'v 19 oct 2026 · b107';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -22059,7 +22059,7 @@ function _cpArmadoHtml(P){
     : AP.alc ? ('alcanza '+esc(AP.alc)) : ('<span class="cp-r">falta '+esc(_cpDia(AP.peor.falla))+'</span>');
   h+='<div class="cp-pie cp-arpie"><div class="cp-art"><div class="cp-art1">Total sin IVA'+(T.falta?' · sin precio':'')+'</div>'
     +'<div class="cp-art2">₡'+_rzN(T.t, 0)+'</div><div class="cp-art3'+(!ya&&!odoo&&AP.corto?' cp-amb3':'')+'">'+alc+'</div></div>'
-    +'<button class="cp-btn cp-btnp cp-btnrev" onclick="cpRevisar()">Revisar</button></div>';
+    +'<button class="cp-btn cp-btnp cp-btnrev" id="cpRev" onclick="cpRevisar()"'+(P.revisando?' disabled':'')+'>Revisar</button></div>';
   return h+'<div class="cp-msg'+(P.cls?(' '+P.cls):'')+'" id="cpRegMsg">'+esc(P.msg||'')+'</div></div>';
 }
 // REVISAR: lo que el servidor armaría en Odoo, en la unidad de Odoo, con IVA. Avisos todos juntos.
@@ -22122,7 +22122,18 @@ async function cpWhatsApp(){
   try{ await navigator.clipboard.writeText(txt); _cpRegMsg('Mensaje copiado: pegalo en la conversación.','cp-ok'); }
   catch(e){ window.prompt('Copiá este texto:', txt); }
 }
+// UN «Revisar» A LA VEZ (b107, 19-oct): cada «Revisar» guarda propuestas nuevas antes de preguntarle al
+// servidor, y el botón no se frenaba. El 19-oct el pedido de BIO corrió tres veces (dos a la vez) y dejó 4
+// propuestas sin orden (40, 41, 42, 44). Mientras trabaja, el botón queda deshabilitado y un segundo toque
+// no hace nada; se libera al terminar, salga bien o mal.
 async function cpRevisar(){
+  const P=_cpReg; if(!P||P.revisando) return;
+  P.revisando=true; _cpRevBtn(true);
+  try{ await _cpRevisarUna(); }
+  finally{ P.revisando=false; _cpRevBtn(false); }
+}
+function _cpRevBtn(on){ const b=document.getElementById('cpRev'); if(b) b.disabled=!!on; }
+async function _cpRevisarUna(){
   const P=_cpReg; if(!P) return; if(P.multi) return cpRevisarMulti(); const g=_cpAlc.grupos[P.gi], F=_cpFechasReg(P, g);
   if(P.llego){
     if(!/^[0-9]{20}$/.test(P.fe||'')){ _cpRegMsg('Falta el consecutivo de la FE: 20 dígitos.','cp-mal'); return; }
