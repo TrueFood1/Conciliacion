@@ -34,10 +34,11 @@ description: Arranque de sesión en el repo Conciliacion. Lee el bloque más rec
   ⚠ MODIFICADA el 2026-09-04, después de restaurarla: se le agregó el
   «Paso 0 — Sello del respaldo», que NO venía en el original y está
   rotulado como agregado ahí mismo.
-  ⚠ MODIFICADA el 2026-10-19 (decisión de Andrea): se le agregó el «Paso 2b —
-  Revisión de tickets» y su parte del reporte, rotulados ahí mismo. Reemplaza,
-  por ahora, al revisor diario por GitHub Actions (pospuesto). El resto del
-  cuerpo sigue siendo textual.
+  ⚠ MODIFICADA el 2026-10-19 (decisiones de Andrea): se le agregó el «Paso 2b —
+  Tickets: los revisa y los escribe CC» y su parte del reporte, rotulados ahí
+  mismo. CC escribe directo con truefie_cc (TICKETS_CC_AMPLIADO.sql). Reemplaza,
+  por ahora, al revisor diario por GitHub Actions (T-149, pospuesto). El resto
+  del cuerpo sigue siendo textual.
 ─────────────────────────────────────────────────────────────────────── -->
 
 # /retomar — cargar contexto al abrir sesión
@@ -102,47 +103,60 @@ bitácora contra los de ahora (local y origin). Lo que se busca cazar: que
 alguien haya movido `main` (u otra rama) por la web **entre sesiones** — el
 agujero del 6-jul, pero detectado al abrir en vez de al cerrar.
 
-## Paso 2b — Revisión de tickets (AGREGADO el 2026-10-19, decisión de Andrea)
+## Paso 2b — Tickets: los revisa y los escribe CC (AGREGADO el 2026-10-19, decisiones de Andrea)
 
-Por ahora la revisión de tickets vive acá y en el `/cierre`: **no hay robot diario** (el revisor por
-GitHub Actions está pospuesto). Este paso **lee** todo y **escribe solo dos cosas**, siempre con
-`--seco` primero: explicaciones y, con OK de Andrea, cierres.
+CC escribe **directo en la base con su rol `truefie_cc`** (TICKETS_CC_AMPLIADO.sql, 19-oct), en tickets de
+Truefie **y** en los pendientes propios de Andrea. La clave está en el llavero de la Mac de Andrea y la lee
+`tk_estado.py`: nunca aparece en pantalla, en el chat ni en el repo. **Todo cambio va primero con `--seco`**
+(la base lo juzga y lo deshace) y después de verdad.
 
-1. **Leer** (solo lectura). `--desde` es la fecha del bloque `DÓNDE QUEDAMOS` del Paso 1:
-   ```bash
-   python3 Conciliacion/herramientas/tickets/revisar_tickets.py --desde <AAAA-MM-DD>
-   ```
-   Lista los no resueltos (sin revisar · disponible · bloqueado · en curso · en validación) y marca
-   `CAMBIÓ` (algo nuevo desde el último cierre), `SIN-EXPLICACIÓN` y `PROPIO`.
+**¿Hay clave?** `security find-generic-password -s truefie-cc-db -a truefie_cc >/dev/null 2>&1`.
+Si **no** está (por ejemplo, en la compu de Lorena): este paso **solo lee y propone**; no escribe nada y lo
+dice en el reporte.
 
-2. **Revisar solo dos grupos**: los que `CAMBIÓ` y todos los «sin revisar». Los demás no se tocan.
+**Lo que la base NO deja, nunca:** descartar, posponer, reabrir algo cerrado/pospuesto/descartado, escribir
+«qué se espera» o «criterio», cambiar o borrar. Eso es de las socias, desde la pantalla.
 
-3. **¿Ya está resuelto?** Para cada uno, buscar la evidencia en el código y en git
-   (`git -C Conciliacion log --all --oneline --grep "T-<n>"`, el build que lo arregló, un `grep` del
-   síntoma en `index.html` o en el servicio). Solo con evidencia de una línea —build (`b108`) o commit—
-   se **propone** cerrar. **No se cierra sin el OK de Andrea en esta sesión**; con su OK:
-   ```bash
-   python3 Conciliacion/herramientas/tk_estado.py cerrar <n> --evidencia "<qué y dónde, con build o commit>" --build b<NN> --seco
-   ```
-   y después lo mismo sin `--seco`.
+### 1 · Leer (solo lectura)
+```bash
+python3 Conciliacion/herramientas/tickets/revisar_tickets.py --desde <fecha del último DÓNDE QUEDAMOS>
+```
+Se revisan dos grupos: los marcados `CAMBIÓ` y todos los «sin revisar». Los demás no se tocan.
 
-4. **Explicar cada «sin revisar»** que no tenga «En palabras claras», en los cuatro renglones fijos
-   (lenguaje de Andrea, no técnico; medido, no supuesto):
-   ```bash
-   python3 Conciliacion/herramientas/tk_estado.py explicar <n> --que-es "…" --por-que "…" \
-       --falta "chico|mediano|grande. …" --recomienda "HACER|CERRAR|DESCARTAR. …" --seco
-   ```
-   y después sin `--seco`. Escribir una explicación no decide nada: es definición, vale la última.
+### 2 · Tickets de Truefie
+- **Explicar** cada «sin revisar» sin «En palabras claras» (cuatro renglones, en el lenguaje de Andrea, medido):
+  `python3 Conciliacion/herramientas/tk_estado.py explicar <n> --que-es "…" --por-que "…" --falta "chico|mediano|grande. …" --recomienda "HACER|CERRAR|DESCARTAR. …" --seco` → sin `--seco`.
+- **Cerrar con evidencia** los ya resueltos: solo si se puede nombrar en una línea el build (`b108`) o el
+  commit donde quedó resuelto, y se verificó en el código o en git. Sin eso, no se cierra.
+  `python3 Conciliacion/herramientas/tk_estado.py cerrar <n> --evidencia "<qué y dónde>" --build b<NN> --cierre "<una línea>" --seco` → sin `--seco`.
+- **Marcar** (prioridad y riesgos) si hace falta: `tk_estado.py marcar <n> --prioridad … --toca-numeros si|no --escribe-en-base si|no --razon "…" --seco`.
 
-5. **Las firmas mandan** (las hacen cumplir las guardias de la base, no este texto):
-   - `truefie_cc` (`tk_estado.py`) **no ve los propios**, no pospone, no descarta y no toca lo que ya está
-     cerrado, pospuesto o descartado.
-   - `cc-sql` (editor) **no mueve pendientes propios**, no cierra, no pospone, no descarta.
-   - Los **propios** («Mis pendientes»): CC los **ve** con `revisar_tickets.py`, pero **no escribe nada**
-     en ellos. Su explicación propuesta va **en el reporte**, para que Andrea decida.
-   - Posponer, descartar, reabrir y todo lo propio: **Andrea decide**.
+### 3 · Pendientes propios de Andrea, EN ESTE ORDEN
+**(a) Primero CC.** Si se resuelve con las herramientas de esta sesión (leer el repo, Drive, Zoho, Odoo en
+solo lectura, armar un archivo o un borrador), CC lo resuelve y lo **cierra con evidencia verificable**: un
+commit o build, o una línea `archivo: <ruta>`, `correo: <de quién, asunto, fecha>`, `enlace: <url>`.
+- CC **no manda nada a terceros** (correos, WhatsApp) sin el OK de Andrea en esta sesión, ni escribe en
+  Odoo o Supabase fuera de sus carriles.
+- Si CC lo hizo pero la evidencia no es verificable desde afuera: **`en_validacion`** con una nota de 20
+  letras o más (`tk_estado.py mover <n> en_validacion --nota "…" --seco`), para que Andrea lo cierre.
 
-6. **Nunca** cerrar un ticket porque «parece viejo», ni recomendar CERRAR sin la evidencia escrita.
+**(b) Después, Instinct.** Solo lo que CC **no** puede y Instinct **sí** podría (correo, calendario,
+averiguar algo, escribirle a alguien): un mensaje **listo para que Andrea se lo mande a Instinct por
+WhatsApp**, con este formato:
+```
+Instinct: <qué hacer, en una o dos líneas>.
+Resultado que esperamos: <qué tiene que quedar hecho o qué dato traer>.
+Antes de mandar cualquier correo a otra persona, mostrámelo y esperá mi OK.
+(Ticket T-<n>)
+```
+Sin claves, sin montos de salarios ni datos sensibles. Al ticket se le agrega un anuncio
+(`tk_estado.py anunciar <n> --texto "Mensaje para Instinct listo el <fecha>." --seco`).
+
+**(c) Lo demás, para Andrea.** Lo que ni CC ni Instinct pueden: queda para ella, con **una línea** de qué
+necesita de ella.
+
+### 4 · Nunca
+Cerrar porque «parece viejo», recomendar CERRAR sin la evidencia escrita, ni escribir sin `--seco` antes.
 
 ## Paso 3 — Reportar (un solo turno)
 
@@ -165,16 +179,19 @@ Estado de ramas (bitácora vs realidad ahora)
    o el aviso: "⚠ origin/main cambió desde el cierre — traé con git fetch
    antes de seguir.">
 
-Tickets (Paso 2b · agregado 19-oct)
-  Cambiaron desde el último cierre
-    T-<n> · <módulo> · <estado> · <qué cambió>
-  Propongo cerrar (con evidencia)
-    T-<n> · <título corto> · <build o commit donde quedó resuelto>
-  Expliqué (sin revisar)
-    T-<n> · <recomendación en una línea>
-  Andrea decide
-    T-<n> · <propio / posponer / descartar / sin criterio> · <qué tiene que decidir>
-  revisé N · propongo cerrar X · Andrea decide Y
+Tickets (Paso 2b · lo que CC escribió con truefie_cc)
+  Explicaciones escritas      T-<n> · <recomendación en una línea>
+  Marcas puestas              T-<n> · <prioridad> · <razón corta>
+  Cerrados con evidencia      T-<n> · <título corto> · <evidencia>
+  Propios
+    (a) resueltos por CC      T-<n> · <qué se hizo> · <evidencia, o «en validación: cerralo vos»>
+    (b) para Instinct         T-<n> · <qué> — mensaje listo para copiar:
+                              «Instinct: … Resultado que esperamos: … Antes de mandar cualquier
+                               correo a otra persona, mostrámelo y esperá mi OK. (Ticket T-<n>)»
+    (c) para Andrea           T-<n> · <una línea: qué necesita de ella>
+  Cambiaron desde el último cierre (sin acción)   T-<n> · <qué cambió>
+  revisé N · escribí X (explicaciones E · marcas M · cierres C) · Instinct I · Andrea decide Y
+  <si no había clave: «Sin la clave de truefie_cc en esta compu: no escribí nada, solo propongo.»>
 ```
 
 Si `BITACORA.md` no existe o no tiene ningún bloque `DÓNDE QUEDAMOS`, decilo

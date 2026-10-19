@@ -1,6 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- TICKETS_CC_AMPLIADO.sql  ·  19-oct-2026  ·  truefie_cc AMPLIADO: tickets de Truefie y pendientes propios
--- ⛔ NO SE CORRIÓ. Ensayo ✅ 26/26 el 19-oct (corrido por CC, rollback verificado). Armado por herramientas/tickets/armar_cc_ampliado.py desde las guardias VIVAS del 19-oct
+-- ✅ APLICADO el 19-oct por Andrea: control 6 · (permisos) · 4 · 0. VERIFICADO desde afuera: 6 políticas de
+--    truefie_cc, md5 nuevos firma=ba681c0f detalle=70bb6ab6 estado=32d62182 marca=1bf13cd7, caminos de socia y
+--    editor intactos, truefie_cc ve T-150 (propio). NO VOLVER A CORRER (la guarda de md5 lo frena). Ensayo 26/26. Armado por herramientas/tickets/armar_cc_ampliado.py desde las guardias VIVAS del 19-oct
 --    (md5 del bloque DDL: 350cd7bbcca6be2cdd784889268feccf). Antes: ENSAYO_TICKETS_CC_AMPLIADO.sql en verde.
 --
 -- DECISIÓN DE ANDREA (19-oct): truefie_cc, en Truefie Y en propios: lee, agrega tickets, explicaciones,

@@ -35,9 +35,10 @@ description: Ritual de cierre de una sesión donde se tocó código en el repo C
   ⚠ MODIFICADA el 2026-09-04, después de restaurarla: se le agregó el
   «Paso 0 — Respaldo de las skills», que NO venía en el original y está
   rotulado como agregado ahí mismo.
-  ⚠ MODIFICADA el 2026-10-19 (decisión de Andrea): se le agregó el «Paso 2b —
-  Pendientes → tickets» y la sección Pendientes del bloque pasa a llevar el
-  número de ticket de cada línea. Rotulados ahí mismo. El resto del cuerpo sigue
+  ⚠ MODIFICADA el 2026-10-19 (decisiones de Andrea): se le agregó el «Paso 2b —
+  Pendientes → tickets» (CC los carga directo con truefie_cc; sin la clave, ensayo
+  + pegado) y la sección Pendientes del bloque lleva el T-<n> de cada línea.
+  Rotulados ahí mismo. El resto del cuerpo sigue
   siendo textual.
 ─────────────────────────────────────────────────────────────────────── -->
 
@@ -123,38 +124,39 @@ Detectá y marcá:
 - **working tree sucio** (archivos sin commitear tras el Paso 1 — no debería,
   pero verificar).
 
-## Paso 2b — Pendientes → tickets (AGREGADO el 2026-10-19, decisión de Andrea)
+## Paso 2b — Pendientes → tickets (AGREGADO el 2026-10-19, decisiones de Andrea)
 
-**Nada queda pendiente solo en la bitácora.** Cada pendiente NUEVO de esta sesión va como ticket, en su
-módulo (Finanzas, Operaciones, Entregas, Compras, Personal, General) o en «Mis pendientes» (ámbito
-`propio`) si es algo que hace Andrea fuera de Truefie.
+**Nada queda pendiente solo en la bitácora.** Cada pendiente NUEVO de la sesión va como ticket, en su
+módulo (Finanzas, Operaciones, Entregas, Compras, Personal, o General si no tiene) o en «Mis pendientes»
+(ámbito `propio`) si es algo que hace Andrea fuera de Truefie.
 
-1. **Juntar** los pendientes nuevos de la sesión (lo que quedó abierto, lo que se decidió hacer después,
-   lo que se encontró de paso).
-2. **¿Ya existe?** Para cada uno, buscarlo en TODOS los tickets —abiertos, cerrados, pospuestos y
-   descartados—, solo lectura:
-   ```bash
-   python3 Conciliacion/herramientas/tickets/revisar_tickets.py --todos --buscar "<palabra clave>"
-   ```
-   (busca en la descripción y en los detalles, en cualquier estado). Si ya existe:
-   no se duplica; si cambió algo, se le agrega un anuncio con `tk_estado.py anunciar <n> --seco` (solo
-   Truefie) y la línea de la bitácora lleva ese T-<n>.
-3. **Armar la tanda** de los que faltan en un JSON (fuera del repo o en
-   `herramientas/tickets/tanda_*.json`, que está en `.gitignore`), con su explicación en los cuatro
-   renglones, y generar ensayo + pegado:
-   ```bash
-   python3 Conciliacion/herramientas/tickets/armar_tickets.py <tanda>.json Conciliacion/PEGADO_TICKETS_<FECHA>
-   ```
-   Salen `PEGADO_TICKETS_<FECHA>_ENSAYO.sql` (rollback) y `PEGADO_TICKETS_<FECHA>.sql`, los dos
-   gitignored (un ticket puede nombrar una brecha y el repo es público).
-4. **Firmas** (las hacen cumplir las guardias): el ticket firma `ticket-sql…`; explicación, anuncio y
-   marca firman `cc-sql…`. Desde el editor **no** se cierra, **no** se pospone y **no** se descarta, y en
-   un propio **no** se pone marca ni estado: nace «sin revisar» y lo triá Andrea. Si Andrea decidió
-   posponer algo, el ticket nace con un anuncio que lo dice y ella toca «Posponer» en la pantalla.
-5. **Pegar** como siempre: ensayo al portapapeles → tabla de Andrea → pegado → fila de control → verificar
-   desde afuera con `revisar_tickets.py`. Recién ahí los T-<n> van a la bitácora.
-6. Si Andrea no lo pega en esta sesión, la línea dice `⏳ ticket por pegar (PEGADO_TICKETS_<FECHA>.sql)`,
-   y el próximo `/retomar` lo muestra arriba de todo.
+1. **Juntar** los pendientes nuevos: lo que quedó abierto, lo que se decidió hacer después, lo que se
+   encontró de paso.
+2. **¿Ya existe?** Buscarlo en TODOS los tickets, en cualquier estado:
+   `python3 Conciliacion/herramientas/tickets/revisar_tickets.py --todos --buscar "<palabra clave>"`.
+   Si existe: no se duplica; si cambió algo, `tk_estado.py anunciar <n> --texto "…" --seco` → sin `--seco`,
+   y la bitácora lleva ese T-<n>.
+3. **Armar la tanda** de los que faltan en `Conciliacion/herramientas/tickets/tanda_<fecha>.json`
+   (gitignored: un ticket puede nombrar una brecha y el repo es público), cada uno con su explicación en
+   los cuatro renglones y, si hace falta, su marca.
+4. **Cargarla.**
+   - **Con la clave de truefie_cc** (la Mac de Andrea: `security find-generic-password -s truefie-cc-db -a truefie_cc`):
+     ```bash
+     python3 Conciliacion/herramientas/tk_estado.py tanda Conciliacion/herramientas/tickets/tanda_<fecha>.json --seco
+     python3 Conciliacion/herramientas/tk_estado.py tanda Conciliacion/herramientas/tickets/tanda_<fecha>.json
+     ```
+     Todo en una transacción (todo o nada), firmado `cc-truefie`; frena si una clave ya existe. Devuelve los T-<n>.
+   - **Sin la clave** (la compu de Lorena): ensayo + pegado para que ella los pegue en el editor:
+     ```bash
+     python3 Conciliacion/herramientas/tickets/armar_tickets.py Conciliacion/herramientas/tickets/tanda_<fecha>.json Conciliacion/PEGADO_TICKETS_<FECHA>
+     ```
+     (firmas del editor: `ticket-sql…` y `cc-sql…`; desde el editor un propio solo nace, sin marca).
+     Ensayo al portapapeles → su tabla → pegado → fila de control → verificar con `revisar_tickets.py`.
+5. **Verificar desde afuera** con `revisar_tickets.py --todos --buscar "<clave>"`. Recién ahí los T-<n> van a
+   la sección Pendientes. Si no se cargó hoy: `⏳ ticket por cargar (<archivo>)`.
+6. **Resumen para Andrea** al final del cierre: tickets creados (T-<n> · módulo · título), marcas puestas,
+   cierres con su evidencia, y —si se revisaron propios— los tres grupos (CC · Instinct · Andrea) con los
+   mensajes para Instinct listos para copiar (mismo formato que el /retomar).
 
 ## Paso 3 — Armar el bloque de bitácora
 
@@ -172,7 +174,7 @@ sesión (no inventar; si una sección queda vacía, escribí "—").
 
 ### Pendientes
 - T-<n> · <módulo o Mis pendientes> · <lo que quedó abierto>   ← cada línea con su ticket (Paso 2b)
-- ⏳ ticket por pegar (PEGADO_TICKETS_<FECHA>.sql) · <lo que quedó abierto>   ← solo si no se pegó hoy
+- ⏳ ticket por cargar (<archivo>) · <lo que quedó abierto>   ← solo si no se cargó hoy
 
 ### Estado de ramas
 - `dev`  → <hash7> · <"sincronizado con origin" | "N commits sin pushear">

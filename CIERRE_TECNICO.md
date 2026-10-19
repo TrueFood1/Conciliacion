@@ -69,18 +69,20 @@ Este checklist se corre al final de **toda sesión donde se tocó código**, sin
    falso, y se creyó durante semanas. La base sí estaba cubierta; el trabajo del
    día, no.
 
-9. **Cada pendiente nuevo es un ticket** (decisión de Andrea, 19-oct-2026). Nada queda pendiente
+9. **Cada pendiente nuevo es un ticket** (decisiones de Andrea, 19-oct-2026). Nada queda pendiente
    solo en la bitácora: lo nuevo de la sesión va como ticket en su módulo o en «Mis pendientes».
    1. Buscar si ya existe, en cualquier estado:
       `python3 herramientas/tickets/revisar_tickets.py --todos --buscar "<palabra clave>"`.
-   2. Los que faltan, a un JSON (`herramientas/tickets/tanda_*.json`, gitignored) con su explicación
-      en los cuatro renglones, y `python3 herramientas/tickets/armar_tickets.py <tanda>.json
-      PEGADO_TICKETS_<FECHA>` → ensayo + pegado (gitignored: el repo es público).
-   3. Ensayo → pegado → fila de control → verificar desde afuera. Recién ahí cada línea de
-      Pendientes de la bitácora lleva su T-<n>. Si no se pegó: `⏳ ticket por pegar`.
-   4. Las firmas las hacen cumplir las guardias: ticket `ticket-sql…`, detalles y marcas
-      `cc-sql…`; desde el editor no se cierra, no se pospone, no se descarta, y en un propio no
-      se pone marca ni estado (lo triá Andrea).
+   2. Los que faltan, a `herramientas/tickets/tanda_<fecha>.json` (gitignored) con su explicación en
+      los cuatro renglones y, si hace falta, su marca.
+   3. **Con la clave de truefie_cc** (llavero de la Mac de Andrea): CC los carga directo, en una
+      transacción, `python3 herramientas/tk_estado.py tanda <json> --seco` y después sin `--seco`.
+      **Sin la clave** (compu de Lorena): `python3 herramientas/tickets/armar_tickets.py <json>
+      PEGADO_TICKETS_<FECHA>` → ensayo + pegado para que lo pegue ella.
+   4. Verificar desde afuera; recién ahí cada línea de Pendientes de la bitácora lleva su T-<n>. Si no se
+      cargó: `⏳ ticket por cargar`.
+   5. Lo que la base no deja, nunca: descartar, posponer, reabrir, criterio, cambiar o borrar. Eso es
+      de las socias, desde la pantalla.
 
 7. **¿Publicar?** Solo si Andrea lo dice explícito → `merge dev → main` + push. Si no, `main` se queda sirviendo la versión publicada vieja.
 

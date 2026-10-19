@@ -12,7 +12,9 @@ POR QUE EXISTE (27-sep-2026, opcion A de Andrea)
   guardias de la base y la RLS del rol. Este script es solo la puerta.
 
 QUE PUEDE Y QUE NO (lo hace cumplir la BASE, no este archivo)
-  · ve y mueve SOLO tickets de ambito truefie. Un propio, para el rol, no existe.
+  · DESDE EL 19-OCT (TICKETS_CC_AMPLIADO.sql, decision de Andrea): ve y escribe en tickets de Truefie Y en
+    los pendientes propios de Andrea: agrega tickets (`nuevo`, `tanda`), marcas (`marcar`), explicaciones,
+    anuncios y estados. Antes (27-sep) un propio, para el rol, no existia.
   · estados: cerrado · en_validacion · en_curso · disponible · bloqueado.
   · no toca un ticket cerrado, pospuesto o descartado: eso lo reabre Andrea.
   · al cerrar: evidencia OBLIGATORIA, una linea, con el build (b72) o el commit.
@@ -24,9 +26,17 @@ COMO SE USA
     python3 herramientas/tk_estado.py anunciar 15 --texto "hallazgo…" [--seco]
     python3 herramientas/tk_estado.py explicar 15 \\
         --que-es "…" --por-que "…" --falta "chico. …" --recomienda "HACER. …" [--seco]
+    python3 herramientas/tk_estado.py nuevo --ambito truefie --modulo compras --tipo encargo \\
+        --descripcion "…" [--build b108] [--seco]          # imprime el T-<n> nuevo
+    python3 herramientas/tk_estado.py marcar 148 --prioridad alta --toca-numeros no \\
+        --escribe-en-base si --razon "…" [--bloquea-entrega no] [--seco]
+    python3 herramientas/tk_estado.py tanda herramientas/tickets/tanda_X.json [--seco]
+        # los tickets del /cierre: TODOS en una transaccion (todo o nada), cada uno con su
+        # explicacion, su anuncio y su marca; frena si alguna clave ya existe en cualquier estado
     python3 herramientas/tk_estado.py cerrar 116 \\
         --evidencia "Resuelto en b72 (65ac781): el 247 ya aparece en Despachos" \\
         --build b72 [--cierre "texto del detalle de cierre"] [--seco]
+    # en un PROPIO la evidencia puede ser tambien "archivo: …", "correo: …" o "enlace: …"
 
   --seco manda el cambio de verdad adentro de una transaccion y la deshace: los
   guardias y la RLS reales lo juzgan, y no queda nada. Siempre primero --seco.
@@ -157,7 +167,7 @@ def ver(db, t):
         "          order by x.creado_en desc, x.id desc limit 1), 'sin_triar') as estado "
         "from ticket t where t.id = %d" % t)[-1]
     if not filas:
-        print("T-%04d: truefie_cc no lo ve (no existe, o es un pendiente propio)." % t)
+        print("T-%04d: no existe (o truefie_cc no lo ve)." % t)
         return None
     print(tabla(cols, filas, 70))
     return filas[0][4]
@@ -253,6 +263,91 @@ def explicar(db, t, texto, seco=True):
     return True
 
 
+# ── TICKETS NUEVOS Y MARCAS (19-oct-2026, TICKETS_CC_AMPLIADO.sql) ─────────
+AMBITOS = ("truefie", "propio")
+TIPOS = ("no_funciona", "duda", "idea", "encargo")
+EVIDENCIA_PROPIO = re.compile(r"^(archivo|correo|enlace): \S", re.I)
+
+
+def _correr(db, sql, seco):
+    """Una transaccion: o entra todo, o nada. En seco, siempre se deshace."""
+    try:
+        res = db._crudo("begin;\n" + sql + ("\nrollback;" if seco else "\ncommit;"))
+        return res
+    except RuntimeError as e:
+        try:
+            db._crudo("rollback;")
+        except Exception:
+            pass
+        print("RECHAZADO por la base: %s" % e)
+        return None
+
+
+def nuevo(db, ambito, modulo, tipo, descripcion, build, seco=True):
+    if ambito not in AMBITOS or tipo not in TIPOS or not descripcion or len(descripcion.strip()) < 5:
+        sys.exit("nuevo: --ambito truefie|propio, --tipo %s, --descripcion de 5 letras o mas" % "|".join(TIPOS))
+    res = _correr(db, "insert into ticket (descripcion, tipo, build, modulo, ambito, creado_por) values "
+                      "(%s, %s, %s, %s, %s, %s) returning id;" % (lit(descripcion.strip()), lit(tipo), lit(build),
+                      lit(modulo), lit(ambito), lit(FIRMA)), seco)
+    if res is None:
+        return None
+    tid = int(res[0][1][0][0])
+    print("✓ %s T-%d (%s%s)" % ("SECO: entraria como" if seco else "CREADO", tid, ambito, (" · " + modulo) if modulo else ""))
+    return tid
+
+
+def marcar(db, t, prioridad, toca, escribe, bloquea, razon, seco=True):
+    si = {"si": "true", "sí": "true", "no": "false"}
+    if prioridad not in ("alta", "media", "baja") or toca not in si or escribe not in si or bloquea not in si \
+            or not razon or len(razon.strip()) < 12:
+        sys.exit("marcar: --prioridad alta|media|baja, --toca-numeros si|no, --escribe-en-base si|no, "
+                 "--razon de 12 letras o mas")
+    res = _correr(db, "insert into ticket_marca (ticket_id, toca_numeros, escribe_en_base, bloquea_entrega, prioridad, "
+                      "razon, creado_por) values (%d, %s, %s, %s, %s, %s, %s);" % (t, si[toca], si[escribe], si[bloquea],
+                      lit(prioridad), lit(razon.strip()), lit(FIRMA)), seco)
+    if res is not None:
+        print("✓ %s (marca %s en T-%d)" % ("SECO: la base lo acepto y se deshizo." if seco else "GUARDADO", prioridad, t))
+    return res is not None
+
+
+def tanda(db, ruta, seco=True):
+    """Los tickets nuevos del /cierre, desde el JSON de armar_tickets.py, en UNA transaccion."""
+    import json
+    D = json.load(open(ruta, encoding="utf-8"))
+    T, build = D["tickets"], D.get("build")
+    claves = ", ".join(lit(x["clave"]) for x in T)
+    sql = ["create temp table _tk_nuevos (n int, clave text, id bigint) on commit drop;",
+           "do $$ declare v_id bigint; begin",
+           "  if exists (select 1 from ticket t, unnest(array[%s]) c where t.descripcion ilike c || '%%') then" % claves,
+           # sin el % de Python: un solo % (el lugar del dato en el RAISE)
+           "    raise exception 'ya existe un ticket con alguna de estas claves (%): no se carga dos veces',",
+           "      (select string_agg(t.id || ' ' || c, ', ') from ticket t, unnest(array[%s]) c where t.descripcion ilike c || '%%');" % claves,
+           "  end if;"]
+    for n, x in enumerate(T, 1):
+        if not x["descripcion"].startswith(x["clave"]):
+            sys.exit("la descripcion tiene que empezar por la clave: %s" % x["clave"])
+        expl = armar_explicacion(*x["explicacion"])
+        sql.append("  insert into ticket (descripcion, tipo, build, modulo, ambito, creado_por) values (%s, %s, %s, %s, %s, %s) "
+                   "returning id into v_id;" % (lit(x["descripcion"]), lit(x["tipo"]), lit(build), lit(x.get("modulo")),
+                                                lit(x["ambito"]), lit(FIRMA)))
+        sql.append("  insert into _tk_nuevos values (%d, %s, v_id);" % (n, lit(x["clave"])))
+        sql.append("  insert into ticket_detalle (ticket_id, clase, texto, creado_por) values (v_id, 'explicacion', %s, %s);"
+                   % (lit(expl), lit(FIRMA)))
+        if x.get("anuncio"):
+            sql.append("  insert into ticket_detalle (ticket_id, clase, texto, creado_por) values (v_id, 'anuncio', %s, %s);"
+                       % (lit(x["anuncio"]), lit(FIRMA)))
+        if x.get("marca"):
+            m = x["marca"]
+            sql.append("  insert into ticket_marca (ticket_id, toca_numeros, escribe_en_base, prioridad, razon, creado_por) "
+                       "values (v_id, %s, %s, %s, %s, %s);" % (str(m["toca_numeros"]).lower(), str(m["escribe_en_base"]).lower(),
+                                                              lit(m["prioridad"]), lit(m["razon"]), lit(FIRMA)))
+    sql += ["end $$;", "select string_agg('T-' || id || ' ' || clave, ' · ' order by n) as tickets from _tk_nuevos;"]
+    res = _correr(db, "\n".join(sql), seco)
+    if res is not None:
+        print("✓ %s %s" % ("SECO (se deshizo):" if seco else "CREADOS:", res[-1][1][0][0]))
+    return res is not None
+
+
 def main():
     a = sys.argv[1:]
     if not a or a[0] in ("-h", "--help"):
@@ -275,6 +370,13 @@ def main():
             print(tabla(*db._crudo("select current_user as rol, "
                                    "(select count(*) from ticket) as tickets_que_ve;")[-1]))
             return
+        if cmd == "nuevo":
+            nuevo(db, opt("--ambito"), opt("--modulo"), opt("--tipo") or "encargo", opt("--descripcion"),
+                  opt("--build"), seco=seco); return
+        if cmd == "tanda":
+            if len(a) < 2:
+                sys.exit("tanda <archivo.json>")
+            tanda(db, a[1], seco=seco); return
         if len(a) < 2 or not a[1].isdigit():
             sys.exit("falta el numero de ticket")
         t = int(a[1])
@@ -296,10 +398,15 @@ def main():
             tx = armar_explicacion(opt("--que-es"), opt("--por-que"), opt("--falta"), opt("--recomienda"))
             if ver(db, t) is None: return
             explicar(db, t, tx, seco=seco); return
+        if cmd == "marcar":
+            if ver(db, t) is None: return
+            marcar(db, t, opt("--prioridad"), (opt("--toca-numeros") or "").lower(), (opt("--escribe-en-base") or "").lower(),
+                   (opt("--bloquea-entrega") or "no").lower(), opt("--razon"), seco=seco); return
         if cmd == "cerrar":
             ev = opt("--evidencia")
-            if not ev or "\n" in ev or not EVIDENCIA.search(ev):
-                sys.exit("--evidencia es obligatoria, en UNA linea, con el build (b72) o el commit")
+            if not ev or "\n" in ev or not (EVIDENCIA.search(ev) or EVIDENCIA_PROPIO.match(ev)):
+                sys.exit("--evidencia es obligatoria, en UNA linea, con el build (b72) o el commit; "
+                         "en un propio tambien «archivo: …», «correo: …» o «enlace: …»")
             if ver(db, t) is None: return
             mover(db, t, "cerrado", nota=ev, build=opt("--build"), cierre=opt("--cierre"), seco=seco)
             return
