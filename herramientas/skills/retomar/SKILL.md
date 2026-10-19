@@ -1,6 +1,6 @@
 ---
 name: retomar
-description: Arranque de sesión en el repo Conciliacion. Lee el bloque más reciente de BITACORA.md y, en un solo turno, reporta dónde quedamos, los pendientes y el estado de ramas — comparando lo que la bitácora grabó contra el estado REAL del remoto con git ls-remote (caza si main se movió por web entre sesiones). Invocar con /retomar al empezar a trabajar.
+description: Arranque de sesión en el repo Conciliacion. Lee el bloque más reciente de BITACORA.md y, en un solo turno, reporta dónde quedamos, los pendientes y el estado de ramas — comparando lo que la bitácora grabó contra el estado REAL del remoto con git ls-remote (caza si main se movió por web entre sesiones) — y revisa los tickets no resueltos (los que cambiaron y los sin revisar). Invocar con /retomar al empezar a trabajar.
 ---
 
 <!-- ───────────────────────────────────────────────────────────────────────
@@ -33,7 +33,11 @@ description: Arranque de sesión en el repo Conciliacion. Lee el bloque más rec
 
   ⚠ MODIFICADA el 2026-09-04, después de restaurarla: se le agregó el
   «Paso 0 — Sello del respaldo», que NO venía en el original y está
-  rotulado como agregado ahí mismo. El resto del cuerpo sigue siendo textual.
+  rotulado como agregado ahí mismo.
+  ⚠ MODIFICADA el 2026-10-19 (decisión de Andrea): se le agregó el «Paso 2b —
+  Revisión de tickets» y su parte del reporte, rotulados ahí mismo. Reemplaza,
+  por ahora, al revisor diario por GitHub Actions (pospuesto). El resto del
+  cuerpo sigue siendo textual.
 ─────────────────────────────────────────────────────────────────────── -->
 
 # /retomar — cargar contexto al abrir sesión
@@ -98,6 +102,48 @@ bitácora contra los de ahora (local y origin). Lo que se busca cazar: que
 alguien haya movido `main` (u otra rama) por la web **entre sesiones** — el
 agujero del 6-jul, pero detectado al abrir en vez de al cerrar.
 
+## Paso 2b — Revisión de tickets (AGREGADO el 2026-10-19, decisión de Andrea)
+
+Por ahora la revisión de tickets vive acá y en el `/cierre`: **no hay robot diario** (el revisor por
+GitHub Actions está pospuesto). Este paso **lee** todo y **escribe solo dos cosas**, siempre con
+`--seco` primero: explicaciones y, con OK de Andrea, cierres.
+
+1. **Leer** (solo lectura). `--desde` es la fecha del bloque `DÓNDE QUEDAMOS` del Paso 1:
+   ```bash
+   python3 Conciliacion/herramientas/tickets/revisar_tickets.py --desde <AAAA-MM-DD>
+   ```
+   Lista los no resueltos (sin revisar · disponible · bloqueado · en curso · en validación) y marca
+   `CAMBIÓ` (algo nuevo desde el último cierre), `SIN-EXPLICACIÓN` y `PROPIO`.
+
+2. **Revisar solo dos grupos**: los que `CAMBIÓ` y todos los «sin revisar». Los demás no se tocan.
+
+3. **¿Ya está resuelto?** Para cada uno, buscar la evidencia en el código y en git
+   (`git -C Conciliacion log --all --oneline --grep "T-<n>"`, el build que lo arregló, un `grep` del
+   síntoma en `index.html` o en el servicio). Solo con evidencia de una línea —build (`b108`) o commit—
+   se **propone** cerrar. **No se cierra sin el OK de Andrea en esta sesión**; con su OK:
+   ```bash
+   python3 Conciliacion/herramientas/tk_estado.py cerrar <n> --evidencia "<qué y dónde, con build o commit>" --build b<NN> --seco
+   ```
+   y después lo mismo sin `--seco`.
+
+4. **Explicar cada «sin revisar»** que no tenga «En palabras claras», en los cuatro renglones fijos
+   (lenguaje de Andrea, no técnico; medido, no supuesto):
+   ```bash
+   python3 Conciliacion/herramientas/tk_estado.py explicar <n> --que-es "…" --por-que "…" \
+       --falta "chico|mediano|grande. …" --recomienda "HACER|CERRAR|DESCARTAR. …" --seco
+   ```
+   y después sin `--seco`. Escribir una explicación no decide nada: es definición, vale la última.
+
+5. **Las firmas mandan** (las hacen cumplir las guardias de la base, no este texto):
+   - `truefie_cc` (`tk_estado.py`) **no ve los propios**, no pospone, no descarta y no toca lo que ya está
+     cerrado, pospuesto o descartado.
+   - `cc-sql` (editor) **no mueve pendientes propios**, no cierra, no pospone, no descarta.
+   - Los **propios** («Mis pendientes»): CC los **ve** con `revisar_tickets.py`, pero **no escribe nada**
+     en ellos. Su explicación propuesta va **en el reporte**, para que Andrea decida.
+   - Posponer, descartar, reabrir y todo lo propio: **Andrea decide**.
+
+6. **Nunca** cerrar un ticket porque «parece viejo», ni recomendar CERRAR sin la evidencia escrita.
+
 ## Paso 3 — Reportar (un solo turno)
 
 Formato:
@@ -118,6 +164,17 @@ Estado de ramas (bitácora vs realidad ahora)
   <línea final: "Nadie tocó el remoto desde el último cierre, podés seguir."
    o el aviso: "⚠ origin/main cambió desde el cierre — traé con git fetch
    antes de seguir.">
+
+Tickets (Paso 2b · agregado 19-oct)
+  Cambiaron desde el último cierre
+    T-<n> · <módulo> · <estado> · <qué cambió>
+  Propongo cerrar (con evidencia)
+    T-<n> · <título corto> · <build o commit donde quedó resuelto>
+  Expliqué (sin revisar)
+    T-<n> · <recomendación en una línea>
+  Andrea decide
+    T-<n> · <propio / posponer / descartar / sin criterio> · <qué tiene que decidir>
+  revisé N · propongo cerrar X · Andrea decide Y
 ```
 
 Si `BITACORA.md` no existe o no tiene ningún bloque `DÓNDE QUEDAMOS`, decilo

@@ -34,7 +34,11 @@ description: Ritual de cierre de una sesión donde se tocó código en el repo C
 
   ⚠ MODIFICADA el 2026-09-04, después de restaurarla: se le agregó el
   «Paso 0 — Respaldo de las skills», que NO venía en el original y está
-  rotulado como agregado ahí mismo. El resto del cuerpo sigue siendo textual.
+  rotulado como agregado ahí mismo.
+  ⚠ MODIFICADA el 2026-10-19 (decisión de Andrea): se le agregó el «Paso 2b —
+  Pendientes → tickets» y la sección Pendientes del bloque pasa a llevar el
+  número de ticket de cada línea. Rotulados ahí mismo. El resto del cuerpo sigue
+  siendo textual.
 ─────────────────────────────────────────────────────────────────────── -->
 
 # /cierre — cierre técnico + bitácora
@@ -119,6 +123,39 @@ Detectá y marcá:
 - **working tree sucio** (archivos sin commitear tras el Paso 1 — no debería,
   pero verificar).
 
+## Paso 2b — Pendientes → tickets (AGREGADO el 2026-10-19, decisión de Andrea)
+
+**Nada queda pendiente solo en la bitácora.** Cada pendiente NUEVO de esta sesión va como ticket, en su
+módulo (Finanzas, Operaciones, Entregas, Compras, Personal, General) o en «Mis pendientes» (ámbito
+`propio`) si es algo que hace Andrea fuera de Truefie.
+
+1. **Juntar** los pendientes nuevos de la sesión (lo que quedó abierto, lo que se decidió hacer después,
+   lo que se encontró de paso).
+2. **¿Ya existe?** Para cada uno, buscarlo en TODOS los tickets —abiertos, cerrados, pospuestos y
+   descartados—, solo lectura:
+   ```bash
+   python3 Conciliacion/herramientas/tickets/revisar_tickets.py --todos --buscar "<palabra clave>"
+   ```
+   (busca en la descripción y en los detalles, en cualquier estado). Si ya existe:
+   no se duplica; si cambió algo, se le agrega un anuncio con `tk_estado.py anunciar <n> --seco` (solo
+   Truefie) y la línea de la bitácora lleva ese T-<n>.
+3. **Armar la tanda** de los que faltan en un JSON (fuera del repo o en
+   `herramientas/tickets/tanda_*.json`, que está en `.gitignore`), con su explicación en los cuatro
+   renglones, y generar ensayo + pegado:
+   ```bash
+   python3 Conciliacion/herramientas/tickets/armar_tickets.py <tanda>.json Conciliacion/PEGADO_TICKETS_<FECHA>
+   ```
+   Salen `PEGADO_TICKETS_<FECHA>_ENSAYO.sql` (rollback) y `PEGADO_TICKETS_<FECHA>.sql`, los dos
+   gitignored (un ticket puede nombrar una brecha y el repo es público).
+4. **Firmas** (las hacen cumplir las guardias): el ticket firma `ticket-sql…`; explicación, anuncio y
+   marca firman `cc-sql…`. Desde el editor **no** se cierra, **no** se pospone y **no** se descarta, y en
+   un propio **no** se pone marca ni estado: nace «sin revisar» y lo triá Andrea. Si Andrea decidió
+   posponer algo, el ticket nace con un anuncio que lo dice y ella toca «Posponer» en la pantalla.
+5. **Pegar** como siempre: ensayo al portapapeles → tabla de Andrea → pegado → fila de control → verificar
+   desde afuera con `revisar_tickets.py`. Recién ahí los T-<n> van a la bitácora.
+6. Si Andrea no lo pega en esta sesión, la línea dice `⏳ ticket por pegar (PEGADO_TICKETS_<FECHA>.sql)`,
+   y el próximo `/retomar` lo muestra arriba de todo.
+
 ## Paso 3 — Armar el bloque de bitácora
 
 Formato fijo, 4 secciones. Redactá el contenido a partir de lo que pasó en la
@@ -134,7 +171,8 @@ sesión (no inventar; si una sección queda vacía, escribí "—").
 <el punto exacto para retomar, 1-2 frases>
 
 ### Pendientes
-- <lo que quedó abierto>
+- T-<n> · <módulo o Mis pendientes> · <lo que quedó abierto>   ← cada línea con su ticket (Paso 2b)
+- ⏳ ticket por pegar (PEGADO_TICKETS_<FECHA>.sql) · <lo que quedó abierto>   ← solo si no se pegó hoy
 
 ### Estado de ramas
 - `dev`  → <hash7> · <"sincronizado con origin" | "N commits sin pushear">
