@@ -58,7 +58,8 @@ def cuerpo(T, build, firma_t, firma_d):
     claves = ", ".join(q(x["clave"]) for x in T)
     s += ["  -- LA GUARDA: ninguna clave puede existir ya, en ningún estado.",
           "  if exists (select 1 from ticket t, unnest(array[%s]) c where t.descripcion ilike c || '%%') then" % claves,
-          "    raise exception 'ya existe un ticket con alguna de estas claves: no se pega dos veces (%%)',",
+          # Esta línea NO pasa por el % de Python: va un solo % (el lugar del dato en el RAISE de PL/pgSQL).
+          "    raise exception 'ya existe un ticket con alguna de estas claves: no se pega dos veces (%)',",
           "      (select string_agg(t.id || ' ' || c, ', ') from ticket t, unnest(array[%s]) c where t.descripcion ilike c || '%%');" % claves,
           "  end if;"]
     for n, x in enumerate(T, 1):
