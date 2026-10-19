@@ -5381,7 +5381,7 @@ button:disabled, button[disabled], .btn:disabled{
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
       <div class="m3title" style="font-size:24px">Pago de quincena</div>
-      <div class="m3sub" style="margin-top:2px">Tarifa: salario mensual ÷ 30 ÷ 8 · descuenta solo el permiso aprobado y marcado «se descuenta».</div>
+      <div class="m3sub" style="margin-top:2px">Valor del día: neto de la quincena ÷ días hábiles de lunes a viernes (los feriados cuentan, porque se pagan) · valor de la hora: ese valor ÷ 8 · descuenta solo el permiso aprobado y marcado «se descuenta».</div>
     </div>
     <div class="cal-bar">
       <button class="btn btn-sm" onclick="pagMover(-1)" aria-label="Quincena anterior">‹</button>
@@ -5450,7 +5450,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 15 oct 2026 · b106';
+const BUILD = 'v 19 oct 2026 · b108: cancelar lo propio en «Mis solicitudes» · Pago de quincena con el neto fijo, feriado trabajado y el divisor a la vista';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -7257,23 +7257,53 @@ async function solMias(force){
   const box=document.getElementById('solMias'); if(!box) return;
   if(_solMias && !force){ _solMiasRender(); return; }
   try{
-    const yo=await perYo(); if(!yo){ box.innerHTML=''; return; }
+    const yo=await perYo();
+    if(!yo){
+      // CERO FILAS NO ES UN FALLO PARA TODOS. Una socia o el asistente no tienen
+      // fila de empleada, así que no pueden tener solicitudes propias. Para un
+      // empleado de verdad, en cambio, no tener persona enlazada SÍ es el fallo
+      // silencioso del módulo, y se dice.
+      box.innerHTML='<div class="per-cnt">'
+        + (_perEsSocia
+            ? 'Esta lista es de las solicitudes propias. Las del equipo se resuelven en el Calendario.'
+            : _perLectora
+              ? 'Esta cuenta no es de una persona del equipo, así que no tiene solicitudes propias.'
+              : 'Tu cuenta todavía no está enlazada a una persona del equipo, así que no puedo mostrar tus solicitudes. Lo enlaza Andrea.')
+        + '</div>';
+      return;
+    }
     const c=sbClient();
-    const [rp,rv]=await Promise.all([
+    const [rp,rv,ra]=await Promise.all([
       c.from('v_rrhh_permiso')
        .select('id,fecha_inicio,fecha_fin,dias,motivo,estado,resolucion_nota,resuelto_por,modalidad_descuento,horas,incapacidad_origen')
        .eq('persona_id',yo.id),
       c.from('v_rrhh_evento_estado').select('id,fecha,dias,motivo,estado,aprobado_por')
-       .eq('persona_id',yo.id).eq('tipo','vacaciones')
+       .eq('persona_id',yo.id).eq('tipo','vacaciones'),
+      // QUIEN ANULO una vacación. `v_rrhh_evento_estado` expone `anulada` pero
+      // NO quién la anuló, y sin eso no se puede decir «Cancelada por vos» sin
+      // adivinar. Se lee la tabla directo (tiene política de select) en vez de
+      // suponer que un «anulado» propio siempre es una cancelación del dueño:
+      // una socia puede anular desde el SQL Editor, y ahí el texto mentiría.
+      c.from('rrhh_evento_anulado').select('evento_id,anulada,motivo,creado_por,creado_en')
+       .order('creado_en',{ascending:false})
     ]);
     if(rp.error) throw rp.error;
     if(rv.error) throw rv.error;
+    // La anulación es ACCESORIA: si esa consulta falla, la lista se muestra
+    // igual y la cancelada dice «cancelada» sin el «por vos». Callarla sería
+    // peor que no tenerla.
+    const anuPor={};
+    if(!ra.error) (ra.data||[]).forEach(function(r){
+      if(anuPor[r.evento_id]===undefined && r.anulada) anuPor[r.evento_id]=r.creado_por;
+    });
     _solMias=[]
-      .concat((rp.data||[]).map(function(r){ return {tipo:'Permiso', ini:r.fecha_inicio, fin:r.fecha_fin,
+      .concat((rp.data||[]).map(function(r){ return {k:'permiso', id:r.id,
+        tipo:'Permiso', ini:r.fecha_inicio, fin:r.fecha_fin,
         dias:r.dias, motivo:r.motivo, estado:r.estado, nota:r.resolucion_nota, por:r.resuelto_por,
         mod:r.modalidad_descuento, horas:(r.horas===null?null:Number(r.horas)),
         origen:r.incapacidad_origen}; }))
-      .concat((rv.data||[]).map(function(r){ return {tipo:'Vacación', ini:r.fecha,
+      .concat((rv.data||[]).map(function(r){ return {k:'vacacion', id:r.id,
+        anuPor:anuPor[r.id], tipo:'Vacación', ini:r.fecha,
         fin:_perISO(_perMasDias(_perDe(r.fecha),(Number(r.dias)||1)-1)), dias:Number(r.dias)||1,
         motivo:r.motivo, estado:(r.estado==='solicitado'?'pendiente':r.estado), por:r.aprobado_por}; }));
     _solMiasRender();
@@ -7281,10 +7311,92 @@ async function solMias(force){
     box.innerHTML='<div class="status s-err">No pude leer tus solicitudes: '+esc(_perErr(e))+'</div>';
   }
 }
+// «CANCELADA POR VOS» en vez del correo propio. Quien mira su propia lista ya
+// sabe quién es: ver su correo ahí no agrega nada y encima se lee como si lo
+// hubiera hecho otro. Para un permiso, quien cancela queda en `resuelto_por`
+// (lo sella el trigger); para una vacación, en rrhh_evento_anulado.creado_por.
+function _solQuienCancelo(s){
+  return (s.k==='vacacion') ? (s.anuPor||null) : (s.por||null);
+}
+function _solEsMia(s){
+  const q=_solQuienCancelo(s);
+  return !!(q && _perEmail && String(q).toLowerCase()===String(_perEmail).toLowerCase());
+}
+function _solEstadoTxt(s){
+  const anu=(s.estado==='cancelado'||s.estado==='anulado');
+  if(anu) return _solEsMia(s) ? 'Cancelada por vos' : 'Cancelada';
+  return s.estado;
+}
+function _solQuien(s){
+  if(s.estado==='pendiente') return '';
+  // Si ya dice «por vos», el correo sería repetirlo.
+  if(_solEsMia(s)) return '';
+  return (s.estado==='cancelado'||s.estado==='anulado') ? (_solQuienCancelo(s)||'') : (s.por||'');
+}
+
+// EL BOTON SOLO EN LO PROPIO Y PENDIENTE. Esta lista ya es propia (sale de
+// `perYo()` y la RLS), así que lo único que hay que filtrar acá es el estado:
+// una aprobada o una rechazada no se cancela, se habla con Andrea o Lorena.
+function _solCancelHTML(s){
+  if(s.estado!=='pendiente') return '';
+  return '<div style="margin-top:8px">'
+    + '<button class="btn" id="solCanBtn'+esc(s.k)+s.id+'" '
+    +   'onclick="solCancelar(\''+esc(s.k)+'\','+Number(s.id)+')">Cancelar</button>'
+    + '</div>';
+}
+
+// ANTI DOBLE TOQUE POR SOLICITUD, no global: cancelar una no tiene por qué
+// congelar el botón de otra. El `finally` lo suelta pase lo que pase — sin él,
+// un error deja el botón muerto hasta recargar.
+const _solCancelando={};
+async function solCancelar(k, id){
+  const clave=k+id;
+  if(_solCancelando[clave]) return;
+  const b=document.getElementById('solCanBtn'+k+id);
+  if(!confirm(k==='vacacion'
+      ? '¿Cancelar esta solicitud de vacaciones? No se borra: queda registrada como cancelada por vos.'
+      : '¿Cancelar este permiso? No se borra: queda registrado como cancelado por vos.')) return;
+  _solCancelando[clave]=1;
+  if(b){ b.disabled=true; b.textContent='Cancelando…'; }
+  try{
+    const c=sbClient(); if(!c) throw new Error('no hay conexión a Supabase');
+    const {error}=await c.rpc('rrhh_cancelar_solicitud',{p_tipo:k, p_id:id, p_motivo:null});
+    if(error) throw error;
+    await solMias(true);
+    _perAviso('solStatusBajo','s-ok', k==='vacacion'
+      ? 'Cancelada. La solicitud quedó registrada como cancelada por vos.'
+      : 'Cancelado. El permiso quedó registrado como cancelado por vos.');
+  }catch(e){
+    _perAviso('solStatusBajo','s-err','No pude cancelar: '+esc(_solCancelErr(e)));
+    // Se relee igual: si falló porque alguien la resolvió en el medio, la lista
+    // tiene que mostrar cómo quedó DE VERDAD y no el estado viejo con su botón.
+    try{ await solMias(true); }catch(_){}
+  }finally{
+    _solCancelando[clave]=0;
+    if(b){ b.disabled=false; b.textContent='Cancelar'; }
+  }
+}
+
+// LOS TRES ERRORES QUE LEVANTA LA FUNCION, en lenguaje de persona. Los mensajes
+// del servidor ya están en castellano y son buenos, así que se usan cuando
+// vienen; el mapeo está para cuando llega solo el código.
+function _solCancelErr(e){
+  const cod=String((e&&(e.code||e.hint))||'');
+  const msg=String((e&&(e.message||e.msg))||'');
+  if(msg) return msg;
+  if(cod==='42501') return 'esa solicitud no es tuya, o tu cuenta no está enlazada a una persona del equipo. Solo quien la pidió puede cancelarla.';
+  if(cod==='55000') return 'ya la resolvieron (aprobada o rechazada) o alguien la resolvió justo ahora. Recargá para ver cómo quedó.';
+  if(cod==='23505') return 'ya hay otra solicitud igual para esas fechas, todavía pendiente o aprobada.';
+  return _perErr(e);
+}
+
 function _solMiasRender(){
   const box=document.getElementById('solMias'); if(!box) return;
   const f=(_solMias||[]).slice().sort(function(a,b){ return String(b.ini).localeCompare(String(a.ini)); });
-  if(!f.length){ box.innerHTML=''; return; }
+  if(!f.length){
+    box.innerHTML='<div class="per-cnt">Todavía no pediste nada. Lo que pidas te va a aparecer acá.</div>';
+    return;
+  }
   let h='<div class="m3title" style="font-size:16px">Lo que pediste</div>';
   f.forEach(function(s){
     const cl=(s.estado==='aprobado')?'ok':((s.estado==='pendiente')?'pend':'no');
@@ -7305,7 +7417,11 @@ function _solMiasRender(){
              + '</div>') : '')
       +  (s.nota?'<div class="per-sol-m">'+esc(s.nota)+'</div>':'')
       +'</div>'
-      +'<div class="per-est '+cl+'">'+esc(s.estado)+(s.por&&s.estado!=='pendiente'?'<div class="per-sol-f" style="text-transform:none;font-weight:400">'+esc(s.por)+'</div>':'')+'</div>'
+      +  _solCancelHTML(s)
+      +'</div>'
+      +'<div class="per-est '+cl+'">'+esc(_solEstadoTxt(s))
+      +   (_solQuien(s)?'<div class="per-sol-f" style="text-transform:none;font-weight:400">'+esc(_solQuien(s))+'</div>':'')
+      +'</div>'
       +'</div>';
   });
   box.innerHTML=h;
@@ -7533,7 +7649,7 @@ function _pagCRC(n){
   const v=Math.round(Number(n)||0);
   return (v<0?'-':'')+'₡'+Math.abs(v).toLocaleString('es-CR');
 }
-// La tarifa SÍ con decimales: salario ÷ 30 ÷ 8 casi nunca da entero, y
+// La tarifa SÍ con decimales: neto ÷ días hábiles ÷ 8 casi nunca da entero, y
 // redondearla a colones rompe la multiplicación que la socia va a querer rehacer
 // de cabeza para auditar el renglón.
 function _pagTarifa(n){
@@ -7559,7 +7675,8 @@ async function pagCargar(force){
     const c=sbClient(); if(!c) throw new Error('no hay conexión a Supabase');
     const [rp,rd,rg,rf]=await Promise.all([
       c.from('v_rrhh_pago')
-       .select('persona_id,nombre,ini,fin,base,descuentos,ajustes,final,permisos,ajustes_n')
+       .select('persona_id,nombre,ini,fin,base,descuentos,ajustes,final,permisos,ajustes_n,'
+               +'divisor,valor_dia,feriados_trab,feriados_trab_n')
        .eq('quincena',_pagQ),
       c.from('v_rrhh_pago_detalle')
        .select('persona_id,concepto,ref_id,dia,cantidad,unidad,tarifa,monto,nota')
@@ -7599,7 +7716,8 @@ async function pagCargar(force){
 // El orden de los renglones del desglose es fijo y no alfabético: primero de
 // dónde sale la plata, después lo que se resta por permiso, después lo que se
 // movió a mano. Es el orden en que se explica el número.
-const _PAG_ORDEN={base:0, incapacidad:1, descuento_permiso:2, rebaja:3, ajuste:4};
+const _PAG_ORDEN={base:0, incapacidad:1, descuento_permiso:2,
+                  feriado_trabajado:3, rebaja:4, ajuste:5};
 
 function _pagRender(){
   const box=document.getElementById('pagBody'); if(!box) return;
@@ -7608,10 +7726,12 @@ function _pagRender(){
   _pagAjusteForm();
   if(!filas.length){
     box.innerHTML='<div class="per-cnt">No hay nada que pagar en esta quincena. '
-      +'Si debería haber, revisá que la persona tenga salario cargado en rrhh_salario.</div>';
+      +'Si debería haber, revisá que la persona tenga su neto cargado en '
+      +'rrhh_neto_quincena, que es de donde sale la base desde el 1-oct-2026 '
+      +'(antes era rrhh_salario).</div>';
     return;
   }
-  let h='', totalQuincena=0, descuadres=0, nIncap=0, nRebaja=0;
+  let h='', totalQuincena=0, descuadres=0, nIncap=0;
   filas.forEach(function(f){
     const det=(_pagDet||[]).filter(function(d){ return Number(d.persona_id)===Number(f.persona_id); })
       .sort(function(a,b){
@@ -7622,7 +7742,6 @@ function _pagRender(){
     det.forEach(function(d){
       suma+=Math.round(Number(d.monto)||0);
       if(d.concepto==='incapacidad') nIncap++;
-      if(d.concepto==='rebaja') nRebaja++;
     });
     const exacto=Math.round(Number(f.final)||0);
     if(Math.abs(suma-exacto)>1) descuadres++;
@@ -7658,6 +7777,16 @@ function _pagRender(){
         qué=(d.nota||'Incapacidad');
         const ci=Number(d.cantidad)||0;
         como=_perDiasTxt(ci)+(ci?(' × '+_pagTarifa(d.tarifa)+'/día, menos lo que paga la empresa'):'');
+      }else if(d.concepto==='feriado_trabajado'){
+        // SUMA, y por eso lleva rotulo propio. Hasta el 19-oct caia en el `else`
+        // final y decia «Ajuste»: el texto de abajo salia bien (lo arma el SQL)
+        // pero el titulo mentia. La etiqueta entera viene de `nota`, con la
+        // fecha y si fue dia completo o por horas.
+        qué='Feriado trabajado';
+        const cf=Number(d.cantidad)||0;
+        como=(d.nota||'')
+            +(cf?(' · '+(d.unidad==='horas'?_perHorasTxt(cf):_perDiasTxt(cf))
+                 +' × '+_pagTarifa(d.tarifa)+(d.unidad==='horas'?'/h':'/día')):'');
       }else if(d.concepto==='descuento_permiso'){
         const cant=Number(d.cantidad)||0;
         qué=(d.nota||'Permiso');
@@ -7675,7 +7804,17 @@ function _pagRender(){
 
     h+='<div class="pag-fila">'
       +  '<div class="pag-t">'
-      +    '<div class="pag-q">'+esc(f.nombre||'—')+'</div>'
+      +    '<div class="pag-q">'+esc(f.nombre||'—')
+      +      (f.divisor
+                ? '<div class="m3sub" style="margin-top:2px;font-weight:400">'
+                  +_perDiasTxt(Number(f.divisor))+' hábiles · '+_pagTarifa(f.valor_dia)+'/día'
+                  +(Number(f.feriados_trab_n)
+                      ? ' · '+Number(f.feriados_trab_n)
+                        +(Number(f.feriados_trab_n)===1?' feriado trabajado':' feriados trabajados')
+                      : '')
+                  +'</div>'
+                : '')
+      +    '</div>'
       +    '<div class="pag-n">'+_pagCRC(suma)+'</div>'
       +  '</div>'
       +  '<div class="pag-det"><table>'+filasHTML+'</table></div>'
@@ -7705,21 +7844,15 @@ function _pagRender(){
   // Prependiendo uno tras otro el orden sale AL REVES del que se escribe —el
   // primero en prependerse queda abajo— y el de la rebaja tiene que ir arriba:
   // afecta el neto de TODAS las personas, no solo de quien tuvo una incapacidad.
-  let avisoRebaja='', avisoIncap='';
-  if(nRebaja && !_pagFlags.rebajaOk){
-    avisoRebaja='<div class="status s-warn" style="margin-bottom:14px">'
-     + '<b>Porcentaje de rebajas sin confirmar con la contadora: verificá que el neto '
-     + 'coincida con la transferencia real.</b> '
-     + 'El salario guardado está ANTES de las rebajas del trabajador, así que la pantalla '
-     + 'le aplica '
-     + (_pagFlags.rebajaPct===null ? 'el porcentaje de <code>rebaja_trabajador_pct</code>'
-        : ('el '+Number(_pagFlags.rebajaPct).toLocaleString('es-CR',{minimumFractionDigits:0,maximumFractionDigits:2})+'%'))
-     + ' para llegar al neto. Ese porcentaje salió de una observación '
-     + '(la pantalla daba 6,94% más que la transferencia), no de una tasa confirmada. '
-     + 'Cuadrá a mano una quincena sin permisos: si el neto de las tres personas no calza '
-     + 'al colón, un porcentaje único no alcanza.'
-     + '</div>';
-  }
+  // EL AVISO DE LA REBAJA SE FUE (19-oct-2026). Decia «verificá que el neto
+  // coincida con la transferencia real» porque la pantalla llegaba al neto
+  // aplicándole un 6,49% al bruto, y ese porcentaje salió de una observación.
+  // Ya no: el neto es un dato guardado y la quincena limpia da el neto exacto,
+  // verificado al colón con las tres personas. Un aviso que ya no aplica enseña
+  // a ignorar los avisos — y abajo queda uno que sí importa, el de incapacidad.
+  // El RENGLÓN de rebaja no se toca: una quincena anterior al 1-oct-2026 todavía
+  // lo emite, porque para esas fechas el parámetro sigue en 6,49.
+  let avisoIncap='';
   if(nIncap && !_pagFlags.reglas){
     avisoIncap='<div class="status s-warn" style="margin-bottom:14px">'
      + '<b>Reglas de incapacidad pendientes de confirmar con la contadora.</b> '
@@ -7732,7 +7865,7 @@ function _pagRender(){
          : 'El subsidio de la CCSS o del INS no va en esta transferencia: se lo depositan al trabajador.')
      + '</div>';
   }
-  h = avisoRebaja + avisoIncap + h;
+  h = avisoIncap + h;   // el de la rebaja se fue el 19-oct: ver la nota de arriba
   box.innerHTML=h;
   if(descuadres) _perAviso('pagStatus','s-warn',descuadres+(descuadres===1?' persona':' personas')
     +' con el desglose descuadrado respecto del total de la vista. Está marcado abajo.');
