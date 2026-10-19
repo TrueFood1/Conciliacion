@@ -37,7 +37,7 @@ description: Arranque de sesión en el repo Conciliacion. Lee el bloque más rec
   ⚠ MODIFICADA el 2026-10-19 (decisiones de Andrea): se le agregó el «Paso 2b —
   Tickets: los revisa y los escribe CC», el «Paso 2c — De Lorena, solo para
   información» y sus partes del reporte, rotulados ahí mismo. Más tarde ese día, la «Regla de cierre»
-  del Paso 2b (preguntas respondidas y lo que se ve en pantalla los cierra CC). CC escribe directo con truefie_cc (TICKETS_CC_AMPLIADO.sql). Reemplaza,
+  del Paso 2b (preguntas respondidas y lo que se ve en pantalla los cierra CC) y «explicado → disponible». CC escribe directo con truefie_cc (TICKETS_CC_AMPLIADO.sql). Reemplaza,
   por ahora, al revisor diario por GitHub Actions (T-149, pospuesto). El resto
   del cuerpo sigue siendo textual.
 ─────────────────────────────────────────────────────────────────────── -->
@@ -127,6 +127,9 @@ Se revisan dos grupos: los marcados `CAMBIÓ` y todos los «sin revisar». Los d
 ### 2 · Tickets de Truefie
 - **Explicar** cada «sin revisar» sin «En palabras claras» (cuatro renglones, en el lenguaje de Andrea, medido):
   `python3 Conciliacion/herramientas/tk_estado.py explicar <n> --que-es "…" --por-que "…" --falta "chico|mediano|grande. …" --recomienda "HACER|CERRAR|DESCARTAR. …" --seco` → sin `--seco`.
+  **Y después pasarlo a «disponible»** (Andrea, 19-oct): un ticket explicado ya está revisado, salvo que en
+  esta misma vuelta CC lo cierre o lo bloquee. `tk_estado.py mover <n> disponible --nota "Revisado y explicado
+  por CC el <fecha>." --seco` → sin `--seco`. Vale también para los propios.
 - **Cerrar con evidencia** los ya resueltos: solo si se puede nombrar en una línea el build (`b108`) o el
   commit donde quedó resuelto, y se verificó en el código o en git. Sin eso, no se cierra.
   `python3 Conciliacion/herramientas/tk_estado.py cerrar <n> --evidencia "<qué y dónde>" --build b<NN> --cierre "<una línea>" --seco` → sin `--seco`.
