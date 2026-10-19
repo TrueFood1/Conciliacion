@@ -1,6 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- INSTINCT_FASE2.sql  ·  19-oct-2026  ·  Instinct crea insumos con «sí + código» (fase 2)
--- ⛔ NO SE CORRIÓ. Rama instinct-fase2, sin OK de Andrea. Antes: ENSAYO_INSTINCT_FASE2.sql en verde.
+-- ⛔ NO SE CORRIÓ. Rama instinct-fase2. ENSAYO_INSTINCT_FASE2.sql ✅ 52/52 el 19-oct (corrido por Andrea,
+--    rollback verificado desde afuera). Pegarlo necesita el OK de Andrea.
 -- Para saber si está aplicado, mirar la base: `select to_regclass('public.asistente_vista_previa')`.
 -- Plan: INSTINCT_FASE2_PLAN.md (aprobado el 19-oct).
 --

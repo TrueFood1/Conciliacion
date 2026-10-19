@@ -144,8 +144,12 @@ out = []
 out.append("""-- ═══════════════════════════════════════════════════════════════════════════
 -- ENSAYO_INSTINCT_FASE2.sql  ·  19-oct-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA (termina en rollback)
 -- Prueba INSTINCT_FASE2.sql: permiso por acción, vista previa con código, intentos y el rastro
--- «hecho por Instinct». ⛔ NO SE CORRIÓ TODAVÍA. Lo arma herramientas/ensayos/armar_ensayo_instinct_fase2.py
--- (md5 del bloque DDL: %s).
+-- «hecho por Instinct». Lo arma herramientas/ensayos/armar_ensayo_instinct_fase2.py (md5 del bloque DDL: %s).
+-- ✅ CORRIDO el 19-oct-2026 por Andrea en producción: 52 de 52 ok = true, cada RECHAZA con su SQLSTATE y por
+--    SU motivo (42501 RLS o sin permiso; 23514 capacidad_check, codigo_check, marca_ok; 23505 el único de
+--    código). X2: 9 tablas rebotan antes por su guardia BEFORE INSERT (8 P0001 + rrhh_feriado_trabajado 23514).
+--    VERIFICADO desde afuera (pg_lector): el rollback no dejó nada (sin tablas, funciones ni columnas nuevas;
+--    permiso vacío; políticas 8 · 8 · 7; interruptor del asistente intacto).
 --
 -- CÓMO SE LEE
 --   Una tabla de %d filas, TODAS con ok = true. Un RECHAZA da ok solo si el SQLSTATE esperado está
