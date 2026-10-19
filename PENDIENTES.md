@@ -589,6 +589,32 @@ rotula como «Ajuste» — ver el final de esta nota en la rama `mis-solicitudes
 
 ---
 
+## P9 · 🗑️ BORRADA · la rama `personal-b108`, y como recrearla
+
+**Borrada del remoto el 19-oct-2026**, por pedido de Andrea y con OK de Lorena: su
+`/retomar` la leía y avisaba de un número de BUILD repetido.
+
+> **SHA: `138ae37c24e8f07632165e1cdcde08c3331b5df9`**
+> `b108: cancelar lo propio, y la pestaña de Pago al dia con el neto fijo`
+> Lorena Madrid · 19-oct-2026 13:50:00 −0600
+
+**Se puede recrear con ese SHA:** `git branch personal-b108 138ae37c`. Y aunque no
+se recree, el commit **sigue alcanzable desde `main`**: medido antes de borrar,
+`git merge-base --is-ancestor` dice que es ancestro de `main` **y** de
+`personal-b109`, y `git rev-list --count personal-b108 --not main personal-b109`
+dio **0 commits únicos**. Borrar la rama no perdió nada: solo quitó un nombre.
+
+⚠️ **Una cosa que conviene saber si el aviso del `/retomar` sigue:** hay una
+**segunda** rama remota con «b108» en el nombre, **`publicar-b108`**, en
+`4921e3f` — que es exactamente el commit que era `main` antes de publicar b109.
+Esa es la rama de publicación de **Andrea** y **no se tocó**. Si el aviso del
+número repetido persiste, es por esa, y borrarla es decisión de ella.
+
+La rama local ya no existía desde antes: el 19-oct se renombró a `personal-b109`
+con `git branch -m`, así que de este lado no quedó nada que borrar.
+
+---
+
 ## P8 · ✅ PUBLICADO · Personal en main · BUILD b109 · 19-oct-2026
 
 **Publicado el 19-oct-2026.** `main` pasó de `4921e3f` (b108) a **`7d453fa`**, y
