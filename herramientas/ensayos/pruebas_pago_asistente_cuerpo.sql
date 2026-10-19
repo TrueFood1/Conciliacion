@@ -237,8 +237,15 @@ select 11, 'ASISTENTE · aparece «enfermedad» o la nota privada en lo que pued
 do $$
 declare v text:=''; v_antes numeric; v_despues numeric;
 begin
+  -- ⚠️ EL ANTES Y EL DESPUES SE LEEN COMO postgres, NO COMO EL ASISTENTE.
+  -- El asistente no puede leer rrhh_neto_quincena (su politica pide socia),
+  -- asi que leyendolo como el las dos lecturas dan NULL — y `null = null` es
+  -- NULL, que no es verdadero: la prueba decia «CAMBIO ❌» con el dato intacto.
+  -- La pregunta es si la TABLA cambio, no si tal perfil la puede ver.
+  perform set_config('role','postgres', true);
   select neto into v_antes from rrhh_neto_quincena
    where persona_id = current_setting('cc.perm',true)::bigint;
+  perform set_config('role','authenticated', true);
   begin insert into rrhh_ajuste_manual (persona_id,fecha,monto,nota,creado_por)
         values (current_setting('cc.perm',true)::bigint,'2026-10-14',999,'zz','asis');
         v:=v||'ajuste: ENTRO ❌';
@@ -259,6 +266,7 @@ begin
           where persona_id = current_setting('cc.perm',true)::bigint;
         v:=v||' · delete: 0 filas';
   exception when others then v:=v||' · delete: '||sqlstate; end;
+  perform set_config('role','postgres', true);
   select neto into v_despues from rrhh_neto_quincena
    where persona_id = current_setting('cc.perm',true)::bigint;
   -- ⚠️ EL FERIADO DA 23514 Y NO 42501, Y NO ES UNA FALLA: `rrhh_feriado_trabajado`
@@ -271,12 +279,13 @@ begin
   insert into zz_res values (12,
     'ASISTENTE · escribir ajuste · neto · feriado · update · delete · dato igual · sin rastro',
     'ajuste: 42501 · neto: 42501 · feriado: 23514 · update: 42501 · delete: 42501 · igual · 0 filas',
-    v || ' · ' || case when v_despues = v_antes then 'igual' else 'CAMBIO ❌' end
+    v || ' · ' || case when v_despues is not distinct from v_antes then 'igual' else 'CAMBIO ❌' end
       || ' · ' || (
         (select count(*) from rrhh_ajuste_manual where creado_por='asis')
       + (select count(*) from rrhh_neto_quincena where creado_por='asis')
       + (select count(*) from rrhh_feriado_trabajado where creado_por='asis')
       )::text || ' filas', null);
+  perform set_config('role','authenticated', true);   -- la seccion sigue como el asistente
 end $$;
 
 

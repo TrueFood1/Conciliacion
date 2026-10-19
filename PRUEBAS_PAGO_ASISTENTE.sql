@@ -28,29 +28,6 @@
 
 begin;
 
--- ── 0 · LA FOTO DE LO QUE HAY FUERA DEL CIERRE, ANTES DE TOCAR NADA ─────
--- Va ANTES del cuerpo del pegado, y por eso esta aca y no en las pruebas: una
--- vez que el pegado corrio, el «antes» ya no se puede medir.
---
--- POR QUE EXISTE. La prueba 11 comparaba contra un 3 escrito a mano, sacado de
--- la semilla del repo (31-ago, 15-sep, 1-dic). En produccion hay 10 filas: el
--- calendario llevaba un año de uso y `rrhh_feriado` es la unica tabla EDITABLE
--- del modulo — la pantalla «Dias cerrados» la cambia de verdad. Asi que la
--- prueba medía CUANTO CALENDARIO HAY, no si el pegado cambio algo: dos cosas
--- distintas, y estaba midiendo la equivocada.
--- Ahora el esperado es la foto de antes, y el obtenido la medicion de despues.
--- Sin numeros fijos: funciona con el calendario que sea.
-create temporary table zz_antes_fuera on commit drop as
-select (select count(*) from rrhh_feriado where fecha < date '2026-12-18')     as filas,
-       (select count(*) from rrhh_feriado where fecha < date '2026-12-18'
-         and pago_obligatorio)                                                 as obligatorias,
-       (select count(*) from (select (f.fecha + g.i)::date as dia
-          from rrhh_feriado f cross join lateral
-               generate_series(0,(coalesce(f.fecha_fin,f.fecha)-f.fecha)) g(i)) c
-         where dia between date '2026-10-01' and date '2026-11-30')            as dias_oct_nov,
-       (select string_agg(to_char(fecha,'DD-MM-YYYY'), ' · ' order by fecha)
-          from rrhh_feriado where fecha < date '2026-12-18')                   as cuales;
-
 -- ╔══════════════════════════════════════════════════════════════════════╗
 -- ║  CUERPO DE PERSONAL_PAGO_ASISTENTE.sql — pegado tal cual               ║
 -- ╚══════════════════════════════════════════════════════════════════════╝
@@ -750,8 +727,15 @@ select 11, 'ASISTENTE · aparece «enfermedad» o la nota privada en lo que pued
 do $$
 declare v text:=''; v_antes numeric; v_despues numeric;
 begin
+  -- ⚠️ EL ANTES Y EL DESPUES SE LEEN COMO postgres, NO COMO EL ASISTENTE.
+  -- El asistente no puede leer rrhh_neto_quincena (su politica pide socia),
+  -- asi que leyendolo como el las dos lecturas dan NULL — y `null = null` es
+  -- NULL, que no es verdadero: la prueba decia «CAMBIO ❌» con el dato intacto.
+  -- La pregunta es si la TABLA cambio, no si tal perfil la puede ver.
+  perform set_config('role','postgres', true);
   select neto into v_antes from rrhh_neto_quincena
    where persona_id = current_setting('cc.perm',true)::bigint;
+  perform set_config('role','authenticated', true);
   begin insert into rrhh_ajuste_manual (persona_id,fecha,monto,nota,creado_por)
         values (current_setting('cc.perm',true)::bigint,'2026-10-14',999,'zz','asis');
         v:=v||'ajuste: ENTRO ❌';
@@ -772,6 +756,7 @@ begin
           where persona_id = current_setting('cc.perm',true)::bigint;
         v:=v||' · delete: 0 filas';
   exception when others then v:=v||' · delete: '||sqlstate; end;
+  perform set_config('role','postgres', true);
   select neto into v_despues from rrhh_neto_quincena
    where persona_id = current_setting('cc.perm',true)::bigint;
   -- ⚠️ EL FERIADO DA 23514 Y NO 42501, Y NO ES UNA FALLA: `rrhh_feriado_trabajado`
@@ -784,12 +769,13 @@ begin
   insert into zz_res values (12,
     'ASISTENTE · escribir ajuste · neto · feriado · update · delete · dato igual · sin rastro',
     'ajuste: 42501 · neto: 42501 · feriado: 23514 · update: 42501 · delete: 42501 · igual · 0 filas',
-    v || ' · ' || case when v_despues = v_antes then 'igual' else 'CAMBIO ❌' end
+    v || ' · ' || case when v_despues is not distinct from v_antes then 'igual' else 'CAMBIO ❌' end
       || ' · ' || (
         (select count(*) from rrhh_ajuste_manual where creado_por='asis')
       + (select count(*) from rrhh_neto_quincena where creado_por='asis')
       + (select count(*) from rrhh_feriado_trabajado where creado_por='asis')
       )::text || ' filas', null);
+  perform set_config('role','authenticated', true);   -- la seccion sigue como el asistente
 end $$;
 
 
