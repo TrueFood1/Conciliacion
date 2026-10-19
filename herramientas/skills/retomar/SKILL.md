@@ -36,7 +36,8 @@ description: Arranque de sesión en el repo Conciliacion. Lee el bloque más rec
   rotulado como agregado ahí mismo.
   ⚠ MODIFICADA el 2026-10-19 (decisiones de Andrea): se le agregó el «Paso 2b —
   Tickets: los revisa y los escribe CC», el «Paso 2c — De Lorena, solo para
-  información» y sus partes del reporte, rotulados ahí mismo. CC escribe directo con truefie_cc (TICKETS_CC_AMPLIADO.sql). Reemplaza,
+  información» y sus partes del reporte, rotulados ahí mismo. Más tarde ese día, la «Regla de cierre»
+  del Paso 2b (preguntas respondidas y lo que se ve en pantalla los cierra CC). CC escribe directo con truefie_cc (TICKETS_CC_AMPLIADO.sql). Reemplaza,
   por ahora, al revisor diario por GitHub Actions (T-149, pospuesto). El resto
   del cuerpo sigue siendo textual.
 ─────────────────────────────────────────────────────────────────────── -->
@@ -129,6 +130,14 @@ Se revisan dos grupos: los marcados `CAMBIÓ` y todos los «sin revisar». Los d
 - **Cerrar con evidencia** los ya resueltos: solo si se puede nombrar en una línea el build (`b108`) o el
   commit donde quedó resuelto, y se verificó en el código o en git. Sin eso, no se cierra.
   `python3 Conciliacion/herramientas/tk_estado.py cerrar <n> --evidencia "<qué y dónde>" --build b<NN> --cierre "<una línea>" --seco` → sin `--seco`.
+- **Regla de cierre (Andrea, 19-oct), vale también para los propios:**
+  - **Preguntas** (tipo `duda`): si CC la responde, la respuesta escrita en el ticket (su «En palabras
+    claras») **es** la evidencia, y CC lo cierra. La guarda de la base igual pide el build/commit (o
+    `archivo:` en un propio) dentro de la evidencia: `--evidencia "respuesta: <en una línea>, medido en b<NN>"`.
+  - **Lo que se ve en pantalla**: antes de dejárselo a Andrea, CC lo comprueba **él mismo en Truefie con su
+    navegador** (Pages, con la sesión ya abierta), y si se ve bien lo cierra:
+    `--evidencia "pantalla: <url> · <qué se vio> · b<NN>"`. **Solo mirar**: nunca tocar un botón que escribe
+    (Revisar, Crear, Guardar, Validar…). Si no hay sesión o no se puede ver, queda para Andrea con una línea.
 - **Marcar** (prioridad y riesgos) si hace falta: `tk_estado.py marcar <n> --prioridad … --toca-numeros si|no --escribe-en-base si|no --razon "…" --seco`.
 
 ### 3 · Pendientes propios de Andrea, EN ESTE ORDEN

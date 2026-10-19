@@ -23,6 +23,7 @@ QUE PUEDE Y QUE NO (lo hace cumplir la BASE, no este archivo)
 COMO SE USA
     python3 herramientas/tk_estado.py ver 115
     python3 herramientas/tk_estado.py mover 116 en_curso --seco
+    python3 herramientas/tk_estado.py mover 107 bloqueado --espera "que QIMA emita el certificado" --seco
     python3 herramientas/tk_estado.py anunciar 15 --texto "hallazgo…" [--seco]
     python3 herramientas/tk_estado.py explicar 15 \\
         --que-es "…" --por-que "…" --falta "chico. …" --recomienda "HACER. …" [--seco]
@@ -37,6 +38,8 @@ COMO SE USA
         --evidencia "Resuelto en b72 (65ac781): el 247 ya aparece en Despachos" \\
         --build b72 [--cierre "texto del detalle de cierre"] [--seco]
     # en un PROPIO la evidencia puede ser tambien "archivo: …", "correo: …" o "enlace: …"
+    # pregunta respondida: --evidencia "respuesta: <en una linea>, medido en b108"
+    # visto en pantalla:   --evidencia "pantalla: <url> · <que se vio> · b109"
 
   --seco manda el cambio de verdad adentro de una transaccion y la deshace: los
   guardias y la RLS reales lo juzgan, y no queda nada. Siempre primero --seco.
@@ -173,11 +176,13 @@ def ver(db, t):
     return filas[0][4]
 
 
-def mover(db, t, estado, nota=None, build=None, cierre=None, seco=True):
+def mover(db, t, estado, nota=None, build=None, cierre=None, seco=True, espera=None):
+    # `espera`: qué se espera para destrabarlo. La base lo exige (8 letras o más) para pasar a «bloqueado»
+    # sin un ticket que lo bloquee (CHECK ticket_estado_bloqueo_ok). Agregado el 19-oct para T-107/T-108.
     sql = ["begin;",
-           "insert into ticket_estado (ticket_id, estado, creado_por, nota, build_arreglo) "
-           "values (%d, %s, %s, %s, %s) returning id, estado, creado_por, build_arreglo;"
-           % (t, lit(estado), lit(FIRMA), lit(nota), lit(build))]
+           "insert into ticket_estado (ticket_id, estado, creado_por, nota, build_arreglo, espera) "
+           "values (%d, %s, %s, %s, %s, %s) returning id, estado, creado_por, build_arreglo;"
+           % (t, lit(estado), lit(FIRMA), lit(nota), lit(build), lit(espera))]
     if cierre:
         sql.append("insert into ticket_detalle (ticket_id, clase, texto, creado_por) "
                    "values (%d, 'cierre', %s, %s);" % (t, lit(cierre), lit(FIRMA)))
@@ -266,6 +271,10 @@ def explicar(db, t, texto, seco=True):
 # ── TICKETS NUEVOS Y MARCAS (19-oct-2026, TICKETS_CC_AMPLIADO.sql) ─────────
 AMBITOS = ("truefie", "propio")
 TIPOS = ("no_funciona", "duda", "idea", "encargo")
+# 19-oct (regla de cierre de Andrea, /retomar Paso 2b): una PREGUNTA respondida se cierra con
+# «respuesta: … » y algo visto en pantalla con «pantalla: … », pero la guarda de la BASE sigue pidiendo
+# el build o el commit adentro (o archivo/correo/enlace en un propio): «respuesta: … medido en b108».
+# Aceptar esos prefijos solos necesita cambiar la guarda (pegado de Andrea); este script no la adelanta.
 EVIDENCIA_PROPIO = re.compile(r"^(archivo|correo|enlace): \S", re.I)
 
 
@@ -387,7 +396,7 @@ def main():
                 sys.exit("mover T <estado>, con estado en: %s (para cerrar, usar `cerrar`)"
                          % ", ".join(e for e in ESTADOS if e != "cerrado"))
             if ver(db, t) is None: return
-            mover(db, t, a[2], nota=opt("--nota"), seco=seco); return
+            mover(db, t, a[2], nota=opt("--nota"), seco=seco, espera=opt("--espera")); return
         if cmd == "anunciar":
             tx = opt("--texto")
             if not tx or len(tx.strip()) < 10:
