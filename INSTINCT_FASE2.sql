@@ -1,7 +1,10 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- INSTINCT_FASE2.sql  ·  19-oct-2026  ·  Instinct crea insumos con «sí + código» (fase 2)
--- ⛔ NO SE CORRIÓ. Rama instinct-fase2. ENSAYO_INSTINCT_FASE2.sql ✅ 52/52 el 19-oct (corrido por Andrea,
---    rollback verificado desde afuera). Pegarlo necesita el OK de Andrea.
+-- ✅ APLICADO el 19-oct-2026 por Andrea en producción, después del ensayo 52/52. Fila de control:
+--    2 · 7 · 7 · 7 · 9 · 9 · 1 · 0 · 4 · 0 · 3. VERIFICADO desde afuera (pg_lector): las 2 tablas con RLS y
+--    vacías, políticas como se diseñaron (permiso sus 7 de siempre), 4 funciones definer sin execute para anon,
+--    3 columnas + marca_ok en el rastro (la fila 715 sin marca), permiso VACÍO (el asistente sigue sin poder
+--    escribir); REST con la anon key → 42501. NO VOLVER A CORRER.
 -- Para saber si está aplicado, mirar la base: `select to_regclass('public.asistente_vista_previa')`.
 -- Plan: INSTINCT_FASE2_PLAN.md (aprobado el 19-oct).
 --
