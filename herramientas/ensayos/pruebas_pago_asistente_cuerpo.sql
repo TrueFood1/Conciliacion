@@ -4,7 +4,9 @@
 -- Los esperados estan escritos a mano, derivados del calendario.
 -- ════════════════════════════════════════════════════════════════════════
 
-create table zz_res (n int, escenario text, esperado text, obtenido text, veredicto text);
+-- `n` es NUMERIC y no int: la prueba 12 se parte en 12.1 … 12.6 para que cada
+-- intento de escritura se lea en su propia fila, y asi ordenan entre la 12 y la 13.
+create table zz_res (n numeric, escenario text, esperado text, obtenido text, veredicto text);
 grant select, insert, update on zz_res to public;
 -- Igual que en los otros ensayos: `ensure_rls` le prende la seguridad por filas
 -- a toda tabla nueva, y sin politica permisiva de insercion nadie inserta. Es un
@@ -232,60 +234,113 @@ select 11, 'ASISTENTE · aparece «enfermedad» o la nota privada en lo que pued
        case when exists (select 1 from v_rrhh_pago_total t
                           where t.nombre ilike '%nota privada%') then 'SI ❌' else 'no' end, null;
 
--- 12 · EL ASISTENTE NO ESCRIBE NADA. Se intenta de verdad, en las tres tablas
---      del pago, y se mira que el dato quede igual.
+-- 12 · EL ASISTENTE NO ESCRIBE NADA. Se intenta de verdad en las tres tablas del
+--      pago, y CADA INTENTO SALE EN SU PROPIA FILA: una sola linea larga con seis
+--      partes se corta en la pantalla de Supabase y hay que deslizar para saber
+--      si fallo el update o el delete. Paso el 19-oct.
 do $$
-declare v text:=''; v_antes numeric; v_despues numeric;
+declare v_n int; v_antes numeric; v_despues numeric; v_rastro int;
 begin
   -- ⚠️ EL ANTES Y EL DESPUES SE LEEN COMO postgres, NO COMO EL ASISTENTE.
-  -- El asistente no puede leer rrhh_neto_quincena (su politica pide socia),
-  -- asi que leyendolo como el las dos lecturas dan NULL — y `null = null` es
-  -- NULL, que no es verdadero: la prueba decia «CAMBIO ❌» con el dato intacto.
-  -- La pregunta es si la TABLA cambio, no si tal perfil la puede ver.
+  -- El asistente no puede leer rrhh_neto_quincena (su politica pide socia), asi
+  -- que leyendolo como el las dos lecturas dan NULL — y `null = null` es NULL,
+  -- que no es verdadero: la prueba decia «CAMBIO» con el dato intacto.
   perform set_config('role','postgres', true);
   select neto into v_antes from rrhh_neto_quincena
    where persona_id = current_setting('cc.perm',true)::bigint;
   perform set_config('role','authenticated', true);
-  begin insert into rrhh_ajuste_manual (persona_id,fecha,monto,nota,creado_por)
-        values (current_setting('cc.perm',true)::bigint,'2026-10-14',999,'zz','asis');
-        v:=v||'ajuste: ENTRO ❌';
-  exception when others then v:=v||'ajuste: '||sqlstate; end;
-  begin insert into rrhh_neto_quincena (persona_id,neto,vigente_desde,nota,creado_por)
-        values (current_setting('cc.perm',true)::bigint,1,'2026-11-01','zz','asis');
-        v:=v||' · neto: ENTRO ❌';
-  exception when others then v:=v||' · neto: '||sqlstate; end;
-  begin insert into rrhh_feriado_trabajado (persona_id,fecha,nota,creado_por)
-        values (current_setting('cc.perm',true)::bigint,'2026-12-25','zz','asis');
-        v:=v||' · feriado: ENTRO ❌';
-  exception when others then v:=v||' · feriado: '||sqlstate; end;
-  begin update rrhh_neto_quincena set neto=1
-          where persona_id = current_setting('cc.perm',true)::bigint;
-        v:=v||' · update: '||(case when found then 'ENTRO ❌' else '0 filas' end);
-  exception when others then v:=v||' · update: '||sqlstate; end;
-  begin delete from rrhh_neto_quincena
-          where persona_id = current_setting('cc.perm',true)::bigint;
-        v:=v||' · delete: 0 filas';
-  exception when others then v:=v||' · delete: '||sqlstate; end;
+
+  begin
+    insert into rrhh_ajuste_manual (persona_id,fecha,monto,nota,creado_por)
+    values (current_setting('cc.perm',true)::bigint,'2026-10-14',999,'zz','asis');
+    insert into zz_res values (12.1,'ASISTENTE no escribe · insert de un AJUSTE manual',
+      '42501','ENTRO', null);
+  exception when others then
+    insert into zz_res values (12.1,'ASISTENTE no escribe · insert de un AJUSTE manual',
+      '42501', sqlstate, null);
+  end;
+
+  begin
+    insert into rrhh_neto_quincena (persona_id,neto,vigente_desde,nota,creado_por)
+    values (current_setting('cc.perm',true)::bigint,1,'2026-11-01','zz','asis');
+    insert into zz_res values (12.2,'ASISTENTE no escribe · insert de un NETO',
+      '42501','ENTRO', null);
+  exception when others then
+    insert into zz_res values (12.2,'ASISTENTE no escribe · insert de un NETO',
+      '42501', sqlstate, null);
+  end;
+
+  -- ⚠️ ESTA ACEPTA DOS CODIGOS, y la razon importa.
+  -- `rrhh_feriado_trabajado` tiene un trigger BEFORE INSERT que rechaza una fecha
+  -- que no sea feriado de pago obligatorio de lunes a viernes, y un BEFORE corre
+  -- ANTES de que se evalue el `with check` de la politica. Asi que cual de las dos
+  -- capas frena depende de si ESA fecha es obligatoria, que a su vez depende de si
+  -- el pegado 11 esta aplicado:
+  --     sin el pegado 11 (mi base local) → el 25-dic no es obligatorio → 23514
+  --     con el pegado 11 (produccion)    → si lo es → pasa el trigger → 42501
+  -- Las dos son un bloqueo. Lo que NO se acepta es que entre.
+  -- El esperado decia 23514 a secas y fallo en produccion el 19-oct: habia
+  -- codificado una suposicion sobre el estado de OTRO pegado.
+  begin
+    insert into rrhh_feriado_trabajado (persona_id,fecha,nota,creado_por)
+    values (current_setting('cc.perm',true)::bigint,'2026-12-25','zz','asis');
+    insert into zz_res values (12.3,'ASISTENTE no escribe · insert de un FERIADO TRABAJADO',
+      'bloqueado','ENTRO', null);
+    insert into zz_res values (12.31,'INFO · y con que codigo lo frenaron',
+      '(lo que diga)','ninguno: ENTRO', 'INFO');
+  exception when others then
+    -- LA PRUEBA mide el HECHO —bloqueado o no— y el codigo va en una fila INFO
+    -- aparte. Si el veredicto saliera de comparar «42501 o 23514» contra un
+    -- codigo concreto, no coincidiria nunca: el esperado y el obtenido serian
+    -- dos textos distintos aunque todo estuviera bien. Paso en la primera
+    -- version de esta fila.
+    insert into zz_res values (12.3,'ASISTENTE no escribe · insert de un FERIADO TRABAJADO',
+      'bloqueado',
+      case when sqlstate in ('42501','23514') then 'bloqueado' else 'otro error' end, null);
+    insert into zz_res values (12.31,'INFO · y con que codigo lo frenaron',
+      '(lo que diga)',
+      sqlstate || case when sqlstate='42501' then ' · la POLITICA (with check pide socia)'
+                       when sqlstate='23514' then ' · el TRIGGER (esa fecha no es feriado obligatorio)'
+                       else ' · inesperado' end, 'INFO');
+  end;
+
+  begin
+    update rrhh_neto_quincena set neto = 1
+     where persona_id = current_setting('cc.perm',true)::bigint;
+    get diagnostics v_n = row_count;
+    insert into zz_res values (12.4,'ASISTENTE no escribe · UPDATE del neto · filas afectadas',
+      '42501', v_n || ' filas', null);
+  exception when others then
+    insert into zz_res values (12.4,'ASISTENTE no escribe · UPDATE del neto · filas afectadas',
+      '42501', sqlstate, null);
+  end;
+
+  begin
+    delete from rrhh_neto_quincena
+     where persona_id = current_setting('cc.perm',true)::bigint;
+    get diagnostics v_n = row_count;
+    insert into zz_res values (12.5,'ASISTENTE no escribe · DELETE del neto · filas afectadas',
+      '42501', v_n || ' filas', null);
+  exception when others then
+    insert into zz_res values (12.5,'ASISTENTE no escribe · DELETE del neto · filas afectadas',
+      '42501', sqlstate, null);
+  end;
+
+  -- 12.6 · LOS HECHOS, que no dependen de ningun codigo de error: el dato esta
+  --        igual y no quedo ni una fila a nombre del asistente.
   perform set_config('role','postgres', true);
   select neto into v_despues from rrhh_neto_quincena
    where persona_id = current_setting('cc.perm',true)::bigint;
-  -- ⚠️ EL FERIADO DA 23514 Y NO 42501, Y NO ES UNA FALLA: `rrhh_feriado_trabajado`
-  -- tiene un trigger BEFORE INSERT que rechaza una fecha que no sea feriado de
-  -- pago obligatorio de lunes a viernes, y un BEFORE trigger corre ANTES de que
-  -- se evalue el WITH CHECK de la politica. O sea que ahi hay una capa MAS, no
-  -- una menos. Mi esperado decia 42501 por suponer el orden de los chequeos.
-  -- Y para no depender del codigo de error, se agrega lo que de verdad importa:
-  -- que no haya quedado NI UNA fila a nombre del asistente.
-  insert into zz_res values (12,
-    'ASISTENTE · escribir ajuste · neto · feriado · update · delete · dato igual · sin rastro',
-    'ajuste: 42501 · neto: 42501 · feriado: 23514 · update: 42501 · delete: 42501 · igual · 0 filas',
-    v || ' · ' || case when v_despues is not distinct from v_antes then 'igual' else 'CAMBIO ❌' end
-      || ' · ' || (
-        (select count(*) from rrhh_ajuste_manual where creado_por='asis')
-      + (select count(*) from rrhh_neto_quincena where creado_por='asis')
-      + (select count(*) from rrhh_feriado_trabajado where creado_por='asis')
-      )::text || ' filas', null);
-  perform set_config('role','authenticated', true);   -- la seccion sigue como el asistente
+  select (select count(*) from rrhh_ajuste_manual     where creado_por='asis')
+       + (select count(*) from rrhh_neto_quincena     where creado_por='asis')
+       + (select count(*) from rrhh_feriado_trabajado where creado_por='asis')
+    into v_rastro;
+  insert into zz_res values (12.6,
+    'ASISTENTE no escribe · el neto quedo igual · y sin rastro en las tres tablas',
+    'igual · 0 filas',
+    (case when v_despues is not distinct from v_antes then 'igual' else 'CAMBIO' end)
+      || ' · ' || v_rastro || ' filas', null);
+  perform set_config('role','authenticated', true);
 end $$;
 
 
@@ -334,18 +389,55 @@ select 15, 'los datos reales · filas que NO son del ensayo en las tres tablas d
        'INFO';
 
 
+-- 16 · INFO · QUE PRIVILEGIOS HAY DE VERDAD EN ESTA BASE.
+--      No es una prueba y no puede fallar: esta para SABER por que una fila dio
+--      un codigo y no otro, sin tener que adivinar.
+--      ⚠️ SE MIDE `authenticated`, NO «el asistente». No existe un rol de base de
+--      datos llamado asistente: el perfil es una fila en acceso_usuario, y en
+--      Postgres tanto la socia como el equipo como Instinct son `authenticated`.
+--      Por eso los privilegios NO distinguen perfiles — lo que distingue son las
+--      POLITICAS, que miran el correo del JWT. Confundir las dos cosas fue lo que
+--      hizo que el esperado de la 12.3 estuviera mal.
+insert into zz_res
+select 16, 'INFO · privilegios de `authenticated` (= cualquier sesion) · ins/upd/del',
+       '(lo que diga, no es una falla)',
+       string_agg(x.t || ': ' ||
+         case when has_table_privilege('authenticated','public.'||x.t,'INSERT') then 'ins' else '—' end || '/' ||
+         case when has_table_privilege('authenticated','public.'||x.t,'UPDATE') then 'upd' else '—' end || '/' ||
+         case when has_table_privilege('authenticated','public.'||x.t,'DELETE') then 'del' else '—' end,
+         ' · ' order by x.t),
+       'INFO'
+  from (select unnest(array['rrhh_ajuste_manual','rrhh_neto_quincena',
+                            'rrhh_feriado_trabajado']) as t) x;
+
+insert into zz_res
+select 17, 'INFO · y lo mismo para `anon`, que es la clave publica',
+       '(tiene que ser todo —)',
+       string_agg(x.t || ': ' ||
+         case when has_table_privilege('anon','public.'||x.t,'INSERT') then 'ins' else '—' end || '/' ||
+         case when has_table_privilege('anon','public.'||x.t,'UPDATE') then 'upd' else '—' end || '/' ||
+         case when has_table_privilege('anon','public.'||x.t,'DELETE') then 'del' else '—' end,
+         ' · ' order by x.t),
+       'INFO'
+  from (select unnest(array['rrhh_ajuste_manual','rrhh_neto_quincena',
+                            'rrhh_feriado_trabajado']) as t) x;
+
+
 -- ── EL VEREDICTO ────────────────────────────────────────────────────────
 update zz_res set veredicto =
   case when obtenido is null                  then 'SIN DATO'
        when btrim(obtenido) = btrim(esperado) then 'OK'
        else 'FALLA' end
- where n between 1 and 14;
+ where n in (1,2,3,4,5,6,7,8,9,10,11,12.1,12.2,12.3,12.4,12.5,12.6,13,14);
 
+-- Y las que tenian que correr y podrian no existir: si un `select ... from`
+-- no devuelve filas, el insert no inserta y la prueba DESAPARECE en silencio.
 insert into zz_res
-select n, 'ESTA PRUEBA NO CORRIO · la consulta no devolvio ninguna fila',
+select v.n, 'ESTA PRUEBA NO CORRIO · la consulta no devolvio ninguna fila',
        'la fila existe', 'NO EXISTE', 'FALLA'
-  from generate_series(1,14) n
- where n not in (select r.n from zz_res r);
+  from (values (1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),
+               (12.1),(12.2),(12.3),(12.4),(12.5),(12.6),(13),(14)) v(n)
+ where v.n not in (select r.n from zz_res r);
 
 -- El veredicto primero y el TOTAL arriba: una sola foto alcanza.
 select t.veredicto as "veredicto", t.n as "#", t.escenario as "escenario",
@@ -358,15 +450,15 @@ select t.veredicto as "veredicto", t.n as "#", t.escenario as "escenario",
                 else 3 end as grupo
       from zz_res r
     union all
-    select (select case when count(*) < 14 then 'FALTAN PRUEBAS · NO PEGAR'
+    select (select case when count(*) < 19 then 'FALTAN PRUEBAS · NO PEGAR'
                         when count(*) filter (where veredicto <> 'OK') = 0 then 'TODO VERDE'
-                        else 'HAY ROJO · NO PEGAR' end from zz_res where n between 1 and 14),
+                        else 'HAY ROJO · NO PEGAR' end from zz_res where veredicto in ('OK','FALLA','SIN DATO')),
            99, '── TOTAL ──',
-           (select count(*)::text || ' pruebas' from zz_res where n between 1 and 14),
+           (select count(*)::text || ' pruebas' from zz_res where veredicto in ('OK','FALLA','SIN DATO')),
            (select count(*) filter (where veredicto='OK')::text || ' OK · ' ||
                    count(*) filter (where veredicto='FALLA')::text || ' FALLA · ' ||
                    count(*) filter (where veredicto='SIN DATO')::text || ' SIN DATO'
-              from zz_res where n between 1 and 14),
+              from zz_res where veredicto in ('OK','FALLA','SIN DATO')),
            0
   ) t
  order by t.grupo, t.n;
