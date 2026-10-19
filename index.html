@@ -1949,6 +1949,18 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
    provisional: un cero que después cambia a 4 es peor que no decir nada,
    porque el primero se lee como un hecho. */
 .tkl-tab-n.cargando{color:var(--text-3);opacity:.55}
+/* ── EL BUSCADOR · b110 ───────────────────────────────────────────────
+   Misma forma que el de Compras (lupa + campo sin borde adentro de una caja).
+   16px en el campo: con menos, Safari del teléfono hace zoom al tocarlo. */
+.tkl-busc{display:flex;align-items:center;gap:10px;margin:0 0 12px;
+  background:var(--surface);border:.5px solid var(--border-strong);border-radius:12px;
+  padding:0 14px;color:var(--text-2)}
+.tkl-busc.hidden{display:none}
+.tkl-busc:focus-within{border-color:var(--text-2)}
+.tkl-busc input{flex:1;min-width:0;background:transparent;border:0;outline:none;
+  color:var(--text);font:inherit;font-size:16px;padding:11px 0}
+/* El módulo de cada ticket, solo en «Todos»: ahí la pestaña ya no lo dice. */
+.tkl-mod{font-size:11px;color:var(--text-2)}
 
 
 /* ── TICKETS · CERRAR · POSPONER · DESCARTAR ──────────────────────────
@@ -2753,6 +2765,14 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
        adentro, cada toque redibujaría los botones y se perdería el scroll
        horizontal de la tira justo cuando hace falta (seis pestañas no
        entran en un teléfono). -->
+  <!-- El buscador (b110). Arriba de la tira y FUERA de #tklCuerpo por lo mismo
+       que la tira: el cuerpo se reescribe en cada letra, y si el campo viviera
+       adentro se perdería el foco a cada tecla. Filtra lo que se está viendo. -->
+  <div id="tklBuscar" class="tkl-busc hidden">
+    <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input type="search" id="tklBusq" aria-label="Buscar un ticket" placeholder="Buscar por número o palabra"
+           autocomplete="off" oninput="tkBuscar(this.value)">
+  </div>
   <div id="tklTabs" class="tkl-tabs hidden" role="tablist"></div>
   <!-- El vigía de la revisión diaria de unidades. Vacío hasta que haya corrida. -->
   <div id="tklVigia" class="tkl-vigia" style="display:none"></div>
@@ -5459,7 +5479,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 19 oct 2026 · b109: cancelar lo propio en «Mis solicitudes» · Pago de quincena con el neto fijo · Instinct ve solo el total';
+const BUILD = 'v 19 oct 2026 · b110: Tickets con buscador, pestaña «Todos» y orden por número';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -28718,7 +28738,15 @@ var TK_TIPOS={no_funciona:'Algo no funciona',duda:'Tengo una duda',
    agrega sola, ANTES de "Sin módulo", cualquier módulo que tenga tickets y
    no tenga pestaña. Si algún día hay uno de Personal, aparece su pestaña;
    si no hay ninguno, no se ve nada. Lo mismo vale para un módulo futuro. */
+/* «Todos» (b110, Andrea 19-oct): la primera a la izquierda, con TODOS los
+   tickets juntos —los de cada módulo y Mis pendientes—, cada uno con su
+   módulo a la vista. Lleva dos guiones bajos por lo mismo que `__propio`: no
+   es un `modulo` ni un `ambito`, es la suma. Su balde se llena con todas las
+   filas DESPUÉS del reparto (ver `tkListar`), así que ningún ticket cae en él
+   por su cuenta, y su contador pregunta a la base sin filtro. No cambia qué
+   ve cada perfil: muestra las mismas filas que las otras pestañas juntas. */
 var TK_TABS=[
+  {k:'__todos',      n:'Todos',          ac:null},
   {k:'finanzas',     n:'Finanzas',       ac:'#378ADD'},
   {k:'operaciones',  n:'Operaciones',    ac:'#D4537E'},
   {k:'entregas',     n:'Entregas',       ac:'#E9FE60'},
@@ -28752,6 +28780,9 @@ var TK_MODNOM={}; TK_TABS.forEach(function(t){ TK_MODNOM[t.k]=t.n; });
    en cuanto aparece un ticket de Personal, que es exactamente el caso que
    `_tkTabsVisibles` está construido para no dejar caer. */
 TK_MODNOM.personal = TK_MODNOM.personal || 'Personal';
+/* Lo mismo con Compras (b110): su pestaña y, en «Todos», cada renglón salían
+   «compras» en minúscula. Visto en el panel con las filas reales del 19-oct. */
+TK_MODNOM.compras = TK_MODNOM.compras || 'Compras';
 /* ── LOS OCHO ESTADOS, CLASIFICADOS UNO POR UNO · 23-sep-2026 ─────────
    El contador cuenta lo NO RESUELTO (Andrea, 23-sep). Para que eso sea
    verificable hay que poder decir dónde cae CADA valor posible, así que
@@ -28839,7 +28870,15 @@ function _tkClaroHtml(t){
     '</summary>'+cuerpo+'</details>';
 }
 
-function tklItem(f, socia){
+/* `conModulo` (b110): en «Todos» la pestaña ya no dice de qué módulo es cada
+   ticket, así que lo dice el renglón. Mis pendientes se nombra igual que su
+   pestaña; un ticket de Truefie sin módulo, «Sin módulo». */
+function _tkModNom(f){
+  if(f.ambito==='propio') return TK_MODNOM.__propio;
+  var k=f.modulo||'sin_modulo';
+  return TK_MODNOM[k]||k;
+}
+function tklItem(f, socia, conModulo){
 var pie=[];
     if(f.miga) pie.push(_tkEsc(f.miga));
     else if(f.vista) pie.push(_tkEsc(f.vista));
@@ -28851,6 +28890,7 @@ var pie=[];
         '<span class="tkl-id">T-'+String(f.id).padStart(4,'0')+'</span>'+
         '<span class="tkl-est '+_tkEsc(f.estado)+'">'+_tkEsc(TK_ESTADOS[f.estado]||f.estado)+'</span>'+
         '<span class="tkl-tipo">'+_tkEsc(TK_TIPOS[f.tipo]||f.tipo)+'</span>'+
+        (conModulo ? '<span class="tkl-mod">'+_tkEsc(_tkModNom(f))+'</span>' : '')+
       '</div>'+
       '<div class="tkl-txt">'+_tkEsc(f.descripcion)+'</div>'+
       _tkClaroHtml(f.en_claro)+
@@ -28977,7 +29017,8 @@ function _tkTabsVisibles(){
 async function _tkContarTab(c, t){
   var q=c.from('v_ticket').select('id',{count:'exact',head:true})
          .not('estado','in','('+TK_CERRADOS.join(',')+')');
-  if(t.k==='__propio') q=q.eq('ambito','propio');
+  if(t.k==='__todos'){ /* sin filtro: todos los abiertos que la base deja ver */ }
+  else if(t.k==='__propio') q=q.eq('ambito','propio');
   else{
     /* `neq` y no `eq('truefie')`: es el mismo criterio defensivo que usa el
        reparto de abajo (`ambito==='propio' ? propio : truefie`). Un ámbito
@@ -29014,7 +29055,8 @@ function _tkCuerpoHtml(){
   var g=_TK_BUCKETS[_TK_TAB]||[];
   if(!g.length){
     return '<div class="tkl-vacio">'+
-      (_TK_TAB==='__propio'
+      (_TK_TAB==='__todos' ? 'No hay tickets.' :
+       _TK_TAB==='__propio'
         ? 'No tenés pendientes propios anotados.'
         : (_TK_TAB==='sin_modulo'
             ? 'Nada sin módulo. Los tickets que se reportan desde el lobby caen acá.'
@@ -29032,23 +29074,66 @@ function _tkCuerpoHtml(){
      dibujar cuando llegan los contadores y después de cada cambio de
      estado, y cerrarse sola en la cara de quien la estaba mirando sería
      un salto sin motivo. */
+  /* ── EL BUSCADOR FILTRA LO QUE SE ESTÁ VIENDO · b110 ──────────────────
+     Solo la pestaña encendida: en «Todos» busca en todo, en Finanzas solo en
+     Finanzas. Los contadores de la tira NO cambian al buscar: cuentan contra
+     la base lo que hay abierto, y un buscador no cambia lo que hay. */
+  var q=_tkBusqNorm(_TK_BUSQ), mod=(_TK_TAB==='__todos');
+  if(q) g=g.filter(function(f){ return _tkCoincide(f, q); });
   var ab=g.filter(_tkAbierto), ce=g.filter(function(f){ return !_tkAbierto(f); });
   var h='';
-  if(!ab.length) h+='<div class="tkl-vacio">Nada abierto acá.</div>';
-  ab.forEach(function(f){ h+=tklItem(f, _TK_SOCIA); });
+  if(q && !g.length) return '<div class="tkl-vacio">Nada con «'+_tkEsc(_TK_BUSQ.trim())+'» acá.</div>';
+  if(!ab.length) h+='<div class="tkl-vacio">'+(q?'Nada abierto con eso.':'Nada abierto acá.')+'</div>';
+  ab.forEach(function(f){ h+=tklItem(f, _TK_SOCIA, mod); });
   if(ce.length){
-    h+='<details class="tkl-cerrados"'+(_TK_VER_CERR?' open':'')+
-       ' ontoggle="_TK_VER_CERR=this.open"><summary>Ver cerrados ('+ce.length+')</summary>';
-    ce.forEach(function(f){ h+=tklItem(f, _TK_SOCIA); });
+    /* Buscando, lo cerrado que coincide se muestra abierto: si no, buscar un
+       número cerrado daría la pantalla vacía. No toca `_TK_VER_CERR`, así que
+       al borrar la búsqueda el plegado vuelve a como estaba. */
+    h+='<details class="tkl-cerrados"'+((_TK_VER_CERR||q)?' open':'')+
+       (q?'':' ontoggle="_TK_VER_CERR=this.open"')+'><summary>Ver cerrados ('+ce.length+')</summary>';
+    ce.forEach(function(f){ h+=tklItem(f, _TK_SOCIA, mod); });
     h+='</details>';
   }
   return h;
+}
+
+/* ── LA BÚSQUEDA · b110 ─────────────────────────────────────────────────
+   Dos formas, las dos que pidió Andrea:
+     · NÚMERO: «113», «T-113», «t 113», «T-0113» → ese ticket. Un número
+       solo busca también como palabra (un lote, una factura que figure en
+       el texto); con «T» adelante es solo el ticket.
+     · PALABRAS: en el título y en «En palabras claras». Sin importar
+       mayúsculas ni tildes («recepcion» encuentra «recepción»), y con varias
+       palabras tienen que estar todas, en cualquier orden. Cada una tiene que
+       ser el COMIENZO de una palabra del texto («carton» encuentra «cartones»):
+       buscando pedazos sueltos, «al dia» traía 28 tickets por «salida» y
+       «tal», medido en el panel con las 68 filas reales. */
+var _TK_BUSQ='';
+function _tkSinTildes(s){ return String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function _tkBusqNorm(s){ return _tkSinTildes(s).replace(/\s+/g,' ').trim(); }
+function _tkCoincide(f, q){
+  var m=/^t\s*-?\s*0*(\d+)$/.exec(q);
+  if(m) return String(f.id)===m[1];
+  var toks=_tkSinTildes((f.descripcion||'')+' '+(f.en_claro||'')).split(/[^a-z0-9ñ]+/);
+  var palabras=q.split(' ');
+  var porTexto=palabras.every(function(p){
+    p=p.replace(/[^a-z0-9ñ]+/g,''); if(!p) return true;
+    return toks.some(function(t){ return t.indexOf(p)===0; });
+  });
+  if(/^\d+$/.test(q)) return String(f.id)===String(+q) || porTexto;
+  return porTexto;
+}
+function tkBuscar(v){
+  _TK_BUSQ=v||'';
+  var cuerpo=document.getElementById('tklCuerpo');
+  if(cuerpo && _TK_TAB) cuerpo.innerHTML=_tkCuerpoHtml();
 }
 
 function _tkPintar(){
   var tabs=document.getElementById('tklTabs');
   var cuerpo=document.getElementById('tklCuerpo');
   if(tabs){ tabs.innerHTML=_tkTabsHtml(); tabs.classList.toggle('hidden', !_TK_VIS.length); }
+  _tkBuscadorVer(!!_TK_VIS.length);
   if(cuerpo) cuerpo.innerHTML=_TK_TAB ? _tkCuerpoHtml() : '';
 }
 
@@ -29056,6 +29141,10 @@ function _tkPintar(){
    contadores también: ir a buscarlas otra vez haría que la pantalla
    parpadee y que el número pueda cambiar entre dos toques sin que haya
    pasado nada. Para refrescar de verdad está volver a entrar a Tickets. */
+/* El buscador se ve cuando se ve la tira: sin tickets no hay en qué buscar. */
+function _tkBuscadorVer(si){
+  var b=document.getElementById('tklBuscar'); if(b) b.classList.toggle('hidden', !si);
+}
 function tkTab(k){
   if(!_TK_BUCKETS.hasOwnProperty(k)) return;
   _TK_TAB=k; _tkPintar();
@@ -29128,6 +29217,7 @@ async function tkListar(){
   var tabs=document.getElementById('tklTabs');
   roto.style.display='none'; roto.textContent='';
   if(tabs){ tabs.innerHTML=''; tabs.classList.add('hidden'); }
+  _tkBuscadorVer(false);
   cuerpo.innerHTML='<div class="tkl-vacio">Cargando tickets…</div>';
   _TK_TAB=null; _TK_CUENTA={}; _TK_BUCKETS={}; _TK_VIS=[];
   /* Se pregunta donde manda: la MISMA funcion que decide si se dibuja una
@@ -29178,6 +29268,15 @@ async function tkListar(){
       var m=f.modulo||'sin_modulo';
       (_TK_BUCKETS[m]=_TK_BUCKETS[m]||[]).push(f);
     });
+    /* «Todos» (b110) = la suma de los baldes, armada DESPUÉS del reparto: así
+       no puede tener una fila que no esté en alguna otra pestaña. */
+    _TK_BUCKETS.__todos=filas.slice();
+    /* EN TODAS LAS PESTAÑAS, POR NÚMERO DE MENOR A MAYOR (b110, Andrea). La
+       lectura sigue pidiendo `creado_en` descendente; el orden de pantalla se
+       decide acá, en un solo lugar, para todas las pestañas a la vez. */
+    Object.keys(_TK_BUCKETS).forEach(function(k){
+      _TK_BUCKETS[k].sort(function(a,b){ return a.id-b.id; });
+    });
     _TK_VIS=_tkTabsVisibles();
 
     /* Si ya se sabe con cuál abrir (se entró desde un módulo), se enciende
@@ -29221,6 +29320,7 @@ async function tkListar(){
 
     if(!filas.length){
       if(tabs) tabs.classList.add('hidden');
+      _tkBuscadorVer(false);
       cuerpo.innerHTML='<div class="tkl-vacio">No hay tickets todavía. '+
         'El botón ✱ de abajo a la derecha es el que los crea.</div>';
       return;
@@ -29230,6 +29330,7 @@ async function tkListar(){
        tiene que decir cual. Confundirlas es como se pierde una cola entera
        sin que nadie se entere. */
     if(tabs){ tabs.innerHTML=''; tabs.classList.add('hidden'); }
+    _tkBuscadorVer(false);
     cuerpo.innerHTML='';
     roto.style.display='';
     roto.textContent='No se pudieron leer los tickets.\n'+_tkMotivo(err);
