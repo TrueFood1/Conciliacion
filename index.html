@@ -814,7 +814,11 @@ tr.r-ing td{background:#eff6ff}
 .home-hdr-name{font-size:15px;font-weight:600;color:var(--text);letter-spacing:-.01em}
 .home-live{display:flex;align-items:center;gap:7px;margin-bottom:0;margin-left:auto;margin-right:84px}
 .home-live .t{font-size:12px;font-weight:500;color:var(--text-dim);letter-spacing:.3px}
-/* Las franjas de «solo lectura» también en el inicio (14-oct): debajo de «conectado a Odoo». */
+/* b111: la línea de Odoo dice «● Odoo en vivo», o «● Odoo sin conexión» en el color de error y sin
+   latido cuando el proxy de lectura deja de contestar (lo marca `lecturaRpc`). Debajo, solo la franja
+   de Instinct (para el asistente). */
+.home-live.caido .live-dot-home{background:var(--err-soft);animation:none}
+.home-live.caido .t{color:var(--err-soft)}
 .home-live-c{display:flex;flex-direction:column;min-width:0;line-height:1.3}
 .home-fr{display:none;font-size:11px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .home-fr.hdr-asis{color:var(--warn)}
@@ -1522,6 +1526,12 @@ table td,table th{border-color:#F2F0EA}
      198 px en una columna de 100 (el chip de tickets de abajo ya se recortaba así). */
   .home-hdr-right .home-live{max-width:100%}
   .home-hdr-right .home-live .t{min-width:0;text-overflow:ellipsis}
+  /* b111 (19-oct): en el teléfono la columna «● Odoo en vivo» + Tickets baja a su PROPIO renglón,
+     alineada a la derecha, debajo de los botones fijos. Entre «Truefie» y la luna quedaban 88 px y el
+     aviso de Tickets salía cortado («20 si…»). El logo y el nombre no llegan a los botones fijos, así
+     que la reserva de la derecha ya no hace falta en este encabezado. */
+  body .home-hdr{padding-right:0;flex-wrap:wrap;row-gap:4px}
+  body .home-hdr-right{flex-basis:100%;margin:0;align-items:flex-end}
 }
 .crumbs{display:flex;align-items:center;gap:9px;font-size:14px}
 .crumb-dot{width:7px;height:7px;border-radius:50%;background:var(--magenta);flex-shrink:0}
@@ -2074,7 +2084,7 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
            ✱ de reportar se queda abajo a la derecha: reportar y ver son dos
            cosas, y juntarlas en la misma esquina las confunde. -->
       <div class="home-hdr-right">
-        <div class="home-live"><span class="live-dot-home"></span><span class="home-live-c"><span class="t">conectado a Odoo · datos en vivo</span><span class="home-fr" id="homeFrProd">producción · solo lectura</span><span class="home-fr hdr-asis" id="homeFrAsis">Instinct · solo lectura</span></span></div>
+        <div class="home-live" id="homeOdoo"><span class="live-dot-home"></span><span class="home-live-c"><span class="t" id="homeOdooTxt">Odoo en vivo</span><span class="home-fr hdr-asis" id="homeFrAsis">Instinct · solo lectura</span></span></div>
         <button class="tk-chip" id="tkLobby" onclick="irATickets()">
           <span class="tk-chip-n">Tickets</span>
           <span class="tk-chip-e cargando" id="tkLobbyEstado">contando…</span>
@@ -5479,7 +5489,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 19 oct 2026 · b110: Tickets con buscador, pestaña «Todos» y orden por número · empaque de Pizza con la bolsa';
+const BUILD = 'v 19 oct 2026 · b111';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -5681,14 +5691,26 @@ async function lecturaRpc(model, method, args=[], kwargs={}){
   // El proxy exige un JWT de Supabase válido (login). Lo tomamos de la sesión actual.
   let token='';
   try{ const s=await sbClient().auth.getSession(); token=(s&&s.data&&s.data.session&&s.data.session.access_token)||''; }catch(e){}
-  const res = await fetch(PROXY_LECTURA_URL, {
-    method:'POST',
-    headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
-    body: JSON.stringify({model, method, args, kwargs})
-  });
+  let res;
+  try{
+    res = await fetch(PROXY_LECTURA_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
+      body: JSON.stringify({model, method, args, kwargs})
+    });
+  }catch(e){ odooVivo(false); throw e; }                 // sin red / el proxy no contesta
+  if(res.status>=500 || res.status===401 || res.status===403) odooVivo(false);
   const data = await res.json();
   if(data.error) throw new Error(typeof data.error==='string' ? data.error : (data.error.message||'Error proxy'));
+  odooVivo(true);
   return data.result;
+}
+/* «● Odoo en vivo» / «● Odoo sin conexión» del inicio (b111, 19-oct). Sale de lo que pasa DE VERDAD con
+   las lecturas: se cae si el proxy no contesta, da 5xx o rechaza la sesión, y vuelve sola con la próxima
+   lectura buena. Un error de la consulta misma (un campo mal pedido) no es «sin conexión». */
+function odooVivo(si){
+  const c=document.getElementById('homeOdoo'), t=document.getElementById('homeOdooTxt'); if(!c||!t) return;
+  c.classList.toggle('caido', !si); t.textContent=si?'Odoo en vivo':'Odoo sin conexión';
 }
 
 // ── CANDADO DE PRODUCCIÓN ───────────────────────────────────────────────
@@ -6203,8 +6225,12 @@ async function entrarProd(){
 function franjasPintar(){
   const prod=!!(SESSION && SESSION.url && esProd(SESSION.url)), asis=(_perfil==='asistente');
   const pon=function(id, si, como){ const e=document.getElementById(id); if(e) e.style.display=si?(como||''):'none'; };
+  /* b111 (19-oct, T-132, decisión de Andrea): en el INICIO ya no se dibuja «producción · solo lectura»
+     —hablaba de la conexión de lectura a Odoo y se leía como «acá no se puede escribir»—; ahí el estado
+     de Odoo lo dice «● Odoo en vivo» / «● Odoo sin conexión». En el encabezado de los MÓDULOS el banner
+     se queda: CLAUDE.md lo nombra como una de las tres capas del candado de producción. */
   pon('bannerProd', prod, 'inline-flex'); pon('bannerAsis', asis);
-  pon('homeFrProd', prod, 'block'); pon('homeFrAsis', asis, 'block');
+  pon('homeFrAsis', asis, 'block');
 }
 // Navegación lobby ↔ herramienta (no toca la lógica de conexión a Odoo)
 // Enciende/apaga el modo producción (banner + pestaña Conciliación deshabilitada).
@@ -21227,7 +21253,9 @@ function insAbrir(){ _insAbierto=!_insAbierto; insPintar(); }
 async function lobbyAlertas(){
   const ids=['homeOpsAlerta','homeComAlerta','homeFinAlerta','homeConcAlerta'];
   if(!(await accesoLectora())){ ids.forEach(function(id){ _lobAl(id,''); }); cuadreLobby(); return; }
-  _lobAl('homeFinAlerta','Al día'); _lobAl('homeConcAlerta','Al día');
+  /* b111 (19-oct, T-163): Finanzas y Conciliación no miden ninguna alerta todavía, así que no dicen nada.
+     Antes decían «Al día» escrito fijo, sin mirar un dato: la regla es no decirlo a ciegas. */
+  _lobAl('homeFinAlerta',''); _lobAl('homeConcAlerta','');
   cuadreLobby();
   // Operaciones y Compras: el MISMO cálculo que el Resumen y Compras (`_cpAlc`). Si no está
   // fresco se lee en segundo plano; un primer «Error Odoo» se reintenta una vez.
