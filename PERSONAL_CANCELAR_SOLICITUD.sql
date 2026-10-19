@@ -1,7 +1,39 @@
 -- SOLO SE PEGA DESPUES DEL ENSAYO · PERSONAL_CANCELAR_SOLICITUD.sql
 -- ════════════════════════════════════════════════════════════════════════
 -- MODULO PERSONAL · CANCELAR LO PROPIO + ANTI REPETIDAS   (PEGADO 9)
--- Preparado el 15-oct-2026. NO SE CORRIO.
+-- Preparado el 15-oct-2026.
+--
+-- ⚠️ 19-oct-2026 · CORRECCION DE ESTA MARCA. Hasta hoy esta linea decia «NO SE
+-- CORRIO» a secas, y eso era una AFIRMACION QUE NADIE VERIFICO. La escribi yo el
+-- 15-oct, cuando era cierta, y no se volvio a tocar en cuatro dias de trabajo
+-- sobre este modulo. Una marca que no se actualiza deja de ser informacion y pasa
+-- a ser una suposicion con cara de dato — y de este archivo depende si el boton
+-- «Cancelar» de «Mis solicitudes» se puede construir o no.
+--
+-- LO QUE SE SABE, Y SOBRE QUE:
+--   · NO CONSTA que se haya aplicado: en el registro de trabajo no hay ninguna
+--     corrida reportada, y la pantalla no tiene ni una llamada a
+--     `rrhh_cancelar_solicitud` (verificado en index.html el 19-oct: cero).
+--   · TAMPOCO ESTA VERIFICADO CONTRA LA BASE. Aca no hay credenciales de
+--     PostgreSQL (no existe `herramientas/conexion_db.env`), y la anon key no
+--     sirve: no puede leer nada de `rrhh_` y el esquema de PostgREST devuelve 401.
+--     Asi que esta marca NO es evidencia del estado de produccion.
+--   · Y no hay señal indirecta: el ensayo de la formula corrio en produccion el
+--     16-oct y paso 35 de 35, pero ninguna de sus pruebas toca el CHECK de
+--     `estado` ni los dos triggers de este pegado, asi que no delata nada.
+--
+-- COMO SE RESUELVE EN TRES SEGUNDOS, de solo lectura, en el SQL Editor:
+--   select (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+--            where n.nspname='public' and p.proname='rrhh_cancelar_solicitud')     as funcion,
+--          (select count(*) from pg_constraint
+--            where conname='rrhh_permiso_estado_ok'
+--              and pg_get_constraintdef(oid) like '%cancelado%')                   as check_nuevo,
+--          (select count(*) from pg_trigger where not tgisinternal
+--            and tgname in ('rrhh_evento_no_repetida_tg','rrhh_permiso_no_repetida_tg')) as triggers;
+--   -- 0 · 0 · 0  => NO esta aplicado, se puede pegar este archivo tal cual.
+--   -- 1 · 1 · 2  => YA esta aplicado; NO volver a pegarlo sin leer la nota de
+--   --              abajo sobre correrlo dos veces (es seguro, pero conviene saberlo).
+--   -- cualquier otra combinacion => esta a medias: avisar antes de tocar nada.
 -- Va DESPUES de PERSONAL_ARREGLO_RESOLVER.sql (pegado 8), aplicado. No toca
 -- ninguno de los .sql ya pegados.
 --
