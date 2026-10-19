@@ -35,8 +35,8 @@ description: Arranque de sesión en el repo Conciliacion. Lee el bloque más rec
   «Paso 0 — Sello del respaldo», que NO venía en el original y está
   rotulado como agregado ahí mismo.
   ⚠ MODIFICADA el 2026-10-19 (decisiones de Andrea): se le agregó el «Paso 2b —
-  Tickets: los revisa y los escribe CC» y su parte del reporte, rotulados ahí
-  mismo. CC escribe directo con truefie_cc (TICKETS_CC_AMPLIADO.sql). Reemplaza,
+  Tickets: los revisa y los escribe CC», el «Paso 2c — De Lorena, solo para
+  información» y sus partes del reporte, rotulados ahí mismo. CC escribe directo con truefie_cc (TICKETS_CC_AMPLIADO.sql). Reemplaza,
   por ahora, al revisor diario por GitHub Actions (T-149, pospuesto). El resto
   del cuerpo sigue siendo textual.
 ─────────────────────────────────────────────────────────────────────── -->
@@ -158,6 +158,32 @@ necesita de ella.
 ### 4 · Nunca
 Cerrar porque «parece viejo», recomendar CERRAR sin la evidencia escrita, ni escribir sin `--seco` antes.
 
+## Paso 2c — De Lorena, solo para información (AGREGADO el 2026-10-19, decisión de Andrea)
+
+**Lorena no usa Tickets.** Anota sus pendientes en `PENDIENTES.md`, con títulos `## P<n> · <estado> · <título>`,
+y trabaja en sus propias ramas. Este paso **solo lee** y lo muestra **al final del reporte**, en un grupo aparte.
+
+1. **Sus ramas**: las del remoto cuyo último commit es de ella.
+   ```bash
+   git -C Conciliacion fetch -q origin
+   git -C Conciliacion for-each-ref refs/remotes/origin --format='%(refname:short)|%(authorname)|%(committerdate:short)' | grep -i '|lorena'
+   ```
+2. **De cada rama**, lo justo:
+   - el BUILD: `git -C Conciliacion show <rama>:index.html | grep -o "const BUILD = '[^']*'"`;
+   - lo que no está en dev: `git -C Conciliacion log --oneline origin/dev..<rama>` (hasta 5);
+   - sus pendientes: `git -C Conciliacion show <rama>:PENDIENTES.md | grep '^## P'` (solo el título y el estado).
+   Y los `## P…` que ya estén en el `PENDIENTES.md` de dev.
+   ⚠️ En zsh, con la rama en una variable, escribir `"${rama}:PENDIENTES.md"` con llaves: `$rama:P…` es un
+   modificador de zsh (`:P` = ruta real) y git recibe otra cosa (pasó al armar este paso, 19-oct).
+3. **Las reglas del grupo**:
+   - **NO** se cargan como tickets, **NO** se resuelven, **NO** van a «Andrea decide» ni a ningún resumen de
+     tareas, y **NO** se toca nada en las ramas de Lorena. Decide ella.
+   - Solo títulos y estados: **nunca montos, salarios ni datos de personas**, aunque estén en el archivo.
+   - Un aviso, una línea y solo si pasa: si una rama de Lorena usa un número de BUILD que **ya está publicado en
+     main** (o que usa otra rama), decirlo dentro del grupo, como dato para coordinar, no como tarea.
+4. **Sin cambios desde el último cierre** (ninguna rama de ella con commits más nuevos que la bitácora):
+   «De Lorena: sin cambios desde el <fecha>.», en una línea.
+
 ## Paso 3 — Reportar (un solo turno)
 
 Formato:
@@ -192,6 +218,11 @@ Tickets (Paso 2b · lo que CC escribió con truefie_cc)
   Cambiaron desde el último cierre (sin acción)   T-<n> · <qué cambió>
   revisé N · escribí X (explicaciones E · marcas M · cierres C) · Instinct I · Andrea decide Y
   <si no había clave: «Sin la clave de truefie_cc en esta compu: no escribí nada, solo propongo.»>
+
+De Lorena (solo para información · Paso 2c)
+  <rama> · <fecha> · <BUILD> · <N> commits que no están en dev
+    P<n> · <estado> · <título>
+  <si pasa: ⚠ <rama> usa el número <bNN>, que ya está publicado en main>
 ```
 
 Si `BITACORA.md` no existe o no tiene ningún bloque `DÓNDE QUEDAMOS`, decilo
