@@ -5479,7 +5479,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 19 oct 2026 · b110: Tickets con buscador, pestaña «Todos» y orden por número';
+const BUILD = 'v 19 oct 2026 · b110: Tickets con buscador, pestaña «Todos» y orden por número · empaque de Pizza con la bolsa';
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -9571,23 +9571,26 @@ const cM = n => '₡'+Math.round(Number(n)||0).toLocaleString('es-CR');   // col
 // CRITERIO (verificado 12-ago-2026): ÚLTIMA COMPRA registrada de cada componente, con la caja
 //   master prorrateada entre las unidades que caben. Valida al céntimo contra Galletas:
 //   pote 65,36 + tapa 66,50 (Diamantes de Papel 8-may) + funda 262,98 (Ind. Cartón 9-jun) = 394,84.
-// PIZZA 417,43 = caja individual 377,76 (Industrias de Cartón, 2-jul-2026) + caja master 39,67
-//   (Colinas 26-sep-2025, ₡238,00 ÷ 6 paquetes). La caja master SÍ existe: se compró en 2025 y
-//   todavía hay inventario, por eso 2026 no la muestra. FALTA la bolsa de polipropileno: se
-//   compra por KILO a Aida María (₡2.876,11/kg) y ni la factura ni el producto de Odoo dicen
-//   cuántas bolsas trae — Andrea las cuenta a mano. El empHold se queda hasta tener ese dato.
+// PIZZA 446,19 = caja individual 377,76 (Industrias de Cartón, 2-jul-2026) + caja master 39,67
+//   (Colinas 26-sep-2025, ₡238,00 ÷ 6 paquetes) + bolsa de polipropileno 28,76. La caja master SÍ
+//   existe: se compró en 2025 y todavía hay inventario, por eso 2026 no la muestra.
+//   BOLSA (b110, 19-oct-2026, T-111): se le compra a Aida María en paquetes de ~1 kg que traen
+//   100 bolsas (dato de Andrea), y va 1 bolsa por paquete de 2. Última compra: factura 2573 del
+//   29-sep-2026, ₡2.876,11 el paquete sin IVA → ₡28,76 la bolsa. En Odoo no tiene producto propio:
+//   cae en el genérico «material de empaque» [490], así que el precio se lee de la factura.
+//   Con esto el empaque de Pizza queda completo (antes 417,43 con empHold «falta la bolsa»).
 const COSTOS_PROD = [
   // prodId FIJO por producto — búsqueda por ID, nunca por nombre (trampa 517/519 "Prueba Galletas"). kw/rx quedan solo informativos.
   {key:'blanco',  label:'Pan Blanco',      prodId:451, kw:'Pan Blanco', rx:/pan\s*blanco/i,    batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'var(--p-blanco)', chkMP:805, chkInd:1462, chkTot:2267, emp:69.55,  empOK:true},
   {key:'semillas',label:'Pan de Semillas', prodId:452, kw:'Semillas',   rx:/semillas/i,        batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'var(--p-semillas)', chkMP:980, chkInd:1462, chkTot:2442, emp:77.58,  empOK:true},
-  {key:'pizza',   label:'Pizza Crust',     prodId:472, kw:'Pizza',      rx:/pizza/i,           batch:10,  unitsPer:2, pack:1, batchOverride:10, unidad:'por paquete de 2',  color:'var(--p-pizza)', chkMP:422, chkInd:3070, chkTot:3492, emp:417.43, empOK:false, empHold:'falta solo la bolsa de polipropileno (conteo manual pendiente)'},
+  {key:'pizza',   label:'Pizza Crust',     prodId:472, kw:'Pizza',      rx:/pizza/i,           batch:10,  unitsPer:2, pack:1, batchOverride:10, unidad:'por paquete de 2',  color:'var(--p-pizza)', chkMP:422, chkInd:3070, chkTot:3492, emp:446.19, empOK:true},
   {key:'frances', label:'Pan Francés',     prodId:453, kw:'Franc',      rx:/franc[eé]s/i,      batch:15,  unitsPer:4, pack:1, unidad:'por paquete de 4',  color:'var(--p-frances)', emp:64.26,  empOK:true},
   {key:'buns',    label:'Buns',            prodId:503, kw:'Bun',        rx:/buns?|hamburgues/i,batch:75,  unitsPer:1, pack:4, unidad:'por paquete de 4',  color:'var(--p-buns)', emp:60.34,  empOK:true},
   // Galletas = product.product 519 en PRODUCCIÓN (es_CR "Cookie Dough" / en_US "Prueba Galletas"; template 705, BOM18 con chocolate, rinde 160, 353 on-hand). El 529 era id del demo.
   {key:'galletas',label:'Galletas',        prodId:519, kw:'cookie dough',rx:/cookie\s*dough|cookie/i, batch:160, unitsPer:1, pack:1, unidad:'por unidad',        color:'var(--p-galletas)', emp:412.66, empOK:true},
 ];
 // Estado del empaque de un producto de COSTOS_PROD. `emp`=colones/unidad de venta o null.
-// `completo` sólo si hay número, empOK y NO hay empHold (Pizza nunca completa hasta quitar el hold).
+// `completo` sólo si hay número, empOK y NO hay empHold.
 function empInfo(P){
   const emp = (typeof P.emp==='number') ? P.emp : null;
   const completo = emp!=null && P.empOK===true && !P.empHold;
