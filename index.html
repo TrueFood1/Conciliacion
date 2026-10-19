@@ -6443,10 +6443,16 @@ const PER_DOW=['L','M','M','J','V','S','D'];
 // EL 4º ELEMENTO DEJA DE SER UN BOOLEANO Y PASA A DECIR QUIEN VE LA PESTAÑA.
 // Con dos estados no alcanzaba: dev (14-oct) hizo que `true` signifique
 // `_perLectora` —socias Y asistente—, y «Pago de quincena» entro en b81 con ese
-// mismo `true`. Resultado: el asistente VEIA la pestaña y `pagCargar` lo
-// rechazaba con un mensaje. Y no se arregla dejandolo leer: las vistas del pago
-// llevan `where acceso_es_socia()`, asi que para el asistente no hay datos ni en
-// solo lectura — veria una pantalla vacia sin explicacion.
+// mismo `true`. El 14-oct se le quito, porque el asistente VEIA la pestaña y
+// `pagCargar` lo rechazaba: las vistas del pago llevan `where acceso_es_socia()`
+// y para el perfil asistente no habia datos ni en solo lectura.
+//
+// 19-oct-2026 · VUELVE, pero con otra puerta. Lorena decidio que Instinct vea
+// SOLO EL TOTAL a pagar de cada persona: ni descuentos, ni permisos, ni
+// incapacidades, ni ajustes, ni notas, ni tarifa, ni divisor, ni desglose. Para
+// eso el pegado 12 agrego `v_rrhh_pago_total`, cuatro columnas y nada mas, y las
+// tres vistas de siempre siguen cerradas al asistente. La pantalla dibuja una
+// lista angosta cuando quien mira no es socia — ver `_pagRenderTotal`.
 //   null      · todos los del modulo
 //   'lectora' · socias y asistente (ven, no actuan)
 //   'socia'   · solo socias
@@ -6455,7 +6461,7 @@ const PER_TABS=[['vacaciones','Mis vacaciones','irAVacaciones()',null],
                 ['calendario','Calendario','irACalendario()',null],
                 ['pedir','Pedir días','irASolicitar()',null],
                 ['cerrados','Días cerrados','irADiasCerrados()','lectora'],
-                ['pago','Pago de quincena','irAPagoQuincena()','socia']];
+                ['pago','Pago de quincena','irAPagoQuincena()','lectora']];
 const PER_TABS_CONT=['perTabsVac','perTabsCal','perTabsSol','perTabsFer','perTabsPago'];
 
 // _perLectora (14-oct, decisión de Andrea): socias y asistente VEN la bandeja y «Días cerrados»;
@@ -7656,17 +7662,77 @@ function _pagTarifa(n){
   return '₡'+(Number(n)||0).toLocaleString('es-CR',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 
+// ── SOLO EL TOTAL · lo que ve el asistente (Instinct) ───────────────────
+// Lee `v_rrhh_pago_total`, que son cuatro columnas: quincena, persona_id, nombre
+// y total. No pide el detalle ni v_rrhh_pago — y si los pidiera, la base le
+// devolvería cero filas igual. No hay un solo botón acá: nada que guardar.
+let _pagTot=null, _pagTotQ=null;
+async function pagCargarTotal(force){
+  const body=document.getElementById('pagBody'); if(!body) return;
+  if(_pagTot && _pagTotQ===_pagQ && !force){ _pagRenderTotal(); return; }
+  _perAviso('pagStatus','s-info','<span class="spin"></span>Leyendo los totales…');
+  try{
+    const c=sbClient(); if(!c) throw new Error('no hay conexión a Supabase');
+    const {data,error}=await c.from('v_rrhh_pago_total')
+      .select('persona_id,nombre,total').eq('quincena',_pagQ);
+    if(error) throw error;
+    _pagTot=data||[]; _pagTotQ=_pagQ;
+    _perAviso('pagStatus','');
+    _pagRenderTotal();
+  }catch(e){
+    _pagTot=null;
+    body.innerHTML='';
+    _perAviso('pagStatus','s-err','No pude leer los totales: '+esc(_perErr(e)));
+  }
+}
+function _pagRenderTotal(){
+  const body=document.getElementById('pagBody'); if(!body) return;
+  const f=(_pagTot||[]).slice().sort(function(a,b){
+    return String(a.nombre||'').localeCompare(String(b.nombre||''),'es'); });
+  if(!f.length){
+    body.innerHTML='<div class="per-cnt">No hay totales en esta quincena.</div>';
+    return;
+  }
+  let h='', tot=0;
+  f.forEach(function(r){
+    const n=Math.round(Number(r.total)||0); tot+=n;
+    h+='<div class="pag-fila"><div class="pag-t">'
+      +  '<div class="pag-q">'+esc(r.nombre||'—')+'</div>'
+      +  '<div class="pag-n">'+_pagCRC(n)+'</div>'
+      +'</div></div>';
+  });
+  h+='<div class="pag-fila"><div class="pag-t">'
+   +   '<div class="pag-q">Total de la quincena · '+f.length+(f.length===1?' persona':' personas')+'</div>'
+   +   '<div class="pag-n">'+_pagCRC(tot)+'</div>'
+   + '</div></div>';
+  // POR QUE NO HAY DESGLOSE, dicho una vez y abajo: que falte sin explicación se
+  // lee como que la pantalla está a medias.
+  h+='<div class="m3sub" style="margin-top:14px">Solo los totales. El desglose '
+   + '—descuentos, permisos, incapacidades y ajustes— lo ven las socias.</div>';
+  body.innerHTML=h;
+}
+
 async function pagCargar(force){
   const body=document.getElementById('pagBody'); if(!body) return;
   if(!_pagQ) _pagQ=_pagQDeISO(_perISO(new Date()));
   const t=document.getElementById('pagQuinTit'); if(t) t.textContent=_pagQTit(_pagQ);
   const aj=document.getElementById('pagAjuste');
-  // La pestaña no se le dibuja al equipo, pero llegar acá es posible con una
-  // recarga a mitad de camino. Acá no se muestra una lista recortada como en
-  // Días cerrados: ESTO ES PLATA, así que no se dibuja nada y se dice por qué.
-  if(!_perEsSocia){
+  // TRES CAMINOS, y el del medio es nuevo (19-oct).
+  //   socia     → todo: el desglose, el formulario de ajustes, los avisos.
+  //   asistente → SOLO la lista «persona · total». Lo decidió Lorena.
+  //   el resto  → nada, y se dice por qué. Acá no se muestra una lista
+  //               recortada como en «Días cerrados»: esto es PLATA.
+  // El formulario de ajustes NO se dibuja para nadie que no sea socia:
+  // `_pagAjusteForm()` ya lo corta, y acá se vacía igual — la base lo bloquea
+  // con sus políticas, pero la pantalla tampoco lo ofrece.
+  if(!_perEsSocia && !_perLectora){
     body.innerHTML=''; if(aj) aj.innerHTML='';
     _perAviso('pagStatus','s-warn','El pago de la quincena es de las socias. Tu cuenta no lo puede ver.');
+    return;
+  }
+  if(!_perEsSocia){
+    if(aj) aj.innerHTML='';
+    await pagCargarTotal(force);
     return;
   }
   if(_pagFilas && !force){ _pagRender(); return; }

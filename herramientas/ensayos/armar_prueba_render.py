@@ -26,7 +26,7 @@ JSC  = '/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/j
 FUNCIONES = ['_perISO','_perDe','_perMasDias','_perRango','_perDiasTxt','_perHorasTxt',
              '_perErr','_pagCRC','_pagTarifa','_solQuienCancelo','_solEsMia',
              '_solEstadoTxt','_solQuien','_solCancelHTML','_solCancelErr',
-             '_solMiasRender','_pagRender']
+             '_solMiasRender','_pagRender','_pagRenderTotal','_pagAjusteForm']
 CONSTS = ['_PAG_ORDEN','PER_MES']
 
 def saca_funcion(src, nombre):
@@ -105,6 +105,7 @@ function _perAviso(id,t,h){ _AVISOS[id]=(t||'')+' '+(h||''); }
 function _pagAjusteForm(){}
 var _perEsSocia=false, _perLectora=false, _perEmail='daniel@example.invalid';
 var _solMias=null, _pagFilas=null, _pagDet=null, _pagQ='2026-10-Q1';
+var _pagTot=null, _pagTotQ=null, _pagAbierto={}, _pagGente=[{id:1,nombre:'ZZ Uno'}];
 var _pagFlags={reglas:1, subsidio:0, rebajaOk:0, rebajaPct:null, incapRebaja:0};
 var _FALLAS=0, _OK=0;
 function ok(q, cond, detalle){
@@ -185,6 +186,41 @@ ok('no quedo el aviso del porcentaje de rebaja',
 ok('ningun NaN ni undefined en el desglose',
    P.indexOf('NaN')<0 && P.indexOf('undefined')<0);
 ok('el total de la quincena sale', P.indexOf('Total de la quincena')>=0);
+
+print('');
+print('── la pestaña de Pago para el ASISTENTE · solo persona y total ──');
+_pagTot=[{persona_id:1, nombre:'ZZ Dos', total:1000},
+         {persona_id:2, nombre:'ZZ Uno', total:1100}];
+_pagRenderTotal();
+var A=_SALIDA['pagBody'].innerHTML;
+// Ordenadas por nombre: «Dos» va antes de «Uno» (D antes que U), aunque en los
+// datos vengan al reves. La primera version de esta prueba lo tenia invertido.
+ok('sale una fila por persona, ordenadas por nombre',
+   A.indexOf('ZZ Dos') > 0 && A.indexOf('ZZ Uno') > 0 && A.indexOf('ZZ Dos') < A.indexOf('ZZ Uno'));
+ok('sale el total de la quincena', A.indexOf('Total de la quincena · 2 personas')>=0);
+ok('dice por que no hay desglose', A.indexOf('Solo los totales')>=0);
+ok('NO hay ningun boton', A.indexOf('<button')<0, 'hay un boton');
+ok('NO hay ningun onclick', A.indexOf('onclick')<0, 'hay un onclick');
+ok('NO aparece ningun concepto del desglose',
+   A.indexOf('Base de la quincena')<0 && A.indexOf('Feriado trabajado')<0
+   && A.indexOf('Incapacidad')<0 && A.indexOf('Permiso')<0 && A.indexOf('Ajuste')<0);
+ok('ningun NaN ni undefined', A.indexOf('NaN')<0 && A.indexOf('undefined')<0);
+
+print('');
+print('── y el vacio de esa lista ──');
+_pagTot=[]; _pagRenderTotal();
+ok('con cero totales dice algo, no queda en blanco',
+   _SALIDA['pagBody'].innerHTML.indexOf('No hay totales')>=0);
+
+print('');
+print('── el formulario de ajustes, por perfil ──');
+_perEsSocia=false; _pagAjusteForm();
+ok('ASISTENTE/EMPLEADO: el formulario de ajustes queda VACIO',
+   _SALIDA['pagAjuste'].innerHTML==='');
+_perEsSocia=true; _pagAjusteForm();
+ok('SOCIA: el formulario de ajustes SI se dibuja',
+   _SALIDA['pagAjuste'].innerHTML.length>0);
+_perEsSocia=false;
 
 print('');
 print('── el vacio de la pestaña de Pago ──');
