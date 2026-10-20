@@ -491,6 +491,17 @@ probando lo que dice probar.
 
 ---
 
+## P10 · ✅ CONFIRMADA POR LORENA · La regla de feriados, y de quién viene
+
+Regla confirmada por **Lorena el 19-oct-2026** — un feriado de pago obligatorio en
+día no laborable no cambia nada, el doble corre solo si cae en día laboral **y** la
+persona trabaja, y solo pagan doble los obligatorios —; el cálculo **cumple los
+cuatro casos**, medido con `PRUEBAS_FERIADOS_REGLA.sql`, que corrió en producción el
+**20-oct-2026 con TODO VERDE, 14/14** y rollback. ⚠️ La fuente es Lorena: **no está
+confirmado que la contadora haya confirmado esta regla.**
+
+---
+
 ## P4 · 🔴 ABIERTO · Cualquier cuenta con sesión puede VACIAR nueve tablas de Personal
 
 Encontrado el **16-oct-2026**, reproducido contra PostgreSQL 17 con la
