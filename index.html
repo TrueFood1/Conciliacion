@@ -5516,7 +5516,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 20 oct 2026 · b115';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 20 oct 2026 · b116';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -22745,7 +22745,7 @@ function cpDesdeCero(id){
   const P=_cpReg; P.filas.forEach(function(f){ P.valores[f.pid]=0; }); P.verTodos=true; cpRenderRegistro();
 }
 
-// ── TARIFAS DE BIO (12-oct-2026) ─────────────────────────────────────────
+// ── TARIFAS DE PROVEEDOR (BIO 12-oct-2026 · todos los de Compras 20-oct) ──
 // Cuarto carril del servicio de escritura (POST /tarifas): la tarifa de proveedor de BIO en Odoo
 // se actualiza con el precio de la última factura de BIO. El navegador manda {modo, confirmar,
 // huella} y nada más: qué tarifas y a qué precio lo decide la revisión del servidor.
@@ -22785,15 +22785,15 @@ async function cpTarCargar(forzar){
   if(_cpVista==='ajustes' && !_cpReg) cpRender();
 }
 const _cpTarCol=function(n){ return n==null?'—':'₡'+_rzN(n, 2); };
-function cpTarifasHtml(){
-  const T=_cpTar; if(!T || !T.r || _socia!==true) return '';
-  const r=T.r, inicial=(T.modo==='inicial');
-  if(inicial && r.inicializado) return T.msg ? '<div class="cp-card cp-tar"><div class="cp-st2">Tarifas de BIO</div><div class="cp-msg '+(T.msgCls||'')+'">'+esc(T.msg)+'</div></div>' : '';
-  const ver=r.lineas.filter(function(l){ return l.estado==='actualiza' || l.estado==='fuera_de_banda'; });
-  if(!ver.length && !T.msg) return '';
-  let h='<div class="cp-card cp-tar"><div class="cp-st2">'+(inicial?'Tarifas de BIO · corrección inicial':'Tarifas de BIO')+'</div>';
+// Una tarjeta por proveedor (20-oct): BIO arriba como siempre (r) y cada otro proveedor de Compras en
+// r.proveedores. El mensaje del último clic va en la tarjeta de ESE proveedor (T.msgProv).
+function _cpTarCardHtml(T, r, prov, titulo, inicial){
+  const msg=(T.msgProv===prov)?T.msg:'', cls=(T.msgProv===prov)?(T.msgCls||''):'';
+  const ver=(r.lineas||[]).filter(function(l){ return l.estado==='actualiza' || l.estado==='fuera_de_banda'; });
+  if(!ver.length && !msg) return '';
+  let h='<div class="cp-card cp-tar"><div class="cp-st2">'+esc(titulo)+'</div>';
   if(ver.length){
-    // La unidad va en el encabezado si es la misma para todas (hoy: kg), si no, en cada fila.
+    // La unidad va en el encabezado si es la misma para todas (BIO: kg), si no, en cada fila.
     const u0=ver[0].unidad, unaU=ver.every(function(l){ return l.unidad===u0; });
     h+='<table class="cp-tartbl"><thead><tr><th>Insumo</th><th>Hoy</th><th>Factura</th><th>Queda'+(unaU&&u0?(' /'+esc(u0)):'')+'</th></tr></thead><tbody>'
       +ver.map(function(l){ const fuera=(l.estado==='fuera_de_banda');
@@ -22802,11 +22802,19 @@ function cpTarifasHtml(){
           +'<td'+(fuera?' class="cp-amb3"':'')+'>'+esc(_cpTarCol(l.precio_nuevo)+(unaU?'':('/'+(l.unidad||''))))+'</td></tr>'; }).join('')
       +'</tbody></table>';
     if(r.fuera_de_banda) h+='<div class="cp-msg cp-amb3">Fuera de banda ('+String(r.banda[0]).replace('.',',')+'× a '+String(r.banda[1]).replace('.',',')+'×): no se aplica.</div>';
-    if(r.aplicables) h+='<div class="cp-btns"><button class="cp-btn cp-btnp"'+(T.enviando?' disabled':'')+' onclick="cpTarAplicar()">'
+    if(r.aplicables) h+='<div class="cp-btns"><button class="cp-btn cp-btnp"'+(T.enviando?' disabled':'')+' onclick="cpTarAplicar('+(+prov)+')">'
       +(inicial?'Aplicar corrección inicial · ':'Actualizar ')+r.aplicables+' tarifa'+(r.aplicables===1?'':'s')+'</button></div>';
   }
-  h+='<div class="cp-msg '+(T.msgCls||'')+'">'+esc(T.msg||'')+'</div></div>';
+  h+='<div class="cp-msg '+cls+'">'+esc(msg||'')+'</div></div>';
   return h;
+}
+const CP_TAR_BIO=948;
+function cpTarifasHtml(){
+  const T=_cpTar; if(!T || !T.r || _socia!==true) return '';
+  const r=T.r, inicial=(T.modo==='inicial');
+  if(inicial && r.inicializado) return T.msg ? '<div class="cp-card cp-tar"><div class="cp-st2">Tarifas de BIO</div><div class="cp-msg '+(T.msgCls||'')+'">'+esc(T.msg)+'</div></div>' : '';
+  return _cpTarCardHtml(T, r, CP_TAR_BIO, inicial?'Tarifas de BIO · corrección inicial':'Tarifas de BIO', inicial)
+    +(inicial?'':(r.proveedores||[]).map(function(p){ return _cpTarCardHtml(T, p, p.proveedor_id, 'Tarifas de '+(p.proveedor||('proveedor '+p.proveedor_id)), false); }).join(''));
 }
 const CP_TAR_MOTIVO={
   tarifa_apagada:'Las tarifas están apagadas en el servicio: no se cambió nada en Odoo.',
@@ -22819,10 +22827,14 @@ const CP_TAR_MOTIVO={
   // Estas dos dejan algo CAMBIADO en Odoo: el texto del servidor dice cuáles, y va entero.
   rastro_truefie:'Las tarifas SÍ se cambiaron en Odoo, pero no quedó el rastro en Truefie.',
   tarifa_distinta:'Odoo no dejó el precio esperado.'};
-async function cpTarAplicar(){
+// El clic manda SOLO la huella de la tarjeta: de qué proveedor es lo decide el servidor (20-oct).
+async function cpTarAplicar(prov){
   const T=_cpTar; if(!T || !T.r || T.enviando) return;
-  T.enviando=true; T.msg='Aplicando en Odoo…'; T.msgCls=''; cpRender();
-  const R=await escrituraTarifas({modo:T.modo, confirmar:true, huella:T.r.huella});
+  prov=+prov||CP_TAR_BIO;
+  const r=(prov===CP_TAR_BIO)?T.r:(T.r.proveedores||[]).filter(function(p){ return +p.proveedor_id===prov; })[0];
+  if(!r) return;
+  T.enviando=true; T.msgProv=prov; T.msg='Aplicando en Odoo…'; T.msgCls=''; cpRender();
+  const R=await escrituraTarifas({modo:T.modo, confirmar:true, huella:r.huella});
   T.enviando=false;
   if(R.red){ T.msg='Sin respuesta del servicio: no sé si se aplicó. Volvé a abrir Compras para ver cómo quedó.'; T.msgCls='cp-mal'; cpRender(); return; }
   if(R.st===200 && R.js.ok){
@@ -22837,7 +22849,7 @@ async function cpTarAplicar(){
   }
   const msg=T.msg, cls=T.msgCls;
   await cpTarCargar(true);
-  if(_cpTar){ _cpTar.msg=msg; _cpTar.msgCls=cls; }
+  if(_cpTar){ _cpTar.msg=msg; _cpTar.msgCls=cls; _cpTar.msgProv=prov; }
   cpRender();
 }
 
