@@ -515,10 +515,10 @@ reportó.
 solo falla con las columnas que uno NOMBRA, así que las dos llegan `undefined` en
 silencio. `_perOrgCur` (6884) cae entonces a `s.origen||null` = null y el selector
 abre sin nada marcado. La raíz es la misma que el bug de «Mis solicitudes» que arregló
-b114: **`v_rrhh_permiso` nunca tuvo la columna `incapacidad_origen`** — está en la
+b115: **`v_rrhh_permiso` nunca tuvo la columna `incapacidad_origen`** — está en la
 tabla `rrhh_permiso` y en `v_rrhh_permiso_dia`, no en esa vista.
 
-**Por qué no se arregló en b114.** Decisión de Lorena (20-oct): opción B ahora —una
+**Por qué no se arregló en b115.** Decisión de Lorena (20-oct): opción B ahora —una
 línea, que devuelve la lista y el botón Cancelar— y opción A después. Arreglar esto
 requiere **A**: agregarle la columna a la vista con `create or replace view ... ,
 pm.incapacidad_origen` **al final** (sólo se puede agregar al final), y en el mismo
@@ -528,7 +528,7 @@ apuró. Hay que decidir explícitamente si `incapacidad_boleta` entra o no.
 
 ⚠️ El renglón de 7525 en «Mis solicitudes» quedó leyendo `s.origen`, que hoy es
 `undefined`, y **está bien así**: degrada a «Incapacidad» sin paréntesis (probado,
-`armar_prueba_render.py` lo mide desde b114) y vuelve a tener sentido solo cuando A
+`armar_prueba_render.py` lo mide desde b115) y vuelve a tener sentido solo cuando A
 devuelva la columna. Borrarlo ahora obligaría a reescribirlo en A.
 
 ---

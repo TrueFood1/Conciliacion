@@ -131,7 +131,7 @@ _solMias=[
    estado:'aprobado', por:'lorena@example.invalid'},
   {k:'permiso', id:15, tipo:'Permiso',  ini:'2026-10-09', fin:'2026-10-09', dias:1,
    estado:'rechazado', por:'lorena@example.invalid'},
-  // b114 · UNA INCAPACIDAD SIN `origen`, que es lo que produce el codigo nuevo.
+  // b115 · UNA INCAPACIDAD SIN `origen`, que es lo que produce el codigo nuevo.
   // «Mis solicitudes» dejo de pedir `incapacidad_origen` porque la vista
   // `v_rrhh_permiso` NUNCA tuvo esa columna y la consulta entera fallaba (42703).
   // Sin la clave, el renglon tiene que decir «Incapacidad» a secas: ni
