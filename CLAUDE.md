@@ -262,6 +262,14 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
 
 ## Entorno y datos fijos
 
+- **Postgres local para ensayos** (desde el 20-oct-2026): binarios oficiales de PostgreSQL
+  **17.6** (EnterpriseDB, firmados, Team ID `26QKX55P9K`) en **`Practica CC/postgres17/pgsql/`**,
+  fuera del repo y sin instalar nada en el sistema. No se borra entre sesiones.
+  `sh herramientas/pg_local.sh up` levanta un clúster temporal en `/tmp/zzpg` (puerto 55432) y
+  `down` lo apaga y borra; `PG_BIN=<otra carpeta>` cambia los binarios. El Postgres de Homebrew
+  del 15-oct ya no está en la Mac. El espejo de producción para un ensayo se arma con
+  `respaldo-truefie/trabajo/seguridad/t148/armar_local.sh` desde el respaldo diario (los datos
+  reales quedan solo en el clúster temporal).
 - Local: `python3 -m http.server 8765` → probar en **Safari**
   (`http://127.0.0.1:8765/index.html`, recarga Cmd+Shift+R). El Chrome
   corporativo bloquea localhost ("Access denied" no es un bug de la herramienta).

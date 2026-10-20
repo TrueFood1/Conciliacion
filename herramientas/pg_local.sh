@@ -15,7 +15,9 @@
 #   sh herramientas/pg_local.sh run X.sql
 #   sh herramientas/pg_local.sh down     apaga y borra
 set -e
-PG=/opt/homebrew/opt/postgresql@17/bin
+# Binarios oficiales de PostgreSQL 17.6 (EnterpriseDB) en Practica CC/postgres17, desde el 20-oct-2026.
+# El Postgres de Homebrew que se usó el 15-oct ya no está en la Mac. PG_BIN lo cambia.
+PG="${PG_BIN:-/Users/andrea/Desktop/Practica CC/postgres17/pgsql/bin}"
 D="${TMPDIR:-/tmp}/zzpg_data"; S=/tmp/zzpg
 CONN="host=$S port=55432 user=postgres dbname=truefie"
 case "$1" in
