@@ -5516,7 +5516,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 19 oct 2026 · b112';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 20 oct 2026 · b113';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -18544,9 +18544,7 @@ async function rpIndetConfirmar(){
              por:(quien||'desconocido'), en:new Date().toISOString()};
   cur.indetAbierto=false;
   // al elegirlo se llena con lo que FALTA, igual que `rpToggleLote`
-  const total=+cur.cant||0;
-  const usado=Object.values(cur.lotes).reduce(function(s,v){return s+(+v||0);},0);
-  cur.lotes[ENT_LOTE_INDET]=Math.max(0,total-usado)||total;
+  cur.lotes[ENT_LOTE_INDET]=_rpLoQueFalta(cur);
   boGuardarManual(false);
   rpRender();
 }
@@ -18561,11 +18559,19 @@ function rpToggleLote(canon){
   const cur=_rp.cur;
   if(cur.lotes[canon]!=null){ delete cur.lotes[canon]; boGuardarManual(false); rpRender(); return; }
   // al elegirlo se llena con lo que FALTA para completar la cantidad
-  const total=+cur.cant||0;
-  const usado=Object.values(cur.lotes).reduce(function(s,v){return s+(+v||0);},0);
-  cur.lotes[canon]=Math.max(0,total-usado)||total;
+  cur.lotes[canon]=_rpLoQueFalta(cur);
   boGuardarManual(false);
   rpRender();
+}
+// LO QUE FALTA para completar la cantidad, para pre-llenar un lote recién elegido
+// (un lote de la lista o el centinela «No sé de qué lote salió»: la regla es UNA).
+// Si ya no falta nada, '' — el lote queda VACÍO y la cantidad se escribe a mano.
+// Hasta b112 era `Math.max(0,total-usado)||total`: con la cantidad ya cubierta el
+// `||total` volvía a meter la cantidad TOTAL en el lote nuevo (T-174, Lorena, 20-oct).
+function _rpLoQueFalta(cur){
+  const total=+cur.cant||0;
+  const usado=Object.values(cur.lotes).reduce(function(s,v){return s+(+v||0);},0);
+  return (total-usado>0) ? (total-usado) : '';
 }
 function rpLoteManual(){
   const pid=_rp.cur.pid; if(!pid) return;
@@ -18610,6 +18616,15 @@ function rpValidarLotes(){
   // que le deja a una socia resolverlo después. Sin él, "no sé" no dice nada.
   if(cur.lotes[ENT_LOTE_INDET]!=null && !(cur.indet&&cur.indet.motivo)){
     el.textContent='Falta decir por qué no se sabe el lote.'; return false; }
+  // UN LOTE ELEGIDO Y VACÍO NO SE GUARDA (b113). Desde T-174 un lote nuevo con la
+  // cantidad ya cubierta nace vacío, y con la suma dando igual pasaría como una
+  // fila de 0 en `ent_alisto_lote` (la base no tiene check para eso).
+  const vacio=ks.find(function(k){ return !(+cur.lotes[k]>0); });
+  if(vacio!=null){
+    el.textContent='El lote '+(vacio===ENT_LOTE_INDET?'«No sé de qué lote salió»':vacio)
+      +' no tiene cantidad. Escribí cuánto salió de ahí o quitalo.';
+    return false;
+  }
   if(Math.abs(suma-total)>0.001){
     el.textContent='Los lotes suman '+_rzN(suma)+' y la cantidad es '+_rzN(total)+' — tiene que dar igual.';
     return false;
