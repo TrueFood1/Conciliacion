@@ -5516,7 +5516,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 20 oct 2026 · b113';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 20 oct 2026 · b114';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -12554,6 +12554,7 @@ function _clTotalPorProd(){
 
 async function _clCargarHist(){
   const c=sbClient(); if(!c){ _clHistErr='no hay sesión de Supabase'; _clHistPintar(); return; }
+  await accesoSocia();   // el perfil antes de dibujar: los botones del ancla son solo de socias (T-148)
   try{
     const {data:cab,error:e1}=await c.from('ent_conteo')
       .select('id,fecha,corte,responsable,nota,creado_en,creado_por')
@@ -12631,7 +12632,14 @@ function _clHistPintar(){
             +'<td class="cl-uds">'+_clVenta(r.producto_id,r.uds)+'</td></tr>';
         });
       h+='</table>';
-      if(!_clSinAncla){
+      // CONFIRMAR O QUITAR EL ANCLA ES SOLO DE SOCIAS (T-148, decisión de Andrea, 20-oct): la base lo
+      // frena para cualquier otro perfil, así que el botón no se dibuja — un botón que solo puede dar
+      // error no se ofrece. El estado («Es el ancla vigente») sí lo ve todo el que entra.
+      if(!_clSinAncla && _socia!==true){
+        if(x.ancla) h+='<div class="cl-detpie"><span class="cl-okmsg">Es el ancla vigente'
+          +(x.est&&x.est.confirmado_en?(' · confirmada '+esc(String(x.est.confirmado_en).replace('T',' ').slice(0,16))):'')
+          +'</span></div>';
+      } else if(!_clSinAncla){
         h+= x.ancla
           ? '<div class="cl-detpie"><span class="cl-okmsg">Es el ancla vigente'
             +(x.est&&x.est.confirmado_en?(' · confirmada '+esc(String(x.est.confirmado_en).replace('T',' ').slice(0,16))):'')
@@ -28473,6 +28481,7 @@ var _TK_TIPO='no_funciona';
    una apertura y otra te podés haber movido de pantalla. */
 var _TK_AMBITO=null;
 function tkAmbito(btn){
+  if(btn.getAttribute('data-ambito')==='propio' && _socia!==true) return;   // solo socias (T-148)
   _TK_AMBITO=btn.getAttribute('data-ambito');
   var t=document.querySelectorAll('#tkAmbito .tk-amb');
   for(var i=0;i<t.length;i++) t[i].classList.toggle('on', t[i]===btn);
@@ -28537,7 +28546,11 @@ function tkAbrir(){
      entre que abriste la hoja la última vez y ahora te pudiste haber movido
      de pantalla. `data-mod` con valor = estás adentro de un módulo. */
   var ctx=tkDondeEstoy();
-  _TK_AMBITO = ctx.modulo ? 'truefie' : 'propio';
+  // LOS PENDIENTES PROPIOS SON SOLO DE SOCIAS (T-148, decisión de Andrea, 20-oct): la base no deja
+  // que el equipo cree uno ni lo vea. Para el equipo el selector no aparece y todo es «De Truefie».
+  var socia=(_socia===true);
+  _TK_AMBITO = (ctx.modulo || !socia) ? 'truefie' : 'propio';
+  var sel=document.getElementById('tkAmbito'); if(sel) sel.style.display = socia ? '' : 'none';
   var ab=document.querySelectorAll('#tkAmbito .tk-amb');
   for(var i=0;i<ab.length;i++)
     ab[i].classList.toggle('on', ab[i].getAttribute('data-ambito')===_TK_AMBITO);
@@ -28578,6 +28591,7 @@ async function tkEnviar(){
     if(!correo) throw new Error('no hay sesión abierta. El ticket tiene que ir firmado.');
 
     var ctx=tkDondeEstoy();
+    if(_TK_AMBITO==='propio' && _socia!==true) _TK_AMBITO='truefie';   // red: solo socias crean propios (T-148)
     var propio = (_TK_AMBITO==='propio');
     var fila={
       descripcion:txt, tipo:_TK_TIPO, ambito:(_TK_AMBITO||'truefie'),
