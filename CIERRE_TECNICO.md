@@ -42,6 +42,35 @@ Este checklist se corre al final de **toda sesión donde se tocó código**, sin
    toca la red. Sintaxis OK ≠ la página carga, y la página carga ≠ las tablas
    existen. Son tres chequeos distintos y hacen falta los tres.
 
+7. **Chequeo de COLUMNAS — `python3 herramientas/sonda_front.py`. Antes de tocar `main`.**
+   Saca del `index.html` cada `.from('X').select('a,b,c')` y las claves de los
+   payloads de escritura, y sondea **cada columna** por REST con la anon key
+   (`42703` = la columna no existe, `PGRST205` = el objeto no existe). Sale con
+   código 1 si falta algo. Se le puede pasar la ruta del `index.html` que se va a
+   publicar, y `--solo rrhh` para mirar un módulo.
+
+   ⚠️ **Existe por un incidente real.** El 20-oct-2026, con la cuenta de una
+   empleada, «Mis solicitudes» no cargaba: `column v_rrhh_permiso.incapacidad_origen
+   does not exist`. La lista no cargaba, así que el botón de Cancelar quedaba
+   inalcanzable. **Los tres chequeos de arriba no podían verlo**, y es la razón de
+   que éste sea un paso aparte:
+   - `esquema_check.py` pide `?select=*&limit=1`, y `select=*` **no nombra ninguna
+     columna**: verifica objetos, no columnas.
+   - `sonda_columnas.py` sí distingue `42703` de `42501`, pero su lista está
+     **quemada en el código** (las columnas del pegado 5) y `v_rrhh_permiso` no
+     estaba ahí. La herramienta servía; nunca se la apuntó a esto.
+   - las **pruebas de render** corren los render de verdad pero **no tocan la base**.
+     El bug estaba en la consulta, antes del render.
+
+   **Lo que NO entiende lo lista, no se lo saltea**: los `select` armados en tiempo
+   de ejecución y los payloads que llegan en una variable salen como «no pude leer»
+   con línea y contexto, para revisarlos a mano. Un chequeo que se saltea en
+   silencio lo que no entiende da verde y no sirve.
+
+   No juzga si un objeto **debería** estar cerrado a `anon`: eso lo decide
+   `esquema_check.py`, que tiene la lista curada de lo sensible y de lo que está
+   abierto a propósito. Acá una lista sólo significa «las columnas existen».
+
 8. **Respaldar lo que git NO respalda.** `BITACORA.md`, los `PEGADO_*.sql` y los
    `CAMBIO_*.sql` que todavía no entraron a una rama están **gitignored** —el repo
    es público y llevan razones sociales, montos y SQL de producción—, así que un
