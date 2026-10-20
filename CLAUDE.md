@@ -9,8 +9,17 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
 ## Reglas madre (aplican siempre)
 
 - **Producción es SOLO LECTURA.** Candado de 3 capas: allowlist deny-by-default
-  en `odooRpc` + Conciliación bloqueada en prod + banner "⚠ PRODUCCIÓN · solo
-  lectura". Nunca debilitarlo ni rodearlo.
+  en `odooRpc` + Conciliación bloqueada en prod + banner del estado de Odoo
+  (`odooEstado`/`odooPintar`, b112). Nunca debilitarlo ni rodearlo.
+  El banner ya no dice "producción · solo lectura" (decisión de Andrea, 19-oct:
+  sonaba a que la socia no puede hacer nada, y escribe en Supabase y por los
+  carriles de truefie-escritura). Dice lo mismo en el inicio y en los módulos:
+  «● Conectado a Odoo» en la versión publicada contra producción; **«⚠ Conectado
+  a Odoo · copia local»** si Truefie no se sirve desde Pages; **«⚠ Odoo de
+  pruebas»** si el Odoo no es producción (los dos en ámbar y negrita); y
+  «● Sin conexión con Odoo» en rojo si el proxy no contesta. Su trabajo es que
+  nadie confunda datos reales con pruebas: cualquier cambio tiene que seguir
+  distinguiendo esos casos a la vista.
   ⚠️ **Y la tercera capa —el usuario de Odoo— NO EXISTIÓ hasta el 3-sep-2026,
   mientras este archivo y `DIAGNOSTICO_ESCRITURA_ODOO.md` afirmaban que sí.**
   Medido el 2-sep: uid 28 (`Lobby Solo Lectura`) tenía `write` y `create` sobre
