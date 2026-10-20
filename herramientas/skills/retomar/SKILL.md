@@ -38,7 +38,10 @@ description: Arranque de sesión en el repo Conciliacion. Lee el bloque más rec
   Tickets: los revisa y los escribe CC», el «Paso 2c — De Lorena, solo para
   información» y sus partes del reporte, rotulados ahí mismo. Más tarde ese día, la «Regla de cierre»
   del Paso 2b (preguntas respondidas y lo que se ve en pantalla los cierra CC) y «explicado → disponible». CC escribe directo con truefie_cc (TICKETS_CC_AMPLIADO.sql). Reemplaza,
-  por ahora, al revisor diario por GitHub Actions (T-149, pospuesto). El resto
+  por ahora, al revisor diario por GitHub Actions (T-149, pospuesto).
+  ⚠ MODIFICADA el 2026-10-20 (decisión de Andrea, T-171): Lorena publica a main sin el
+  OK de Andrea; el Paso 2 distingue «main movido por Lorena» (publicación normal) del
+  aviso ⚠, y el grupo de Lorena muestra lo que publicó. Rotulado ahí mismo. El resto
   del cuerpo sigue siendo textual.
 ─────────────────────────────────────────────────────────────────────── -->
 
@@ -103,6 +106,14 @@ Compará los hashes de `dev` y `main` que grabó el "Estado de ramas" de la
 bitácora contra los de ahora (local y origin). Lo que se busca cazar: que
 alguien haya movido `main` (u otra rama) por la web **entre sesiones** — el
 agujero del 6-jul, pero detectado al abrir en vez de al cerrar.
+
+**Desde el 20-oct (decisión de Andrea, T-171) Lorena publica a `main` sin el OK de Andrea**, así que
+un `main` movido puede ser una publicación normal. Si `main` cambió, mirá de quién son los commits
+nuevos: `git -C Conciliacion log --format='%h %an %s' <main grabado>..origin/main`.
+- **Todos de Lorena** → no es alarma: «main pasó a <bNN>, publicado por Lorena». Va también al grupo
+  del Paso 2c, con qué toca del trabajo de Andrea si toca algo (mismo criterio que el Paso 2c del
+  `/cierre`). Igual hay que traerlo con `git fetch` antes de seguir.
+- **De otra persona, o por la web sin autor claro** → el aviso ⚠ de siempre.
 
 ## Paso 2b — Tickets: los revisa y los escribe CC (AGREGADO el 2026-10-19, decisiones de Andrea)
 
@@ -214,6 +225,7 @@ Estado de ramas (bitácora vs realidad ahora)
   dev  → grabado <hash7> · hoy <hash7>   <✓ sin cambios | ⚠ ...>
   main → grabado <hash7> · hoy <hash7>   <✓ sin cambios | ⚠ ...>
   <línea final: "Nadie tocó el remoto desde el último cierre, podés seguir."
+   o "main pasó a <bNN>, publicado por Lorena — traé con git fetch antes de seguir."
    o el aviso: "⚠ origin/main cambió desde el cierre — traé con git fetch
    antes de seguir.">
 
@@ -232,6 +244,7 @@ Tickets (Paso 2b · lo que CC escribió con truefie_cc)
   <si no había clave: «Sin la clave de truefie_cc en esta compu: no escribí nada, solo propongo.»>
 
 De Lorena (solo para información · Paso 2c)
+  <si publicó: Publicó b<NN> en main · <qué toca del trabajo de Andrea, o «no toca lo tuyo»>>
   <rama> · <fecha> · <BUILD> · <N> commits que no están en dev
     P<n> · <estado> · <título>
   <si pasa: ⚠ <rama> usa el número <bNN>, que ya está publicado en main>

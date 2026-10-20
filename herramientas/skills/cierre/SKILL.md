@@ -38,8 +38,10 @@ description: Ritual de cierre de una sesión donde se tocó código en el repo C
   ⚠ MODIFICADA el 2026-10-19 (decisiones de Andrea): se le agregó el «Paso 2b —
   Pendientes → tickets» (CC los carga directo con truefie_cc; sin la clave, ensayo
   + pegado) y la sección Pendientes del bloque lleva el T-<n> de cada línea.
-  Rotulados ahí mismo. El resto del cuerpo sigue
-  siendo textual.
+  Rotulados ahí mismo.
+  ⚠ MODIFICADA el 2026-10-20 (decisión de Andrea, T-171): Andrea y Lorena publican a
+  main sin el OK de la otra (Contexto de rutas y Paso 1) y se agregó el «Paso 2c — Aviso
+  a la otra socia». Rotulado ahí mismo. El resto del cuerpo sigue siendo textual.
 ─────────────────────────────────────────────────────────────────────── -->
 
 # /cierre — cierre técnico + bitácora
@@ -55,7 +57,8 @@ que se olvidó → `main` se movió por web sin que nadie lo notara).
 - La bitácora es `Conciliacion/BITACORA.md` (gitignored → escribirla NO genera
   commit). El checklist técnico es `Conciliacion/CIERRE_TECNICO.md`.
 - Ramas: `dev` = respaldo del trabajo en curso (push SIEMPRE acá). `main` = lo
-  que GitHub Pages publica (solo se mueve con decisión explícita de Andrea).
+  que GitHub Pages publica (lo mueve Andrea o Lorena, cualquiera de las dos sin
+  autorización de la otra; se avisan si toca el trabajo de la otra — 20-oct, T-171).
 
 ## Paso 0 — Respaldo de las skills (AGREGADO el 2026-09-04, no venía en el original)
 
@@ -103,7 +106,8 @@ de secretos sobre el diff (keys, tokens, datos bancarios, correos personales) �
 commit con mensaje descriptivo → **push a `dev`** → actualizar la constante
 `BUILD` (inicio del bloque JS de `index.html`) a la fecha de hoy.
 
-- **NO mergear a `main`** salvo que Andrea lo diga explícito en esta sesión.
+- **NO publicar a `main`** salvo que la socia de la sesión —Andrea o Lorena— lo diga
+  explícito en esta sesión. Ninguna necesita el OK de la otra (20-oct, T-171).
 - Si el chequeo de secretos encuentra algo, PARÁ y avisá antes de commitear.
 
 ## Paso 2 — Estado REAL del remoto (no suponer el local)
@@ -158,6 +162,32 @@ módulo (Finanzas, Operaciones, Entregas, Compras, Personal, o General si no tie
    cierres con su evidencia, y —si se revisaron propios— los tres grupos (CC · Instinct · Andrea) con los
    mensajes para Instinct listos para copiar (mismo formato que el /retomar).
 
+## Paso 2c — Aviso a la otra socia (AGREGADO el 2026-10-20, decisión de Andrea, T-171)
+
+Andrea y Lorena tienen el mismo poder de decisión: cualquiera publica a `main` sin el OK de la otra.
+A cambio, **se avisan** cuando lo publicado toca o puede tocar el trabajo de la otra. Este paso arma
+ese aviso; **no lo manda** (mandarlo es de la socia).
+
+1. **¿Se publicó hoy?** Si `main` no se movió en esta sesión, el paso termina acá: sin aviso.
+2. **¿Toca lo de la otra?** Mirar lo publicado (`git -C Conciliacion diff --stat <main antes> <main ahora>`
+   y el diff de `index.html`). Toca si cae en cualquiera de estos:
+   - la zona o el módulo de la otra (Lorena: Personal —CSS `.vac-`/`.cal-`/`.per-`, sus vistas,
+     `PER_TABS`…—; Andrea: el resto, salvo que la bitácora diga otra cosa);
+   - una rama de la otra que ahora tenga conflicto con `main`, o un número de BUILD que ella esté usando;
+   - algo compartido: el login, el inicio, los tokens del tema, `CLAUDE.md`, `CIERRE_TECNICO.md`, las
+     skills, o un SQL / esquema que lean sus pantallas.
+   Si no toca nada: una línea en el resumen, «Publicado b<NN>: no toca el trabajo de <la otra>.»
+3. **Si toca**: el aviso, listo para copiar, en el lenguaje de las socias (sin hashes ni nombres de
+   funciones, sin montos ni datos de personas):
+   ```
+   <Lorena|Andrea>: publiqué b<NN> en Truefie.
+   Qué cambia: <una o dos líneas, en palabras de pantalla>.
+   Te toca porque: <qué de tu trabajo roza: módulo, rama, número de BUILD>.
+   Qué conviene que hagas: <nada | traer main a tu rama antes de seguir | usar el b<NN+1> | mirar X>.
+   ```
+4. Va al final del Paso 4, junto al resumen de tickets, con un renglón: «Aviso para <la otra>, listo para
+   mandar». En la bitácora, una línea en «Qué se hizo hoy»: «Aviso a <la otra> por b<NN>: armado».
+
 ## Paso 3 — Armar el bloque de bitácora
 
 Formato fijo, 4 secciones. Redactá el contenido a partir de lo que pasó en la
@@ -184,8 +214,8 @@ sesión (no inventar; si una sección queda vacía, escribí "—").
 
 ## Paso 4 — Mostrar y ESPERAR OK
 
-Mostrá el resultado del Paso 1 (checklist), el del Paso 2 (estado real) y el
-bloque del Paso 3. Terminá preguntando si lo escribe tal cual o si quiere
+Mostrá el resultado del Paso 1 (checklist), el del Paso 2 (estado real), el aviso
+del Paso 2c si lo hay, y el bloque del Paso 3. Terminá preguntando si lo escribe tal cual o si quiere
 ajustar. **No escribas nada en BITACORA.md todavía.**
 
 ## Paso 5 — Escribir (solo con OK explícito)

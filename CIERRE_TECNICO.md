@@ -84,7 +84,12 @@ Este checklist se corre al final de **toda sesión donde se tocó código**, sin
    5. Lo que la base no deja, nunca: descartar, posponer, reabrir, criterio, cambiar o borrar. Eso es
       de las socias, desde la pantalla.
 
-7. **¿Publicar?** Solo si Andrea lo dice explícito → `merge dev → main` + push. Si no, `main` se queda sirviendo la versión publicada vieja.
+7. **¿Publicar?** Solo si la socia de la sesión —Andrea o Lorena— lo dice explícito → a `main` + push.
+   Si no, `main` se queda sirviendo la versión publicada vieja. **Andrea y Lorena tienen el mismo poder
+   de decisión** (Andrea, 20-oct-2026, T-171): cualquiera de las dos publica sin la autorización de la
+   otra. Lo que sí es obligatorio es **avisarse** cuando lo publicado toque o pueda tocar el trabajo de
+   la otra (sus módulos, sus ramas, archivos compartidos, el esquema o el número de BUILD): el `/cierre`
+   arma ese aviso listo para mandar.
 
 ## Contexto de ramas
 
@@ -97,4 +102,5 @@ Este checklist se corre al final de **toda sesión donde se tocó código**, sin
   ⚠️ `git branch X origin/main` deja el upstream apuntando a **`main`**: un
   `git push` pelado publica sin querer. Medido al armar b57. Se desarma con
   `git branch --unset-upstream`, o se evita creando la rama con `--no-track`.
-- **`main`** — la versión publicada. GitHub Pages la sirve. Solo se mueve con decisión explícita de Andrea.
+- **`main`** — la versión publicada. GitHub Pages la sirve. La mueve Andrea o Lorena, cualquiera de las
+  dos sin la autorización de la otra, avisándose si toca el trabajo de la otra (20-oct-2026, T-171).

@@ -250,7 +250,10 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
 [`CIERRE_TECNICO.md`](CIERRE_TECNICO.md) **sin que haya que pedirlo**.
 
 - El **push va a `dev`** (respaldo, siempre).
-- A **`main`** solo con **decisión explícita de Andrea** (`main` sirve la versión publicada por GitHub Pages).
+- A **`main`** solo con **decisión explícita de una socia —Andrea o Lorena—** (`main` sirve la versión
+  publicada por GitHub Pages). Las dos tienen el mismo poder de decisión (Andrea, 20-oct-2026, T-171):
+  cualquiera publica sin la autorización de la otra, y se avisan cuando lo publicado toque o pueda tocar
+  el trabajo de la otra. El `/cierre` arma ese aviso.
 
 ## Seguridad
 
