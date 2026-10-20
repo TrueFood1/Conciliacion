@@ -502,6 +502,50 @@ confirmado que la contadora haya confirmado esta regla.**
 
 ---
 
+## P12 · ✅ PUBLICADO · «Mis solicitudes» carga · BUILD b115 · 20-oct-2026
+
+**Qué se publicó.** Opción B del arreglo de `incapacidad_origen`: «Mis solicitudes»
+dejó de pedirle a `v_rrhh_permiso` una columna que esa vista **nunca tuvo**, así que
+la lista vuelve a cargar con la cuenta de una empleada y el botón **Cancelar** queda
+alcanzable. Tres líneas de `index.html`: el sello, el `select` de la línea 7389 y el
+mapeo de 7414. Más el chequeo nuevo `herramientas/sonda_front.py` (paso 7 de
+`CIERRE_TECNICO.md`), el caso de incapacidad en las pruebas de render, la marca del
+pegado 6 corregida y la nota [[P11]].
+
+| | |
+|---|---|
+| **BUILD** | `v 20 oct 2026 · b115` |
+| **commit en main** | `2a6c9d3` (avance rápido desde `f9e3ead`, sin merge extra) |
+| **rama de trabajo** | `arreglo-solicitudes-b114` · SHA `2a6c9d3a1ddcb4f385e8abc755dcfc224ba12000` · borrada del remoto el 20-oct (0 commits únicos) |
+| **autorización** | OK de Lorena, 20-oct-2026 |
+
+**El número de BUILD se corrió a b115 por una colisión real.** Mientras la rama se
+armaba, Andrea publicó su propio **b114** (`f9e3ead`, T-148). Las dos habíamos escrito
+el mismo texto en `const BUILD`, así que **la integración no dio conflicto**: git no vio
+diferencia donde sí había una colisión de número. Si el sello se hubiera dejado en
+b114, dos versiones distintas se habrían llamado igual. Lección para la próxima: el
+número de BUILD hay que volver a mirarlo **después** del último `fetch`, no cuando se
+crea la rama.
+
+**Chequeos, antes de tocar `main`** (los dos que consultan producción, corridos de
+nuevo sobre el archivo ya integrado): `loadcheck` 0 · `esquema_check` «se puede
+publicar», 0 dependencias nuevas · `sonda_columnas` 0 · pruebas de render **36 OK / 0
+FALLA** · `sonda_front` **0 faltantes** en 66 objetos y 393 columnas.
+
+**Verificado desde afuera**, no sólo desde git: Pages sirve un `index.html` con md5
+`e77dee63893fe407aa803dd4ca7523dc`, **byte-idéntico** al blob de `main`
+(`eec902e9…`), con el sello `b115` y el `select` ya sin la columna. La primera
+consulta todavía devolvió el b114 — Pages tarda en desplegar, así que mirar una sola
+vez no alcanza. `dev` quedó en `ccda5ba`, donde estaba.
+
+⚠️ **Lo que todavía nadie probó con el dedo:** la solicitud de prueba del
+**12-feb-2027** sigue pendiente en producción y el botón **Cancelar nunca se usó**. Es
+el único botón nuevo que escribe. No se cancela por SQL: el texto «Cancelada por vos»
+sale de `rrhh_evento_anulado.creado_por` y una cancelación hecha a mano lo haría
+mentir.
+
+---
+
 ## P11 · 🟠 ABIERTO · El selector de origen de la incapacidad arranca SIEMPRE vacío (va con la opción A)
 
 **Síntoma exacto:** en la bandeja de aprobación de las socias (Calendario), cuando
