@@ -130,7 +130,15 @@ _solMias=[
   {k:'permiso', id:14, tipo:'Permiso',  ini:'2026-10-08', fin:'2026-10-08', dias:1,
    estado:'aprobado', por:'lorena@example.invalid'},
   {k:'permiso', id:15, tipo:'Permiso',  ini:'2026-10-09', fin:'2026-10-09', dias:1,
-   estado:'rechazado', por:'lorena@example.invalid'}
+   estado:'rechazado', por:'lorena@example.invalid'},
+  // b115 · UNA INCAPACIDAD SIN `origen`, que es lo que produce el codigo nuevo.
+  // «Mis solicitudes» dejo de pedir `incapacidad_origen` porque la vista
+  // `v_rrhh_permiso` NUNCA tuvo esa columna y la consulta entera fallaba (42703).
+  // Sin la clave, el renglon tiene que decir «Incapacidad» a secas: ni
+  // «undefined», ni un parentesis vacio. La fila va `aprobado` para no mover la
+  // cuenta de botones de Cancelar de las pruebas de arriba.
+  {k:'permiso', id:16, tipo:'Permiso',  ini:'2026-10-12', fin:'2026-10-12', dias:1,
+   estado:'aprobado', por:'lorena@example.invalid', mod:'incapacidad'}
 ];
 _solMiasRender();
 var H=_SALIDA['solMias'].innerHTML;
@@ -150,6 +158,10 @@ ok('en las propias NO se imprime el correo propio',
    H.indexOf('daniel@example.invalid')<0, 'aparece el correo del dueño');
 ok('ningun NaN ni undefined en la lista',
    H.indexOf('NaN')<0 && H.indexOf('undefined')<0);
+ok('la incapacidad SIN origen dice «Incapacidad»', H.indexOf('Incapacidad')>=0);
+ok('y NO le cuelga ningun parentesis de origen',
+   H.indexOf('Incapacidad (')<0, 'quedo un parentesis despues de «Incapacidad»');
+ok('ni un parentesis vacio en toda la lista', H.indexOf('()')<0);
 
 print('');
 print('── el vacio ──');

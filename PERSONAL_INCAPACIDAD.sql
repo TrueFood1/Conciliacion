@@ -1,6 +1,26 @@
 -- ════════════════════════════════════════════════════════════════════════
 -- MÓDULO PERSONAL · INCAPACIDADES   (PEGADO 6)
--- Preparado el 3-oct-2026. NO SE CORRIO.
+-- Preparado el 3-oct-2026.
+-- ⚠️ 20-oct-2026 · LA MARCA «NO SE CORRIO» ERA FALSA, Y SE CORRIGE A MEDIAS A
+--    PROPOSITO. Medido en produccion ese dia, solo lectura con la anon key:
+--    las DIEZ columnas que este pegado agrega YA EXISTEN —rrhh_permiso
+--    (incapacidad_origen, incapacidad_boleta), v_rrhh_permiso_dia (dia_n,
+--    incapacidad_origen), v_rrhh_pago (incapacidades, incap_n) y las de
+--    v_rrhh_pago_detalle—, asi que el `alter` y los `replace` de este archivo
+--    corrieron. Es la SEGUNDA marca «NO SE CORRIO» que miente: la del pegado 9
+--    bloqueo el trabajo cuatro dias en octubre.
+--
+--    NO dice «APLICADO» porque TRES cosas NO se pudieron verificar con la anon
+--    key, y afirmar mas de lo medido es como nacio este problema:
+--      · los 6 parametros `clave like 'incap%'` de rrhh_param (son FILAS, y la
+--        tabla esta cerrada: la sonda ve columnas, no valores)
+--      · el CHECK `rrhh_permiso_incap_ok`
+--      · que `rrhh_permiso_modalidad_ok` acepte 'incapacidad'
+--    Las tres las contesta la FILA DE CONTROL de la seccion 6 de este archivo
+--    (el `select` de abajo, que es de solo lectura y se puede correr suelto en
+--    el SQL Editor). ESPERADO: 2 · 1 · 1 · 6 · 3 · 0 · 0.
+--    Hasta que alguien la corra y pegue el resultado, el estado real de este
+--    pegado es: esquema SI, reglas y parametros SIN CONFIRMAR.
 -- Va DESPUES de PERSONAL_PAGO_QUINCENA.sql (pegado 5), que YA ESTA APLICADO y
 -- NO SE TOCA. Todo lo de aca es alter/replace sobre lo que ese dejo.
 --

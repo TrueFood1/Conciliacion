@@ -7386,7 +7386,7 @@ async function solMias(force){
     const c=sbClient();
     const [rp,rv,ra]=await Promise.all([
       c.from('v_rrhh_permiso')
-       .select('id,fecha_inicio,fecha_fin,dias,motivo,estado,resolucion_nota,resuelto_por,modalidad_descuento,horas,incapacidad_origen')
+       .select('id,fecha_inicio,fecha_fin,dias,motivo,estado,resolucion_nota,resuelto_por,modalidad_descuento,horas')
        .eq('persona_id',yo.id),
       c.from('v_rrhh_evento_estado').select('id,fecha,dias,motivo,estado,aprobado_por')
        .eq('persona_id',yo.id).eq('tipo','vacaciones'),
@@ -7411,8 +7411,7 @@ async function solMias(force){
       .concat((rp.data||[]).map(function(r){ return {k:'permiso', id:r.id,
         tipo:'Permiso', ini:r.fecha_inicio, fin:r.fecha_fin,
         dias:r.dias, motivo:r.motivo, estado:r.estado, nota:r.resolucion_nota, por:r.resuelto_por,
-        mod:r.modalidad_descuento, horas:(r.horas===null?null:Number(r.horas)),
-        origen:r.incapacidad_origen}; }))
+        mod:r.modalidad_descuento, horas:(r.horas===null?null:Number(r.horas))}; }))
       .concat((rv.data||[]).map(function(r){ return {k:'vacacion', id:r.id,
         anuPor:anuPor[r.id], tipo:'Vacación', ini:r.fecha,
         fin:_perISO(_perMasDias(_perDe(r.fecha),(Number(r.dias)||1)-1)), dias:Number(r.dias)||1,
