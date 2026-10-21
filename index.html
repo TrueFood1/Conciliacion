@@ -26023,13 +26023,35 @@ function _mesAnioDe(txt){
   const m=_RX_MES_ANIO.exec(txt||''); if(!m) return null;
   return m[2]+'-'+String(_MESTXT[m[1].toLowerCase()]).padStart(2,'0');
 }
+// Mes anterior a una fecha 'YYYY-MM-DD…' → 'YYYY-MM'. Automercado factura el frío al mes vencido.
+function _mesAnterior(f){
+  let y=+String(f).slice(0,4), m=+String(f).slice(5,7)-1; if(m===0){ m=12; y--; }
+  return y+'-'+String(m).padStart(2,'0');
+}
+// Las líneas de frío de un XML de FE para el mes `ym` (Andrea, 21-oct-2026): el mes es el que dice el
+// detalle («ESPACIO CONGELADO AM AGOSTO 2026»); si no dice, el mes ANTERIOR a la fecha de emisión de la
+// FE, y la línea sale marcada `porRegla` para que la vista lo avise. Sin fecha ni mes, no entra.
+function _frioLineasXml(xml, k, rx, ym){
+  const out=[], fe=/<(?:\w+:)?FechaEmision\b[^>]*>([\s\S]*?)<\/(?:\w+:)?FechaEmision>/i.exec(xml);
+  const fecha=fe?fe[1].trim().slice(0,10):'';
+  const re=/<(?:\w+:)?LineaDetalle\b[^>]*>([\s\S]*?)<\/(?:\w+:)?LineaDetalle>/gi; let m;
+  while((m=re.exec(xml))){
+    const det=/<(?:\w+:)?Detalle\b[^>]*>([\s\S]*?)<\/(?:\w+:)?Detalle>/i.exec(m[1]);
+    const sub=/<(?:\w+:)?SubTotal\b[^>]*>([\s\S]*?)<\/(?:\w+:)?SubTotal>/i.exec(m[1]);
+    if(!det || !rx.test(det[1])) continue;
+    const delDetalle=_mesAnioDe(det[1]), mes=delDetalle || (fecha?_mesAnterior(fecha):null);
+    if(mes!==ym) continue;
+    out.push({fe:k, fecha:fecha, detalle:det[1].trim(), monto:sub?(+sub[1]||0):0, porRegla:!delDetalle});
+  }
+  return out;
+}
 // Devuelve {monto, fuente:'parseo'|'fe'|'constante', aviso:''} para el canal en el mes [D1,D2].
 async function canalFrioMes(c, D1, D2){
   const base=canalFrio(c);
   if(!c.frio || !c.frioPartner) return {monto:base, fuente:'constante', aviso:''};
   if(c.frio.modo==='feDetalle'){
-    // El mes lo dice el detalle de la FE, no ninguna fecha: se leen todas las FE del partner y se
-    // suman las líneas de frío cuyo texto nombra el mes pedido.
+    // El mes lo dice el detalle de la FE (o, si no lo dice, el mes anterior a la FE, con aviso): se
+    // leen todas las FE del partner y se suman las líneas de frío de ese mes (_frioLineasXml).
     let vs=[];
     try{
       vs=await odooCall('electronic.voucher.supplier','search_read',
@@ -26042,18 +26064,16 @@ async function canalFrioMes(c, D1, D2){
     for(const v of (vs||[])){
       const k=v.consecutive_number_xml||''; if(k && vistas[k]) continue; vistas[k]=1;   // la misma FE cargada dos veces cuenta una
       const xml=_xmlDeVoucher(v); if(!xml) continue;
-      const re=/<(?:\w+:)?LineaDetalle\b[^>]*>([\s\S]*?)<\/(?:\w+:)?LineaDetalle>/gi; let m;
-      while((m=re.exec(xml))){
-        const det=/<(?:\w+:)?Detalle\b[^>]*>([\s\S]*?)<\/(?:\w+:)?Detalle>/i.exec(m[1]);
-        const sub=/<(?:\w+:)?SubTotal\b[^>]*>([\s\S]*?)<\/(?:\w+:)?SubTotal>/i.exec(m[1]);
-        if(!det || !rx.test(det[1]) || _mesAnioDe(det[1])!==ym) continue;
-        lineas.push({fe:k, detalle:det[1].trim(), monto:sub?(+sub[1]||0):0});
-      }
+      _frioLineasXml(xml, k, rx, ym).forEach(function(x){ lineas.push(x); });
     }
     if(!lineas.length) return {monto:base, fuente:'constante',
       aviso:'no hay FE de frío de '+c.label+' para este mes: va el respaldo '+cM(base)+' sin IVA'};
+    const avisos=[];
+    if(lineas.length>1) avisos.push(lineas.length+' líneas de frío para el mismo mes');
+    lineas.filter(function(x){ return x.porRegla; }).forEach(function(x){
+      avisos.push('la FE '+x.fe+' no dice el mes: se toma el anterior a su fecha ('+x.fecha+')'); });
     return {monto:lineas.reduce(function(s,x){ return s+x.monto; },0), fuente:'fe', n:lineas.length, lineas:lineas,
-      aviso: lineas.length>1 ? (lineas.length+' líneas de frío para el mismo mes') : ''};
+      aviso: avisos.join(' · ')};
   }
   let ls=[];
   try{
