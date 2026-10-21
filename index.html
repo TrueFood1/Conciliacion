@@ -22753,6 +22753,9 @@ function cpDesdeCero(id){
 // · La TARJETA (modo «factura_nueva») solo aparece si hay algo que actualizar o fuera de banda, y
 //   el servidor no le da líneas hasta que exista la corrección inicial: nunca muestra el atraso.
 // · La CORRECCIÓN INICIAL (modo «inicial», una vez) solo se ve con ?tarifas=inicial en la dirección.
+// · Desde el 21-oct (opción A, umbral 25 %) la tarjeta pide el modo «historial»: la última factura contra la
+//   ANTERIOR del mismo proveedor. Hasta 25 % la cambia sola la revisión diaria y no se muestra; acá queda lo
+//   que necesita el clic de una socia («tarjeta») o mirarse a mano («fuera_de_banda»), y los avisos de lectura.
 let _cpTar=null;    // {modo, r, cargando, msg, msgCls, enviando, en}
 const CP_TAR_INICIAL=/[?&]tarifas=inicial\b/.test(location.search);
 // UN POST al servicio de escritura con un cuerpo propio de la ruta (tarifas, barrido). {st, js} o
@@ -22774,7 +22777,7 @@ async function escrituraTarifas(cuerpo){ return _escrituraPost('/tarifas', cuerp
 async function cpTarCargar(forzar){
   if(_socia!==true) return;
   if(!forzar && _cpTar && _cpTar.en && Date.now()-_cpTar.en < 5*60000) return;
-  const modo=CP_TAR_INICIAL ? 'inicial' : 'factura_nueva';
+  const modo=CP_TAR_INICIAL ? 'inicial' : 'historial';
   _cpTar=Object.assign({}, _cpTar||{}, {modo:modo, cargando:true});
   const R=await escrituraTarifas({modo:modo});
   _cpTar.cargando=false; _cpTar.en=Date.now();
@@ -22790,7 +22793,8 @@ const _cpTarCol=function(n){ return n==null?'—':'₡'+_rzN(n, 2); };
 // r.proveedores. El mensaje del último clic va en la tarjeta de ESE proveedor (T.msgProv).
 function _cpTarCardHtml(T, r, prov, titulo, inicial){
   const msg=(T.msgProv===prov)?T.msg:'', cls=(T.msgProv===prov)?(T.msgCls||''):'';
-  const ver=(r.lineas||[]).filter(function(l){ return l.estado==='actualiza' || l.estado==='fuera_de_banda'; });
+  const ver=(r.lineas||[]).filter(function(l){ return l.estado==='actualiza' || l.estado==='tarjeta' || l.estado==='fuera_de_banda'; });
+  const fuera=ver.filter(function(l){ return l.estado==='fuera_de_banda'; }).length;
   if(!ver.length && !msg) return '';
   let h='<div class="cp-card cp-tar"><div class="cp-st2">'+esc(titulo)+'</div>';
   if(ver.length){
@@ -22799,10 +22803,11 @@ function _cpTarCardHtml(T, r, prov, titulo, inicial){
     h+='<table class="cp-tartbl"><thead><tr><th>Insumo</th><th>Hoy</th><th>Factura</th><th>Queda'+(unaU&&u0?(' /'+esc(u0)):'')+'</th></tr></thead><tbody>'
       +ver.map(function(l){ const fuera=(l.estado==='fuera_de_banda');
         return '<tr><td>'+esc(l.producto)+'</td><td>'+esc(_cpTarCol(l.precio_actual))+'</td>'
-          +'<td><span class="cp-g" title="'+esc(l.factura_fecha||'')+'">'+esc(l.factura_nombre||'—')+'</span></td>'
+          +'<td><span class="cp-g" title="'+esc((l.factura_fecha||'')+(l.anterior_nombre?(' · anterior '+l.anterior_nombre+' '+_cpTarCol(l.precio_anterior)):' · sin factura anterior'))+'">'+esc(l.factura_nombre||'—')+'</span></td>'
           +'<td'+(fuera?' class="cp-amb3"':'')+'>'+esc(_cpTarCol(l.precio_nuevo)+(unaU?'':('/'+(l.unidad||''))))+'</td></tr>'; }).join('')
       +'</tbody></table>';
-    if(r.fuera_de_banda) h+='<div class="cp-msg cp-amb3">Fuera de banda ('+String(r.banda[0]).replace('.',',')+'× a '+String(r.banda[1]).replace('.',',')+'×): no se aplica.</div>';
+    if(fuera) h+='<div class="cp-msg cp-amb3">Fuera de banda ('+String(r.banda[0]).replace('.',',')+'× a '+String(r.banda[1]).replace('.',',')+'×'
+      +(r.umbral!=null?' de la factura anterior':'')+'): no se aplica.</div>';
     if(r.aplicables) h+='<div class="cp-btns"><button class="cp-btn cp-btnp"'+(T.enviando?' disabled':'')+' onclick="cpTarAplicar('+(+prov)+')">'
       +(inicial?'Aplicar corrección inicial · ':'Actualizar ')+r.aplicables+' tarifa'+(r.aplicables===1?'':'s')+'</button></div>';
   }
@@ -22813,6 +22818,13 @@ const CP_TAR_BIO=948;
 function cpTarifasHtml(){
   const T=_cpTar; if(!T || !T.r || _socia!==true) return '';
   const r=T.r, inicial=(T.modo==='inicial');
+  if(T.modo==='historial'){
+    // Si el servicio no pudo leer facturas, se dice: nunca una tarjeta vacía que parezca «al día» (Lusof).
+    const av=(r.avisos||[]);
+    return (av.length?'<div class="cp-card cp-tar"><div class="cp-st2">Tarifas de proveedor</div>'
+             +av.map(function(a){ return '<div class="cp-msg cp-amb3">'+esc(a.texto)+'</div>'; }).join('')+'</div>':'')
+      +(r.proveedores||[]).map(function(p){ return _cpTarCardHtml(T, p, p.proveedor_id, 'Tarifas de '+(p.proveedor||('proveedor '+p.proveedor_id)), false); }).join('');
+  }
   if(inicial && r.inicializado) return T.msg ? '<div class="cp-card cp-tar"><div class="cp-st2">Tarifas de BIO</div><div class="cp-msg '+(T.msgCls||'')+'">'+esc(T.msg)+'</div></div>' : '';
   return _cpTarCardHtml(T, r, CP_TAR_BIO, inicial?'Tarifas de BIO · corrección inicial':'Tarifas de BIO', inicial)
     +(inicial?'':(r.proveedores||[]).map(function(p){ return _cpTarCardHtml(T, p, p.proveedor_id, 'Tarifas de '+(p.proveedor||('proveedor '+p.proveedor_id)), false); }).join(''));
@@ -22827,12 +22839,13 @@ const CP_TAR_MOTIVO={
   sin_rol:'Solo para socias.',
   // Estas dos dejan algo CAMBIADO en Odoo: el texto del servidor dice cuáles, y va entero.
   rastro_truefie:'Las tarifas SÍ se cambiaron en Odoo, pero no quedó el rastro en Truefie.',
+  historial_truefie:'Las tarifas SÍ se cambiaron en Odoo, pero no quedaron en el historial de Truefie.',
   tarifa_distinta:'Odoo no dejó el precio esperado.'};
 // El clic manda SOLO la huella de la tarjeta: de qué proveedor es lo decide el servidor (20-oct).
 async function cpTarAplicar(prov){
   const T=_cpTar; if(!T || !T.r || T.enviando) return;
   prov=+prov||CP_TAR_BIO;
-  const r=(prov===CP_TAR_BIO)?T.r:(T.r.proveedores||[]).filter(function(p){ return +p.proveedor_id===prov; })[0];
+  const r=(prov===CP_TAR_BIO && T.modo!=='historial')?T.r:(T.r.proveedores||[]).filter(function(p){ return +p.proveedor_id===prov; })[0];
   if(!r) return;
   T.enviando=true; T.msgProv=prov; T.msg='Aplicando en Odoo…'; T.msgCls=''; cpRender();
   const R=await escrituraTarifas({modo:T.modo, confirmar:true, huella:r.huella});
@@ -22844,7 +22857,7 @@ async function cpTarAplicar(prov){
       +c.map(function(x){ return x.producto+' '+_cpTarCol(x.ahora); }).join(' · ')+'.';
     T.msgCls='cp-ok';
   } else {
-    const m=R.js.motivo, conTexto=(!CP_TAR_MOTIVO[m] || m==='rastro_truefie' || m==='tarifa_distinta');
+    const m=R.js.motivo, conTexto=(!CP_TAR_MOTIVO[m] || m==='rastro_truefie' || m==='historial_truefie' || m==='tarifa_distinta');
     T.msg=(CP_TAR_MOTIVO[m]||'No se aplicó.')+(conTexto&&R.js.texto?(' '+R.js.texto):'');
     T.msgCls=(m==='tarifa_apagada'||m==='huella_vieja')?'cp-amb2':'cp-mal';
   }
