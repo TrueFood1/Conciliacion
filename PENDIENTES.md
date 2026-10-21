@@ -33,6 +33,60 @@ Si se redondea solo en el `toLocaleString` de la vista, es el primero.
 
 ---
 
+## F2 · Finanzas · Frío de Automercado: pasar a la fecha de la FE cuando haya permiso
+
+Anotado por Andrea el 20-oct-2026.
+
+**Hoy.** Rentabilidad lee el frío de Automercado del mayor (write-off en `6106013`,
+÷ 1,13) y le asigna el mes de servicio con una aproximación: el mes anterior al de
+**(fecha del pago − 25 días)** (`_frioMesVencido`, modo `writeoffVencido` en
+`CANALES`). Calza con los cuatro cargos conocidos, pero es una regla sobre la fecha
+del PAGO, no sobre la del cobro.
+
+**Lo correcto.** Usar la **fecha de emisión de la FE que Automercado le emite a True
+Food** (`electronic.voucher.supplier`, partner 713, `date_issuance`): mes de servicio
+= mes anterior a esa fecha.
+
+**Lo que falta.** Que el usuario de lectura tenga permiso sobre
+`electronic.voucher.supplier`. Hoy `odoo_read.py` devuelve «Contact your
+administrator to request access». Antes de cambiarlo, medir si las FE de Automercado
+están cargadas en ese modelo.
+
+**ABIERTO (20-oct): qué mes cubre cada cargo.** La regla de los 25 días sale de dos
+facturas electrónicas de Automercado que, según el buscador del correo, nombran el
+mes anterior (la del 21-jul dice «junio» y la del 20-ago dice «julio»). No sale de
+leer el documento. Andrea llama al cargo del 2-oct (PBACC/2026/00851, ₡616.302,09)
+«frío de octubre», y la regla lo pone en agosto. En Odoo ese asiento no dice ningún
+mes: sus líneas son «Pago de cliente … 02/10/2026» y «Write-Off», su ref es la
+factura 3489, y el chatter solo dice «Asiento contable creado» (Keylor, 13-oct). Lo
+decide el detalle de la FE de Automercado del 17-sep.
+
+---
+
+## F3 · Finanzas · Rentabilidad usa la CIFRA FIJA de frío en los 3 canales desde el 13-ago
+
+Medido el 20-oct-2026.
+
+**Qué pasa.** `reporteRenta` calcula el frío por unidad con `canalFrio(c)`, que
+devuelve el `monto` o `porTienda × unidades_cobro` del canal. `canalFrioMes()`
+—la función que lee el mayor y parsea el mes de servicio— **no se llamaba desde
+ningún lado**. Así que desde el 13-ago Automercado iba con ₡612.726,83 (con IVA),
+Compre Bien con ₡76.500 y MegaSuper con ₡2.709,19 × 10, todos los meses.
+
+**Lo que dice el commit `e631cdd` (13-ago).** *«Compre Bien y MegaSuper escriben el
+mes en el texto de cada línea: canalFrioMes() lo parsea y suma solo las líneas del
+mes pedido»* y *«por eso este canal se lee del mayor»*. Eso describe la función, no
+lo que hacía Rentabilidad: la función se escribió y nunca se conectó. El ✓ de esa
+vez fue citado, no corrido (regla madre «una salvaguarda CITADA no es una salvaguarda
+VERIFICADA»).
+
+**Estado.** En la rama `frio-auto` (sin publicar) Automercado pasa a leerse del
+mayor. **Compre Bien y MegaSuper siguen con su cifra fija.** Para conectarlos hay
+que llamar a `canalFrioMes` también para el modo `parseMes`, y antes medir qué da su
+parseo mes a mes contra la cifra fija, porque les va a mover el margen.
+
+---
+
 ## O1 · Operaciones · El Planificador BLOQUEA el tope de batches, y debería avisar
 
 Reportado por Andrea el 26-ago-2026.
