@@ -33,33 +33,29 @@ Si se redondea solo en el `toLocaleString` de la vista, es el primero.
 
 ---
 
-## F2 · Finanzas · Frío de Automercado: pasar a la fecha de la FE cuando haya permiso
+## F2 · Finanzas · Frío de Automercado leído de su FE: falta verlo andar en vivo
 
 Anotado por Andrea el 20-oct-2026.
 
-**Hoy.** Rentabilidad lee el frío de Automercado del mayor (write-off en `6106013`,
-÷ 1,13) y le asigna el mes de servicio con una aproximación: el mes anterior al de
-**(fecha del pago − 25 días)** (`_frioMesVencido`, modo `writeoffVencido` en
-`CANALES`). Calza con los cuatro cargos conocidos, pero es una regla sobre la fecha
-del PAGO, no sobre la del cobro.
+**Regla (Andrea, 20-oct).** El frío de Automercado se factura al mes vencido, y **el mes
+de servicio viene escrito en el detalle de su FE**. Caso que lo fijó: la FE
+00100099010000064770, emitida el 17-sep-2026, tiene una sola línea, «OV ESPACIO CONGELADO
+AM AGOSTO 2026», 1 × ₡545.400, total ₡616.302 con IVA. Es el write-off del 2-oct
+(PBACC/2026/00851). Rentabilidad suma el `<SubTotal>` sin IVA de las líneas «ESPACIO
+CONGELADO <MES> <AÑO>» (modo `feDetalle`, rama `frio-auto`). La regla anterior, «pago −
+25 días», se descartó.
 
-**Lo correcto.** Usar la **fecha de emisión de la FE que Automercado le emite a True
-Food** (`electronic.voucher.supplier`, partner 713, `date_issuance`): mes de servicio
-= mes anterior a esa fecha.
+**Lo que falta, antes de publicar.** El código lee `electronic.voucher.supplier`
+(`xml_supplier_approval`, partner 713) como ya lo hace Lusof, pero **nunca se vio
+contra Odoo real**: el usuario de lectura local no tiene permiso para ese modelo
+(«Contact your administrator…»). El ensayo corrió con un comprobante armado a mano
+con la línea de arriba. Hay que mirarlo en vivo con la sesión de una socia y
+confirmar dos cosas:
+1. que las FE de Automercado están cargadas en ese modelo a nombre del partner 713;
+2. que agosto da ₡545.400 «de su FE» y no «respaldo».
 
-**Lo que falta.** Que el usuario de lectura tenga permiso sobre
-`electronic.voucher.supplier`. Hoy `odoo_read.py` devuelve «Contact your
-administrator to request access». Antes de cambiarlo, medir si las FE de Automercado
-están cargadas en ese modelo.
-
-**ABIERTO (20-oct): qué mes cubre cada cargo.** La regla de los 25 días sale de dos
-facturas electrónicas de Automercado que, según el buscador del correo, nombran el
-mes anterior (la del 21-jul dice «junio» y la del 20-ago dice «julio»). No sale de
-leer el documento. Andrea llama al cargo del 2-oct (PBACC/2026/00851, ₡616.302,09)
-«frío de octubre», y la regla lo pone en agosto. En Odoo ese asiento no dice ningún
-mes: sus líneas son «Pago de cliente … 02/10/2026» y «Write-Off», su ref es la
-factura 3489, y el chatter solo dice «Asiento contable creado» (Keylor, 13-oct). Lo
-decide el detalle de la FE de Automercado del 17-sep.
+Si no están cargadas, la vista lo va a decir («no hay FE de frío…: va el respaldo
+₡542.400 sin IVA») todos los meses.
 
 ---
 
@@ -80,8 +76,8 @@ lo que hacía Rentabilidad: la función se escribió y nunca se conectó. El ✓
 vez fue citado, no corrido (regla madre «una salvaguarda CITADA no es una salvaguarda
 VERIFICADA»).
 
-**Estado.** En la rama `frio-auto` (sin publicar) Automercado pasa a leerse del
-mayor. **Compre Bien y MegaSuper siguen con su cifra fija.** Para conectarlos hay
+**Estado.** En la rama `frio-auto` (sin publicar) Automercado pasa a leerse de su
+FE (F2). **Compre Bien y MegaSuper siguen con su cifra fija.** Para conectarlos hay
 que llamar a `canalFrioMes` también para el modo `parseMes`, y antes medir qué da su
 parseo mes a mes contra la cifra fija, porque les va a mover el margen.
 
