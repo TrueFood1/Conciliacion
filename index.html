@@ -26056,7 +26056,9 @@ async function canalFrioMes(c, D1, D2){
     try{
       vs=await odooCall('electronic.voucher.supplier','search_read',
         [[['partner_id','=',c.frioPartner],['xml_supplier_approval','!=',false]]],
-        {fields:['consecutive_number_xml','xml_supplier_approval'],limit:200});
+        // order explícito: Automercado ya tiene más de 300 FE (casi todas tiquetes de compra) y sin él
+        // el límite dependía del orden por defecto del modelo; las de frío son de las más nuevas.
+        {fields:['consecutive_number_xml','xml_supplier_approval'],order:'id desc',limit:400});
     }catch(e){
       return {monto:base, fuente:'constante', aviso:'no pude leer las FE de '+c.label+' ('+((e&&e.message)||e)+'): va el respaldo '+cM(base)+' sin IVA'};
     }
@@ -26194,7 +26196,7 @@ async function reporteLogistica(D1,D2,cell,keyDe){
   const lu=await logLusofSemanal(D1,D2);
   for(const k in lu.porCanal) out.porCanal[k]=(out.porCanal[k]||0)+lu.porCanal[k];
   if(lu.total) out.detalle.push({q:'Lusof (BM + Compre Bien)', monto:lu.total, modo:'por semana de servicio'});
-  out.sinAsignar=lu.sinAsignar;
+  out.sinAsignar=lu.sinAsignar; out.lusofIlegibles=lu.ilegibles||[];
   if(lu.mentha) out.notas.push(LOG_SIN_ASIGNAR_NOTA);
   // (4) Don Jorge: par ingreso/gasto, el NETO a sus canales por su peso de venta
   const pag=await odooCall('account.move.line','read_group',
@@ -26213,10 +26215,36 @@ async function reporteLogistica(D1,D2,cell,keyDe){
   return out;
 }
 
+// La semana de servicio escrita en el <OtroTexto> de una FE de Lusof → {a, b} ('YYYY-MM-DD'), o null.
+// Formatos medidos en las 37 FE (21-oct-2026): «DEL 17 AL 21-8-26» (el de casi todas),
+// «DEL 30 MARZO AL 1 ABRIL 26» (mes con nombre, cruza de mes), «DEL 28 AL 2-10-26» (cruza de mes sin
+// decirlo) y «DEL 27-8-24» (un solo día).
+const _RX_LUSOF_SEM=new RegExp('DEL\\s+(\\d{1,2})(?:[\\s-]+('+Object.keys(_MESTXT).join('|')+'|\\d{1,2})\\b)?'
+  +'(?:[\\s-]+(\\d{2,4})\\b)?(?:\\s+AL\\s+(\\d{1,2})[\\s-]+('+Object.keys(_MESTXT).join('|')+'|\\d{1,2})[\\s-]+(\\d{2,4})\\b)?','i');
+function _lusofSemana(txt){
+  const m=_RX_LUSOF_SEM.exec(txt||''); if(!m) return null;
+  const mes=function(x){ return /^\d+$/.test(x) ? +x : _MESTXT[x.toLowerCase()]; };
+  const anio=function(x){ x=+x; return x<100 ? 2000+x : x; };
+  let d1=+m[1], m1=m[2]?mes(m[2]):null, y1=m[3]?anio(m[3]):null, d2, m2, y2;
+  if(m[4]){
+    d2=+m[4]; m2=mes(m[5]); y2=anio(m[6]);
+    // «DEL 28 AL 2-10-26»: sin mes de inicio y el día de inicio mayor → empezó el mes anterior (28-sep).
+    // El lector viejo la leía como 28-oct a 2-oct, una semana al revés que no juntaba ninguna venta.
+    if(m1==null) m1=(d1>d2) ? (m2===1?12:m2-1) : m2;
+    if(y1==null) y1=(m1>m2)?y2-1:y2;
+  }
+  else { if(m1==null || y1==null) return null; d2=d1; m2=m1; y2=y1; }
+  const ok=function(d,mm){ return mm>=1 && mm<=12 && d>=1 && d<=31; };
+  if(!ok(d1,m1) || !ok(d2,m2)) return null;
+  const f=function(y,mm,d){ return y+'-'+String(mm).padStart(2,'0')+'-'+String(d).padStart(2,'0'); };
+  const a=f(y1,m1,d1), b=f(y2,m2,d2);
+  return a<=b ? {a:a, b:b} : null;
+}
 // Reparto semanal de Lusof. El rango de fechas sale del <OtroTexto> del comprobante
-// electrónico (formato "SERVICIO DE TRANSPORTE DEL d AL d-m-aa"): 24 de 27 lo traen.
+// electrónico (_lusofSemana). Si una FE no trae una semana legible, su factura NO se salta en
+// silencio: va a `ilegibles` (si su fecha cae en el período) y Rentabilidad lo avisa (21-oct-2026).
 async function logLusofSemanal(D1,D2){
-  const res={porCanal:{}, total:0, sinAsignar:[], mentha:false};
+  const res={porCanal:{}, total:0, sinAsignar:[], ilegibles:[], mentha:false};
   let vs=[];
   try{
     vs=await odooCall('electronic.voucher.supplier','search_read',
@@ -26225,18 +26253,28 @@ async function logLusofSemanal(D1,D2){
   }catch(e){ return res; }   // sin acceso al comprobante → Lusof no se reparte (y no se inventa)
   const fs=await odooCall('account.move','search_read',
     [[['partner_id','=',LOG_LUSOF],['move_type','=','in_invoice'],['state','=','posted']]],
-    {fields:['ref','amount_untaxed'],limit:200});
+    {fields:['name','date','ref','amount_untaxed'],limit:200});
   const byRef={}; fs.forEach(f=>byRef[(f.ref||'').trim()]=f);
   for(const v of vs){
     const txt=_xmlDeVoucher(v); if(txt===null) continue;
     const ot=/<OtroTexto[^>]*>([\s\S]*?)<\/OtroTexto>/i.exec(txt);
-    const r=ot && /DEL\s+(\d{1,2})\s+AL\s+(\d{1,2})-(\d{1,2})-(\d{2})/i.exec(ot[1]);
-    if(!r) continue;
-    const y=2000+ +r[4], mo=+r[3];
-    const a=y+'-'+String(mo).padStart(2,'0')+'-'+String(+r[1]).padStart(2,'0');
-    const b=y+'-'+String(mo).padStart(2,'0')+'-'+String(+r[2]).padStart(2,'0');
-    if(b<D1 || a>D2) continue;                       // la semana no cae en el período
-    const f=byRef[v.consecutive_number_xml]; if(!f) continue;
+    const sem=_lusofSemana(ot?ot[1]:'');
+    const f=byRef[v.consecutive_number_xml];
+    if(!sem){
+      if(f && f.date>=D1 && f.date<=D2)
+        res.ilegibles.push({factura:f.name, fecha:f.date, monto:f.amount_untaxed,
+                            texto:((ot?ot[1]:'').trim().split('\n')[0]||'sin texto').slice(0,70)});
+      continue;
+    }
+    const a=sem.a, b=sem.b;
+    // Una semana que cruza de mes (30-mar al 1-abr) cuenta en UN solo mes: el que tiene más días de
+    // servicio (empate → el de inicio). Antes esas semanas no se leían; sin esto contaba en los dos.
+    const finMesA=new Date(Date.UTC(+a.slice(0,4), +a.slice(5,7), 0)).toISOString().slice(0,10);
+    const diasA=(Math.min(Date.parse(b), Date.parse(finMesA))-Date.parse(a))/864e5+1;
+    const diasB=(Date.parse(b)-Date.parse(a))/864e5+1-diasA;
+    const ancla=(diasB>diasA) ? b : a;
+    if(ancla<D1 || ancla>D2) continue;               // la semana no es de este período
+    if(!f) continue;
     const ls=await odooCall('account.move.line','search_read',
       [[['partner_id','in',Object.keys(LOG_LUSOF_CLI).map(Number).concat([887])],
         ['parent_state','=','posted'],['move_id.move_type','=','out_invoice'],
@@ -26394,7 +26432,18 @@ function rentaRender(R, label){
     +'<button class="rf-toggle" onclick="rentaFootToggle(this)">Cómo se calcula</button>'
     +'<div class="rf-body">'+foot+'</div></div>';
   _rentaR=R;                                  // el teléfono repinta su lista sin recalcular
-  el.innerHTML=_rentaMovHtml(R)+h;
+  el.innerHTML=_rentaLogAvisoHtml(R)+_rentaMovHtml(R)+h;
+}
+// Lo de Lusof que NO se pudo repartir, arriba de la tabla y en ámbar (21-oct-2026): una factura cuya
+// semana no se lee, o una semana sin ventas a BM ni a Compre Bien. Sin esto se perdían callados.
+function _rentaLogAvisoHtml(R){
+  const L=R.logi||{}, av=[];
+  (L.lusofIlegibles||[]).forEach(function(x){
+    av.push('Lusof: la factura '+esc(x.factura)+' ('+esc(x.fecha)+', '+cM(x.monto)+') no trae una semana legible («'
+      +esc(x.texto)+'»): no se repartió.'); });
+  (L.sinAsignar||[]).forEach(function(x){
+    av.push('Lusof: semana '+esc(x.sem)+' sin ventas a BM ni a Compre Bien: '+cM(x.monto)+' sin asignar.'); });
+  return av.length ? '<div class="renta-aviso" style="padding:8px 12px;font-size:12px;color:var(--warn)">'+av.join('<br>')+'</div>' : '';
 }
 // ── RENTABILIDAD EN TELÉFONO: un canal a la vez ──────────────────────────────
 // La matriz producto × canal no cabe en un teléfono sin volverse una tabla ancha. Acá se
