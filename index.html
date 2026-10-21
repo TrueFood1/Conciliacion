@@ -25922,12 +25922,23 @@ const CANALES = [
    comision:{pct:0.126, enFactura:true, fuente:'acuerdo comercial · confirmado por Andrea, 9-ago-2026',
              intro:{pct:0.1697, meses:3, motivo:'tarifa de introducción de producto nuevo'}},
    frioPartner:713,
-   frio:{monto:612726.83, modo:'constante', desvioMax:0.05,
-         fuente:'aviso de pago de Automercado del 3-ago-2026: factura 0010000101 0000003373 por '
-               +'₡1.800.739,66 − ND FACCLI-0061942 (22-jul) por ₡612.912 = depósito ₡1.187.827,66. '
-               +'En Odoo solo queda el write-off: NO hay factura ni nota de débito formal.',
-         nota:'Automercado no declara el mes de servicio en el texto, así que va por CONSTANTE. '
-             +'Si el write-off del mes difiere más de 5%, la validación lo avisa en ámbar.'}},
+   // FRÍO DE AUTOMERCADO DEL MAYOR, SIN IVA, AL MES VENCIDO (decisión de Andrea, 20-oct-2026).
+   // Automercado emite cada mes (~día 20) una FE por el frío del mes ANTERIOR y la descuenta del
+   // pago de una factura nuestra: en Odoo solo queda el «Write-Off» en 6106013, con la fecha del
+   // pago. Esa FE trae el IVA adentro (confirmado por Andrea en la del 20-ago: ₡542.400 + 13% =
+   // ₡612.912), así que el monto se divide entre FRIO_IVA_AUTO.
+   // Mes de servicio = mes anterior al de (fecha del pago − 25 días). Calza con los 4 cargos
+   // conocidos: 3-jul→mayo · 31-jul→junio · 4-sep→julio · 2-oct→agosto. La regla literal «mes
+   // anterior al pago» le daba dos cargos a junio y ninguno a julio.
+   // PENDIENTE (Andrea, 20-oct-2026): pasar a la FECHA DE EMISIÓN de la FE de Automercado
+   // (electronic.voucher.supplier, partner 713) cuando el usuario de lectura tenga ese permiso.
+   // Hoy no lo tiene y la regla de los 25 días es una aproximación a esa fecha.
+   // `monto` queda de respaldo SIN IVA (la FE de julio): se usa solo si el mes no tiene cargo, y
+   // la vista lo dice.
+   frio:{monto:542400, modo:'writeoffVencido', ivaIncluido:true, cuenta:'6106013', diasAtras:25,
+         fuente:'write-off de Automercado en 6106013 (descontado del pago), ÷ 1,13, asignado al mes '
+               +'de servicio — FE de Automercado del 20-ago-2026: ₡542.400 + IVA 13% = ₡612.912',
+         nota:'Antes iba la constante ₡612.726,83, CON IVA (promedio de los write-offs de julio).'}},
   {key:'walmart',label:'Walmart / Más x Menos', plId:10,
    // enFactura:true CORREGIDO el 12-ago-2026. Estaba en false y Rentabilidad le restaba el
    // 6,54% a un neto que YA lo traía descontado: doble conteo de ~6,5 puntos de margen.
@@ -26005,7 +26016,7 @@ const canalFrio = c => !c.frio ? 0 : (c.frio.porTienda ? c.frio.porTienda*(c.fri
 // ₡156.202 (mezcla de meses + la transitoria) y MegaSuper ₡39.110 (incluye el write-off de
 // mayo+junio). Leer el mayor a lo bruto da PEOR que la constante.
 // Compre Bien y MegaSuper escriben el mes en el texto de cada línea → se parsea de ahí.
-// Automercado no lo escribe → va por constante, con aviso si el mes se desvía más de 5%.
+// Automercado no lo escribe → modo 'writeoffVencido' (ver su entrada en CANALES).
 const _MESTXT={enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,
                setiembre:9,septiembre:9,octubre:10,noviembre:11,diciembre:12};
 function _frioMesDe(txt){
@@ -26013,10 +26024,39 @@ function _frioMesDe(txt){
   for(const k in _MESTXT){ if(t.indexOf(k)>=0) return _MESTXT[k]; }
   return null;
 }
-// Devuelve {monto, fuente:'parseo'|'constante', aviso:''} para el canal en el mes [D1,D2].
+// Mes de servicio (YYYY-MM) de un cargo cobrado al mes vencido: el mes anterior al de
+// (fecha − dias). setDate(1) antes de restar el mes evita el desborde del 31.
+function _frioMesVencido(fecha, dias){
+  const d=new Date(fecha+'T00:00:00'); d.setDate(d.getDate()-dias); d.setDate(1); d.setMonth(d.getMonth()-1);
+  return _ymd(d).slice(0,7);
+}
+// Devuelve {monto, fuente:'parseo'|'mayor'|'constante', aviso:''} para el canal en el mes [D1,D2].
 async function canalFrioMes(c, D1, D2){
   const base=canalFrio(c);
   if(!c.frio || !c.frioPartner) return {monto:base, fuente:'constante', aviso:''};
+  if(c.frio.modo==='writeoffVencido'){
+    // El cargo del mes M se paga en M+1 o M+2: se lee del 1º de M+1 al 1º de M+3 y el mes lo
+    // decide _frioMesVencido, no la fecha de posteo.
+    const a=new Date(D1+'T00:00:00'); a.setMonth(a.getMonth()+1);
+    const b=new Date(D1+'T00:00:00'); b.setMonth(b.getMonth()+3);
+    let ws=[];
+    try{
+      ws=await odooCall('account.move.line','search_read',
+        [[['partner_id','=',c.frioPartner],['account_id.code','=',c.frio.cuenta],
+          ['parent_state','=','posted'],['date','>=',_ymd(a)],['date','<',_ymd(b)]]],
+        {fields:['date','debit','credit','move_id'],limit:400});
+    }catch(e){
+      return {monto:base, fuente:'constante', aviso:'no pude leer el mayor ('+((e&&e.message)||e)+'): va el respaldo '+cM(base)+' sin IVA'};
+    }
+    const ym=D1.slice(0,7), del=ws.filter(function(l){ return _frioMesVencido(l.date, c.frio.diasAtras)===ym; });
+    if(!del.length) return {monto:base, fuente:'constante',
+      aviso:'no hay cargo de frío de '+c.label+' para este mes en '+c.frio.cuenta+': va el respaldo '+cM(base)+' sin IVA'};
+    const iva=c.frio.ivaIncluido ? FRIO_IVA : 1;
+    const cargos=del.map(function(l){ return {fecha:l.date, doc:l.move_id&&l.move_id[1], monto:(l.debit||0)-(l.credit||0)}; });
+    const bruto=cargos.reduce(function(s,x){ return s+x.monto; },0);
+    return {monto:bruto/iva, bruto:bruto, fuente:'mayor', n:cargos.length, cargos:cargos,
+      aviso: cargos.length>1 ? (cargos.length+' cargos asignados al mismo mes de servicio') : ''};
+  }
   let ls=[];
   try{
     ls=await odooCall('account.move.line','search_read',
@@ -26041,8 +26081,11 @@ async function canalFrioMes(c, D1, D2){
     return {monto:suma*iva, fuente:'parseo', n:n,
       aviso: sinMes ? (sinMes+' línea'+(sinMes===1?'':'s')+' de frío sin mes legible, no se contaron') : ''};
   }
-  // modo constante (Automercado): se compara contra lo posteado y se avisa si difiere
-  const post=ls.reduce(function(s,l){ return s+(l.debit||0)-(l.credit||0); },0);
+  // modo constante: se compara contra lo posteado EN EL MES y se avisa si difiere. La ventana
+  // de arriba es de cinco meses (sirve al parseo); sumarla entera daba un falso ×4 (agosto
+  // ₡2.454.668 = los cargos de julio a octubre, 20-oct-2026).
+  const post=ls.filter(function(l){ return l.date>=D1 && l.date<=D2; })
+    .reduce(function(s,l){ return s+(l.debit||0)-(l.credit||0); },0);
   const lim=c.frio.desvioMax||0.05;
   const av = (post>0 && Math.abs(post-base)/base>lim)
     ? ('el mayor de este mes trae '+cM(post)+' contra la constante '+cM(base)
@@ -26238,7 +26281,11 @@ async function reporteRenta(D1,D2){
     chVol[ch]=(chVol[ch]||0)+vol;
   }
   // Frío por unidad del canal (₡ fijo ÷ unidades del canal ese mes)
-  const frioUnit={}; CANALES_MATRIZ.forEach(c=>{ const f=canalFrio(c); frioUnit[c.key]=(f&&chVol[c.key])?f/chVol[c.key]:0; });
+  // Automercado lee su frío del mayor (writeoffVencido); el resto sigue con su cifra fija.
+  const frioMes={};
+  for(const c of CANALES_MATRIZ){ if(c.frio && c.frio.modo==='writeoffVencido') frioMes[c.key]=await canalFrioMes(c,D1,D2); }
+  const frioMonto=c=>frioMes[c.key] ? frioMes[c.key].monto : canalFrio(c);
+  const frioUnit={}; CANALES_MATRIZ.forEach(c=>{ const f=frioMonto(c); frioUnit[c.key]=(f&&chVol[c.key])?f/chVol[c.key]:0; });
   const logi=await reporteLogistica(D1,D2,cell,keyDe);   // costo de entrega por canal
   // Solo columnas con ventas ese mes
   const canalesActivos=CANALES_MATRIZ.filter(c=>RENTA_PROD.some(P=>{ const x=cell[c.key+'|'+P.key]; return x&&Math.abs(x.vol)>1e-6; }));
@@ -26267,7 +26314,7 @@ async function reporteRenta(D1,D2){
   const colTot=canalesActivos.map((c,ci)=>filas.reduce((s,f)=>s+(f.celdas[ci]?f.celdas[ci].gan:0),0));
   const gran=colTot.reduce((s,x)=>s+x,0);
   const netoTot=filas.reduce((s,f)=>s+f.celdas.reduce((a,x)=>a+(x?x.neto:0),0),0);
-  return {canalesActivos, filas, colTot, gran, netoTot, frioUnit, chVol, logi, revIds};
+  return {canalesActivos, filas, colTot, gran, netoTot, frioUnit, frioMes, chVol, logi, revIds};
 }
 async function cargarRenta(){
   const sel=document.getElementById('mesRenta'), ym=sel&&sel.value; if(!ym) return;
@@ -26305,8 +26352,12 @@ function rentaRender(R, label){
   const notas=R.canalesActivos.filter(c=>canalComRenta(c)||canalFrio(c)).map(c=>{
     const t=' title="'+esc(canalFuente(c))+'"';
     if(canalComRenta(c)) return '<span'+t+'>'+esc(c.label)+' −'+_pct(canalComRenta(c)*100)+' sobre neto</span>';
-    return '<span'+t+'>'+esc(c.label)+' frío '+cM(canalFrio(c))+'/mes ÷ '+fmtN(Math.round(R.chVol[c.key]||0))+' u = '
-      +cM(R.frioUnit[c.key])+'/u'+((c.frio&&c.frio.provisional)?' <em style="font-style:normal;color:var(--warn)">provisional</em>':'')+'</span>';
+    const fm=R.frioMes&&R.frioMes[c.key];
+    return '<span'+t+'>'+esc(c.label)+' frío '+cM(fm?fm.monto:canalFrio(c))+'/mes'
+      +(fm?(fm.fuente==='mayor'?' sin IVA, del mayor':' sin IVA, respaldo'):'')
+      +' ÷ '+fmtN(Math.round(R.chVol[c.key]||0))+' u = '
+      +cM(R.frioUnit[c.key])+'/u'+((c.frio&&c.frio.provisional)?' <em style="font-style:normal;color:var(--warn)">provisional</em>':'')
+      +((fm&&fm.aviso)?' <em style="font-style:normal;color:var(--warn)">'+esc(fm.aviso)+'</em>':'')+'</span>';
   });
   if(notas.length) foot+='<br>Costos de canal: '+notas.join(' · ')+'.';
   // Cambio de supuestos VISIBLE (no silencioso): quien note que el margen de esos canales
