@@ -161,6 +161,11 @@ módulo (Finanzas, Operaciones, Entregas, Compras, Personal, o General si no tie
 6. **Resumen para Andrea** al final del cierre: tickets creados (T-<n> · módulo · título), marcas puestas,
    cierres con su evidencia, y —si se revisaron propios— los tres grupos (CC · Instinct · Andrea) con los
    mensajes para Instinct listos para copiar (mismo formato que el /retomar).
+7. **Por chat de origen** (AGREGADO el 2026-10-20, regla de Andrea; detalle en `Conciliacion/CLAUDE.md`,
+   «Origen de los pedidos»): si algún prompt de la sesión trajo `[Origen: chat «…»]`, el resumen y la
+   sección Pendientes se agrupan por ese chat (qué se hizo · qué quedó pendiente). Lo que vino sin origen
+   va en un grupo «sin origen». Cada ticket nuevo de la tanda lleva `Origen: chat «…».` al final de la
+   descripción; a un ticket que ya existía se le agrega un anuncio que empieza con `Origen: chat «…» ·`.
 
 ## Paso 2c — Aviso a la otra socia (AGREGADO el 2026-10-20, decisión de Andrea, T-171)
 

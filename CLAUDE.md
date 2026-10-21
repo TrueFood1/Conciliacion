@@ -255,6 +255,17 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
   cualquiera publica sin la autorización de la otra, y se avisan cuando lo publicado toque o pueda tocar
   el trabajo de la otra. El `/cierre` arma ese aviso.
 
+## Origen de los pedidos (regla fija, Andrea, 20-oct-2026)
+
+Andrea trabaja en varios chats aparte y pega los pedidos acá. Para saber de qué chat salió cada cosa:
+
+- Si un prompt arranca con **`[Origen: chat «…»]`**, ese nombre va en **cada ticket que se cree o se toque
+  por ese prompt**. La tabla `ticket` no tiene columna «origen», así que:
+  - en un ticket **nuevo**, la descripción termina con `Origen: chat «…».`;
+  - en un ticket que ya existía, va un anuncio (`tk_estado.py anunciar`) que empieza con `Origen: chat «…» ·`.
+- En el **`/cierre`**, lo hecho y lo pendiente se listan **agrupados por chat de origen**.
+- Si un prompt **no trae la línea de origen**, se pregunta de qué chat viene **antes de crear tickets**.
+
 ## Seguridad
 
 - El repo es **público**. Nunca commitear credenciales, tokens ni datos bancarios/personales.
