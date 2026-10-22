@@ -59,6 +59,10 @@ revoke all on public.compra_tarifa_historial from anon, authenticated;
 grant select, insert on public.compra_tarifa_historial to authenticated;
 grant usage on schema public to truefie_tarifa_auto;
 grant insert on public.compra_tarifa_historial to truefie_tarifa_auto;
+-- La revisión diaria necesita saber qué insumos son de Compras: SOLO la fila compras_config (22-oct).
+grant select on public.plan_config to truefie_tarifa_auto;
+create policy plan_config_tarifa_auto on public.plan_config
+  for select to truefie_tarifa_auto using (clave = 'compras_config');
 
 create policy compra_tarifa_historial_sel on public.compra_tarifa_historial
   for select to authenticated using (acceso_es_socia());
@@ -75,7 +79,7 @@ grant truefie_tarifa_auto to current_user;
 
 do $$
 declare
-  v_socia text; v_equipo text; v_asis text; v_n int; r record; v_ok boolean; v_obt text;
+  v_socia text; v_equipo text; v_asis text; v_n int; v_m int; r record; v_ok boolean; v_obt text;
   v_res jsonb := '[]'::jsonb;
   -- una fila del historial; %1$L origen · %2$s antes · %3$s nuevo · %4$s anterior_id · %5$s anterior_nombre ·
   -- %6$s precio_anterior · %7$L creado_por
@@ -135,6 +139,10 @@ begin
            'update public.compra_tarifa_historial set precio_nuevo = 1', '42501'),
       (19, 'R9 revisión escribe en OTRA tabla (compra_tarifa_odoo)',            'truefie_tarifa_auto', null,
            'insert into public.compra_tarifa_odoo (motivo) values (''factura_nueva'')', '42501'),
+      (191,'R10 revisión EDITA compras_config',                                  'truefie_tarifa_auto', null,
+           'update public.plan_config set valor = valor where clave = ''compras_config''', '42501'),
+      (192,'R11 revisión agrega una fila a plan_config',                         'truefie_tarifa_auto', null,
+           'insert into public.plan_config (clave, valor, usuario) values (''compras_config'', ''{}''::jsonb, ''x'')', '42501'),
       -- equipo y anon
       (20, 'E1 alguien de equipo anota un clic',                                'authenticated', v_equipo,
            format(ins, 'clic', 100, 130, '41530', '''2538''', 100, v_equipo), '42501'),
@@ -182,6 +190,15 @@ begin
     v_res := v_res || jsonb_build_object('p', 'I1 el asistente anota un clic', 'esperado', 'RECHAZA · 42501', 'obtenido', v_obt, 'ok', v_ok);
   end if;
 
+  -- la revisión LEE compras_config y NADA más de plan_config
+  perform set_config('request.jwt.claims', '', true);
+  perform set_config('role', 'truefie_tarifa_auto', true);
+  select count(*) into v_n from public.plan_config where clave = 'compras_config';
+  select count(*) into v_m from public.plan_config where clave <> 'compras_config';
+  perform set_config('role', 'postgres', true);
+  v_res := v_res || jsonb_build_object('p', 'R12 revisión lee las filas de compras_config', 'esperado', '>0', 'obtenido', v_n::text, 'ok', v_n > 0);
+  v_res := v_res || jsonb_build_object('p', 'R13 revisión NO ve otras claves de plan_config', 'esperado', '0', 'obtenido', v_m::text, 'ok', v_m = 0);
+
   -- catálogo: 8 políticas (5 automáticas + 3), sin grants a anon, el rol sin login
   select count(*) into v_n from pg_policy where polrelid = 'public.compra_tarifa_historial'::regclass;
   v_res := v_res || jsonb_build_object('p', 'C1 políticas: 5 automáticas del asistente + 3 propias', 'esperado', '8', 'obtenido', v_n::text, 'ok', v_n = 8);
@@ -195,6 +212,6 @@ end $$;
 
 select r->>'p' as prueba, r->>'esperado' as esperado, r->>'obtenido' as obtenido, (r->>'ok')::boolean as ok
   from jsonb_array_elements(current_setting('ensayo.res')::jsonb) r;
--- ESPERADO: 28 filas (27 si no hay perfil asistente activo), todas ok = true.
+-- ESPERADO: 32 filas (31 si no hay perfil asistente activo), todas ok = true.
 
 rollback;

@@ -22,8 +22,9 @@
 --   QUIÉN ESCRIBE
 --     · clic: la socia, con SU token (como compra_tarifa_odoo): creado_por = su correo.
 --     · automático: un rol propio, `truefie_tarifa_auto`, que SOLO puede insertar filas 'automatico'
---       firmadas 'revision-automatica'. Se crea NOLOGIN: no entra hasta que se elija dónde corre la
---       revisión diaria y una socia le ponga clave (ALTER ROLE … LOGIN PASSWORD …, aparte).
+--       firmadas 'revision-automatica' y leer la fila compras_config de plan_config. Se crea NOLOGIN:
+--       entra recién cuando una socia pega, aparte, la línea `alter role … login password 'SCRAM…'`
+--       (la revisión diaria corre en GitHub Actions, decisión de Andrea 22-oct).
 --     · lo leen solo las socias (precios de compra). Instinct, por las políticas automáticas.
 --
 --   Las 5 políticas del asistente y el RLS los pone sola la base al crear la tabla (event triggers
@@ -79,6 +80,10 @@ revoke all on public.compra_tarifa_historial from anon, authenticated;
 grant select, insert on public.compra_tarifa_historial to authenticated;
 grant usage on schema public to truefie_tarifa_auto;
 grant insert on public.compra_tarifa_historial to truefie_tarifa_auto;
+-- La revisión diaria necesita saber qué insumos son de Compras: SOLO la fila compras_config (22-oct).
+grant select on public.plan_config to truefie_tarifa_auto;
+create policy plan_config_tarifa_auto on public.plan_config
+  for select to truefie_tarifa_auto using (clave = 'compras_config');
 
 create policy compra_tarifa_historial_sel on public.compra_tarifa_historial
   for select to authenticated using (acceso_es_socia());
@@ -89,9 +94,10 @@ create policy compra_tarifa_historial_auto on public.compra_tarifa_historial
   for insert to truefie_tarifa_auto
   with check (origen = 'automatico' and creado_por = 'revision-automatica');
 
--- Control: 1 · 8 · 0 · INSERT,SELECT · INSERT · f · 1
+-- Control: 1 · 8 · 0 · INSERT,SELECT · INSERT · f · 1 · 1
 --   tabla con RLS · políticas (5 automáticas del asistente + 3 propias) · grants a anon ·
---   grants a authenticated · grants a truefie_tarifa_auto · el rol entra (tiene que ser f) · índice
+--   grants a authenticated · grants a truefie_tarifa_auto · el rol entra (tiene que ser f) · índice ·
+--   la política de lectura de compras_config
 select (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
          where n.nspname = 'public' and c.relname = 'compra_tarifa_historial' and c.relrowsecurity) as tabla_con_rls,
        (select count(*) from pg_policy where polrelid = 'public.compra_tarifa_historial'::regclass) as politicas,
@@ -103,5 +109,7 @@ select (select count(*) from pg_class c join pg_namespace n on n.oid = c.relname
          where table_name = 'compra_tarifa_historial' and grantee = 'truefie_tarifa_auto') as grants_auto,
        (select rolcanlogin from pg_roles where rolname = 'truefie_tarifa_auto') as rol_entra,
        (select count(*) from pg_indexes where tablename = 'compra_tarifa_historial'
-         and indexname = 'compra_tarifa_historial_tarifa') as indice;
+         and indexname = 'compra_tarifa_historial_tarifa') as indice,
+       (select count(*) from pg_policy where polrelid = 'public.plan_config'::regclass
+         and polname = 'plan_config_tarifa_auto') as lee_compras_config;
 commit;
