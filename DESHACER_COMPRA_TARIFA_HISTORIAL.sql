@@ -23,14 +23,17 @@ begin
 end $$;
 
 drop table public.compra_tarifa_historial;
+drop policy if exists plan_config_tarifa_auto on public.plan_config;
 do $$ begin
   if exists (select 1 from pg_roles where rolname = 'truefie_tarifa_auto') then
+    revoke select on public.plan_config from truefie_tarifa_auto;
     revoke usage on schema public from truefie_tarifa_auto;
     drop role truefie_tarifa_auto;
   end if;
 end $$;
 
--- Control: t · f  (la tabla ya no existe · el rol tampoco)
+-- Control: t · f · 0  (la tabla ya no existe · el rol tampoco · la política de plan_config tampoco)
 select to_regclass('public.compra_tarifa_historial') is null as tabla_borrada,
-       exists (select 1 from pg_roles where rolname = 'truefie_tarifa_auto') as rol_sigue;
+       exists (select 1 from pg_roles where rolname = 'truefie_tarifa_auto') as rol_sigue,
+       (select count(*) from pg_policy where polname = 'plan_config_tarifa_auto') as politica_plan_config;
 commit;
