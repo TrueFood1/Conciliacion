@@ -108,7 +108,7 @@ def entrada(origen, repos, tickets, hecho, pendiente, decision):
 def escribir_bitacora(ruta, texto):
     """Debajo del encabezado y ARRIBA de los bloques: lo más nuevo, primero. El /cierre-dia las junta."""
     viejo = open(ruta, encoding="utf-8").read()
-    m = re.search(r"(?m)^---\s*$", viejo)
+    m = re.search(r"(?m)^---[ \t]*$", viejo)
     corte = m.end() if m else 0
     open(ruta, "w", encoding="utf-8").write(viejo[:corte] + "\n\n" + texto.rstrip("\n") + "\n\n" + viejo[corte:].lstrip("\n"))
 
