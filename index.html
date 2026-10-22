@@ -25965,9 +25965,10 @@ const CANALES = [
    // verificado que las facturas de venta van con discount 0 y que las bills del proveedor son
    // solo frío, así que no hay doble conteo.
    frioPartner:1224,
-   // Desde T-238 (22-oct-2026) Rentabilidad suma los renglones reales del mes (canalFrioMes); la
-   // multiplicación queda de respaldo para un mes sin FE (ago y sep-2026 no tienen).
-   frio:{porTienda:2709.19, unidades_cobro:10, verificado:true, editable:true, modo:'parseMes',
+   // Desde T-238 (22-oct-2026) Rentabilidad suma los renglones reales del mes (canalFrioMes). Un mes
+   // sin FE (ago y sep-2026 no tienen) usa el ÚLTIMO frío conocido, con aviso (sinFE:'ultimo', Andrea
+   // 22-oct); la multiplicación queda solo si no hay ningún mes anterior con FE.
+   frio:{porTienda:2709.19, unidades_cobro:10, verificado:true, editable:true, modo:'parseMes', sinFE:'ultimo',
          fuente:'bills del proveedor en 6106013, una por tienda — julio 2026 (11-ago-2026)',
          nota:'Arranca en mayo 2026. El write-off de ₡12.018,39 en 6106028 NO es gasto: es el pago de las bills de mayo+junio (₡10.635,75 × 1,13 = ₡12.018,40) descontado del depósito.'}},
   {key:'compre', label:'Compre Bien',           plId:5,
@@ -26134,7 +26135,12 @@ async function canalFrioMes(c, D1, D2){
       lineas.push({fe:l.move_id&&l.move_id[1], fecha:l.date, detalle:(l.name||'').trim(),
                    monto:((l.debit||0)-(l.credit||0))/ms.length});
     });
-    // Blindaje: si el mes no tiene ni una línea, cae a la constante Y LO DICE.
+    if(!lineas.length && c.frio.sinFE==='ultimo'){
+      const ult=await _frioUltimoConocido(c, ym);
+      if(ult) return {monto:ult.monto, fuente:'estimado', n:0, lineas:[],
+        aviso:'frío estimado: sin factura del mes (se usa el de '+_ymLabel(ult.ym)+')'};
+    }
+    // Blindaje: si el mes no tiene ni una línea (ni un mes anterior conocido), cae a la constante Y LO DICE.
     if(!lineas.length) return {monto:base, fuente:'constante',
       aviso:'no hay FE de frío de '+c.label+' para este mes: va la constante '+cM(base)};
     const iva = FRIO_CON_IVA ? FRIO_IVA : 1, avisos=[];
@@ -26163,6 +26169,23 @@ async function canalFrioMes(c, D1, D2){
        +' ('+((post/base-1)*100).toFixed(0)+'%) — puede ser un mes con dos cargos o uno sin cargo')
     : '';
   return {monto:base, fuente:'constante', aviso:av};
+}
+// El último mes ANTERIOR a `ym` con FE de frío del canal, sumado igual que canalFrioMes: {ym, monto} o
+// null. Mira hasta 12 meses atrás. Lo usa MegaSuper en un mes sin factura (sinFE:'ultimo').
+async function _frioUltimoConocido(c, ym){
+  const d=new Date(ym+'-01T00:00:00'); d.setMonth(d.getMonth()-12);
+  const ls=await odooCall('account.move.line','search_read',
+    [[['partner_id','=',c.frioPartner],['account_id.code','in',['6106013','111601']],
+      ['move_id.move_type','in',['in_invoice','in_refund']],['display_type','=','product'],
+      ['parent_state','=','posted'],['date','>=',_ymd(d)]]],
+    {fields:['name','debit','credit','date'],limit:400});
+  const porMes={};
+  ls.forEach(function(l){
+    const ms=_frioMesesDe(l.name, l.date);
+    ms.forEach(function(m){ porMes[m]=(porMes[m]||0)+((l.debit||0)-(l.credit||0))/ms.length; });
+  });
+  const prev=Object.keys(porMes).filter(m=>m<ym && porMes[m]>0).sort().pop();
+  return prev ? {ym:prev, monto:porMes[prev]*(FRIO_CON_IVA?FRIO_IVA:1)} : null;
 }
 // El cargo puede postearse con desfase: se mira una ventana amplia y el mes lo decide el TEXTO.
 // Hasta seis meses después: la diferencia de San Carlos «enero a abril» se facturó el 20-may.
@@ -26213,23 +26236,31 @@ async function _rentaReversiones(D1,D2){
 //     con cita. Misma frecuencia a los dos → 50/50. Regla de operación, no supuesto.
 // (2) LUSOF, POR MES (T-237, Andrea 22-oct-2026): cada factura cubre una semana lun-vie (el rango
 //     va en el <OtroTexto> del comprobante) y cuenta en el mes de esa semana. El total del mes se
-//     reparte entre BM y Compre Bien según lo facturado a cada canal EN EL MES. Antes se repartía
-//     semana por semana, y eso emparejaba mal: Lusof entrega la semana siguiente lo que facturamos
-//     el viernes (BM facturado el 13-feb salió del 16 al 20-feb, según sus FE de feb-abr), así que
-//     una semana con solo Compre Bien facturado se llevaba la factura entera (julio-2026: semanal
-//     ₡94.735 contra ₡46.541 por mes).
+//     reparte entre TODOS los clientes que Lusof entrega (LOG_LUSOF_CLIENTES) según lo facturado a
+//     cada uno EN EL MES; solo se cargan las partes de BM y Compre Bien, y las demás (Mentha, Societe
+//     Saphir…) se restan del total sin cargárselas a nadie. Antes se repartía semana por semana, y eso
+//     emparejaba mal: Lusof entrega la semana siguiente lo que facturamos el viernes (BM facturado el
+//     13-feb salió del 16 al 20-feb, según sus FE de feb-abr), así que una semana con solo Compre Bien
+//     facturado se llevaba la factura entera (julio-2026: semanal ₡94.735 contra ₡46.541 por mes).
 // (3) EYC → MegaSuper. (4) DON JORGE: par ingreso/gasto (cobrado por el producto Envío menos
 //     lo pagado); el NETO se carga a los canales que lo generan.
-// MENTHA Y LIMÓN queda FUERA del reparto de Lusof a propósito — ver la nota de abajo.
 const LOG_MARLON=1161, LOG_LUSOF=1106, LOG_EYC=1098;
-// A Mentha (887) NO se le asigna Lusof. Lusof también la lleva (consta en sus FE de feb-abr), pero
-// también la entregan EyC (consta en su factura de enero) y Don Jorge: con el reparto por semana,
-// en 3 de 22 semanas Mentha aparecía SOLA y absorbía la factura entera (2-6 de marzo: ₡125.676
-// contra ₡55.360 de venta, un 227%). Es limitación del método, no un dato. Se resuelve cuando
-// Lusof mande el detalle por factura.
-const LOG_SIN_ASIGNAR_NOTA='Mentha y limón: logística no asignable — el método no aplica a este cliente';
+// Los clientes de Lusof salen de sus propias FE: de feb a abr-2026 (y tres de 2024) el <OtroTexto>
+// nombra cada destino con NUESTRO número de factura («BM UVITA 3213 13/4/2026»), y cada número se
+// cruzó con su cliente en Odoo (22-oct-2026, 23 destinos en 9 FE). Desde mayo sus FE ya no nombran
+// destinos: un cliente nuevo de Lusof hay que sumarlo acá a mano. BM Boston y BM Dominical no salen en
+// esas FE, pero son dos de las ocho tiendas BM del reparto de Lusof medido el 12-ago-2026 (BITACORA):
+// sin ellas, BM pesa de menos en el denominador y Compre Bien carga su parte (jul-2026: ₡65.084
+// en vez de ₡46.541).
+// Mentha y los otros entran al DENOMINADOR (se llevan su parte del costo) pero no se les carga: Mentha
+// también la entregan EyC y Don Jorge, y ninguno de ellos es canal propio de Rentabilidad.
+const LOG_LUSOF_CLIENTES={
+  1006:'BM Quepos', 1104:'BM Limitada', 1008:'BM Uvita', 1011:'BM Palmar', 1012:'BM Corcovado',
+  1054:'BM Daniel Flores', 1004:'BM Boston', 1191:'BM Dominical', 1032:'Compre Bien', 887:'Mentha y limón', 1205:'Societe Saphir (Le Gourmet)',
+  880:'Saretto'};
+const LOG_LUSOF_CANALES=['bm','compre'];   // los canales a los que SÍ se les carga su parte
 
-async function reporteLogistica(D1,D2,cell,keyDe){
+async function reporteLogistica(D1,D2,cell,keyDe,netoCli){
   const out={porCanal:{}, detalle:[], sinAsignar:[], notas:[]};
   const gastoDe=async(pid,cta)=>{
     const g=await odooCall('account.move.line','read_group',
@@ -26246,12 +26277,13 @@ async function reporteLogistica(D1,D2,cell,keyDe){
   const eyc=await gastoDe(LOG_EYC,'6103003');
   if(eyc){ out.porCanal.mega=(out.porCanal.mega||0)+eyc;
            out.detalle.push({q:'EyC (MegaSuper)', monto:eyc, modo:'directo al canal'}); }
-  // (2) Lusof por mes, entre BM y Compre Bien según lo facturado en el mes
-  const lu=await logLusofMes(D1,D2,cell);
+  // (2) Lusof por mes, entre todos sus clientes según lo facturado en el mes
+  const lu=await logLusofMes(D1,D2,netoCli);
   for(const k in lu.porCanal) out.porCanal[k]=(out.porCanal[k]||0)+lu.porCanal[k];
-  if(lu.total) out.detalle.push({q:'Lusof (BM + Compre Bien)', monto:lu.total, modo:'por mes · según lo facturado a cada canal en el mes'});
-  out.sinAsignar=lu.sinAsignar; out.lusofIlegibles=lu.ilegibles||[];
-  if(lu.mentha) out.notas.push(LOG_SIN_ASIGNAR_NOTA);
+  if(lu.total) out.detalle.push({q:'Lusof (BM + Compre Bien)', monto:lu.total, modo:'por mes · según lo facturado a cada cliente de Lusof en el mes'});
+  out.sinAsignar=lu.sinAsignar; out.lusofIlegibles=lu.ilegibles||[]; out.lusofFuera=lu.fuera;
+  if(lu.fuera.length) out.notas.push('Lusof sin cargar (clientes que no son BM ni Compre Bien): '
+    +lu.fuera.map(x=>x.cliente+' '+cM(x.monto)).join(' · '));
   // (4) Don Jorge: par ingreso/gasto, el NETO a sus canales por su peso de venta
   const pag=await odooCall('account.move.line','read_group',
     [[['account_id.code','=','6400003'],['parent_state','=','posted'],['date','>=',D1],['date','<=',D2],
@@ -26295,12 +26327,12 @@ function _lusofSemana(txt){
   return a<=b ? {a:a, b:b} : null;
 }
 // Reparto mensual de Lusof. La semana de cada factura sale del <OtroTexto> del comprobante
-// electrónico (_lusofSemana) y decide el mes; el total del mes se reparte por lo facturado a BM y a
-// Compre Bien en el mes (`cell`, la misma agregación por canal de Rentabilidad). Si una FE no trae una
-// semana legible, su factura NO se salta en silencio: va a `ilegibles` (si su fecha cae en el período)
-// y Rentabilidad lo avisa (21-oct-2026).
-async function logLusofMes(D1,D2,cell){
-  const res={porCanal:{}, total:0, facturas:[], sinAsignar:[], ilegibles:[], mentha:false};
+// electrónico (_lusofSemana) y decide el mes; el total del mes se reparte por lo facturado en el mes a
+// cada cliente de LOG_LUSOF_CLIENTES (`netoCli`, de las mismas líneas de venta de Rentabilidad), y a los
+// canales de LOG_LUSOF_CANALES se les carga su parte. Si una FE no trae una semana legible, su factura NO
+// se salta en silencio: va a `ilegibles` (si su fecha cae en el período) y Rentabilidad lo avisa (21-oct).
+async function logLusofMes(D1,D2,netoCli){
+  const res={porCanal:{}, total:0, facturas:[], fuera:[], sinAsignar:[], ilegibles:[]};
   let vs=[];
   try{
     vs=await odooCall('electronic.voucher.supplier','search_read',
@@ -26335,11 +26367,16 @@ async function logLusofMes(D1,D2,cell){
     res.facturas.push({factura:f.name, sem:a+' al '+b, monto:f.amount_untaxed});
   }
   if(!res.total) return res;
-  res.mentha=true;                                   // Lusof también lleva a Mentha, que no entra al reparto
-  const netoDe=ch=>RENTA_PROD.reduce((s,P)=>{ const y=cell[ch+'|'+P.key]; return s+(y?y.neto:0); },0);
-  const w={bm:netoDe('bm'), compre:netoDe('compre')}, tot=w.bm+w.compre;
+  const cli=Object.keys(netoCli||{}).filter(pid=>netoCli[pid].neto>0);
+  const tot=cli.reduce((s,pid)=>s+netoCli[pid].neto,0);
   if(tot<=0){ res.sinAsignar.push({periodo:D1.slice(0,7), monto:res.total}); return res; }
-  for(const ch in w) if(w[ch]>0) res.porCanal[ch]=res.total*w[ch]/tot;
+  const fuera={};
+  cli.forEach(pid=>{
+    const x=netoCli[pid], parte=res.total*x.neto/tot;
+    if(LOG_LUSOF_CANALES.indexOf(x.ch)>=0) res.porCanal[x.ch]=(res.porCanal[x.ch]||0)+parte;
+    else fuera[LOG_LUSOF_CLIENTES[pid]]=(fuera[LOG_LUSOF_CLIENTES[pid]]||0)+parte;   // se resta y no se carga
+  });
+  for(const k in fuera) res.fuera.push({cliente:k, monto:fuera[k]});
   return res;
 }
 
@@ -26380,14 +26417,15 @@ async function reporteRenta(D1,D2){
   const parts=partIds.length?await odooCall('res.partner','read',[partIds],{fields:['id','name','commercial_name','team_id']}):[];
   const pI={}; parts.forEach(p=>pI[p.id]=p);
   // Agregar por (canal, producto): neto y volumen (en unidad de venta)
-  const cell={}, chVol={};
+  const cell={}, chVol={}, netoCli={};   // netoCli: lo facturado a cada cliente de Lusof, para repartirlo
   for(const l of lines){
-    const p=pI[l.partner_id&&l.partner_id[0]]||{};
+    const pid=l.partner_id&&l.partner_id[0], p=pI[pid]||{};
     const ch=clasificarCanal(p), key=keyDe[l.product_id[0]];
     const vol=await _conv(l._sg*(l.quantity||0), l.product_uom_id&&l.product_uom_id[0], refUom[key]);
     const ck=ch+'|'+key, c=cell[ck]||(cell[ck]={neto:0,vol:0});
     c.neto+=l._sg*(l.price_subtotal||0); c.vol+=vol;
     chVol[ch]=(chVol[ch]||0)+vol;
+    if(LOG_LUSOF_CLIENTES[pid]){ const n=netoCli[pid]||(netoCli[pid]={neto:0, ch:ch}); n.neto+=l._sg*(l.price_subtotal||0); }
   }
   // Frío por unidad del canal (₡ fijo ÷ unidades del canal ese mes)
   // Automercado lee su frío del detalle de su FE (feDetalle); Compre Bien y MegaSuper, del mes escrito
@@ -26396,7 +26434,7 @@ async function reporteRenta(D1,D2){
   for(const c of CANALES_MATRIZ){ if(c.frio && (c.frio.modo==='feDetalle' || c.frio.modo==='parseMes')) frioMes[c.key]=await canalFrioMes(c,D1,D2); }
   const frioMonto=c=>frioMes[c.key] ? frioMes[c.key].monto : canalFrio(c);
   const frioUnit={}; CANALES_MATRIZ.forEach(c=>{ const f=frioMonto(c); frioUnit[c.key]=(f&&chVol[c.key])?f/chVol[c.key]:0; });
-  const logi=await reporteLogistica(D1,D2,cell,keyDe);   // costo de entrega por canal
+  const logi=await reporteLogistica(D1,D2,cell,keyDe,netoCli);   // costo de entrega por canal
   // Solo columnas con ventas ese mes
   const canalesActivos=CANALES_MATRIZ.filter(c=>RENTA_PROD.some(P=>{ const x=cell[c.key+'|'+P.key]; return x&&Math.abs(x.vol)>1e-6; }));
   const filas=RENTA_PROD.map(P=>{
@@ -26472,7 +26510,7 @@ function rentaRender(R, label){
     if(canalComRenta(c)) return '<span'+t+'>'+esc(c.label)+' −'+_pct(canalComRenta(c)*100)+' sobre neto</span>';
     const fm=R.frioMes&&R.frioMes[c.key];
     return '<span'+t+'>'+esc(c.label)+' frío '+cM(fm?fm.monto:canalFrio(c))+'/mes'
-      +(fm?(fm.fuente==='fe'?' sin IVA, de su FE':fm.fuente==='parseo'?' sin IVA, de sus FE del mes':' sin IVA, respaldo'):'')
+      +(fm?(fm.fuente==='fe'?' sin IVA, de su FE':fm.fuente==='parseo'?' sin IVA, de sus FE del mes':fm.fuente==='estimado'?' sin IVA':' sin IVA, respaldo'):'')
       +' ÷ '+fmtN(Math.round(R.chVol[c.key]||0))+' u = '
       +cM(R.frioUnit[c.key])+'/u'+((c.frio&&c.frio.provisional)?' <em style="font-style:normal;color:var(--warn)">provisional</em>':'')
       +((fm&&fm.aviso)?' <em style="font-style:normal;color:var(--warn)">'+esc(fm.aviso)+'</em>':'')+'</span>';
