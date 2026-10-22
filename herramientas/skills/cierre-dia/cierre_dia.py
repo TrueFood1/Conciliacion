@@ -283,6 +283,10 @@ def main():
     c = R["Conciliacion"]
     B.append("Truefie: publicado b%s · próximo libre b%d · main %s · dev %s" % (pub, libre, c["ramas"].get("main", ("—", "—"))[1],
                                                                               c["ramas"].get("dev", ("—", "—"))[1]))
+    publ = [l for l in git(REPOS["Conciliacion"], "log", "refs/remotes/origin/main", "--since=%s 00:00" % desde,
+                         "--date=format:%d-%m", "--format=%cd\t%s").splitlines() if re.search(r"\tb\d{3}:", l)]
+    if publ:
+        B.append("Publicado en main: " + " · ".join("%s (%s)" % (l.split("\t")[1].split(":")[0], l.split("\t")[0]) for l in reversed(publ)))
     for n, r in R.items():
         if r.get("falta"):
             continue
@@ -294,6 +298,9 @@ def main():
         B.append("Tickets tocados: %d · cerrados: %s · nuevos: %s" % (
             len(T), ", ".join("T-%d" % t["id"] for t in T if t["estado"] == "cerrado") or "—",
             ", ".join("T-%d" % t["id"] for t in T if t["nuevo"]) or "—"))
+        for t in T:
+            if t["estado"] == "cerrado" or t["nuevo"]:
+                B.append("  T-%d %s: %s" % (t["id"], "cerrado" if t["estado"] == "cerrado" else "nuevo", t["titulo"][:80]))
         for o, ts in grupos.items():
             B.append("· %s: %s" % (o, ", ".join("T-%d" % t["id"] for t in ts)))
         if cand:
