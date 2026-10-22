@@ -244,10 +244,26 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
   `conexion_prod.env`; confirmar presencia con sí/no, sin mostrar la key.
 - Explicar en español simple; reportar con evidencia (números, no adjetivos).
 
-## Cierre de sesión (regla fija)
+## Cierre de sesión (regla fija · protocolo de cierre, Andrea 21-oct-2026)
 
-Al cierre de **toda sesión donde se tocó código**, correr el checklist de
-[`CIERRE_TECNICO.md`](CIERRE_TECNICO.md) **sin que haya que pedirlo**.
+**El 20-oct** seis sesiones de CC en paralelo cerraron cada una con el `/cierre` viejo: cuatro ESTADOS el
+mismo día, un prompt perdido entre chats, el choque de BUILD b114/b115 y un cierre de dos horas. Desde el
+22-oct:
+
+- **`/listo` — cada sesión, al terminar SU tarea**, sin que haya que pedirlo: toma el turno, nada sin
+  commitear, push de **su** rama (nunca `main`), tickets con su línea `Origen: chat «…»` y una entrada
+  `✅ LISTO` arriba de la `BITACORA.md`. No escribe el ESTADO ni corre el cierre del día.
+- **`/cierre-dia` — UNA sola sesión, cuando Andrea lo pide:** junta el día de los 4 repos y escribe
+  `respaldo-truefie/trabajo/cierres/CIERRE_DIA_<fecha>.md` + un bloque para el chat de Claude.ai. **El
+  ESTADO lo escribe Claude.ai**, no CC. Si un día quedó sin cierre, el siguiente lo cubre.
+- **Turno:** antes de `/listo` o `/cierre-dia`, la marca local `Practica CC/.turno_cierre.json` (no va a
+  git; `.claude/skills/listo/turno.py`). Si la tiene otra sesión, se espera; a los 30 minutos se da por
+  abandonada.
+- **Una carpeta por sesión:** la sesión que necesite otra rama trabaja en **su propio worktree**
+  (`git -C Conciliacion worktree add <scratchpad>/wt-<tarea> <rama>`), **nunca cambiando de rama en la
+  carpeta compartida**: otra sesión puede estar trabajando ahí.
+- El `/cierre` viejo quedó **retirado**. [`CIERRE_TECNICO.md`](CIERRE_TECNICO.md) sigue siendo el
+  checklist técnico (secretos, `esquema_check`, `loadcheck`) que se corre antes de commitear y de publicar.
 
 - El **push va a `dev`** (respaldo, siempre).
 - A **`main`** solo con **decisión explícita de una socia —Andrea o Lorena—** (`main` sirve la versión

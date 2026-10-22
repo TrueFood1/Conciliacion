@@ -39,6 +39,8 @@ description: Arranque de sesión en el repo Conciliacion. Lee el bloque más rec
   información» y sus partes del reporte, rotulados ahí mismo. Más tarde ese día, la «Regla de cierre»
   del Paso 2b (preguntas respondidas y lo que se ve en pantalla los cierra CC) y «explicado → disponible». CC escribe directo con truefie_cc (TICKETS_CC_AMPLIADO.sql). Reemplaza,
   por ahora, al revisor diario por GitHub Actions (T-149, pospuesto).
+  ⚠ MODIFICADA el 2026-10-22 (protocolo de cierre, Andrea 21-oct): el Paso 1 lee el último
+  CIERRE_DIA_<fecha>.md y las entradas ✅ LISTO (el /cierre viejo se retiró). Rotulado ahí mismo.
   ⚠ MODIFICADA el 2026-10-20 (decisión de Andrea, T-171): Lorena publica a main sin el
   OK de Andrea; el Paso 2 distingue «main movido por Lorena» (publicación normal) del
   aviso ⚠, y el grupo de Lorena muestra lo que publicó. Rotulado ahí mismo. El resto
@@ -88,9 +90,16 @@ apagar la alarma en vez de atender el fuego.
 
 ## Paso 1 — Leer la bitácora
 
-Leé `Conciliacion/BITACORA.md` y tomá el **bloque `# 📍 DÓNDE QUEDAMOS` más
-reciente** (el de más arriba). De ahí salen: la fecha/título, "Dónde quedamos",
-"Pendientes" y el "Estado de ramas" que grabó el último `/cierre`.
+**Desde el 22-oct-2026 (protocolo de cierre, Andrea 21-oct) el día se cierra con `/cierre-dia`**, que
+deja `respaldo-truefie/trabajo/cierres/CIERRE_DIA_<fecha>.md`, y cada sesión deja una entrada
+`## ✅ LISTO · <fecha hora> · chat «…»` arriba de `Conciliacion/BITACORA.md`. Leé, en este orden:
+1. el **`CIERRE_DIA_*.md` más reciente** (`ls respaldo-truefie/trabajo/cierres/ | tail -1`): estado de
+   ramas, BUILD publicado y próximo libre, tickets por origen, lo que espera a una socia;
+2. las **entradas `✅ LISTO` posteriores** a ese cierre (lo que cerraron las sesiones después);
+3. si no hay ningún `CIERRE_DIA`, el **bloque `# 📍 DÓNDE QUEDAMOS` más reciente** (el formato viejo).
+Si el último `CIERRE_DIA` es de antes de ayer y hay entradas `✅ LISTO` después, decirlo: **hay un día
+sin cerrar** (lo cubre el próximo `/cierre-dia`). En el reporte, el «grabado» de las ramas sale del
+último cierre que haya, del formato que sea.
 
 ## Paso 2 — Chequeo de sanidad del remoto (en vivo)
 

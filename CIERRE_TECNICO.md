@@ -2,6 +2,12 @@
 
 Este checklist se corre al final de **toda sesión donde se tocó código**, sin que haya que pedirlo.
 
+> **Desde el 22-oct-2026 (protocolo de cierre, Andrea 21-oct):** el cierre de cada sesión es **`/listo`**
+> (`.claude/skills/listo/`), y el del día, **`/cierre-dia`**, lo corre una sola sesión. Este checklist es
+> lo técnico que va ANTES de `/listo`: pasos 1-3 (status, secretos, commit) siempre; 5-6 (`BUILD`,
+> `esquema_check`, `loadcheck`) solo si se publica. El paso 4 lo hace `/listo` (push de SU rama, nunca
+> `main`). Trabajar en otra rama = **su propio worktree**, nunca cambiar de rama en la carpeta compartida.
+
 1. **`git status`** — ¿quedó algo sin commitear?
 2. **Chequeo de secretos** sobre lo modificado: API keys, tokens, datos bancarios, correos personales. Ojo especial con archivos de **datos** que el `.gitignore` no matchea (el repo es público y sirve GitHub Pages).
 3. **Commit** con mensaje descriptivo de la sesión.
