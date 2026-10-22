@@ -8,10 +8,13 @@ escribe UN archivo local: respaldo-truefie/trabajo/cierres/CIERRE_DIA_<fecha>.md
 al final para pegar en el chat de Claude.ai. NO escribe el ESTADO (eso lo hace Claude.ai con el bloque
 y los chats del día), NO commitea, NO cierra tickets (propone; Andrea aprueba en un mensaje).
 
-Cubre desde el último cierre: el último CIERRE_DIA_*.md, o si no hay, el último «DÓNDE QUEDAMOS» de
-la bitácora. Si un día quedó sin cierre, entra solo.
+Cubre desde la HORA exacta del último cierre (la línea «Generado por /cierre-dia el …» del
+CIERRE_DIA_*.md más reciente; 22-oct, pedido de Andrea: el de la noche cubre desde el de la tarde, no
+desde el día siguiente). Si no hay ninguno, desde el día después del último «DÓNDE QUEDAMOS» de la
+bitácora. Si un día quedó sin cierre, entra solo. Un segundo cierre el mismo día no pisa el primero:
+se llama CIERRE_DIA_<fecha>_<HHMM>.md.
 
-    python3 cierre_dia.py [--desde 2026-10-21] [--hasta 2026-10-22] [--salida RUTA] [--sin-fetch]
+    python3 cierre_dia.py [--desde "2026-10-21" | "2026-10-22 16:27"] [--hasta 2026-10-22] [--salida RUTA] [--sin-fetch]
 """
 import glob, hashlib, json, os, re, subprocess, sys, time
 from collections import OrderedDict
@@ -48,16 +51,22 @@ def sha(path_o_texto, es_texto=False):
     return hashlib.sha256(b).hexdigest()[:12]
 
 
+RX_GENERADO = re.compile(r"Generado por /cierre-dia el (\d{4}-\d{2}-\d{2} \d{2}:\d{2})")
+
+
 def desde_por_defecto(hasta):
-    hechos = sorted(f for f in glob.glob(os.path.join(CIERRES, "CIERRE_DIA_*.md")) if hasta not in os.path.basename(f))
+    """La hora del último cierre del día, leída de su propio archivo: «YYYY-MM-DD HH:MM»."""
+    hechos = []
+    for f in glob.glob(os.path.join(CIERRES, "CIERRE_DIA_*.md")):
+        m = RX_GENERADO.search(open(f, encoding="utf-8").read(2000))
+        if m:
+            hechos.append((m.group(1), os.path.basename(f)))
     if hechos:
-        ult = re.search(r"(\d{4}-\d{2}-\d{2})", hechos[-1]).group(1)
-        fuente = "último cierre del día (%s)" % os.path.basename(hechos[-1])
-    else:
-        m = re.search(r"# 📍 DÓNDE QUEDAMOS — (\d{4}-\d{2}-\d{2})", open(BITACORA, encoding="utf-8").read())
-        ult, fuente = m.group(1), "último /cierre de la bitácora (%s)" % m.group(1)
-    t = time.mktime(time.strptime(ult, "%Y-%m-%d")) + 86400 * 1.5
-    return time.strftime("%Y-%m-%d", time.localtime(t)), fuente
+        cuando, nombre = max(hechos)
+        return cuando, "último cierre del día (%s, generado %s)" % (nombre, cuando)
+    m = re.search(r"# 📍 DÓNDE QUEDAMOS — (\d{4}-\d{2}-\d{2})", open(BITACORA, encoding="utf-8").read())
+    t = time.mktime(time.strptime(m.group(1), "%Y-%m-%d")) + 86400 * 1.5
+    return time.strftime("%Y-%m-%d 00:00", time.localtime(t)), "día después del último /cierre de la bitácora (%s)" % m.group(1)
 
 
 def repo_info(nombre, repo, desde, fetch):
@@ -67,7 +76,7 @@ def repo_info(nombre, repo, desde, fetch):
         subprocess.run(["git", "-C", repo, "fetch", "-q", "--prune", "origin"], capture_output=True)
     out = {"nombre": nombre, "commits": OrderedDict(), "sin_push": [], "worktrees": [], "sucio": [], "ramas": {}}
     vistos = set()
-    for l in git(repo, "log", "--all", "--since=%s 00:00" % desde, "--date=format:%d-%m %H:%M",
+    for l in git(repo, "log", "--all", "--since=%s" % desde, "--date=format:%d-%m %H:%M",
                  "--format=%H\t%h\t%ad\t%an\t%s\t%S").splitlines():
         h, c, f, a, s, ref = (l.split("\t") + [""] * 6)[:6]
         if h in vistos or ref.startswith("refs/stash"):
@@ -79,7 +88,7 @@ def repo_info(nombre, repo, desde, fetch):
         out["commits"].setdefault(rama, []).append("%s %s · %s · %s" % (c, f, a, s[:90]))
     viejas = 0
     for l in git(repo, "for-each-ref", "refs/heads", "--format=%(refname:short)").splitlines():
-        if git(repo, "log", "-1", "--format=%cd", "--date=format:%Y-%m-%d", "refs/heads/" + l) < desde:
+        if git(repo, "log", "-1", "--format=%cd", "--date=format:%Y-%m-%d %H:%M", "refs/heads/" + l) < desde:
             viejas += (not git(repo, "rev-parse", "-q", "--verify", "refs/remotes/origin/" + l)) or \
                 git(repo, "rev-list", "--count", "refs/remotes/origin/%s..refs/heads/%s" % (l, l)) not in ("", "0")
             continue
@@ -130,13 +139,13 @@ def tickets(desde):
     from pg_lector import Lector, clave
     sql = """
     with ev as (
-      select ticket_id id, texto, creado_en from ticket_detalle where (creado_en at time zone 'America/Costa_Rica') >= '%(d)s'::date
-      union all select ticket_id, coalesce(nota,''), creado_en from ticket_estado where (creado_en at time zone 'America/Costa_Rica') >= '%(d)s'::date
-      union all select ticket_id, coalesce(razon,''), creado_en from ticket_marca where (creado_en at time zone 'America/Costa_Rica') >= '%(d)s'::date
-      union all select id, descripcion, creado_en from ticket where (creado_en at time zone 'America/Costa_Rica') >= '%(d)s'::date)
+      select ticket_id id, texto, creado_en from ticket_detalle where (creado_en at time zone 'America/Costa_Rica') >= '%(d)s'::timestamp
+      union all select ticket_id, coalesce(nota,''), creado_en from ticket_estado where (creado_en at time zone 'America/Costa_Rica') >= '%(d)s'::timestamp
+      union all select ticket_id, coalesce(razon,''), creado_en from ticket_marca where (creado_en at time zone 'America/Costa_Rica') >= '%(d)s'::timestamp
+      union all select id, descripcion, creado_en from ticket where (creado_en at time zone 'America/Costa_Rica') >= '%(d)s'::timestamp)
     select v.id, v.estado, coalesce(v.modulo,''), t.ambito, left(regexp_replace(v.descripcion,'\\s+',' ','g'),90),
            string_agg(ev.texto, ' ¦ ' order by ev.creado_en),
-           ((t.creado_en at time zone 'America/Costa_Rica') >= '%(d)s'::date), v.descripcion
+           ((t.creado_en at time zone 'America/Costa_Rica') >= '%(d)s'::timestamp), v.descripcion
       from ev join v_ticket v on v.id = ev.id join ticket t on t.id = ev.id
      group by v.id, v.estado, v.modulo, t.ambito, v.descripcion, t.creado_en order by v.id""" % {"d": desde}
     with Lector(clave()[0]) as db:
@@ -173,7 +182,7 @@ def listos_bitacora(desde):
     txt = open(BITACORA, encoding="utf-8").read()
     out = []
     for m in re.finditer(r"(?ms)^## ✅ LISTO · (\d{4}-\d{2}-\d{2} \d{2}:\d{2}) · chat «([^»]+)»\n(.*?)(?=^## |^# |\Z)", txt):
-        if m.group(1)[:10] >= desde:
+        if m.group(1) >= desde:
             dec = re.search(r"(?m)^- Espera a una socia: (.*)$", m.group(3))
             pen = re.search(r"(?m)^- Pendiente: (.*)$", m.group(3))
             out.append({"hora": m.group(1), "origen": m.group(2), "decision": dec.group(1) if dec else "",
@@ -201,9 +210,11 @@ def main():
     hasta = _arg("--hasta", time.strftime("%Y-%m-%d"))
     if _arg("--desde"):
         desde, fuente = _arg("--desde"), "pedido (--desde)"
+        if len(desde) == 10:
+            desde += " 00:00"
     else:
         desde, fuente = desde_por_defecto(hasta)
-    if desde > hasta:
+    if desde[:10] > hasta:
         sys.exit("✗ desde %s es después de hasta %s: ¿ya se cerró este día?" % (desde, hasta))
     fetch = "--sin-fetch" not in sys.argv
     L = ["# Cierre del día · %s → %s" % (desde, hasta), "",
@@ -283,7 +294,7 @@ def main():
     c = R["Conciliacion"]
     B.append("Truefie: publicado b%s · próximo libre b%d · main %s · dev %s" % (pub, libre, c["ramas"].get("main", ("—", "—"))[1],
                                                                               c["ramas"].get("dev", ("—", "—"))[1]))
-    publ = [l for l in git(REPOS["Conciliacion"], "log", "refs/remotes/origin/main", "--since=%s 00:00" % desde,
+    publ = [l for l in git(REPOS["Conciliacion"], "log", "refs/remotes/origin/main", "--since=%s" % desde,
                          "--date=format:%d-%m", "--format=%cd\t%s").splitlines() if re.search(r"\tb\d{3}:", l)]
     if publ:
         B.append("Publicado en main: " + " · ".join("%s (%s)" % (l.split("\t")[1].split(":")[0], l.split("\t")[0]) for l in reversed(publ)))
@@ -309,7 +320,9 @@ def main():
         B.append("Esperan a una socia: " + "; ".join([x["decision"] for x in dec] + ["T-%d" % t["id"] for t in en_val]))
     B.append("Bitácora: %s · skills: %s" % ("copias iguales" if iguales else "copias DISTINTAS", "ok" if not dif else "distintas"))
     L += ["", "## Bloque para el chat de Claude.ai", "", "```", *B, "```", ""]
-    salida = _arg("--salida", os.path.join(CIERRES, "CIERRE_DIA_%s.md" % hasta))
+    salida = _arg("--salida") or os.path.join(CIERRES, "CIERRE_DIA_%s.md" % hasta)
+    if not _arg("--salida") and os.path.exists(salida):          # un segundo cierre el mismo día no pisa el primero
+        salida = os.path.join(CIERRES, "CIERRE_DIA_%s_%s.md" % (hasta, time.strftime("%H%M")))
     os.makedirs(os.path.dirname(salida), exist_ok=True)
     open(salida, "w", encoding="utf-8").write("\n".join(L))
     print("\n".join(B)); print("\n→ %s (local, sin commitear)" % salida)
