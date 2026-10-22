@@ -331,6 +331,7 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .pdot{width:9px;height:9px;border-radius:2px;display:inline-block;flex-shrink:0}
 .renta-cell .rg{color:var(--text);font-variant-numeric:tabular-nums}
 .renta-cell .rp{color:var(--text-3);font-size:11px;font-variant-numeric:tabular-nums;margin-top:2px}
+.renta-tbl tfoot td .rp,.rm-l .rp{color:var(--text-3);font-size:11px;font-weight:400;margin-top:2px}   /* la línea del Aporte */
 .renta-na{color:var(--text-3)}
 .renta-cell .rg.rneg{color:var(--red)}   /* ganancia negativa: señal, no decoración */
 .renta-rowtot .rg,.renta-coltot .rg,.renta-grand .rg{font-weight:600}
@@ -26346,6 +26347,9 @@ async function reporteRenta(D1,D2){
   const {prods}=await computeCostos();            // HEREDA el motor real de costos
   const byKey={}; prods.forEach(p=>byKey[p.key]=p);
   const costoDe={}; RENTA_PROD.forEach(P=>{ const d=byKey[P.key]; costoDe[P.key]=d?(d.totalVenta||0):0; });   // costo por unidad de venta CON empaque (fuente única)
+  // Lo mismo SIN el indirecto de producción (materia prima + empaque): es el costo del APORTE (Andrea,
+  // 22-oct-2026), lo que deja el canal antes de los costos fijos de planta.
+  const costoDirDe={}; RENTA_PROD.forEach(P=>{ const d=byKey[P.key]; costoDirDe[P.key]=d?((d.totalVenta||0)-(d.indPerSales||0)):0; });
   _rentaData={byKey};
   // UoM de referencia (unidad de venta) por producto — para convertir el volumen
   const pids=RENTA_PROD.map(P=>P.pid), keyDe={}; RENTA_PROD.forEach(P=>keyDe[P.pid]=P.key);
@@ -26406,21 +26410,25 @@ async function reporteRenta(D1,D2){
       const netoCanal=RENTA_PROD.reduce((s,PP)=>{ const y=cell[c.key+'|'+PP.key]; return s+(y?y.neto:0); },0);
       const log=(logi.porCanal[c.key]||0)*(netoCanal?x.neto/netoCanal:0);
       const gan=x.neto-cprod-desc-frio-log;
+      const aporte=x.neto-costoDirDe[P.key]*x.vol-desc-frio-log;   // igual que gan, sin el indirecto
       // EL % NECESITA UNA BASE, Y LA BASE ES EL NETO. Si el neto es cero o negativo
       // —un mes con más notas de crédito que facturas— no hay margen que calcular:
       // dividir devuelve un número enorme y sin sentido (MegaSuper julio-2026 mostraba
       // +1.195,5% y −1.203,2% con un neto de prácticamente cero). `pct: null` significa
       // "no hay base", y la pantalla lo dice con un guion. La ganancia en ₡ sí se muestra:
       // esa no necesita base y sigue siendo verdad.
-      return {neto:x.neto, vol:x.vol, cprod, desc, frio, log, gan,
+      return {neto:x.neto, vol:x.vol, cprod, desc, frio, log, gan, aporte,
               pct: (x.neto>0) ? gan/x.neto : null};
     });
     return {P, celdas, rowTot:celdas.reduce((s,x)=>s+(x?x.gan:0),0)};
   });
   const colTot=canalesActivos.map((c,ci)=>filas.reduce((s,f)=>s+(f.celdas[ci]?f.celdas[ci].gan:0),0));
   const gran=colTot.reduce((s,x)=>s+x,0);
+  const colAporte=canalesActivos.map((c,ci)=>filas.reduce((s,f)=>s+(f.celdas[ci]?f.celdas[ci].aporte:0),0));
+  const granAporte=colAporte.reduce((s,x)=>s+x,0);
+  const colNeto=canalesActivos.map((c,ci)=>filas.reduce((s,f)=>s+(f.celdas[ci]?f.celdas[ci].neto:0),0));
   const netoTot=filas.reduce((s,f)=>s+f.celdas.reduce((a,x)=>a+(x?x.neto:0),0),0);
-  return {canalesActivos, filas, colTot, gran, netoTot, frioUnit, frioMes, chVol, logi, revIds};
+  return {canalesActivos, filas, colTot, gran, colAporte, granAporte, colNeto, netoTot, frioUnit, frioMes, chVol, logi, revIds};
 }
 async function cargarRenta(){
   const sel=document.getElementById('mesRenta'), ym=sel&&sel.value; if(!ym) return;
@@ -26450,11 +26458,15 @@ function rentaRender(R, label){
   });
   h+='</tbody><tfoot><tr><td>Total canal</td>'
     +R.colTot.map(t=>'<td class="renta-cell renta-coltot"><div class="rg'+(t<0?' rneg':'')+'">'+cMs(t)+'</div></td>').join('')
-    +'<td class="renta-cell renta-grand"><div class="rg">'+cMs(R.gran)+'</div></td></tr></tfoot></table>';
+    +'<td class="renta-cell renta-grand"><div class="rg">'+cMs(R.gran)+'</div></td></tr>'
+    +'<tr><td>Aporte<div class="rp">'+RENTA_APORTE_TXT+'</div></td>'
+    +R.colAporte.map((a,ci)=>'<td class="renta-cell renta-coltot"><div class="rg'+(a<0?' rneg':'')+'">'+cMs(a)+'</div><div class="rp">'+_rentaAportePct(a,R.colNeto[ci])+'</div></td>').join('')
+    +'<td class="renta-cell renta-grand"><div class="rg'+(R.granAporte<0?' rneg':'')+'">'+cMs(R.granAporte)+'</div><div class="rp">'+_rentaAportePct(R.granAporte,R.netoTot)+'</div></td></tr></tfoot></table>';
   // Conciliación + costos de canal aplicados. El gran total NO se repite acá: vive en
   // la celda esquina (Total canal × Total producto). Acá solo el contexto de neto.
   let foot='Ganancia = neto sin IVA − costo de producir (motor) − costo de canal '
-    +'(el total del mes está en la esquina de la tabla). Neto del mes: '+cM(R.netoTot)+'. Tocá un producto para ver su costo real.';
+    +'(el total del mes está en la esquina de la tabla). Neto del mes: '+cM(R.netoTot)+'. Tocá un producto para ver su costo real.'
+    +'<br>Aporte = neto sin IVA − materia prima − empaque − frío − transporte − comisión, sin el indirecto de producción.';
   const notas=R.canalesActivos.filter(c=>canalComRenta(c)||canalFrio(c)).map(c=>{
     const t=' title="'+esc(canalFuente(c))+'"';
     if(canalComRenta(c)) return '<span'+t+'>'+esc(c.label)+' −'+_pct(canalComRenta(c)*100)+' sobre neto</span>';
@@ -26524,11 +26536,19 @@ function _rentaMovLista(R, ci){
           : '<div class="rm-r rm-na">—</div>')
       +'</div>';
   });
-  const t=R.colTot[ci];
+  const t=R.colTot[ci], a=R.colAporte[ci];
   out+='<div class="rm-row rm-tot"><div class="rm-l"><div class="rm-nm">Total del canal</div></div>'
-    +'<div class="rm-r"><div class="rg'+(t<0?' rneg':'')+'">'+cMs(t)+'</div></div></div>';
+    +'<div class="rm-r"><div class="rg'+(t<0?' rneg':'')+'">'+cMs(t)+'</div></div></div>'
+    +'<div class="rm-row rm-tot"><div class="rm-l"><div class="rm-nm">Aporte</div><div class="rp">'+RENTA_APORTE_TXT+'</div></div>'
+    +'<div class="rm-r"><div class="rg'+(a<0?' rneg':'')+'">'+cMs(a)+'</div><div class="rp">'+_rentaAportePct(a,R.colNeto[ci])+'</div></div></div>';
   return out;
 }
+// APORTE DEL CANAL (Andrea, 22-oct-2026): la ganancia de arriba sin el indirecto de producción. El
+// indirecto es fijo de planta y se reparte por unidad: no desaparece si el canal se va, así que el
+// aporte es lo que responde «¿este canal deja plata o resta?». La línea la escribió Andrea («Aporte: lo
+// que deja…»): el rótulo de la fila es «Aporte» y esto va debajo, para no repetir la palabra.
+const RENTA_APORTE_TXT='lo que deja el canal antes de los costos fijos de planta';
+function _rentaAportePct(a, neto){ return neto>0 ? _pct(a/neto*100) : '—'; }
 // Abre/cierra las notas al pie de Rentabilidad (teléfono).
 function rentaFootToggle(btn){
   const b=btn.parentElement.querySelector('.rf-body'); if(!b) return;
