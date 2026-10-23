@@ -1,8 +1,10 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- COMPRA_TARIFA_HISTORIAL.sql  ·  21-oct-2026  ·  Tarifas que se actualizan solas (opción A, umbral 25 %)
--- ⛔ NO APLICADO. Lo autoriza una socia después de ver el ensayo en seco de la revisión diaria.
---    Probado en Postgres local (espejo del respaldo del 21-oct): ENSAYO_COMPRA_TARIFA_HISTORIAL.sql
---    todo ok, y este archivo + DESHACER_COMPRA_TARIFA_HISTORIAL.sql de ida y vuelta.
+-- ✅ APLICADO el 22-oct-2026 por Andrea en producción, después del ensayo 32/32. Fila de control:
+--    1 · 8 · 0 · INSERT,SELECT · INSERT · f · 1 · 1. VERIFICADO desde afuera (pg_lector, 18:56 CR): tabla con
+--    RLS, 8 políticas (las 3 propias + 5 del asistente), rol truefie_tarifa_auto SIN login, política
+--    plan_config_tarifa_auto y SELECT sobre plan_config, 0 filas. NO VOLVER A CORRER.
+--    El rol entra recién con la línea `alter role … login password 'SCRAM…'` (clave_tarifa_auto.py nueva).
 -- Para saber si está aplicado, mirar la base: `select to_regclass('public.compra_tarifa_historial')`.
 --
 -- QUÉ HACE
