@@ -2,7 +2,10 @@
 -- ENSAYO_COMPRA_TARIFA_HISTORIAL.sql  ·  21-oct-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA
 -- Prueba la tabla y el rol de COMPRA_TARIFA_HISTORIAL.sql y lo deshace todo (rollback).
 -- ✅ CORRIDO en Postgres local (espejo del respaldo del 21-oct, con los event triggers de producción):
---    todas ok = true. ⛔ NO corrido en producción.
+--    todas ok = true.
+-- ✅ CORRIDO en producción el 22-oct-2026 por Andrea: 32 de 32 ok = true, cada RECHAZA con su SQLSTATE.
+--    Rollback verificado desde afuera (pg_lector, 22-oct 18:49 CR): sin tabla, sin el rol truefie_tarifa_auto,
+--    sin la política plan_config_tarifa_auto y sin grants sobre plan_config.
 --
 -- CÓMO SE LEE
 --   Una tabla con TODAS las filas en ok = true. Un RECHAZA da ok solo si el SQLSTATE esperado es
