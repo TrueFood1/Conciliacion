@@ -5612,7 +5612,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 23 oct 2026 · b121';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 23 oct 2026 · b122';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -27223,10 +27223,17 @@ function _cobMontoHTML(r){
   return _cobExtTxt(r._ext)+'<div class="muted" style="font-size:11px;font-weight:400">≈ '+_crcTico(r._crc)+'</div>';
 }
 function _cobSuma(a){ return a.reduce((s,r)=>s+r._crc,0); }
-// Lo que NO es colones dentro de un grupo, por moneda («$2.398,44»): la fila del proveedor lo
-// dice sin tener que desplegarla, que es lo primero que se ve en teléfono.
+// Lo que NO es colones dentro de un grupo, por moneda («$2.398,44»). La fila del proveedor lo
+// pone ARRIBA, porque en esa moneda se paga (Andrea, 23-oct); el equivalente en colones va abajo.
 function _cobExtDe(a){ const por={}; a.filter(r=>r._ext).forEach(r=>{ por[r._ext.cur]=(por[r._ext.cur]||0)+r._ext.c; });
   return Object.keys(por).map(k=>_cobExtTxt({cur:k,c:por[k]})).join(' + '); }
+// Fila del proveedor: cada moneda en la suya («$2.398,44», o «₡50.000,00 + $254,25» si mezcla) y,
+// si hay alguna que no es colones, el total en colones abajo. Sin dólares, igual que siempre.
+function _cobGrupoMonto(a){
+  const ext=_cobExtDe(a); if(!ext) return _crcTico(_cobSuma(a));
+  const crc=_cobSuma(a.filter(r=>!r._ext));
+  return (crc?_crcTico(crc)+' + ':'')+ext+'<div class="muted" style="font-size:11px;font-weight:400">≈ '+_crcTico(_cobSuma(a))+'</div>';
+}
 function _cobExtNota(n, todasUSD){ return n+(n===1?' factura':' facturas')+(todasUSD?' en dólares':' en otra moneda')+(n===1?', sumada':', sumadas')+' en colones al tipo de cambio de cada factura'; }
 async function cobLoad(which){
   const mt=_COB_MT[which];
@@ -27411,8 +27418,7 @@ function renderCobCliente(which,d,el){
         +'<span class="cob-diasmov cob-venc'+(venc&&g.maxVenc>COB_DIAS_ROJO?' cob-d30':'')+'"> · '
         +(venc?(g.maxVenc+' d'):'al día')+'</span>'
         +((wa && !waOk)?'<span class="cob-waest-mov'+(wa.st==='sin_venc'?'':' cob-waest-av')+'"> · '+esc(wa.txt)+'</span>':'')+'</td>'
-      +'<td class="cob-g-tot" style="text-align:right"><strong>'+_crcTico(g.total)+'</strong>'
-        +(_cobExtDe(g.rows)?'<div class="muted" style="font-size:11px">incluye '+_cobExtDe(g.rows)+'</div>':'')+'</td>'
+      +'<td class="cob-g-tot" style="text-align:right"><strong>'+_cobGrupoMonto(g.rows)+'</strong></td>'
       +'<td class="cob-g-venc" style="text-align:right">'+vencCell+'</td>'+celdaAcc+'</tr>';
     const copiaDet = conAcc
       ? '<div class="cob-detacc"><button class="cob-copy" onclick="cobCopiar('+i+',event)">Copiar recordatorio</button></div>' : '';
