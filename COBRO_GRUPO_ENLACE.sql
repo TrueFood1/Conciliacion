@@ -1,7 +1,8 @@
 -- ════════════════════════════════════════════════════════════════════════
 -- COBRO_GRUPO_ENLACE · enlaces de invitación de los grupos de WhatsApp de cobro
--- PREPARADO, NO APLICADO. NO SE CORRIÓ EN NINGUNA BASE (23-oct-2026, b121).
--- Lo pega Andrea en Supabase, con su OK, cuando b121 vaya a publicarse.
+-- APLICADO en producción por Andrea (23-oct-2026, b121). Control: t·8·0·0·DELETE,INSERT,SELECT,UPDATE·0.
+-- Verificado desde afuera con pg_lector: la tabla existe, RLS t, 4 restrictivas del asistente
+-- + 4 propias, sin asistente_ve_todo. esquema_check y sonda_front en verde.
 -- [Origen: chat «Retomar 23-oct» + consulta de Instinct «Diseño CRM WA Cobros»]
 --
 -- Qué guarda: UNA fila por grupo de cobro. `partner_id` es el contacto del grupo en
@@ -31,6 +32,8 @@ create table public.cobro_grupo_enlace (
   actualizado_por text not null default (auth.jwt() ->> 'email'),
   actualizado_en timestamptz not null default now()
 );
+
+alter table public.cobro_grupo_enlace enable row level security;   -- ya lo prende ensure_rls; no estorba
 
 revoke all on public.cobro_grupo_enlace from anon, authenticated;
 grant select, insert, update, delete on public.cobro_grupo_enlace to authenticated;
