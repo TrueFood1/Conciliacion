@@ -331,6 +331,7 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .pdot{width:9px;height:9px;border-radius:2px;display:inline-block;flex-shrink:0}
 .renta-cell .rg{color:var(--text);font-variant-numeric:tabular-nums}
 .renta-cell .rp{color:var(--text-3);font-size:11px;font-variant-numeric:tabular-nums;margin-top:2px}
+.renta-tbl tfoot td .rp,.rm-l .rp{color:var(--text-3);font-size:11px;font-weight:400;margin-top:2px}   /* la línea del Aporte */
 .renta-na{color:var(--text-3)}
 .renta-cell .rg.rneg{color:var(--red)}   /* ganancia negativa: señal, no decoración */
 .renta-rowtot .rg,.renta-coltot .rg,.renta-grand .rg{font-weight:600}
@@ -5516,7 +5517,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 20 oct 2026 · b116';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 22 oct 2026 · b118';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -25922,12 +25923,20 @@ const CANALES = [
    comision:{pct:0.126, enFactura:true, fuente:'acuerdo comercial · confirmado por Andrea, 9-ago-2026',
              intro:{pct:0.1697, meses:3, motivo:'tarifa de introducción de producto nuevo'}},
    frioPartner:713,
-   frio:{monto:612726.83, modo:'constante', desvioMax:0.05,
-         fuente:'aviso de pago de Automercado del 3-ago-2026: factura 0010000101 0000003373 por '
-               +'₡1.800.739,66 − ND FACCLI-0061942 (22-jul) por ₡612.912 = depósito ₡1.187.827,66. '
-               +'En Odoo solo queda el write-off: NO hay factura ni nota de débito formal.',
-         nota:'Automercado no declara el mes de servicio en el texto, así que va por CONSTANTE. '
-             +'Si el write-off del mes difiere más de 5%, la validación lo avisa en ámbar.'}},
+   // FRÍO DE AUTOMERCADO DESDE SU FE, SIN IVA, POR EL MES ESCRITO EN EL DETALLE (Andrea, 20-oct-2026).
+   // Automercado le emite a True Food una FE por mes, al mes vencido, y la descuenta del pago de
+   // una factura nuestra. En el mayor solo queda un «Write-Off» en 6106013 con la fecha del PAGO,
+   // que no dice qué mes cubre. El mes viene escrito en el detalle de la FE. Caso que lo fijó:
+   // FE 00100099010000064770, emitida 17-sep-2026, línea única «OV ESPACIO CONGELADO AM AGOSTO
+   // 2026», 1 × ₡545.400, total ₡616.302 con IVA → es el write-off del 2-oct (PBACC/2026/00851).
+   // Se suma el <SubTotal> de cada línea (sin IVA): no hay que dividir entre 1,13.
+   // La FE se lee de electronic.voucher.supplier (xml_supplier_approval), igual que Lusof.
+   // `monto` es el respaldo SIN IVA (la FE de julio, ₡542.400): solo entra si la FE no se pudo leer
+   // o el mes no tiene línea, y la vista lo dice.
+   frio:{monto:542400, modo:'feDetalle', rxDetalle:'ESPACIO\\s+CONGELADO',
+         fuente:'FE mensual de Automercado (electronic.voucher.supplier): SubTotal sin IVA de las líneas '
+               +'«ESPACIO CONGELADO <MES> <AÑO>» — ej. FE 00100099010000064770 del 17-sep-2026: AGOSTO 2026, ₡545.400',
+         nota:'Antes iba la constante ₡612.726,83, CON IVA (promedio de los write-offs de julio).'}},
   {key:'walmart',label:'Walmart / Más x Menos', plId:10,
    // enFactura:true CORREGIDO el 12-ago-2026. Estaba en false y Rentabilidad le restaba el
    // 6,54% a un neto que YA lo traía descontado: doble conteo de ~6,5 puntos de margen.
@@ -25956,12 +25965,17 @@ const CANALES = [
    // verificado que las facturas de venta van con discount 0 y que las bills del proveedor son
    // solo frío, así que no hay doble conteo.
    frioPartner:1224,
-   frio:{porTienda:2709.19, unidades_cobro:10, verificado:true, editable:true, modo:'parseMes',
+   // Desde T-238 (22-oct-2026) Rentabilidad suma los renglones reales del mes (canalFrioMes). Un mes
+   // sin FE (ago y sep-2026 no tienen) usa el ÚLTIMO frío conocido, con aviso (sinFE:'ultimo', Andrea
+   // 22-oct); la multiplicación queda solo si no hay ningún mes anterior con FE.
+   frio:{porTienda:2709.19, unidades_cobro:10, verificado:true, editable:true, modo:'parseMes', sinFE:'ultimo',
          fuente:'bills del proveedor en 6106013, una por tienda — julio 2026 (11-ago-2026)',
          nota:'Arranca en mayo 2026. El write-off de ₡12.018,39 en 6106028 NO es gasto: es el pago de las bills de mayo+junio (₡10.635,75 × 1,13 = ₡12.018,40) descontado del depósito.'}},
   {key:'compre', label:'Compre Bien',           plId:5,
    comision:null,
    frioPartner:1032,
+   // Desde T-238 (22-oct-2026) Rentabilidad usa el frío REAL del mes, de sus FE (canalFrioMes): de
+   // dic-2025 a may-2026 fue ₡41-51 mil, no 76.500. `monto` queda de respaldo para un mes sin FE.
    frio:{monto:76500, verificado:true, editable:true, antes:45280, modo:'parseMes',
          fuente:'facturas del proveedor en 6106013, verificado factura por factura (11-ago-2026)',
          nota:'MENSUAL, una línea por TIENDA y por línea de producto, con el mes escrito en el texto '
@@ -26005,18 +26019,136 @@ const canalFrio = c => !c.frio ? 0 : (c.frio.porTienda ? c.frio.porTienda*(c.fri
 // ₡156.202 (mezcla de meses + la transitoria) y MegaSuper ₡39.110 (incluye el write-off de
 // mayo+junio). Leer el mayor a lo bruto da PEOR que la constante.
 // Compre Bien y MegaSuper escriben el mes en el texto de cada línea → se parsea de ahí.
-// Automercado no lo escribe → va por constante, con aviso si el mes se desvía más de 5%.
+// Automercado lo escribe en el detalle de su FE → modo 'feDetalle' (ver su entrada en CANALES).
 const _MESTXT={enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,
                setiembre:9,septiembre:9,octubre:10,noviembre:11,diciembre:12};
-function _frioMesDe(txt){
-  const t=(txt||'').toLowerCase();
-  for(const k in _MESTXT){ if(t.indexOf(k)>=0) return _MESTXT[k]; }
-  return null;
+// Los meses de servicio ('YYYY-MM') que cubre una línea de frío de proveedor, leídos del texto
+// (T-238, 22-oct-2026). «// JULIO // NICOYA» → el mes; el año, si el texto no lo dice, es el de la
+// fecha de la factura, o el anterior cuando el mes queda más de uno por delante de ella
+// («DICIEMBRE» facturado en enero). «ENERO A ABRIL» → los cuatro meses (el monto se reparte en
+// partes iguales). [] si no hay mes legible.
+const _RX_MES_TXT=new RegExp('\\b('+Object.keys(_MESTXT).join('|')+')\\b(?:\\s+(\\d{4})\\b)?','gi');
+function _frioMesesDe(txt, fecha){
+  const ms=[]; let m; _RX_MES_TXT.lastIndex=0;
+  while((m=_RX_MES_TXT.exec(txt||''))) ms.push({mes:_MESTXT[m[1].toLowerCase()], anio:m[2]?+m[2]:null});
+  if(!ms.length) return [];
+  const yf=+String(fecha).slice(0,4), mf=+String(fecha).slice(5,7);
+  const ym=x=>(x.anio || (x.mes>mf+1 ? yf-1 : yf))+'-'+String(x.mes).padStart(2,'0');
+  const rango=/\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|setiembre|septiembre|octubre|noviembre|diciembre)\s+a\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|setiembre|septiembre|octubre|noviembre|diciembre)\b/i.exec(txt||'');
+  if(!rango) return [ym(ms[0])];
+  const a=ym({mes:_MESTXT[rango[1].toLowerCase()]}), b=ym({mes:_MESTXT[rango[2].toLowerCase()]}), out=[];
+  for(let y=+a.slice(0,4), mm=+a.slice(5,7); out.length<12; ){
+    const k=y+'-'+String(mm).padStart(2,'0'); out.push(k); if(k>=b) break;
+    if(++mm>12){ mm=1; y++; }
+  }
+  return out;
 }
-// Devuelve {monto, fuente:'parseo'|'constante', aviso:''} para el canal en el mes [D1,D2].
+// XML de una FE de proveedor guardada en electronic.voucher.supplier (base64, UTF-8).
+// null si no se puede decodificar. Lo usan Lusof y el frío de Automercado.
+function _xmlDeVoucher(v){
+  const b=v&&v.xml_supplier_approval; if(!b) return null;
+  try{ return decodeURIComponent(escape(atob(b))); }catch(e){ try{ return atob(b); }catch(e2){ return null; } }
+}
+// Mes (YYYY-MM) escrito en un texto como «ESPACIO CONGELADO AM AGOSTO 2026»: nombre del mes
+// seguido del año. null si no lo trae.
+const _RX_MES_ANIO=new RegExp('\\b('+Object.keys(_MESTXT).join('|')+')\\s+(\\d{4})\\b','i');
+function _mesAnioDe(txt){
+  const m=_RX_MES_ANIO.exec(txt||''); if(!m) return null;
+  return m[2]+'-'+String(_MESTXT[m[1].toLowerCase()]).padStart(2,'0');
+}
+// Mes anterior a una fecha 'YYYY-MM-DD…' → 'YYYY-MM'. Automercado factura el frío al mes vencido.
+function _mesAnterior(f){
+  let y=+String(f).slice(0,4), m=+String(f).slice(5,7)-1; if(m===0){ m=12; y--; }
+  return y+'-'+String(m).padStart(2,'0');
+}
+// Las líneas de frío de un XML de FE para el mes `ym` (Andrea, 21-oct-2026): el mes es el que dice el
+// detalle («ESPACIO CONGELADO AM AGOSTO 2026»); si no dice, el mes ANTERIOR a la fecha de emisión de la
+// FE, y la línea sale marcada `porRegla` para que la vista lo avise. Sin fecha ni mes, no entra.
+function _frioLineasXml(xml, k, rx, ym){
+  const out=[], fe=/<(?:\w+:)?FechaEmision\b[^>]*>([\s\S]*?)<\/(?:\w+:)?FechaEmision>/i.exec(xml);
+  const fecha=fe?fe[1].trim().slice(0,10):'';
+  const re=/<(?:\w+:)?LineaDetalle\b[^>]*>([\s\S]*?)<\/(?:\w+:)?LineaDetalle>/gi; let m;
+  while((m=re.exec(xml))){
+    const det=/<(?:\w+:)?Detalle\b[^>]*>([\s\S]*?)<\/(?:\w+:)?Detalle>/i.exec(m[1]);
+    const sub=/<(?:\w+:)?SubTotal\b[^>]*>([\s\S]*?)<\/(?:\w+:)?SubTotal>/i.exec(m[1]);
+    if(!det || !rx.test(det[1])) continue;
+    const delDetalle=_mesAnioDe(det[1]), mes=delDetalle || (fecha?_mesAnterior(fecha):null);
+    if(mes!==ym) continue;
+    out.push({fe:k, fecha:fecha, detalle:det[1].trim(), monto:sub?(+sub[1]||0):0, porRegla:!delDetalle});
+  }
+  return out;
+}
+// Devuelve {monto, fuente:'parseo'|'fe'|'constante', aviso:''} para el canal en el mes [D1,D2].
 async function canalFrioMes(c, D1, D2){
   const base=canalFrio(c);
   if(!c.frio || !c.frioPartner) return {monto:base, fuente:'constante', aviso:''};
+  if(c.frio.modo==='feDetalle'){
+    // El mes lo dice el detalle de la FE (o, si no lo dice, el mes anterior a la FE, con aviso): se
+    // leen todas las FE del partner y se suman las líneas de frío de ese mes (_frioLineasXml).
+    let vs=[];
+    try{
+      vs=await odooCall('electronic.voucher.supplier','search_read',
+        [[['partner_id','=',c.frioPartner],['xml_supplier_approval','!=',false]]],
+        // order explícito: Automercado ya tiene más de 300 FE (casi todas tiquetes de compra) y sin él
+        // el límite dependía del orden por defecto del modelo; las de frío son de las más nuevas.
+        {fields:['consecutive_number_xml','xml_supplier_approval'],order:'id desc',limit:400});
+    }catch(e){
+      return {monto:base, fuente:'constante', aviso:'no pude leer las FE de '+c.label+' ('+((e&&e.message)||e)+'): va el respaldo '+cM(base)+' sin IVA'};
+    }
+    const ym=D1.slice(0,7), rx=new RegExp(c.frio.rxDetalle,'i'), vistas={}, lineas=[];
+    for(const v of (vs||[])){
+      const k=v.consecutive_number_xml||''; if(k && vistas[k]) continue; vistas[k]=1;   // la misma FE cargada dos veces cuenta una
+      const xml=_xmlDeVoucher(v); if(!xml) continue;
+      _frioLineasXml(xml, k, rx, ym).forEach(function(x){ lineas.push(x); });
+    }
+    if(!lineas.length) return {monto:base, fuente:'constante',
+      aviso:'no hay FE de frío de '+c.label+' para este mes: va el respaldo '+cM(base)+' sin IVA'};
+    const avisos=[];
+    if(lineas.length>1) avisos.push(lineas.length+' líneas de frío para el mismo mes');
+    lineas.filter(function(x){ return x.porRegla; }).forEach(function(x){
+      avisos.push('la FE '+x.fe+' no dice el mes: se toma el anterior a su fecha ('+x.fecha+')'); });
+    return {monto:lineas.reduce(function(s,x){ return s+x.monto; },0), fuente:'fe', n:lineas.length, lineas:lineas,
+      aviso: avisos.join(' · ')};
+  }
+  if(c.frio.modo==='parseMes'){
+    // FRÍO REAL DEL MES desde las FE del proveedor (T-238, Andrea 22-oct-2026): una línea por tienda y
+    // por mes, con el mes escrito en el texto (_frioMesesDe). Solo facturas y notas del proveedor: los
+    // write-offs de 6106028 son el PAGO de esas mismas FE con IVA, y las compensaciones de 111601 son
+    // asientos de cierre; sumarlos sería contar dos veces. Hasta dic-2025 Compre Bien iba a 111601
+    // (frío pagado por adelantado) y desde ene-2026 a 6106013: se leen las dos.
+    let ls=[];
+    try{
+      ls=await odooCall('account.move.line','search_read',
+        [[['partner_id','=',c.frioPartner],['account_id.code','in',['6106013','111601']],
+          ['move_id.move_type','in',['in_invoice','in_refund']],['display_type','=','product'],
+          ['parent_state','=','posted'],['date','>=',_frioDesde(D1)],['date','<=',_frioHasta(D2)]]],
+        {fields:['name','debit','credit','date','move_id'],limit:400});
+    }catch(e){
+      return {monto:base, fuente:'constante', aviso:'no pude leer las FE de frío de '+c.label+' ('+((e&&e.message)||e)+'): va la constante '+cM(base)};
+    }
+    const ym=D1.slice(0,7), lineas=[]; let sinMes=0, repartidas=0;
+    ls.forEach(function(l){
+      const ms=_frioMesesDe(l.name, l.date);
+      if(!ms.length){ sinMes++; return; }
+      if(ms.indexOf(ym)<0) return;
+      if(ms.length>1) repartidas++;
+      lineas.push({fe:l.move_id&&l.move_id[1], fecha:l.date, detalle:(l.name||'').trim(),
+                   monto:((l.debit||0)-(l.credit||0))/ms.length});
+    });
+    if(!lineas.length && c.frio.sinFE==='ultimo'){
+      const ult=await _frioUltimoConocido(c, ym);
+      if(ult) return {monto:ult.monto, fuente:'estimado', n:0, lineas:[],
+        aviso:'frío estimado: sin factura del mes (se usa el de '+_ymLabel(ult.ym)+')'};
+    }
+    // Blindaje: si el mes no tiene ni una línea (ni un mes anterior conocido), cae a la constante Y LO DICE.
+    if(!lineas.length) return {monto:base, fuente:'constante',
+      aviso:'no hay FE de frío de '+c.label+' para este mes: va la constante '+cM(base)};
+    const iva = FRIO_CON_IVA ? FRIO_IVA : 1, avisos=[];
+    if(repartidas) avisos.push(repartidas+' FE cubre'+(repartidas===1?'':'n')+' varios meses: se reparte en partes iguales');
+    if(sinMes) avisos.push(sinMes+' línea'+(sinMes===1?'':'s')+' de frío sin mes legible, no se contaron');
+    return {monto:lineas.reduce(function(s,x){ return s+x.monto; },0)*iva, fuente:'parseo', n:lineas.length,
+      lineas:lineas, aviso:avisos.join(' · ')};
+  }
   let ls=[];
   try{
     ls=await odooCall('account.move.line','search_read',
@@ -26026,23 +26158,11 @@ async function canalFrioMes(c, D1, D2){
   }catch(e){
     return {monto:base, fuente:'constante', aviso:'no pude leer el mayor ('+((e&&e.message)||e)+'): va la constante'};
   }
-  const mes=+D1.slice(5,7);
-  if(c.frio.modo==='parseMes'){
-    let suma=0, n=0, sinMes=0;
-    ls.forEach(function(l){
-      const m=_frioMesDe(l.name);
-      if(m===null){ sinMes++; return; }
-      if(m===mes){ suma+=(l.debit||0)-(l.credit||0); n++; }
-    });
-    // Blindaje: si no se pudo parsear nada, o el mes no tiene ni una línea, cae a la constante Y LO DICE.
-    if(!n) return {monto:base, fuente:'constante',
-      aviso:'no encontré ninguna línea de frío con el mes escrito en el texto: va la constante ('+cM(base)+')'};
-    const iva = FRIO_CON_IVA ? FRIO_IVA : 1;
-    return {monto:suma*iva, fuente:'parseo', n:n,
-      aviso: sinMes ? (sinMes+' línea'+(sinMes===1?'':'s')+' de frío sin mes legible, no se contaron') : ''};
-  }
-  // modo constante (Automercado): se compara contra lo posteado y se avisa si difiere
-  const post=ls.reduce(function(s,l){ return s+(l.debit||0)-(l.credit||0); },0);
+  // modo constante: se compara contra lo posteado EN EL MES y se avisa si difiere. La ventana
+  // de arriba es de varios meses (sirve al parseo); sumarla entera daba un falso ×4 (agosto
+  // ₡2.454.668 = los cargos de julio a octubre, 20-oct-2026).
+  const post=ls.filter(function(l){ return l.date>=D1 && l.date<=D2; })
+    .reduce(function(s,l){ return s+(l.debit||0)-(l.credit||0); },0);
   const lim=c.frio.desvioMax||0.05;
   const av = (post>0 && Math.abs(post-base)/base>lim)
     ? ('el mayor de este mes trae '+cM(post)+' contra la constante '+cM(base)
@@ -26050,9 +26170,27 @@ async function canalFrioMes(c, D1, D2){
     : '';
   return {monto:base, fuente:'constante', aviso:av};
 }
+// El último mes ANTERIOR a `ym` con FE de frío del canal, sumado igual que canalFrioMes: {ym, monto} o
+// null. Mira hasta 12 meses atrás. Lo usa MegaSuper en un mes sin factura (sinFE:'ultimo').
+async function _frioUltimoConocido(c, ym){
+  const d=new Date(ym+'-01T00:00:00'); d.setMonth(d.getMonth()-12);
+  const ls=await odooCall('account.move.line','search_read',
+    [[['partner_id','=',c.frioPartner],['account_id.code','in',['6106013','111601']],
+      ['move_id.move_type','in',['in_invoice','in_refund']],['display_type','=','product'],
+      ['parent_state','=','posted'],['date','>=',_ymd(d)]]],
+    {fields:['name','debit','credit','date'],limit:400});
+  const porMes={};
+  ls.forEach(function(l){
+    const ms=_frioMesesDe(l.name, l.date);
+    ms.forEach(function(m){ porMes[m]=(porMes[m]||0)+((l.debit||0)-(l.credit||0))/ms.length; });
+  });
+  const prev=Object.keys(porMes).filter(m=>m<ym && porMes[m]>0).sort().pop();
+  return prev ? {ym:prev, monto:porMes[prev]*(FRIO_CON_IVA?FRIO_IVA:1)} : null;
+}
 // El cargo puede postearse con desfase: se mira una ventana amplia y el mes lo decide el TEXTO.
+// Hasta seis meses después: la diferencia de San Carlos «enero a abril» se facturó el 20-may.
 function _frioDesde(D1){ const d=new Date(D1+'T00:00:00'); d.setMonth(d.getMonth()-1); return _ymd(d); }
-function _frioHasta(D2){ const d=new Date(D2+'T00:00:00'); d.setMonth(d.getMonth()+3); return _ymd(d); }
+function _frioHasta(D2){ const d=new Date(D2+'T00:00:00'); d.setMonth(d.getMonth()+6); return _ymd(d); }
 // Cómo se explica ese número en el tooltip: si es por tienda, se muestra la multiplicación.
 const canalFrioCalc = c => (c.frio && c.frio.porTienda)
   ? cM(c.frio.porTienda)+' × '+fmtN(c.frio.unidades_cobro||0)+' = '+cM(canalFrio(c))
@@ -26096,23 +26234,33 @@ async function _rentaReversiones(D1,D2){
 // ── LOGÍSTICA POR CANAL — cuatro modelos distintos, uno por transportista ──
 // (1) MARLON, fijo por viaje: entrega a los CEDI de Automercado y Walmart SOLO los lunes,
 //     con cita. Misma frecuencia a los dos → 50/50. Regla de operación, no supuesto.
-// (2) LUSOF, por SEMANA DE SERVICIO: cada factura cubre una semana lun-vie y el rango va en
-//     el <OtroTexto> del comprobante electrónico. El costo de la semana se reparte entre lo
-//     facturado a sus clientes ESA MISMA semana. Se lee del XML: no hay que transcribir nada.
+// (2) LUSOF, POR MES (T-237, Andrea 22-oct-2026): cada factura cubre una semana lun-vie (el rango
+//     va en el <OtroTexto> del comprobante) y cuenta en el mes de esa semana. El total del mes se
+//     reparte entre TODOS los clientes que Lusof entrega (LOG_LUSOF_CLIENTES) según lo facturado a
+//     cada uno EN EL MES; solo se cargan las partes de BM y Compre Bien, y las demás (Mentha, Societe
+//     Saphir…) se restan del total sin cargárselas a nadie. Antes se repartía semana por semana, y eso
+//     emparejaba mal: Lusof entrega la semana siguiente lo que facturamos el viernes (BM facturado el
+//     13-feb salió del 16 al 20-feb, según sus FE de feb-abr), así que una semana con solo Compre Bien
+//     facturado se llevaba la factura entera (julio-2026: semanal ₡94.735 contra ₡46.541 por mes).
 // (3) EYC → MegaSuper. (4) DON JORGE: par ingreso/gasto (cobrado por el producto Envío menos
 //     lo pagado); el NETO se carga a los canales que lo generan.
-// MENTHA Y LIMÓN queda FUERA del reparto de Lusof a propósito — ver la nota de abajo.
 const LOG_MARLON=1161, LOG_LUSOF=1106, LOG_EYC=1098;
-const LOG_LUSOF_CLI={1004:'bm',1006:'bm',1008:'bm',1011:'bm',1012:'bm',1054:'bm',1104:'bm',1191:'bm',
-                     1032:'compre'};
-// A Mentha (887) NO se le asigna Lusof. El método supone que si a un cliente se le facturó esa
-// semana, Lusof lo llevó — y para Mentha es falso: también lo entrega EyC (consta en su factura
-// de enero) y Don Jorge. En 3 de las 22 semanas Mentha aparecía SOLO y absorbía la factura
-// entera; la del 2-6 de marzo cargaba ₡125.676 contra ₡55.360 de venta, un 227%. Es limitación
-// del método, no un dato. Se resuelve cuando Lusof mande el detalle por factura.
-const LOG_SIN_ASIGNAR_NOTA='Mentha y limón: logística no asignable — el método no aplica a este cliente';
+// Los clientes de Lusof salen de sus propias FE: de feb a abr-2026 (y tres de 2024) el <OtroTexto>
+// nombra cada destino con NUESTRO número de factura («BM UVITA 3213 13/4/2026»), y cada número se
+// cruzó con su cliente en Odoo (22-oct-2026, 23 destinos en 9 FE). Desde mayo sus FE ya no nombran
+// destinos: un cliente nuevo de Lusof hay que sumarlo acá a mano. BM Boston y BM Dominical no salen en
+// esas FE, pero son dos de las ocho tiendas BM del reparto de Lusof medido el 12-ago-2026 (BITACORA):
+// sin ellas, BM pesa de menos en el denominador y Compre Bien carga su parte (jul-2026: ₡65.084
+// en vez de ₡46.541).
+// Mentha y los otros entran al DENOMINADOR (se llevan su parte del costo) pero no se les carga: Mentha
+// también la entregan EyC y Don Jorge, y ninguno de ellos es canal propio de Rentabilidad.
+const LOG_LUSOF_CLIENTES={
+  1006:'BM Quepos', 1104:'BM Limitada', 1008:'BM Uvita', 1011:'BM Palmar', 1012:'BM Corcovado',
+  1054:'BM Daniel Flores', 1004:'BM Boston', 1191:'BM Dominical', 1032:'Compre Bien', 887:'Mentha y limón', 1205:'Societe Saphir (Le Gourmet)',
+  880:'Saretto'};
+const LOG_LUSOF_CANALES=['bm','compre'];   // los canales a los que SÍ se les carga su parte
 
-async function reporteLogistica(D1,D2,cell,keyDe){
+async function reporteLogistica(D1,D2,cell,keyDe,netoCli){
   const out={porCanal:{}, detalle:[], sinAsignar:[], notas:[]};
   const gastoDe=async(pid,cta)=>{
     const g=await odooCall('account.move.line','read_group',
@@ -26129,12 +26277,13 @@ async function reporteLogistica(D1,D2,cell,keyDe){
   const eyc=await gastoDe(LOG_EYC,'6103003');
   if(eyc){ out.porCanal.mega=(out.porCanal.mega||0)+eyc;
            out.detalle.push({q:'EyC (MegaSuper)', monto:eyc, modo:'directo al canal'}); }
-  // (2) Lusof por semana de servicio
-  const lu=await logLusofSemanal(D1,D2);
+  // (2) Lusof por mes, entre todos sus clientes según lo facturado en el mes
+  const lu=await logLusofMes(D1,D2,netoCli);
   for(const k in lu.porCanal) out.porCanal[k]=(out.porCanal[k]||0)+lu.porCanal[k];
-  if(lu.total) out.detalle.push({q:'Lusof (BM + Compre Bien)', monto:lu.total, modo:'por semana de servicio'});
-  out.sinAsignar=lu.sinAsignar;
-  if(lu.mentha) out.notas.push(LOG_SIN_ASIGNAR_NOTA);
+  if(lu.total) out.detalle.push({q:'Lusof (BM + Compre Bien)', monto:lu.total, modo:'por mes · según lo facturado a cada cliente de Lusof en el mes'});
+  out.sinAsignar=lu.sinAsignar; out.lusofIlegibles=lu.ilegibles||[]; out.lusofFuera=lu.fuera;
+  if(lu.fuera.length) out.notas.push('Lusof sin cargar (clientes que no son BM ni Compre Bien): '
+    +lu.fuera.map(x=>x.cliente+' '+cM(x.monto)).join(' · '));
   // (4) Don Jorge: par ingreso/gasto, el NETO a sus canales por su peso de venta
   const pag=await odooCall('account.move.line','read_group',
     [[['account_id.code','=','6400003'],['parent_state','=','posted'],['date','>=',D1],['date','<=',D2],
@@ -26152,10 +26301,38 @@ async function reporteLogistica(D1,D2,cell,keyDe){
   return out;
 }
 
-// Reparto semanal de Lusof. El rango de fechas sale del <OtroTexto> del comprobante
-// electrónico (formato "SERVICIO DE TRANSPORTE DEL d AL d-m-aa"): 24 de 27 lo traen.
-async function logLusofSemanal(D1,D2){
-  const res={porCanal:{}, total:0, sinAsignar:[], mentha:false};
+// La semana de servicio escrita en el <OtroTexto> de una FE de Lusof → {a, b} ('YYYY-MM-DD'), o null.
+// Formatos medidos en las 37 FE (21-oct-2026): «DEL 17 AL 21-8-26» (el de casi todas),
+// «DEL 30 MARZO AL 1 ABRIL 26» (mes con nombre, cruza de mes), «DEL 28 AL 2-10-26» (cruza de mes sin
+// decirlo) y «DEL 27-8-24» (un solo día).
+const _RX_LUSOF_SEM=new RegExp('DEL\\s+(\\d{1,2})(?:[\\s-]+('+Object.keys(_MESTXT).join('|')+'|\\d{1,2})\\b)?'
+  +'(?:[\\s-]+(\\d{2,4})\\b)?(?:\\s+AL\\s+(\\d{1,2})[\\s-]+('+Object.keys(_MESTXT).join('|')+'|\\d{1,2})[\\s-]+(\\d{2,4})\\b)?','i');
+function _lusofSemana(txt){
+  const m=_RX_LUSOF_SEM.exec(txt||''); if(!m) return null;
+  const mes=function(x){ return /^\d+$/.test(x) ? +x : _MESTXT[x.toLowerCase()]; };
+  const anio=function(x){ x=+x; return x<100 ? 2000+x : x; };
+  let d1=+m[1], m1=m[2]?mes(m[2]):null, y1=m[3]?anio(m[3]):null, d2, m2, y2;
+  if(m[4]){
+    d2=+m[4]; m2=mes(m[5]); y2=anio(m[6]);
+    // «DEL 28 AL 2-10-26»: sin mes de inicio y el día de inicio mayor → empezó el mes anterior (28-sep).
+    // El lector viejo la leía como 28-oct a 2-oct, una semana al revés que no juntaba ninguna venta.
+    if(m1==null) m1=(d1>d2) ? (m2===1?12:m2-1) : m2;
+    if(y1==null) y1=(m1>m2)?y2-1:y2;
+  }
+  else { if(m1==null || y1==null) return null; d2=d1; m2=m1; y2=y1; }
+  const ok=function(d,mm){ return mm>=1 && mm<=12 && d>=1 && d<=31; };
+  if(!ok(d1,m1) || !ok(d2,m2)) return null;
+  const f=function(y,mm,d){ return y+'-'+String(mm).padStart(2,'0')+'-'+String(d).padStart(2,'0'); };
+  const a=f(y1,m1,d1), b=f(y2,m2,d2);
+  return a<=b ? {a:a, b:b} : null;
+}
+// Reparto mensual de Lusof. La semana de cada factura sale del <OtroTexto> del comprobante
+// electrónico (_lusofSemana) y decide el mes; el total del mes se reparte por lo facturado en el mes a
+// cada cliente de LOG_LUSOF_CLIENTES (`netoCli`, de las mismas líneas de venta de Rentabilidad), y a los
+// canales de LOG_LUSOF_CANALES se les carga su parte. Si una FE no trae una semana legible, su factura NO
+// se salta en silencio: va a `ilegibles` (si su fecha cae en el período) y Rentabilidad lo avisa (21-oct).
+async function logLusofMes(D1,D2,netoCli){
+  const res={porCanal:{}, total:0, facturas:[], fuera:[], sinAsignar:[], ilegibles:[]};
   let vs=[];
   try{
     vs=await odooCall('electronic.voucher.supplier','search_read',
@@ -26164,33 +26341,42 @@ async function logLusofSemanal(D1,D2){
   }catch(e){ return res; }   // sin acceso al comprobante → Lusof no se reparte (y no se inventa)
   const fs=await odooCall('account.move','search_read',
     [[['partner_id','=',LOG_LUSOF],['move_type','=','in_invoice'],['state','=','posted']]],
-    {fields:['ref','amount_untaxed'],limit:200});
+    {fields:['name','date','ref','amount_untaxed'],limit:200});
   const byRef={}; fs.forEach(f=>byRef[(f.ref||'').trim()]=f);
   for(const v of vs){
-    let txt=''; try{ txt=decodeURIComponent(escape(atob(v.xml_supplier_approval))); }catch(e){ try{ txt=atob(v.xml_supplier_approval); }catch(e2){ continue; } }
+    const txt=_xmlDeVoucher(v); if(txt===null) continue;
     const ot=/<OtroTexto[^>]*>([\s\S]*?)<\/OtroTexto>/i.exec(txt);
-    const r=ot && /DEL\s+(\d{1,2})\s+AL\s+(\d{1,2})-(\d{1,2})-(\d{2})/i.exec(ot[1]);
-    if(!r) continue;
-    const y=2000+ +r[4], mo=+r[3];
-    const a=y+'-'+String(mo).padStart(2,'0')+'-'+String(+r[1]).padStart(2,'0');
-    const b=y+'-'+String(mo).padStart(2,'0')+'-'+String(+r[2]).padStart(2,'0');
-    if(b<D1 || a>D2) continue;                       // la semana no cae en el período
-    const f=byRef[v.consecutive_number_xml]; if(!f) continue;
-    const ls=await odooCall('account.move.line','search_read',
-      [[['partner_id','in',Object.keys(LOG_LUSOF_CLI).map(Number).concat([887])],
-        ['parent_state','=','posted'],['move_id.move_type','=','out_invoice'],
-        ['display_type','=','product'],['date','>=',a],['date','<=',b],
-        ['product_id','in',RENTA_PROD.map(P=>P.pid)]]],
-      {fields:['partner_id','price_subtotal'],limit:2000});
-    const w={}; let tot=0;
-    ls.forEach(l=>{ const pid=l.partner_id[0];
-      if(pid===887){ res.mentha=true; return; }      // Mentha NO entra al denominador
-      const ch=LOG_LUSOF_CLI[pid]; if(!ch) return;
-      w[ch]=(w[ch]||0)+(l.price_subtotal||0); tot+=(l.price_subtotal||0); });
+    const sem=_lusofSemana(ot?ot[1]:'');
+    const f=byRef[v.consecutive_number_xml];
+    if(!sem){
+      if(f && f.date>=D1 && f.date<=D2)
+        res.ilegibles.push({factura:f.name, fecha:f.date, monto:f.amount_untaxed,
+                            texto:((ot?ot[1]:'').trim().split('\n')[0]||'sin texto').slice(0,70)});
+      continue;
+    }
+    const a=sem.a, b=sem.b;
+    // Una semana que cruza de mes (30-mar al 1-abr) cuenta en UN solo mes: el que tiene más días de
+    // servicio (empate → el de inicio). Antes esas semanas no se leían; sin esto contaba en los dos.
+    const finMesA=new Date(Date.UTC(+a.slice(0,4), +a.slice(5,7), 0)).toISOString().slice(0,10);
+    const diasA=(Math.min(Date.parse(b), Date.parse(finMesA))-Date.parse(a))/864e5+1;
+    const diasB=(Date.parse(b)-Date.parse(a))/864e5+1-diasA;
+    const ancla=(diasB>diasA) ? b : a;
+    if(ancla<D1 || ancla>D2) continue;               // la semana no es de este período
+    if(!f) continue;
     res.total+=f.amount_untaxed;
-    if(!tot){ res.sinAsignar.push({sem:a+' al '+b, monto:f.amount_untaxed}); continue; }
-    for(const ch in w) res.porCanal[ch]=(res.porCanal[ch]||0)+f.amount_untaxed*w[ch]/tot;
+    res.facturas.push({factura:f.name, sem:a+' al '+b, monto:f.amount_untaxed});
   }
+  if(!res.total) return res;
+  const cli=Object.keys(netoCli||{}).filter(pid=>netoCli[pid].neto>0);
+  const tot=cli.reduce((s,pid)=>s+netoCli[pid].neto,0);
+  if(tot<=0){ res.sinAsignar.push({periodo:D1.slice(0,7), monto:res.total}); return res; }
+  const fuera={};
+  cli.forEach(pid=>{
+    const x=netoCli[pid], parte=res.total*x.neto/tot;
+    if(LOG_LUSOF_CANALES.indexOf(x.ch)>=0) res.porCanal[x.ch]=(res.porCanal[x.ch]||0)+parte;
+    else fuera[LOG_LUSOF_CLIENTES[pid]]=(fuera[LOG_LUSOF_CLIENTES[pid]]||0)+parte;   // se resta y no se carga
+  });
+  for(const k in fuera) res.fuera.push({cliente:k, monto:fuera[k]});
   return res;
 }
 
@@ -26198,6 +26384,9 @@ async function reporteRenta(D1,D2){
   const {prods}=await computeCostos();            // HEREDA el motor real de costos
   const byKey={}; prods.forEach(p=>byKey[p.key]=p);
   const costoDe={}; RENTA_PROD.forEach(P=>{ const d=byKey[P.key]; costoDe[P.key]=d?(d.totalVenta||0):0; });   // costo por unidad de venta CON empaque (fuente única)
+  // Lo mismo SIN el indirecto de producción (materia prima + empaque): es el costo del APORTE (Andrea,
+  // 22-oct-2026), lo que deja el canal antes de los costos fijos de planta.
+  const costoDirDe={}; RENTA_PROD.forEach(P=>{ const d=byKey[P.key]; costoDirDe[P.key]=d?((d.totalVenta||0)-(d.indPerSales||0)):0; });
   _rentaData={byKey};
   // UoM de referencia (unidad de venta) por producto — para convertir el volumen
   const pids=RENTA_PROD.map(P=>P.pid), keyDe={}; RENTA_PROD.forEach(P=>keyDe[P.pid]=P.key);
@@ -26228,18 +26417,24 @@ async function reporteRenta(D1,D2){
   const parts=partIds.length?await odooCall('res.partner','read',[partIds],{fields:['id','name','commercial_name','team_id']}):[];
   const pI={}; parts.forEach(p=>pI[p.id]=p);
   // Agregar por (canal, producto): neto y volumen (en unidad de venta)
-  const cell={}, chVol={};
+  const cell={}, chVol={}, netoCli={};   // netoCli: lo facturado a cada cliente de Lusof, para repartirlo
   for(const l of lines){
-    const p=pI[l.partner_id&&l.partner_id[0]]||{};
+    const pid=l.partner_id&&l.partner_id[0], p=pI[pid]||{};
     const ch=clasificarCanal(p), key=keyDe[l.product_id[0]];
     const vol=await _conv(l._sg*(l.quantity||0), l.product_uom_id&&l.product_uom_id[0], refUom[key]);
     const ck=ch+'|'+key, c=cell[ck]||(cell[ck]={neto:0,vol:0});
     c.neto+=l._sg*(l.price_subtotal||0); c.vol+=vol;
     chVol[ch]=(chVol[ch]||0)+vol;
+    if(LOG_LUSOF_CLIENTES[pid]){ const n=netoCli[pid]||(netoCli[pid]={neto:0, ch:ch}); n.neto+=l._sg*(l.price_subtotal||0); }
   }
   // Frío por unidad del canal (₡ fijo ÷ unidades del canal ese mes)
-  const frioUnit={}; CANALES_MATRIZ.forEach(c=>{ const f=canalFrio(c); frioUnit[c.key]=(f&&chVol[c.key])?f/chVol[c.key]:0; });
-  const logi=await reporteLogistica(D1,D2,cell,keyDe);   // costo de entrega por canal
+  // Automercado lee su frío del detalle de su FE (feDetalle); Compre Bien y MegaSuper, del mes escrito
+  // en cada línea de sus FE (parseMes, T-238). Un mes sin FE cae a la cifra fija y la vista lo avisa.
+  const frioMes={};
+  for(const c of CANALES_MATRIZ){ if(c.frio && (c.frio.modo==='feDetalle' || c.frio.modo==='parseMes')) frioMes[c.key]=await canalFrioMes(c,D1,D2); }
+  const frioMonto=c=>frioMes[c.key] ? frioMes[c.key].monto : canalFrio(c);
+  const frioUnit={}; CANALES_MATRIZ.forEach(c=>{ const f=frioMonto(c); frioUnit[c.key]=(f&&chVol[c.key])?f/chVol[c.key]:0; });
+  const logi=await reporteLogistica(D1,D2,cell,keyDe,netoCli);   // costo de entrega por canal
   // Solo columnas con ventas ese mes
   const canalesActivos=CANALES_MATRIZ.filter(c=>RENTA_PROD.some(P=>{ const x=cell[c.key+'|'+P.key]; return x&&Math.abs(x.vol)>1e-6; }));
   const filas=RENTA_PROD.map(P=>{
@@ -26253,21 +26448,25 @@ async function reporteRenta(D1,D2){
       const netoCanal=RENTA_PROD.reduce((s,PP)=>{ const y=cell[c.key+'|'+PP.key]; return s+(y?y.neto:0); },0);
       const log=(logi.porCanal[c.key]||0)*(netoCanal?x.neto/netoCanal:0);
       const gan=x.neto-cprod-desc-frio-log;
+      const aporte=x.neto-costoDirDe[P.key]*x.vol-desc-frio-log;   // igual que gan, sin el indirecto
       // EL % NECESITA UNA BASE, Y LA BASE ES EL NETO. Si el neto es cero o negativo
       // —un mes con más notas de crédito que facturas— no hay margen que calcular:
       // dividir devuelve un número enorme y sin sentido (MegaSuper julio-2026 mostraba
       // +1.195,5% y −1.203,2% con un neto de prácticamente cero). `pct: null` significa
       // "no hay base", y la pantalla lo dice con un guion. La ganancia en ₡ sí se muestra:
       // esa no necesita base y sigue siendo verdad.
-      return {neto:x.neto, vol:x.vol, cprod, desc, frio, log, gan,
+      return {neto:x.neto, vol:x.vol, cprod, desc, frio, log, gan, aporte,
               pct: (x.neto>0) ? gan/x.neto : null};
     });
     return {P, celdas, rowTot:celdas.reduce((s,x)=>s+(x?x.gan:0),0)};
   });
   const colTot=canalesActivos.map((c,ci)=>filas.reduce((s,f)=>s+(f.celdas[ci]?f.celdas[ci].gan:0),0));
   const gran=colTot.reduce((s,x)=>s+x,0);
+  const colAporte=canalesActivos.map((c,ci)=>filas.reduce((s,f)=>s+(f.celdas[ci]?f.celdas[ci].aporte:0),0));
+  const granAporte=colAporte.reduce((s,x)=>s+x,0);
+  const colNeto=canalesActivos.map((c,ci)=>filas.reduce((s,f)=>s+(f.celdas[ci]?f.celdas[ci].neto:0),0));
   const netoTot=filas.reduce((s,f)=>s+f.celdas.reduce((a,x)=>a+(x?x.neto:0),0),0);
-  return {canalesActivos, filas, colTot, gran, netoTot, frioUnit, chVol, logi, revIds};
+  return {canalesActivos, filas, colTot, gran, colAporte, granAporte, colNeto, netoTot, frioUnit, frioMes, chVol, logi, revIds};
 }
 async function cargarRenta(){
   const sel=document.getElementById('mesRenta'), ym=sel&&sel.value; if(!ym) return;
@@ -26297,16 +26496,24 @@ function rentaRender(R, label){
   });
   h+='</tbody><tfoot><tr><td>Total canal</td>'
     +R.colTot.map(t=>'<td class="renta-cell renta-coltot"><div class="rg'+(t<0?' rneg':'')+'">'+cMs(t)+'</div></td>').join('')
-    +'<td class="renta-cell renta-grand"><div class="rg">'+cMs(R.gran)+'</div></td></tr></tfoot></table>';
+    +'<td class="renta-cell renta-grand"><div class="rg">'+cMs(R.gran)+'</div></td></tr>'
+    +'<tr><td>Aporte<div class="rp">'+RENTA_APORTE_TXT+'</div></td>'
+    +R.colAporte.map((a,ci)=>'<td class="renta-cell renta-coltot"><div class="rg'+(a<0?' rneg':'')+'">'+cMs(a)+'</div><div class="rp">'+_rentaAportePct(a,R.colNeto[ci])+'</div></td>').join('')
+    +'<td class="renta-cell renta-grand"><div class="rg'+(R.granAporte<0?' rneg':'')+'">'+cMs(R.granAporte)+'</div><div class="rp">'+_rentaAportePct(R.granAporte,R.netoTot)+'</div></td></tr></tfoot></table>';
   // Conciliación + costos de canal aplicados. El gran total NO se repite acá: vive en
   // la celda esquina (Total canal × Total producto). Acá solo el contexto de neto.
   let foot='Ganancia = neto sin IVA − costo de producir (motor) − costo de canal '
-    +'(el total del mes está en la esquina de la tabla). Neto del mes: '+cM(R.netoTot)+'. Tocá un producto para ver su costo real.';
+    +'(el total del mes está en la esquina de la tabla). Neto del mes: '+cM(R.netoTot)+'. Tocá un producto para ver su costo real.'
+    +'<br>Aporte = neto sin IVA − materia prima − empaque − frío − transporte − comisión, sin el indirecto de producción.';
   const notas=R.canalesActivos.filter(c=>canalComRenta(c)||canalFrio(c)).map(c=>{
     const t=' title="'+esc(canalFuente(c))+'"';
     if(canalComRenta(c)) return '<span'+t+'>'+esc(c.label)+' −'+_pct(canalComRenta(c)*100)+' sobre neto</span>';
-    return '<span'+t+'>'+esc(c.label)+' frío '+cM(canalFrio(c))+'/mes ÷ '+fmtN(Math.round(R.chVol[c.key]||0))+' u = '
-      +cM(R.frioUnit[c.key])+'/u'+((c.frio&&c.frio.provisional)?' <em style="font-style:normal;color:var(--warn)">provisional</em>':'')+'</span>';
+    const fm=R.frioMes&&R.frioMes[c.key];
+    return '<span'+t+'>'+esc(c.label)+' frío '+cM(fm?fm.monto:canalFrio(c))+'/mes'
+      +(fm?(fm.fuente==='fe'?' sin IVA, de su FE':fm.fuente==='parseo'?' sin IVA, de sus FE del mes':fm.fuente==='estimado'?' sin IVA':' sin IVA, respaldo'):'')
+      +' ÷ '+fmtN(Math.round(R.chVol[c.key]||0))+' u = '
+      +cM(R.frioUnit[c.key])+'/u'+((c.frio&&c.frio.provisional)?' <em style="font-style:normal;color:var(--warn)">provisional</em>':'')
+      +((fm&&fm.aviso)?' <em style="font-style:normal;color:var(--warn)">'+esc(fm.aviso)+'</em>':'')+'</span>';
   });
   if(notas.length) foot+='<br>Costos de canal: '+notas.join(' · ')+'.';
   // Cambio de supuestos VISIBLE (no silencioso): quien note que el margen de esos canales
@@ -26325,7 +26532,18 @@ function rentaRender(R, label){
     +'<button class="rf-toggle" onclick="rentaFootToggle(this)">Cómo se calcula</button>'
     +'<div class="rf-body">'+foot+'</div></div>';
   _rentaR=R;                                  // el teléfono repinta su lista sin recalcular
-  el.innerHTML=_rentaMovHtml(R)+h;
+  el.innerHTML=_rentaLogAvisoHtml(R)+_rentaMovHtml(R)+h;
+}
+// Lo de Lusof que NO se pudo repartir, arriba de la tabla y en ámbar (21-oct-2026): una factura cuya
+// semana no se lee, o un mes con Lusof y sin ventas a BM ni a Compre Bien. Sin esto se perdían callados.
+function _rentaLogAvisoHtml(R){
+  const L=R.logi||{}, av=[];
+  (L.lusofIlegibles||[]).forEach(function(x){
+    av.push('Lusof: la factura '+esc(x.factura)+' ('+esc(x.fecha)+', '+cM(x.monto)+') no trae una semana legible («'
+      +esc(x.texto)+'»): no se repartió.'); });
+  (L.sinAsignar||[]).forEach(function(x){
+    av.push('Lusof: '+esc(x.periodo)+' sin ventas a BM ni a Compre Bien: '+cM(x.monto)+' sin asignar.'); });
+  return av.length ? '<div class="renta-aviso" style="padding:8px 12px;font-size:12px;color:var(--warn)">'+av.join('<br>')+'</div>' : '';
 }
 // ── RENTABILIDAD EN TELÉFONO: un canal a la vez ──────────────────────────────
 // La matriz producto × canal no cabe en un teléfono sin volverse una tabla ancha. Acá se
@@ -26356,11 +26574,19 @@ function _rentaMovLista(R, ci){
           : '<div class="rm-r rm-na">—</div>')
       +'</div>';
   });
-  const t=R.colTot[ci];
+  const t=R.colTot[ci], a=R.colAporte[ci];
   out+='<div class="rm-row rm-tot"><div class="rm-l"><div class="rm-nm">Total del canal</div></div>'
-    +'<div class="rm-r"><div class="rg'+(t<0?' rneg':'')+'">'+cMs(t)+'</div></div></div>';
+    +'<div class="rm-r"><div class="rg'+(t<0?' rneg':'')+'">'+cMs(t)+'</div></div></div>'
+    +'<div class="rm-row rm-tot"><div class="rm-l"><div class="rm-nm">Aporte</div><div class="rp">'+RENTA_APORTE_TXT+'</div></div>'
+    +'<div class="rm-r"><div class="rg'+(a<0?' rneg':'')+'">'+cMs(a)+'</div><div class="rp">'+_rentaAportePct(a,R.colNeto[ci])+'</div></div></div>';
   return out;
 }
+// APORTE DEL CANAL (Andrea, 22-oct-2026): la ganancia de arriba sin el indirecto de producción. El
+// indirecto es fijo de planta y se reparte por unidad: no desaparece si el canal se va, así que el
+// aporte es lo que responde «¿este canal deja plata o resta?». La línea la escribió Andrea («Aporte: lo
+// que deja…»): el rótulo de la fila es «Aporte» y esto va debajo, para no repetir la palabra.
+const RENTA_APORTE_TXT='lo que deja el canal antes de los costos fijos de planta';
+function _rentaAportePct(a, neto){ return neto>0 ? _pct(a/neto*100) : '—'; }
 // Abre/cierra las notas al pie de Rentabilidad (teléfono).
 function rentaFootToggle(btn){
   const b=btn.parentElement.querySelector('.rf-body'); if(!b) return;

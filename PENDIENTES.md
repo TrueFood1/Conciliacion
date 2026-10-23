@@ -33,6 +33,60 @@ Si se redondea solo en el `toLocaleString` de la vista, es el primero.
 
 ---
 
+## F2 · Finanzas · Frío de Automercado leído de su FE: falta verlo andar en vivo
+
+Anotado por Andrea el 20-oct-2026.
+
+**Regla (Andrea, 20-oct).** El frío de Automercado se factura al mes vencido, y **el mes
+de servicio viene escrito en el detalle de su FE**. Caso que lo fijó: la FE
+00100099010000064770, emitida el 17-sep-2026, tiene una sola línea, «OV ESPACIO CONGELADO
+AM AGOSTO 2026», 1 × ₡545.400, total ₡616.302 con IVA. Es el write-off del 2-oct
+(PBACC/2026/00851). Rentabilidad suma el `<SubTotal>` sin IVA de las líneas «ESPACIO
+CONGELADO <MES> <AÑO>» (modo `feDetalle`, rama `frio-auto`). La regla anterior, «pago −
+25 días», se descartó.
+
+**Lo que falta, antes de publicar.** El código lee `electronic.voucher.supplier`
+(`xml_supplier_approval`, partner 713) como ya lo hace Lusof, pero **nunca se vio
+contra Odoo real**: el usuario de lectura local no tiene permiso para ese modelo
+(«Contact your administrator…»). El ensayo corrió con un comprobante armado a mano
+con la línea de arriba. Hay que mirarlo en vivo con la sesión de una socia y
+confirmar dos cosas:
+1. que las FE de Automercado están cargadas en ese modelo a nombre del partner 713;
+2. que agosto da ₡545.400 «de su FE» y no «respaldo».
+
+Si no están cargadas, la vista lo va a decir («no hay FE de frío…: va el respaldo
+₡542.400 sin IVA») todos los meses.
+
+---
+
+## F3 · Finanzas · Rentabilidad usa la CIFRA FIJA de frío en los 3 canales desde el 13-ago
+
+Medido el 20-oct-2026.
+
+**Qué pasa.** `reporteRenta` calcula el frío por unidad con `canalFrio(c)`, que
+devuelve el `monto` o `porTienda × unidades_cobro` del canal. `canalFrioMes()`
+—la función que lee el mayor y parsea el mes de servicio— **no se llamaba desde
+ningún lado**. Así que desde el 13-ago Automercado iba con ₡612.726,83 (con IVA),
+Compre Bien con ₡76.500 y MegaSuper con ₡2.709,19 × 10, todos los meses.
+
+**Lo que dice el commit `e631cdd` (13-ago).** *«Compre Bien y MegaSuper escriben el
+mes en el texto de cada línea: canalFrioMes() lo parsea y suma solo las líneas del
+mes pedido»* y *«por eso este canal se lee del mayor»*. Eso describe la función, no
+lo que hacía Rentabilidad: la función se escribió y nunca se conectó. El ✓ de esa
+vez fue citado, no corrido (regla madre «una salvaguarda CITADA no es una salvaguarda
+VERIFICADA»).
+
+**Estado.** En la rama `frio-auto` (sin publicar) Automercado pasa a leerse de su
+FE (F2). **Compre Bien y MegaSuper siguen con su cifra fija.** Para conectarlos hay
+que llamar a `canalFrioMes` también para el modo `parseMes`, y antes medir qué da su
+parseo mes a mes contra la cifra fija, porque les va a mover el margen.
+
+**RESUELTO en b118 (22-oct-2026).** Compre Bien y MegaSuper leen el frío REAL del mes de sus FE
+(6106013, y 111601 hasta dic-2025), por el mes escrito en cada línea; MegaSuper, en un mes sin FE,
+usa el último frío conocido con aviso. Probado de dic-2025 a oct-2026 contra la auditoría (T-238).
+
+---
+
 ## O1 · Operaciones · El Planificador BLOQUEA el tope de batches, y debería avisar
 
 Reportado por Andrea el 26-ago-2026.
