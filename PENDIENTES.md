@@ -81,6 +81,10 @@ FE (F2). **Compre Bien y MegaSuper siguen con su cifra fija.** Para conectarlos 
 que llamar a `canalFrioMes` también para el modo `parseMes`, y antes medir qué da su
 parseo mes a mes contra la cifra fija, porque les va a mover el margen.
 
+**RESUELTO en b118 (22-oct-2026).** Compre Bien y MegaSuper leen el frío REAL del mes de sus FE
+(6106013, y 111601 hasta dic-2025), por el mes escrito en cada línea; MegaSuper, en un mes sin FE,
+usa el último frío conocido con aviso. Probado de dic-2025 a oct-2026 contra la auditoría (T-238).
+
 ---
 
 ## O1 · Operaciones · El Planificador BLOQUEA el tope de batches, y debería avisar
