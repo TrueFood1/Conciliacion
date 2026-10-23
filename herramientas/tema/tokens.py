@@ -62,6 +62,7 @@ NUEVOS = {
   'm-conc':     ('#84BD00', '#4E7A00', 'Conciliación'),
   'm-comp':     ('#A27FEB', '#6E46CC', 'Compras'),
   'm-per':      ('#FF671D', '#C04400', 'Personal'),
+  'm-ven':      ('#3FB6A8', '#1C7E73', 'Ventas'),
   'magenta':    ('#C964CF', '#A23DA8', 'acento por defecto'),
   'orange-2':   ('#FF751F', '#C85400', 'naranja de Automatización / Pizza'),
   # colores de PRODUCTO (puntos y bordes; la etiqueta va siempre al lado)
@@ -106,7 +107,7 @@ MAPA = {
   ('#E9FE60', 'bg'): 'lime', ('#E9FE60', 'tx'): 'ent-line', ('#E9FE60', 'bd'): 'ent-line', ('#E9FE60', 'sh'): 'ent-line',
   ('#DFF04A', 'bg'): 'lime-hover',
   ('#378ADD', '*'): 'm-fin', ('#C77DA0', '*'): 'm-ops', ('#D4537E', '*'): 'm-ops-2', ('#84BD00', '*'): 'm-conc',
-  ('#A27FEB', '*'): 'm-comp', ('#FF671D', '*'): 'm-per', ('#C964CF', '*'): 'magenta', ('#FF751F', '*'): 'orange-2',
+  ('#A27FEB', '*'): 'm-comp', ('#FF671D', '*'): 'm-per', ('#3FB6A8', '*'): 'm-ven', ('#C964CF', '*'): 'magenta', ('#FF751F', '*'): 'orange-2',
   ('#F0B45C', '*'): 'warn-3', ('#E8C96A', '*'): 'warn-4', ('#C9A227', '*'): 'warn-5', ('#D9BE8C', '*'): 'warn-6',
   ('#C9B284', '*'): 'warn-7', ('#E0A82E', '*'): 'warn-line',
   ('#E7A6A6', '*'): 'err-3', ('#E8A9A9', '*'): 'err-4', ('#FFD9D9', '*'): 'err-5', ('#E08A8A', '*'): 'err-6',
