@@ -335,6 +335,8 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 /* Cobro por WhatsApp: por qué no hay botón (escritorio al lado del nombre; teléfono en la línea tenue). */
 .cob-waest{margin-left:10px;font-size:11px;color:var(--text-3);vertical-align:middle}
 .cob-waest-av{color:var(--warn)}
+.cob-local{color:var(--text-2);font-weight:400}
+.cob-sinlocal{color:var(--warn);font-weight:400}
 .cob-waest-mov{display:none}
 /* «¿A quién?» cuando el cliente tiene varios contactos de cobros. */
 .cob-wamenu{position:fixed;z-index:60;min-width:200px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--border-strong);
@@ -27235,12 +27237,41 @@ function _cobGrupoMonto(a){
   return (crc?_crcTico(crc)+' + ':'')+ext+'<div class="muted" style="font-size:11px;font-weight:400">≈ '+_crcTico(_cobSuma(a))+'</div>';
 }
 function _cobExtNota(n, todasUSD){ return n+(n===1?' factura':' facturas')+(todasUSD?' en dólares':' en otra moneda')+(n===1?', sumada':', sumadas')+' en colones al tipo de cambio de cada factura'; }
+// ── LOCALES (b123, Andrea 23-oct) ───────────────────────────────────────
+// Clientes con varios locales bajo UNA razón social: en Por cobrar cada local es su propio
+// grupo, con su mensaje y su botón. El local NO vive en ningún campo de Odoo: se escribe en
+// «Referencia del cliente» de la orden de venta (LOCAL - OC), que sale en el PDF para Daniel
+// y el distribuidor; la dirección de entrega no se imprime. Se lee de `ref` y, si no está, de la
+// nota. Clave = commercial_partner_id. `k` = palabras que lo identifican (sin tildes, minúscula).
+const COB_LOCALES={
+  651: [{n:'Nunciatura',k:['nunciatura']},{n:'Escalante',k:['escalante']}],
+  1032:[{n:'Grecia',k:['grecia','gracia']},{n:'Palmares',k:['palmares']},{n:'Nicoya',k:['nicoya']},
+        {n:'Cañas',k:['canas']},{n:'Esparza',k:['esparza']},{n:'Frente al hospital',k:['hospital']}],
+  1054:[{n:'General',k:['general','generwl']},{n:'Daniel Flores',k:['daniel flores','flores']}],
+  1008:[{n:'Uvita',k:['uvita']},{n:'Dominical',k:['dominical']}],
+  1224:[{n:'Tamarindo',k:['tamarindo']},{n:'El Coco',k:['coco']},{n:'Escazú',k:['escazu']}],
+  1056:[{n:'Lincoln',k:['lincoln','lindoln']},{n:'Amara',k:['amara']},{n:'Sabana',k:['sabana']},{n:'Paseo Colón',k:['paseo colon']}],
+  664: [{n:'Escazú',k:['escazu']},{n:'Guachipelín',k:['guachipelin','trivium']}],
+};
+const COB_SIN_LOCAL='Sin local';
+// Locales que nombra un texto. Uno solo = ese; ninguno o dos = no se adivina.
+function _cobLocalesEn(txt, locs){
+  const t=' '+_normTxt(String(txt||'').replace(/<[^>]+>|&nbsp;/g,' ')).replace(/[^a-z0-9]+/g,' ')+' ';
+  return locs.filter(l=>l.k.some(k=>t.indexOf(' '+k+' ')>=0));
+}
+// Local de una factura: null si el cliente no tiene locales; si los tiene, el de `ref`, si no el
+// de la nota, y si ninguno lo dice sin ambigüedad, «Sin local» (a la vista, nunca adivinado).
+function _cobLocal(r){
+  const locs=COB_LOCALES[r._cpid||(r.partner_id&&r.partner_id[0])]; if(!locs) return null;
+  for(const txt of [r.ref, r.narration]){ const m=_cobLocalesEn(txt, locs); if(m.length===1) return m[0].n; }
+  return COB_SIN_LOCAL;
+}
 async function cobLoad(which){
   const mt=_COB_MT[which];
   // Corte por fecha (COB_DESDE): las viejas incobrables ensucian e inflan el total.
   let rows=await odooCall('account.move','search_read',
     [[['move_type','=',mt],['state','=','posted'],['amount_residual','>',0],['invoice_date','>=',COB_DESDE[which]]]],
-    {fields:['name','ref','number_electronic','invoice_date','invoice_date_due','amount_residual','amount_residual_signed','currency_id','partner_id'],limit:5000});
+    {fields:['name','ref','number_electronic','invoice_date','invoice_date_due','amount_residual','amount_residual_signed','currency_id','partner_id'].concat(which==='cobrar'?['narration']:[]),limit:5000});
   if(which==='pagar'){
     // Excluir Gastos Adicionales (cuenta 640103 = compensación de IVA, NO pagos reales de Andrea).
     // Criterio robusto = la cuenta (no la referencia): captura las que traen ref con número de
@@ -27270,6 +27301,7 @@ async function cobLoad(which){
     rows.forEach(r=>{ const pid=r.partner_id&&r.partner_id[0]; if(pid&&comDe[pid]) r._com=comDe[pid]; if(pid&&empDe[pid]) r._cpid=empDe[pid];
       r._busca=[(r.partner_id&&r.partner_id[1])||''].concat(busDe[pid]||[]); });
   }
+  if(which==='cobrar') rows.forEach(r=>{ r._local=_cobLocal(r); if(r._local) (r._busca=r._busca||[]).push(r._local); });
   return rows;
 }
 async function cobTab(which){
@@ -27316,7 +27348,9 @@ function renderCob(){
   if(_cobModo==='cliente') renderCobCliente(which,d,el); else renderCobFactura(which,d,el);
 }
 // Cliente/proveedor: nombre comercial + razón social (parejo con Ventas).
-function _cobPartner(r){ const razon=(r.partner_id&&r.partner_id[1])||'—'; return r._com ? esc(r._com)+' <span class="muted" style="font-size:11px">· '+esc(razon)+'</span>' : esc(razon); }
+function _cobPartner(r){ const razon=(r.partner_id&&r.partner_id[1])||'—';
+  const loc=r._local ? ' <span class="'+(r._local===COB_SIN_LOCAL?'cob-sinlocal':'cob-local')+'">· '+esc(r._local)+'</span>' : '';
+  return (r._com ? esc(r._com)+loc+' <span class="muted" style="font-size:11px">· '+esc(razon)+'</span>' : esc(razon)+loc); }
 // Documento: en Por pagar = número del PROVEEDOR (campo `ref`, "Referencia del
 // proveedor"), con el consecutivo interno de Odoo como referencia chica; si el
 // proveedor no trae número (~28%), cae al interno. En Por cobrar = nuestro nº de
@@ -27379,15 +27413,17 @@ function renderCobFactura(which,d,el){
 }
 function renderCobCliente(which,d,el){
   const groups={};
-  d.forEach(r=>{ const pid=(r.partner_id&&r.partner_id[0])||0, pn=(r.partner_id&&r.partner_id[1])||'—';
-    const g=groups[pid]||(groups[pid]={pid:pid,cpid:r._cpid||null,razon:pn,com:r._com||null,rows:[],total:0,maxVenc:null});
+  // Un cliente con locales (COB_LOCALES) se parte en un grupo por local.
+  const clave=r=>((r.partner_id&&r.partner_id[0])||0)+'|'+(r._local||'');
+  d.forEach(r=>{ const pid=(r.partner_id&&r.partner_id[0])||0, pn=(r.partner_id&&r.partner_id[1])||'—', k=clave(r);
+    const g=groups[k]||(groups[k]={pid:pid,cpid:r._cpid||null,razon:pn,com:r._com||null,local:r._local||null,clave:k,rows:[],total:0,maxVenc:null});
     g.rows.push(r); g.total+=r._crc;
     const dv=_diasVencida(r.invoice_date_due);
     if(dv!=null && (g.maxVenc==null || dv>g.maxVenc)) g.maxVenc=dv;
   });
   const arr=Object.values(groups).sort((a,b)=>b.total-a.total);   // el que más debe, arriba
   // El mensaje usa toda la cartera del cliente: un filtro o una búsqueda no recortan lo que se cobra.
-  arr.forEach(g=>{ g.todas=(_cobData[which]||[]).filter(r=>((r.partner_id&&r.partner_id[0])||0)===g.pid); });
+  arr.forEach(g=>{ g.todas=(_cobData[which]||[]).filter(r=>clave(r)===g.clave); });
   window._cobGrupos=arr;   // para el botón "Copiar recordatorio"
   const cliLbl=which==='cobrar'?'Cliente':'Proveedor';
   let h='<div style="overflow-x:auto"><table class="cob-tbl"><tr><th>'+esc(cliLbl)+'</th><th style="text-align:right">Facturas</th><th style="text-align:right">Pendiente</th><th style="text-align:right">Más vencida</th></tr>';
@@ -27410,7 +27446,8 @@ function renderCobCliente(which,d,el){
         +(conAcc?' <button class="cob-copy" onclick="cobCopiar('+i+',event)">Copiar recordatorio</button>':'')+'</span>' : '';
     const celdaAcc = '<td class="cob-g-acc">'+(waOk
       ? '<button class="cob-wa-ico" title="Mandar recordatorio por WhatsApp" onclick="cobWhatsApp('+i+',event)">'+_SVG_WA+'</button>' : '')+'</td>';
-    const primary = g.com ? esc(g.com) : esc(g.razon);
+    const primary = (g.com ? esc(g.com) : esc(g.razon))
+      + (g.local ? ' <span class="'+(g.local===COB_SIN_LOCAL?'cob-sinlocal':'cob-local')+'">· '+esc(g.local)+'</span>' : '');
     const sec = g.com ? ' <span class="muted cob-razon" style="font-size:11px"><span class="cob-sep">· </span>'+esc(g.razon)+'</span>' : '';
     h+='<tr class="prod-row cob-gr" onclick="cobToggleGrupo('+i+')"><td class="cob-g-nm"><span class="pcaret">▸</span> '
       +(venc?'<span class="cob-venc">'+primary+'</span>':primary)+sec+btnCopiar+'</td>'
@@ -27465,7 +27502,8 @@ function _cobMensaje(g){
     if(crc||!partes.length) partes.unshift(_crcTico(crc));
     return partes.join(' + '); };
   const linea=r=>r._ext?_cobExtTxt(r._ext):_crcTico(r._crc);
-  const L=['Hola, ¿cómo está?','','Le compartimos el detalle de facturas vencidas:',''];
+  const deLocal = g.local && g.local!==COB_SIN_LOCAL ? ' de '+g.local : '';
+  const L=['Hola, ¿cómo está?','','Le compartimos el detalle de facturas vencidas'+deLocal+':',''];
   una.forEach(r=>L.push('- '+_cobNombreMsg(r.name)+' · '+_fD(r.invoice_date)+' · venció '+_fD(r.invoice_date_due)+' · '+linea(r)));
   if(resto.length) L.push('y '+resto.length+(resto.length===1?' factura vencida':' facturas vencidas')+' más por '+suma(resto));
   L.push('','*Total vencido: '+suma(venc)+'*','','¡Muchas gracias!','Saludos.');
