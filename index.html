@@ -27421,7 +27421,11 @@ function renderCobCliente(which,d,el){
     const dv=_diasVencida(r.invoice_date_due);
     if(dv!=null && (g.maxVenc==null || dv>g.maxVenc)) g.maxVenc=dv;
   });
-  const arr=Object.values(groups).sort((a,b)=>b.total-a.total);   // el que más debe, arriba
+  // El cliente que más debe, arriba; sus locales juntos, uno debajo del otro (el que más debe
+  // primero y «Sin local» al final).
+  const totCli={}; Object.values(groups).forEach(g=>{ totCli[g.pid]=(totCli[g.pid]||0)+g.total; });
+  const arr=Object.values(groups).sort((a,b)=>(totCli[b.pid]-totCli[a.pid]) || (a.pid-b.pid)
+    || ((a.local===COB_SIN_LOCAL)-(b.local===COB_SIN_LOCAL)) || (b.total-a.total));
   // El mensaje usa toda la cartera del cliente: un filtro o una búsqueda no recortan lo que se cobra.
   arr.forEach(g=>{ g.todas=(_cobData[which]||[]).filter(r=>clave(r)===g.clave); });
   window._cobGrupos=arr;   // para el botón "Copiar recordatorio"
