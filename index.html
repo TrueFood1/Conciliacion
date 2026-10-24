@@ -335,6 +335,8 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 /* Cobro por WhatsApp: por qué no hay botón (escritorio al lado del nombre; teléfono en la línea tenue). */
 .cob-waest{margin-left:10px;font-size:11px;color:var(--text-3);vertical-align:middle}
 .cob-waest-av{color:var(--warn)}
+.cob-local{color:var(--text-2);font-weight:400}
+.cob-sinlocal{color:var(--warn);font-weight:400}
 .cob-waest-mov{display:none}
 /* «¿A quién?» cuando el cliente tiene varios contactos de cobros. */
 .cob-wamenu{position:fixed;z-index:60;min-width:200px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--border-strong);
@@ -344,6 +346,26 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
   font:inherit;font-size:13px;color:var(--text);cursor:pointer}
 .cob-wamenu button:hover{background:var(--raise)}
 .cob-wamenu button span{color:var(--text-3);font-size:11.5px}
+/* Buscador de Cobros y de Ventas › Clientes (b121): razón social, nombre comercial, otros nombres y factura. */
+.cob-q{flex:1;min-width:200px;max-width:320px;background:var(--surface);border:1px solid var(--border-strong);border-radius:8px;
+  padding:8px 10px;font:inherit;font-size:13px;color:var(--text)}
+.vc-bar .cob-q{flex:0 1 260px}
+@media(max-width:700px){.cob-q,.vc-bar .cob-q{font-size:16px;max-width:none;flex-basis:100%}}
+/* Cobro a un GRUPO de WhatsApp (b121): el mensaje se copió y el nombre exacto del grupo va grande. */
+.cob-grupo{position:fixed;z-index:61;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,calc(100vw - 32px));
+  background:var(--surface);border:1px solid var(--border-strong);border-radius:12px;padding:18px 18px 14px;box-shadow:0 12px 32px rgba(0,0,0,.35)}
+.cob-grupo-nm{font-size:22px;font-weight:600;color:var(--text);margin:4px 0 10px;word-break:break-word}
+.cob-grupo-t{font-size:13px;color:var(--text-2)}
+.cob-grupo-err{color:var(--warn)}
+.cob-grupo textarea{width:100%;min-height:120px;margin-top:10px;background:var(--bg);color:var(--text);border:1px solid var(--border-strong);
+  border-radius:8px;padding:8px;font:inherit;font-size:13px}
+.cob-grupo-pie{margin-top:12px;text-align:right}
+/* Enlace de invitación de un grupo (solo socias): nunca se muestra, solo si está guardado. */
+.vc-enl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 0 6px;font-size:12px;color:var(--text-2)}
+.vc-enl input{flex:1;min-width:180px;max-width:300px;background:var(--surface);border:1px solid var(--border-strong);border-radius:7px;
+  padding:6px 8px;font:inherit;font-size:13px;color:var(--text)}
+.vc-enl-av{color:var(--warn)}
+@media(max-width:700px){.vc-enl{padding-left:0}.vc-enl input{font-size:16px;max-width:none}}
 
 /* ── Ventas: drill-down canal → cliente → factura (rediseño Finanzas) ── */
 .vent-sub{padding:2px 0 8px 20px}
@@ -2434,6 +2456,7 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
       <option value="todos">Todos</option>
       <option value="sin_cobros">Sin contacto de cobros</option>
     </select>
+    <input id="vcQ" class="cob-q" type="search" placeholder="Buscar" autocomplete="off" oninput="renderVenClientes()">
     <span id="vcResumen" class="muted" style="font-size:12px"></span>
   </div>
   <div id="vcStatus" class="status s-info hidden" style="margin-top:14px"></div>
@@ -2939,6 +2962,7 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
       <button data-v="todas" class="on" onclick="cobSetVenc('todas')">Todas</button>
       <button data-v="vencidas" onclick="cobSetVenc('vencidas')">Solo vencidas</button>
     </div>
+    <input id="cobQ" class="cob-q" type="search" placeholder="Buscar" autocomplete="off" oninput="renderCob()">
   </div>
   <div class="card" style="margin-top:14px" id="cobTabla"></div>
 </div>
@@ -3782,6 +3806,45 @@ body.es-lectora .face-pend{display:block}
   border-radius:14px 14px 0 0;width:100%;max-width:520px;max-height:88vh;
   display:flex;flex-direction:column;overflow:hidden}
 @media(min-width:700px){ .de-caja{border-radius:14px} }
+/* ── EN TELÉFONO LA CAJA FLOTA, NO VA PEGADA AL BORDE (T-116, 24-oct) ─────
+   Andrea, iPhone 440 px: «la pantalla de validar la entrega sale muy abajo —
+   quiero que esté más arriba, accesible a los dedos más fácil». Pegada al borde,
+   los botones del pie («No, todavía no sale», Cancelar/Confirmar) caían en la
+   franja de la barra de Safari y del indicador de inicio, que es donde el pulgar
+   llega torcido y donde un toque se lo come el navegador.
+   Se SUBE la caja un piso fijo (18% del alto chico de la pantalla, entre 88 y
+   170 px; ~160 px en el iPhone de Andrea) y se le redondean las cuatro esquinas,
+   así el pie queda en el arco natural del pulgar. NO se centra: centrada, una
+   caja corta se iría a la mitad de arriba, que es la zona que el pulgar no
+   alcanza. El orden de adentro no cambia: el «No» lima sigue siendo lo de más
+   abajo de la caja (la regla de posición de `_despPreguntaHTML`).
+   Un toque doble en el botón de la página que abre la pregunta ahora cae en el
+   velo, debajo de la caja, que CIERRA sin guardar: falla del lado seguro.
+   Alto máximo = el que queda entre el piso y el borde de arriba; el cuerpo
+   scrollea y el pie sigue a la vista, igual que antes.
+   Escritorio (≥700 px) no cambia: sigue centrada. */
+@media(max-width:699px){
+  .de-fondo{padding:calc(12px + env(safe-area-inset-top)) 10px
+    calc(clamp(88px,18vh,170px) + env(safe-area-inset-bottom))}
+  @supports (height:1svh){
+    .de-fondo{padding-bottom:calc(clamp(88px,18svh,170px) + env(safe-area-inset-bottom))}
+  }
+  .de-caja{border-radius:14px;max-height:100%}
+  .de-caja .de-pie-preg{padding-bottom:14px}
+  /* Con un campo de TEXTO enfocado (la nota de «Marcar» / «Registrar») el teclado
+     de iOS tapa la mitad de abajo y Safari no achica el velo fijo: la caja sube
+     arriba de todo y se achica a lo que queda visible, con el pie —el botón que
+     guarda— a la vista. El campo de fecha no cuenta: en iOS abre un selector,
+     no el teclado. */
+  .de-fondo:has(textarea:focus,input[type=text]:focus,input[type=number]:focus,input:not([type]):focus){
+    align-items:flex-start;padding-bottom:12px}
+  .de-fondo:has(textarea:focus,input[type=text]:focus,input[type=number]:focus,input:not([type]):focus) .de-caja{
+    max-height:min(100%,46vh)}
+  @supports (height:1svh){
+    .de-fondo:has(textarea:focus,input[type=text]:focus,input[type=number]:focus,input:not([type]):focus) .de-caja{
+      max-height:min(100%,46svh)}
+  }
+}
 .de-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
   padding:16px 16px 12px;border-bottom:1px solid var(--border)}
 .de-cli{font-size:16px;color:var(--text);font-weight:500;line-height:1.25}
@@ -4942,6 +5005,16 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 #vCompras .cp-tartbl th:nth-child(3),#vCompras .cp-tartbl td:nth-child(3){width:48px}
 #vCompras .cp-tartbl th:nth-child(4),#vCompras .cp-tartbl td:nth-child(4){width:88px;text-align:right}
 @media (max-width:560px){#vCompras .cp-tartbl th:nth-child(3),#vCompras .cp-tartbl td:nth-child(3){display:none}}
+/* T-264 (24-oct): una sola tarjeta, un renglón por proveedor que se despliega a su tabla */
+#vCompras .cp-tarl .cp-tarp:first-child>.cp-it{border-top:none}
+#vCompras .cp-tarp-s{cursor:default}
+#vCompras .cp-tarp .cp-g{white-space:nowrap;font-size:12.5px}
+#vCompras .cp-tardet{padding:0 0 10px}
+#vCompras .cp-tardet .cp-tartbl{font-size:13px}
+#vCompras .cp-tardet .cp-tartbl td{padding:7px 0}
+#vCompras .cp-tarbtn{margin-top:10px}
+#vCompras .cp-tarbtn .cp-btn{padding:8px 14px;font-size:13px}
+#vCompras .cp-tarp>.cp-msg{margin:0 0 8px}
 /* «Faltan compras por cargar» (4-oct): Odoo tiene menos de lo que ya se usó. NO es un faltante
    (no pide comprar): gris azulado y en cursiva, nunca rojo ni ámbar. */
 #vCompras .cp-odoo{color:var(--odoo) !important;font-style:italic}
@@ -5590,7 +5663,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 22 oct 2026 · b120';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 24 oct 2026 · b125';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -9814,8 +9887,9 @@ async function uomFactores(ids){
   return _uomFac;
 }
 // Lector SÍNCRONO, para usar después de `uomFactores()` (por ejemplo dentro de un
-// .map() que no puede ser async). Por ID, nunca por nombre: `Paquete de 4` [37] y
-// `Docenas` [2] se llaman los dos "Dozens" en inglés y valen 4 y 12.
+// .map() que no puede ser async). Por ID, nunca por nombre: hasta sep-2026
+// `Paquete de 4` [37] y `Docenas` [2] se llamaban los dos "Dozens" en inglés y
+// valen 4 y 12. Odoo los renombró sin avisar; el nombre no es un dato estable.
 function uomFac(id){ return _uomFac[id]!=null ? _uomFac[id] : 1; }
 
 // ── Sub-pestañas de Finanzas y Operaciones ──────────────────────────────
@@ -10319,16 +10393,19 @@ function nivLevel(ritmo, fin, cfg, ref){
   // `ref` (opcional): la fecha desde la que se nivela. Sin ella, hoy. Con ella se rehace el plan
   // de una semana YA PASADA, que es lo que necesita el chequeo de producción sin cargar (3-oct).
   const ahora=ref?new Date(ref):new Date();
-  const H=cfg.horizonte||6, cur=_isoWk(ahora), mon0=_mondayProd(ahora);
-  const colDe=pid=>{ const t=(cfg.ventanas||[]).some(v=>+v.producto_id===pid && cur>=v.desde && cur<=v.hasta);
+  const H=cfg.horizonte||6, mon0=_mondayProd(ahora);
+  // Colchón según la temporada de CADA semana del horizonte, igual que nivProyeccion y
+  // planProyeccionOv (T-243). Antes se tomaba la semana de hoy para las H semanas: si una
+  // ventana de temporada empezaba o terminaba dentro del horizonte, Resumen y Plan diferían.
+  const colDeWk=wk=>pid=>{ const t=(cfg.ventanas||[]).some(v=>+v.producto_id===pid && wk>=v.desde && wk<=v.hasta);
     return t?cfg.colchonTemporada:(cfg.colchon[pid]||3); };
   const stock={}; NIV_PROD.forEach(p=>stock[p]=fin[p]||0);
   const weeks=[];
   let rampaOn=false;   // latch: una vez encendida, la rampa no se apaga hasta el cierre
   for(let w=0;w<H;w++){ const mon=new Date(mon0); mon.setDate(mon.getDate()+w*7);
-    const pers=_personasDe(_isoWk(mon)), R=_rampaDe(mon);
+    const wk=_isoWk(mon), pers=_personasDe(wk), R=_rampaDe(mon);
     if(R){ rampaOn=rampaOn||_rampaEstado(stock, ritmo, R.meta, R.k).on; R.on=rampaOn; }
-    weeks.push(_weekLayout(stock, ritmo, colDe, H, pers, R)); }   // capacidad + rampa por semana; muta stock
+    weeks.push(_weekLayout(stock, ritmo, colDeWk(wk), H, pers, R)); }   // capacidad + rampa por semana; muta stock
   return {w0:_semanaBatches(weeks[0]), weeks};
 }
 // Layout de UNA semana: decide QUÉ se produce (no en qué día del calendario — eso lo
@@ -10901,6 +10978,21 @@ function nivUltimas(planPorDia, realByDate, hoyStr){
 // viene vacío/planeado a futuro y el filtro por date_finished los EXCLUÍA (bug: el calendario
 // mostraba el plan viejo en vez de lo real). date_start SIEMPRE está en un MO done — es el mismo
 // campo que usan los lectores de producción del motor de costos (nivDiasProd, costos por producto).
+// STOCK DEL LUNES (T-243): desde dónde se nivela la semana en curso = stock de HOY menos lo ya
+// producido esta semana (`nivSemana().doneU`). UNA sola función para el Resumen (`_rzSetup`) y el
+// Plan (`cargarPlanMeses` → nivProyeccion / planProyeccionOv / planColchonOv). Antes el Plan
+// decidía la semana 0 desde el stock de HOY, que ya trae adentro lo producido el lun–mar, y
+// proponía otra semana que el Resumen (medido 20-oct: mié Pizza 12 contra mié Blanco 8).
+function nivStockLunes(fin, doneU){
+  const o={}; NIV_PROD.forEach(function(p){ o[p]=Math.max(0,((fin&&fin[p])||0)-((doneU&&doneU[p])||0)); }); return o;
+}
+// Stock con el que se DECIDE el layout de la semana `w` en las proyecciones que llevan la cuenta
+// del stock desde HOY (planProyeccionOv, planColchonOv): la semana 0 se decide desde el stock del
+// lunes —igual que el Resumen—; las demás, desde el stock proyectado. Devuelve una copia (el
+// layout la muta y se descarta).
+function _nivStockDecision(w, stock, finLunes){
+  const src=(w===0 && finLunes)?finLunes:stock, o={}; NIV_PROD.forEach(function(p){ o[p]=src[p]||0; }); return o;
+}
 async function nivSemana(lunes){
   // Sin `lunes`: la semana de producción vigente hasta hoy. Con `lunes`: esa semana (lun–dom),
   // sin pasar de hoy — para mirar la semana anterior (3-oct, ver `_rzSetup`).
@@ -11018,7 +11110,7 @@ async function _rzSetup(){
   // META SEMANAL ESTABLE: se nivela desde el stock del LUNES = stock de hoy MENOS lo ya
   // producido esta semana. Así la meta NO deriva a medida que se produce (el motor razona por
   // SEMANA, no por día): lo real cuenta contra la meta y no se duplica producción.
-  const finPlan={}; NIV_PROD.forEach(function(p){ finPlan[p]=Math.max(0,(stock.fin[p]||0)-(real.doneU[p]||0)); });
+  const finPlan=nivStockLunes(stock.fin, real.doneU);
   stock.finPlan=finPlan;
   const {w0, weeks}=nivLevel(ritmo, finPlan, cfg);
   const hoy=new Date();
@@ -13370,10 +13462,11 @@ async function _rpCalcularPuntas(g){
 // del chatter, rpCalcSaldos() para el saldo por lote contra el ancla, y las
 // tablas ent_pedido / ent_alisto del 12-ago (extendidas por ENTREGAS_DESPACHOS.sql).
 //
-// ⚠️ LA UNIDAD SE LEE POR ID, NUNCA POR NOMBRE. `Paquete de 4` [37] y `Docenas`
-// [2] se llaman los dos "Dozens" en inglés (4 u vs 12 u); `Caja` [46] y
-// `Caja (Hamburguesa)` [42] se llaman los dos "Caja" (6 u vs 24 u). El factor
-// sale de uom.uom por id y se guarda congelado en la línea.
+// ⚠️ LA UNIDAD SE LEE POR ID, NUNCA POR NOMBRE. Hasta sep-2026 `Paquete de 4`
+// [37] y `Docenas` [2] se llamaban los dos "Dozens" en inglés (4 u vs 12 u), y
+// `Caja` [46] y `Caja (Buns)` [42] —entonces `Caja (Hamburguesa)`— los dos "Caja"
+// en inglés (6 u vs 24 u). Odoo los renombró sin avisar. El factor sale de
+// uom.uom por id y se guarda congelado en la línea.
 //
 // ⚠️ Y EL RÓTULO TAMBIÉN VA POR ID (26-ago). Hasta hoy el rótulo corto salía de
 // `uom_factor===1 ? 'u' : 'cj'` — o sea: todo lo que no fuera "Unidades" se
@@ -13391,7 +13484,7 @@ const DESP_UOM_CORTA = {
   1:'u',                       // Unidades
   2:'doc',                     // Docenas (12 u)
   37:'paq', 38:'paq', 50:'paq',// Paquete de 4 · de 2 · de 12
-  42:'cj', 44:'cj', 46:'cj', 49:'cj',   // Caja (Hamburguesa 24) · (Frances 24) · Caja 6 · (Pizza 12)
+  42:'cj', 44:'cj', 46:'cj', 49:'cj',   // Caja (Buns 24) · (Frances 24) · Caja 6 · (Pizza 12)
 };
 // ── LA CANTIDAD EN PALABRAS (1-oct, Andrea) ─────────────────────────────
 // Despachos y Devoluciones decían la unidad como la llama Odoo («6 Unidades»,
@@ -13463,6 +13556,7 @@ let _despSinDesp=[], _despForzar={};
 // Sub-pestaña abierta en Despachos: 'preparar' | 'entregar'. Arranca en preparar,
 // que es el trabajo de la mañana.
 let _despTab='preparar';
+const UOM_CAT_UNIDAD = 1;   // uom.category [1] «Unidad» (en_US «Unit») — por id, nunca por nombre
 let _despFac=null, _despUom=null, _despErr='', _despAbierto=null, _despLotes=null,
     _despSaldo=null, _despEdit={}, _despGuardando=false;
 // Corte del ancla vigente en ms. null = no se pudo leer (sin sesion o sin ancla):
@@ -13692,7 +13786,12 @@ async function despCargar(force, silencioso){
   despRender();                 // la sección "Preparado" no espera a Odoo
   try{
     if(!_despUom){
-      const us=await odooCall('uom.uom','search_read',[[['category_id.name','=','Unidad']]],
+      // La categoría va POR ID (T-104, 24-oct). Por nombre dependía del idioma:
+      // medido el 24-oct, `category_id.name = 'Unidad'` da 19 UoM en es_CR y
+      // CERO en en_US (allá se llama "Unit"), y un renombre en Odoo la vaciaba
+      // igual. `uom.category` [1] = Unidad/Unit; `category_id = 1` da las
+      // mismas 19 (id, nombre y factor idénticos a la búsqueda por nombre).
+      const us=await odooCall('uom.uom','search_read',[[['category_id','=',UOM_CAT_UNIDAD]]],
         {fields:['id','name','factor'],limit:100,context:{lang:'es_CR'}});
       _despUom={}; us.forEach(function(u){ _despUom[u.id]=u; });
       // El nombre se guarda acá (lo usa el selector); el FACTOR va a la caché
@@ -21890,7 +21989,7 @@ async function rzPersistPersonas(iso, n){
 function _rzRenivelar(){
   if(_rzCtx){ const lvl=nivLevel(_rzCtx.ritmo, _rzCtx.stock.finPlan||_rzCtx.stock.fin, _rzCtx.cfg); _rzCtx.weeks=lvl.weeks; _rzCtx.w0=lvl.w0; _rzRecalcAuto(); }
   if(_planInputs){ const sem=Math.max(0, Math.round((_mondayProd(new Date(2026,11,18))-_mondayProd(new Date()))/(7*86400000))+1);
-    _planProj=_planProyectar(_planInputs.ritmo, _planInputs.fin, _planInputs.cfg, sem); }
+    _planProj=_planProyectar(_planInputs.ritmo, _planInputs.finLunes||_planInputs.fin, _planInputs.cfg, sem); }
 }
 function _rzRepintar(){ if(_rzCtx && document.getElementById('rzBody')) rzRender(); if(_planProj.length && document.getElementById('planBody')) planRenderMeses(); }
 // Cambio MANUAL de personas: NO recalcula/guarda de una. Primero PREVISUALIZA y pide confirmar.
@@ -22867,45 +22966,69 @@ async function cpTarCargar(forzar){
   if(_cpVista==='ajustes' && !_cpReg) cpRender();
 }
 const _cpTarCol=function(n){ return n==null?'—':'₡'+_rzN(n, 2); };
-// Una tarjeta por proveedor (20-oct): BIO arriba como siempre (r) y cada otro proveedor de Compras en
-// r.proveedores. El mensaje del último clic va en la tarjeta de ESE proveedor (T.msgProv).
-function _cpTarCardHtml(T, r, prov, titulo, inicial){
-  const msg=(T.msgProv===prov)?T.msg:'', cls=(T.msgProv===prov)?(T.msgCls||''):'';
-  const ver=(r.lineas||[]).filter(function(l){ return l.estado==='actualiza' || l.estado==='tarjeta' || l.estado==='fuera_de_banda'; });
+// UNA tarjeta «Tarifas» con un renglón por proveedor (T-264, 24-oct; antes una tarjeta por proveedor, 20-oct).
+// El renglón dice cuántas cambian y cuántas están fuera de banda, y se despliega a su tabla con su botón.
+// Lo abierto vive en T.ab (cpRender redibuja todo). El mensaje del último clic va en el renglón de ESE
+// proveedor (T.msgProv) y se ve aunque esté cerrado.
+function _cpTarVer(r){
+  return (r.lineas||[]).filter(function(l){ return l.estado==='actualiza' || l.estado==='tarjeta' || l.estado==='fuera_de_banda'; });
+}
+function _cpTarDetHtml(T, r, prov, inicial, ver){
   const fuera=ver.filter(function(l){ return l.estado==='fuera_de_banda'; }).length;
-  if(!ver.length && !msg) return '';
-  let h='<div class="cp-card cp-tar"><div class="cp-st2">'+esc(titulo)+'</div>';
-  if(ver.length){
-    // La unidad va en el encabezado si es la misma para todas (BIO: kg), si no, en cada fila.
-    const u0=ver[0].unidad, unaU=ver.every(function(l){ return l.unidad===u0; });
-    h+='<table class="cp-tartbl"><thead><tr><th>Insumo</th><th>Hoy</th><th>Factura</th><th>Queda'+(unaU&&u0?(' /'+esc(u0)):'')+'</th></tr></thead><tbody>'
-      +ver.map(function(l){ const fuera=(l.estado==='fuera_de_banda');
-        return '<tr><td>'+esc(l.producto)+'</td><td>'+esc(_cpTarCol(l.precio_actual))+'</td>'
-          +'<td><span class="cp-g" title="'+esc((l.factura_fecha||'')+(l.anterior_nombre?(' · anterior '+l.anterior_nombre+' '+_cpTarCol(l.precio_anterior)):' · sin factura anterior'))+'">'+esc(l.factura_nombre||'—')+'</span></td>'
-          +'<td'+(fuera?' class="cp-amb3"':'')+'>'+esc(_cpTarCol(l.precio_nuevo)+(unaU?'':('/'+(l.unidad||''))))+'</td></tr>'; }).join('')
-      +'</tbody></table>';
-    if(fuera) h+='<div class="cp-msg cp-amb3">Fuera de banda ('+String(r.banda[0]).replace('.',',')+'× a '+String(r.banda[1]).replace('.',',')+'×'
-      +(r.umbral!=null?' de la factura anterior':'')+'): no se aplica.</div>';
-    if(r.aplicables) h+='<div class="cp-btns"><button class="cp-btn cp-btnp"'+(T.enviando?' disabled':'')+' onclick="cpTarAplicar('+(+prov)+')">'
-      +(inicial?'Aplicar corrección inicial · ':'Actualizar ')+r.aplicables+' tarifa'+(r.aplicables===1?'':'s')+'</button></div>';
-  }
-  h+='<div class="cp-msg '+cls+'">'+esc(msg||'')+'</div></div>';
+  // La unidad va en el encabezado si es la misma para todas (BIO: kg), si no, en cada fila.
+  const u0=ver[0].unidad, unaU=ver.every(function(l){ return l.unidad===u0; });
+  let h='<table class="cp-tartbl"><thead><tr><th>Insumo</th><th>Hoy</th><th>Factura</th><th>Queda'+(unaU&&u0?(' /'+esc(u0)):'')+'</th></tr></thead><tbody>'
+    +ver.map(function(l){ const fuera=(l.estado==='fuera_de_banda');
+      return '<tr><td>'+esc(l.producto)+'</td><td>'+esc(_cpTarCol(l.precio_actual))+'</td>'
+        +'<td><span class="cp-g" title="'+esc((l.factura_fecha||'')+(l.anterior_nombre?(' · anterior '+l.anterior_nombre+' '+_cpTarCol(l.precio_anterior)):' · sin factura anterior'))+'">'+esc(l.factura_nombre||'—')+'</span></td>'
+        +'<td'+(fuera?' class="cp-amb3"':'')+'>'+esc(_cpTarCol(l.precio_nuevo)+(unaU?'':('/'+(l.unidad||''))))+'</td></tr>'; }).join('')
+    +'</tbody></table>';
+  if(fuera && r.banda) h+='<div class="cp-msg cp-amb3">Fuera de banda ('+String(r.banda[0]).replace('.',',')+'× a '+String(r.banda[1]).replace('.',',')+'×'
+    +(r.umbral!=null?' de la factura anterior':'')+'): no se aplica.</div>';
+  if(r.aplicables) h+='<div class="cp-btns cp-btns-d cp-tarbtn"><button class="cp-btn cp-btnp"'+(T.enviando?' disabled':'')+' onclick="cpTarAplicar('+(+prov)+')">'
+    +(inicial?'Aplicar corrección inicial · ':'Actualizar ')+r.aplicables+' tarifa'+(r.aplicables===1?'':'s')+'</button></div>';
   return h;
 }
+// items: [{r, prov, nombre, inicial}]. Devuelve '' si ningún proveedor tiene nada que mostrar.
+function _cpTarListaHtml(T, items, titulo, avisos){
+  // Si un solo proveedor tiene algo que mirar, su renglón ya viene abierto.
+  const nVer=items.filter(function(it){ return _cpTarVer(it.r).length; }).length;
+  const filas=items.map(function(it){
+    const prov=it.prov, ver=_cpTarVer(it.r);
+    const msg=(T.msgProv===prov)?T.msg:'', cls=(T.msgProv===prov)?(T.msgCls||''):'';
+    if(!ver.length && !msg) return '';
+    const fuera=ver.filter(function(l){ return l.estado==='fuera_de_banda'; }).length, camb=ver.length-fuera;
+    const ab=(T.ab && prov in T.ab) ? !!T.ab[prov] : nVer===1;
+    T.abVisto=T.abVisto||{}; T.abVisto[prov]=ab;
+    const res=[camb?(camb+' cambia'+(camb===1?'':'n')):'', fuera?(fuera+' fuera de banda'):''].filter(Boolean).join(' · ');
+    let h='<div class="cp-tarp"><div class="cp-it'+(ver.length?'':' cp-tarp-s')+'"'+(ver.length?(' onclick="cpTarToggle('+(+prov)+')"'):'')+'>'
+      +'<span class="cp-in cp-in1">'+esc(it.nombre)+'</span>'
+      +'<span class="cp-g">'+(fuera?('<span>'+(camb?(camb+' cambia'+(camb===1?'':'n')+' · '):'')+'</span><span class="cp-amb3">'+fuera+' fuera de banda</span>'):esc(res))
+      +(ver.length?(' <span class="cp-fl'+(ab?' abierto':'')+'" aria-hidden="true">›</span>'):'')+'</span></div>';
+    if(ab && ver.length) h+='<div class="cp-tardet">'+_cpTarDetHtml(T, it.r, prov, it.inicial, ver)+'</div>';
+    h+='<div class="cp-msg '+cls+'">'+esc(msg||'')+'</div></div>';
+    return h;
+  }).join('');
+  const av=(avisos||[]).map(function(a){ return '<div class="cp-msg cp-amb3">'+esc(a.texto)+'</div>'; }).join('');
+  if(!filas && !av) return '';
+  return '<div class="cp-card cp-tar"><div class="cp-st2">'+esc(titulo)+'</div>'+av+(filas?('<div class="cp-tarl">'+filas+'</div>'):'')+'</div>';
+}
+function cpTarToggle(prov){
+  const T=_cpTar; if(!T) return;
+  T.ab=T.ab||{}; prov=+prov; T.ab[prov]=!(T.abVisto && T.abVisto[prov]); cpRender();
+}
 const CP_TAR_BIO=948;
+function _cpTarProvItems(r){
+  return (r.proveedores||[]).map(function(p){ return {r:p, prov:+p.proveedor_id, nombre:_cpNomCorto(p.proveedor||('proveedor '+p.proveedor_id)), inicial:false}; });
+}
 function cpTarifasHtml(){
   const T=_cpTar; if(!T || !T.r || _socia!==true) return '';
   const r=T.r, inicial=(T.modo==='inicial');
-  if(T.modo==='historial'){
-    // Si el servicio no pudo leer facturas, se dice: nunca una tarjeta vacía que parezca «al día» (Lusof).
-    const av=(r.avisos||[]);
-    return (av.length?'<div class="cp-card cp-tar"><div class="cp-st2">Tarifas de proveedor</div>'
-             +av.map(function(a){ return '<div class="cp-msg cp-amb3">'+esc(a.texto)+'</div>'; }).join('')+'</div>':'')
-      +(r.proveedores||[]).map(function(p){ return _cpTarCardHtml(T, p, p.proveedor_id, 'Tarifas de '+(p.proveedor||('proveedor '+p.proveedor_id)), false); }).join('');
-  }
+  // Si el servicio no pudo leer facturas, se dice: nunca una tarjeta vacía que parezca «al día» (Lusof).
+  if(T.modo==='historial') return _cpTarListaHtml(T, _cpTarProvItems(r), 'Tarifas', r.avisos);
   if(inicial && r.inicializado) return T.msg ? '<div class="cp-card cp-tar"><div class="cp-st2">Tarifas de BIO</div><div class="cp-msg '+(T.msgCls||'')+'">'+esc(T.msg)+'</div></div>' : '';
-  return _cpTarCardHtml(T, r, CP_TAR_BIO, inicial?'Tarifas de BIO · corrección inicial':'Tarifas de BIO', inicial)
-    +(inicial?'':(r.proveedores||[]).map(function(p){ return _cpTarCardHtml(T, p, p.proveedor_id, 'Tarifas de '+(p.proveedor||('proveedor '+p.proveedor_id)), false); }).join(''));
+  if(inicial) return _cpTarListaHtml(T, [{r:r, prov:CP_TAR_BIO, nombre:'BIO', inicial:true}], 'Tarifas de BIO · corrección inicial', null);
+  return _cpTarListaHtml(T, [{r:r, prov:CP_TAR_BIO, nombre:'BIO', inicial:false}].concat(_cpTarProvItems(r)), 'Tarifas', null);
 }
 const CP_TAR_MOTIVO={
   tarifa_apagada:'Las tarifas están apagadas en el servicio: no se cambió nada en Odoo.',
@@ -24766,6 +24889,8 @@ async function nivRealRango(D1,D2){
 }
 
 let _planProj=[], _planReal={}, _planInputs=null;
+let _planSinLunes=false;                 // T-243: no se pudo leer la producción de esta semana → semana en curso desde el stock de hoy
+let _planSinReal=false;                  // no se pudo leer la producción real del mes → días pasados con la propuesta
 let _planEdit=null, _planEditMes=null;   // edición inline del Plan (ds en edición · mes abierto)
 let _planAviso='';                       // motivo visible cuando una edición del Plan no se puede hacer
 async function cargarPlanMeses(){
@@ -24777,18 +24902,35 @@ async function cargarPlanMeses(){
     _rzPersonas=await nivPersonas();        // marca de personas por semana (antes de proyectar)
     await cierreCargarMeta(cfg, ritmo);     // rampa hacia la meta de cierre (antes de proyectar)
     if(_rzCtx) _rzRecalcAuto();             // refresca el derrame/faltante que pinta _rzDerrameNota
-    _planStock=stk.fin;                     // stock de HOY, para el panel META vs HOY
-    _planInputs={ritmo:ritmo, fin:stk.fin, cfg:cfg};   // para re-proyectar al cambiar personas sin volver a Odoo
+    // Stock del LUNES (T-243): la semana en curso se nivela desde el MISMO punto que el Resumen.
+    // Se lee SIEMPRE la producción de esta semana junto con el stock de recién: reusar la del
+    // Resumen mezclaría un stock nuevo con una producción vieja, y una orden validada en el medio
+    // inflaría el stock del lunes sin que nada avise. Si la lectura falla: la del Resumen solo si
+    // es de esta semana y de hace menos de 10 min; si no, el stock de hoy, con la marca.
+    let doneU=null;
+    try{ doneU=(await nivSemana()).doneU; }
+    catch(e){ try{ console.warn('[Truefie] Plan: no pude leer la producción de esta semana:', (e&&e.message)||e); }catch(_){}
+      if(_rzCtx && _rzCtx.real && +_rzCtx.mon0===+_mondayProd(hoy) && (Date.now()-(_rzCtx.cargadoEn||0))<10*60*1000) doneU=_rzCtx.real.doneU; }
     // Semanas hasta el cierre duro (lun 14-dic, viernes 18-dic incluido). nivProyeccion vuelve a cortar por seguridad.
     const semDic=Math.max(0, Math.round((_mondayProd(new Date(2026,11,18))-_mondayProd(hoy))/(7*86400000))+1);
     _rzOverrides=await nivOverrides();     // ediciones ANTES de proyectar (MISMA fuente que el Resumen)
     // Lo REAL de Odoo se carga ANTES de proyectar: la proyección lo necesita para los días pasados
     // de la semana en curso (antes se cargaba después y la primera pasada iba a ciegas).
-    _planReal=await nivRealRango(hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-01', _ymd(hoy));
+    // Si falla, el Plan NO se pierde: se proyecta igual, sin lo real del mes (los días pasados
+    // quedan con la propuesta) y la tarjeta del mes lo marca. Todo lo demás es de esta carga.
+    let realMes=null;
+    try{ realMes=await nivRealRango(hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-01', _ymd(hoy)); }
+    catch(e){ try{ console.warn('[Truefie] Plan: no pude leer la producción del mes:', (e&&e.message)||e); }catch(_){} }
+    _planReal=realMes||{}; _planSinReal=!realMes;
     // Plan RECALCULADO (no pegado): si hay ediciones guardadas, la proyección de carga las honra y ya queda
     // NIVELADA hacia la meta; si no, la proyección cruda del motor. Así al recargar el plan ya está nivelado
     // desde las ediciones (el aviso de "reacomodar" no reaparece), sin guardar ningún plan aparte.
-    _planProj = _planProyectar(ritmo, stk.fin, cfg, semDic);
+    // De cierreCargarMeta en adelante ninguna lectura corta la carga (nivSemana y nivRealRango
+    // caen a su respaldo con marca; nivOverrides atrapa sus errores): el estado queda de ESTA carga.
+    _planSinLunes=!doneU;
+    _planStock=stk.fin;                     // stock de HOY, para el panel META vs HOY
+    _planInputs={ritmo:ritmo, fin:stk.fin, finLunes:doneU?nivStockLunes(stk.fin, doneU):stk.fin, cfg:cfg};   // para re-proyectar al cambiar personas sin volver a Odoo
+    _planProj = _planProyectar(ritmo, _planInputs.finLunes, cfg, semDic);
     if(_rzCtx) _rzRecalcAuto();             // si el Resumen ya corrió, refresca el auto-relleno de la meta
     st.classList.add('hidden');
     planRenderMeses();
@@ -24818,12 +24960,12 @@ function planPanelMeta(){
     _planProj.forEach(function(wk){ const b=_semanaBatches(wk);
       for(const p in b) prod[p]=(prod[p]||0)+b[p]*NIV_INFO[p].rend; });
     R.M.forEach(function(m){
-      const fin=(_planStock[m.p]||0)+(prod[m.p]||0)-(m.r||0)*_planProj.length;
+      const fin=(((_planInputs&&_planInputs.finLunes)||_planStock)[m.p]||0)+(prod[m.p]||0)-(m.r||0)*_planProj.length;   // stock del LUNES: la semana 0 de _planProj ya trae lo producido (T-243)
       const falta=Math.ceil(((m.b1+m.b2+m.b3)-fin)/m.I.cajaU);
       if(falta>0) cortos.push(_nomCorto(m.p)+' '+_rzN(falta)); });
   }
   const aviso=cortos.length
-    ? '<div class="pm-corto"><b>La rampa no llega a la meta.</b> Aun produciendo todos los días hasta el 18-dic quedan cortos, en cajas: '
+    ? '<div class="pm-corto"><b>La rampa no llega a la meta.</b>'+(_planSinLunes?'<span class="pm-est">desde stock de hoy</span>':'')+' Aun produciendo todos los días hasta el 18-dic quedan cortos, en cajas: '
       +esc(cortos.join(' · '))+'. La fábrica tiene techo (un producto por día, Semillas solo el jueves, Galletas solo el viernes): hay que bajar algún bloque de la meta, sumar gente o arrancar antes.</div>'
     : '';
   return '<div class="pm">'
@@ -24936,7 +25078,9 @@ function planRenderMeses(){
     const bat=porMes[m]||{}, esHoy=(m===mesHoy);
     const filas=NIV_PROD.filter(p=>(bat[p]||0)>0).map(p=>'<div class="pl-bl">'+esc(_rzBP(bat[p], p))+'</div>').join('') || '<div class="pl-bl pl-b0">—</div>';
     const tags=(m===11?'<span class="pl-tag pl-tag-cierre">Cierre 18-dic</span>':'')
-      +(FERCORTO[m]?'<span class="pl-tag pl-tag-fer">'+esc(FERCORTO[m])+'</span>':'');
+      +(FERCORTO[m]?'<span class="pl-tag pl-tag-fer">'+esc(FERCORTO[m])+'</span>':'')
+      +(esHoy && _planSinLunes?'<span class="pl-tag pl-tag-fer">Semana en curso desde stock de hoy</span>':'')
+      +(esHoy && _planSinReal?'<span class="pl-tag pl-tag-fer">Sin producción real del mes</span>':'');
     cards+='<div class="pl-mes'+(esHoy?' pl-mes-now':'')+'" onclick="planVerDetalle('+m+')">'
       +'<div class="pl-mnom">'+_MESNOM2[m]+(esHoy?' <span class="pl-hoy">· ahora</span>':'')+'</div>'
       +(tags?'<div class="pl-tags">'+tags+'</div>':'')
@@ -25036,9 +25180,10 @@ function planColchonOv(overrides){
     const wk=_isoWk(mon);
     const colDe=pid=>{ const t=(cfg.ventanas||[]).some(v=>+v.producto_id===pid && wk>=v.desde && wk<=v.hasta); return t?cfg.colchonTemporada:(cfg.colchon[pid]||3); };
     const pers=_personasDe(wk), Rr=_rampaDe(mon);
-    if(Rr){ rampaOn=rampaOn||_rampaEstado(stock, ritmo, Rr.meta, Rr.k).on; Rr.on=rampaOn; }
+    const dec=_nivStockDecision(w, stock, _planInputs.finLunes);    // semana 0: stock del lunes (T-243)
+    if(Rr){ rampaOn=rampaOn||_rampaEstado(dec, ritmo, Rr.meta, Rr.k).on; Rr.on=rampaOn; }
     const pre={}; NIV_PROD.forEach(p=>pre[p]=stock[p]);
-    const L=_weekLayout(stock, ritmo, colDe, H, pers, Rr);           // decide la semana con el stock de inicio (muta stock: se descarta)
+    const L=_weekLayout(dec, ritmo, colDe, H, pers, Rr);             // decide la semana con el stock de inicio (muta dec: se descarta)
     const cells=_aplicarPicado(rzCeldas(mon, L, _planReal||{}, hoyStr, overrides), pers);   // overrides + picado (NO indexa: es simulación)
     // (el recorte por dotación y el del picado ya vienen aplicados en las celdas: el colchón
     //  proyectado deja de contar producción que la gente de esa semana no puede hacer)
@@ -25095,9 +25240,10 @@ function planProyeccionOv(fixedOv){
     const wk=_isoWk(mon);
     const colDe=pid=>{ const t=(cfg.ventanas||[]).some(v=>+v.producto_id===pid && wk>=v.desde && wk<=v.hasta); return t?cfg.colchonTemporada:(cfg.colchon[pid]||3); };
     const pers=_personasDe(wk), R=_rampaDe(mon);
-    if(R){ rampaOn=rampaOn||_rampaEstado(stock, ritmo, R.meta, R.k).on; R.on=rampaOn; }
+    const dec=_nivStockDecision(w, stock, _planInputs.finLunes);      // semana 0: stock del lunes (T-243)
+    if(R){ rampaOn=rampaOn||_rampaEstado(dec, ritmo, R.meta, R.k).on; R.on=rampaOn; }
     const pre={}; NIV_PROD.forEach(p=>pre[p]=stock[p]);
-    const L=_weekLayout(stock, ritmo, colDe, H, pers, R);              // decide la semana (muta stock, se descarta)
+    const L=_weekLayout(dec, ritmo, colDe, H, pers, R);                // decide la semana (muta dec, se descarta)
     // Celdas EFECTIVAS: colocación + lo REAL de Odoo en los días pasados + las ediciones + el
     // picado. Es la misma verdad que pinta el detalle del Plan — antes esta función ya las
     // calculaba para el stock, pero al `out` empujaba el layout CRUDO, así que las tarjetas de
@@ -26974,6 +27120,8 @@ const CLI_ROLES=[
   {k:'cobros',  etq:'WA Cobros',    nom:'Cobros'},
   {k:'pedidos', etq:'WA Pedidos',   nom:'Pedidos'},
   {k:'contab',  etq:'Contabilidad', nom:'Contabilidad'},
+  // b121: un GRUPO de WhatsApp es un hijo tipo «Otro» con «WA Cobros» + «WA Grupo» y sin móvil.
+  {k:'grupo',   etq:'WA Grupo',     nom:'Grupo'},
 ];
 let _cliCtos=null;   // {porMadre:{partner_id:[contacto]}, en, faltan:[etiqueta]} | {error}
 // Número para wa.me: solo dígitos, con el 506 adelante. Odoo lo guarda «+506 XXXX XXXX».
@@ -26992,12 +27140,12 @@ async function cliContactosCargar(forzar){
     const rolDe={}; cats.forEach(c=>{ const r=CLI_ROLES.find(x=>x.etq===c.name); if(r) rolDe[c.id]=r.k; });
     const ids=Object.keys(rolDe).map(Number);
     const rows=ids.length ? await odooCall('res.partner','search_read',[[['category_id','in',ids],['parent_id','!=',false]]],
-      {fields:['name','parent_id','function','mobile','category_id'],limit:2000}) : [];
+      {fields:['name','parent_id','function','mobile','category_id','type'],limit:2000}) : [];
     const porMadre={};
     rows.forEach(p=>{
       const pid=p.parent_id[0], movil=(typeof p.mobile==='string')?p.mobile:'';
       (porMadre[pid]||(porMadre[pid]=[])).push({id:p.id, nombre:p.name||'', puesto:(typeof p.function==='string')?p.function:'',
-        wa:waNumero(movil), roles:(p.category_id||[]).map(c=>rolDe[c]).filter(Boolean)});
+        wa:waNumero(movil), tipo:p.type||'', roles:(p.category_id||[]).map(c=>rolDe[c]).filter(Boolean)});
     });
     Object.values(porMadre).forEach(a=>a.sort((x,y)=>x.nombre.localeCompare(y.nombre,'es')));
     _cliCtos={porMadre, en:Date.now(), faltan:CLI_ROLES.filter(r=>!cats.some(c=>c.name===r.etq)).map(r=>r.etq)};
@@ -27006,6 +27154,50 @@ async function cliContactosCargar(forzar){
 }
 // Contactos de un cliente con ese rol. Primero los de la ficha de la factura (la sucursal,
 // si la factura va a una); si esa ficha no tiene ninguno, los de la empresa (commercial_partner_id).
+// ¿Es un grupo de WhatsApp? Hijo tipo «Otro», con «WA Grupo» y sin móvil (decisión 5, 23-oct).
+function cliEsGrupo(c){ return !!c && c.tipo==='other' && c.roles.indexOf('grupo')>=0 && !c.wa; }
+
+// ── NOMBRE QUE SE MUESTRA Y BÚSQUEDA (b121, Andrea 23-oct) ──────────────
+// Se muestra commercial_name si existe y NO repite la razón social (sin mayúsculas, tildes,
+// puntos ni «S.A.»/«SRL»/«Sociedad Anónima»); si no, la razón social. La búsqueda encuentra
+// por razón social, commercial_name y x_otros_nombres (alias que no se muestran).
+function _normTxt(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); }
+function _normRazon(s){
+  return _normTxt(s).replace(/[.,]/g,' ')
+    .replace(/\b(sociedad de responsabilidad limitada|sociedad responsabilidad limitada|sociedad anonima|limitada|ltda|s ?r ?l|s ?a)\b/g,' ')
+    .replace(/\s+/g,' ').trim();
+}
+function nombreComercialVisible(razon, com){
+  const c=(typeof com==='string')?com.trim():'';
+  return c && _normRazon(c)!==_normRazon(razon) ? c : null;
+}
+function coincideBusqueda(q, textos){ const n=_normTxt(q); return !n || textos.some(t=>_normTxt(t).indexOf(n)>=0); }
+// x_otros_nombres es un campo propio de Odoo: se pide solo si existe, así Truefie anda antes y después de crearlo.
+let _xOtros=null;
+async function cliOtrosNombresCampo(){
+  if(_xOtros===null){
+    try{ const f=await odooCall('res.partner','fields_get',[['x_otros_nombres']],{attributes:['type']}); _xOtros=!!(f&&f.x_otros_nombres); }
+    catch(e){ return []; }
+  }
+  return _xOtros ? ['x_otros_nombres'] : [];
+}
+
+// ── ENLACES DE INVITACIÓN DE LOS GRUPOS (b121) ───────────────────────────
+// Viven SOLO en Truefie (tabla cobro_grupo_enlace, COBRO_GRUPO_ENLACE.sql), ligados al contacto
+// del grupo en Odoo. Solo las socias los leen y los cargan. El valor nunca se pinta, ni en un
+// mensaje de error: la pantalla dice «Enlace guardado ✓» y nada más.
+let _grpEnl={};   // {partner_id: enlace}
+const GRP_ENL_RE=/^https:\/\/chat\.whatsapp\.com\/(invite\/)?[A-Za-z0-9]{10,40}$/;
+async function grpEnlacesCargar(){
+  if(_socia!==true){ _grpEnl={}; return _grpEnl; }
+  try{
+    const {data,error}=await sbClient().from('cobro_grupo_enlace').select('partner_id,enlace');
+    if(error) throw error;
+    const m={}; (data||[]).forEach(r=>{ if(GRP_ENL_RE.test(r.enlace||'')) m[r.partner_id]=r.enlace; }); _grpEnl=m;
+  }catch(e){ _grpEnl={}; }
+  return _grpEnl;
+}
+
 function cliContactos(pid, cpid, rol){
   const P=_cliCtos&&_cliCtos.porMadre; if(!P) return [];
   const de=id=>(P[id]||[]).filter(c=>!rol||c.roles.indexOf(rol)>=0);
@@ -27025,8 +27217,10 @@ async function venClientesCargar(forzar){
       cliContactosCargar(forzar)]);
     if(C.error) throw new Error('contactos: '+C.error);
     const ids=[...new Set(fact.map(g=>g.partner_id&&g.partner_id[0]).filter(Boolean).concat(Object.keys(C.porMadre).map(Number)))];
-    const parts=ids.length ? await odooCall('res.partner','read',[ids],{fields:['name','commercial_name']}) : [];
-    const clientes=parts.map(p=>({id:p.id, razon:p.name||'—', com:(typeof p.commercial_name==='string'&&p.commercial_name&&p.commercial_name!==p.name)?p.commercial_name:null}));
+    const [extra]=await Promise.all([cliOtrosNombresCampo(), grpEnlacesCargar()]);
+    const parts=ids.length ? await odooCall('res.partner','read',[ids],{fields:['name','commercial_name'].concat(extra)}) : [];
+    const clientes=parts.map(p=>({id:p.id, razon:p.name||'—', com:nombreComercialVisible(p.name, p.commercial_name),
+      busca:[p.name, p.commercial_name, p.x_otros_nombres].filter(t=>typeof t==='string'&&t)}));
     clientes.sort((a,b)=>(a.com||a.razon).localeCompare(b.com||b.razon,'es',{sensitivity:'base'}));
     _vcData={clientes};
   }catch(e){ _vcData={error:e&&e.message||String(e)}; }
@@ -27040,7 +27234,8 @@ function renderVenClientes(){
   if(D.error){ el.innerHTML='<div class="status s-err">No pude leer los clientes: '+esc(D.error)+'</div>'; if(res) res.textContent=''; return; }
   const sinCob=c=>!cliContactos(c.id,null,'cobros').some(x=>x.wa);
   const f=(document.getElementById('vcFiltro')||{}).value||'todos';
-  const lista=D.clientes.filter(c=>f!=='sin_cobros'||sinCob(c));
+  const q=(document.getElementById('vcQ')||{}).value||'';
+  const lista=D.clientes.filter(c=>(f!=='sin_cobros'||sinCob(c)) && coincideBusqueda(q, c.busca));
   const nSin=D.clientes.filter(sinCob).length;
   if(res) res.textContent=D.clientes.length+' clientes · '+nSin+' sin contacto de cobros';
   const falt=(_cliCtos&&_cliCtos.faltan)||[];
@@ -27056,13 +27251,16 @@ function renderVenClientes(){
       +'<div class="vc-det hidden" id="vcd-'+c.id+'">';
     if(!ctos.length) h+='<div class="muted vc-vacio">Sin contactos cargados en Odoo.</div>';
     CLI_ROLES.forEach(r=>{
-      const cs=ctos.filter(x=>x.roles.indexOf(r.k)>=0); if(!cs.length) return;
+      // Un grupo lleva «WA Cobros» y «WA Grupo»: va solo bajo «Grupo».
+      const cs=ctos.filter(x=>x.roles.indexOf(r.k)>=0 && (r.k==='grupo' || !cliEsGrupo(x))); if(!cs.length) return;
       h+='<div class="vc-rol">'+esc(r.nom)+'</div>';
       cs.forEach(x=>{
+        const grp=cliEsGrupo(x);
         h+='<div class="vc-cto"><span class="vc-cnm">'+esc(x.nombre)+(x.puesto?'<span class="vc-puesto"> · '+esc(x.puesto)+'</span>':'')+'</span>'
           +(x.wa ? '<span class="vc-num">'+esc(waNumeroVer(x.wa))+'</span>'
               +'<button class="cob-wa-ico vc-wa" title="Abrir WhatsApp" onclick="vcWhatsApp(\''+x.wa+'\',event)">'+_SVG_WA+'</button>'
-            : '<span class="vc-num vc-av">sin móvil</span>')+'</div>';
+            : (grp ? '<span class="vc-num">grupo</span>' : '<span class="vc-num vc-av">sin móvil</span>'))+'</div>'
+          +(grp && _socia===true ? '<div class="vc-enl" id="vce-'+x.id+'">'+vcEnlHtml(x.id)+'</div>' : '');
       });
     });
     h+='</div>';
@@ -27071,6 +27269,39 @@ function renderVenClientes(){
 }
 function vcToggle(id){ const d=document.getElementById('vcd-'+id), r=document.getElementById('vcr-'+id); if(!d) return;
   d.classList.toggle('hidden'); if(r) r.classList.toggle('open', !d.classList.contains('hidden')); }
+// Enlace de invitación del grupo: el campo de carga es oculto y después solo dice «Enlace guardado ✓».
+function vcEnlHtml(id, editando, msg){
+  const hay=!!_grpEnl[id], m=msg?'<span class="vc-enl-av">'+esc(msg)+'</span>':'';
+  if(editando) return '<input type="password" id="vcei-'+id+'" autocomplete="off" placeholder="Enlace de invitación del grupo" onclick="event.stopPropagation()">'
+    +'<button class="cob-copy" onclick="vcEnlGuardar('+id+',event)">Guardar</button>'
+    +'<button class="cob-copy" onclick="vcEnlVer('+id+',false,null,event)">Cancelar</button>'+m;
+  return (hay ? '<span>Enlace guardado ✓</span><button class="cob-copy" onclick="vcEnlVer('+id+',true,null,event)">Reemplazar</button>'
+      +'<button class="cob-copy" onclick="vcEnlBorrar('+id+',event)">Borrar</button>'
+    : '<span>Sin enlace</span><button class="cob-copy" onclick="vcEnlVer('+id+',true,null,event)">Guardar enlace</button>')+m;
+}
+function vcEnlVer(id, editando, msg, ev){ if(ev) ev.stopPropagation(); const el=document.getElementById('vce-'+id); if(!el) return;
+  el.innerHTML=vcEnlHtml(id, editando, msg); if(editando){ const i=document.getElementById('vcei-'+id); if(i) i.focus(); } }
+async function vcEnlGuardar(id, ev){
+  ev.stopPropagation();
+  const inp=document.getElementById('vcei-'+id); if(!inp) return;
+  const v=inp.value.trim(); inp.value='';
+  if(!GRP_ENL_RE.test(v)){ vcEnlVer(id, true, 'No es un enlace de invitación de WhatsApp.'); return; }
+  try{
+    // Solo el código del error, nunca su texto: Postgres repite la fila (con el enlace) en el mensaje.
+    const {error}=await sbClient().from('cobro_grupo_enlace')
+      .upsert({partner_id:id, enlace:v, actualizado_por:_miEmail, actualizado_en:new Date().toISOString()});
+    if(error) throw error;
+    _grpEnl[id]=v; vcEnlVer(id, false, null);
+  }catch(e){ vcEnlVer(id, false, 'No se guardó'+(e&&e.code?' ('+e.code+')':'')+'.'); }
+}
+async function vcEnlBorrar(id, ev){
+  ev.stopPropagation();
+  try{
+    const {error}=await sbClient().from('cobro_grupo_enlace').delete().eq('partner_id', id);
+    if(error) throw error;
+    delete _grpEnl[id]; vcEnlVer(id, false, null);
+  }catch(e){ vcEnlVer(id, false, 'No se borró'+(e&&e.code?' ('+e.code+')':'')+'.'); }
+}
 // Solo abre el chat: sin texto y sin mandar nada.
 function vcWhatsApp(num,ev){ ev.stopPropagation(); if(!/^\d{10,15}$/.test(num)) return; window.open('https://wa.me/'+num, '_blank', 'noopener'); }
 
@@ -27085,10 +27316,12 @@ const _COB_MT={cobrar:'out_invoice', pagar:'in_invoice'};
 // umbral el atraso es normal y va en gris: si todo es rojo, el rojo no dice nada.
 const COB_DIAS_ROJO=30;
 let _cobData={cobrar:null, pagar:null}, _cobTab='cobrar';
-// Facturas de 2025 con saldo, por cliente (partner_id). NO se muestran (la cartera corta en 2026):
-// solo entran al MENSAJE de cobro por WhatsApp, que sí incluye las vencidas de 2025 (Andrea, 22-oct).
-const COB_MSG_DESDE='2025-01-01';
-let _cobViejas={};
+// Corte (Andrea, 23-oct, b121): en Por cobrar no sale NINGÚN documento anterior al 1-mar-2026, ni
+// en la cartera ni en el mensaje (reemplaza a las vencidas de 2025 de b120). Por pagar sigue en 2026.
+// En Odoo no se toca nada.
+const COB_DESDE={cobrar:'2026-03-01', pagar:'2026-01-01'};
+// Últimos 4 dígitos → cuántos documentos de la cartera los comparten. Si chocan, va FE/NC adelante.
+let _cobChoque={};
 // Días vencida: hoy (CR, fecha local) − vencimiento. >0 = vencida. null si no hay vencimiento.
 function _diasVencida(due){
   if(!due) return null;
@@ -27097,12 +27330,70 @@ function _diasVencida(due){
   const n=new Date(), hoy=Date.UTC(n.getFullYear(),n.getMonth(),n.getDate());
   return Math.round((hoy-dueUTC)/86400000);
 }
+// Moneda (T-15, b122): `amount_residual` viene en la moneda de la FACTURA — una de US$254,25 se
+// leía como ₡254. Cada fila guarda el saldo en céntimos de colón (`amount_residual_signed`, que
+// Odoo convierte al tipo de cambio de la factura) para los totales, y en su moneda para mostrarla.
+// Montos exactos, con céntimos (T-16): nada se redondea en Cobros y pagos.
+function _cobMoneda(r){
+  const cur=(r.currency_id&&r.currency_id[1])||'CRC';
+  r._crc=_crcCent(Math.abs(Number(r.amount_residual_signed)||0));
+  r._ext = /CRC/i.test(cur) ? null : {cur:cur, c:_crcCent(r.amount_residual)};
+}
+const COB_SIMB={USD:'$', EUR:'€'};
+function _cobExtTxt(x){ return _crcTico(x.c).replace('₡', COB_SIMB[x.cur]||(x.cur+' ')); }
+// Una fila: en dólares el monto de la factura, y debajo su equivalente en colones.
+function _cobMontoHTML(r){
+  if(!r._ext) return _crcTico(r._crc);
+  return _cobExtTxt(r._ext)+'<div class="muted" style="font-size:11px;font-weight:400">≈ '+_crcTico(r._crc)+'</div>';
+}
+function _cobSuma(a){ return a.reduce((s,r)=>s+r._crc,0); }
+// Lo que NO es colones dentro de un grupo, por moneda («$2.398,44»). La fila del proveedor lo
+// pone ARRIBA, porque en esa moneda se paga (Andrea, 23-oct); el equivalente en colones va abajo.
+function _cobExtDe(a){ const por={}; a.filter(r=>r._ext).forEach(r=>{ por[r._ext.cur]=(por[r._ext.cur]||0)+r._ext.c; });
+  return Object.keys(por).map(k=>_cobExtTxt({cur:k,c:por[k]})).join(' + '); }
+// Fila del proveedor: cada moneda en la suya («$2.398,44», o «₡50.000,00 + $254,25» si mezcla) y,
+// si hay alguna que no es colones, el total en colones abajo. Sin dólares, igual que siempre.
+function _cobGrupoMonto(a){
+  const ext=_cobExtDe(a); if(!ext) return _crcTico(_cobSuma(a));
+  const crc=_cobSuma(a.filter(r=>!r._ext));
+  return (crc?_crcTico(crc)+' + ':'')+ext+'<div class="muted" style="font-size:11px;font-weight:400">≈ '+_crcTico(_cobSuma(a))+'</div>';
+}
+function _cobExtNota(n, todasUSD){ return n+(n===1?' factura':' facturas')+(todasUSD?' en dólares':' en otra moneda')+(n===1?', sumada':', sumadas')+' en colones al tipo de cambio de cada factura'; }
+// ── LOCALES (b123, Andrea 23-oct) ───────────────────────────────────────
+// Clientes con varios locales bajo UNA razón social: en Por cobrar cada local es su propio
+// grupo, con su mensaje y su botón. El local NO vive en ningún campo de Odoo: se escribe en
+// «Referencia del cliente» de la orden de venta (LOCAL - OC), que sale en el PDF para Daniel
+// y el distribuidor; la dirección de entrega no se imprime. Se lee de `ref` y, si no está, de la
+// nota. Clave = commercial_partner_id. `k` = palabras que lo identifican (sin tildes, minúscula).
+const COB_LOCALES={
+  651: [{n:'Nunciatura',k:['nunciatura']},{n:'Escalante',k:['escalante']}],
+  1032:[{n:'Grecia',k:['grecia','gracia']},{n:'Palmares',k:['palmares']},{n:'Nicoya',k:['nicoya']},
+        {n:'Cañas',k:['canas']},{n:'Esparza',k:['esparza']},{n:'Frente al hospital',k:['hospital']}],
+  1054:[{n:'General',k:['general','generwl']},{n:'Daniel Flores',k:['daniel flores','flores']}],
+  1008:[{n:'Uvita',k:['uvita']},{n:'Dominical',k:['dominical']}],
+  1224:[{n:'Tamarindo',k:['tamarindo']},{n:'El Coco',k:['coco']},{n:'Escazú',k:['escazu']}],
+  1056:[{n:'Lincoln',k:['lincoln','lindoln']},{n:'Amara',k:['amara']},{n:'Sabana',k:['sabana']},{n:'Paseo Colón',k:['paseo colon']}],
+  664: [{n:'Escazú',k:['escazu']},{n:'Guachipelín',k:['guachipelin','trivium']}],
+};
+const COB_SIN_LOCAL='Sin local';
+// Locales que nombra un texto. Uno solo = ese; ninguno o dos = no se adivina.
+function _cobLocalesEn(txt, locs){
+  const t=' '+_normTxt(String(txt||'').replace(/<[^>]+>|&nbsp;/g,' ')).replace(/[^a-z0-9]+/g,' ')+' ';
+  return locs.filter(l=>l.k.some(k=>t.indexOf(' '+k+' ')>=0));
+}
+// Local de una factura: null si el cliente no tiene locales; si los tiene, el de `ref`, si no el
+// de la nota, y si ninguno lo dice sin ambigüedad, «Sin local» (a la vista, nunca adivinado).
+function _cobLocal(r){
+  const locs=COB_LOCALES[r._cpid||(r.partner_id&&r.partner_id[0])]; if(!locs) return null;
+  for(const txt of [r.ref, r.narration]){ const m=_cobLocalesEn(txt, locs); if(m.length===1) return m[0].n; }
+  return COB_SIN_LOCAL;
+}
 async function cobLoad(which){
   const mt=_COB_MT[which];
-  // Corte por año: solo facturas de 2026 en adelante (las viejas incobrables ensucian e inflan el total).
+  // Corte por fecha (COB_DESDE): las viejas incobrables ensucian e inflan el total.
   let rows=await odooCall('account.move','search_read',
-    [[['move_type','=',mt],['state','=','posted'],['amount_residual','>',0],['invoice_date','>=','2026-01-01']]],
-    {fields:['name','ref','number_electronic','invoice_date','invoice_date_due','amount_residual','partner_id'],limit:5000});
+    [[['move_type','=',mt],['state','=','posted'],['amount_residual','>',0],['invoice_date','>=',COB_DESDE[which]]]],
+    {fields:['name','ref','number_electronic','invoice_date','invoice_date_due','amount_residual','amount_residual_signed','currency_id','partner_id'].concat(which==='cobrar'?['narration']:[]),limit:5000});
   if(which==='pagar'){
     // Excluir Gastos Adicionales (cuenta 640103 = compensación de IVA, NO pagos reales de Andrea).
     // Criterio robusto = la cuenta (no la referencia): captura las que traen ref con número de
@@ -27113,11 +27404,9 @@ async function cobLoad(which){
     const adicSet=new Set(adic.map(l=>l.move_id&&l.move_id[0]).filter(Boolean));
     rows=rows.filter(r=>!adicSet.has(r.id));
   }
+  rows.forEach(_cobMoneda);
   if(which==='cobrar'){
-    const viejas=await odooCall('account.move','search_read',
-      [[['move_type','=',mt],['state','=','posted'],['amount_residual','>',0],['invoice_date','>=',COB_MSG_DESDE],['invoice_date','<','2026-01-01']]],
-      {fields:['name','invoice_date','invoice_date_due','amount_residual','partner_id'],limit:5000});
-    _cobViejas={}; viejas.forEach(r=>{ const pid=r.partner_id&&r.partner_id[0]; if(pid) (_cobViejas[pid]||(_cobViejas[pid]=[])).push(r); });
+    _cobChoque={}; rows.forEach(r=>{ const u=_cobU4(r.name); if(u) _cobChoque[u]=(_cobChoque[u]||0)+1; });
   }
   // Orden por vencimiento asc; las sin vencimiento van al final.
   rows.sort((a,b)=>{ const x=a.invoice_date_due||'9999-99-99', y=b.invoice_date_due||'9999-99-99'; return x<y?-1:x>y?1:0; });
@@ -27125,11 +27414,16 @@ async function cobLoad(which){
   // (commercial_partner_id), para buscar el contacto de cobros si la factura va a una sucursal.
   const pids=[...new Set(rows.map(r=>r.partner_id&&r.partner_id[0]).filter(Boolean))];
   if(pids.length){
-    const parts=await odooCall('res.partner','read',[pids],{fields:['commercial_name','commercial_partner_id']});
-    const comDe={}, empDe={}; parts.forEach(p=>{ if(typeof p.commercial_name==='string'&&p.commercial_name) comDe[p.id]=p.commercial_name;
-      if(p.commercial_partner_id) empDe[p.id]=p.commercial_partner_id[0]; });
-    rows.forEach(r=>{ const pid=r.partner_id&&r.partner_id[0]; if(pid&&comDe[pid]) r._com=comDe[pid]; if(pid&&empDe[pid]) r._cpid=empDe[pid]; });
+    const extra=await cliOtrosNombresCampo();
+    const parts=await odooCall('res.partner','read',[pids],{fields:['name','commercial_name','commercial_partner_id'].concat(extra)});
+    const comDe={}, empDe={}, busDe={};
+    parts.forEach(p=>{ const c=nombreComercialVisible(p.name, p.commercial_name); if(c) comDe[p.id]=c;
+      if(p.commercial_partner_id) empDe[p.id]=p.commercial_partner_id[0];
+      busDe[p.id]=[p.commercial_name, p.x_otros_nombres].filter(t=>typeof t==='string'&&t); });
+    rows.forEach(r=>{ const pid=r.partner_id&&r.partner_id[0]; if(pid&&comDe[pid]) r._com=comDe[pid]; if(pid&&empDe[pid]) r._cpid=empDe[pid];
+      r._busca=[(r.partner_id&&r.partner_id[1])||''].concat(busDe[pid]||[]); });
   }
+  if(which==='cobrar') rows.forEach(r=>{ r._local=_cobLocal(r); if(r._local) (r._busca=r._busca||[]).push(r._local); });
   return rows;
 }
 async function cobTab(which){
@@ -27140,7 +27434,7 @@ async function cobTab(which){
     document.getElementById('cobTotal').innerHTML=''; document.getElementById('cobTabla').innerHTML='<div class="muted">Cargando…</div>';
     // Por cobrar lee también los contactos de cobros (el botón de WhatsApp). cliContactosCargar
     // no tira: si falla, el botón dice «Contactos sin leer» y la cartera se ve igual.
-    try{ _cobData[which]=(await Promise.all([cobLoad(which), which==='cobrar'?cliContactosCargar():null]))[0]; }
+    try{ _cobData[which]=(await Promise.all([cobLoad(which), which==='cobrar'?cliContactosCargar():null, which==='cobrar'?grpEnlacesCargar():null]))[0]; }
     catch(e){ _cobData[which]={error:e&&e.message||String(e)}; }
     finally{ _spin('cobStatus',false); }
   }
@@ -27161,20 +27455,24 @@ function renderCob(){
   if(!dAll||!dAll.length){ el.innerHTML='<div class="muted">Sin facturas '+(which==='cobrar'?'por cobrar':'por pagar')+' con saldo.</div>'; tot.innerHTML=''; return; }
   // Filtro Todas / Solo vencidas: recalcula totales y agrupamiento SOBRE lo filtrado.
   const soloVenc=_cobVenc==='vencidas';
-  const d = soloVenc ? dAll.filter(r=>(_diasVencida(r.invoice_date_due)||0)>0) : dAll;
-  const total=d.reduce((s,r)=>s+(r.amount_residual||0),0);
-  const venc=d.filter(r=>(_diasVencida(r.invoice_date_due)||0)>0), vencTot=venc.reduce((s,r)=>s+(r.amount_residual||0),0);
+  const q=((document.getElementById('cobQ')||{}).value||'').trim();
+  const d = (soloVenc ? dAll.filter(r=>(_diasVencida(r.invoice_date_due)||0)>0) : dAll).filter(r=>_cobCoincide(r,q));
+  const total=_cobSuma(d);
+  const venc=d.filter(r=>(_diasVencida(r.invoice_date_due)||0)>0), vencTot=_cobSuma(venc);
+  const ext=d.filter(r=>r._ext);
   tot.innerHTML='<div class="cob-strip">'
-    +'<div class="sim-stat"><div class="k">Total '+(which==='cobrar'?'por cobrar':'por pagar')+(soloVenc?' vencido':'')+'</div><div class="val">'+cM(total)+'</div><div class="note">'+d.length+' factura'+(d.length===1?'':'s')+(soloVenc?' vencida'+(d.length===1?'':'s'):' con saldo')+'</div></div>'
-    +'<div class="sim-stat"><div class="k">Vencido</div><div class="val">'+cM(vencTot)+'</div><div class="note">'+venc.length+' factura'+(venc.length===1?'':'s')+' vencida'+(venc.length===1?'':'s')+'</div></div>'
+    +'<div class="sim-stat"><div class="k">Total '+(which==='cobrar'?'por cobrar':'por pagar')+(soloVenc?' vencido':'')+'</div><div class="val">'+_crcTico(total)+'</div><div class="note">'+d.length+' factura'+(d.length===1?'':'s')+(soloVenc?' vencida'+(d.length===1?'':'s'):' con saldo')+'</div></div>'
+    +'<div class="sim-stat"><div class="k">Vencido</div><div class="val">'+_crcTico(vencTot)+'</div><div class="note">'+venc.length+' factura'+(venc.length===1?'':'s')+' vencida'+(venc.length===1?'':'s')+'</div></div>'
     +'</div>'
-    +'<div class="m3sub" style="margin-top:8px;font-size:11px;color:var(--text-3)">Solo facturas de 2026 en adelante'+(which==='pagar'?' · excluye Gastos Adicionales (compensación de IVA, cuenta 640103)':'')+(soloVenc?' · solo vencidas':'')+'. El total es sobre lo visible.</div>';
-  if(!d.length){ el.innerHTML='<div class="muted">Sin facturas vencidas.</div>'; return; }
+    +'<div class="m3sub" style="margin-top:8px;font-size:11px;color:var(--text-3)">'+(which==='cobrar'?'Desde el 1-mar-2026':'Solo facturas de 2026 en adelante')+(which==='pagar'?' · excluye Gastos Adicionales (compensación de IVA, cuenta 640103)':'')+(soloVenc?' · solo vencidas':'')+(ext.length?' · '+_cobExtNota(ext.length, ext.every(r=>r._ext.cur==='USD')):'')+'. El total es sobre lo visible.</div>';
+  if(!d.length){ el.innerHTML='<div class="muted">'+(q?'Nada coincide con la búsqueda.':'Sin facturas vencidas.')+'</div>'; return; }
   document.querySelectorAll('#cobModo button').forEach(b=>b.classList.toggle('on',b.dataset.m===_cobModo));
   if(_cobModo==='cliente') renderCobCliente(which,d,el); else renderCobFactura(which,d,el);
 }
 // Cliente/proveedor: nombre comercial + razón social (parejo con Ventas).
-function _cobPartner(r){ const razon=(r.partner_id&&r.partner_id[1])||'—'; return r._com ? esc(r._com)+' <span class="muted" style="font-size:11px">· '+esc(razon)+'</span>' : esc(razon); }
+function _cobPartner(r){ const razon=(r.partner_id&&r.partner_id[1])||'—';
+  const loc=r._local ? ' <span class="'+(r._local===COB_SIN_LOCAL?'cob-sinlocal':'cob-local')+'">· '+esc(r._local)+'</span>' : '';
+  return (r._com ? esc(r._com)+loc+' <span class="muted" style="font-size:11px">· '+esc(razon)+'</span>' : esc(razon)+loc); }
 // Documento: en Por pagar = número del PROVEEDOR (campo `ref`, "Referencia del
 // proveedor"), con el consecutivo interno de Odoo como referencia chica; si el
 // proveedor no trae número (~28%), cae al interno. En Por cobrar = nuestro nº de
@@ -27183,13 +27481,33 @@ function _cobPartner(r){ const razon=(r.partner_id&&r.partner_id[1])||'—'; ret
 // interno de Odoo nunca se muestra a secas — solo aparece como fallback cuando el proveedor
 // no trae consecutivo, y siempre rotulado "interno N".
 function _cobUlt4(s){ const t=String(s||'').replace(/\s+/g,''); return t?('…'+t.slice(-4)):''; }
-function _cobDoc(r){
+// Por cobrar (b121): cada comprobante se nombra por sus últimos 4 dígitos. Si dos de la cartera
+// comparten esos 4, se les pone el tipo adelante (posiciones 9-10 del consecutivo de Hacienda).
+const COB_TIPO={'01':'FE','02':'ND','03':'NC','04':'TE'};
+function _cobU4(name){ const t=String(name||'').replace(/\s+/g,''); return t.slice(-4); }
+function _cobTipo(name){ const t=String(name||'').replace(/\s+/g,''); return t.length===20 ? (COB_TIPO[t.slice(8,10)]||'') : ''; }
+function _cobChoca(name){ return (_cobChoque[_cobU4(name)]||0)>1 && !!_cobTipo(name); }
+function _cobCorto(name){ return (_cobChoca(name)?_cobTipo(name)+' ':'')+'…'+_cobU4(name); }
+function _cobNombreMsg(name){ return (_cobChoca(name)?_cobTipo(name):'Factura')+' '+_cobU4(name); }
+// Buscador: por cliente (razón social, nombre comercial, otros nombres) o por factura (número
+// completo o últimos 4). En Por pagar el número es el del proveedor (`ref`).
+function _cobCoincide(r, q){
+  if(!q) return true;
+  const dig=q.replace(/[\s….]/g,'');
+  if(/^\d{4,}$/.test(dig)){
+    const docs=[r.name, r.ref].map(x=>String(x||'').replace(/\s+/g,''));
+    if(docs.some(x=>x && (x===dig || x.endsWith(dig)))) return true;
+  }
+  return coincideBusqueda(q, r._busca||[(r.partner_id&&r.partner_id[1])||'']);
+}
+function _cobDoc(r, corto){
   if(_cobTab==='pagar'){
     if(r.ref && String(r.ref).trim())
       return '<span class="cob-cons">'+esc(_cobUlt4(r.ref))+'</span> <span class="cob-consfull">'+esc(r.ref)+'</span>'
         +(r.name?' <span class="muted" style="font-size:11px">· interno '+esc(r.name)+'</span>':'');
     return '<span class="muted" style="font-size:11px">sin nº de proveedor · </span>interno '+esc(r.name||'—');
   }
+  if(corto) return '<span title="'+esc(r.name||'')+'">'+esc(_cobCorto(r.name))+'</span>';
   const refDist = r.ref && r.ref!==r.name ? ' <span class="muted" style="font-size:11px">· '+esc(r.ref)+'</span>' : '';
   const fe = r.number_electronic ? ' <span class="cob-fe" title="Comprobante electrónico: '+esc(r.number_electronic)+'">FE</span>' : '';
   return esc(r.name||'—')+refDist+fe;
@@ -27203,27 +27521,35 @@ function _cobFilaFactura(r,conPartner){
   return '<tr class="cob-fr"><td class="cob-f-fecha">'+_fD(r.invoice_date)+'</td><td class="cob-f-vence">'+_fD(r.invoice_date_due)+'</td>'
     +'<td class="cob-f-dias" style="text-align:right">'+diasCell+'</td>'
     +(conPartner?'<td class="cob-f-cli">'+_cobPartner(r)+'</td>':'')
-    +'<td class="cob-f-doc">'+_cobDoc(r)+'</td>'
-    +'<td class="cob-f-tot" style="text-align:right"><strong>'+cM(r.amount_residual||0)+'</strong></td></tr>';
+    +'<td class="cob-f-doc">'+_cobDoc(r, conPartner)+'</td>'
+    +'<td class="cob-f-tot" style="text-align:right"><strong>'+_cobMontoHTML(r)+'</strong></td></tr>';
 }
 function renderCobFactura(which,d,el){
   const cliLbl=which==='cobrar'?'Cliente':'Proveedor';
   let h='<div style="overflow-x:auto"><table class="cob-tbl"><tr><th>Fecha</th><th>Vence</th><th style="text-align:right">Días</th><th>'+esc(cliLbl)+'</th><th>Documento</th><th style="text-align:right">Pendiente</th></tr>';
   d.forEach(r=>{ h+=_cobFilaFactura(r,true); });
-  const gtot=d.reduce((s,r)=>s+(r.amount_residual||0),0);
+  const gtot=_cobSuma(d);
   h+='<tr class="cob-total"><td colspan="5"><strong>Total</strong> <span class="muted" style="font-size:11px">· '+d.length+' factura'+(d.length===1?'':'s')+' (sobre lo visible)</span></td>'
-    +'<td style="text-align:right"><strong>'+cM(gtot)+'</strong></td></tr>';
+    +'<td style="text-align:right"><strong>'+_crcTico(gtot)+'</strong></td></tr>';
   el.innerHTML=h+'</table></div>';
 }
 function renderCobCliente(which,d,el){
   const groups={};
-  d.forEach(r=>{ const pid=(r.partner_id&&r.partner_id[0])||0, pn=(r.partner_id&&r.partner_id[1])||'—';
-    const g=groups[pid]||(groups[pid]={pid:pid,cpid:r._cpid||null,razon:pn,com:r._com||null,rows:[],total:0,maxVenc:null});
-    g.rows.push(r); g.total+=r.amount_residual||0;
+  // Un cliente con locales (COB_LOCALES) se parte en un grupo por local.
+  const clave=r=>((r.partner_id&&r.partner_id[0])||0)+'|'+(r._local||'');
+  d.forEach(r=>{ const pid=(r.partner_id&&r.partner_id[0])||0, pn=(r.partner_id&&r.partner_id[1])||'—', k=clave(r);
+    const g=groups[k]||(groups[k]={pid:pid,cpid:r._cpid||null,razon:pn,com:r._com||null,local:r._local||null,clave:k,rows:[],total:0,maxVenc:null});
+    g.rows.push(r); g.total+=r._crc;
     const dv=_diasVencida(r.invoice_date_due);
     if(dv!=null && (g.maxVenc==null || dv>g.maxVenc)) g.maxVenc=dv;
   });
-  const arr=Object.values(groups).sort((a,b)=>b.total-a.total);   // el que más debe, arriba
+  // El cliente que más debe, arriba; sus locales juntos, uno debajo del otro (el que más debe
+  // primero y «Sin local» al final).
+  const totCli={}; Object.values(groups).forEach(g=>{ totCli[g.pid]=(totCli[g.pid]||0)+g.total; });
+  const arr=Object.values(groups).sort((a,b)=>(totCli[b.pid]-totCli[a.pid]) || (a.pid-b.pid)
+    || ((a.local===COB_SIN_LOCAL)-(b.local===COB_SIN_LOCAL)) || (b.total-a.total));
+  // El mensaje usa toda la cartera del cliente: un filtro o una búsqueda no recortan lo que se cobra.
+  arr.forEach(g=>{ g.todas=(_cobData[which]||[]).filter(r=>clave(r)===g.clave); });
   window._cobGrupos=arr;   // para el botón "Copiar recordatorio"
   const cliLbl=which==='cobrar'?'Cliente':'Proveedor';
   let h='<div style="overflow-x:auto"><table class="cob-tbl"><tr><th>'+esc(cliLbl)+'</th><th style="text-align:right">Facturas</th><th style="text-align:right">Pendiente</th><th style="text-align:right">Más vencida</th></tr>';
@@ -27240,25 +27566,22 @@ function renderCobCliente(which,d,el){
     // al lado del nombre, en teléfono en la línea tenue de abajo.
     const conAcc = (which==='cobrar' && _cobVencidas(g).length>0);
     const wa = which==='cobrar' ? _cobWa(g) : null, waOk = !!(wa && wa.st==='ok');
-    // Las de 2025 no se ven en la fila: si el mensaje las lleva, se dice cuántas.
-    const n25 = conAcc ? _cobVencViejas(g) : 0, t25 = n25 ? 'incluye '+n25+' vencida'+(n25===1?'':'s')+' de 2025' : '';
-    const waEst = ((wa && !waOk) ? '<span class="cob-waest'+(wa.st==='sin_venc'?'':' cob-waest-av')+'">'+esc(wa.txt)+'</span>' : '')
-      + (t25 ? '<span class="cob-waest">'+t25+'</span>' : '');
+    const waEst = (wa && !waOk) ? '<span class="cob-waest'+(wa.st==='sin_venc'?'':' cob-waest-av')+'">'+esc(wa.txt)+'</span>' : '';
     const btnCopiar = which==='cobrar'
       ? ' <span class="cob-acc">'+(waOk?'<button class="cob-wa" onclick="cobWhatsApp('+i+',event)">WhatsApp</button>':'')+waEst
         +(conAcc?' <button class="cob-copy" onclick="cobCopiar('+i+',event)">Copiar recordatorio</button>':'')+'</span>' : '';
     const celdaAcc = '<td class="cob-g-acc">'+(waOk
       ? '<button class="cob-wa-ico" title="Mandar recordatorio por WhatsApp" onclick="cobWhatsApp('+i+',event)">'+_SVG_WA+'</button>' : '')+'</td>';
-    const primary = g.com ? esc(g.com) : esc(g.razon);
+    const primary = (g.com ? esc(g.com) : esc(g.razon))
+      + (g.local ? ' <span class="'+(g.local===COB_SIN_LOCAL?'cob-sinlocal':'cob-local')+'">· '+esc(g.local)+'</span>' : '');
     const sec = g.com ? ' <span class="muted cob-razon" style="font-size:11px"><span class="cob-sep">· </span>'+esc(g.razon)+'</span>' : '';
     h+='<tr class="prod-row cob-gr" onclick="cobToggleGrupo('+i+')"><td class="cob-g-nm"><span class="pcaret">▸</span> '
       +(venc?'<span class="cob-venc">'+primary+'</span>':primary)+sec+btnCopiar+'</td>'
       +'<td class="cob-g-fac">'+g.rows.length+'<span class="cob-movsuf"> factura'+(g.rows.length===1?'':'s')+'</span>'
         +'<span class="cob-diasmov cob-venc'+(venc&&g.maxVenc>COB_DIAS_ROJO?' cob-d30':'')+'"> · '
         +(venc?(g.maxVenc+' d'):'al día')+'</span>'
-        +((wa && !waOk)?'<span class="cob-waest-mov'+(wa.st==='sin_venc'?'':' cob-waest-av')+'"> · '+esc(wa.txt)+'</span>':'')
-        +(t25?'<span class="cob-waest-mov"> · '+t25+'</span>':'')+'</td>'
-      +'<td class="cob-g-tot" style="text-align:right"><strong>'+cM(g.total)+'</strong></td>'
+        +((wa && !waOk)?'<span class="cob-waest-mov'+(wa.st==='sin_venc'?'':' cob-waest-av')+'"> · '+esc(wa.txt)+'</span>':'')+'</td>'
+      +'<td class="cob-g-tot" style="text-align:right"><strong>'+_cobGrupoMonto(g.rows)+'</strong></td>'
       +'<td class="cob-g-venc" style="text-align:right">'+vencCell+'</td>'+celdaAcc+'</tr>';
     const copiaDet = conAcc
       ? '<div class="cob-detacc"><button class="cob-copy" onclick="cobCopiar('+i+',event)">Copiar recordatorio</button></div>' : '';
@@ -27269,7 +27592,7 @@ function renderCobCliente(which,d,el){
   });
   const gtot=arr.reduce((s,g)=>s+g.total,0), gfac=arr.reduce((s,g)=>s+g.rows.length,0);
   h+='<tr class="cob-total"><td><strong>Total</strong> <span class="muted" style="font-size:11px">· '+arr.length+' '+(which==='cobrar'?'cliente':'proveedor')+(arr.length===1?'':'s')+'</span></td>'
-    +'<td style="text-align:right">'+gfac+'</td><td style="text-align:right"><strong>'+cM(gtot)+'</strong></td><td></td></tr>';
+    +'<td style="text-align:right">'+gfac+'</td><td style="text-align:right"><strong>'+_crcTico(gtot)+'</strong></td><td></td></tr>';
   el.innerHTML=h+'</table></div>';
 }
 function cobToggleGrupo(i){ const row=document.getElementById('cobg-'+i); if(!row)return; row.classList.toggle('hidden');
@@ -27291,33 +27614,38 @@ const COB_WA_TOPE=15;
 // Texto del recordatorio: UNA sola fuente para el botón de copiar y para el de WhatsApp,
 // así los dos mandan exactamente el mismo mensaje. SOLO vencidas, de la más vieja a la más
 // nueva, saldo pendiente con IVA (amount_residual). Sin nombre de cliente ni de quien manda.
-// Vencidas de un cliente para el COBRO: las de la cartera (2026) más las de 2025 con saldo.
-function _cobVencidas(g){
-  const v=r=>(_diasVencida(r.invoice_date_due)||0)>0;
-  return g.rows.filter(v).concat((_cobViejas[g.pid]||[]).filter(v));
-}
-function _cobVencViejas(g){ return (_cobViejas[g.pid]||[]).filter(r=>(_diasVencida(r.invoice_date_due)||0)>0).length; }
+// Vencidas de un cliente para el COBRO: las de su cartera (desde el 1-mar-2026), sin filtros de pantalla.
+function _cobVencidas(g){ return (g.todas||g.rows).filter(r=>(_diasVencida(r.invoice_date_due)||0)>0); }
 function _cobMensaje(g){
   const venc=_cobVencidas(g).slice()
     .sort((a,b)=>{ const x=(a.invoice_date||'')+(a.name||''), y=(b.invoice_date||'')+(b.name||''); return x<y?-1:x>y?1:0; });
   if(!venc.length) return '';
   const una=venc.length>=COB_WA_TOPE ? venc.slice(0,COB_WA_TOPE-1) : venc, resto=venc.slice(una.length);
-  const suma=a=>a.reduce((s,r)=>s+_crcCent(r.amount_residual),0);
-  const L=['Hola, ¿cómo está?','','Le compartimos el detalle de facturas vencidas:',''];
-  una.forEach(r=>L.push('- Factura '+(r.name||'—')+' · '+_fD(r.invoice_date)+' · venció '+_fD(r.invoice_date_due)+' · '+_crcTico(_crcCent(r.amount_residual))));
-  if(resto.length) L.push('y '+resto.length+(resto.length===1?' factura vencida':' facturas vencidas')+' más por '+_crcTico(suma(resto)));
-  L.push('','*Total vencido: '+_crcTico(suma(venc))+'*','','¡Muchas gracias!','Saludos.');
+  // Una factura en dólares se cobra en dólares: su línea y el total van por moneda, sin convertir.
+  const suma=a=>{ const crc=a.filter(r=>!r._ext).reduce((s,r)=>s+r._crc,0), por={};
+    a.filter(r=>r._ext).forEach(r=>{ por[r._ext.cur]=(por[r._ext.cur]||0)+r._ext.c; });
+    const partes=Object.keys(por).map(k=>_cobExtTxt({cur:k,c:por[k]}));
+    if(crc||!partes.length) partes.unshift(_crcTico(crc));
+    return partes.join(' + '); };
+  const linea=r=>r._ext?_cobExtTxt(r._ext):_crcTico(r._crc);
+  const deLocal = g.local && g.local!==COB_SIN_LOCAL ? ' de '+g.local : '';
+  const L=['Hola, ¿cómo está?','','Le compartimos el detalle de facturas vencidas'+deLocal+':',''];
+  una.forEach(r=>L.push('- '+_cobNombreMsg(r.name)+' · '+_fD(r.invoice_date)+' · venció '+_fD(r.invoice_date_due)+' · '+linea(r)));
+  if(resto.length) L.push('y '+resto.length+(resto.length===1?' factura vencida':' facturas vencidas')+' más por '+suma(resto));
+  L.push('','*Total vencido: '+suma(venc)+'*','','¡Muchas gracias!','Saludos.');
   return L.join('\n');
 }
-// ¿Hay botón de cobro? SOLO con vencidas y SOLO a un contacto hijo con «WA Cobros» que tenga
-// móvil. Nunca el teléfono de la ficha madre. Si no hay botón, `txt` dice por qué.
+// ¿Hay botón de cobro? SOLO con vencidas y SOLO a un contacto hijo con «WA Cobros»: con móvil (abre
+// wa.me) o un GRUPO (hijo «Otro» + «WA Grupo», sin móvil: copia el mensaje). Nunca el teléfono de la
+// ficha madre. Sin opciones no hay botón, y `txt` dice por qué.
 function _cobWa(g){
   if(!_cobVencidas(g).length) return {st:'sin_venc', txt:'Sin facturas vencidas'};
   if(!_cliCtos || _cliCtos.error) return {st:'error', txt:'Contactos sin leer'};
-  const cs=cliContactos(g.pid, g.cpid, 'cobros'), ok=cs.filter(c=>c.wa);
+  const cs=cliContactos(g.pid, g.cpid, 'cobros');
+  const ops=cs.filter(c=>c.wa).map(c=>({k:'tel', c})).concat(cs.filter(cliEsGrupo).map(c=>({k:'grupo', c})));
   if(!cs.length) return {st:'sin_cto', txt:'Sin contacto de cobros'};
-  if(!ok.length) return {st:'sin_num', txt:'Contacto de cobros sin móvil'};
-  return {st:'ok', ctos:ok};
+  if(!ops.length) return {st:'sin_num', txt:'Contacto de cobros sin móvil'};
+  return {st:'ok', ops};
 }
 // Solo ABRE WhatsApp con el mensaje escrito: mandarlo es siempre un toque de la persona.
 function _cobWaLink(num, txt){ return 'https://wa.me/'+num+'?text='+encodeURIComponent(txt); }
@@ -27327,26 +27655,25 @@ function cobCopiar(i,ev){
   const btn=ev.currentTarget, g=(window._cobGrupos||[])[i]; if(!g) return;
   const txt=_cobMensaje(g); if(!txt) return;
   const restore=()=>{ btn.textContent='Copiar recordatorio'; btn.classList.remove('on','err'); };
-  _copiarTexto(txt).then(()=>{ btn.textContent='Copiado ✓'; btn.classList.add('on'); setTimeout(restore,1600); })
+  _copiarTexto(txt).then(()=>{ btn.textContent='Copiado ✓'; btn.classList.add('on'); setTimeout(restore,1600); _cobCerrarBloque(i); })
     .catch(()=>{ btn.textContent='No se pudo copiar'; btn.classList.add('err'); setTimeout(restore,1800); });
 }
-// Abre WhatsApp al contacto de cobros con el mensaje ya escrito (22-oct: antes iba SIN número,
-// wa.me/?text=, y había que buscar el chat a mano). Un contacto → directo. Varios → pregunta a cuál.
+// El botón de WhatsApp: una opción → directo; varias → pregunta a cuál (contactos y grupos juntos).
 function cobWhatsApp(i,ev){
   ev.stopPropagation();
   const g=(window._cobGrupos||[])[i]; if(!g) return;
-  const w=_cobWa(g), txt=_cobMensaje(g); if(w.st!=='ok' || !txt) return;
-  if(w.ctos.length===1){ window.open(_cobWaLink(w.ctos[0].wa, txt), '_blank', 'noopener'); return; }
-  cobWaElegir(i, ev.currentTarget, w.ctos);
+  const w=_cobWa(g); if(w.st!=='ok' || !_cobMensaje(g)) return;
+  if(w.ops.length===1){ _cobUsar(i, g, w.ops[0]); return; }
+  cobWaElegir(i, ev.currentTarget, w.ops);
 }
-function cobWaElegir(i, btn, ctos){
+function cobWaElegir(i, btn, ops){
   let m=document.getElementById('cobWaMenu');
   if(!m){
     m=document.createElement('div'); m.id='cobWaMenu'; m.className='cob-wamenu hidden'; document.body.appendChild(m);
     document.addEventListener('click', e=>{ if(!m.contains(e.target)) m.classList.add('hidden'); });
   }
-  m.innerHTML='<div class="cob-wamenu-t">¿A quién?</div>'+ctos.map((c,k)=>'<button onclick="cobWaIr('+i+','+k+',event)">'
-    +esc(c.nombre)+(c.puesto?'<span> · '+esc(c.puesto)+'</span>':'')+'</button>').join('');
+  m.innerHTML='<div class="cob-wamenu-t">¿A quién?</div>'+ops.map((o,k)=>'<button onclick="cobWaIr('+i+','+k+',event)">'
+    +(o.k==='grupo' ? 'Grupo «'+esc(o.c.nombre)+'»' : esc(o.c.nombre)+(o.c.puesto?'<span> · '+esc(o.c.puesto)+'</span>':''))+'</button>').join('');
   m.classList.remove('hidden');
   const r=btn.getBoundingClientRect(), w=m.offsetWidth||240;
   m.style.top=Math.round(r.bottom+6)+'px';
@@ -27356,8 +27683,55 @@ function cobWaIr(i,k,ev){
   ev.stopPropagation();
   const m=document.getElementById('cobWaMenu'); if(m) m.classList.add('hidden');
   const g=(window._cobGrupos||[])[i]; if(!g) return;
-  const w=_cobWa(g), c=w.ctos&&w.ctos[k], txt=_cobMensaje(g); if(!c || !txt) return;
-  window.open(_cobWaLink(c.wa, txt), '_blank', 'noopener');
+  const w=_cobWa(g), o=w.ops&&w.ops[k]; if(!o) return;
+  _cobUsar(i, g, o);
+}
+// Todo en el MISMO toque: Safari de iPhone bloquea una ventana que se abre después de una promesa,
+// y al abrir WhatsApp la página pierde el foco (una copia asíncrona puede no terminar).
+// Contacto → abre wa.me con el mensaje escrito. Grupo → copia el mensaje AHORA, muestra el nombre
+// exacto del grupo y, si hay enlace guardado, lo abre. Nada se manda solo ni se marca como enviado.
+function _cobUsar(i, g, o){
+  const txt=_cobMensaje(g); if(!txt) return;
+  if(o.k==='tel'){ window.open(_cobWaLink(o.c.wa, txt), '_blank', 'noopener'); _cobCerrarBloque(i); return; }
+  const ok=_copiarSync(txt), p=ok ? null : _copiarTexto(txt), enl=_grpEnl[o.c.id];
+  if(enl) window.open(enl, '_blank', 'noopener');
+  const fin=bien=>{ _cobGrupoAviso(o.c.nombre, bien, txt); if(bien) _cobCerrarBloque(i); };
+  if(ok) fin(true); else { _cobGrupoAviso(o.c.nombre, null, txt); p.then(()=>fin(true), ()=>fin(false)); }
+}
+// Copia sin promesa (textarea + execCommand, la forma que anda en Safari de iPhone): termina antes de
+// que se abra WhatsApp. Si no puede, devuelve false y se usa _copiarTexto.
+function _copiarSync(txt){
+  let ta=null;
+  try{
+    ta=document.createElement('textarea'); ta.value=txt; ta.setAttribute('readonly','');
+    ta.style.position='fixed'; ta.style.top='0'; ta.style.left='0'; ta.style.opacity='0'; ta.style.fontSize='16px';
+    document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0, txt.length);
+    return !!document.execCommand('copy');
+  }catch(e){ return false; }
+  finally{ if(ta && ta.parentNode) ta.parentNode.removeChild(ta); }
+}
+// El nombre del grupo, grande. ok: true copiado · false falló (el texto queda a mano) · null copiando.
+function _cobGrupoAviso(nombre, ok, txt){
+  let m=document.getElementById('cobGrupo');
+  if(!m){
+    m=document.createElement('div'); m.id='cobGrupo'; m.className='cob-grupo hidden'; document.body.appendChild(m);
+    document.addEventListener('click', e=>{ if(!m.contains(e.target)) m.classList.add('hidden'); });
+  }
+  const t = ok===true ? 'Mensaje copiado. Abrí el grupo «'+nombre+'» en WhatsApp y pegalo'
+          : ok===false ? 'No se pudo copiar el mensaje.' : 'Copiando el mensaje…';
+  m.innerHTML='<div class="cob-grupo-t">Grupo de WhatsApp</div><div class="cob-grupo-nm">'+esc(nombre)+'</div>'
+    +'<div class="cob-grupo-t'+(ok===false?' cob-grupo-err':'')+'">'+esc(t)+'</div>'
+    +(ok===false?'<textarea readonly>'+esc(txt)+'</textarea>':'')
+    +'<div class="cob-grupo-pie"><button class="cob-copy" onclick="_cobGrupoCerrar(event)">Listo</button></div>';
+  m.classList.remove('hidden');
+}
+function _cobGrupoCerrar(ev){ if(ev) ev.stopPropagation(); const m=document.getElementById('cobGrupo'); if(m) m.classList.add('hidden'); }
+// Decisión 8: al abrir wa.me, o cuando la copia sale bien (no si falla), se cierra el desplegable
+// de ese cliente. No se guarda nada.
+function _cobCerrarBloque(i){
+  const row=document.getElementById('cobg-'+i); if(!row) return;
+  row.classList.add('hidden');
+  const prev=row.previousElementSibling; if(prev) prev.classList.remove('open');
 }
 
 // RENT_CANALES murió: las tarifas y términos por canal viven en la FUENTE ÚNICA
