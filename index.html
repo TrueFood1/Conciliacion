@@ -10343,16 +10343,19 @@ function nivLevel(ritmo, fin, cfg, ref){
   // `ref` (opcional): la fecha desde la que se nivela. Sin ella, hoy. Con ella se rehace el plan
   // de una semana YA PASADA, que es lo que necesita el chequeo de producción sin cargar (3-oct).
   const ahora=ref?new Date(ref):new Date();
-  const H=cfg.horizonte||6, cur=_isoWk(ahora), mon0=_mondayProd(ahora);
-  const colDe=pid=>{ const t=(cfg.ventanas||[]).some(v=>+v.producto_id===pid && cur>=v.desde && cur<=v.hasta);
+  const H=cfg.horizonte||6, mon0=_mondayProd(ahora);
+  // Colchón según la temporada de CADA semana del horizonte, igual que nivProyeccion y
+  // planProyeccionOv (T-243). Antes se tomaba la semana de hoy para las H semanas: si una
+  // ventana de temporada empezaba o terminaba dentro del horizonte, Resumen y Plan diferían.
+  const colDeWk=wk=>pid=>{ const t=(cfg.ventanas||[]).some(v=>+v.producto_id===pid && wk>=v.desde && wk<=v.hasta);
     return t?cfg.colchonTemporada:(cfg.colchon[pid]||3); };
   const stock={}; NIV_PROD.forEach(p=>stock[p]=fin[p]||0);
   const weeks=[];
   let rampaOn=false;   // latch: una vez encendida, la rampa no se apaga hasta el cierre
   for(let w=0;w<H;w++){ const mon=new Date(mon0); mon.setDate(mon.getDate()+w*7);
-    const pers=_personasDe(_isoWk(mon)), R=_rampaDe(mon);
+    const wk=_isoWk(mon), pers=_personasDe(wk), R=_rampaDe(mon);
     if(R){ rampaOn=rampaOn||_rampaEstado(stock, ritmo, R.meta, R.k).on; R.on=rampaOn; }
-    weeks.push(_weekLayout(stock, ritmo, colDe, H, pers, R)); }   // capacidad + rampa por semana; muta stock
+    weeks.push(_weekLayout(stock, ritmo, colDeWk(wk), H, pers, R)); }   // capacidad + rampa por semana; muta stock
   return {w0:_semanaBatches(weeks[0]), weeks};
 }
 // Layout de UNA semana: decide QUÉ se produce (no en qué día del calendario — eso lo
@@ -24805,6 +24808,7 @@ async function nivRealRango(D1,D2){
 }
 
 let _planProj=[], _planReal={}, _planInputs=null;
+let _planSinLunes=false;                 // T-243: no se pudo leer la producción de esta semana → semana en curso desde el stock de hoy
 let _planEdit=null, _planEditMes=null;   // edición inline del Plan (ds en edición · mes abierto)
 let _planAviso='';                       // motivo visible cuando una edición del Plan no se puede hacer
 async function cargarPlanMeses(){
@@ -24815,11 +24819,13 @@ async function cargarPlanMeses(){
     const hoy=new Date();
     _rzPersonas=await nivPersonas();        // marca de personas por semana (antes de proyectar)
     await cierreCargarMeta(cfg, ritmo);     // rampa hacia la meta de cierre (antes de proyectar)
-    if(_rzCtx) _rzRecalcAuto();             // refresca el derrame/faltante que pinta _rzDerrameNota
-    _planStock=stk.fin;                     // stock de HOY, para el panel META vs HOY
     // Stock del LUNES (T-243): la semana en curso se nivela desde el MISMO punto que el Resumen.
-    const realSem=await nivSemana();
-    _planInputs={ritmo:ritmo, fin:stk.fin, finLunes:nivStockLunes(stk.fin, realSem.doneU), cfg:cfg};   // para re-proyectar al cambiar personas sin volver a Odoo
+    // Si el Resumen ya leyó la producción de esta semana HOY, se reusa (misma lectura → misma
+    // semana). Si la lectura falla, el Plan no se cae: sigue desde el stock de hoy y lo marca.
+    let doneU=null;
+    if(_rzCtx && _rzCtx.real && _rzCtx.hoyStr===_ymd(hoy) && +_rzCtx.mon0===+_mondayProd(hoy)) doneU=_rzCtx.real.doneU;
+    else { try{ doneU=(await nivSemana()).doneU; }
+           catch(e){ try{ console.warn('[Truefie] Plan: no pude leer la producción de esta semana:', (e&&e.message)||e); }catch(_){} } }
     // Semanas hasta el cierre duro (lun 14-dic, viernes 18-dic incluido). nivProyeccion vuelve a cortar por seguridad.
     const semDic=Math.max(0, Math.round((_mondayProd(new Date(2026,11,18))-_mondayProd(hoy))/(7*86400000))+1);
     _rzOverrides=await nivOverrides();     // ediciones ANTES de proyectar (MISMA fuente que el Resumen)
@@ -24829,6 +24835,12 @@ async function cargarPlanMeses(){
     // Plan RECALCULADO (no pegado): si hay ediciones guardadas, la proyección de carga las honra y ya queda
     // NIVELADA hacia la meta; si no, la proyección cruda del motor. Así al recargar el plan ya está nivelado
     // desde las ediciones (el aviso de "reacomodar" no reaparece), sin guardar ningún plan aparte.
+    // Todo lo leído de Odoo ya está: recién ahora se toca el estado global (si algo de arriba
+    // falla, el Plan queda entero con la carga anterior, no mitad nueva y mitad vieja).
+    _planSinLunes=!doneU;
+    if(_rzCtx) _rzRecalcAuto();             // refresca el derrame/faltante que pinta _rzDerrameNota
+    _planStock=stk.fin;                     // stock de HOY, para el panel META vs HOY
+    _planInputs={ritmo:ritmo, fin:stk.fin, finLunes:doneU?nivStockLunes(stk.fin, doneU):stk.fin, cfg:cfg};   // para re-proyectar al cambiar personas sin volver a Odoo
     _planProj = _planProyectar(ritmo, _planInputs.finLunes, cfg, semDic);
     if(_rzCtx) _rzRecalcAuto();             // si el Resumen ya corrió, refresca el auto-relleno de la meta
     st.classList.add('hidden');
@@ -24859,7 +24871,7 @@ function planPanelMeta(){
     _planProj.forEach(function(wk){ const b=_semanaBatches(wk);
       for(const p in b) prod[p]=(prod[p]||0)+b[p]*NIV_INFO[p].rend; });
     R.M.forEach(function(m){
-      const fin=(_planStock[m.p]||0)+(prod[m.p]||0)-(m.r||0)*_planProj.length;
+      const fin=(((_planInputs&&_planInputs.finLunes)||_planStock)[m.p]||0)+(prod[m.p]||0)-(m.r||0)*_planProj.length;   // stock del LUNES: la semana 0 de _planProj ya trae lo producido (T-243)
       const falta=Math.ceil(((m.b1+m.b2+m.b3)-fin)/m.I.cajaU);
       if(falta>0) cortos.push(_nomCorto(m.p)+' '+_rzN(falta)); });
   }
@@ -24977,7 +24989,8 @@ function planRenderMeses(){
     const bat=porMes[m]||{}, esHoy=(m===mesHoy);
     const filas=NIV_PROD.filter(p=>(bat[p]||0)>0).map(p=>'<div class="pl-bl">'+esc(_rzBP(bat[p], p))+'</div>').join('') || '<div class="pl-bl pl-b0">—</div>';
     const tags=(m===11?'<span class="pl-tag pl-tag-cierre">Cierre 18-dic</span>':'')
-      +(FERCORTO[m]?'<span class="pl-tag pl-tag-fer">'+esc(FERCORTO[m])+'</span>':'');
+      +(FERCORTO[m]?'<span class="pl-tag pl-tag-fer">'+esc(FERCORTO[m])+'</span>':'')
+      +(esHoy && _planSinLunes?'<span class="pl-tag pl-tag-fer">Semana en curso desde stock de hoy</span>':'');
     cards+='<div class="pl-mes'+(esHoy?' pl-mes-now':'')+'" onclick="planVerDetalle('+m+')">'
       +'<div class="pl-mnom">'+_MESNOM2[m]+(esHoy?' <span class="pl-hoy">· ahora</span>':'')+'</div>'
       +(tags?'<div class="pl-tags">'+tags+'</div>':'')
