@@ -4966,6 +4966,16 @@ body[data-mod="compras"] .main{--mod:var(--m-comp);--accent:var(--m-comp);--blue
 #vCompras .cp-tartbl th:nth-child(3),#vCompras .cp-tartbl td:nth-child(3){width:48px}
 #vCompras .cp-tartbl th:nth-child(4),#vCompras .cp-tartbl td:nth-child(4){width:88px;text-align:right}
 @media (max-width:560px){#vCompras .cp-tartbl th:nth-child(3),#vCompras .cp-tartbl td:nth-child(3){display:none}}
+/* T-264 (24-oct): una sola tarjeta, un renglón por proveedor que se despliega a su tabla */
+#vCompras .cp-tarl .cp-tarp:first-child>.cp-it{border-top:none}
+#vCompras .cp-tarp-s{cursor:default}
+#vCompras .cp-tarp .cp-g{white-space:nowrap;font-size:12.5px}
+#vCompras .cp-tardet{padding:0 0 10px}
+#vCompras .cp-tardet .cp-tartbl{font-size:13px}
+#vCompras .cp-tardet .cp-tartbl td{padding:7px 0}
+#vCompras .cp-tarbtn{margin-top:10px}
+#vCompras .cp-tarbtn .cp-btn{padding:8px 14px;font-size:13px}
+#vCompras .cp-tarp>.cp-msg{margin:0 0 8px}
 /* «Faltan compras por cargar» (4-oct): Odoo tiene menos de lo que ya se usó. NO es un faltante
    (no pide comprar): gris azulado y en cursiva, nunca rojo ni ámbar. */
 #vCompras .cp-odoo{color:var(--odoo) !important;font-style:italic}
@@ -22891,45 +22901,69 @@ async function cpTarCargar(forzar){
   if(_cpVista==='ajustes' && !_cpReg) cpRender();
 }
 const _cpTarCol=function(n){ return n==null?'—':'₡'+_rzN(n, 2); };
-// Una tarjeta por proveedor (20-oct): BIO arriba como siempre (r) y cada otro proveedor de Compras en
-// r.proveedores. El mensaje del último clic va en la tarjeta de ESE proveedor (T.msgProv).
-function _cpTarCardHtml(T, r, prov, titulo, inicial){
-  const msg=(T.msgProv===prov)?T.msg:'', cls=(T.msgProv===prov)?(T.msgCls||''):'';
-  const ver=(r.lineas||[]).filter(function(l){ return l.estado==='actualiza' || l.estado==='tarjeta' || l.estado==='fuera_de_banda'; });
+// UNA tarjeta «Tarifas» con un renglón por proveedor (T-264, 24-oct; antes una tarjeta por proveedor, 20-oct).
+// El renglón dice cuántas cambian y cuántas están fuera de banda, y se despliega a su tabla con su botón.
+// Lo abierto vive en T.ab (cpRender redibuja todo). El mensaje del último clic va en el renglón de ESE
+// proveedor (T.msgProv) y se ve aunque esté cerrado.
+function _cpTarVer(r){
+  return (r.lineas||[]).filter(function(l){ return l.estado==='actualiza' || l.estado==='tarjeta' || l.estado==='fuera_de_banda'; });
+}
+function _cpTarDetHtml(T, r, prov, inicial, ver){
   const fuera=ver.filter(function(l){ return l.estado==='fuera_de_banda'; }).length;
-  if(!ver.length && !msg) return '';
-  let h='<div class="cp-card cp-tar"><div class="cp-st2">'+esc(titulo)+'</div>';
-  if(ver.length){
-    // La unidad va en el encabezado si es la misma para todas (BIO: kg), si no, en cada fila.
-    const u0=ver[0].unidad, unaU=ver.every(function(l){ return l.unidad===u0; });
-    h+='<table class="cp-tartbl"><thead><tr><th>Insumo</th><th>Hoy</th><th>Factura</th><th>Queda'+(unaU&&u0?(' /'+esc(u0)):'')+'</th></tr></thead><tbody>'
-      +ver.map(function(l){ const fuera=(l.estado==='fuera_de_banda');
-        return '<tr><td>'+esc(l.producto)+'</td><td>'+esc(_cpTarCol(l.precio_actual))+'</td>'
-          +'<td><span class="cp-g" title="'+esc((l.factura_fecha||'')+(l.anterior_nombre?(' · anterior '+l.anterior_nombre+' '+_cpTarCol(l.precio_anterior)):' · sin factura anterior'))+'">'+esc(l.factura_nombre||'—')+'</span></td>'
-          +'<td'+(fuera?' class="cp-amb3"':'')+'>'+esc(_cpTarCol(l.precio_nuevo)+(unaU?'':('/'+(l.unidad||''))))+'</td></tr>'; }).join('')
-      +'</tbody></table>';
-    if(fuera) h+='<div class="cp-msg cp-amb3">Fuera de banda ('+String(r.banda[0]).replace('.',',')+'× a '+String(r.banda[1]).replace('.',',')+'×'
-      +(r.umbral!=null?' de la factura anterior':'')+'): no se aplica.</div>';
-    if(r.aplicables) h+='<div class="cp-btns"><button class="cp-btn cp-btnp"'+(T.enviando?' disabled':'')+' onclick="cpTarAplicar('+(+prov)+')">'
-      +(inicial?'Aplicar corrección inicial · ':'Actualizar ')+r.aplicables+' tarifa'+(r.aplicables===1?'':'s')+'</button></div>';
-  }
-  h+='<div class="cp-msg '+cls+'">'+esc(msg||'')+'</div></div>';
+  // La unidad va en el encabezado si es la misma para todas (BIO: kg), si no, en cada fila.
+  const u0=ver[0].unidad, unaU=ver.every(function(l){ return l.unidad===u0; });
+  let h='<table class="cp-tartbl"><thead><tr><th>Insumo</th><th>Hoy</th><th>Factura</th><th>Queda'+(unaU&&u0?(' /'+esc(u0)):'')+'</th></tr></thead><tbody>'
+    +ver.map(function(l){ const fuera=(l.estado==='fuera_de_banda');
+      return '<tr><td>'+esc(l.producto)+'</td><td>'+esc(_cpTarCol(l.precio_actual))+'</td>'
+        +'<td><span class="cp-g" title="'+esc((l.factura_fecha||'')+(l.anterior_nombre?(' · anterior '+l.anterior_nombre+' '+_cpTarCol(l.precio_anterior)):' · sin factura anterior'))+'">'+esc(l.factura_nombre||'—')+'</span></td>'
+        +'<td'+(fuera?' class="cp-amb3"':'')+'>'+esc(_cpTarCol(l.precio_nuevo)+(unaU?'':('/'+(l.unidad||''))))+'</td></tr>'; }).join('')
+    +'</tbody></table>';
+  if(fuera && r.banda) h+='<div class="cp-msg cp-amb3">Fuera de banda ('+String(r.banda[0]).replace('.',',')+'× a '+String(r.banda[1]).replace('.',',')+'×'
+    +(r.umbral!=null?' de la factura anterior':'')+'): no se aplica.</div>';
+  if(r.aplicables) h+='<div class="cp-btns cp-btns-d cp-tarbtn"><button class="cp-btn cp-btnp"'+(T.enviando?' disabled':'')+' onclick="cpTarAplicar('+(+prov)+')">'
+    +(inicial?'Aplicar corrección inicial · ':'Actualizar ')+r.aplicables+' tarifa'+(r.aplicables===1?'':'s')+'</button></div>';
   return h;
 }
+// items: [{r, prov, nombre, inicial}]. Devuelve '' si ningún proveedor tiene nada que mostrar.
+function _cpTarListaHtml(T, items, titulo, avisos){
+  // Si un solo proveedor tiene algo que mirar, su renglón ya viene abierto.
+  const nVer=items.filter(function(it){ return _cpTarVer(it.r).length; }).length;
+  const filas=items.map(function(it){
+    const prov=it.prov, ver=_cpTarVer(it.r);
+    const msg=(T.msgProv===prov)?T.msg:'', cls=(T.msgProv===prov)?(T.msgCls||''):'';
+    if(!ver.length && !msg) return '';
+    const fuera=ver.filter(function(l){ return l.estado==='fuera_de_banda'; }).length, camb=ver.length-fuera;
+    const ab=(T.ab && prov in T.ab) ? !!T.ab[prov] : nVer===1;
+    T.abVisto=T.abVisto||{}; T.abVisto[prov]=ab;
+    const res=[camb?(camb+' cambia'+(camb===1?'':'n')):'', fuera?(fuera+' fuera de banda'):''].filter(Boolean).join(' · ');
+    let h='<div class="cp-tarp"><div class="cp-it'+(ver.length?'':' cp-tarp-s')+'"'+(ver.length?(' onclick="cpTarToggle('+(+prov)+')"'):'')+'>'
+      +'<span class="cp-in cp-in1">'+esc(it.nombre)+'</span>'
+      +'<span class="cp-g">'+(fuera?('<span>'+(camb?(camb+' cambia'+(camb===1?'':'n')+' · '):'')+'</span><span class="cp-amb3">'+fuera+' fuera de banda</span>'):esc(res))
+      +(ver.length?(' <span class="cp-fl'+(ab?' abierto':'')+'" aria-hidden="true">›</span>'):'')+'</span></div>';
+    if(ab && ver.length) h+='<div class="cp-tardet">'+_cpTarDetHtml(T, it.r, prov, it.inicial, ver)+'</div>';
+    h+='<div class="cp-msg '+cls+'">'+esc(msg||'')+'</div></div>';
+    return h;
+  }).join('');
+  const av=(avisos||[]).map(function(a){ return '<div class="cp-msg cp-amb3">'+esc(a.texto)+'</div>'; }).join('');
+  if(!filas && !av) return '';
+  return '<div class="cp-card cp-tar"><div class="cp-st2">'+esc(titulo)+'</div>'+av+(filas?('<div class="cp-tarl">'+filas+'</div>'):'')+'</div>';
+}
+function cpTarToggle(prov){
+  const T=_cpTar; if(!T) return;
+  T.ab=T.ab||{}; prov=+prov; T.ab[prov]=!(T.abVisto && T.abVisto[prov]); cpRender();
+}
 const CP_TAR_BIO=948;
+function _cpTarProvItems(r){
+  return (r.proveedores||[]).map(function(p){ return {r:p, prov:+p.proveedor_id, nombre:_cpNomCorto(p.proveedor||('proveedor '+p.proveedor_id)), inicial:false}; });
+}
 function cpTarifasHtml(){
   const T=_cpTar; if(!T || !T.r || _socia!==true) return '';
   const r=T.r, inicial=(T.modo==='inicial');
-  if(T.modo==='historial'){
-    // Si el servicio no pudo leer facturas, se dice: nunca una tarjeta vacía que parezca «al día» (Lusof).
-    const av=(r.avisos||[]);
-    return (av.length?'<div class="cp-card cp-tar"><div class="cp-st2">Tarifas de proveedor</div>'
-             +av.map(function(a){ return '<div class="cp-msg cp-amb3">'+esc(a.texto)+'</div>'; }).join('')+'</div>':'')
-      +(r.proveedores||[]).map(function(p){ return _cpTarCardHtml(T, p, p.proveedor_id, 'Tarifas de '+(p.proveedor||('proveedor '+p.proveedor_id)), false); }).join('');
-  }
+  // Si el servicio no pudo leer facturas, se dice: nunca una tarjeta vacía que parezca «al día» (Lusof).
+  if(T.modo==='historial') return _cpTarListaHtml(T, _cpTarProvItems(r), 'Tarifas', r.avisos);
   if(inicial && r.inicializado) return T.msg ? '<div class="cp-card cp-tar"><div class="cp-st2">Tarifas de BIO</div><div class="cp-msg '+(T.msgCls||'')+'">'+esc(T.msg)+'</div></div>' : '';
-  return _cpTarCardHtml(T, r, CP_TAR_BIO, inicial?'Tarifas de BIO · corrección inicial':'Tarifas de BIO', inicial)
-    +(inicial?'':(r.proveedores||[]).map(function(p){ return _cpTarCardHtml(T, p, p.proveedor_id, 'Tarifas de '+(p.proveedor||('proveedor '+p.proveedor_id)), false); }).join(''));
+  if(inicial) return _cpTarListaHtml(T, [{r:r, prov:CP_TAR_BIO, nombre:'BIO', inicial:true}], 'Tarifas de BIO · corrección inicial', null);
+  return _cpTarListaHtml(T, [{r:r, prov:CP_TAR_BIO, nombre:'BIO', inicial:false}].concat(_cpTarProvItems(r)), 'Tarifas', null);
 }
 const CP_TAR_MOTIVO={
   tarifa_apagada:'Las tarifas están apagadas en el servicio: no se cambió nada en Odoo.',
