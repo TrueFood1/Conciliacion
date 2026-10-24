@@ -3806,6 +3806,45 @@ body.es-lectora .face-pend{display:block}
   border-radius:14px 14px 0 0;width:100%;max-width:520px;max-height:88vh;
   display:flex;flex-direction:column;overflow:hidden}
 @media(min-width:700px){ .de-caja{border-radius:14px} }
+/* ── EN TELÉFONO LA CAJA FLOTA, NO VA PEGADA AL BORDE (T-116, 24-oct) ─────
+   Andrea, iPhone 440 px: «la pantalla de validar la entrega sale muy abajo —
+   quiero que esté más arriba, accesible a los dedos más fácil». Pegada al borde,
+   los botones del pie («No, todavía no sale», Cancelar/Confirmar) caían en la
+   franja de la barra de Safari y del indicador de inicio, que es donde el pulgar
+   llega torcido y donde un toque se lo come el navegador.
+   Se SUBE la caja un piso fijo (18% del alto chico de la pantalla, entre 88 y
+   170 px; ~160 px en el iPhone de Andrea) y se le redondean las cuatro esquinas,
+   así el pie queda en el arco natural del pulgar. NO se centra: centrada, una
+   caja corta se iría a la mitad de arriba, que es la zona que el pulgar no
+   alcanza. El orden de adentro no cambia: el «No» lima sigue siendo lo de más
+   abajo de la caja (la regla de posición de `_despPreguntaHTML`).
+   Un toque doble en el botón de la página que abre la pregunta ahora cae en el
+   velo, debajo de la caja, que CIERRA sin guardar: falla del lado seguro.
+   Alto máximo = el que queda entre el piso y el borde de arriba; el cuerpo
+   scrollea y el pie sigue a la vista, igual que antes.
+   Escritorio (≥700 px) no cambia: sigue centrada. */
+@media(max-width:699px){
+  .de-fondo{padding:calc(12px + env(safe-area-inset-top)) 10px
+    calc(clamp(88px,18vh,170px) + env(safe-area-inset-bottom))}
+  @supports (height:1svh){
+    .de-fondo{padding-bottom:calc(clamp(88px,18svh,170px) + env(safe-area-inset-bottom))}
+  }
+  .de-caja{border-radius:14px;max-height:100%}
+  .de-pie-preg{padding-bottom:14px}
+  /* Con un campo de TEXTO enfocado (la nota de «Marcar» / «Registrar») el teclado
+     de iOS tapa la mitad de abajo y Safari no achica el velo fijo: la caja sube
+     arriba de todo y se achica a lo que queda visible, con el pie —el botón que
+     guarda— a la vista. El campo de fecha no cuenta: en iOS abre un selector,
+     no el teclado. */
+  .de-fondo:has(textarea:focus,input[type=text]:focus,input[type=number]:focus,input:not([type]):focus){
+    align-items:flex-start;padding-bottom:12px}
+  .de-fondo:has(textarea:focus,input[type=text]:focus,input[type=number]:focus,input:not([type]):focus) .de-caja{
+    max-height:min(100%,46vh)}
+  @supports (height:1svh){
+    .de-fondo:has(textarea:focus,input[type=text]:focus,input[type=number]:focus,input:not([type]):focus) .de-caja{
+      max-height:min(100%,46svh)}
+  }
+}
 .de-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
   padding:16px 16px 12px;border-bottom:1px solid var(--border)}
 .de-cli{font-size:16px;color:var(--text);font-weight:500;line-height:1.25}
