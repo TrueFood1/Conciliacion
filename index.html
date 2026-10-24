@@ -9838,8 +9838,9 @@ async function uomFactores(ids){
   return _uomFac;
 }
 // Lector SÍNCRONO, para usar después de `uomFactores()` (por ejemplo dentro de un
-// .map() que no puede ser async). Por ID, nunca por nombre: `Paquete de 4` [37] y
-// `Docenas` [2] se llaman los dos "Dozens" en inglés y valen 4 y 12.
+// .map() que no puede ser async). Por ID, nunca por nombre: hasta sep-2026
+// `Paquete de 4` [37] y `Docenas` [2] se llamaban los dos "Dozens" en inglés y
+// valen 4 y 12. Odoo los renombró sin avisar; el nombre no es un dato estable.
 function uomFac(id){ return _uomFac[id]!=null ? _uomFac[id] : 1; }
 
 // ── Sub-pestañas de Finanzas y Operaciones ──────────────────────────────
@@ -13394,10 +13395,11 @@ async function _rpCalcularPuntas(g){
 // del chatter, rpCalcSaldos() para el saldo por lote contra el ancla, y las
 // tablas ent_pedido / ent_alisto del 12-ago (extendidas por ENTREGAS_DESPACHOS.sql).
 //
-// ⚠️ LA UNIDAD SE LEE POR ID, NUNCA POR NOMBRE. `Paquete de 4` [37] y `Docenas`
-// [2] se llaman los dos "Dozens" en inglés (4 u vs 12 u); `Caja` [46] y
-// `Caja (Hamburguesa)` [42] se llaman los dos "Caja" (6 u vs 24 u). El factor
-// sale de uom.uom por id y se guarda congelado en la línea.
+// ⚠️ LA UNIDAD SE LEE POR ID, NUNCA POR NOMBRE. Hasta sep-2026 `Paquete de 4`
+// [37] y `Docenas` [2] se llamaban los dos "Dozens" en inglés (4 u vs 12 u), y
+// `Caja` [46] y `Caja (Buns)` [42] —entonces `Caja (Hamburguesa)`— los dos "Caja"
+// en inglés (6 u vs 24 u). Odoo los renombró sin avisar. El factor sale de
+// uom.uom por id y se guarda congelado en la línea.
 //
 // ⚠️ Y EL RÓTULO TAMBIÉN VA POR ID (26-ago). Hasta hoy el rótulo corto salía de
 // `uom_factor===1 ? 'u' : 'cj'` — o sea: todo lo que no fuera "Unidades" se
@@ -13415,7 +13417,7 @@ const DESP_UOM_CORTA = {
   1:'u',                       // Unidades
   2:'doc',                     // Docenas (12 u)
   37:'paq', 38:'paq', 50:'paq',// Paquete de 4 · de 2 · de 12
-  42:'cj', 44:'cj', 46:'cj', 49:'cj',   // Caja (Hamburguesa 24) · (Frances 24) · Caja 6 · (Pizza 12)
+  42:'cj', 44:'cj', 46:'cj', 49:'cj',   // Caja (Buns 24) · (Frances 24) · Caja 6 · (Pizza 12)
 };
 // ── LA CANTIDAD EN PALABRAS (1-oct, Andrea) ─────────────────────────────
 // Despachos y Devoluciones decían la unidad como la llama Odoo («6 Unidades»,
@@ -13487,6 +13489,7 @@ let _despSinDesp=[], _despForzar={};
 // Sub-pestaña abierta en Despachos: 'preparar' | 'entregar'. Arranca en preparar,
 // que es el trabajo de la mañana.
 let _despTab='preparar';
+const UOM_CAT_UNIDAD = 1;   // uom.category [1] «Unidad» (en_US «Unit») — por id, nunca por nombre
 let _despFac=null, _despUom=null, _despErr='', _despAbierto=null, _despLotes=null,
     _despSaldo=null, _despEdit={}, _despGuardando=false;
 // Corte del ancla vigente en ms. null = no se pudo leer (sin sesion o sin ancla):
@@ -13716,7 +13719,12 @@ async function despCargar(force, silencioso){
   despRender();                 // la sección "Preparado" no espera a Odoo
   try{
     if(!_despUom){
-      const us=await odooCall('uom.uom','search_read',[[['category_id.name','=','Unidad']]],
+      // La categoría va POR ID (T-104, 24-oct). Por nombre dependía del idioma:
+      // medido el 24-oct, `category_id.name = 'Unidad'` da 19 UoM en es_CR y
+      // CERO en en_US (allá se llama "Unit"), y un renombre en Odoo la vaciaba
+      // igual. `uom.category` [1] = Unidad/Unit; `category_id = 1` da las
+      // mismas 19 (id, nombre y factor idénticos a la búsqueda por nombre).
+      const us=await odooCall('uom.uom','search_read',[[['category_id','=',UOM_CAT_UNIDAD]]],
         {fields:['id','name','factor'],limit:100,context:{lang:'es_CR'}});
       _despUom={}; us.forEach(function(u){ _despUom[u.id]=u; });
       // El nombre se guarda acá (lo usa el selector); el FACTOR va a la caché

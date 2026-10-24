@@ -178,9 +178,10 @@ y entregar" con la **factura 3496**: la línea decía *"2 Paquete de
   uom_factor`, con el factor real leído por ID y congelado en la línea.
   Verificado el 26-ago contra las **27 facturas** desde el arranque del módulo
   (15-ago): las 7 UoM en uso —`[1] Unidades`, `[37] Paquete de 4`, `[46] Caja`,
-  `[44] Caja (Frances)`, `[42] Caja (Hamburguesa)`, `[49] Caja (Pizza)`,
-  `[38] Paquete de 2`— están todas dentro del filtro del diálogo
-  (`category_id.name = 'Unidad'`), así que **ninguna cayó al factor 1 por
+  `[44] Caja (Frances)`, `[42] Caja (Buns)` (entonces «Caja (Hamburguesa)»),
+  `[49] Caja (Pizza)`, `[38] Paquete de 2`— están todas dentro del filtro del
+  diálogo (entonces `category_id.name = 'Unidad'`; desde el 24-oct por id,
+  `category_id = 1`, T-104), así que **ninguna cayó al factor 1 por
   defecto**. Cero entregas registradas con el número equivocado.
 - ❌ **La columna sigue guardando mal.** No se tocó a propósito.
 

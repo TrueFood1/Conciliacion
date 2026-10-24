@@ -292,18 +292,18 @@ Encontrado el 17-sep-2026 midiendo los factores de unidad para Devoluciones.
 
 ### Por qué está mal
 
-Buns se factura normalmente en **`Caja (Hamburguesa)` (uom 42) = 24 unidades**, o
+Buns se factura normalmente en **`Caja (Buns)` (uom 42) = 24 unidades**, o
 en `Paquete de 4` (uom 37). La unidad `Caja` (uom 46) es la de **Pan Blanco y Pan
 Semillas**, que sí traen 6 por caja.
 
 Medido sobre `ent_pedido_linea`: Buns aparece con **tres** unidades distintas —
-`Paquete de 4` (30 líneas), `Caja (Hamburguesa)` (11) y **`Caja` (1 sola línea,
+`Paquete de 4` (30 líneas), `Caja (Buns)` (11) y **`Caja` (1 sola línea,
 ésta)**. Las otras dos son correctas.
 
 ### Qué corregir, y dónde
 
 **En Odoo**, en la factura `…3534`: la línea de Buns debería ir en
-`Caja (Hamburguesa)` (1 caja = 24 u) o en `Paquete de 4`. Como está, esa entrega
+`Caja (Buns)` (1 caja = 24 u) o en `Paquete de 4`. Como está, esa entrega
 dice que salieron **6 unidades** de Buns cuando es probable que hayan salido
 **24** — hay que confirmarlo contra lo que realmente se despachó antes de tocar
 nada.
