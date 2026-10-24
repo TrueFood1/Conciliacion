@@ -10925,6 +10925,21 @@ function nivUltimas(planPorDia, realByDate, hoyStr){
 // viene vacío/planeado a futuro y el filtro por date_finished los EXCLUÍA (bug: el calendario
 // mostraba el plan viejo en vez de lo real). date_start SIEMPRE está en un MO done — es el mismo
 // campo que usan los lectores de producción del motor de costos (nivDiasProd, costos por producto).
+// STOCK DEL LUNES (T-243): desde dónde se nivela la semana en curso = stock de HOY menos lo ya
+// producido esta semana (`nivSemana().doneU`). UNA sola función para el Resumen (`_rzSetup`) y el
+// Plan (`cargarPlanMeses` → nivProyeccion / planProyeccionOv / planColchonOv). Antes el Plan
+// decidía la semana 0 desde el stock de HOY, que ya trae adentro lo producido el lun–mar, y
+// proponía otra semana que el Resumen (medido 20-oct: mié Pizza 12 contra mié Blanco 8).
+function nivStockLunes(fin, doneU){
+  const o={}; NIV_PROD.forEach(function(p){ o[p]=Math.max(0,((fin&&fin[p])||0)-((doneU&&doneU[p])||0)); }); return o;
+}
+// Stock con el que se DECIDE el layout de la semana `w` en las proyecciones que llevan la cuenta
+// del stock desde HOY (planProyeccionOv, planColchonOv): la semana 0 se decide desde el stock del
+// lunes —igual que el Resumen—; las demás, desde el stock proyectado. Devuelve una copia (el
+// layout la muta y se descarta).
+function _nivStockDecision(w, stock, finLunes){
+  const src=(w===0 && finLunes)?finLunes:stock, o={}; NIV_PROD.forEach(function(p){ o[p]=src[p]||0; }); return o;
+}
 async function nivSemana(lunes){
   // Sin `lunes`: la semana de producción vigente hasta hoy. Con `lunes`: esa semana (lun–dom),
   // sin pasar de hoy — para mirar la semana anterior (3-oct, ver `_rzSetup`).
@@ -11042,7 +11057,7 @@ async function _rzSetup(){
   // META SEMANAL ESTABLE: se nivela desde el stock del LUNES = stock de hoy MENOS lo ya
   // producido esta semana. Así la meta NO deriva a medida que se produce (el motor razona por
   // SEMANA, no por día): lo real cuenta contra la meta y no se duplica producción.
-  const finPlan={}; NIV_PROD.forEach(function(p){ finPlan[p]=Math.max(0,(stock.fin[p]||0)-(real.doneU[p]||0)); });
+  const finPlan=nivStockLunes(stock.fin, real.doneU);
   stock.finPlan=finPlan;
   const {w0, weeks}=nivLevel(ritmo, finPlan, cfg);
   const hoy=new Date();
@@ -21914,7 +21929,7 @@ async function rzPersistPersonas(iso, n){
 function _rzRenivelar(){
   if(_rzCtx){ const lvl=nivLevel(_rzCtx.ritmo, _rzCtx.stock.finPlan||_rzCtx.stock.fin, _rzCtx.cfg); _rzCtx.weeks=lvl.weeks; _rzCtx.w0=lvl.w0; _rzRecalcAuto(); }
   if(_planInputs){ const sem=Math.max(0, Math.round((_mondayProd(new Date(2026,11,18))-_mondayProd(new Date()))/(7*86400000))+1);
-    _planProj=_planProyectar(_planInputs.ritmo, _planInputs.fin, _planInputs.cfg, sem); }
+    _planProj=_planProyectar(_planInputs.ritmo, _planInputs.finLunes||_planInputs.fin, _planInputs.cfg, sem); }
 }
 function _rzRepintar(){ if(_rzCtx && document.getElementById('rzBody')) rzRender(); if(_planProj.length && document.getElementById('planBody')) planRenderMeses(); }
 // Cambio MANUAL de personas: NO recalcula/guarda de una. Primero PREVISUALIZA y pide confirmar.
@@ -24802,7 +24817,9 @@ async function cargarPlanMeses(){
     await cierreCargarMeta(cfg, ritmo);     // rampa hacia la meta de cierre (antes de proyectar)
     if(_rzCtx) _rzRecalcAuto();             // refresca el derrame/faltante que pinta _rzDerrameNota
     _planStock=stk.fin;                     // stock de HOY, para el panel META vs HOY
-    _planInputs={ritmo:ritmo, fin:stk.fin, cfg:cfg};   // para re-proyectar al cambiar personas sin volver a Odoo
+    // Stock del LUNES (T-243): la semana en curso se nivela desde el MISMO punto que el Resumen.
+    const realSem=await nivSemana();
+    _planInputs={ritmo:ritmo, fin:stk.fin, finLunes:nivStockLunes(stk.fin, realSem.doneU), cfg:cfg};   // para re-proyectar al cambiar personas sin volver a Odoo
     // Semanas hasta el cierre duro (lun 14-dic, viernes 18-dic incluido). nivProyeccion vuelve a cortar por seguridad.
     const semDic=Math.max(0, Math.round((_mondayProd(new Date(2026,11,18))-_mondayProd(hoy))/(7*86400000))+1);
     _rzOverrides=await nivOverrides();     // ediciones ANTES de proyectar (MISMA fuente que el Resumen)
@@ -24812,7 +24829,7 @@ async function cargarPlanMeses(){
     // Plan RECALCULADO (no pegado): si hay ediciones guardadas, la proyección de carga las honra y ya queda
     // NIVELADA hacia la meta; si no, la proyección cruda del motor. Así al recargar el plan ya está nivelado
     // desde las ediciones (el aviso de "reacomodar" no reaparece), sin guardar ningún plan aparte.
-    _planProj = _planProyectar(ritmo, stk.fin, cfg, semDic);
+    _planProj = _planProyectar(ritmo, _planInputs.finLunes, cfg, semDic);
     if(_rzCtx) _rzRecalcAuto();             // si el Resumen ya corrió, refresca el auto-relleno de la meta
     st.classList.add('hidden');
     planRenderMeses();
@@ -25060,9 +25077,10 @@ function planColchonOv(overrides){
     const wk=_isoWk(mon);
     const colDe=pid=>{ const t=(cfg.ventanas||[]).some(v=>+v.producto_id===pid && wk>=v.desde && wk<=v.hasta); return t?cfg.colchonTemporada:(cfg.colchon[pid]||3); };
     const pers=_personasDe(wk), Rr=_rampaDe(mon);
-    if(Rr){ rampaOn=rampaOn||_rampaEstado(stock, ritmo, Rr.meta, Rr.k).on; Rr.on=rampaOn; }
+    const dec=_nivStockDecision(w, stock, _planInputs.finLunes);    // semana 0: stock del lunes (T-243)
+    if(Rr){ rampaOn=rampaOn||_rampaEstado(dec, ritmo, Rr.meta, Rr.k).on; Rr.on=rampaOn; }
     const pre={}; NIV_PROD.forEach(p=>pre[p]=stock[p]);
-    const L=_weekLayout(stock, ritmo, colDe, H, pers, Rr);           // decide la semana con el stock de inicio (muta stock: se descarta)
+    const L=_weekLayout(dec, ritmo, colDe, H, pers, Rr);             // decide la semana con el stock de inicio (muta dec: se descarta)
     const cells=_aplicarPicado(rzCeldas(mon, L, _planReal||{}, hoyStr, overrides), pers);   // overrides + picado (NO indexa: es simulación)
     // (el recorte por dotación y el del picado ya vienen aplicados en las celdas: el colchón
     //  proyectado deja de contar producción que la gente de esa semana no puede hacer)
@@ -25119,9 +25137,10 @@ function planProyeccionOv(fixedOv){
     const wk=_isoWk(mon);
     const colDe=pid=>{ const t=(cfg.ventanas||[]).some(v=>+v.producto_id===pid && wk>=v.desde && wk<=v.hasta); return t?cfg.colchonTemporada:(cfg.colchon[pid]||3); };
     const pers=_personasDe(wk), R=_rampaDe(mon);
-    if(R){ rampaOn=rampaOn||_rampaEstado(stock, ritmo, R.meta, R.k).on; R.on=rampaOn; }
+    const dec=_nivStockDecision(w, stock, _planInputs.finLunes);      // semana 0: stock del lunes (T-243)
+    if(R){ rampaOn=rampaOn||_rampaEstado(dec, ritmo, R.meta, R.k).on; R.on=rampaOn; }
     const pre={}; NIV_PROD.forEach(p=>pre[p]=stock[p]);
-    const L=_weekLayout(stock, ritmo, colDe, H, pers, R);              // decide la semana (muta stock, se descarta)
+    const L=_weekLayout(dec, ritmo, colDe, H, pers, R);                // decide la semana (muta dec, se descarta)
     // Celdas EFECTIVAS: colocación + lo REAL de Odoo en los días pasados + las ediciones + el
     // picado. Es la misma verdad que pinta el detalle del Plan — antes esta función ya las
     // calculaba para el stock, pero al `out` empujaba el layout CRUDO, así que las tarjetas de
