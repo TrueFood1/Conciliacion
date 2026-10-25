@@ -25591,7 +25591,7 @@ function planVerDetalle(m, noScroll){
   let html='<div class="pl-det"><div class="pl-det-h"><span>Detalle de '+_MESNOM2[m%12]+' '+Math.floor(m/12)+'</span><button class="pl-volver" onclick="planVolver()">‹ volver a los meses</button></div>';
   html+='<div class="pl-edithint">Tocá cualquier día futuro para editarlo: producto y batches, o dejá el producto en “limpieza / nada”. La edición manda y el motor reconcilia; se guarda en el plan.</div>';
   if(_planAviso) html+='<div class="rz-aviso">'+esc(_planAviso)+'</div>';
-  html+=planColchonAviso();   // impacto de las ediciones sobre el colchón (motor reconciliado)
+  // Sin el aviso «Con N limpiezas · M cambios…» (Andrea, 25-oct). planColchonAviso() queda sin llamar.
   // MISMA verdad que el Resumen: motor + overrides (ediciones) + auto-relleno de la meta.
   const PLK={real:'pl-d-real', today:'pl-d-prop', pend:'pl-d-pend', prop:'pl-d-prop', edit:'pl-d-prop', auto:'pl-d-prop', clean:'pl-d-clean', 'edit-empty':'pl-d-clean', viernes:'pl-d-clean', feriado:'pl-d-fer', libre:'pl-d-clean'};
   wks.forEach(wk=>{
@@ -25604,7 +25604,8 @@ function planVerDetalle(m, noScroll){
     cells.forEach(c=>{
       if(_planEdit===c.ds && c.editable){ html+=planFormHtml(c); return; }   // día en edición → mini-form
       const txt=c.prod+(c.bt?' '+c.bt:'');
-      const tag=(c.kind==='pend')?'<div class="pl-dtag">sin registrar</div>':(c.edited?'<div class="pl-dtag pl-dtag-ed">editado</div>':(c.auto?'<div class="pl-dtag pl-dtag-auto">meta</div>':''));
+      // Sin «editado» en el detalle del mes (Andrea, 25-oct): el plan cargado es el plan, no una excepción.
+      const tag=(c.kind==='pend')?'<div class="pl-dtag">sin registrar</div>':(c.auto&&!c.edited?'<div class="pl-dtag pl-dtag-auto">meta</div>':'');
       const cls='pl-d '+(PLK[c.kind]||'pl-d-clean')+(c.edited?' pl-d-ed':'')+(c.editable?' pl-d-editable':'');
       const click=c.editable?(' onclick="planOpenEdit(\''+c.ds+'\')"'):'';
       const pic=c.picadoChip?('<div class="rz-picchip">'+esc(c.picadoChip)+'</div>'):'';
