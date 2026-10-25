@@ -52,45 +52,55 @@ async function main(){
   var C0 = calcCondBase();
   var A = calcPrecio(C0.auto.frio, 13, 1935, 'mn', 40);
   cerca("Auto frío, costo 1.935, margen 40 % → nos queda 3.225", A.neto, 3225, 0.01);
-  cerca("Auto frío → factura 3.706,9", A.pf, 3706.9, 0.05);
-  cerca("Auto frío → PVP 5.984", A.pvp, 5984, 0.5);
+  cerca("Auto frío → factura 3.225 ÷ (0,95 × 0,92) = 3.690", A.pf, 3225/(0.95*0.92), 0.01);
+  cerca("Auto frío → PVP 3.225 ÷ 0,708 × 1,13 ≈ 5.147", A.pvp, 3225/0.708*1.13, 1e-6);
+  eq("margen de Automercado frío por defecto: 29,2 %", C0.auto.frio.mc, 29.2);
+  cerca("descuentos escalonados: 5 % y 8 % = 12,6 %", calcDesc(C0.auto.frio).d, 0.126, 1e-12);
+  var PB = calcPrecio(C0.auto.frio, 13, null, 'pf', 3975);
+  cerca("Pan Blanco: lista 3.975 → neto 3.474", PB.neto, 3474.15, 0.01);
+  cerca("Pan Blanco: lista 3.975 → PVP ≈ 5.545 (góndola AM Belén, 25-oct)", PB.pvp, 5545, 1);
   var F = calcPrecio(C0.fresh.frio, 13, 1935, 'pf', 3718);
   cerca("Fresh frío, factura 3.718 → PVP ≈ 5.821 (plantilla 5.820)", F.pvp, 5821, 1);
   // escribir precio a la cadena → se recalcula nuestro margen
   var P = calcPrecio(C0.auto.frio, 13, 1935, 'pf', 4000);
-  cerca("factura 4.000 → nos queda 3.480", P.neto, 3480, 1e-6);
-  cerca("factura 4.000 → nuestro margen (3.480 − 1.935) ÷ 3.480", P.mn, (3480-1935)/3480*100, 1e-6);
+  cerca("factura 4.000 → nos queda 4.000 × 0,95 × 0,92 = 3.496", P.neto, 3496, 1e-6);
+  cerca("factura 4.000 → nuestro margen (3.496 − 1.935) ÷ 3.496", P.mn, (3496-1935)/3496*100, 1e-6);
   // escribir PVP → se recalculan factura y margen
-  var V = calcPrecio(C0.auto.frio, 13, 1935, 'pvp', 5984);
-  cerca("PVP 5.984 → factura 3.706,9", V.pf, 3706.9, 0.05);
-  cerca("PVP 5.984 → margen 40 %", V.mn, 40, 0.01);
+  var V = calcPrecio(C0.auto.frio, 13, 1935, 'pvp', A.pvp);
+  cerca("PVP 5.147 → factura 3.690", V.pf, A.pf, 1e-6);
+  cerca("PVP 5.147 → margen 40 %", V.mn, 40, 1e-6);
   var Vf = calcPrecio(C0.fresh.frio, 13, 1935, 'pvp', 5821.86);
   cerca("Fresh: PVP → factura (ida y vuelta)", Vf.pf, 3718, 0.05);
   // sin margen de la cadena: PVP vacío y lo dice
-  var W = calcPrecio(C0.wm.frio, 13, 1935, 'mn', 40);
-  eq("Walmart sin margen de la cadena: PVP vacío", [W.pvp, W.faltaMc], [null, true]);
+  eq("Walmart frío por defecto: margen 29,4 %, comisión 6,43 %", [C0.wm.frio.mc, C0.wm.frio.com], [29.4, 6.43]);
+  var WB = calcPrecio(C0.wm.frio, 13, null, 'pf', 3688.8);
+  cerca("Walmart: factura 3.688,8 (Blanco por pan) → neto 3.451,6", WB.neto, 3451.61, 0.01);
+  cerca("Walmart: → PVP 3.451,6 ÷ 0,706 × 1,13 ≈ 5.524,5", WB.pvp, 3451.61016/0.706*1.13, 1e-3);
+  var wsin = Object.assign({}, C0.wm.frio, {mc:null});
+  var W = calcPrecio(wsin, 13, 1935, 'mn', 40);
+  eq("sin margen de la cadena: PVP vacío", [W.pvp, W.faltaMc], [null, true]);
   cerca("Walmart: factura = neto ÷ (1 − 6,43 %)", W.pf, 3225/(1-0.0643), 0.01);
-  eq("Walmart: desde el PVP no hay factura", calcPrecio(C0.wm.frio, 13, 1935, 'pvp', 6000).pf, null);
+  eq("sin margen de la cadena: desde el PVP no hay factura", calcPrecio(wsin, 13, 1935, 'pvp', 6000).pf, null);
   eq("anaquel en blanco", [C0.auto.anaquel.mc, C0.auto.anaquel.cedi, C0.fresh.anaquel.fijo], [null,null,null]);
 
   // ── 4. Comisión Uber ──
   var fu = JSON.parse(JSON.stringify(C0.fresh.frio)); fu.uberPct = 40;
   cerca("Uber: 12,5 % × 40 % por Uber = 5 % efectivo", calcDesc(fu).uber, 0.05, 1e-12);
-  cerca("Fresh con Uber: descuentos 3 % + 5 %", calcDesc(fu).d, 0.08, 1e-12);
+  cerca("Fresh con Uber: 3 % y 5 % escalonados", calcDesc(fu).d, 1-0.97*0.95, 1e-12);
   var Fu = calcPrecio(fu, 13, 1935, 'pf', 3718);
-  cerca("Uber baja lo que nos queda", Fu.neto, 3718*0.92, 1e-6);
+  cerca("Uber baja lo que nos queda", Fu.neto, 3718*0.97*0.95, 1e-6);
   cerca("Uber no cambia el PVP", Fu.pvp, F.pvp, 1e-6);
   eq("Uber en blanco = 0", calcDesc(C0.fresh.frio).uber, 0);
 
   // ── 5. Ventana: Fresh con techo «Automercado + 5 %» ──
   var S2 = calcEstadoBase(); S2.ancla='mn'; S2.val=40;
   calcCambiarCadena(S2, 'fresh', 1935);
-  cerca("al dejar Automercado recuerda su factura", S2.pfCad.auto, 3706.9, 0.05);
+  cerca("al dejar Automercado recuerda su factura", S2.pfCad.auto, A.pf, 1e-6);
   eq("Fresh arranca con techo Automercado + 5 %", [S2.techos.fresh.modo, S2.techos.fresh.ref, S2.techos.fresh.x, S2.techos.fresh.xTipo], ['ref','auto',5,'%']);
   var refPvp = calcPvpDe(S2, 'auto', 1935);
-  cerca("PVP de referencia = el de Automercado", refPvp, 5984, 0.5);
+  cerca("PVP de referencia = el de Automercado", refPvp, A.pvp, 1e-6);
   var pmax = calcTechoPvp(S2.techos.fresh, refPvp);
-  cerca("PVP máximo = Automercado × 1,05", pmax, 5984*1.05, 0.6);
+  cerca("PVP máximo = Automercado × 1,05", pmax, A.pvp*1.05, 1e-6);
   var Vn = calcVentana(S2.cond.fresh.frio, 13, 1935, 25, pmax);
   cerca("piso Fresh = 1.935 ÷ 0,75 ÷ 0,97", Vn.piso, 1935/0.75/0.97, 0.01);
   cerca("techo Fresh = PVP máx ÷ 1,13 × 0,7 ÷ 0,97", Vn.techo, pmax/1.13*0.7/0.97, 0.01);
@@ -100,7 +110,7 @@ async function main(){
   var Vno = calcVentana(S2.cond.fresh.frio, 13, 1935, 25, 3000);
   eq("piso arriba del techo: no hay ventana", Vno.hay, false);
   calcCambiarCadena(S2, 'auto', 1935);
-  cerca("volver a Automercado: su precio recordado", calcPrecio(S2.cond.auto.frio, 13, 1935, S2.ancla, S2.val).pf, 3706.9, 0.05);
+  cerca("volver a Automercado: su precio recordado", calcPrecio(S2.cond.auto.frio, 13, 1935, S2.ancla, S2.val).pf, A.pf, 1e-6);
 
   // ── 6. Catálogo: última factura, por factor de UoM (nunca por el nombre) ──
   var UO = [{id:12, factor:1, category_id:[2,'x']}, {id:13, factor:1000, category_id:[2,'x']}, {id:10, factor:1, category_id:[6,'x']},

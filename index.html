@@ -621,7 +621,6 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .calc-flow .calc-warn{color:var(--warn)}
 .calc-flow .calc-nota{color:var(--text-3);font-size:11.5px}
 .calc-vtxt{font-size:12px;color:var(--text-2);margin-top:6px;line-height:1.5}
-.calc-check{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-2);margin-top:2px}
 .calc-big input{height:44px;font-size:17px;font-weight:600;border-color:var(--mod)}
 .calc-bar{position:relative;height:10px;border-radius:5px;background:var(--surface-2);margin:28px 6px 30px}
 .calc-zone{position:absolute;top:0;bottom:0;border:1px solid var(--mod);border-radius:5px;background:color-mix(in srgb,var(--mod) 18%,transparent)}
@@ -2878,11 +2877,11 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
           <div class="calc-field"><label for="calcFijo">Fijo %</label><input type="text" inputmode="decimal" id="calcFijo" class="calc-num" data-cc="fijo"></div>
           <div class="calc-field"><label for="calcCom">Comisión %</label><input type="text" inputmode="decimal" id="calcCom" class="calc-num" data-cc="com"></div>
         </div>
-        <label class="calc-check"><input type="checkbox" id="calcFijoFact"> Fijo descontado en la factura</label>
         <div id="calcUberBox" class="calc-grid2 hidden" style="margin-top:8px">
           <div class="calc-field"><label for="calcUberPct">% de las ventas por Uber</label><input type="text" inputmode="decimal" id="calcUberPct" class="calc-num" data-cc="uberPct"></div>
           <div class="calc-field"><label for="calcUberCom">Comisión Uber %</label><input type="text" inputmode="decimal" id="calcUberCom" class="calc-num" data-cc="uberCom"></div>
         </div>
+        <div class="calc-vtxt" id="calcCondFuente"></div>
         <div class="calc-field" style="max-width:150px;margin-top:8px"><label for="calcIva">IVA al consumidor %</label><input type="text" inputmode="decimal" id="calcIva" class="calc-num" data-cb="iva" data-dec="2"></div>
       </div>
       <div class="sim-panel calc-panel">
@@ -28470,11 +28469,13 @@ function simBuildUI(){
 // tabla no existe la calculadora sigue andando sin guardar y lo dice en la línea de estado.
 //  · Costo por unidad de venta = materia prima + empaque + indirecto. Un insumo SIN PRECIO no cuenta
 //    como ₡0: el total sale «incompleto» con lo que falta.
-//  · Precio: neto = factura × (1 − CEDI − fijo − comisión − %Uber × comisión Uber);
-//    lo que paga la cadena = factura × (1 − descuentos EN FACTURA) — hoy solo el fijo de Fresh
-//    Market (plantilla del 20-oct: Pan Blanco ₡3.718 → PVP ₡5.820); el CEDI y el fijo de
-//    Automercado son cobros aparte y no bajan su base.
-//    PVP sin IVA = lo que paga la cadena ÷ (1 − margen de la cadena); PVP = × (1 + IVA).
+//  · Precio: los descuentos van ESCALONADOS, no sumados:
+//    neto = factura × (1 − CEDI) × (1 − fijo) × (1 − comisión) × (1 − %Uber × comisión Uber).
+//    PVP sin IVA = neto de factura ÷ (1 − margen de la cadena); PVP = × (1 + IVA). La cadena pone
+//    su margen sobre el NETO de los descuentos de factura (CEDI, fijo, comisión). La comisión de
+//    Uber nos baja lo que nos queda pero no el PVP: la cobra Uber sobre lo que ya se vendió. Calibrado el 25-oct: la OC A003522187-2 de Automercado dice
+//    «% Desc 12.60» (5 % y 8 % escalonados), y los PVP de la app (Blanco, Semillas, Francés,
+//    Buns) dan todos 29,2 % sobre el neto; Fresh Market, plantilla del 20-oct: ₡3.718 → ₡5.820.
 //    nuestro margen = (neto − costo) ÷ neto.
 // ════════════════════════════════════════════════════════════════════════
 // ── Formato es-CR para inputs editables (punto miles, coma decimales) + parseo tolerante ──
@@ -28522,12 +28523,16 @@ const CALC_CATS=[{k:'frio',label:'Frío'},{k:'anaquel',label:'Anaquel'}];
 const _CALC_MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 function calcDiaMes(ds){ const m=String(ds||'').match(/^\d{4}-(\d{2})-(\d{2})/); return m?(+m[2])+'-'+_CALC_MES[+m[1]-1]:''; }
 // Condiciones por cadena y categoría (Andrea, 25-oct). null = no se sabe todavía. Anaquel en blanco.
+// De dónde sale cada condición precargada (se muestra bajo las condiciones; las demás no llevan línea).
+const CALC_FUENTE={'auto.frio':'Automercado · frío: margen 29,2 % (calibrado con la góndola, 25-oct), descuentos 5 % y 8 % escalonados (12,6 %)',
+  'wm.frio':'Walmart · frío: margen 29,4 % (calibrado con la góndola, 25-oct; Buns da 27 %), comisión 6,43 %',
+  'fresh.frio':'Fresh Market · frío: margen 30 % y fijo 3 %, plantilla a Carlos del 20-oct'};
 function calcCondBase(){
-  const v=function(){ return {mc:null,cedi:null,fijo:null,com:null,fijoEnFactura:false,uberPct:null,uberCom:null}; };
+  const v=function(){ return {mc:null,cedi:null,fijo:null,com:null,uberPct:null,uberCom:null}; };
   const C={}; CALC_CADENAS.forEach(function(c){ C[c.k]={frio:v(),anaquel:v()}; });
-  Object.assign(C.auto.frio,{mc:30,cedi:8,fijo:5});
-  Object.assign(C.wm.frio,{com:6.43});
-  Object.assign(C.fresh.frio,{mc:30,fijo:3,fijoEnFactura:true,uberCom:12.5});
+  Object.assign(C.auto.frio,{mc:29.2,cedi:8,fijo:5});   // 29,2 %: calibrado con la góndola (Andrea, 25-oct)
+  Object.assign(C.wm.frio,{mc:29.4,com:6.43});   // 29,4 %: calibrado con la góndola (25-oct)
+  Object.assign(C.fresh.frio,{mc:30,fijo:3,uberCom:12.5});
   Object.assign(C.dir.frio,{cedi:0,fijo:0}); Object.assign(C.dir.anaquel,{cedi:0,fijo:0});
   return C;
 }
@@ -28604,20 +28609,21 @@ function calcCostoU(S){
 function calcDesc(cond){
   const p=function(x){ return (x||0)/100; };
   const uber=p(cond.uberPct)*p(cond.uberCom);
-  return {d:p(cond.cedi)+p(cond.fijo)+p(cond.com)+uber, dF:cond.fijoEnFactura?p(cond.fijo):0, uber};
+  const fact=(1-p(cond.cedi))*(1-p(cond.fijo))*(1-p(cond.com));
+  return {d:1-fact*(1-uber), dB:1-fact, uber};   // d = descuento total equivalente (5 % y 8 % → 12,6 %)
 }
 // ancla: 'mn' (nuestro margen %) · 'pf' (precio a la cadena, factura sin IVA) · 'pvp' (con IVA).
 function calcPrecio(cond,ivaPct,C,ancla,val){
-  const ds=calcDesc(cond), d=ds.d, dF=ds.dF, iva=(ivaPct||0)/100, mc=cond.mc==null?null:cond.mc/100;
+  const ds=calcDesc(cond), d=ds.d, dB=ds.dB, iva=(ivaPct||0)/100, mc=cond.mc==null?null:cond.mc/100;
   let pf=null;
   if(val!=null){
     if(ancla==='mn'){ if(C!=null && val<100 && d<1) pf=C/(1-val/100)/(1-d); }
     else if(ancla==='pf') pf=val;
-    else if(ancla==='pvp'){ if(mc!=null && mc<1 && dF<1) pf=val/(1+iva)*(1-mc)/(1-dF); }
+    else if(ancla==='pvp'){ if(mc!=null && mc<1 && dB<1) pf=val/(1+iva)*(1-mc)/(1-dB); }
   }
-  const out={pf:null, neto:null, base:null, pvpSin:null, pvp:(ancla==='pvp'?val:null), mn:(ancla==='mn'?val:null), gan:null, d, dF, uber:ds.uber, faltaMc:mc==null};
+  const out={pf:null, neto:null, base:null, pvpSin:null, pvp:(ancla==='pvp'?val:null), mn:(ancla==='mn'?val:null), gan:null, d, uber:ds.uber, faltaMc:mc==null};
   if(pf==null) return out;
-  out.pf=pf; out.neto=pf*(1-d); out.base=pf*(1-dF);
+  out.pf=pf; out.neto=pf*(1-d); out.base=pf*(1-dB);
   if(mc!=null && mc<1){ out.pvpSin=out.base/(1-mc); out.pvp=out.pvpSin*(1+iva); }
   else if(ancla!=='pvp') out.pvp=null;
   if(C!=null){ out.gan=out.neto-C; if(ancla!=='mn') out.mn=out.neto>0?(out.neto-C)/out.neto*100:null; }
@@ -28835,7 +28841,6 @@ function calcBuildUI(){
     el.oninput=function(){ calcCond()[el.dataset.cc]=_crNum(el.value); calcRecalc(); };
     el.onblur=function(){ calcPintarCampos(true); };
   });
-  const fe=document.getElementById('calcFijoFact'); if(fe) fe.onchange=function(){ calcCond().fijoEnFactura=fe.checked; calcRecalc(); };
   document.querySelectorAll('#vCalcPrecios [data-anc]').forEach(function(el){
     el.oninput=function(){ CALC.ancla=el.dataset.anc; CALC.val=_crNum(el.value); calcRecalc(); };
     el.onblur=function(){ calcPintarCampos(true); };
@@ -28963,7 +28968,6 @@ function calcPintarCampos(blur){
   document.querySelectorAll('#vCalcPrecios [data-cb]').forEach(function(el){ pon(el,calcGet(el.dataset.cb),+(el.dataset.dec||0)); });
   const cond=calcCond();
   document.querySelectorAll('#vCalcPrecios [data-cc]').forEach(function(el){ pon(el,cond[el.dataset.cc],2); });
-  const fe=document.getElementById('calcFijoFact'); if(fe) fe.checked=!!cond.fijoEnFactura;
   const t=CALC.techos[CALC.cad];
   document.querySelectorAll('#vCalcPrecios input[data-te]').forEach(function(el){ pon(el,t[el.dataset.te],el.dataset.te==='x'?2:0); });
   const C=calcCostoPrecio(), r=calcPrecio(cond,CALC.iva,C,CALC.ancla,CALC.val);
@@ -28998,6 +29002,7 @@ function calcRecalc(){
   if(r.faltaMc) f+='<div class="calc-warn"><span>Sin margen de la cadena: no hay PVP</span></div>';
   if(cond.uberCom!=null && CALC.cad==='fresh') f+='<div class="calc-nota"><span>Uber: solo arriba del umbral mensual (pendiente)</span></div>';
   sett('calcFlow',f);
+  sett('calcCondFuente', esc(CALC_FUENTE[CALC.cad+'.'+CALC.cat]||''));
   // Ventana
   const t=CALC.techos[CALC.cad];
   const refPvp = t.modo==='ref' ? calcPvpDe(CALC,t.ref,C) : null;
