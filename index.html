@@ -5673,7 +5673,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 25 oct 2026 · b126';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 25 oct 2026 · b127';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -10702,6 +10702,7 @@ async function nivTemporada(ritmo, cfg){
     const porDia={};
     for(const l of aml){ const f=(l.product_uom_id && _uomFac[l.product_uom_id[0]])||1, s=(mt[l.move_id[0]]==='out_refund')?-1:1;
       const d=porDia[l.date]=porDia[l.date]||{}; d[l.product_id[0]]=(d[l.product_id[0]]||0)+l.quantity/f*s; }
+    _noServida(D1, D2).forEach(function(r){ const d=porDia[r.ds]=porDia[r.ds]||{}; d[r.p]=(d[r.p]||0)+r.uds; });   // b127
     _planTemp={porMes:_temporadaCalc(porDia, Ac, Afin, ritmo), error:''};
     _tempCache={key:key, data:_planTemp};
   }catch(e){
@@ -11571,6 +11572,42 @@ const CIERRE_FACTOR_SEM=11;               // factor de cadena: semanas del año 
 const CIERRE_FACTOR_SEM_HOY=16;           // …y semanas de HOY (las cadenas compran un lote por semana: con 6 el factor salta)
 const CONGELADOR_CJ=888;                  // capacidad MÁXIMA del congelador, confirmada por Andrea (jul-2026).
                                           // Las 444 de antes eran el stock de hoy, no el tope. Pico real validado: 819 cj → cabe.
+// ── DEMANDA NO SERVIDA (b127, 25-oct-2026) ──
+// Lo que Auto y Walmart PIDIERON en su OC y no se entregó, dic-2025 → mar-2026, en CAJAS, con la fecha
+// de la factura de esa entrega. La venta facturada es lo que se PUDO entregar (Andrea, 25-oct): sin esto,
+// el pedido de cierre y los factores de enero–febrero salen cortos. Fuente: los PDF de las OC contra los
+// traslados de Odoo (detalle privado en el coordinador, OC_vs_ENTREGADO_dic25_mar26). Es un PISO: no
+// están lo que las cadenas dejaron de pedir ni los otros clientes. Las OC de resurtido no se suman entre
+// sí (cada una reemplaza a la anterior); la OC entera no entregada del 27-feb no cuenta (la reemplazó la siguiente).
+// Se suma a la venta en nivVentasCanalPorDia (meta de cierre) y en nivTemporada (factores).
+const DEMANDA_NO_SERVIDA=[
+  // Pedido de cierre 2025 (entrega 15-dic): Buns no entregado + lo que Auto pidió el 2-ene con la planta cerrada.
+  {ds:'2025-12-15', canal:'auto',    p:503, cj:23+14},
+  {ds:'2025-12-15', canal:'auto',    p:452, cj:6},
+  {ds:'2025-12-15', canal:'auto',    p:453, cj:5},
+  {ds:'2025-12-15', canal:'auto',    p:472, cj:5},
+  // Enero
+  {ds:'2026-01-12', canal:'walmart', p:451, cj:24},
+  {ds:'2026-01-19', canal:'auto',    p:452, cj:19},
+  {ds:'2026-01-19', canal:'walmart', p:452, cj:8},
+  {ds:'2026-01-19', canal:'walmart', p:503, cj:7},
+  {ds:'2026-01-26', canal:'walmart', p:452, cj:10},
+  // Febrero
+  {ds:'2026-02-02', canal:'auto',    p:452, cj:4},
+  {ds:'2026-02-02', canal:'walmart', p:452, cj:16},
+  {ds:'2026-02-09', canal:'walmart', p:452, cj:4},
+  {ds:'2026-02-17', canal:'walmart', p:503, cj:1},
+  // Marzo–abril
+  {ds:'2026-03-09', canal:'auto',    p:451, cj:17},
+  {ds:'2026-03-09', canal:'auto',    p:452, cj:11},
+  {ds:'2026-03-09', canal:'auto',    p:472, cj:2},
+  {ds:'2026-03-16', canal:'auto',    p:472, cj:3},
+  {ds:'2026-04-06', canal:'walmart', p:451, cj:10}];
+// Las filas de DEMANDA_NO_SERVIDA entre D1 y D2, en uds sueltas: [{ds, canal, p, uds}].
+function _noServida(D1, D2){
+  return DEMANDA_NO_SERVIDA.filter(function(r){ return r.ds>=D1 && r.ds<=D2; })
+    .map(function(r){ return {ds:r.ds, canal:r.canal, p:r.p, uds:r.cj*NIV_INFO[r.p].cajaU}; });
+}
 
 // Config de fechas (plan_config; la fila más reciente por clave manda).
 async function cierreConfig(){
@@ -11635,6 +11672,8 @@ async function nivVentasCanalPorDia(D1,D2){
     const canal=canalDe[mp[l.move_id[0]]]||'otros';
     const d=out[l.date]=out[l.date]||{}, c=d[canal]=d[canal]||{};
     c[pid]=(c[pid]||0)+uds*s; }
+  _noServida(D1, D2).forEach(function(r){ const d=out[r.ds]=out[r.ds]||{}, c=d[r.canal]=d[r.canal]||{};
+    c[r.p]=(c[r.p]||0)+r.uds; });                                  // lo pedido y no entregado (b127)
   return out;
 }
 // Suma de una ventana, filtrando por canales. Devuelve {porProd, porDia:[{ds,uds}]}.
@@ -11732,10 +11771,14 @@ function _lunesDe(ds){ const d=new Date(ds+'T00:00:00'); d.setDate(d.getDate()-(
 //   vLY/vHoy: ventas por día → canal → producto (nivVentasCanalPorDia) · lyUlt: último día con venta
 //   de dic del año pasado · hoyIni/hoyFin: ventana de hoy (CIERRE_FACTOR_SEM_HOY semanas completas).
 // Devuelve {vacio, D1, D2, pico, porDia, ped, base, hoy, f:{pid:factor|null}, semCub}.
+// semLY = semanas que cubrió el pedido: de su lunes al lunes de la primera venta de enero a esos
+// canales (2025: 15-dic → 12-ene = 4). null si en enero no hubo venta.
 function _cierrePedidoLY(vLY, vHoy, lyUlt, hoyIni, hoyFin, canales){
-  const N=CIERRE_FACTOR_SEM, NH=CIERRE_FACTOR_SEM_HOY, D1=_cierreShift(lyUlt,-13);
+  // El pico se busca en TODO diciembre: una refacturación suelta a fin de mes corría lyUlt y,
+  // con una ventana de 2 semanas hacia atrás, podía dejar el pedido afuera.
+  const N=CIERRE_FACTOR_SEM, NH=CIERRE_FACTOR_SEM_HOY, D1=lyUlt.slice(0,8)+'01';
   const w=_cierreSuma(vLY, D1, lyUlt, canales);
-  if(!w.porDia.length) return {vacio:true, D1:D1, D2:lyUlt, porDia:[], ped:{}, base:{}, hoy:{}, f:{}, semCub:0};
+  if(!w.porDia.length) return {vacio:true, D1:D1, D2:lyUlt, porDia:[], ped:{}, base:{}, hoy:{}, f:{}, semCub:0, semLY:null};
   const pico=w.porDia.slice().sort(function(a,b){ return b.uds-a.uds; })[0];
   const lun=_lunesDe(pico.ds);                                         // el pedido = desde el lunes de su semana
   const ped=_cierreSuma(vLY, lun, lyUlt, canales).porProd;
@@ -11747,22 +11790,24 @@ function _cierrePedidoLY(vLY, vHoy, lyUlt, hoyIni, hoyFin, canales){
     // Sin historia si el año pasado vendía menos de la mitad que hoy (mismo umbral que la temporada).
     f[p]=(base[p]>0 && base[p]>=0.5*hoy[p]) ? hoy[p]/base[p] : null;
     pedCj+=ped[p]/cj; baseCj+=base[p]/cj; });
+  const ene=_cierreSuma(vLY, _cierreShift(lyUlt,1), _cierreShift(lyUlt,45), canales).porDia;
+  const semLY=ene.length?Math.round((new Date(_lunesDe(ene[0].ds)+'T00:00:00')-new Date(lun+'T00:00:00'))/(7*86400000)):null;
   return {vacio:false, D1:D1, D2:lyUlt, lunes:lun, pico:pico, porDia:w.porDia, ped:ped, base:base, hoy:hoy, f:f,
-          semCub:baseCj>0?pedCj/baseCj:0};
+          semCub:baseCj>0?pedCj/baseCj:0, semLY:(semLY>0?semLY:null)};
 }
 async function cierreMeta(cfg, ritmo){
   cfg=cfg||await nivConfig();
   const fc=await cierreConfig();
   ritmo=ritmo||await nivRitmo(cfg.ritmoVentana);
   // Ventas: diciembre del año pasado (con las semanas de antes del pedido) y las semanas de hoy.
-  const yLY=(+CIERRE.slice(0,4))-1, lyIni=_cierreShift(yLY+'-12-01', -7*(CIERRE_FACTOR_SEM+3)), lyFin=yLY+'-12-31';
+  const yLY=(+CIERRE.slice(0,4))-1, lyIni=_cierreShift(yLY+'-12-01', -7*(CIERRE_FACTOR_SEM+3)), lyFin=(yLY+1)+'-01-31';   // + enero: cuándo volvió a comprar cada cadena
   const lunHoy=_lunesDe(_ymd(new Date())), hoyFin=_cierreShift(lunHoy,-1), hoyIni=_cierreShift(lunHoy,-7*CIERRE_FACTOR_SEM_HOY);
   const key=lyIni+'|'+hoyIni;
   let V=(_cierreCache && _cierreCache.key===key)?_cierreCache.data:null;
   if(!V){ V={ly:await nivVentasCanalPorDia(lyIni, lyFin), hoy:await nivVentasCanalPorDia(hoyIni, hoyFin)}; _cierreCache={key:key, data:V}; }
-  const diasDic=Object.keys(V.ly).filter(function(ds){ return ds>=yLY+'-12-01' && Object.keys(V.ly[ds]).some(function(c){
+  const diasDic=Object.keys(V.ly).filter(function(ds){ return ds>=yLY+'-12-01' && ds<=yLY+'-12-31' && Object.keys(V.ly[ds]).some(function(c){
     return Object.keys(V.ly[ds][c]).some(function(k){ return V.ly[ds][c][k]>0; }); }); }).sort();
-  const lyUlt=diasDic.length?diasDic[diasDic.length-1]:lyFin;
+  const lyUlt=diasDic.length?diasDic[diasDic.length-1]:yLY+'-12-31';
   const G1=CIERRE_CANALES_1.map(function(c){ return {c:c, x:_cierrePedidoLY(V.ly, V.hoy, lyUlt, hoyIni, hoyFin, [c])}; });
   const e2=_cierrePedidoLY(V.ly, V.hoy, lyUlt, hoyIni, hoyFin, CIERRE_CANALES_2);
   // e1 = las dos cadenas juntas, solo para mostrar el pedido del año pasado día por día.
@@ -11773,6 +11818,12 @@ async function cierreMeta(cfg, ritmo){
 
   const avisos=[];
   if(!diasDic.length) avisos.push('Sin ventas en diciembre de '+yLY+': las entregas de diciembre quedan en 0.');
+  // COBERTURA (b127): el pedido de Auto+WM cubre de su entrega a la reapertura. El del año pasado
+  // cubrió semLY semanas; este año cubre semHoy → bloque 1 × semHoy/semLY. Con la entrega el 21-dic
+  // son 3 de 4: la semana del 14-dic es una entrega normal, que ya consume el plan.
+  const semHoy=Math.max(0, Math.round((new Date(_lunesDe(REAPERTURA)+'T00:00:00')-new Date(_lunesDe(fc.autowm)+'T00:00:00'))/(7*86400000)));
+  const kCub=function(x){ return (x.semLY>0) ? semHoy/x.semLY : 1; };
+  G1.forEach(function(g){ if(!g.x.vacio && !(g.x.semLY>0)) avisos.push('Sin venta de '+g.c+' en enero de '+(yLY+1)+': no se sabe cuántas semanas cubrió su pedido; va entero.'); });
   if(e2.vacio) avisos.push('Sin ventas del resto de canales en '+e2.D1+' → '+e2.D2+' (bloque 2 queda en 0).');
   if(semEne>0 && ene.sinFac) avisos.push('Enero sin factor de temporada'+(_planTemp&&_planTemp.error?' ('+_planTemp.error+')':'')+': va al ritmo de hoy.');
 
@@ -11783,8 +11834,9 @@ async function cierreMeta(cfg, ritmo){
     const r=ritmo[p]||0;
     let b1=0, b1e=false;
     G1.forEach(function(g){ const x=g.x; if(x.vacio) return;
-      if(x.f[p]!=null) b1+=x.ped[p]*x.f[p];
-      else if(x.hoy[p]>0){ b1+=x.semCub*x.hoy[p]; b1e=true; } });
+      const k=kCub(x);
+      if(x.f[p]!=null) b1+=x.ped[p]*x.f[p]*k;
+      else if(x.hoy[p]>0){ b1+=x.semCub*x.hoy[p]*k; b1e=true; } });
     if(p===519 && galDicU!=null){ b1=galDicU; b1e=true; }                 // galletas dic = número manual de Andrea
     if(b1e) estim[p]=1;
     const b2=(!e2.vacio && e2.f[p]!=null) ? Math.max(0, e2.ped[p]-e2.base[p])*e2.f[p] : 0;   // solo el EXTRA de la semana de cierre
@@ -11794,7 +11846,7 @@ async function cierreMeta(cfg, ritmo){
   const porProd={};   // META por producto en UDS — lo que consume el motor
   M.forEach(function(m){ porProd[m.p]=m.b1+m.b2+m.b3; });
   const total=M.reduce(function(a,m){ return a+Math.ceil((m.b1+m.b2+m.b3)/m.I.cajaU); },0);
-  return {fc:fc, e1:e1, e2:e2, g1:G1, lyUlt:lyUlt, hoyIni:hoyIni, hoyFin:hoyFin, ene:ene, semEne:semEne, M:M,
+  return {fc:fc, e1:e1, e2:e2, g1:G1, lyUlt:lyUlt, semHoy:semHoy, hoyIni:hoyIni, hoyFin:hoyFin, ene:ene, semEne:semEne, M:M,
           porProd:porProd, total:total, estim:estim, avisos:avisos, ritmo:ritmo};
 }
 
@@ -22098,12 +22150,15 @@ async function rzDiagCierre(body){
     const pDias=_picoDias(fc.resto), pIso=_isoWk(new Date(fc.resto+'T00:00:00')), pPers=_personasDe(pIso);
     const metaU={}, needU={};
     M.forEach(function(m){ metaU[m.p]=m.b1+m.b2+m.b3; needU[m.p]=m.b2+m.b3; });   // b1 sale el lun 14 → NO se puede producir esa semana
-    const pA=_picoAsignar(pDias, pPers, needU), pT=_picoTotales(metaU, pA.prodU);
+    const b1Tarde=fc.autowm>fc.resto;               // Auto+WM sale DESPUÉS de la última entrega (21-dic): todo junto el 18
+    const pA=_picoAsignar(pDias, pPers, needU), pT=_picoTotales(metaU, b1Tarde?{}:pA.prodU);
     const pTecho=_picoTecho(pDias, pPers);          // mix más rendidor posible → pico más bajo alcanzable
     const pPicoMin=Math.max(0, total-pTecho);
     const pExceso=pT.picoCj-CONGELADOR_CJ;
     const pB1Cj=M.reduce(function(a,m){ return a+Math.ceil(m.b1/m.I.cajaU); },0);   // espacio que libera la entrega del 14
-    if(_isoWk(new Date(fc.autowm+'T00:00:00'))!==pIso)
+    if(b1Tarde)
+      avisos.push('Auto + Walmart se entrega el '+_fechaCorta(fc.autowm)+', después de la última entrega ('+_fechaCorta(fc.resto)+'): ese día está toda la meta junta en el congelador → pico = meta.');
+    else if(_isoWk(new Date(fc.autowm+'T00:00:00'))!==pIso)
       avisos.push('Las dos entregas caen en semanas distintas: el pico se calcula contra la semana de la última entrega ('+fc.resto+'). Revisá las fechas.');
     if(!pDias.length)
       avisos.push('La última entrega ('+fc.resto+') cae en fin de semana: esa semana no tiene días productivos, así que el pico sale igual a la meta. Poné un día lun–vie.');
@@ -22111,7 +22166,7 @@ async function rzDiagCierre(body){
     const pSens=[]; for(let k=0;k<=SEM;k++){
       const mU={}, nU={};
       M.forEach(function(m){ const b3v=m.b3De(k); mU[m.p]=m.b1+m.b2+b3v; nU[m.p]=m.b2+b3v; });
-      const t=_picoTotales(mU, _picoAsignar(pDias, pPers, nU).prodU);
+      const t=_picoTotales(mU, b1Tarde?{}:_picoAsignar(pDias, pPers, nU).prodU);
       pSens.push({k:k, meta:t.metaCj, pico:t.picoCj, cabe:t.picoCj<=CONGELADOR_CJ}); }
     const pMaxK=pSens.filter(function(s){ return s.cabe; }).map(function(s){ return s.k; }).pop();
 
@@ -22213,7 +22268,7 @@ async function rzDiagCierre(body){
         +'<span style="color:var(--text-3);font-size:11.5px">cj</span>'
         +'<button onclick="cierreGuardarFechas()" style="background:none;border:.5px solid var(--border-strong);color:var(--text-2);font-size:11.5px;border-radius:6px;padding:4px 12px;cursor:pointer">Guardar y recalcular</button>'
       +'</div>'
-      +'<div style="margin-bottom:8px">'+detalle(e1,'Bloque 1 · pedido de cierre Auto + Walmart (dic pasado, × ritmo de hoy de cada cadena)')+'</div>'
+      +'<div style="margin-bottom:8px">'+detalle(e1,'Bloque 1 · pedido de cierre Auto + Walmart (dic pasado con lo no entregado, × ritmo de hoy de cada cadena, × '+R.semHoy+' de '+(e1.semLY||'?')+' semanas cubiertas)')+'</div>'
       +'<div style="margin-bottom:8px">'+detalle(e2,'Bloque 2 · resto + HORECA + Abner (extra de su semana de cierre, × ritmo de hoy)')+'</div>'
       +'<div style="margin-bottom:18px"><b style="color:var(--text)">Bloque 3 · enero</b> — '+SEM+' semanas desde <b style="color:var(--accent)">'+esc(primerEne?_fechaLarga(primerEne):'—')+'</b>'+(finEne?(' hasta '+esc(_fechaLarga(finEne))):'')+' <span style="color:var(--text-3)">(ritmo de hoy × temporada de enero, como el plan)</span></div>'
       +'<table style="border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums">'
@@ -25444,7 +25499,7 @@ function planDesgloseMeta(){
   return '<div class="dm">'
     +'<table class="dm-tab"><thead><tr>'
       +'<th>Producto</th>'
-      +'<th>Entrega '+esc(dm(R.fc.autowm))+'<span>Auto + Walmart</span></th>'
+      +'<th>Entrega '+esc(dm(R.fc.autowm))+'<span>Auto + Walmart · '+_rzN(R.semHoy)+' sem</span></th>'
       +'<th>Entrega '+esc(dm(R.fc.resto))+'<span>resto + HORECA + Abner</span></th>'
       +'<th>Reapertura 11 ene<span>stock para arrancar enero</span></th>'
       +'<th>Meta<span>suma</span></th>'

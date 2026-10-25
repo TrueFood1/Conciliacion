@@ -31,6 +31,8 @@ function lunes(desde, n){ var out=[], d=new Date(desde+'T00:00:00'); for (var i=
 lunes('2025-09-29', 11).forEach(function(ds){ fact(ds,1,451,60,1); fact(ds,2,453,6,37); fact(ds,3,451,30,1); });
 // Pedido de cierre del año pasado: lun 15-dic Auto 300 Blanco, Walmart 60 paq Francés; HORECA 50 + 40 esa semana.
 fact('2025-12-15',1,451,300,1); fact('2025-12-15',2,453,60,37); fact('2025-12-15',3,451,50,1); fact('2025-12-17',3,451,40,1);
+// Vuelven a comprar el lun 12-ene-2026 → el pedido de cierre cubrió 4 semanas (15-dic → 12-ene).
+fact('2026-01-12',1,451,60,1); fact('2026-01-12',2,453,6,37);
 // Hoy, 16 semanas (29-jun → 12-oct-2026): Auto 45 Blanco + 24 Galletas (nuevas) · Walmart 9 paq Francés · HORECA 24 Blanco.
 lunes('2026-06-29', 16).forEach(function(ds){ fact(ds,1,451,45,1); fact(ds,1,519,24,1); fact(ds,2,453,9,37); fact(ds,3,451,24,1); });
 function filtra(dom){ return AML.filter(function(l){ return dom.every(function(c){
@@ -59,6 +61,8 @@ var RITMO = {451:120, 452:60, 453:240, 503:96, 472:48, 519:24};
 var CFG = {ritmoVentana:6, cierreSemEne:3, planMeses:4, colchon:{}, ventanas:[]};
 
 async function main(){
+  // Las OC no entregadas reales (DEMANDA_NO_SERVIDA) no entran en los datos sintéticos; la sección 5 las prueba aparte.
+  var NS_REAL = DEMANDA_NO_SERVIDA.slice(); DEMANDA_NO_SERVIDA.length = 0;
   _calAplicar(_calDesdeFilas(FILAS), '2026-10-25');
   eq("calendario: cierre 18-dic, vuelta 11-ene", [CIERRE, REAPERTURA], ['2026-12-18','2027-01-11']);
 
@@ -81,18 +85,22 @@ async function main(){
   var m = {}; R.M.forEach(function(x){ m[x.p] = x; });
   eq("año pasado: última venta de dic = 15-dic → ventana del pedido", [R.lyUlt, R.e1.lunes], ['2025-12-17','2025-12-15']);
   eq("ventana de hoy: 16 semanas completas antes de esta", [R.hoyIni, R.hoyFin], ['2026-06-29','2026-10-18']);
-  cerca("Auto Blanco: 300 × (45 ÷ 60)", m[451].b1, 300*0.75);
-  cerca("Walmart Francés: 240 u × (36 ÷ 24)", m[453].b1, 240*1.5);
-  cerca("Galletas sin historia en Auto: semanas que cubrió el pedido (50 cj ÷ 10) × 24 de hoy", m[519].b1, 5*24);
+  eq("cobertura: el pedido 2025 cubrió 4 semanas; con entrega el 21-dic este cubre 3", [R.g1[0].x.semLY, R.g1[1].x.semLY, R.semHoy], [4,4,3]);
+  cerca("Auto Blanco: 300 × (45 ÷ 60) × 3/4", m[451].b1, 300*0.75*3/4);
+  cerca("Walmart Francés: 240 u × (36 ÷ 24) × 3/4", m[453].b1, 240*1.5*3/4);
+  cerca("Galletas sin historia en Auto: semanas que cubrió el pedido (50 cj ÷ 10) × 24 de hoy × 3/4", m[519].b1, 5*24*3/4);
   eq("Galletas marcadas estimadas", !!R.estim[519], true);
   cerca("resto: solo el EXTRA de su semana (90 − 30) × (24 ÷ 30)", m[451].b2, 60*0.8);
   cerca("enero en la meta (Blanco)", m[451].b3, 120*0.9*3);
   eq("semanas de enero sin fila = 3", R.semEne, 3);
   cerca("b3De(k): las primeras k semanas de enero", m[453].b3De(2), 240*1.2*2);
   var total21 = R.total;
-  // la fecha de entrega de este año ya no mueve la cantidad: 14-dic da lo mismo que 21-dic
-  CONFIG = []; var R14 = await cierreMeta(CFG, RITMO);
-  eq("14-dic y 21-dic: misma meta", [R14.fc.autowm, R14.total, JSON.stringify(R14.porProd)], ['2026-12-14', total21, JSON.stringify(R.porProd)]);
+  // la fecha de entrega decide cuántas semanas cubre: el 14-dic cubre las 4, como en 2025
+  CONFIG = []; var R14 = await cierreMeta(CFG, RITMO); var m14 = {}; R14.M.forEach(function(x){ m14[x.p] = x; });
+  eq("14-dic: cubre 4 semanas", [R14.fc.autowm, R14.semHoy], ['2026-12-14', 4]);
+  cerca("14-dic: Auto Blanco entero = 300 × 0,75", m14[451].b1, 300*0.75);
+  eq("14-dic pide más que 21-dic", R14.total > total21, true);
+  cerca("el bloque 2 no depende de la fecha de Auto+WM", m14[451].b2, m[451].b2);
   // override manual de Galletas
   CONFIG = [{clave:'cierre_galletas_dic_cj', valor:'10'}];
   var Rg = await cierreMeta(CFG, RITMO); eq("Galletas dic a mano: 10 cj = 120 potes", Rg.M.filter(function(x){ return x.p===519; })[0].b1, 120);
@@ -107,7 +115,12 @@ async function main(){
 
   // ── 3. ?diag=cierre ya no revienta (era «b3 is not defined») ──
   var body = {innerHTML:''};
+  CONFIG = [{clave:'cierre_fecha_autowm', valor:'2026-12-21'}];
   await rzDiagCierre(body);
+  eq("diag=cierre: Auto+WM después de la última entrega → pico = meta", /pico = meta/.test(body.innerHTML), true);
+  CONFIG = []; body = {innerHTML:''};
+  await rzDiagCierre(body);
+  eq("diag=cierre con 14-dic: sin ese aviso", /pico = meta/.test(body.innerHTML), false);
   eq("diag=cierre pinta la meta, sin error", [/No pude calcular/.test(body.innerHTML), /Meta de cierre al/.test(body.innerHTML)], [false, true]);
   eq("diag=cierre trae los campos de fecha", [/id="cierreFAutowm"/.test(body.innerHTML), /cierreGuardarFechas\(\)/.test(body.innerHTML)], [true, true]);
   eq("diag=cierre dice ENERO 3 SEM", /ENERO 3 SEM/.test(body.innerHTML), true);
@@ -130,6 +143,18 @@ async function main(){
   await cierreGuardarFechas('pl');
   eq("semanas fuera de rango: no guarda", [INSERTADAS.length, alertas.length], [0, 1]);
   document = docViejo; cargarPlanMeses = cpm;
+
+  // ── 5. DEMANDA NO SERVIDA: lo pedido y no entregado se suma a la venta ──
+  eq("no servida: tabla real cargada (18 filas, dic-25 → abr-26)", [NS_REAL.length, NS_REAL[0].ds, NS_REAL[NS_REAL.length-1].ds], [18,'2025-12-15','2026-04-06']);
+  var cjNS = {}; NS_REAL.forEach(function(r){ var k=r.canal+'·'+r.p; cjNS[k]=(cjNS[k]||0)+r.cj; });
+  eq("no servida: cajas por cadena y producto (= informe OC vs entregado)", cjNS,
+     {'auto·503':37,'auto·452':40,'auto·453':5,'auto·472':10,'walmart·451':34,'walmart·452':38,'walmart·503':8,'auto·451':17});
+  DEMANDA_NO_SERVIDA.push({ds:'2025-12-15', canal:'auto', p:451, cj:10});
+  eq("_noServida pasa cajas a uds sueltas", _noServida('2025-12-01','2025-12-31'), [{ds:'2025-12-15', canal:'auto', p:451, uds:60}]);
+  eq("_noServida respeta la ventana", _noServida('2026-01-01','2026-12-31'), []);
+  _cierreCache = null; var Rn = await cierreMeta(CFG, RITMO);
+  cerca("Auto Blanco con 10 cj no entregadas: (300 + 60) × 0,75", Rn.M.filter(function(x){ return x.p===451; })[0].b1, 360*0.75);
+  DEMANDA_NO_SERVIDA.length = 0; NS_REAL.forEach(function(r){ DEMANDA_NO_SERVIDA.push(r); }); _cierreCache = null;
 
   print((mal ? "✗ " : "✓ ") + ok + "/" + (ok + mal) + " casos");
   if (mal) throw new Error(mal + " casos fallaron");

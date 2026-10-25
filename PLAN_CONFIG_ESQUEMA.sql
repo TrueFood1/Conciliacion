@@ -29,6 +29,8 @@
 --   cierre_fecha_autowm      fecha       cierreConfig()          cierreGuardar()
 --   cierre_fecha_resto       fecha       cierreConfig()          cierreGuardar()
 --   cierre_galletas_dic_cj   número      cierreConfig()          cierreGuardar()
+--   cierre_semanas_enero     número 0–8  nivConfig()             cierreGuardarFechas('pl') (b127)
+--   plan_meses               número 1–11 nivConfig()             NADIE (sin UI) — horizonte del plan (b126)
 --   compras_dia_fijo         objeto      nivConfig()             NADIE (sin UI) — se siembra con
 --                                                                COMPRAS_DIA_FIJO.sql (T-28, 2-oct-2026)
 --
