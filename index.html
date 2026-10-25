@@ -11577,24 +11577,23 @@ const CONGELADOR_CJ=888;                  // capacidad MÁXIMA del congelador, c
 // de la factura de esa entrega. La venta facturada es lo que se PUDO entregar (Andrea, 25-oct): sin esto,
 // el pedido de cierre y los factores de enero–febrero salen cortos. Fuente: los PDF de las OC contra los
 // traslados de Odoo (detalle privado en el coordinador, OC_vs_ENTREGADO_dic25_mar26). Es un PISO: no
-// están lo que las cadenas dejaron de pedir ni los otros clientes. Las OC de resurtido no se suman entre
-// sí (cada una reemplaza a la anterior); la OC entera no entregada del 27-feb no cuenta (la reemplazó la siguiente).
+// están lo que las cadenas dejaron de pedir ni los otros clientes. Las OC son de RESURTIDO: lo que faltó
+// y la OC siguiente volvió a pedir y se entregó es ATRASO, no demanda extra (ya está en la venta de
+// después). Solo cuenta lo que nunca se recuperó. Por eso no están: Walmart Blanco del 12-ene (la OC del
+// 16-ene pidió 42 y salió entera), Walmart Semillas del 19-ene al 2-feb (atraso que se recuperó al
+// 13-feb), 18 de los 23 Buns de Auto del 15-dic (salieron el 21-dic) ni la OC de Auto del 27-feb.
 // Se suma a la venta en nivVentasCanalPorDia (meta de cierre) y en nivTemporada (factores).
 const DEMANDA_NO_SERVIDA=[
   // Pedido de cierre 2025 (entrega 15-dic): Buns no entregado + lo que Auto pidió el 2-ene con la planta cerrada.
-  {ds:'2025-12-15', canal:'auto',    p:503, cj:23+14},
+  {ds:'2025-12-15', canal:'auto',    p:503, cj:5+14},
   {ds:'2025-12-15', canal:'auto',    p:452, cj:6},
   {ds:'2025-12-15', canal:'auto',    p:453, cj:5},
   {ds:'2025-12-15', canal:'auto',    p:472, cj:5},
   // Enero
-  {ds:'2026-01-12', canal:'walmart', p:451, cj:24},
   {ds:'2026-01-19', canal:'auto',    p:452, cj:19},
-  {ds:'2026-01-19', canal:'walmart', p:452, cj:8},
   {ds:'2026-01-19', canal:'walmart', p:503, cj:7},
-  {ds:'2026-01-26', canal:'walmart', p:452, cj:10},
   // Febrero
   {ds:'2026-02-02', canal:'auto',    p:452, cj:4},
-  {ds:'2026-02-02', canal:'walmart', p:452, cj:16},
   {ds:'2026-02-09', canal:'walmart', p:452, cj:4},
   {ds:'2026-02-17', canal:'walmart', p:503, cj:1},
   // Marzo–abril
@@ -11631,6 +11630,7 @@ async function cierreGuardarFechas(pre){
   const a=$('cierreFAutowm'), r=$('cierreFResto'), g=$('cierreGalDicCj'), n=$('cierreSemEne');
   const c=sbClient(); if(!c){ alert('Sin conexión con la base — no se guardó.'); return; }
   if(!a || !r || !/^\d{4}-\d{2}-\d{2}$/.test(a.value) || !/^\d{4}-\d{2}-\d{2}$/.test(r.value)){ alert('Fechas incompletas — no se guardó.'); return; }
+  if(_calFinAnioOk && (a.value>=REAPERTURA || a.value<_lunesDe(CIERRE))){ alert('La entrega de Auto + Walmart tiene que caer entre la semana del cierre y la reapertura ('+REAPERTURA+') — no se guardó.'); return; }
   let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
   const galVal=(g&&g.value!=='' && parseFloat(g.value)>0)?String(parseFloat(g.value)):'';   // vacío/0 = sin override (galletas vuelven al ritmo)
   const filas=[
@@ -11818,10 +11818,12 @@ async function cierreMeta(cfg, ritmo){
 
   const avisos=[];
   if(!diasDic.length) avisos.push('Sin ventas en diciembre de '+yLY+': las entregas de diciembre quedan en 0.');
-  // COBERTURA (b127): el pedido de Auto+WM cubre de su entrega a la reapertura. El del año pasado
-  // cubrió semLY semanas; este año cubre semHoy → bloque 1 × semHoy/semLY. Con la entrega el 21-dic
-  // son 3 de 4: la semana del 14-dic es una entrega normal, que ya consume el plan.
-  const semHoy=Math.max(0, Math.round((new Date(_lunesDe(REAPERTURA)+'T00:00:00')-new Date(_lunesDe(fc.autowm)+'T00:00:00'))/(7*86400000)));
+  // COBERTURA (b127): el pedido de Auto+WM cubre las semanas sin producción, de la semana DESPUÉS
+  // de la del cierre a la reapertura. El del año pasado cubrió semLY semanas; este año semHoy →
+  // bloque 1 × semHoy/semLY. La semana del cierre (14-dic) la consume el plan con el ritmo normal,
+  // así que no entra aunque la entrega sea el 14: contarla en los dos lados era el doble conteo.
+  const lunPost=_cierreShift(_lunesDe(CIERRE),7), desdeCub=(_lunesDe(fc.autowm)>lunPost)?_lunesDe(fc.autowm):lunPost;
+  const semHoy=Math.max(0, Math.round((new Date(_lunesDe(REAPERTURA)+'T00:00:00')-new Date(desdeCub+'T00:00:00'))/(7*86400000)));
   const kCub=function(x){ return (x.semLY>0) ? semHoy/x.semLY : 1; };
   G1.forEach(function(g){ if(!g.x.vacio && !(g.x.semLY>0)) avisos.push('Sin venta de '+g.c+' en enero de '+(yLY+1)+': no se sabe cuántas semanas cubrió su pedido; va entero.'); });
   if(e2.vacio) avisos.push('Sin ventas del resto de canales en '+e2.D1+' → '+e2.D2+' (bloque 2 queda en 0).');
@@ -22268,7 +22270,7 @@ async function rzDiagCierre(body){
         +'<span style="color:var(--text-3);font-size:11.5px">cj</span>'
         +'<button onclick="cierreGuardarFechas()" style="background:none;border:.5px solid var(--border-strong);color:var(--text-2);font-size:11.5px;border-radius:6px;padding:4px 12px;cursor:pointer">Guardar y recalcular</button>'
       +'</div>'
-      +'<div style="margin-bottom:8px">'+detalle(e1,'Bloque 1 · pedido de cierre Auto + Walmart (dic pasado con lo no entregado, × ritmo de hoy de cada cadena, × '+R.semHoy+' de '+(e1.semLY||'?')+' semanas cubiertas)')+'</div>'
+      +'<div style="margin-bottom:8px">'+detalle(e1,'Bloque 1 · pedido de cierre Auto + Walmart (dic pasado con lo no entregado, × ritmo de hoy de cada cadena, × '+R.semHoy+' de '+R.g1.map(function(g){ return g.x.semLY||'?'; }).join('/')+' semanas cubiertas)')+'</div>'
       +'<div style="margin-bottom:8px">'+detalle(e2,'Bloque 2 · resto + HORECA + Abner (extra de su semana de cierre, × ritmo de hoy)')+'</div>'
       +'<div style="margin-bottom:18px"><b style="color:var(--text)">Bloque 3 · enero</b> — '+SEM+' semanas desde <b style="color:var(--accent)">'+esc(primerEne?_fechaLarga(primerEne):'—')+'</b>'+(finEne?(' hasta '+esc(_fechaLarga(finEne))):'')+' <span style="color:var(--text-3)">(ritmo de hoy × temporada de enero, como el plan)</span></div>'
       +'<table style="border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums">'

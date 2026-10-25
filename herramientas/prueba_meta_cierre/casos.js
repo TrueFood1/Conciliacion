@@ -95,12 +95,11 @@ async function main(){
   eq("semanas de enero sin fila = 3", R.semEne, 3);
   cerca("b3De(k): las primeras k semanas de enero", m[453].b3De(2), 240*1.2*2);
   var total21 = R.total;
-  // la fecha de entrega decide cuántas semanas cubre: el 14-dic cubre las 4, como en 2025
-  CONFIG = []; var R14 = await cierreMeta(CFG, RITMO); var m14 = {}; R14.M.forEach(function(x){ m14[x.p] = x; });
-  eq("14-dic: cubre 4 semanas", [R14.fc.autowm, R14.semHoy], ['2026-12-14', 4]);
-  cerca("14-dic: Auto Blanco entero = 300 × 0,75", m14[451].b1, 300*0.75);
-  eq("14-dic pide más que 21-dic", R14.total > total21, true);
-  cerca("el bloque 2 no depende de la fecha de Auto+WM", m14[451].b2, m[451].b2);
+  // la semana del cierre (14-dic) la consume el plan con el ritmo: entregar el 14 también cubre 3
+  CONFIG = []; var R14 = await cierreMeta(CFG, RITMO);
+  eq("14-dic: también 3 semanas (sin doble conteo de la semana del cierre)", [R14.fc.autowm, R14.semHoy, R14.total], ['2026-12-14', 3, total21]);
+  CONFIG = [{clave:'cierre_fecha_autowm', valor:'2026-12-28'}]; var R28 = await cierreMeta(CFG, RITMO);
+  eq("28-dic: cubre 2 (de su lunes a la reapertura)", R28.semHoy, 2);
   // override manual de Galletas
   CONFIG = [{clave:'cierre_galletas_dic_cj', valor:'10'}];
   var Rg = await cierreMeta(CFG, RITMO); eq("Galletas dic a mano: 10 cj = 120 potes", Rg.M.filter(function(x){ return x.p===519; })[0].b1, 120);
@@ -142,18 +141,24 @@ async function main(){
   CAMPOS.plcierreSemEne.value = '12'; INSERTADAS = []; var alertas = []; alert = function(t){ alertas.push(t); };
   await cierreGuardarFechas('pl');
   eq("semanas fuera de rango: no guarda", [INSERTADAS.length, alertas.length], [0, 1]);
+  CAMPOS.plcierreSemEne.value = '3'; CAMPOS.plcierreFAutowm.value = '2027-01-11'; INSERTADAS = []; alertas = [];
+  await cierreGuardarFechas('pl');
+  eq("entrega Auto+WM en la reapertura o después: no guarda", [INSERTADAS.length, alertas.length], [0, 1]);
+  CAMPOS.plcierreFAutowm.value = '2026-12-04'; INSERTADAS = []; alertas = [];
+  await cierreGuardarFechas('pl');
+  eq("entrega Auto+WM antes de la semana del cierre: no guarda", [INSERTADAS.length, alertas.length], [0, 1]);
   document = docViejo; cargarPlanMeses = cpm;
 
   // ── 5. DEMANDA NO SERVIDA: lo pedido y no entregado se suma a la venta ──
-  eq("no servida: tabla real cargada (18 filas, dic-25 → abr-26)", [NS_REAL.length, NS_REAL[0].ds, NS_REAL[NS_REAL.length-1].ds], [18,'2025-12-15','2026-04-06']);
+  eq("no servida: tabla real cargada (14 filas, dic-25 → abr-26)", [NS_REAL.length, NS_REAL[0].ds, NS_REAL[NS_REAL.length-1].ds], [14,'2025-12-15','2026-04-06']);
   var cjNS = {}; NS_REAL.forEach(function(r){ var k=r.canal+'·'+r.p; cjNS[k]=(cjNS[k]||0)+r.cj; });
   eq("no servida: cajas por cadena y producto (= informe OC vs entregado)", cjNS,
-     {'auto·503':37,'auto·452':40,'auto·453':5,'auto·472':10,'walmart·451':34,'walmart·452':38,'walmart·503':8,'auto·451':17});
+     {'auto·503':19,'auto·452':40,'auto·453':5,'auto·472':10,'walmart·503':8,'walmart·452':4,'auto·451':17,'walmart·451':10});
   DEMANDA_NO_SERVIDA.push({ds:'2025-12-15', canal:'auto', p:451, cj:10});
   eq("_noServida pasa cajas a uds sueltas", _noServida('2025-12-01','2025-12-31'), [{ds:'2025-12-15', canal:'auto', p:451, uds:60}]);
   eq("_noServida respeta la ventana", _noServida('2026-01-01','2026-12-31'), []);
   _cierreCache = null; var Rn = await cierreMeta(CFG, RITMO);
-  cerca("Auto Blanco con 10 cj no entregadas: (300 + 60) × 0,75", Rn.M.filter(function(x){ return x.p===451; })[0].b1, 360*0.75);
+  cerca("Auto Blanco con 10 cj no entregadas: (300 + 60) × 0,75 × 3/4", Rn.M.filter(function(x){ return x.p===451; })[0].b1, 360*0.75*3/4);
   DEMANDA_NO_SERVIDA.length = 0; NS_REAL.forEach(function(r){ DEMANDA_NO_SERVIDA.push(r); }); _cierreCache = null;
 
   print((mal ? "✗ " : "✓ ") + ok + "/" + (ok + mal) + " casos");
