@@ -90,7 +90,8 @@ async function main(){
   cerca("Walmart Francés: 240 u × (36 ÷ 24) × 3/4", m[453].b1, 240*1.5*3/4);
   cerca("Galletas sin historia en Auto: semanas que cubrió el pedido (50 cj ÷ 10) × 24 de hoy × 3/4", m[519].b1, 5*24*3/4);
   eq("Galletas marcadas estimadas", !!R.estim[519], true);
-  cerca("resto: solo el EXTRA de su semana (90 − 30) × (24 ÷ 30)", m[451].b2, 60*0.8);
+  cerca("resto: 3 semanas de cierre × su venta de hoy (24 Blanco/sem)", m[451].b2, 24*3);
+  eq("resto: 3 semanas", R.semResto, 3);
   cerca("enero en la meta (Blanco)", m[451].b3, 120*0.9*3);
   eq("semanas de enero sin fila = 3", R.semEne, 3);
   cerca("b3De(k): las primeras k semanas de enero", m[453].b3De(2), 240*1.2*2);

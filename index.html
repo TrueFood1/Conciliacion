@@ -11825,6 +11825,12 @@ async function cierreMeta(cfg, ritmo){
   const lunPost=_cierreShift(_lunesDe(CIERRE),7), desdeCub=(_lunesDe(fc.autowm)>lunPost)?_lunesDe(fc.autowm):lunPost;
   const semHoy=Math.max(0, Math.round((new Date(_lunesDe(REAPERTURA)+'T00:00:00')-new Date(desdeCub+'T00:00:00'))/(7*86400000)));
   const kCub=function(x){ return (x.semLY>0) ? semHoy/x.semLY : 1; };
+  // BLOQUE 2 (resto + HORECA + Abner), b127: las semanas de cierre COMPLETAS a su venta de hoy
+  // (Andrea, 25-oct). Antes copiaba el extra que compraron en su semana de cierre de 2025 (≈ 2 de las 3
+  // semanas); ahora cubre de la semana después de su última entrega a la reapertura.
+  const desdeResto=(_lunesDe(fc.resto)>lunPost)?_lunesDe(fc.resto):lunPost;
+  const semResto=Math.max(0, Math.round((new Date(_lunesDe(REAPERTURA)+'T00:00:00')-new Date(desdeResto+'T00:00:00'))/(7*86400000)));
+  const hoyResto=_cierreSuma(V.hoy, hoyIni, hoyFin, CIERRE_CANALES_2).porProd;
   G1.forEach(function(g){ if(!g.x.vacio && !(g.x.semLY>0)) avisos.push('Sin venta de '+g.c+' en enero de '+(yLY+1)+': no se sabe cuántas semanas cubrió su pedido; va entero.'); });
   if(e2.vacio) avisos.push('Sin ventas del resto de canales en '+e2.D1+' → '+e2.D2+' (bloque 2 queda en 0).');
   if(semEne>0 && ene.sinFac) avisos.push('Enero sin factor de temporada'+(_planTemp&&_planTemp.error?' ('+_planTemp.error+')':'')+': va al ritmo de hoy.');
@@ -11841,14 +11847,14 @@ async function cierreMeta(cfg, ritmo){
       else if(x.hoy[p]>0){ b1+=x.semCub*x.hoy[p]*k; b1e=true; } });
     if(p===519 && galDicU!=null){ b1=galDicU; b1e=true; }                 // galletas dic = número manual de Andrea
     if(b1e) estim[p]=1;
-    const b2=(!e2.vacio && e2.f[p]!=null) ? Math.max(0, e2.ped[p]-e2.base[p])*e2.f[p] : 0;   // solo el EXTRA de la semana de cierre
+    const b2=Math.max(0, hoyResto[p]||0)/CIERRE_FACTOR_SEM_HOY*semResto;   // semanas de cierre × venta semanal de hoy
     const b3=ene.porProd[p]||0;
     return {p:p, I:NIV_INFO[p], b1:b1, b2:b2, b3:b3, r:r, b3De:function(k){ return b3Sem(p,k); }, nota:b1e?' *':''};
   });
   const porProd={};   // META por producto en UDS — lo que consume el motor
   M.forEach(function(m){ porProd[m.p]=m.b1+m.b2+m.b3; });
   const total=M.reduce(function(a,m){ return a+Math.ceil((m.b1+m.b2+m.b3)/m.I.cajaU); },0);
-  return {fc:fc, e1:e1, e2:e2, g1:G1, lyUlt:lyUlt, semHoy:semHoy, hoyIni:hoyIni, hoyFin:hoyFin, ene:ene, semEne:semEne, M:M,
+  return {fc:fc, e1:e1, e2:e2, g1:G1, lyUlt:lyUlt, semHoy:semHoy, semResto:semResto, hoyIni:hoyIni, hoyFin:hoyFin, ene:ene, semEne:semEne, M:M,
           porProd:porProd, total:total, estim:estim, avisos:avisos, ritmo:ritmo};
 }
 
@@ -22271,7 +22277,7 @@ async function rzDiagCierre(body){
         +'<button onclick="cierreGuardarFechas()" style="background:none;border:.5px solid var(--border-strong);color:var(--text-2);font-size:11.5px;border-radius:6px;padding:4px 12px;cursor:pointer">Guardar y recalcular</button>'
       +'</div>'
       +'<div style="margin-bottom:8px">'+detalle(e1,'Bloque 1 · pedido de cierre Auto + Walmart (dic pasado con lo no entregado, × ritmo de hoy de cada cadena, × '+R.semHoy+' de '+R.g1.map(function(g){ return g.x.semLY||'?'; }).join('/')+' semanas cubiertas)')+'</div>'
-      +'<div style="margin-bottom:8px">'+detalle(e2,'Bloque 2 · resto + HORECA + Abner (extra de su semana de cierre, × ritmo de hoy)')+'</div>'
+      +'<div style="margin-bottom:8px">'+detalle(e2,'Bloque 2 · resto + HORECA + Abner ('+R.semResto+' semanas de cierre × su venta semanal de hoy)')+'</div>'
       +'<div style="margin-bottom:18px"><b style="color:var(--text)">Bloque 3 · enero</b> — '+SEM+' semanas desde <b style="color:var(--accent)">'+esc(primerEne?_fechaLarga(primerEne):'—')+'</b>'+(finEne?(' hasta '+esc(_fechaLarga(finEne))):'')+' <span style="color:var(--text-3)">(ritmo de hoy × temporada de enero, como el plan)</span></div>'
       +'<table style="border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums">'
         +'<thead><tr style="color:var(--text-3);text-align:left">'
