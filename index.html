@@ -25150,10 +25150,21 @@ function nivProyeccion(ritmo, fin, cfg, nWeeks){
     const colDe=pid=>{ const t=(cfg.ventanas||[]).some(v=>+v.producto_id===pid && wk>=v.desde && wk<=v.hasta); return t?cfg.colchonTemporada:(cfg.colchon[pid]||3); };
     const R=_rampaDe(mon);
     if(R){ rampaOn=rampaOn||_rampaEstado(stock, S.ritmo, R.meta, R.k).on; R.on=rampaOn; }   // latch
+    const pre={}; NIV_PROD.forEach(p=>pre[p]=stock[p]);
     const layout=_weekLayout(stock, S.ritmo, colDe, cfg.horizonte||NIV_CFG_DEF.horizonte, pers, R);   // muta stock
+    const wkOut={monday:mon, otros:layout.otros, semillas:layout.semillas, viernes:layout.viernes, personas:layout.personas, rampa:layout.rampaOn,
+              fac:S.fac, salidaFalta:!!(S.salida&&S.salida.falta)};
+    // Semana con un CIERRE que no es el de fin de año (Semana Santa): esos días no producen. El
+    // layout no lo sabe, así que se cuenta desde las celdas, igual que planProyeccionOv — si no, la
+    // proyección sin ediciones sumaba producción en días cerrados. Las demás semanas, como siempre.
+    if(_weekDays(mon).some(function(d){ return _enCierre(d.ds) && !_enCierreAnio(d.ds); })){
+      const hoyStr=_ymd(new Date()), cells=_aplicarPicado(rzCeldas(mon, layout, _planReal||{}, hoyStr, {}), pers), bMes={}, bFut={};
+      cells.forEach(function(c){ const pr=c.prods||{}; for(const k in pr){ bMes[+k]=(bMes[+k]||0)+pr[k]; if(c.ds>=hoyStr) bFut[+k]=(bFut[+k]||0)+pr[k]; } });
+      wkOut.batches=bMes;
+      NIV_PROD.forEach(p=>{ stock[p]=pre[p]+(bFut[p]||0)*NIV_INFO[p].rend-(S.ritmo[p]||0); });
+    }
     _planRestarSalida(stock, S);
-    out.push({monday:mon, otros:layout.otros, semillas:layout.semillas, viernes:layout.viernes, personas:layout.personas, rampa:layout.rampaOn,
-              fac:S.fac, salidaFalta:!!(S.salida&&S.salida.falta)});
+    out.push(wkOut);
   }
   return out;
 }

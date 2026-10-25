@@ -168,6 +168,15 @@ async function main(){
   // ── 11. COBERTURA DEL CALENDARIO ──
   eq("horizonte a feb: falta 2027", _calCoberturaAviso('2027-02-25'), 'Feriados 2027 sin cargar desde 12-ene');
   eq("horizonte que la tabla cubre: sin aviso", _calCoberturaAviso('2027-01-05'), '');
+  // ── 12. SEMANA SANTA EN LA PROYECCION SIN EDICIONES (= planProyeccionOv) ──
+  _calAplicar(_calDesdeFilas(FILAS.concat([{fecha:'2027-02-15',fecha_fin:'2027-02-19',tipo:'cierre'}])), '2026-10-25');
+  var Pss = nivProyeccion(R, fin, cfg, _planNSem(new Date(), 4));
+  var wss = Pss.filter(function(w){ return lun(w)==='2027-02-15'; })[0];
+  eq("semana cerrada (no fin de año): sin produccion en nivProyeccion", JSON.stringify(_semanaBatches(wss)), '{}');
+  _rzOverrides = {}; _planInputs = {cfg:cfg, ritmo:R, fin:fin, finLunes:fin};
+  var Pov = planProyeccionOv({});
+  eq("nivProyeccion = planProyeccionOv semana a semana", Pss.map(function(w){ return JSON.stringify(_semanaBatches(w)); }), Pov.map(function(w){ return JSON.stringify(_semanaBatches(w)); }));
+  _calAplicar(_calDesdeFilas(FILAS), '2026-10-25');
   // ── 8. VOLVER AL PLAN ACOTADO ──
   var ovs = {'2026-10-20':{}, '2026-10-26':{}, '2026-11-06':{}, '2026-11-09':{}, '2027-01-12':{}};
   eq("volver al plan: solo hoy → fin de la semana proxima", _rzVolverRango(ovs, '2026-10-25', new Date(2026,9,26)), ['2026-10-26','2026-11-06']);
