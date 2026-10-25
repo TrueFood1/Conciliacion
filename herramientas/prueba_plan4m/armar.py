@@ -46,7 +46,7 @@ def constante(nombre):
     return None
 
 CONSTS = ["NIV_PROD","NIV_INFO","NIV_CFG_DEF","_rzN","NIV_CAP","_rzPersonas","FERIADOS","CIERRE_RESPALDO",
-          "CIERRE","CIERRE_BORDES_PRODUCEN","_calFer","_calFuente","_calHasta","_calFinAnioOk","_ritmoAviso","_planTemp","_tempCache",
+          "CIERRE","CIERRE_BORDES_PRODUCEN","_calFer","_calFuente","_calHasta","_calFinAnioOk","CIERRE_ANIO_MIN_DIAS","_ritmoAviso","_planTemp","_tempCache",
           "NIV_HORNO","NIV_DERRAME_MIN","RAMPA_DIAS_SEM","_rzCierreMeta","RAMPA_PERS_BASE",
           "_DOW","_MESAB","_planCierre","_MESNOM2","_rzPicIdx"]
 FUNCS  = ["_capDe","_personasDe","_esFeriado","_cierreCubre","_enCierre","_enCierreAnio","_calCoberturaAviso","_ritmoVentana","_ritmoBloque","_calDesdeFilas","_calAplicar","_calRespaldo","nivCalendario",

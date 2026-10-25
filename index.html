@@ -10238,7 +10238,12 @@ function _calDesdeFilas(filas){
 // ¿Es el cierre de FIN DE AÑO? Toca la última semana de diciembre (24–31) o la primera de enero
 // (1–7). No alcanza con "cruza el 31-dic": si Personal carga primero solo «17–31 dic», ese bloque
 // ya es el de fin de año aunque todavía no llegue a enero.
+// Y dura al menos CIERRE_ANIO_MIN_DIAS corridos: un día suelto (el 24-dic cargado solo) es un cierre
+// cualquiera — no se queda con CIERRE y cierra todos sus días (con la regla de bordes no cerraría nada).
+const CIERRE_ANIO_MIN_DIAS=5;
 function _esBloqueAnio(b){
+  const dias=Math.round((new Date(b.fin+'T00:00:00')-new Date(b.ini+'T00:00:00'))/86400000)+1;
+  if(dias<CIERRE_ANIO_MIN_DIAS) return false;
   const toca=function(a,z){ return b.ini<=z && b.fin>=a; };
   for(let y=+b.ini.slice(0,4); y<=+b.fin.slice(0,4); y++)
     if(toca(y+'-12-24', y+'-12-31') || toca(y+'-01-01', y+'-01-07')) return true;

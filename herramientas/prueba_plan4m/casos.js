@@ -194,6 +194,10 @@ async function main(){
   eq("17–31 dic (sin enero todavia) es fin de año", _esBloqueAnio({ini:'2027-12-17', fin:'2027-12-31'}), true);
   eq("3–10 ene (solo enero) es fin de año", _esBloqueAnio({ini:'2028-01-03', fin:'2028-01-10'}), true);
   eq("Semana Santa no", _esBloqueAnio({ini:'2027-03-29', fin:'2027-04-02'}), false);
+  eq("24-dic suelto (1 dia) no es fin de año", _esBloqueAnio({ini:'2027-12-24', fin:'2027-12-24'}), false);
+  eq("4 dias tampoco; 5 si", [_esBloqueAnio({ini:'2027-12-27', fin:'2027-12-30'}), _esBloqueAnio({ini:'2027-12-27', fin:'2027-12-31'})], [false, true]);
+  _calAplicar(_calDesdeFilas(FILAS.concat([{fecha:'2027-12-24',fecha_fin:null,tipo:'cierre'}])), '2027-02-01');
+  eq("24-dic suelto: se cierra, no se queda con CIERRE, y sigue el aviso", [_esProductivo('2027-12-24'), CIERRE, _calFinAnioAviso()], [false, '2026-12-18', 'Cierre de fin de año sin cargar']);
   eq("un cierre de 1–5 dic no", _esBloqueAnio({ini:'2027-12-01', fin:'2027-12-05'}), false);
   _calAplicar(_calDesdeFilas(FILAS.concat([{fecha:'2027-12-17',fecha_fin:'2027-12-31',tipo:'cierre'}])), '2027-02-01');
   eq("con 17–31 dic 2027 cargado: es EL cierre, sin aviso", [CIERRE, REAPERTURA, _calFinAnioAviso()], ['2027-12-17','2027-12-31','']);
