@@ -45,8 +45,20 @@ async function main(){
   cerca("empaque = bolsa + etiqueta + caja ÷ unidades por caja", Cu.emp, 120, 1e-9);
   cerca("indirecto = ₡185.603 ÷ 400", Cu.ind, 185603/400, 1e-9);
   // terminado: usa MP e indirecto de Costos por producto
-  var T = calcEstadoBase(); T.prod='blanco'; T.term={mp:805, ind:1462, label:'Pan Blanco', unidad:'por unidad'}; T.emp.bolsa=69.55;
-  cerca("terminado: MP + empaque + indirecto de Truefie", calcCostoU(T).total, 805+69.55+1462, 1e-9);
+  var T = calcEstadoBase(); T.emp = {bolsa:50, etiqueta:20, caja:600, upc:12};   // empaque escrito para la receta
+  T.prod='blanco'; T.term=calcTermDe({key:'blanco', label:'Pan Blanco', unidad:'por unidad', prodId:451, pack:1, dias:9,
+    mp:{mpUnit:805}, indPerSales:1462, indUnit:1462, emp:69.55, totalVenta:805+1462+69.55});
+  cerca("terminado: igual al Total de Costos por producto (MP + indirecto + empaque)", calcCostoU(T).total, 805+1462+69.55, 1e-9);
+  cerca("terminado: el empaque es el de Costos por producto, no el de la receta", calcCostoU(T).emp, 69.55, 1e-9);
+  eq("terminado completo", calcCostoU(T).completo, true);
+  var Tb = calcTermDe({key:'buns', label:'Buns', prodId:503, pack:4, dias:5, mp:{mpUnit:100}, indPerSales:800, emp:60.34});
+  eq("Buns: MP por unidad de venta = mpUnit × pack", Tb.mp, 400);
+  var Te = calcTermDe({key:'pizza', label:'Pizza', prodId:472, pack:1, dias:3, mp:{mpUnit:0, error:'sin BoM'}, indPerSales:null, emp:null});
+  eq("MP con error, indirecto y empaque sin dato → null, no ₡0", [Te.mp, Te.ind, Te.emp], [null, null, null]);
+  var T2 = calcEstadoBase(); T2.prod='pizza'; T2.term=Te;
+  eq("y salen como faltas", calcCostoU(T2).faltan, ['materia prima','empaque','indirecto']);
+  var Tg = calcTermDe({key:'galletas', label:'Galletas', prodId:519, pack:1, dias:0, mp:{mpUnit:300}, indPerSales:0, emp:412.66});
+  eq("Galletas: indirecto ₡0 con su condición", [Tg.ind, Tg.indNota], [0, 'Galletas: ₡0 de indirecto, comparte el día']);
 
   // ── 3. Precio: Automercado y Fresh Market frío ──
   var C0 = calcCondBase();
@@ -95,7 +107,7 @@ async function main(){
   // ── 5. Ventana: Fresh con techo «Automercado + 5 %» ──
   var S2 = calcEstadoBase(); S2.ancla='mn'; S2.val=40;
   calcCambiarCadena(S2, 'fresh', 1935);
-  cerca("al dejar Automercado recuerda su factura", S2.pfCad.auto, A.pf, 1e-6);
+  cerca("al dejar Automercado recuerda su factura (por cadena y categoría)", S2.pfCad['auto.frio'], A.pf, 1e-6);
   eq("Fresh arranca con techo Automercado + 5 %", [S2.techos.fresh.modo, S2.techos.fresh.ref, S2.techos.fresh.x, S2.techos.fresh.xTipo], ['ref','auto',5,'%']);
   var refPvp = calcPvpDe(S2, 'auto', 1935);
   cerca("PVP de referencia = el de Automercado", refPvp, A.pvp, 1e-6);
@@ -163,6 +175,54 @@ async function main(){
   eq("abrir una guardada conserva ⅔ y el origen del precio", [S5.receta.filas[4].cant, S5.receta.filas[0].fuente, S5.receta.filas[6].fuente], ['⅔','factura',null]);
   eq("tabla que no existe → degradación", [_calcSinTabla({code:'PGRST205', message:"Could not find the table 'public.calc_receta' in the schema cache"}),
      _calcSinTabla({code:'42P01', message:'relation "public.calc_receta" does not exist'}), _calcSinTabla({code:'42501', message:'permission denied'})], [true,true,false]);
+
+  // recuerdo por categoría
+  var S6 = calcEstadoBase(); S6.ancla='pf'; S6.val=4000;
+  calcIrA(S6, 'auto', 'anaquel', 1935);
+  eq("anaquel no hereda el precio de frío", [S6.pfCad['auto.frio'], S6.ancla], [4000, 'mn']);
+  S6.ancla='pf'; S6.val=4500; calcIrA(S6, 'auto', 'frio', 1935);
+  eq("volver a frío: su precio; anaquel quedó recordado aparte", [S6.val, S6.pfCad['auto.anaquel']], [4000, 4500]);
+
+  // ── 8. Números es-CR: punto = miles, coma = decimal ──
+  [['3.718',3718],['185.603',185603],['1.782,18',1782.18],['29,2',29.2],['0,5',0.5],['1.000',1000],['12,6',12.6],['',null],
+   ['₡ 3.718',3718],['1.234.567',1234567],['29,25',29.25]].forEach(function(c){ eq("es-CR «"+c[0]+"»", calcNumCR(c[0]), c[1]); });
+  eq("cantidad «1.000» g = mil", calcParseCant('1.000'), 1000);
+
+  // ── 9. La realidad: margen por producto, góndola, precio real ──
+  eq("margen Auto Galletas 26,43 · Walmart Buns 26,97 · Walmart Pizza sin dato → 29,4 · receta Fresh 30",
+     [calcMcDe('auto',519), calcMcDe('wm',503), calcMcDe('wm',472), calcMcDe('fresh',null), calcMcDe('auto',null)], [26.43, 26.97, 29.4, 30, 29.2]);
+  var cA = calcCondBase(451), cW = calcCondBase(451), cG = calcCondBase(519);
+  cerca("Auto Blanco: factura 3.975 → PVP 5.545", calcPrecio(cA.auto.frio, 13, null, 'pf', 3975).pvp, 5545, 1);
+  var wb = calcPrecio(cW.wm.frio, 13, null, 'pf', 3688.8);
+  cerca("Walmart Blanco: factura 3.688,8 → neto 3.451,6", wb.neto, 3451.61, 0.01);
+  cerca("Walmart Blanco: → PVP 5.550 con 29,72 %", wb.pvp, 5550, 1);
+  cerca("Auto Galletas: factura por pote 3.396,9 → PVP ≈ 4.560 con 26,43 %", calcPrecio(cG.auto.frio, 13, null, 'pf', 3396.9).pvp, 4560, 1);
+  // precio real desde la factura, por id de UoM
+  var FAC = {46:1/6, 44:1/24, 42:1/24, 51:1/12, 49:1/12, 1:1, 37:0.25, 38:0.5};
+  var PU = {451:1, 453:37, 503:37, 472:38, 519:1};
+  var LA = [{product_id:[451,'x'], date:'2026-10-19', price_unit:23850, discount:12.6, product_uom_id:[46,'Caja']},
+            {product_id:[451,'x'], date:'2026-10-12', price_unit:1, discount:0, product_uom_id:[46,'Caja']},
+            {product_id:[453,'x'], date:'2026-10-19', price_unit:21150, discount:12.6, product_uom_id:[44,'Caja (Frances)']},
+            {product_id:[503,'x'], date:'2026-10-19', price_unit:23875, discount:12.6, product_uom_id:[42,'Caja']},
+            {product_id:[472,'x'], date:'2026-10-19', price_unit:23362.86, discount:12.6, product_uom_id:[49,'Caja (Pizza)']},
+            {product_id:[519,'x'], date:'2026-10-19', price_unit:40762.8, discount:12.6, product_uom_id:[51,'Caja (Galletas)']}];
+  var H = calcArmarHoy(LA, PU, FAC);
+  eq("Blanco: la última factura, caja de 6 → por pan", [H[451].pf, H[451].desc, H[451].fecha], [3975, 12.6, '2026-10-19']);
+  cerca("Francés: caja de 24 u → por paquete de 4", H[453].pf, 21150/6, 1e-9);
+  cerca("Buns: caja de 24 u → por paquete de 4", H[503].pf, 23875/6, 1e-9);
+  cerca("Pizza: caja de 12 u → por paquete de 2", H[472].pf, 23362.86/6, 1e-9);
+  cerca("Galletas: caja de 12 → por pote", H[519].pf, 3396.9, 1e-9);
+  var SH = calcEstadoBase(); SH.prod='blanco'; SH.term={mp:805, ind:1462, emp:69.55, pid:451, label:'Pan Blanco', unidad:'por unidad'};
+  calcAplicarMargenes(SH);
+  eq("al elegir Blanco el margen de la cadena pasa al suyo", [SH.cond.auto.frio.mc, SH.cond.wm.frio.mc], [29.2, 29.72]);
+  var hh = calcHoy(SH, {auto:H}, 805+1462+69.55);
+  cerca("Hoy: nos queda 3.975 × (1 − 12,6 %)", hh.neto, 3474.15, 0.01);
+  eq("Hoy: góndola real y su fuente", [hh.gondola, hh.gondFuente], [5545, 'app, AM Belén']);
+  cerca("Hoy: margen de la cadena real ≈ 29,2 %", hh.mc, 29.2, 0.05);
+  cerca("Hoy: nuestro margen real", hh.mn, (3474.15-2336.55)/3474.15*100, 0.01);
+  eq("Hoy: el PVP calculado calza con la góndola (diferencia < ₡1)", Math.abs(hh.dif) < 1, true);
+  SH.cad='wm'; eq("Hoy: Walmart sin factura en los datos → sin fila", calcHoy(SH, {auto:H}, 2000), null);
+  var SR = calcEstadoBase(); eq("Hoy: receta → sin fila", calcHoy(SR, {auto:H}, 2000), null);
 
   print((mal ? "✗ " : "✓ ") + ok + "/" + (ok + mal) + " casos");
   if (mal) throw new Error(mal + " casos fallaron");

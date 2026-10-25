@@ -620,6 +620,11 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .calc-flow .calc-gan{font-weight:600;color:var(--text);border-top:1px solid var(--border);padding-top:4px}
 .calc-flow .calc-warn{color:var(--warn)}
 .calc-flow .calc-nota{color:var(--text-3);font-size:11.5px}
+.calc-hoy{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 16px}
+.calc-hoy>div{display:flex;flex-direction:column;gap:2px}
+.calc-hoy span{font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em}
+.calc-hoy b{font-size:16px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+.calc-hoy small{font-size:11.5px;color:var(--text-2)}
 .calc-vtxt{font-size:12px;color:var(--text-2);margin-top:6px;line-height:1.5}
 .calc-big input{height:44px;font-size:17px;font-weight:600;border-color:var(--mod)}
 .calc-bar{position:relative;height:10px;border-radius:5px;background:var(--surface-2);margin:28px 6px 30px}
@@ -2833,7 +2838,10 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
     <div class="calc-grid">
       <div class="sim-panel calc-panel">
         <div class="sim-h2">Empaque por unidad</div>
-        <div class="calc-grid2">
+        <div id="calcEmpTerm" class="calc-grid2 hidden">
+          <div class="calc-field"><label for="calcTermEmp">Empaque (₡) · Costos por producto</label><input type="text" inputmode="decimal" id="calcTermEmp" class="calc-num" data-cb="term.emp" data-dec="2"></div>
+        </div>
+        <div id="calcEmpRec" class="calc-grid2">
           <div class="calc-field"><label for="calcEmpBolsa">Bolsa (₡)</label><input type="text" inputmode="decimal" id="calcEmpBolsa" class="calc-num" data-cb="emp.bolsa" data-dec="2"></div>
           <div class="calc-field"><label for="calcEmpEtiq">Etiqueta (₡)</label><input type="text" inputmode="decimal" id="calcEmpEtiq" class="calc-num" data-cb="emp.etiqueta" data-dec="2"></div>
           <div class="calc-field"><label for="calcEmpCaja">Caja de despacho (₡)</label><input type="text" inputmode="decimal" id="calcEmpCaja" class="calc-num" data-cb="emp.caja" data-dec="2"></div>
@@ -2848,7 +2856,7 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
         </div>
         <div id="calcIndTerm" class="calc-grid2 hidden">
           <div class="calc-field"><label for="calcTermMp">Materia prima (₡) · <span id="calcTermEtiq"></span></label><input type="text" inputmode="decimal" id="calcTermMp" class="calc-num" data-cb="term.mp" data-dec="2"></div>
-          <div class="calc-field"><label for="calcTermInd">Indirecto (₡) · Costos por producto</label><input type="text" inputmode="decimal" id="calcTermInd" class="calc-num" data-cb="term.ind" data-dec="2"></div>
+          <div class="calc-field"><label for="calcTermInd">Indirecto (₡) · Costos por producto</label><input type="text" inputmode="decimal" id="calcTermInd" class="calc-num" data-cb="term.ind" data-dec="2"><div class="calc-vtxt" id="calcTermIndNota"></div></div>
         </div>
       </div>
     </div>
@@ -2868,6 +2876,7 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
       <span style="width:10px"></span>
       <div id="calcCats" class="calc-chips"></div>
     </div>
+    <div id="calcHoy" class="sim-panel calc-panel hidden"></div>
     <div class="calc-grid">
       <div class="sim-panel calc-panel">
         <div class="sim-h2">Condiciones de la cadena</div>
@@ -2887,7 +2896,7 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
       <div class="sim-panel calc-panel">
         <div class="sim-h2">Precios</div>
         <div class="calc-sum" style="margin-bottom:10px">Costo: <b id="calcCostoP"></b></div>
-        <div class="calc-field calc-big"><label for="calcMn">Nuestro margen %</label><input type="text" inputmode="decimal" id="calcMn" class="calc-num" data-anc="mn"></div>
+        <div class="calc-field calc-big"><label for="calcMn">Nuestro margen % <span id="calcMnTag"></span></label><input type="text" inputmode="decimal" id="calcMn" class="calc-num" data-anc="mn"></div>
         <div class="calc-field calc-big"><label for="calcPf">Precio a la cadena · factura sin IVA (₡)</label><input type="text" inputmode="decimal" id="calcPf" class="calc-num" data-anc="pf"></div>
         <div class="calc-field calc-big"><label for="calcPvp">PVP · con IVA (₡)</label><input type="text" inputmode="decimal" id="calcPvp" class="calc-num" data-anc="pvp"></div>
         <div class="calc-flow" id="calcFlow"></div>
@@ -28496,7 +28505,22 @@ function _crLive(el){
   try{ el.setSelectionRange(idx,idx); }catch(e){}
 }
 // Campo en blanco = no se sabe (null), nunca 0.
-function _crNum(s){ s=String(s==null?'':s).trim(); if(!/\d/.test(s)) return null; return _crDec(s); }
+// Número es-CR de la calculadora: el PUNTO es miles y la COMA es decimal. Solo puntos agrupados de
+// a 3 = entero («3.718», «185.603», «1.000»); «1.782,18» = 1782,18. Un punto suelto que no agrupa de
+// a 3 («0.5») se tolera como decimal. NO es `_crDec` (que toma el último «.» como decimal y la usan
+// otros módulos): con ella, tocar un dígito de «3.718» lo dividía por 1000 en silencio.
+function calcNumCR(s){
+  s=String(s==null?'':s).replace(/[₡%\s]/g,'').trim(); if(!/\d/.test(s)) return null;
+  const neg=/^-/.test(s); s=s.replace(/[^\d.,]/g,'');
+  let n;
+  if(s.indexOf(',')>=0){ const i=s.lastIndexOf(','); n=parseFloat(s.slice(0,i).replace(/[.,]/g,'')+'.'+s.slice(i+1).replace(/[.,]/g,'')); }
+  else if(/^\d{1,3}(\.\d{3})+$/.test(s)) n=parseFloat(s.replace(/\./g,''));
+  else if((s.match(/\./g)||[]).length===1) n=parseFloat(s);
+  else n=parseFloat(s.replace(/\./g,''));
+  if(!isFinite(n)) return null;
+  return neg?-n:n;
+}
+function _crNum(s){ return calcNumCR(s); }
 // Cantidad de receta: «77», «0,5», «1/2», «½», «1 ½», «⅔».
 const CALC_FRAC={'½':1/2,'⅓':1/3,'⅔':2/3,'¼':1/4,'¾':3/4,'⅛':1/8};
 function calcParseCant(txt){
@@ -28505,7 +28529,7 @@ function calcParseCant(txt){
   s=s.replace(/[½⅓⅔¼¾⅛]/g,function(m){ tot+=CALC_FRAC[m]; hay=true; return ' '; }).trim();
   const fr=s.match(/(\d+)\s*\/\s*(\d+)\s*$/);
   if(fr){ if(+fr[2]===0) return null; tot+=(+fr[1])/(+fr[2]); hay=true; s=s.slice(0,fr.index).trim(); }
-  if(s){ if(!/\d/.test(s)) return hay?tot:null; tot+=_crDec(s); hay=true; }
+  if(s){ if(!/\d/.test(s)) return hay?tot:null; tot+=calcNumCR(s); hay=true; }
   return hay?tot:null;
 }
 
@@ -28524,15 +28548,66 @@ const _CALC_MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','no
 function calcDiaMes(ds){ const m=String(ds||'').match(/^\d{4}-(\d{2})-(\d{2})/); return m?(+m[2])+'-'+_CALC_MES[+m[1]-1]:''; }
 // Condiciones por cadena y categoría (Andrea, 25-oct). null = no se sabe todavía. Anaquel en blanco.
 // De dónde sale cada condición precargada (se muestra bajo las condiciones; las demás no llevan línea).
-const CALC_FUENTE={'auto.frio':'Automercado · frío: margen 29,2 % (calibrado con la góndola, 25-oct), descuentos 5 % y 8 % escalonados (12,6 %)',
-  'wm.frio':'Walmart · frío: margen 29,4 % (calibrado con la góndola, 25-oct; Buns da 27 %), comisión 6,43 %',
-  'fresh.frio':'Fresh Market · frío: margen 30 % y fijo 3 %, plantilla a Carlos del 20-oct'};
-function calcCondBase(){
+// MARGEN DE LA CADENA POR PRODUCTO (frío), sobre el NETO de los descuentos escalonados. UNA sola tabla.
+// Fuente: góndola real del 25-oct-2026 (CALC_GONDOLA) contra la factura del 19-oct en Odoo.
+// Producto sin dato o receta: `porDefecto`. Walmart no vende Pizza ni Galletas.
+const CALC_MARGEN_CADENA={fecha:'2026-10-25', fuente:'góndola real del 25-oct contra la factura del 19-oct',
+  porDefecto:{auto:29.2, wm:29.4, fresh:30},
+  frio:{auto:{451:29.2, 452:29.25, 453:29.24, 503:29.25, 472:29.24, 519:26.43},
+        wm:  {451:29.72, 452:29.47, 453:28.98, 503:26.97}}};
+// GÓNDOLA REAL OBSERVADA (PVP con IVA, por unidad de venta), 25-oct-2026.
+const CALC_GONDOLA={fecha:'2026-10-25', fuente:{auto:'app, AM Belén', wm:'walmart.co.cr'},
+  pvp:{auto:{451:5545, 452:6020, 453:4920, 503:5555, 472:5435, 519:4560},
+       wm:  {451:5550, 452:6000, 453:4870, 503:5340}}};
+// Partners de cada cadena POR ID (commercial_partner_id de la factura): Automercado S.A. [713] ·
+// CORPORACION SUPERMERCADOS UNIDOS S.R.L. [951] (Walmart). Medido el 25-oct.
+const CALC_PARTNER={auto:713, wm:951};
+function calcMcDe(cad,pid){
+  const t=CALC_MARGEN_CADENA.frio[cad];
+  if(t && pid && t[pid]!=null) return t[pid];
+  return CALC_MARGEN_CADENA.porDefecto[cad]!=null ? CALC_MARGEN_CADENA.porDefecto[cad] : null;
+}
+// Línea de fuente de la condición vigente (solo las precargadas).
+function calcFuenteCond(cad,cat,pid,label){
+  if(cat!=='frio') return '';
+  const mc=calcMcDe(cad,pid), conDato=!!(pid && CALC_MARGEN_CADENA.frio[cad] && CALC_MARGEN_CADENA.frio[cad][pid]!=null);
+  const m='margen '+_crFmt(mc,2)+' % ('+(conDato?esc(label||'')+', góndola 25-oct':'sin dato del producto: el general')+')';
+  if(cad==='auto') return 'Automercado · frío: '+m+', descuentos 5 % y 8 % escalonados (12,6 %)';
+  if(cad==='wm') return 'Walmart · frío: '+m+', comisión 6,43 %';
+  if(cad==='fresh') return 'Fresh Market · frío: margen 30 % y fijo 3 %, plantilla a Carlos del 20-oct';
+  return '';
+}
+// Precio REAL a cada cadena: la última factura (out_invoice posteada, display_type 'product') por
+// producto, llevada a la unidad de venta por id de UoM: price_unit × factor(UoM línea) ÷ factor(UoM
+// del producto). `discount` es el de la línea (Automercado 12,6 · Walmart 6,43).
+function calcArmarHoy(lineas,prodUom,fac){
+  const out={};
+  (lineas||[]).forEach(function(l){ const pid=l.product_id&&l.product_id[0], uid=l.product_uom_id&&l.product_uom_id[0];
+    if(!pid || out[pid] || !uid || prodUom[pid]==null) return;
+    const fl=fac[uid], fp=fac[prodUom[pid]]; if(!fl || !fp) return;
+    out[pid]={pf:(l.price_unit||0)*fl/fp, desc:l.discount||0, fecha:String(l.date||'').slice(0,10)}; });
+  return out;
+}
+// La fila «Hoy» de un terminado en una cadena: precio real, lo que nos queda, góndola real, nuestro
+// margen real y el de la cadena; y cuánto se aparta el PVP que calcula la calculadora de la góndola.
+function calcHoy(S,hoy,C){
+  const pid=S.term&&S.term.pid; if(S.prod==='receta' || !pid) return null;
+  const h=hoy&&hoy[S.cad]&&hoy[S.cad][pid]; if(!h) return null;
+  const neto=h.pf*(1-h.desc/100), iva=(S.iva||0)/100;
+  const g=CALC_GONDOLA.pvp[S.cad]&&CALC_GONDOLA.pvp[S.cad][pid];
+  const out={pf:h.pf, fecha:h.fecha, desc:h.desc, neto, gondola:g==null?null:g, gondFecha:CALC_GONDOLA.fecha, gondFuente:CALC_GONDOLA.fuente[S.cad]||'',
+    mn:(C!=null&&neto>0)?(neto-C)/neto*100:null, mc:null, pvpCalc:null, dif:null};
+  if(g!=null) out.mc=(1-neto/(g/(1+iva)))*100;
+  out.pvpCalc=calcPrecio(S.cond[S.cad][S.cat],S.iva,C,'pf',h.pf).pvp;
+  if(g!=null && out.pvpCalc!=null) out.dif=out.pvpCalc-g;
+  return out;
+}
+function calcCondBase(pid){
   const v=function(){ return {mc:null,cedi:null,fijo:null,com:null,uberPct:null,uberCom:null}; };
   const C={}; CALC_CADENAS.forEach(function(c){ C[c.k]={frio:v(),anaquel:v()}; });
-  Object.assign(C.auto.frio,{mc:29.2,cedi:8,fijo:5});   // 29,2 %: calibrado con la góndola (Andrea, 25-oct)
-  Object.assign(C.wm.frio,{mc:29.4,com:6.43});   // 29,4 %: calibrado con la góndola (25-oct)
-  Object.assign(C.fresh.frio,{mc:30,fijo:3,uberCom:12.5});
+  Object.assign(C.auto.frio,{mc:calcMcDe('auto',pid),cedi:8,fijo:5});
+  Object.assign(C.wm.frio,{mc:calcMcDe('wm',pid),com:6.43});
+  Object.assign(C.fresh.frio,{mc:calcMcDe('fresh',pid),fijo:3,uberCom:12.5});
   Object.assign(C.dir.frio,{cedi:0,fijo:0}); Object.assign(C.dir.anaquel,{cedi:0,fijo:0});
   return C;
 }
@@ -28551,7 +28626,7 @@ function calcBrownie(){
 }
 function calcFilaVacia(){ return {nombre:'', pid:null, cant:'', uni:'g', gpu:null, precio:null, por:'kg', fuente:null, fecha:null}; }
 function calcEstadoBase(){
-  return {tab:'costo', prod:'receta', receta:calcBrownie(), term:{mp:null, ind:null, label:'', unidad:''},
+  return {tab:'costo', prod:'receta', receta:calcBrownie(), term:{mp:null, ind:null, emp:null, pid:null, label:'', unidad:'', indNota:''},
     emp:{bolsa:null, etiqueta:null, caja:null, upc:null},
     indDia:CALC_IND_FIJO.monto, indEtiq:CALC_IND_FIJO.etiqueta, udsDia:null,
     cad:'auto', cat:'frio', cond:calcCondBase(), iva:13,
@@ -28593,11 +28668,14 @@ function calcCostoU(S){
   const faltan=[]; let mp, ind;
   if(S.prod==='receta'){ const r=calcRecetaMP(S.receta); mp=r.porUnidad; r.faltan.forEach(function(x){ faltan.push(x); }); }
   else { mp=S.term.mp; if(mp==null){ mp=0; faltan.push('materia prima'); } }
-  const e=S.emp; let emp=0, empHay=false;
-  if(e.bolsa!=null){ emp+=e.bolsa; empHay=true; }
-  if(e.etiqueta!=null){ emp+=e.etiqueta; empHay=true; }
-  if(e.caja!=null){ if(e.upc>0){ emp+=e.caja/e.upc; empHay=true; } else faltan.push('unidades por caja'); }
-  if(!empHay && e.caja==null) faltan.push('empaque');
+  let emp=0;
+  if(S.prod==='receta'){
+    const e=S.emp; let empHay=false;
+    if(e.bolsa!=null){ emp+=e.bolsa; empHay=true; }
+    if(e.etiqueta!=null){ emp+=e.etiqueta; empHay=true; }
+    if(e.caja!=null){ if(e.upc>0){ emp+=e.caja/e.upc; empHay=true; } else faltan.push('unidades por caja'); }
+    if(!empHay && e.caja==null) faltan.push('empaque');
+  }else{ emp=S.term.emp; if(emp==null){ emp=0; faltan.push('empaque'); } }   // el de Costos por producto
   if(S.prod==='receta'){
     if(S.indDia!=null && S.udsDia>0) ind=S.indDia/S.udsDia;
     else { ind=0; faltan.push(S.indDia==null?'indirecto por día':'unidades por día (indirecto)'); }
@@ -28645,20 +28723,23 @@ function calcVentana(cond,ivaPct,C,mmin,pvpMax){
 // Precio a la cadena de cada cadena en esta sesión: el recordado, o el que da el margen de ahora.
 function calcPfDe(S,k,C){
   if(k===S.cad) return calcPrecio(S.cond[k][S.cat],S.iva,C,S.ancla,S.val).pf;
-  if(S.pfCad[k]!=null) return S.pfCad[k];
+  if(S.pfCad[k+'.'+S.cat]!=null) return S.pfCad[k+'.'+S.cat];
   const mn=calcPrecio(S.cond[S.cad][S.cat],S.iva,C,S.ancla,S.val).mn;
   return calcPrecio(S.cond[k][S.cat],S.iva,C,'mn',mn).pf;
 }
 function calcPvpDe(S,k,C){ const pf=calcPfDe(S,k,C); return pf==null?null:calcPrecio(S.cond[k][S.cat],S.iva,C,'pf',pf).pvp; }
 // Cambio de cadena: la que se deja recuerda su precio; la nueva arranca del suyo o del margen actual.
-function calcCambiarCadena(S,k,C){
-  if(k===S.cad) return;
+// El recuerdo es por cadena Y categoría (el precio de frío no es el de anaquel).
+function calcIrA(S,k,cat,C){
+  if(k===S.cad && cat===S.cat) return;
   const r=calcPrecio(S.cond[S.cad][S.cat],S.iva,C,S.ancla,S.val);
-  if(r.pf!=null) S.pfCad[S.cad]=r.pf;
+  if(r.pf!=null) S.pfCad[S.cad+'.'+S.cat]=r.pf;
   const mn=r.mn!=null?r.mn:40;
-  S.cad=k;
-  if(S.pfCad[k]!=null){ S.ancla='pf'; S.val=S.pfCad[k]; } else { S.ancla='mn'; S.val=mn; }
+  S.cad=k; S.cat=cat;
+  const rec=S.pfCad[k+'.'+cat];
+  if(rec!=null){ S.ancla='pf'; S.val=rec; } else { S.ancla='mn'; S.val=mn; }
 }
+function calcCambiarCadena(S,k,C){ calcIrA(S,k,S.cat,C); }
 
 // ── Catálogo de insumos (Odoo, solo lectura) ────────────────────────────
 // Cualquier producto comprable. Precio = la última factura de proveedor (in_invoice posteada,
@@ -28749,8 +28830,7 @@ async function cargarCalcPrecios(){
   try{
     const r=await computeCostos();
     calcTerm={};
-    r.prods.forEach(function(p){ const pack=p.pack||1;
-      calcTerm[p.key]={label:p.label, unidad:p.unidad||'por unidad', mp:(p.mp.mpUnit||0)*pack, ind:p.indPerSales||0}; });
+    r.prods.forEach(function(p){ calcTerm[p.key]=calcTermDe(p); });
     if(r.totalDias>0 && r.poolAvg>0 && r.ventana && r.ventana.length){
       const v=r.ventana, a=+v[0].D1.slice(5,7)-1, b=+v[v.length-1].D1.slice(5,7)-1, y=v[v.length-1].D1.slice(0,4);
       const etiq=_CALC_MES[a]+'–'+_CALC_MES[b]+' '+y;
@@ -28769,12 +28849,43 @@ async function cargarCalcPrecios(){
     calcCat=calcArmarCatalogo(prods,lineas,uoms);
     calcRefrescarFilas(CALC.receta,calcCat);
   }catch(e){ console.warn('calculadora · catálogo:',e); msgs.push('catálogo de insumos sin Odoo: precios fijos del 25-oct'); }
+  // 3) Precio real a cada cadena (última factura) de los terminados
+  try{ await calcCargarHoy(); }catch(e){ console.warn('calculadora · facturas a cadenas:',e); msgs.push('precio real a las cadenas: sin Odoo'); }
   calcOdooMsg=msgs.join(' · ');
   calcBuildUI(); calcPintarTodo();
   await calcCargarGuardadas();
 }
+// Un terminado de Costos por producto → lo que usa la calculadora, por unidad de venta. Sin dato o
+// con error → null (sale «falta»), nunca ₡0. Indirecto ₡0 sin días propios va con su condición.
+function calcTermDe(p){
+  const pack=p.pack||1, mpU=p.mp&&!p.mp.error&&p.mp.mpUnit!=null&&isFinite(p.mp.mpUnit)?p.mp.mpUnit*pack:null;
+  const ind=(p.indPerSales!=null&&isFinite(p.indPerSales))?p.indPerSales:null;
+  let indNota='';
+  if(ind===0 && !(p.dias>0)) indNota = p.key==='galletas' ? 'Galletas: ₡0 de indirecto, comparte el día' : 'sin días propios';
+  return {label:p.label, unidad:p.unidad||'por unidad', pid:p.prodId||null, mp:mpU, ind, emp:(p.emp!=null&&isFinite(p.emp))?p.emp:null, indNota};
+}
+let calcHoyData={};
+async function calcCargarHoy(){
+  const pids=Object.keys(calcTerm).map(function(k){ return calcTerm[k].pid; }).filter(Boolean);
+  if(!pids.length) return;
+  const prods=await odooCall('product.product','read',[pids],{fields:['id','uom_id']});
+  const prodUom={}; (prods||[]).forEach(function(x){ prodUom[x.id]=x.uom_id&&x.uom_id[0]; });
+  const out={};
+  for(const cad of Object.keys(CALC_PARTNER)){
+    const lineas=await odooCall('account.move.line','search_read',
+      [[['move_id.move_type','=','out_invoice'],['parent_state','=','posted'],['display_type','=','product'],
+        ['move_id.commercial_partner_id','=',CALC_PARTNER[cad]],['product_id','in',pids]]],
+      {fields:['product_id','date','price_unit','discount','product_uom_id'],order:'date desc, id desc',limit:500});
+    await uomFactores((lineas||[]).map(function(l){ return l.product_uom_id&&l.product_uom_id[0]; }).concat(Object.values(prodUom)));
+    out[cad]=calcArmarHoy(lineas,prodUom,_uomFac);
+  }
+  calcHoyData=out;
+}
 async function calcCargarGuardadas(){
   calcSb={ok:false, msg:''};
+  // Guardar es de socias (la política exige acceso_es_socia()): a quien no lo es no se le muestra.
+  let socia=false; try{ socia=await accesoSocia(); }catch(e){}
+  if(!socia){ calcPintarGuardadas(); calcEstado(); return; }
   try{
     const c=sbClient(); if(!c){ calcSb.msg='Guardar recetas: sin conexión con la base'; calcEstado(); return; }
     const {data,error}=await c.from('calc_receta').select('id,nombre,version,datos,nota,creado_por,creado_en').order('version',{ascending:false});
@@ -28831,7 +28942,7 @@ function calcBuildUI(){
   document.querySelectorAll('#calcCadenas button').forEach(function(b){ b.onclick=function(){ calcCambiarCadena(CALC,b.dataset.k,calcCostoPrecio()); calcPintarTodo(); }; });
   const chK=document.getElementById('calcCats');
   if(chK) chK.innerHTML=CALC_CATS.map(function(c){ return '<button class="sim-chip" data-k="'+c.k+'">'+esc(c.label)+'</button>'; }).join('');
-  document.querySelectorAll('#calcCats button').forEach(function(b){ b.onclick=function(){ CALC.cat=b.dataset.k; calcPintarTodo(); }; });
+  document.querySelectorAll('#calcCats button').forEach(function(b){ b.onclick=function(){ calcIrA(CALC,CALC.cad,b.dataset.k,calcCostoPrecio()); calcPintarTodo(); }; });
   // Campos con ruta en el estado (data-cb) — formato es-CR, en blanco = null
   document.querySelectorAll('#vCalcPrecios [data-cb]').forEach(function(el){
     el.oninput=function(){ calcSet(el.dataset.cb, _crNum(el.value)); calcRecalc(); };
@@ -28858,19 +28969,27 @@ function calcBuildUI(){
   const ba=document.getElementById('calcAddFila'); if(ba) ba.onclick=function(){ CALC.receta.filas.push(calcFilaVacia()); calcPintarReceta(); calcRecalc(); };
   const bn=document.getElementById('calcNueva'); if(bn) bn.onclick=function(){
     CALC.prod='receta'; CALC.guardadaId=null; CALC.receta={nombre:'', rinde:1, filas:[calcFilaVacia(),calcFilaVacia(),calcFilaVacia()]};
-    CALC.emp={bolsa:null,etiqueta:null,caja:null,upc:null}; CALC.udsDia=null; calcPintarTodo(); };
+    CALC.emp={bolsa:null,etiqueta:null,caja:null,upc:null}; CALC.udsDia=null; calcAplicarMargenes(CALC); calcPintarTodo(); };
   const gs=document.getElementById('calcGuardadas'); if(gs) gs.onchange=function(){
-    const r=calcGuardadas.find(function(x){ return String(x.id)===gs.value; }); if(r){ calcAplicarGuardada(CALC,r); calcPintarTodo(); } };
+    const r=calcGuardadas.find(function(x){ return String(x.id)===gs.value; }); if(r){ calcAplicarGuardada(CALC,r); calcAplicarMargenes(CALC); calcPintarTodo(); } };
   const gv=document.getElementById('calcVersiones'); if(gv) gv.onchange=function(){
-    const r=calcGuardadas.find(function(x){ return String(x.id)===gv.value; }); if(r){ calcAplicarGuardada(CALC,r); calcPintarTodo(); } };
+    const r=calcGuardadas.find(function(x){ return String(x.id)===gv.value; }); if(r){ calcAplicarGuardada(CALC,r); calcAplicarMargenes(CALC); calcPintarTodo(); } };
 }
 function calcSet(path,v){ const p=path.split('.'); let o=CALC; for(let i=0;i<p.length-1;i++) o=o[p[i]]; o[p[p.length-1]]=v; }
 function calcGet(path){ return path.split('.').reduce(function(o,k){ return o==null?null:o[k]; },CALC); }
 function calcCond(){ return CALC.cond[CALC.cad][CALC.cat]; }
 function calcElegirProd(k){
   if(k==='receta'){ CALC.prod='receta'; }
-  else if(calcTerm[k]){ CALC.prod=k; const t=calcTerm[k]; CALC.term={mp:t.mp, ind:t.ind, label:t.label, unidad:t.unidad}; }
+  else if(calcTerm[k]){ CALC.prod=k; const t=calcTerm[k];
+    CALC.term={mp:t.mp, ind:t.ind, emp:t.emp, pid:t.pid, label:t.label, unidad:t.unidad, indNota:t.indNota}; }
+  calcAplicarMargenes(CALC);
   calcPintarTodo();
+}
+// Al cambiar de producto, el margen de la cadena (frío) pasa al de ese producto.
+function calcAplicarMargenes(S){
+  const pid=S.prod==='receta'?null:S.term.pid;
+  ['auto','wm','fresh'].forEach(function(c){ S.cond[c].frio.mc=calcMcDe(c,pid); });
+  S.pfCad={};
 }
 // Costo que usa la pestaña Precio: el total aunque esté incompleto (se marca), null si no hay nada.
 function calcCostoPrecio(){ const c=calcCostoU(CALC); return c.total>0?c.total:null; }
@@ -28883,8 +29002,8 @@ function calcPintarTodo(){
   if(pc) pc.classList.toggle('hidden',CALC.tab!=='costo'); if(pp) pp.classList.toggle('hidden',CALC.tab!=='precio');
   const sel=document.getElementById('calcProd'); if(sel) sel.value=CALC.prod;
   const esRec=CALC.prod==='receta';
-  ['calcRecWrap','calcIndRec','calcRecBar'].forEach(function(id){ const e=document.getElementById(id); if(e) e.classList.toggle('hidden',!esRec); });
-  const it=document.getElementById('calcIndTerm'); if(it) it.classList.toggle('hidden',esRec);
+  ['calcRecWrap','calcIndRec','calcRecBar','calcEmpRec'].forEach(function(id){ const e=document.getElementById(id); if(e) e.classList.toggle('hidden',!esRec); });
+  ['calcIndTerm','calcEmpTerm'].forEach(function(id){ const e=document.getElementById(id); if(e) e.classList.toggle('hidden',esRec); });
   const nr=document.getElementById('calcRecNombre'); if(nr && document.activeElement!==nr) nr.value=CALC.receta.nombre||'';
   document.querySelectorAll('#calcCadenas button').forEach(function(b){ b.classList.toggle('on',b.dataset.k===CALC.cad); });
   document.querySelectorAll('#calcCats button').forEach(function(b){ b.classList.toggle('on',b.dataset.k===CALC.cat); });
@@ -28976,6 +29095,24 @@ function calcPintarCampos(blur){
     if(el.dataset.anc===CALC.ancla && el===foco) return;
     pon(el,fld[el.dataset.anc],el.dataset.anc==='mn'?1:0); });
 }
+// Fila «Hoy»: solo lectura; terminado que la cadena ya compra.
+function calcPintarHoy(C){
+  const box=document.getElementById('calcHoy'); if(!box) return;
+  const h=calcHoy(CALC,calcHoyData,C);
+  box.classList.toggle('hidden',!h); if(!h){ box.innerHTML=''; return; }
+  const pct=function(x){ return x==null?'—':_crFmt(x,1)+' %'; };
+  let dif='';
+  if(h.dif!=null && Math.abs(h.dif)>=1) dif=' <span class="calc-tag calc-tag-est">calculado '+(h.dif>0?'+':'−')+cM(Math.abs(h.dif))+'</span>';
+  box.innerHTML='<div class="sim-h2" style="margin-bottom:8px">Hoy</div><div class="calc-hoy">'
+    +'<div><span>Precio a la cadena</span><b>'+cM(h.pf)+'</b><small>factura '+calcDiaMes(h.fecha)+'</small></div>'
+    +'<div><span>Nos queda</span><b>'+cM(h.neto)+'</b><small>desc. '+_crFmt(h.desc,2)+' %</small></div>'
+    +'<div><span>Góndola</span><b>'+(h.gondola!=null?cM(h.gondola):'—')+dif+'</b><small>'+(h.gondola!=null?esc(h.gondFuente)+' · '+calcDiaMes(h.gondFecha):'sin dato')+'</small></div>'
+    +'<div><span>Nuestro margen</span><b>'+pct(h.mn)+'</b><small>costo de Costos por producto'+(calcCostoU(CALC).completo?'':' · incompleto')+'</small></div>'
+    +'<div><span>Margen de la cadena</span><b>'+pct(h.mc)+'</b><small>sobre el neto</small></div>'
+    +'</div><button class="btn btn-sm" id="calcPartirHoy" style="margin-top:10px">Partir de hoy</button>';
+  const b=document.getElementById('calcPartirHoy');
+  if(b) b.onclick=function(){ CALC.ancla='pf'; CALC.val=h.pf; calcRecalc(); };
+}
 function calcRecalc(){
   if(!CALC) return;
   const c=calcCostoU(CALC), u=calcUnidadTxt();
@@ -28990,6 +29127,8 @@ function calcRecalc(){
   sett('calcFaltan', c.faltan.length?'Falta: '+esc(c.faltan.join(' · ')):'');
   // Precio
   const C=c.total>0?c.total:null, cond=calcCond(), r=calcPrecio(cond,CALC.iva,C,CALC.ancla,CALC.val);
+  const inc=c.completo?'':' <span class="calc-tag calc-tag-falta">costo incompleto</span>';
+  sett('calcTermIndNota', CALC.prod!=='receta'&&CALC.term.indNota?esc(CALC.term.indNota):'');
   sett('calcCostoP', (C!=null?cM(C):'—')+' <span class="calc-u">'+esc(u)+'</span>'+(c.completo?'':' <span class="calc-tag calc-tag-falta">incompleto</span>'));
   let f='';
   if(r.pf!=null){
@@ -28997,12 +29136,14 @@ function calcRecalc(){
     f+='<div><span>Factura a la cadena</span><span>'+cM(r.pf)+'</span></div>';
     f+='<div><span>− descuentos ('+pct(r.d)+')</span><span>−'+cM(r.pf*r.d)+'</span></div>';
     f+='<div><span>= Nos queda</span><span>'+cM(r.neto)+'</span></div>';
-    if(C!=null) f+='<div><span>− Costo</span><span>−'+cM(C)+'</span></div><div class="calc-gan"><span>= Ganancia '+esc(u)+'</span><span>'+(r.gan<0?'−':'')+cM(Math.abs(r.gan))+'</span></div>';
+    if(C!=null) f+='<div><span>− Costo</span><span>−'+cM(C)+'</span></div><div class="calc-gan"><span>= Ganancia '+esc(u)+'</span><span>'+(r.gan<0?'−':'')+cM(Math.abs(r.gan))+inc+'</span></div>';
   }
   if(r.faltaMc) f+='<div class="calc-warn"><span>Sin margen de la cadena: no hay PVP</span></div>';
   if(cond.uberCom!=null && CALC.cad==='fresh') f+='<div class="calc-nota"><span>Uber: solo arriba del umbral mensual (pendiente)</span></div>';
   sett('calcFlow',f);
-  sett('calcCondFuente', esc(CALC_FUENTE[CALC.cad+'.'+CALC.cat]||''));
+  sett('calcMnTag', inc);
+  calcPintarHoy(C);
+  sett('calcCondFuente', calcFuenteCond(CALC.cad,CALC.cat,CALC.prod==='receta'?null:CALC.term.pid,CALC.term.label));
   // Ventana
   const t=CALC.techos[CALC.cad];
   const refPvp = t.modo==='ref' ? calcPvpDe(CALC,t.ref,C) : null;
@@ -29016,9 +29157,9 @@ function calcRecalc(){
     vh='<div class="calc-bar">'+(v.hay?'<div class="calc-zone" style="left:'+pos(v.piso)+';width:calc('+pos(v.techo)+' - '+pos(v.piso)+')"></div>':'')
       +'<span class="calc-lb calc-lb-t" style="left:'+pos(v.piso)+'">piso '+cM(v.piso)+'</span><span class="calc-lb calc-lb-t" style="left:'+pos(v.techo)+'">techo '+cM(v.techo)+'</span>'
       +(r.pf!=null?'<div class="calc-mk" style="left:'+pos(r.pf)+'"></div><span class="calc-lb calc-lb-b" style="left:'+pos(r.pf)+'">tu precio '+cM(r.pf)+'</span>':'')+'</div>';
-    vh+= v.hay ? '<div class="calc-vtxt">Precio a la cadena entre '+cM(v.piso)+' y '+cM(v.techo)+' · ventana '+cM(v.techo-v.piso)+'</div>'
+    vh+= v.hay ? '<div class="calc-vtxt">Precio a la cadena entre '+cM(v.piso)+inc+' y '+cM(v.techo)+' · ventana '+cM(v.techo-v.piso)+'</div>'
                : '<div class="calc-vtxt" style="color:var(--stop-tx)">No hay ventana: el piso ('+cM(v.piso)+') pasa el techo ('+cM(v.techo)+').</div>';
-  }else if(v.piso!=null){ vh='<div class="calc-vtxt">Piso '+cM(v.piso)+' · sin techo'+(r.faltaMc?' (falta el margen de la cadena)':'')+'</div>'; }
+  }else if(v.piso!=null){ vh='<div class="calc-vtxt">Piso '+cM(v.piso)+inc+' · sin techo'+(r.faltaMc?' (falta el margen de la cadena)':'')+'</div>'; }
   else vh='<div class="calc-vtxt">Sin costo o sin margen mínimo: no hay piso.</div>';
   sett('calcVentana',vh);
   calcPintarCampos(false);
