@@ -10205,6 +10205,7 @@ const CIERRE_BORDES_PRODUCEN=true;
 let _calFer=FERIADOS, _calCierres=[{ini:CIERRE_RESPALDO, fin:REAPERTURA_RESPALDO, anio:true}];
 let _calFuente='respaldo', _calAviso='';   // 'tabla' cuando la lectura anduvo; si no, el motivo visible
 let _calHasta=REAPERTURA_RESPALDO;          // último día que el calendario cubre (fila más tardía)
+let _calFinAnioOk=true;                     // false = no hay cierre de fin de año por delante (se avisa)
 function _esFeriado(ds){ return _calFer[ds]||''; }
 function _cierreCubre(b, ds){ return (CIERRE_BORDES_PRODUCEN && b.anio) ? (ds>b.ini && ds<b.fin) : (ds>=b.ini && ds<=b.fin); }
 // Día no productivo por CUALQUIER cierre de la tabla.
@@ -10231,8 +10232,17 @@ function _calDesdeFilas(filas){
   rangos.forEach(function(r){ const b=cierres[cierres.length-1];
     let d=b?_diaSig(b.fin):null; while(d && d<r.ini && (fer[d] || finde(d))) d=_diaSig(d);
     if(b && r.ini<=d){ if(r.fin>b.fin) b.fin=r.fin; } else cierres.push({ini:r.ini, fin:r.fin}); });
-  cierres.forEach(function(b){ b.anio=b.ini.slice(0,4)!==b.fin.slice(0,4); });
+  cierres.forEach(function(b){ b.anio=_esBloqueAnio(b); });
   return {fer:fer, cierres:cierres, hasta:hasta};
+}
+// ¿Es el cierre de FIN DE AÑO? Toca la última semana de diciembre (24–31) o la primera de enero
+// (1–7). No alcanza con "cruza el 31-dic": si Personal carga primero solo «17–31 dic», ese bloque
+// ya es el de fin de año aunque todavía no llegue a enero.
+function _esBloqueAnio(b){
+  const toca=function(a,z){ return b.ini<=z && b.fin>=a; };
+  for(let y=+b.ini.slice(0,4); y<=+b.fin.slice(0,4); y++)
+    if(toca(y+'-12-24', y+'-12-31') || toca(y+'-01-01', y+'-01-07')) return true;
+  return false;
 }
 // Deja vigente un calendario. CIERRE/REAPERTURA (meta y rampa) salen SOLO del cierre de fin de año:
 // el próximo que todavía no terminó; si no hay ninguno por delante, el último (ya pasado: la rampa
@@ -10240,14 +10250,23 @@ function _calDesdeFilas(filas){
 function _calAplicar(cal, hoyStr){
   _calFer=cal.fer; _calCierres=cal.cierres; _calHasta=cal.hasta||'';
   const anios=cal.cierres.filter(function(b){ return b.anio; });
-  const prox=anios.filter(function(b){ return b.fin>=hoyStr; })[0] || anios[anios.length-1];
+  const prox=anios.filter(function(b){ return b.fin>=hoyStr; })[0];
+  // SIN CIERRE DE FIN DE AÑO POR DELANTE en la tabla: NO se vuelve en silencio a la constante. Se
+  // avisa (_calFinAnioOk=false → «Cierre de fin de año sin cargar») y la meta de cierre se apaga
+  // (cierreCargarMeta): sin cierre cargado no hay fecha hacia la que rampar. CIERRE queda en el
+  // último ya pasado (o el respaldo), pero con _calFinAnioOk=false nada lo usa como meta: sin meta no
+  // hay rampa (_rampaDe), ni ritmo congelado (_bajoMetaCierre), ni entregas que descontar (_planSem).
+  _calFinAnioOk=!!prox;
+  const ref=prox || anios[anios.length-1];
   // CIERRE = último día productivo, REAPERTURA = primero de vuelta (lo que siempre significaron).
-  if(prox){ CIERRE=CIERRE_BORDES_PRODUCEN?prox.ini:_cierreShift(prox.ini,-1); REAPERTURA=CIERRE_BORDES_PRODUCEN?prox.fin:_cierreShift(prox.fin,1); }
+  if(ref){ CIERRE=CIERRE_BORDES_PRODUCEN?ref.ini:_cierreShift(ref.ini,-1); REAPERTURA=CIERRE_BORDES_PRODUCEN?ref.fin:_cierreShift(ref.fin,1); }
   else { CIERRE=CIERRE_RESPALDO; REAPERTURA=REAPERTURA_RESPALDO; }
 }
+function _calFinAnioAviso(){ return _calFinAnioOk ? '' : 'Cierre de fin de año sin cargar'; }
 function _calRespaldo(motivo){
   _calFer=FERIADOS; _calCierres=[{ini:CIERRE_RESPALDO, fin:REAPERTURA_RESPALDO, anio:true}]; _calHasta=REAPERTURA_RESPALDO;
   CIERRE=CIERRE_RESPALDO; REAPERTURA=REAPERTURA_RESPALDO; _calFuente='respaldo';
+  _calFinAnioOk=(REAPERTURA_RESPALDO>=_ymd(new Date()));   // un respaldo ya pasado tampoco es meta
   _calAviso='Feriados y cierre del código, no de Días cerrados ('+motivo+')';
   try{ console.warn('[Truefie] calendario del plan: '+_calAviso); }catch(_){}
 }
@@ -10521,7 +10540,7 @@ function _semAbiertos(mon){
 }
 function _semCierreMs(){ return _mondayProd(new Date(CIERRE+'T00:00:00')).getTime(); }
 // ¿La semana está bajo la meta de cierre? De hoy a la semana del cierre, si el cierre todavía viene.
-function _bajoMetaCierre(mon, hoyStr){ return CIERRE>=hoyStr && _mondayProd(mon).getTime()<=_semCierreMs(); }
+function _bajoMetaCierre(mon, hoyStr){ return _calFinAnioOk && CIERRE>=hoyStr && _mondayProd(mon).getTime()<=_semCierreMs(); }
 let _planTemp=null;   // {porMes:{mesAbs:{pid:{f,n}}}, error} — lo llena nivTemporada()
 // Factores de la semana ({pid:{f,n}}) o null = ritmo de hoy tal cual (bajo la meta, o el mes en curso).
 function _temporadaSem(mon){
@@ -10542,7 +10561,7 @@ function _planSalidaCierre(){
 function _planSem(mon, ritmo){
   const ab=_semAbiertos(mon), fac=_temporadaSem(mon), r={};
   NIV_PROD.forEach(function(p){ const k=(fac&&fac[p]?fac[p].f:1)*(ab/5); r[p]=(k===1)?(ritmo[p]||0):(ritmo[p]||0)*k; });
-  return {cerrada:ab===0, abiertos:ab, ritmo:r, fac:fac, salida:(ab>0 && _mondayProd(mon).getTime()===_semCierreMs())?_planSalidaCierre():null};
+  return {cerrada:ab===0, abiertos:ab, ritmo:r, fac:fac, salida:(ab>0 && _calFinAnioOk && _mondayProd(mon).getTime()===_semCierreMs())?_planSalidaCierre():null};
 }
 function _planRestarSalida(stock, S){
   if(!S || !S.salida || !S.salida.porProd) return;
@@ -10550,6 +10569,26 @@ function _planRestarSalida(stock, S){
 }
 // Semana entera dentro del cierre: layout vacío (las celdas dicen "Cierre"), no consume.
 function _layoutCerrado(pers){ return {otros:[], semillas:0, viernes:{prod:null}, personas:pers, rampaOn:false, cerrada:true}; }
+// ── PRODUCCIÓN EFECTIVA DE UNA SEMANA, desde sus CELDAS — UNA función para las tres proyecciones ──
+// Celdas = colocación + lo REAL de Odoo en los días pasados + las ediciones + el picado (+ los días
+// de cierre, que no producen). Devuelve los batches del mes de la semana y deja `stock` en
+//   pre + producción de HOY en adelante − ritmo de la semana.
+// DOS sumas distintas, y la diferencia importa:
+//  · mes = TODOS los días: lo que la tarjeta del mes dice (lo ya producido más lo que falta).
+//  · fut = solo de HOY en adelante: lo único que puede SUMARSE al stock, porque `fin` es el on-hand
+//    de hoy y ya trae lo producido en los días pasados de esta semana.
+// planProyeccionOv la usa siempre (honra ediciones). nivLevel (Resumen) y nivProyeccion (Plan sin
+// ediciones) la usan cuando la semana tiene un día de un cierre que NO es el de fin de año (Semana
+// Santa): su layout no sabe de esos días y contaría producción que no ocurre. Las tres tienen que
+// dar lo mismo — medido el 25-oct: el Resumen daba 8 Blanco + 20 Francés y el Plan 6 + 6.
+function _semCierreSuelto(mon){ return _weekDays(mon).some(function(d){ return _enCierre(d.ds) && !_enCierreAnio(d.ds); }); }
+function _planProdCeldas(mon, layout, pers, overrides, stock, pre, ritmoW){
+  const hoyStr=_ymd(new Date()), bMes={}, bFut={};
+  _aplicarPicado(rzCeldas(mon, layout, _planReal||{}, hoyStr, overrides||{}), pers).forEach(function(c){ const pr=c.prods||{};
+    for(const k in pr){ bMes[+k]=(bMes[+k]||0)+pr[k]; if(c.ds>=hoyStr) bFut[+k]=(bFut[+k]||0)+pr[k]; } });
+  NIV_PROD.forEach(function(p){ stock[p]=pre[p]+(bFut[p]||0)*NIV_INFO[p].rend-(ritmoW[p]||0); });
+  return bMes;
+}
 
 // ── FACTOR DE TEMPORADA ──────────────────────────────────────────────────
 // factor(M) = promedio, sobre los dos años anteriores, de
@@ -10646,7 +10685,10 @@ function nivLevel(ritmo, fin, cfg, ref){
     if(S.cerrada){ weeks.push(_layoutCerrado(pers)); continue; }
     const R=_rampaDe(mon);
     if(R){ rampaOn=rampaOn||_rampaEstado(stock, S.ritmo, R.meta, R.k).on; R.on=rampaOn; }
-    weeks.push(_weekLayout(stock, S.ritmo, colDeWk(wk), H, pers, R));   // capacidad + rampa por semana; muta stock
+    const pre={}; NIV_PROD.forEach(p=>pre[p]=stock[p]);
+    const L=_weekLayout(stock, S.ritmo, colDeWk(wk), H, pers, R);        // capacidad + rampa por semana; muta stock
+    if(_semCierreSuelto(mon)) L.batches=_planProdCeldas(mon, L, pers, {}, stock, pre, S.ritmo);   // Semana Santa: lo que pasa en las celdas
+    weeks.push(L);
     _planRestarSalida(stock, S); }                                       // la semana del cierre: salen las entregas
   return {w0:_semanaBatches(weeks[0]), weeks};
 }
@@ -11752,6 +11794,7 @@ function escColchon(stockCierre, M){
 let _planCierre=null;    // resultado completo de cierreMeta() — lo usa el panel META vs HOY
 let _planStock=null;     // stock terminado de HOY en uds ({pid:uds})
 async function cierreCargarMeta(cfg, ritmo){
+  if(!_calFinAnioOk){ _planCierre=null; _rzCierreMeta=null; return null; }   // sin cierre de fin de año cargado: no hay meta a la que llegar (se avisa)
   try{ const R=await cierreMeta(cfg, ritmo); _planCierre=R; _rzCierreMeta=R.porProd; return R; }
   catch(e){ console.warn('Meta de cierre no disponible → motor sin rampa:', e && e.message || e);
     _planCierre=null; _rzCierreMeta=null; return null; }
@@ -22581,7 +22624,7 @@ async function rzRecalcAlistar(){ _rzRecalcAuto();
 // Estado de los datos con que se niveló (Resumen). Lo mismo que el Plan marca en sus tarjetas.
 function _rzAvisosPlan(){
   const fin=new Date(_rzCtx.mon0); fin.setDate(fin.getDate()+7*((_rzCtx.weeks&&_rzCtx.weeks.length)||2)-1);
-  const av=[_calAviso, _calCoberturaAviso(_ymd(fin)), _ritmoAviso, (_planTemp&&_planTemp.error)||''].filter(Boolean);
+  const av=[_calAviso, _calFinAnioAviso(), _calCoberturaAviso(_ymd(fin)), _ritmoAviso, (_planTemp&&_planTemp.error)||''].filter(Boolean);
   return av.length?'<div class="rz-aviso">'+esc(av.join(' · '))+'</div>':'';
 }
 function rzRender(){
@@ -25154,15 +25197,7 @@ function nivProyeccion(ritmo, fin, cfg, nWeeks){
     const layout=_weekLayout(stock, S.ritmo, colDe, cfg.horizonte||NIV_CFG_DEF.horizonte, pers, R);   // muta stock
     const wkOut={monday:mon, otros:layout.otros, semillas:layout.semillas, viernes:layout.viernes, personas:layout.personas, rampa:layout.rampaOn,
               fac:S.fac, salidaFalta:!!(S.salida&&S.salida.falta)};
-    // Semana con un CIERRE que no es el de fin de año (Semana Santa): esos días no producen. El
-    // layout no lo sabe, así que se cuenta desde las celdas, igual que planProyeccionOv — si no, la
-    // proyección sin ediciones sumaba producción en días cerrados. Las demás semanas, como siempre.
-    if(_weekDays(mon).some(function(d){ return _enCierre(d.ds) && !_enCierreAnio(d.ds); })){
-      const hoyStr=_ymd(new Date()), cells=_aplicarPicado(rzCeldas(mon, layout, _planReal||{}, hoyStr, {}), pers), bMes={}, bFut={};
-      cells.forEach(function(c){ const pr=c.prods||{}; for(const k in pr){ bMes[+k]=(bMes[+k]||0)+pr[k]; if(c.ds>=hoyStr) bFut[+k]=(bFut[+k]||0)+pr[k]; } });
-      wkOut.batches=bMes;
-      NIV_PROD.forEach(p=>{ stock[p]=pre[p]+(bFut[p]||0)*NIV_INFO[p].rend-(S.ritmo[p]||0); });
-    }
+    if(_semCierreSuelto(mon)) wkOut.batches=_planProdCeldas(mon, layout, pers, {}, stock, pre, S.ritmo);   // Semana Santa: lo que pasa en las celdas
     _planRestarSalida(stock, S);
     out.push(wkOut);
   }
@@ -25387,6 +25422,7 @@ function planRenderMeses(){
       +(m===_monKey(new Date(CIERRE+'T00:00:00')) && salidaFalta?'<span class="pl-tag pl-tag-fer">Sin meta de cierre: entregas de diciembre sin descontar</span>':'')
       +(esHoy && _calAviso?'<span class="pl-tag pl-tag-fer">'+esc(_calAviso)+'</span>':'')
       +(esHoy && cobertura?'<span class="pl-tag pl-tag-fer">'+esc(cobertura)+'</span>':'')
+      +(esHoy && _calFinAnioAviso()?'<span class="pl-tag pl-tag-fer">'+esc(_calFinAnioAviso())+'</span>':'')
       +(esHoy && _ritmoAviso?'<span class="pl-tag pl-tag-fer">'+esc(_ritmoAviso)+'</span>':'')
       +(esHoy && _planSinLunes?'<span class="pl-tag pl-tag-fer">Semana en curso desde stock de hoy</span>':'')
       +(esHoy && _planSinReal?'<span class="pl-tag pl-tag-fer">Sin producción real del mes</span>':'');
@@ -25540,7 +25576,7 @@ function _planProyectar(ritmo, fin, cfg, nWeeks){
 }
 function planProyeccionOv(fixedOv){
   if(!_planInputs) return [];
-  const cfg=_planInputs.cfg, ritmo=_planInputs.ritmo, fin=_planInputs.fin, hoyStr=_ymd(new Date());
+  const cfg=_planInputs.cfg, ritmo=_planInputs.ritmo, fin=_planInputs.fin;
   const mon0=_mondayProd(new Date()), nSem=_planNSem(new Date(), cfg.planMeses||NIV_CFG_DEF.planMeses);
   const H=cfg.horizonte||NIV_CFG_DEF.horizonte;
   const stock={}; NIV_PROD.forEach(p=>stock[p]=fin[p]||0);
@@ -25555,24 +25591,12 @@ function planProyeccionOv(fixedOv){
     if(R){ rampaOn=rampaOn||_rampaEstado(dec, S.ritmo, R.meta, R.k).on; R.on=rampaOn; }
     const pre={}; NIV_PROD.forEach(p=>pre[p]=stock[p]);
     const L=_weekLayout(dec, S.ritmo, colDe, H, pers, R);              // decide la semana (muta dec, se descarta)
-    // Celdas EFECTIVAS: colocación + lo REAL de Odoo en los días pasados + las ediciones + el
-    // picado. Es la misma verdad que pinta el detalle del Plan — antes esta función ya las
-    // calculaba para el stock, pero al `out` empujaba el layout CRUDO, así que las tarjetas de
-    // mes seguían mostrando la propuesta del motor y no lo que Andrea había corregido.
-    const cells=_aplicarPicado(rzCeldas(mon, L, _planReal||{}, hoyStr, fixedOv), pers);
-    // DOS sumas distintas, y la diferencia importa:
-    //  · mes  = TODOS los días. Es lo que la tarjeta del mes tiene que decir: lo ya producido más
-    //           lo que falta. Para los días pasados son lo real de Odoo o la corrección de Andrea.
-    //  · fut  = solo de HOY en adelante. Es lo único que puede SUMARSE al stock: `fin` es el
-    //           on-hand de Odoo de hoy y ya trae adentro lo que se produjo en los días pasados de
-    //           esta semana. Sumarlos otra vez inflaba el stock proyectado justo en la semana que
-    //           más se mira. De la semana 1 en adelante no hay días pasados y las dos coinciden.
-    const bMes={}, bFut={};
-    cells.forEach(function(c){ const pr=c.prods||{};
-      for(const k in pr){ bMes[+k]=(bMes[+k]||0)+pr[k]; if(c.ds>=hoyStr) bFut[+k]=(bFut[+k]||0)+pr[k]; } });
+    // Celdas EFECTIVAS (colocación + lo real + las ediciones + el picado): la misma verdad que pinta
+    // el detalle del Plan. Antes al `out` iba el layout CRUDO y las tarjetas de mes no mostraban lo
+    // que Andrea había corregido. stock = honra overrides → la rampa reacciona.
+    const bMes=_planProdCeldas(mon, L, pers, fixedOv, stock, pre, S.ritmo);
     out.push({monday:mon, otros:L.otros, semillas:L.semillas, viernes:L.viernes, personas:L.personas, rampa:L.rampaOn, batches:bMes,
               fac:S.fac, salidaFalta:!!(S.salida&&S.salida.falta)});
-    NIV_PROD.forEach(p=>{ stock[p]=pre[p]+(bFut[p]||0)*NIV_INFO[p].rend-(S.ritmo[p]||0); });   // stock = honra overrides → la rampa reacciona
     _planRestarSalida(stock, S);
   }
   return out;

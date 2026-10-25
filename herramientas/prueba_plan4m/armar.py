@@ -46,7 +46,7 @@ def constante(nombre):
     return None
 
 CONSTS = ["NIV_PROD","NIV_INFO","NIV_CFG_DEF","_rzN","NIV_CAP","_rzPersonas","FERIADOS","CIERRE_RESPALDO",
-          "CIERRE","CIERRE_BORDES_PRODUCEN","_calFer","_calFuente","_calHasta","_ritmoAviso","_planTemp","_tempCache",
+          "CIERRE","CIERRE_BORDES_PRODUCEN","_calFer","_calFuente","_calHasta","_calFinAnioOk","_ritmoAviso","_planTemp","_tempCache",
           "NIV_HORNO","NIV_DERRAME_MIN","RAMPA_DIAS_SEM","_rzCierreMeta","RAMPA_PERS_BASE",
           "_DOW","_MESAB","_planCierre","_MESNOM2","_rzPicIdx"]
 FUNCS  = ["_capDe","_personasDe","_esFeriado","_cierreCubre","_enCierre","_enCierreAnio","_calCoberturaAviso","_ritmoVentana","_ritmoBloque","_calDesdeFilas","_calAplicar","_calRespaldo","nivCalendario",
@@ -54,7 +54,7 @@ FUNCS  = ["_capDe","_personasDe","_esFeriado","_cierreCubre","_enCierre","_enCie
           "_monKey","_planFinHorizonte","_planNSem","_semAbiertos","_semCierreMs","_bajoMetaCierre","_temporadaSem",
           "_planSalidaCierre","_planSem","_planRestarSalida","_layoutCerrado","_habilesMes","_temporadaCalc",
           "_rampaDe","_rampaDeudaUds","_rampaEstado","_weekLayout","_semanaBatches","nivLevel","nivProyeccion",
-          "_weekDays","_ovItems","_mismosBatches","rzCeldas","_rzVolverRango","_aplicarPicado","planProyeccionOv","_nivStockDecision","_fechaCierreTxt","_planTagsMes"]
+          "_weekDays","_ovItems","_mismosBatches","rzCeldas","_rzVolverRango","_esBloqueAnio","_calFinAnioAviso","_semCierreSuelto","_planProdCeldas","cierreCargarMeta","_aplicarPicado","planProyeccionOv","_nivStockDecision","_fechaCierreTxt","_planTagsMes"]
 piezas, faltan = [], []
 for c in CONSTS:
     t = constante(c)

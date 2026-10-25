@@ -177,6 +177,37 @@ async function main(){
   var Pov = planProyeccionOv({});
   eq("nivProyeccion = planProyeccionOv semana a semana", Pss.map(function(w){ return JSON.stringify(_semanaBatches(w)); }), Pov.map(function(w){ return JSON.stringify(_semanaBatches(w)); }));
   _calAplicar(_calDesdeFilas(FILAS), '2026-10-25');
+  // ── 13. SEMANA SANTA: PLAN = RESUMEN (revision de e7f1e7c) ──
+  _AHORA = new _RealDate(2027, 2, 7, 10, 0, 0).getTime();          // dom 7-mar-2027
+  _calAplicar(_calDesdeFilas(FILAS.concat([{fecha:'2027-03-29',fecha_fin:'2027-03-31',tipo:'cierre'}])), '2027-03-07');
+  var key = function(L){ return L.map(function(w){ return JSON.stringify(_semanaBatches(w)); }); };
+  var Lr = nivLevel(R, fin, cfg).weeks, Lp = nivProyeccion(R, fin, cfg, 6);
+  _planInputs = {cfg:cfg, ritmo:R, fin:fin, finLunes:fin};
+  var Lo = planProyeccionOv({}).slice(0,6);
+  eq("Semana Santa: Resumen = Plan sin ediciones, semana a semana", key(Lr), key(Lp));
+  eq("Semana Santa: Plan sin ediciones = Plan con ediciones vacias", key(Lp), key(Lo));
+  var c29 = rzCeldas(new Date(2027,2,29), Lr[3], {}, '2027-03-07', {});
+  eq("29–31 mar: Cierre en las celdas", c29.slice(0,3).map(function(c){ return c.prod; }), ['Cierre','Cierre','Cierre']);
+  var bss = _semanaBatches(Lr[3]), cel = {}; _aplicarPicado(c29, 3).forEach(function(c){ for(var k in c.prods) cel[k]=(cel[k]||0)+c.prods[k]; });
+  eq("semana del 29-mar: lo que suma el Resumen es lo de las celdas abiertas", bss, cel);
+  // ── 14. CIERRE DE FIN DE AÑO: QUE SE RECONOZCA Y QUE NO SE INVENTE ──
+  eq("17–31 dic (sin enero todavia) es fin de año", _esBloqueAnio({ini:'2027-12-17', fin:'2027-12-31'}), true);
+  eq("3–10 ene (solo enero) es fin de año", _esBloqueAnio({ini:'2028-01-03', fin:'2028-01-10'}), true);
+  eq("Semana Santa no", _esBloqueAnio({ini:'2027-03-29', fin:'2027-04-02'}), false);
+  eq("un cierre de 1–5 dic no", _esBloqueAnio({ini:'2027-12-01', fin:'2027-12-05'}), false);
+  _calAplicar(_calDesdeFilas(FILAS.concat([{fecha:'2027-12-17',fecha_fin:'2027-12-31',tipo:'cierre'}])), '2027-02-01');
+  eq("con 17–31 dic 2027 cargado: es EL cierre, sin aviso", [CIERRE, REAPERTURA, _calFinAnioAviso()], ['2027-12-17','2027-12-31','']);
+  _calAplicar(_calDesdeFilas(FILAS), '2027-02-01');
+  eq("sin fin de año por delante: aviso, y CIERRE no salta a una fecha futura inventada", [_calFinAnioAviso(), CIERRE<'2027-02-01'], ['Cierre de fin de año sin cargar', true]);
+  _rzCierreMeta = {451:1}; _planCierre = {M:[]};
+  await cierreCargarMeta({}, R);
+  eq("…y la meta de cierre se apaga (sin rampa)", [_planCierre, _rzCierreMeta], [null, null]);
+  eq("…ni entregas que descontar ni ritmo congelado", [_planSem(new Date(2026,11,14), R).salida, _bajoMetaCierre(new Date(2027,1,8), '2027-02-01')], [null, false]);
+  _AHORA = new _RealDate(2027, 1, 1, 10, 0, 0).getTime(); _SB = null; await nivCalendario();
+  eq("respaldo ya pasado: tambien avisa", _calFinAnioAviso(), 'Cierre de fin de año sin cargar');
+  _AHORA = new _RealDate(2026, 9, 25, 10, 0, 0).getTime(); _SB = null; await nivCalendario();
+  eq("respaldo vigente (hoy): sin aviso", _calFinAnioAviso(), '');
+  _calAplicar(_calDesdeFilas(FILAS), '2026-10-25');
   // ── 8. VOLVER AL PLAN ACOTADO ──
   var ovs = {'2026-10-20':{}, '2026-10-26':{}, '2026-11-06':{}, '2026-11-09':{}, '2027-01-12':{}};
   eq("volver al plan: solo hoy → fin de la semana proxima", _rzVolverRango(ovs, '2026-10-25', new Date(2026,9,26)), ['2026-10-26','2026-11-06']);
