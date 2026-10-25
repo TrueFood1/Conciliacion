@@ -3033,6 +3033,14 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
 #vPlan .pm-corto{margin-top:12px;background:rgba(233,162,59,.10);border:.5px solid rgba(233,162,59,.35);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--warn);line-height:1.55}
 #vPlan .pm-corto b{color:var(--warn-3)}
 #vPlan .pm-foot{font-size:11.5px;color:var(--text-3);padding:9px 0 10px;line-height:1.55}
+/* Fechas de las entregas de cierre y semanas de enero (b127): una fila compacta al pie de la tarjeta. */
+#vPlan .pm-cfg{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:12px;padding:10px 0 10px;border-top:.5px solid var(--border);font-size:11.5px;color:var(--text-3)}
+#vPlan .pm-cfg label{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+#vPlan .pm-cfg input{background:var(--bg);border:.5px solid var(--border);color:var(--text);border-radius:6px;padding:4px 7px;font-family:inherit;font-size:12px;font-variant-numeric:tabular-nums}
+#vPlan .pm-cfg input[type=number]{width:52px}
+#vPlan .pm-cfg button{background:none;border:.5px solid var(--border-strong);color:var(--text-2);font-family:inherit;font-size:11.5px;border-radius:6px;padding:4px 12px;cursor:pointer}
+#vPlan .pm-cfg button:hover{color:var(--m-ops);border-color:var(--m-ops)}
+@media (max-width:640px){ #vPlan .pm-cfg input{font-size:16px} }
 #vPlan .pl-reaco{max-width:940px;margin:14px 0 2px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:rgba(199,125,160,.08);border:.5px solid rgba(199,125,160,.30);border-radius:9px;padding:11px 14px}
 #vPlan .pl-reaco-txt{font-size:12.5px;color:var(--text-2);line-height:1.5;flex:1;min-width:220px}
 #vPlan .pl-reaco-btn{background:var(--mod);border:none;color:#fff;font-family:inherit;font-size:12.5px;font-weight:600;border-radius:8px;padding:9px 16px;cursor:pointer;white-space:nowrap}
@@ -10161,7 +10169,7 @@ function uomLineaMal(pid, uomId, uds){
 
 // planMeses: cuántos meses mira el Plan desde HOY (rodante). Clave `plan_meses` de plan_config; sin
 // fila, 4 (Andrea, 25-oct-2026). No confundir con `horizonte`: esas son SEMANAS de cobertura del motor.
-const NIV_CFG_DEF={ritmoVentana:6, colchon:3, colchonTemporada:4, horizonte:6, medirLunesFrac:0.5, planMeses:4};
+const NIV_CFG_DEF={ritmoVentana:6, colchon:3, colchonTemporada:4, horizonte:6, medirLunesFrac:0.5, planMeses:4, cierreSemEne:3};
 const _rzN=(n,d=0)=>(Number(n)||0).toLocaleString('es-CR',{minimumFractionDigits:d,maximumFractionDigits:d});
 // ── CAPACIDAD por Nº de personas (batches/día). Adelanto del futuro módulo RRHH. ──
 // El motor usa la tabla según cuánta gente hay esa semana (marca manual por semana ISO).
@@ -10413,7 +10421,7 @@ function _crDate(dt){
 async function nivConfig(){
   const cfg={ritmoVentana:NIV_CFG_DEF.ritmoVentana, colchonTemporada:NIV_CFG_DEF.colchonTemporada,
              horizonte:NIV_CFG_DEF.horizonte, medirLunesFrac:NIV_CFG_DEF.medirLunesFrac, planMeses:NIV_CFG_DEF.planMeses,
-             colchon:{}, ventanas:[], diaFijo:[], sembrado:false};
+             cierreSemEne:NIV_CFG_DEF.cierreSemEne, colchon:{}, ventanas:[], diaFijo:[], sembrado:false};
   NIV_PROD.forEach(p=>cfg.colchon[p]=NIV_CFG_DEF.colchon);
   // SIN atrapa-errores: `plan_config` existe desde el 17-ago-2026 y está sembrada. Antes había un
   // catch mudo acá porque la tabla no existía y el 404 era esperado — pero eso también se tragaba
@@ -10433,6 +10441,7 @@ async function nivConfig(){
       else if(r.clave==='ventanas_estacionales' && Array.isArray(v)) cfg.ventanas=v;
       else if(r.clave==='medir_lunes_frac' && v!=null && +v>=0 && +v<=1) cfg.medirLunesFrac=+v;
       else if(r.clave==='plan_meses' && v!=null && Number.isInteger(+v) && +v>=1 && +v<=11) cfg.planMeses=+v;   // fuera de 1..11 → el default
+      else if(r.clave==='cierre_semanas_enero' && v!=null && v!=='' && Number.isInteger(+v) && +v>=0 && +v<=8) cfg.cierreSemEne=+v;   // semanas de enero en la meta (b127)
       else if(r.clave==='compras_dia_fijo' && v && Array.isArray(v.insumos)) cfg.diaFijo=v.insumos;   // T-28
       else if(r.clave==='compras_config' && v && Array.isArray(v.proveedores) && Array.isArray(v.insumos)) cfg.compras=v;   // Compras v2
     }
@@ -10578,6 +10587,33 @@ function _planRestarSalida(stock, S){
   if(!S || !S.salida || !S.salida.porProd) return;
   NIV_PROD.forEach(function(p){ stock[p]=(stock[p]||0)-(S.salida.porProd[p]||0); });
 }
+// ── ENERO DE LA META DE CIERRE = el enero del plan (b127) ──
+// Las `n` semanas desde la de la reapertura, cada una con _planSem: ritmo de hoy × factor de
+// temporada del mes × días con venta ÷ 5 — exactamente lo que el plan rodante consume esas
+// semanas. Una sola cuenta: la meta guarda lo que el plan después vende, y no pueden contradecirse.
+function _cierreSemEne(cfg){ const n=cfg&&cfg.cierreSemEne; return (n!=null && isFinite(n)) ? +n : NIV_CFG_DEF.cierreSemEne; }
+function _cierreEneMons(n){
+  const mon0=_mondayProd(new Date(REAPERTURA+'T00:00:00')), out=[];
+  for(let k=0;k<n;k++){ const mon=new Date(mon0); mon.setDate(mon.getDate()+k*7); out.push(mon); }
+  return out;
+}
+// Último mes que tocan esas semanas (para que nivTemporada lea su factor); 0 = ninguno.
+function _cierreEneMesFin(cfg){
+  if(!_calFinAnioOk) return 0;
+  const mons=_cierreEneMons(_cierreSemEne(cfg)); if(!mons.length) return 0;
+  const vie=new Date(mons[mons.length-1]); vie.setDate(vie.getDate()+4);
+  return _monKey(vie);
+}
+function cierreDemandaEne(ritmo, n){
+  const porProd={}, porSem=[]; let sinFac=false;
+  NIV_PROD.forEach(function(p){ porProd[p]=0; });
+  _cierreEneMons(n).forEach(function(mon){ const S=_planSem(mon, ritmo);
+    if(!S.fac) sinFac=true;
+    NIV_PROD.forEach(function(p){ porProd[p]+=S.ritmo[p]||0; });
+    porSem.push({mon:mon, ritmo:S.ritmo, fac:S.fac}); });
+  let fin=null; if(porSem.length){ const d=new Date(porSem[porSem.length-1].mon); d.setDate(d.getDate()+6); fin=_ymd(d); }
+  return {porProd:porProd, porSem:porSem, desde:porSem.length?_ymd(porSem[0].mon):null, hasta:fin, semanas:n, sinFac:sinFac};
+}
 // Semana entera dentro del cierre: layout vacío (las celdas dicen "Cierre"), no consume.
 function _layoutCerrado(pers){ return {otros:[], semillas:0, viernes:{prod:null}, personas:pers, rampaOn:false, cerrada:true}; }
 // ── PRODUCCIÓN EFECTIVA DE UNA SEMANA, desde sus CELDAS — UNA función para las tres proyecciones ──
@@ -10649,7 +10685,8 @@ function _temporadaCalc(porDia, Ac, Afin, ritmo){
 // en _planTemp.error, que el Plan muestra. Se cachea por sesión (mes, horizonte y ritmo).
 let _tempCache=null;
 async function nivTemporada(ritmo, cfg){
-  const hoy=new Date(), Ac=_monKey(hoy), Afin=_monKey(_planFinHorizonte(hoy, (cfg&&cfg.planMeses)||NIV_CFG_DEF.planMeses));
+  const hoy=new Date(), Ac=_monKey(hoy), Afin=Math.max(_monKey(_planFinHorizonte(hoy, (cfg&&cfg.planMeses)||NIV_CFG_DEF.planMeses)),
+                                                   _cierreEneMesFin(cfg));   // y los meses de enero de la meta (b127)
   const key=Ac+'|'+Afin+'|'+NIV_PROD.map(function(p){ return Math.round(ritmo[p]||0); }).join(',');
   if(_tempCache && _tempCache.key===key){ _planTemp=_tempCache.data; return _planTemp; }
   try{
@@ -11511,12 +11548,18 @@ async function rzDiagPlan(body){
 // pasado cerraron con poco stock y quedaron cortos hasta marzo. La rampa existe para
 // llegar al 18-dic con stock para todo el arranque. Todo debe estar producido al 18-dic.
 //
-// META por producto = 3 bloques:
-//   1) ENTREGA Auto+Walmart (~14-dic): nivel REAL del dic pasado, esos canales.
-//   2) ENTREGA resto (~18-dic): resto de tiendas + HORECA + Abner (retail), nivel real.
-//      Abner pide más en dic (turístico) — el nivel real del año pasado ya lo trae.
-//   3) COLCHÓN = primeras 4 SEMANAS de venta real de enero (YA incluyen el arranque
-//      fuerte del 11-ene → NO se suma el pico de reapertura aparte).
+// META por producto = 3 bloques (b127, 25-oct-2026: ningún bloque usa ya un nivel viejo):
+//   1) ENTREGA Auto+Walmart: el PEDIDO DE CIERRE del año pasado de cada cadena (Auto y Walmart
+//      por separado), producto por producto, × el factor de esa cadena: su venta semanal de hoy
+//      (últimas CIERRE_FACTOR_SEM_HOY semanas) ÷ la de las CIERRE_FACTOR_SEM semanas antes de ese
+//      pedido. Producto sin historia en la cadena (Galletas): las semanas que cubrió el pedido ×
+//      su venta semanal de hoy. Es la proyección del 24-oct.
+//   2) ENTREGA resto (HORECA, Abner, tiendas): solo el EXTRA de su semana de cierre del año
+//      pasado sobre una semana normal, × el mismo factor. La semana normal ya la consume el ritmo.
+//   3) ENERO = cfg.cierreSemEne semanas (plan_config `cierre_semanas_enero`, 3 sin fila) desde la
+//      reapertura, cada una como la proyecta el plan: cierreDemandaEne → _planSem (ritmo de hoy ×
+//      temporada). Antes eran 4 semanas de la venta REAL de ene-2026: un nivel que ya no existe.
+//   Las fechas de entrega de este año ya no mueven la cantidad: solo dicen cuándo sale.
 // Canal por PARTNER con clasificarCanal() — la misma de Finanzas/Rentabilidad.
 // Fechas de última entrega: CONFIGURABLES (plan_config), Andrea las cambia sin CC.
 // ════════════════════════════════════════════════════════════════════════
@@ -11524,7 +11567,8 @@ const CIERRE_DEF_AUTOWM='2026-12-14';     // default: última entrega Auto + Wal
 const CIERRE_DEF_RESTO ='2026-12-18';     // default: última entrega resto + HORECA + Abner
 const CIERRE_CANALES_1=['auto','walmart'];                                   // bloque 1
 const CIERRE_CANALES_2=['mega','compre','bm','negro','horeca','retail','otros'];  // bloque 2 (retail incluye Abner)
-const CIERRE_COLCHON_SEM=4;               // bloque 3: semanas de venta real de enero
+const CIERRE_FACTOR_SEM=11;               // factor de cadena: semanas del año pasado ANTES del pedido de cierre (29-sep → 14-dic-2025)
+const CIERRE_FACTOR_SEM_HOY=16;           // …y semanas de HOY (las cadenas compran un lote por semana: con 6 el factor salta)
 const CONGELADOR_CJ=888;                  // capacidad MÁXIMA del congelador, confirmada por Andrea (jul-2026).
                                           // Las 444 de antes eran el stock de hoy, no el tope. Pico real validado: 819 cj → cabe.
 
@@ -11542,22 +11586,30 @@ async function cierreConfig(){
   }catch(e){}
   return out;
 }
-async function cierreGuardarFechas(){
-  const a=document.getElementById('cierreFAutowm'), r=document.getElementById('cierreFResto'), g=document.getElementById('cierreGalDicCj');
+// Guarda fechas de entrega (+ Galletas y, desde el Plan, semanas de enero). `pre`: prefijo de los ids
+// del formulario — '' en ?diag=cierre, 'pl' en la tarjeta del Plan (los dos pueden estar en el DOM).
+async function cierreGuardarFechas(pre){
+  pre=pre||'';
+  const $=function(id){ return document.getElementById(pre+id); };
+  const a=$('cierreFAutowm'), r=$('cierreFResto'), g=$('cierreGalDicCj'), n=$('cierreSemEne');
   const c=sbClient(); if(!c){ alert('Sin conexión con la base — no se guardó.'); return; }
+  if(!a || !r || !/^\d{4}-\d{2}-\d{2}$/.test(a.value) || !/^\d{4}-\d{2}-\d{2}$/.test(r.value)){ alert('Fechas incompletas — no se guardó.'); return; }
   let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
   const galVal=(g&&g.value!=='' && parseFloat(g.value)>0)?String(parseFloat(g.value)):'';   // vacío/0 = sin override (galletas vuelven al ritmo)
-  try{ const {error}=await c.from('plan_config').insert([
+  const filas=[
       {clave:'cierre_fecha_autowm', valor:a.value, usuario:email||null},
       {clave:'cierre_fecha_resto',  valor:r.value, usuario:email||null},
-      {clave:'cierre_galletas_dic_cj', valor:galVal, usuario:email||null}]);
+      {clave:'cierre_galletas_dic_cj', valor:galVal, usuario:email||null}];
+  if(n){ const v=parseInt(n.value,10);
+    if(!(v>=0 && v<=8)){ alert('Semanas de enero: de 0 a 8 — no se guardó.'); return; }
+    filas.push({clave:'cierre_semanas_enero', valor:String(v), usuario:email||null}); }
+  try{ const {error}=await c.from('plan_config').insert(filas);
     if(error){ alert('No se pudo guardar: '+error.message); return; }
     _cierreCache=null;                                          // fechas nuevas → meta nueva → rampa nueva
-    rzDiagCierre(document.getElementById('rzBody'));            // recalcula con las nuevas fechas
-    if(_planProj.length && document.getElementById('planBody')) cargarPlanMeses();   // y re-proyecta la rampa
+    if(!pre){ const rb=document.getElementById('rzBody'); if(rb) rzDiagCierre(rb); }   // recalcula el diagnóstico donde se guardó
+    if(document.getElementById('planBody') && (pre || _planProj.length)) cargarPlanMeses();   // y re-proyecta la rampa
   }catch(e){ alert('No se pudo guardar: '+(e&&e.message||e)); }
 }
-function _cierreLY(ds){ return (parseInt(ds.slice(0,4),10)-1)+ds.slice(4); }   // misma fecha, año pasado
 function _cierreShift(ds,n){ const d=new Date(ds+'T00:00:00'); d.setDate(d.getDate()+n); return _ymd(d); }
 
 // Ventas netas facturadas por DÍA → CANAL → producto, en uds sueltas.
@@ -11596,16 +11648,6 @@ function _cierreSuma(byDate, D1, D2, canales){
       for(const k in c){ porProd[+k]=(porProd[+k]||0)+c[k]; tot+=c[k]; } });
     if(tot>0) porDia.push({ds:ds, uds:tot}); });
   return {porProd:porProd, porDia:porDia};
-}
-// La ENTREGA = el día PICO de la ventana para esos canales (se muestra el detalle diario).
-function _cierreEntrega(byDate, centro, canales, radio){
-  const D1=_cierreShift(centro,-radio), D2=_cierreShift(centro,radio);
-  const w=_cierreSuma(byDate, D1, D2, canales);
-  if(!w.porDia.length) return {vacio:true, D1:D1, D2:D2, porDia:[]};
-  const pico=w.porDia.slice().sort(function(a,b){ return b.uds-a.uds; })[0];
-  const solo=_cierreSuma(byDate, pico.ds, pico.ds, canales);
-  const seg=w.porDia.slice().sort(function(a,b){ return b.uds-a.uds; })[1]||null;
-  return {vacio:false, D1:D1, D2:D2, pico:pico, segundo:seg, porDia:w.porDia, porProd:solo.porProd};
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -11682,69 +11724,78 @@ function _picoTotales(metaU, prodU){
 
 // ── META DE CIERRE, una sola verdad ──────────────────────────────────────
 // La usan el reporte (?diag=cierre), el MOTOR (rampa hacia la meta) y el panel del Plan.
-// Devuelve uds sueltas por producto. Cara (2 lecturas de ventas) → se cachea por fechas
-// de entrega + ventana de ritmo; cierreGuardarFechas() invalida el caché.
+// Devuelve uds sueltas por producto. Las lecturas de ventas (año pasado + hoy por canal) se
+// cachean; el resto (factores, enero) se recalcula en cada llamada. cierreGuardarFechas() invalida.
 let _cierreCache=null;
+function _lunesDe(ds){ const d=new Date(ds+'T00:00:00'); d.setDate(d.getDate()-((d.getDay()+6)%7)); return _ymd(d); }
+// Pedido de cierre del año pasado de un grupo de canales + su factor de hoy. Puro.
+//   vLY/vHoy: ventas por día → canal → producto (nivVentasCanalPorDia) · lyUlt: último día con venta
+//   de dic del año pasado · hoyIni/hoyFin: ventana de hoy (CIERRE_FACTOR_SEM_HOY semanas completas).
+// Devuelve {vacio, D1, D2, pico, porDia, ped, base, hoy, f:{pid:factor|null}, semCub}.
+function _cierrePedidoLY(vLY, vHoy, lyUlt, hoyIni, hoyFin, canales){
+  const N=CIERRE_FACTOR_SEM, NH=CIERRE_FACTOR_SEM_HOY, D1=_cierreShift(lyUlt,-13);
+  const w=_cierreSuma(vLY, D1, lyUlt, canales);
+  if(!w.porDia.length) return {vacio:true, D1:D1, D2:lyUlt, porDia:[], ped:{}, base:{}, hoy:{}, f:{}, semCub:0};
+  const pico=w.porDia.slice().sort(function(a,b){ return b.uds-a.uds; })[0];
+  const lun=_lunesDe(pico.ds);                                         // el pedido = desde el lunes de su semana
+  const ped=_cierreSuma(vLY, lun, lyUlt, canales).porProd;
+  const bS=_cierreSuma(vLY, _cierreShift(lun,-7*N), _cierreShift(lun,-1), canales).porProd;
+  const hS=_cierreSuma(vHoy, hoyIni, hoyFin, canales).porProd;
+  const base={}, hoy={}, f={}; let pedCj=0, baseCj=0;
+  NIV_PROD.forEach(function(p){ const cj=NIV_INFO[p].cajaU;
+    base[p]=Math.max(0,bS[p]||0)/N; hoy[p]=Math.max(0,hS[p]||0)/NH; ped[p]=Math.max(0,ped[p]||0);
+    // Sin historia si el año pasado vendía menos de la mitad que hoy (mismo umbral que la temporada).
+    f[p]=(base[p]>0 && base[p]>=0.5*hoy[p]) ? hoy[p]/base[p] : null;
+    pedCj+=ped[p]/cj; baseCj+=base[p]/cj; });
+  return {vacio:false, D1:D1, D2:lyUlt, lunes:lun, pico:pico, porDia:w.porDia, ped:ped, base:base, hoy:hoy, f:f,
+          semCub:baseCj>0?pedCj/baseCj:0};
+}
 async function cierreMeta(cfg, ritmo){
   cfg=cfg||await nivConfig();
   const fc=await cierreConfig();
-  const key=fc.autowm+'|'+fc.resto+'|'+(fc.galDicCj||0)+'|'+(cfg.ritmoVentana||0);
-  if(_cierreCache && _cierreCache.key===key) return _cierreCache.data;
   ritmo=ritmo||await nivRitmo(cfg.ritmoVentana);
-  const lyA=_cierreLY(fc.autowm), lyR=_cierreLY(fc.resto);          // mismas fechas, año pasado
-  const vDic=await nivVentasCanalPorDia(_cierreShift(lyA,-6), _cierreShift(lyR,6));
-  const e1=_cierreEntrega(vDic, lyA, CIERRE_CANALES_1, 3);          // bloque 1: Auto + Walmart
-  const e2=_cierreEntrega(vDic, lyR, CIERRE_CANALES_2, 3);          // bloque 2: resto + HORECA + Abner
-  // bloque 3: primeras 4 semanas de venta REAL de enero (desde el primer día con venta)
-  const yEne=(parseInt(fc.resto.slice(0,4),10))+'-01-01';           // ene del año de reapertura (= año del cierre config)
-  const vEne=await nivVentasCanalPorDia(yEne, _cierreShift(yEne,60));
-  const diasEne=Object.keys(vEne).sort();
-  const primerEne=diasEne.length?diasEne[0]:null;
-  const finEne=primerEne?_cierreShift(primerEne, CIERRE_COLCHON_SEM*7-1):null;
-  const b3=primerEne?_cierreSuma(vEne, primerEne, finEne, null):{porProd:{},porDia:[]};
-  // SALIDA de reapertura (11-ene): el día PICO de venta al reabrir. Separa lo que SALE ese día de
-  // lo que queda como colchón para operar las semanas siguientes. porProd = entrega del día pico.
-  const eEne=primerEne?_cierreEntrega(vEne, primerEne, null, 3):{vacio:true, porProd:{}};
+  // Ventas: diciembre del año pasado (con las semanas de antes del pedido) y las semanas de hoy.
+  const yLY=(+CIERRE.slice(0,4))-1, lyIni=_cierreShift(yLY+'-12-01', -7*(CIERRE_FACTOR_SEM+3)), lyFin=yLY+'-12-31';
+  const lunHoy=_lunesDe(_ymd(new Date())), hoyFin=_cierreShift(lunHoy,-1), hoyIni=_cierreShift(lunHoy,-7*CIERRE_FACTOR_SEM_HOY);
+  const key=lyIni+'|'+hoyIni;
+  let V=(_cierreCache && _cierreCache.key===key)?_cierreCache.data:null;
+  if(!V){ V={ly:await nivVentasCanalPorDia(lyIni, lyFin), hoy:await nivVentasCanalPorDia(hoyIni, hoyFin)}; _cierreCache={key:key, data:V}; }
+  const diasDic=Object.keys(V.ly).filter(function(ds){ return ds>=yLY+'-12-01' && Object.keys(V.ly[ds]).some(function(c){
+    return Object.keys(V.ly[ds][c]).some(function(k){ return V.ly[ds][c][k]>0; }); }); }).sort();
+  const lyUlt=diasDic.length?diasDic[diasDic.length-1]:lyFin;
+  const G1=CIERRE_CANALES_1.map(function(c){ return {c:c, x:_cierrePedidoLY(V.ly, V.hoy, lyUlt, hoyIni, hoyFin, [c])}; });
+  const e2=_cierrePedidoLY(V.ly, V.hoy, lyUlt, hoyIni, hoyFin, CIERRE_CANALES_2);
+  // e1 = las dos cadenas juntas, solo para mostrar el pedido del año pasado día por día.
+  const e1=_cierrePedidoLY(V.ly, V.hoy, lyUlt, hoyIni, hoyFin, CIERRE_CANALES_1);
+  // Enero: la misma demanda que el plan (temporada leída por nivTemporada; si ya está, es caché).
+  if(_calFinAnioOk) await nivTemporada(ritmo, cfg);
+  const semEne=_cierreSemEne(cfg), ene=cierreDemandaEne(ritmo, semEne);
 
   const avisos=[];
-  if(e1.vacio) avisos.push('Sin ventas de Auto+Walmart en '+e1.D1+' → '+e1.D2+' (bloque 1 queda en 0).');
+  if(!diasDic.length) avisos.push('Sin ventas en diciembre de '+yLY+': las entregas de diciembre quedan en 0.');
   if(e2.vacio) avisos.push('Sin ventas del resto de canales en '+e2.D1+' → '+e2.D2+' (bloque 2 queda en 0).');
-  if(!primerEne) avisos.push('Sin ventas de enero — el colchón de 4 semanas queda en 0.');
-  if(!e1.vacio && e1.segundo && e1.pico.uds < e1.segundo.uds*1.5) avisos.push('Auto+Walmart: no se ve un pico claro — la entrega pudo partirse en varios días. Confirmá el día tomado.');
-  if(!e2.vacio && e2.segundo && e2.pico.uds < e2.segundo.uds*1.5) avisos.push('Resto de canales: no se ve un pico claro — pudo partirse en varios días.');
+  if(semEne>0 && ene.sinFac) avisos.push('Enero sin factor de temporada'+(_planTemp&&_planTemp.error?' ('+_planTemp.error+')':'')+': va al ritmo de hoy.');
 
-  // Colchón acumulado a k semanas (k=0..4) — para ver cuánto colchón aguanta el congelador.
-  const b3k=[{porProd:{}}];
-  for(let k=1;k<=CIERRE_COLCHON_SEM;k++)
-    b3k.push(primerEne?_cierreSuma(vEne, primerEne, _cierreShift(primerEne,k*7-1), null):{porProd:{}});
-
-  const estim={};   // productos sin historia → estimados con ritmo actual
-  // Modelo por producto, UNA sola vez: los 3 bloques en uds sueltas. De acá salen la
-  // tabla de la meta, el total, el pico real, la rampa del motor y el panel del Plan.
+  const estim={};   // productos sin historia en una cadena → semanas que cubrió el pedido × venta de hoy
   const galDicU=(fc.galDicCj>0)?fc.galDicCj*NIV_INFO[519].cajaU:null;   // override manual: galletas en la entrega grande de dic (cj → uds)
+  const b3Sem=function(p,k){ let t=0; for(let i=0;i<k && i<ene.porSem.length;i++) t+=ene.porSem[i].ritmo[p]||0; return t; };
   const M=NIV_PROD.map(function(p){
     const r=ritmo[p]||0;
-    let b1=Math.max(0,(e1.porProd||{})[p]||0), b1e=false;
-    const b2=Math.max(0,(e2.porProd||{})[p]||0);
-    let b3p=Math.max(0,(b3.porProd||{})[p]||0), b3e=false;
-    if(p===519 && galDicU!=null){ b1=galDicU; b1e=true; estim[p]=1; }   // galletas dic = número manual de Andrea (antojo navideño), no ritmo
-    else if(b1<=0 && r>0){ b1=r; b1e=true; estim[p]=1; }                // ej. Galletas sin override: nuevo, sin dic pasado → ritmo actual
-    if(b3p<=0 && r>0){ b3p=r*CIERRE_COLCHON_SEM; b3e=true; estim[p]=1; }
-    // colchón de k semanas: si es estimado escala con el ritmo, si no es la venta real acumulada
-    const b3De=function(k){ return b3e ? r*k : Math.max(0,((b3k[k]||{porProd:{}}).porProd||{})[p]||0); };
-    // separar la SALIDA de reapertura (11-ene) del colchón restante. Estimado (sin historia): ~1 semana de ritmo.
-    let b3s = b3e ? r : Math.max(0,(eEne.porProd||{})[p]||0);
-    b3s = Math.min(b3s, b3p);
-    const b3r = Math.max(0, b3p - b3s);
-    return {p:p, I:NIV_INFO[p], b1:b1, b2:b2, b3:b3p, b3s:b3s, b3r:b3r, r:r, b3De:b3De, nota:(b1e||b3e)?' *':''};
+    let b1=0, b1e=false;
+    G1.forEach(function(g){ const x=g.x; if(x.vacio) return;
+      if(x.f[p]!=null) b1+=x.ped[p]*x.f[p];
+      else if(x.hoy[p]>0){ b1+=x.semCub*x.hoy[p]; b1e=true; } });
+    if(p===519 && galDicU!=null){ b1=galDicU; b1e=true; }                 // galletas dic = número manual de Andrea
+    if(b1e) estim[p]=1;
+    const b2=(!e2.vacio && e2.f[p]!=null) ? Math.max(0, e2.ped[p]-e2.base[p])*e2.f[p] : 0;   // solo el EXTRA de la semana de cierre
+    const b3=ene.porProd[p]||0;
+    return {p:p, I:NIV_INFO[p], b1:b1, b2:b2, b3:b3, r:r, b3De:function(k){ return b3Sem(p,k); }, nota:b1e?' *':''};
   });
   const porProd={};   // META por producto en UDS — lo que consume el motor
   M.forEach(function(m){ porProd[m.p]=m.b1+m.b2+m.b3; });
   const total=M.reduce(function(a,m){ return a+Math.ceil((m.b1+m.b2+m.b3)/m.I.cajaU); },0);
-  const data={fc:fc, e1:e1, e2:e2, b3:b3, primerEne:primerEne, finEne:finEne, M:M,
-              porProd:porProd, total:total, estim:estim, avisos:avisos, ritmo:ritmo};
-  _cierreCache={key:key, data:data};
-  return data;
+  return {fc:fc, e1:e1, e2:e2, g1:G1, lyUlt:lyUlt, hoyIni:hoyIni, hoyFin:hoyFin, ene:ene, semEne:semEne, M:M,
+          porProd:porProd, total:total, estim:estim, avisos:avisos, ritmo:ritmo};
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -11755,8 +11806,8 @@ async function cierreMeta(cfg, ritmo){
 // COLCHÓN = lo que queda el 11-ene, cuando la fábrica reabre:
 //     colchón[p] = stock al 18-dic − entrega Auto+WM − entrega del resto
 // (entre el 18-dic y el 11-ene no se produce NI se vende → el stock no se mueve).
-// En semanas: ÷ (colchón de la meta ÷ 4) = el ritmo real de venta de enero, no el de julio.
-// Si la rampa cumple la meta, da exactamente 4 semanas.
+// En semanas: ÷ (enero de la meta ÷ R.semEne) = la venta de enero que proyecta el plan.
+// Si la rampa cumple la meta, da exactamente R.semEne semanas.
 // ════════════════════════════════════════════════════════════════════════
 // opt = {mesDesde:0-11 · vie:'limpieza'|'alterno'|'todos' · personas:3|null}
 function escSim(ritmo, fin, cfg, meta, opt){
@@ -11787,12 +11838,12 @@ function escSim(ritmo, fin, cfg, meta, opt){
   return {stock:stock, sem:sem};
 }
 // Colchón por producto y total, en semanas de venta de enero + cajas.
-function escColchon(stockCierre, M){
+function escColchon(stockCierre, M, sem){
   const porProd={}; let cjTot=0, cjSem=0;
   M.forEach(function(m){
     const sale=m.b1+m.b2;                                // las dos entregas de diciembre
     const queda=Math.max(0, (stockCierre[m.p]||0) - sale);
-    const porSem=m.b3/CIERRE_COLCHON_SEM;                // ritmo REAL de enero (el colchón de la meta ÷ 4)
+    const porSem=sem>0?m.b3/sem:0;                       // venta de enero por semana (la meta ÷ sus semanas)
     porProd[m.p]={uds:queda, cj:Math.floor(queda/m.I.cajaU), sem:porSem>0?queda/porSem:null,
                   faltaCj:Math.max(0, Math.ceil((m.b3-queda)/m.I.cajaU))};
     cjTot+=queda/m.I.cajaU; cjSem+=porSem/m.I.cajaU;
@@ -11824,7 +11875,7 @@ function escenariosCalc(cfg, R, fin, ritmo){
   ];
   const res=ESC.map(function(e){
     const S=escSim(ritmo, fin, cfg, R.porProd, {mesDesde:ESC_MES_RAMPA, vie:e.vie, personas:3});
-    const C=escColchon(S.stock, R.M);
+    const C=escColchon(S.stock, R.M, R.semEne);
     // viernes productivos y días de Galletas (519 solo puede ir el viernes)
     let vieProd=0, galDias=0, arranque=null;
     S.sem.forEach(function(x){
@@ -11841,6 +11892,7 @@ function escenariosCalc(cfg, R, fin, ritmo){
 // META vs colchón por producto + veredicto del viernes + notas). Autocontenido con estilos
 // inline (~940px, grises del módulo). El caller pone su propio encabezado.
 function escenariosCuerpoHTML(R, calc){
+  const SEM=R.semEne;   // semanas de enero de la meta (plan_config)
   const A=calc.A, B=calc.B, HOY=calc.HOY, res=calc.res;
   const semTxt=function(s){ return s==null?'—':_rzN(s,1); };
   // Colchón de PAN (Blanco + Francés + Buns) por escenario, y viernes que fueron a pan vs Galletas.
@@ -11852,11 +11904,11 @@ function escenariosCuerpoHTML(R, calc){
   const veredicto = panSube
     ? '<b style="color:var(--warn-tx)">El viernes productivo suma PAN.</b> El viernes es un día de producción más para el pan (Blanco, Francés, Buns, Pizza) y para Galletas — todo menos Semillas. El colchón de pan (Blanco + Francés + Buns) pasa de <b>'+_rzN(panA,1)+'</b> semanas con viernes de limpieza (A) a <b>'+_rzN(panHOY,1)+'</b> con todos productivos (HOY)'+(Math.abs(panB-panA)>0.1?', y <b>'+_rzN(panB,1)+'</b> con alternos (B)':'')+'. Cada viernes productivo es un día extra de pan.'
     : '<b style="color:var(--warn-tx)">Con este ritmo, el viernes productivo casi no mueve el pan.</b> Las Galletas se llevan casi todos los viernes (solo pueden hacerse ese día y vienen muy cortas de stock), así que al pan le quedan pocos: el colchón de pan pasa de '+_rzN(panA,1)+' a '+_rzN(panHOY,1)+' semanas. Con más viernes libres de Galletas, el pan subiría más.';
-  const col=function(s){ return s==null?'var(--text-3)':(s>=CIERRE_COLCHON_SEM?'#7E8C5A':(s>=CIERRE_COLCHON_SEM*0.6?'#C99A4E':'#C0564E')); };
+  const col=function(s){ return s==null?'var(--text-3)':(s>=SEM?'#7E8C5A':(s>=SEM*0.6?'#C99A4E':'#C0564E')); };
 
   // Tarjeta grande por escenario
   const tarjeta=function(x){
-    const ok=x.C.sem!=null && x.C.sem>=CIERRE_COLCHON_SEM;
+    const ok=x.C.sem!=null && x.C.sem>=SEM;
     return '<div style="flex:1;min-width:270px;background:var(--panel);border:.5px solid '+(ok?'#3A4A2E':'#2C2C33')+';border-radius:11px;padding:15px 18px">'
       +'<div style="font-size:11px;letter-spacing:.05em;color:var(--text-3);text-transform:uppercase">Escenario '+x.k+'</div>'
       +'<div style="font-size:14px;font-weight:600;color:var(--text);margin-top:3px">'+esc(x.tit)+'</div>'
@@ -11866,7 +11918,7 @@ function escenariosCuerpoHTML(R, calc){
         +'<span style="font-size:12px;color:var(--text-3)">semanas de colchón · '+_rzN(x.C.cj)+' cj</span>'
       +'</div>'
       +'<div style="font-size:11.5px;color:'+(ok?'#7E8C5A':'#C99A4E')+';margin-top:6px">'
-        +(ok?'Llega a las '+CIERRE_COLCHON_SEM+' semanas.':'Corto: faltan '+semTxt(CIERRE_COLCHON_SEM-(x.C.sem||0))+' semanas para las '+CIERRE_COLCHON_SEM+'.')+'</div>'
+        +(ok?'Llega a las '+SEM+' semanas.':'Corto: faltan '+semTxt(SEM-(x.C.sem||0))+' semanas para las '+SEM+'.')+'</div>'
       +'<div style="font-size:11.5px;color:var(--text-3);margin-top:9px">Rampa arranca '+(x.arranque?esc(_fechaLarga(_ymd(x.arranque))):'nunca')
         +' · '+x.vieProd+' viernes productivos · '+x.galDias+' de Galletas</div>'
     +'</div>';
@@ -11875,10 +11927,10 @@ function escenariosCuerpoHTML(R, calc){
   const celda=function(x,pid,pad){ const v=x.C.porProd[pid];
     return '<td style="text-align:right;color:'+col(v.sem)+';font-weight:600'+(pad?';padding-left:22px':'')+'">'+semTxt(v.sem)+'</td>'
       +'<td style="text-align:right;color:var(--text-3);font-size:11.5px">'+_rzN(v.cj)+' cj</td>'; };
-  // META por producto: a dónde hay que llegar. Siempre CIERRE_COLCHON_SEM semanas; en cajas = colchón meta (b3) ÷ caja.
+  // META por producto: a dónde hay que llegar. Siempre SEM semanas; en cajas = colchón meta (b3) ÷ caja.
   const metaCj=function(m){ return Math.ceil(m.b3/m.I.cajaU); };
   const metaCelda=function(m,pad){
-    return '<td style="text-align:right;color:var(--text-2);font-weight:600'+(pad?';padding-left:22px':'')+'">'+_rzN(CIERRE_COLCHON_SEM,1)+'</td>'
+    return '<td style="text-align:right;color:var(--text-2);font-weight:600'+(pad?';padding-left:22px':'')+'">'+_rzN(SEM,1)+'</td>'
       +'<td style="text-align:right;color:var(--text-3);font-size:11.5px">'+_rzN(metaCj(m))+' cj</td>'; };
   const filas=R.M.map(function(m){
     return '<tr>'
@@ -11886,7 +11938,7 @@ function escenariosCuerpoHTML(R, calc){
       +metaCelda(m,false)+celda(A,m.p,true)+celda(B,m.p,true)+celda(HOY,m.p,true)
     +'</tr>'; }).join('');
   const metaTotCj=R.M.reduce(function(a,m){ return a+metaCj(m); },0);
-  const metaTotCelda='<td style="text-align:right;color:var(--text-2);font-weight:700;padding:10px 0 0">'+_rzN(CIERRE_COLCHON_SEM,1)+'</td>'
+  const metaTotCelda='<td style="text-align:right;color:var(--text-2);font-weight:700;padding:10px 0 0">'+_rzN(SEM,1)+'</td>'
       +'<td style="text-align:right;color:var(--text-3);font-size:11.5px;padding-top:10px">'+_rzN(metaTotCj)+' cj</td>';
   const totCelda=function(x,pad){
     return '<td style="text-align:right;color:'+col(x.C.sem)+';font-weight:700;padding:10px 0 0'+(pad?' 22px':'')+'">'+semTxt(x.C.sem)+'</td>'
@@ -11909,7 +11961,7 @@ function escenariosCuerpoHTML(R, calc){
     +'<div style="color:var(--text-3);margin-bottom:14px;max-width:940px">Los tres con <b style="color:var(--text-2)">3 personas</b> y la rampa arrancando en <b style="color:var(--text-2)">agosto</b> (julio sigue en certificaciones). Cambia solo la política del viernes.</div>'
     +'<div style="background:var(--panel);border:.5px solid var(--border-strong);border-radius:9px;padding:12px 15px;margin-bottom:20px;max-width:940px;font-size:12px;color:var(--text-2);line-height:1.65">'
       +'<b style="color:var(--text)">Qué es el colchón.</b> Es el stock que queda el <b style="color:var(--text)">11-ene al ABRIR la fábrica, ANTES de la primera entrega de reapertura</b>: el stock del cierre (18-dic) menos las dos entregas de diciembre. Entre el 18-dic y el 11-ene no se produce ni se vende, así que ese stock no se mueve — es exactamente con lo que se abre.<br>'
-      +'<b style="color:var(--text)">La meta son las primeras '+CIERRE_COLCHON_SEM+' semanas de venta de enero</b>, y el arranque fuerte del 11-ene YA está adentro de esas '+CIERRE_COLCHON_SEM+' semanas (no se suma aparte). Por eso el colchón se mide en <b style="color:var(--text)">semanas de venta de enero</b> (el ritmo del arranque, no el de julio): si la rampa cumple la meta, el stock de apertura cubre exactas '+CIERRE_COLCHON_SEM+' semanas.'
+      +'<b style="color:var(--text)">La meta son las primeras '+SEM+' semanas de enero</b>, al ritmo de hoy × la temporada de enero (lo mismo que proyecta el plan). El colchón se mide en esas semanas: si la rampa cumple la meta, el stock de apertura cubre exactas '+SEM+'.'
     +'</div>'
     +'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px">'+tarjeta(A)+tarjeta(B)+tarjeta(HOY)+'</div>'
     +'<div style="color:var(--text);font-weight:600;margin-bottom:6px">Colchón por producto — meta vs alcanzado</div>'
@@ -11934,7 +11986,7 @@ function escenariosCuerpoHTML(R, calc){
     +(R.avisos.length?('<div style="margin-top:16px;font-size:12px;color:var(--warn-2);max-width:940px">'+R.avisos.map(function(a){ return '⚠ '+esc(a); }).join('<br>')+'</div>'):'')
     +'<div style="color:var(--text-3);margin-top:18px;font-size:12px;max-width:940px">'
       +'· Mismo motor del Plan (mismas reglas duras: un producto/día · Semillas solo jueves · Galletas solo viernes · feriados · cierre 18-dic). Lo único que cambia es la política del viernes.<br>'
-      +'· Semanas = colchón ÷ (colchón de la meta ÷ '+CIERRE_COLCHON_SEM+'), o sea contra el ritmo real de enero. Si la rampa cumpliera la meta darían '+CIERRE_COLCHON_SEM+',0.<br>'
+      +'· Semanas = colchón ÷ (enero de la meta ÷ '+SEM+'). Si la rampa cumpliera la meta darían '+SEM+',0.<br>'
       +'· Los tres ignoran las marcas de personas y fuerzan 3, para aislar la palanca del viernes.<br>'
       +'· Solo cálculo: nada de esto está conectado al motor.'
     +'</div>';
@@ -22029,7 +22081,8 @@ async function rzDiagCierre(body){
   try{
     const cfg=await nivConfig();
     const R=await cierreMeta(cfg);
-    const fc=R.fc, ritmo=R.ritmo, e1=R.e1, e2=R.e2, primerEne=R.primerEne, finEne=R.finEne;
+    const SEM=R.semEne;
+    const fc=R.fc, ritmo=R.ritmo, e1=R.e1, e2=R.e2, primerEne=R.ene.desde, finEne=R.ene.hasta;
     const avisos=R.avisos.slice(), estim=R.estim, M=R.M;
     const filas=M.map(function(m){
       const cj=function(u){ return Math.ceil(u/m.I.cajaU); }, meta=m.b1+m.b2+m.b3;
@@ -22055,7 +22108,7 @@ async function rzDiagCierre(body){
     if(!pDias.length)
       avisos.push('La última entrega ('+fc.resto+') cae en fin de semana: esa semana no tiene días productivos, así que el pico sale igual a la meta. Poné un día lun–vie.');
     // Sensibilidad: ¿cuánto colchón aguanta el congelador? (mismo cálculo con k semanas)
-    const pSens=[]; for(let k=0;k<=CIERRE_COLCHON_SEM;k++){
+    const pSens=[]; for(let k=0;k<=SEM;k++){
       const mU={}, nU={};
       M.forEach(function(m){ const b3v=m.b3De(k); mU[m.p]=m.b1+m.b2+b3v; nU[m.p]=m.b2+b3v; });
       const t=_picoTotales(mU, _picoAsignar(pDias, pPers, nU).prodU);
@@ -22079,7 +22132,7 @@ async function rzDiagCierre(body){
         +'<td style="text-align:right;color:var(--text-2);padding-left:18px">'+(x.prodCj?('−'+_rzN(x.prodCj)):'—')+'</td>'
         +'<td style="text-align:right;color:var(--text);font-weight:600;padding-left:18px">'+_rzN(x.picoCj)+'</td></tr>'; }).join('');
     const pFilasSens=pSens.map(function(s){
-      return '<tr><td style="padding:4px 16px 4px 0;color:var(--text-2)">'+(s.k===0?'sin colchón':(s.k+' semana'+(s.k>1?'s':'')))+(s.k===CIERRE_COLCHON_SEM?'<span style="color:var(--text-3)"> · plan actual</span>':'')+'</td>'
+      return '<tr><td style="padding:4px 16px 4px 0;color:var(--text-2)">'+(s.k===0?'sin colchón':(s.k+' semana'+(s.k>1?'s':'')))+(s.k===SEM?'<span style="color:var(--text-3)"> · plan actual</span>':'')+'</td>'
         +'<td style="text-align:right;color:var(--text-3)">'+_rzN(s.meta)+'</td>'
         +'<td style="text-align:right;color:var(--text);padding-left:18px">'+_rzN(s.pico)+'</td>'
         +'<td style="padding-left:18px;color:'+(s.cabe?'#7E8C5A':'#C99A4E')+'">'+(s.cabe?'entra':'no entra · +'+_rzN(s.pico-CONGELADOR_CJ)+' cj')+'</td></tr>'; }).join('');
@@ -22127,8 +22180,8 @@ async function rzDiagCierre(body){
           +'<tbody>'+pFilasSens+'</tbody></table>'
         +'<div style="margin-top:8px;color:'+(pMaxK?'var(--text-3)':'#C99A4E')+';font-size:12px;max-width:730px">'
           +(pMaxK==null?'Ni siquiera sin colchón entra: solo las dos entregas de diciembre ya pasan el congelador. El cierre completo no cabe con el frío de hoy.'
-            :pMaxK===0?'Con el congelador de hoy solo entra <b style="color:var(--text-2)">sin nada de colchón</b> — es decir, produciendo apenas las dos entregas de diciembre y arrancando enero en cero, que es justo lo que salió mal el año pasado. El plan pide '+CIERRE_COLCHON_SEM+' semanas.'
-            :('Con el congelador de hoy aguanta hasta <b style="color:var(--text-2)">'+pMaxK+' semana'+(pMaxK>1?'s':'')+'</b> de colchón. El plan pide '+CIERRE_COLCHON_SEM+'.'))
+            :pMaxK===0?'Con el congelador de hoy solo entra <b style="color:var(--text-2)">sin nada de colchón</b> — es decir, produciendo apenas las dos entregas de diciembre y arrancando enero en cero, que es justo lo que salió mal el año pasado. El plan pide '+SEM+' semanas.'
+            :('Con el congelador de hoy aguanta hasta <b style="color:var(--text-2)">'+pMaxK+' semana'+(pMaxK>1?'s':'')+'</b> de colchón. El plan pide '+SEM+'.'))
         +'</div></div>'))
       +'<div style="color:var(--text-3);margin-top:16px;font-size:12px;max-width:730px">'
         +'· Congelador '+_rzN(CONGELADOR_CJ)+' cj = capacidad máxima confirmada por Andrea (jul-2026).<br>'
@@ -22139,9 +22192,9 @@ async function rzDiagCierre(body){
       return '<div style="margin-bottom:3px"><b style="color:var(--text)">'+lbl+'</b> — pico: <b style="color:var(--accent)">'+esc(_fechaLarga(e.pico.ds))+'</b> ('+_rzN(e.pico.uds)+' uds)</div>'
         +'<div style="color:var(--text-3);font-size:11.5px">'+e.porDia.map(function(x){ const es=x.ds===e.pico.ds;
           return '<span style="'+(es?'color:var(--accent);font-weight:600':'')+'">'+esc(_fechaCorta(x.ds))+' '+_rzN(x.uds)+'</span>'; }).join(' · ')+'</div>'; }
-    console.log('DIAG CIERRE · bloque1 Auto+WM:', e1.porProd, '· pico:', e1.pico);
-    console.log('DIAG CIERRE · bloque2 resto:', e2.porProd, '· pico:', e2.pico);
-    console.log('DIAG CIERRE · bloque3 colchón 4 sem enero:', b3.porProd, '· desde', primerEne, 'hasta', finEne);
+    console.log('DIAG CIERRE · bloque1 Auto+WM: pedido del año pasado', e1.ped, '· factores', R.g1.map(function(g){ return [g.c, g.x.f]; }));
+    console.log('DIAG CIERRE · bloque2 resto: semana de cierre', e2.ped, '· semana normal', e2.base, '· factor', e2.f);
+    console.log('DIAG CIERRE · bloque3 enero', SEM, 'sem:', R.ene.porProd, '· desde', primerEne, 'hasta', finEne);
     console.log('DIAG CIERRE · TOTAL cajas:', total, '· congelador ref:', CONGELADOR_CJ);
     console.log('DIAG PICO · última semana', pIso, '·', pPers, 'personas ·', pA.plan.map(function(d){ return d.ds+':'+(d.pid?_nomCorto(d.pid)+'×'+d.batches:'—'); }).join(' '));
     console.log('DIAG PICO · meta', total, 'cj − última semana', pT.prodCj, 'cj = PICO REAL', pT.picoCj, 'cj · congelador', CONGELADOR_CJ, '· techo semana', pTecho, 'cj → pico mínimo', pPicoMin);
@@ -22160,15 +22213,15 @@ async function rzDiagCierre(body){
         +'<span style="color:var(--text-3);font-size:11.5px">cj</span>'
         +'<button onclick="cierreGuardarFechas()" style="background:none;border:.5px solid var(--border-strong);color:var(--text-2);font-size:11.5px;border-radius:6px;padding:4px 12px;cursor:pointer">Guardar y recalcular</button>'
       +'</div>'
-      +'<div style="margin-bottom:8px">'+detalle(e1,'Bloque 1 · entrega Auto + Walmart (dic pasado)')+'</div>'
-      +'<div style="margin-bottom:8px">'+detalle(e2,'Bloque 2 · entrega resto + HORECA + Abner (dic pasado)')+'</div>'
-      +'<div style="margin-bottom:18px"><b style="color:var(--text)">Bloque 3 · colchón</b> — primeras '+CIERRE_COLCHON_SEM+' semanas de venta real desde <b style="color:var(--accent)">'+esc(primerEne?_fechaLarga(primerEne):'—')+'</b>'+(finEne?(' hasta '+esc(_fechaLarga(finEne))):'')+' <span style="color:var(--text-3)">(ya incluyen el arranque fuerte del 11-ene)</span></div>'
+      +'<div style="margin-bottom:8px">'+detalle(e1,'Bloque 1 · pedido de cierre Auto + Walmart (dic pasado, × ritmo de hoy de cada cadena)')+'</div>'
+      +'<div style="margin-bottom:8px">'+detalle(e2,'Bloque 2 · resto + HORECA + Abner (extra de su semana de cierre, × ritmo de hoy)')+'</div>'
+      +'<div style="margin-bottom:18px"><b style="color:var(--text)">Bloque 3 · enero</b> — '+SEM+' semanas desde <b style="color:var(--accent)">'+esc(primerEne?_fechaLarga(primerEne):'—')+'</b>'+(finEne?(' hasta '+esc(_fechaLarga(finEne))):'')+' <span style="color:var(--text-3)">(ritmo de hoy × temporada de enero, como el plan)</span></div>'
       +'<table style="border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums">'
         +'<thead><tr style="color:var(--text-3);text-align:left">'
           +'<th rowspan="2" style="padding:0 16px 8px 0;vertical-align:bottom">Producto</th>'
           +'<th colspan="2" style="text-align:center;padding:0 0 4px;border-bottom:.5px solid var(--border)">1 · AUTO+WM</th>'
           +'<th colspan="2" style="text-align:center;padding:0 0 4px 18px;border-bottom:.5px solid var(--border)">2 · RESTO</th>'
-          +'<th colspan="2" style="text-align:center;padding:0 0 4px 18px;border-bottom:.5px solid var(--border)">3 · COLCHÓN 4 SEM</th>'
+          +'<th colspan="2" style="text-align:center;padding:0 0 4px 18px;border-bottom:.5px solid var(--border)">3 · ENERO '+SEM+' SEM</th>'
           +'<th style="text-align:right;padding:0 0 4px 18px;border-bottom:.5px solid var(--border)">META</th></tr>'
           +'<tr style="color:var(--text-3);font-weight:400">'
             +'<th style="text-align:right;padding:5px 0 8px">uds</th><th style="text-align:right;padding:5px 0 8px 10px">cj</th>'
@@ -22182,7 +22235,7 @@ async function rzDiagCierre(body){
       +'<div style="margin-top:10px;font-size:12px;color:var(--text-3)">Las '+_rzN(total)+' cj de la meta NO son el número del congelador: nunca están juntas. El que importa está abajo.</div>'
       +(avisos.length?('<div style="margin-top:14px;font-size:12px;color:var(--warn-2);max-width:730px">'+avisos.map(function(a){ return '⚠ '+esc(a); }).join('<br>')+'</div>'):'')
       +'<div style="color:var(--text-3);margin-top:16px;font-size:12px;max-width:730px">'
-        +'· Bloques 1 y 2 = el DÍA PICO de cada ventana (±3 días de la fecha configurada, del año pasado). El detalle diario está arriba.<br>'
+        +'· Bloques 1 y 2 = el pedido de cierre del año pasado (desde el lunes de su día pico hasta la última venta de dic), × venta semanal de hoy ('+CIERRE_FACTOR_SEM_HOY+' semanas) ÷ la de las '+CIERRE_FACTOR_SEM+' semanas antes del pedido, por cadena y producto.<br>'
         +'· Canal por PARTNER (la misma clasificación de Finanzas/Rentabilidad). "Resto" = MegaSuper · Compre Bien · BM · Super Negro · HORECA · Retail (incluye Abner) · Otros.<br>'
         +'· Cajas hacia arriba (Blanco/Semillas ÷6 · Francés/Buns ÷24 · Pizza/Galletas ÷12). Ventas netas (out_invoice − out_refund), por ID y uom_id.'
       +'</div>'
@@ -25323,7 +25376,20 @@ function planPanelMeta(){
     +'<tfoot><tr><td>Total</td><td>'+_rzN(metaCj)+'</td><td>'+_rzN(hoyCj)+'</td><td class="pm-falta">'+_rzN(faltaCj)+'</td></tr></tfoot>'
     +'</table>'
     +aviso
+    +planCierreCfgHTML(R)
     +'</div>';
+}
+// Fila de ajustes de la meta (b127): antes vivía solo en ?diag=cierre. Mismos campos y mismo guardado
+// (cierreGuardarFechas), con ids prefijados 'pl' porque el diagnóstico puede estar en el DOM a la vez.
+function planCierreCfgHTML(R){
+  const fc=R.fc||{};
+  return '<div class="pm-cfg">'
+    +'<label>Entrega Auto + Walmart<input id="plcierreFAutowm" type="date" value="'+esc(fc.autowm||'')+'"></label>'
+    +'<label>Resto<input id="plcierreFResto" type="date" value="'+esc(fc.resto||'')+'"></label>'
+    +'<label>Galletas dic<input id="plcierreGalDicCj" type="number" min="0" step="1" placeholder="cj" value="'+(fc.galDicCj?esc(String(fc.galDicCj)):'')+'">cj</label>'
+    +'<label>Enero<input id="plcierreSemEne" type="number" min="0" max="8" step="1" value="'+esc(String(R.semEne!=null?R.semEne:NIV_CFG_DEF.cierreSemEne))+'">sem</label>'
+    +'<button onclick="cierreGuardarFechas(\'pl\')">Guardar</button>'
+  +'</div>';
 }
 // Aviso contextual: aparece SOLO si el re-nivelado CAMBIARÍA algo (hay descuadre real entre las
 // ediciones y el plan actual). Misma condición que dispara "ya está nivelado" en planValidarCambios:
@@ -25385,7 +25451,7 @@ function planDesgloseMeta(){
     +'</tr></thead><tbody>'+filas+'</tbody>'
     +'<tfoot><tr><td>Total cajas</td><td>'+_rzN(t1)+'</td><td>'+_rzN(t2)+'</td><td>'+_rzN(tc)+'</td><td class="dm-meta">'+_rzN(tm)+'</td></tr></tfoot>'
     +'</table>'
-    +'<div class="pm-foot">Cajas calculadas de las ventas reales del año pasado, mismas fechas. "Estimado" (Galletas): sin historia del año pasado, va por ritmo actual + el antojo de diciembre puesto a mano.</div>'
+    +'<div class="pm-foot">Diciembre: pedido de cierre del año pasado × ritmo de hoy de cada cadena. Reapertura: '+_rzN(R.semEne)+' semanas de enero, como las proyecta el plan. "Estimado": sin historia en esa cadena.</div>'
     +'</div>';
 }
 // Desglose plegado: se despliega al clic (de entrada solo META vs HOY).
@@ -25547,11 +25613,12 @@ function planColchonOv(overrides){
     const prodB={}; cells.forEach(c=>{ if(c.ds<hoyStr) return; const pr=c.prods||{}; for(const k in pr) prodB[+k]=(prodB[+k]||0)+pr[k]; });
     NIV_PROD.forEach(p=>{ stock[p]=pre[p]+(prodB[p]||0)*NIV_INFO[p].rend-(ritmo[p]||0); });   // consumo = ritmo (fijo)
   }
-  return escColchon(stock, R.M);
+  return escColchon(stock, R.M, R.semEne);
 }
 // Aviso discreto del impacto en el colchón de las ediciones futuras (solo si hay ediciones).
 function planColchonAviso(){
   if(!_planCierre || !_planInputs) return '';
+  const SEM=_planCierre.semEne;
   // Cuenta TODAS las ediciones, no solo las futuras: una corrección de un día pasado también
   // mueve el colchón (la producción que no ocurrió no está), y la puerta vieja hacía que el aviso
   // ni se calculara en ese caso.
@@ -25567,9 +25634,9 @@ function planColchonAviso(){
   const bt=function(v){ return v==null?'—':_rzN(v,1); };
   const b=base.sem, e=ed.sem;
   let cuerpo;
-  if(b!=null && e!=null && e < b-0.05) cuerpo='el colchón <b>baja de '+bt(b)+' a '+bt(e)+' semanas</b> (meta '+CIERRE_COLCHON_SEM+'). Cada día sin producir en la rampa cuesta colchón.';
-  else if(b!=null && e!=null && e > b+0.05) cuerpo='el colchón <b>sube a '+bt(e)+' semanas</b> (meta '+CIERRE_COLCHON_SEM+').';
-  else cuerpo='el colchón <b>se mantiene en '+bt(e)+' semanas</b> (meta '+CIERRE_COLCHON_SEM+') — la producción se reacomodó sin costo.';
+  if(b!=null && e!=null && e < b-0.05) cuerpo='el colchón <b>baja de '+bt(b)+' a '+bt(e)+' semanas</b> (meta '+SEM+'). Cada día sin producir en la rampa cuesta colchón.';
+  else if(b!=null && e!=null && e > b+0.05) cuerpo='el colchón <b>sube a '+bt(e)+' semanas</b> (meta '+SEM+').';
+  else cuerpo='el colchón <b>se mantiene en '+bt(e)+' semanas</b> (meta '+SEM+') — la producción se reacomodó sin costo.';
   return '<div class="pl-impacto">Con '+partes.join(' · ')+' en la rampa, '+cuerpo+'</div>';
 }
 
