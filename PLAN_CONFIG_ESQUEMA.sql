@@ -28,7 +28,7 @@
 --   medir_lunes_frac         número 0–1  nivConfig()             NADIE (sin UI)
 --   cierre_fecha_autowm      fecha       cierreConfig()          cierreGuardar()
 --   cierre_fecha_resto       fecha       cierreConfig()          cierreGuardar()
---   cierre_galletas_dic_cj   número      cierreConfig()          cierreGuardar()
+--   cierre_galletas_dic_cj   número      NADIE desde b128        NADIE (se quitó el campo, 25-oct-2026)
 --   cierre_semanas_enero     número 0–8  nivConfig()             cierreGuardarFechas('pl') (b127)
 --   plan_meses               número 1–11 nivConfig()             NADIE (sin UI) — horizonte del plan (b126)
 --   compras_dia_fijo         objeto      nivConfig()             NADIE (sin UI) — se siembra con

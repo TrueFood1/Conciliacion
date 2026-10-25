@@ -101,9 +101,9 @@ async function main(){
   eq("14-dic: también 3 semanas (sin doble conteo de la semana del cierre)", [R14.fc.autowm, R14.semHoy, R14.total], ['2026-12-14', 3, total21]);
   CONFIG = [{clave:'cierre_fecha_autowm', valor:'2026-12-28'}]; var R28 = await cierreMeta(CFG, RITMO);
   eq("28-dic: cubre 2 (de su lunes a la reapertura)", R28.semHoy, 2);
-  // override manual de Galletas
+  // Galletas sin campo manual: una fila vieja de cierre_galletas_dic_cj ya no cambia nada
   CONFIG = [{clave:'cierre_galletas_dic_cj', valor:'10'}];
-  var Rg = await cierreMeta(CFG, RITMO); eq("Galletas dic a mano: 10 cj = 120 potes", Rg.M.filter(function(x){ return x.p===519; })[0].b1, 120);
+  var Rg = await cierreMeta(CFG, RITMO); eq("Galletas: la fila vieja de plan_config se ignora", Rg.M.filter(function(x){ return x.p===519; })[0].b1, m[519].b1);
   // semanas de enero desde la config
   CONFIG = [{clave:'cierre_semanas_enero', valor:'2'}];
   var cfg2 = await nivConfig(); eq("plan_config cierre_semanas_enero = 2", cfg2.cierreSemEne, 2);
@@ -131,13 +131,13 @@ async function main(){
   eq("tarjeta: fecha Auto+WM con su valor", /id="plcierreFAutowm" type="date" value="2026-12-21"/.test(html), true);
   eq("tarjeta: semanas de enero con su valor", /id="plcierreSemEne"[^>]*value="3"/.test(html), true);
   eq("tarjeta: botón guarda con prefijo pl", /cierreGuardarFechas\('pl'\)/.test(html), true);
-  var CAMPOS = {plcierreFAutowm:{value:'2026-12-21'}, plcierreFResto:{value:'2026-12-18'}, plcierreGalDicCj:{value:''}, plcierreSemEne:{value:'3'}};
+  var CAMPOS = {plcierreFAutowm:{value:'2026-12-21'}, plcierreFResto:{value:'2026-12-18'}, plcierreSemEne:{value:'3'}};
   var docViejo = document; var recargas = 0;
   document = {getElementById:function(id){ return CAMPOS[id] || (id==='planBody'?{}:null); }};
   var cpm = cargarPlanMeses; cargarPlanMeses = async function(){ recargas++; };
   INSERTADAS = []; await cierreGuardarFechas('pl');
-  eq("guardar desde el Plan: 4 filas", INSERTADAS.map(function(f){ return f.clave+'='+f.valor; }),
-     ['cierre_fecha_autowm=2026-12-21','cierre_fecha_resto=2026-12-18','cierre_galletas_dic_cj=','cierre_semanas_enero=3']);
+  eq("guardar desde el Plan: 3 filas", INSERTADAS.map(function(f){ return f.clave+'='+f.valor; }),
+     ['cierre_fecha_autowm=2026-12-21','cierre_fecha_resto=2026-12-18','cierre_semanas_enero=3']);
   eq("y re-proyecta el plan", recargas, 1);
   CAMPOS.plcierreSemEne.value = '12'; INSERTADAS = []; var alertas = []; alert = function(t){ alertas.push(t); };
   await cierreGuardarFechas('pl');

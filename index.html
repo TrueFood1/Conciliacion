@@ -5673,7 +5673,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 25 oct 2026 · b127';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 25 oct 2026 · b128';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -11610,15 +11610,14 @@ function _noServida(D1, D2){
 
 // Config de fechas (plan_config; la fila más reciente por clave manda).
 async function cierreConfig(){
-  const out={autowm:CIERRE_DEF_AUTOWM, resto:CIERRE_DEF_RESTO, galDicCj:null};   // galDicCj: override manual de galletas en la entrega grande de dic (cajas)
+  const out={autowm:CIERRE_DEF_AUTOWM, resto:CIERRE_DEF_RESTO};
   try{ const c=sbClient(); if(!c) return out;
     const {data,error}=await c.from('plan_config').select('clave,valor,creado_en').order('creado_en',{ascending:false});
     if(error||!data) return out;
     const seen={};
     for(const r of data){ if(seen[r.clave])continue; seen[r.clave]=1;
       if(r.clave==='cierre_fecha_autowm' && r.valor) out.autowm=String(r.valor).slice(0,10);
-      if(r.clave==='cierre_fecha_resto'  && r.valor) out.resto =String(r.valor).slice(0,10);
-      if(r.clave==='cierre_galletas_dic_cj'){ const n=parseFloat(r.valor); out.galDicCj=(isFinite(n)&&n>0)?n:null; } }
+      if(r.clave==='cierre_fecha_resto'  && r.valor) out.resto =String(r.valor).slice(0,10); }
   }catch(e){}
   return out;
 }
@@ -11627,16 +11626,14 @@ async function cierreConfig(){
 async function cierreGuardarFechas(pre){
   pre=pre||'';
   const $=function(id){ return document.getElementById(pre+id); };
-  const a=$('cierreFAutowm'), r=$('cierreFResto'), g=$('cierreGalDicCj'), n=$('cierreSemEne');
+  const a=$('cierreFAutowm'), r=$('cierreFResto'), n=$('cierreSemEne');
   const c=sbClient(); if(!c){ alert('Sin conexión con la base — no se guardó.'); return; }
   if(!a || !r || !/^\d{4}-\d{2}-\d{2}$/.test(a.value) || !/^\d{4}-\d{2}-\d{2}$/.test(r.value)){ alert('Fechas incompletas — no se guardó.'); return; }
   if(_calFinAnioOk && (a.value>=REAPERTURA || a.value<_lunesDe(CIERRE))){ alert('La entrega de Auto + Walmart tiene que caer entre la semana del cierre y la reapertura ('+REAPERTURA+') — no se guardó.'); return; }
   let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
-  const galVal=(g&&g.value!=='' && parseFloat(g.value)>0)?String(parseFloat(g.value)):'';   // vacío/0 = sin override (galletas vuelven al ritmo)
   const filas=[
       {clave:'cierre_fecha_autowm', valor:a.value, usuario:email||null},
-      {clave:'cierre_fecha_resto',  valor:r.value, usuario:email||null},
-      {clave:'cierre_galletas_dic_cj', valor:galVal, usuario:email||null}];
+      {clave:'cierre_fecha_resto',  valor:r.value, usuario:email||null}];
   if(n){ const v=parseInt(n.value,10);
     if(!(v>=0 && v<=8)){ alert('Semanas de enero: de 0 a 8 — no se guardó.'); return; }
     filas.push({clave:'cierre_semanas_enero', valor:String(v), usuario:email||null}); }
@@ -11827,16 +11824,18 @@ async function cierreMeta(cfg, ritmo){
   const kCub=function(x){ return (x.semLY>0) ? semHoy/x.semLY : 1; };
   // BLOQUE 2 (resto + HORECA + Abner), b127: las semanas de cierre COMPLETAS a su venta de hoy
   // (Andrea, 25-oct). Antes copiaba el extra que compraron en su semana de cierre de 2025 (≈ 2 de las 3
-  // semanas); ahora cubre de la semana después de su última entrega a la reapertura.
+  // semanas); ahora cubre de la semana después de la del cierre (o de la semana de su entrega, si cae
+  // más tarde) a la reapertura — misma regla que desdeCub.
   const desdeResto=(_lunesDe(fc.resto)>lunPost)?_lunesDe(fc.resto):lunPost;
   const semResto=Math.max(0, Math.round((new Date(_lunesDe(REAPERTURA)+'T00:00:00')-new Date(desdeResto+'T00:00:00'))/(7*86400000)));
-  const hoyResto=_cierreSuma(V.hoy, hoyIni, hoyFin, CIERRE_CANALES_2).porProd;
+  const hoyResto=_cierreSuma(V.hoy, hoyIni, hoyFin, CIERRE_CANALES_2).porProd;   // no depende de que haya historia del resto
   G1.forEach(function(g){ if(!g.x.vacio && !(g.x.semLY>0)) avisos.push('Sin venta de '+g.c+' en enero de '+(yLY+1)+': no se sabe cuántas semanas cubrió su pedido; va entero.'); });
-  if(e2.vacio) avisos.push('Sin ventas del resto de canales en '+e2.D1+' → '+e2.D2+' (bloque 2 queda en 0).');
   if(semEne>0 && ene.sinFac) avisos.push('Enero sin factor de temporada'+(_planTemp&&_planTemp.error?' ('+_planTemp.error+')':'')+': va al ritmo de hoy.');
 
-  const estim={};   // productos sin historia en una cadena → semanas que cubrió el pedido × venta de hoy
-  const galDicU=(fc.galDicCj>0)?fc.galDicCj*NIV_INFO[519].cajaU:null;   // override manual: galletas en la entrega grande de dic (cj → uds)
+  // Producto sin historia en una cadena (Galletas): crece en el pedido de cierre lo mismo que crecieron
+  // los otros productos de esa cadena — semCub = pedido de cierre ÷ su venta semanal normal, en cajas —
+  // sobre su venta semanal de hoy (Andrea, 25-oct). En el resto, como todos: semanas de cierre × venta de hoy.
+  const estim={};
   const b3Sem=function(p,k){ let t=0; for(let i=0;i<k && i<ene.porSem.length;i++) t+=ene.porSem[i].ritmo[p]||0; return t; };
   const M=NIV_PROD.map(function(p){
     const r=ritmo[p]||0;
@@ -11845,7 +11844,6 @@ async function cierreMeta(cfg, ritmo){
       const k=kCub(x);
       if(x.f[p]!=null) b1+=x.ped[p]*x.f[p]*k;
       else if(x.hoy[p]>0){ b1+=x.semCub*x.hoy[p]*k; b1e=true; } });
-    if(p===519 && galDicU!=null){ b1=galDicU; b1e=true; }                 // galletas dic = número manual de Andrea
     if(b1e) estim[p]=1;
     const b2=Math.max(0, hoyResto[p]||0)/CIERRE_FACTOR_SEM_HOY*semResto;   // semanas de cierre × venta semanal de hoy
     const b3=ene.porProd[p]||0;
@@ -22256,7 +22254,7 @@ async function rzDiagCierre(body){
         +'<div style="color:var(--text-3);font-size:11.5px">'+e.porDia.map(function(x){ const es=x.ds===e.pico.ds;
           return '<span style="'+(es?'color:var(--accent);font-weight:600':'')+'">'+esc(_fechaCorta(x.ds))+' '+_rzN(x.uds)+'</span>'; }).join(' · ')+'</div>'; }
     console.log('DIAG CIERRE · bloque1 Auto+WM: pedido del año pasado', e1.ped, '· factores', R.g1.map(function(g){ return [g.c, g.x.f]; }));
-    console.log('DIAG CIERRE · bloque2 resto: semana de cierre', e2.ped, '· semana normal', e2.base, '· factor', e2.f);
+    console.log('DIAG CIERRE · bloque2 resto:', R.semResto, 'semanas × venta semanal de hoy', e2.hoy);
     console.log('DIAG CIERRE · bloque3 enero', SEM, 'sem:', R.ene.porProd, '· desde', primerEne, 'hasta', finEne);
     console.log('DIAG CIERRE · TOTAL cajas:', total, '· congelador ref:', CONGELADOR_CJ);
     console.log('DIAG PICO · última semana', pIso, '·', pPers, 'personas ·', pA.plan.map(function(d){ return d.ds+':'+(d.pid?_nomCorto(d.pid)+'×'+d.batches:'—'); }).join(' '));
@@ -22271,9 +22269,6 @@ async function rzDiagCierre(body){
         +'<input id="cierreFAutowm" type="date" value="'+esc(fc.autowm)+'" style="background:var(--bg);border:.5px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-family:inherit;font-size:12px">'
         +'<span style="color:var(--text-3);font-size:11.5px">· resto + HORECA + Abner</span>'
         +'<input id="cierreFResto" type="date" value="'+esc(fc.resto)+'" style="background:var(--bg);border:.5px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-family:inherit;font-size:12px">'
-        +'<span style="color:var(--text-3);font-size:11.5px">· Galletas 14-dic (antojo)</span>'
-        +'<input id="cierreGalDicCj" type="number" min="0" step="1" value="'+(fc.galDicCj?esc(String(fc.galDicCj)):'')+'" placeholder="cj" title="Override manual de galletas en la entrega grande de dic, en cajas. Vacío = ritmo actual." style="width:56px;background:var(--bg);border:.5px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-family:inherit;font-size:12px">'
-        +'<span style="color:var(--text-3);font-size:11.5px">cj</span>'
         +'<button onclick="cierreGuardarFechas()" style="background:none;border:.5px solid var(--border-strong);color:var(--text-2);font-size:11.5px;border-radius:6px;padding:4px 12px;cursor:pointer">Guardar y recalcular</button>'
       +'</div>'
       +'<div style="margin-bottom:8px">'+detalle(e1,'Bloque 1 · pedido de cierre Auto + Walmart (dic pasado con lo no entregado, × ritmo de hoy de cada cadena, × '+R.semHoy+' de '+R.g1.map(function(g){ return g.x.semLY||'?'; }).join('/')+' semanas cubiertas)')+'</div>'
@@ -22298,7 +22293,7 @@ async function rzDiagCierre(body){
       +'<div style="margin-top:10px;font-size:12px;color:var(--text-3)">Las '+_rzN(total)+' cj de la meta NO son el número del congelador: nunca están juntas. El que importa está abajo.</div>'
       +(avisos.length?('<div style="margin-top:14px;font-size:12px;color:var(--warn-2);max-width:730px">'+avisos.map(function(a){ return '⚠ '+esc(a); }).join('<br>')+'</div>'):'')
       +'<div style="color:var(--text-3);margin-top:16px;font-size:12px;max-width:730px">'
-        +'· Bloques 1 y 2 = el pedido de cierre del año pasado (desde el lunes de su día pico hasta la última venta de dic), × venta semanal de hoy ('+CIERRE_FACTOR_SEM_HOY+' semanas) ÷ la de las '+CIERRE_FACTOR_SEM+' semanas antes del pedido, por cadena y producto.<br>'
+        +'· Bloque 1 = el pedido de cierre del año pasado (desde el lunes de su día pico hasta la última venta de dic), × venta semanal de hoy ('+CIERRE_FACTOR_SEM_HOY+' semanas) ÷ la de las '+CIERRE_FACTOR_SEM+' semanas antes del pedido, por cadena y producto. Bloque 2 = semanas de cierre × venta semanal de hoy.<br>'
         +'· Canal por PARTNER (la misma clasificación de Finanzas/Rentabilidad). "Resto" = MegaSuper · Compre Bien · BM · Super Negro · HORECA · Retail (incluye Abner) · Otros.<br>'
         +'· Cajas hacia arriba (Blanco/Semillas ÷6 · Francés/Buns ÷24 · Pizza/Galletas ÷12). Ventas netas (out_invoice − out_refund), por ID y uom_id.'
       +'</div>'
@@ -25449,7 +25444,6 @@ function planCierreCfgHTML(R){
   return '<div class="pm-cfg">'
     +'<label>Entrega Auto + Walmart<input id="plcierreFAutowm" type="date" value="'+esc(fc.autowm||'')+'"></label>'
     +'<label>Resto<input id="plcierreFResto" type="date" value="'+esc(fc.resto||'')+'"></label>'
-    +'<label>Galletas dic<input id="plcierreGalDicCj" type="number" min="0" step="1" placeholder="cj" value="'+(fc.galDicCj?esc(String(fc.galDicCj)):'')+'">cj</label>'
     +'<label>Enero<input id="plcierreSemEne" type="number" min="0" max="8" step="1" value="'+esc(String(R.semEne!=null?R.semEne:NIV_CFG_DEF.cierreSemEne))+'">sem</label>'
     +'<button onclick="cierreGuardarFechas(\'pl\')">Guardar</button>'
   +'</div>';
