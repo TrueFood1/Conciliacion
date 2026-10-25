@@ -593,19 +593,46 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .calc-num{width:100%;height:40px;background:var(--surface-2);border:1px solid var(--border-strong);color:var(--text);border-radius:8px;padding:0 11px;font-family:inherit;font-size:14px;outline:none;box-sizing:border-box;-moz-appearance:textfield}
 .calc-num::-webkit-outer-spin-button,.calc-num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .calc-num:focus{border-color:var(--mod)}
-.calc-costo{margin-top:8px;font-size:14px;color:var(--text-2)}
-.calc-costo b{color:var(--text);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
 .calc-tin{width:52px;background:var(--surface-2);border:1px solid var(--border-strong);color:var(--text);font-family:inherit;font-size:13px;text-align:right;border-radius:6px;padding:4px 5px;outline:none;-moz-appearance:textfield}
 .calc-tin::-webkit-outer-spin-button,.calc-tin::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .calc-tin:focus{border-color:var(--mod)}
-/* Constructor de receta (Calculadora, modo Producto nuevo) */
 .calc-rec{width:100%;border-collapse:collapse;font-size:13px}
+/* Calculadora b128: pestañas Costo / Precio */
+.calc-tabs{max-width:320px;margin-top:14px}
+.calc-panel{margin-top:14px}
+.calc-estado{margin-top:12px;font-size:12px;color:var(--text-2);line-height:1.6}
+.calc-fila{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}
+.calc-grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+@media(max-width:520px){.calc-grid2{grid-template-columns:1fr}}
+.calc-chips{display:flex;flex-wrap:wrap;gap:6px}
+.calc-rec th.r,.calc-rec td.r{text-align:right}
+.calc-rec td{white-space:nowrap}
+.calc-tag{font-size:11.5px;color:var(--text-2);white-space:nowrap}
+.calc-tag-fact{color:var(--good)}
+.calc-tag-est{color:var(--warn)}
+.calc-tag-falta{color:var(--stop-tx)}
+.calc-sum{font-size:13px;color:var(--text-2)}
+.calc-sum b{color:var(--text);font-variant-numeric:tabular-nums}
+.calc-total{font-size:22px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+.calc-u{font-size:12px;font-weight:400;color:var(--text-3)}
+.calc-flow{display:flex;flex-direction:column;gap:4px;margin-top:10px;font-size:12.5px;color:var(--text-2);font-variant-numeric:tabular-nums}
+.calc-flow>div{display:flex;justify-content:space-between;gap:8px}
+.calc-flow .calc-gan{font-weight:600;color:var(--text);border-top:1px solid var(--border);padding-top:4px}
+.calc-flow .calc-warn{color:var(--warn)}
+.calc-flow .calc-nota{color:var(--text-3);font-size:11.5px}
+.calc-vtxt{font-size:12px;color:var(--text-2);margin-top:6px;line-height:1.5}
+.calc-check{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-2);margin-top:2px}
+.calc-big input{height:44px;font-size:17px;font-weight:600;border-color:var(--mod)}
+.calc-bar{position:relative;height:10px;border-radius:5px;background:var(--surface-2);margin:28px 6px 30px}
+.calc-zone{position:absolute;top:0;bottom:0;border:1px solid var(--mod);border-radius:5px;background:color-mix(in srgb,var(--mod) 18%,transparent)}
+.calc-mk{position:absolute;top:-6px;width:2px;height:22px;background:var(--text)}
+.calc-lb{position:absolute;font-size:11.5px;white-space:nowrap;transform:translateX(-50%);color:var(--text-2);font-variant-numeric:tabular-nums}
+.calc-lb-t{top:-22px} .calc-lb-b{top:16px}
 .calc-rec th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-3);font-weight:600;padding:4px 6px;border-bottom:1px solid var(--border)}
 .calc-rec td{padding:5px 6px;border-bottom:1px solid var(--border);vertical-align:middle}
 .calc-rec .calc-num{height:32px}
 .calc-rec-x{background:none;border:1px solid var(--border-strong);color:var(--text-3);border-radius:6px;width:24px;height:24px;cursor:pointer;font-size:11px;line-height:1;padding:0}
 .calc-rec-x:hover{border-color:#7a3a3a;color:var(--err-6)}
-#calcTabla td, #calcTabla th{white-space:nowrap}
 tr:last-child td{border-bottom:none}
 tr.r-done td{background:#f2f9d6}
 tr.r-done{height:28px}
@@ -2750,7 +2777,7 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
   </div>
 </div>
 
-<!-- CALCULADORA DE PRECIOS DE VENTA (módulo Finanzas) — hipótesis en el cliente, solo lectura -->
+<!-- CALCULADORA DE PRECIOS (módulo Finanzas, b128) — pestañas Costo y Precio. Odoo solo lectura; recetas en Supabase `calc_receta` -->
 <div id="vCalcPrecios" class="hidden">
   <div class="faces">
     <button class="face" onclick="irAResultados()">Resultados</button>
@@ -2766,72 +2793,123 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
   <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
     <div>
       <div class="m3title" style="font-size:24px">Calculadora de precios</div>
-      <div class="m3sub" style="margin-top:2px;font-size:13px">No escribe nada.</div>
+      <div class="m3sub" style="margin-top:2px;font-size:13px">Odoo solo lectura · montos sin IVA salvo el PVP.</div>
     </div>
     <div class="live-ind"><span class="live-dot"></span>base en vivo de Odoo</div>
   </div>
-  <div id="calcStatus" class="status s-info hidden" style="margin-top:14px"></div>
-  <div id="calcBody" style="display:none">
-    <div class="sim-panel" style="margin-top:14px">
-      <div class="sim-h2">¿Desde dónde querés calcular?</div>
-      <div class="sim-seg" id="calcSeg" style="max-width:540px">
-        <button data-dir="A" class="on">Desde la góndola →</button>
-        <button data-dir="B">Desde tu costo →</button>
+  <div id="calcStatus" class="calc-estado hidden"></div>
+  <div class="sim-seg calc-tabs" id="calcTabs">
+    <button data-t="costo" class="on">Costo</button>
+    <button data-t="precio">Precio</button>
+  </div>
+
+  <!-- ── Pestaña COSTO ── -->
+  <div id="calcPCosto">
+    <div class="sim-panel calc-panel">
+      <div class="calc-fila">
+        <div class="calc-field" style="flex:1;min-width:180px"><label for="calcProd">Producto</label><select id="calcProd" class="calc-num"></select></div>
+        <div class="calc-field" id="calcRecBar" style="flex:2;min-width:200px"><label for="calcRecNombre">Receta</label><input type="text" id="calcRecNombre" class="calc-num" maxlength="80" placeholder="Nombre"></div>
+        <button class="btn btn-sm" id="calcNueva" style="align-self:flex-end;margin-bottom:11px">Receta nueva</button>
       </div>
-      <div class="m3sub" id="calcSegNote" style="font-size:12px;margin-top:9px"></div>
+      <div id="calcGuardBox" class="calc-fila hidden">
+        <div class="calc-field" style="flex:1;min-width:180px"><label for="calcGuardadas">Guardadas</label><select id="calcGuardadas" class="calc-num"></select></div>
+        <div class="calc-field" style="flex:1;min-width:160px"><label for="calcVersiones">Versión</label><select id="calcVersiones" class="calc-num hidden"></select></div>
+        <div class="calc-field" style="flex:2;min-width:200px"><label for="calcNota">Nota</label><input type="text" id="calcNota" class="calc-num" maxlength="300" placeholder="Opcional"></div>
+        <button class="btn btn-sm btn-p" id="calcGuardar" style="align-self:flex-end;margin-bottom:11px">Guardar</button>
+      </div>
+      <div id="calcGuardarMsg" class="calc-vtxt"></div>
     </div>
-    <div class="calc-grid" style="margin-top:14px">
-      <div class="sim-panel">
-        <div class="sim-h2">Costo del producto</div>
-        <div class="sim-seg" id="calcModeSeg" style="margin-bottom:14px">
-          <button data-mode="existente" class="on">Producto existente</button>
-          <button data-mode="nuevo">Producto nuevo</button>
-        </div>
-        <div class="calc-field" id="calcRefField"><label>Elegí el producto</label><select id="calcRef" class="calc-num" style="height:40px"></select></div>
-        <!-- ¿Cómo querés meter la materia prima? — solo visible en modo Producto nuevo -->
-        <div id="calcMpSeg" class="sim-seg hidden" style="margin-bottom:9px;max-width:100%">
-          <button data-mp="total" class="on">Sé el costo</button>
-          <button data-mp="receta">Armar la receta</button>
-        </div>
-        <div class="m3sub hidden" id="calcMpSegNote" style="font-size:11px;margin:-2px 0 10px"></div>
-        <!-- Forma 1 · costo total directo (y campo MP del modo existente) -->
-        <div class="calc-field" id="calcMpTotal"><label>Materia prima / unidad (₡)</label><input type="text" inputmode="numeric" id="calcMP" class="calc-num" placeholder="—"></div>
-        <!-- Formas 2 + 3 · constructor de receta (ingredientes de Odoo y/o nuevos, misma tabla) -->
-        <div id="calcMpReceta" class="hidden">
-          <div style="overflow-x:auto"><table id="calcRecTabla" class="calc-rec"></table></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">
-            <button class="btn btn-sm" onclick="calcRecAdd('odoo')">+ Ingrediente de Odoo</button>
-            <button class="btn btn-sm" onclick="calcRecAdd('nuevo')">+ Ingrediente nuevo</button>
-          </div>
-          <div class="calc-field" style="margin:12px 0 4px">
-            <label>¿Cuánto rinde la receta completa?</label>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-              <input type="text" inputmode="numeric" id="calcRecRinde" class="calc-num" placeholder="—" style="max-width:110px">
-              <div class="sim-seg" id="calcRindeSeg" style="flex:1;min-width:180px;max-width:230px">
-                <button data-ru="individual" class="on">Individuales</button>
-                <button data-ru="paquete">Paquetes</button>
-              </div>
-            </div>
-            
-          </div>
-          <div class="calc-costo" style="font-size:13px;margin-top:2px">MP total de la receta: <b id="calcRecTotal">—</b></div>
-          <div class="calc-costo" style="font-size:13px;margin-top:4px"><span id="calcRecMpULbl">MP por unidad:</span> <b id="calcRecMpU">—</b></div>
-        </div>
-        <div class="calc-field"><label>Indirecto del producto / mes (₡)</label><input type="text" inputmode="numeric" id="calcIndMes" class="calc-num" placeholder="—"></div>
-        <div class="calc-field" style="margin-bottom:6px"><label>Unidades estimadas / mes</label><input type="text" inputmode="numeric" id="calcUnid" class="calc-num" placeholder="—"></div>
-        <div class="calc-costo"><span id="calcCostoULbl">Costo por unidad:</span> <b id="calcCostoU">—</b></div>
-        <div class="m3sub" id="calcModeNote" style="font-size:11px;margin-top:5px">Indirecto/u = indirecto del mes ÷ unidades.</div>
-      </div>
-      <div class="sim-panel">
-        <div class="sim-h2" id="calcInputTitle">Precio de góndola objetivo</div>
-        <div id="calcInputA"><div class="calc-field"><label>Precio en el estante (₡)</label><input type="text" inputmode="numeric" id="calcGondola" class="calc-num" placeholder="—"></div></div>
-        <div id="calcInputB" class="hidden"><div class="calc-field"><label>Margen que querés ganar (%)</label><input type="text" inputmode="decimal" id="calcMargen" class="calc-num" placeholder="—"></div></div>
-        <div class="m3sub" id="calcInputNote" style="font-size:11px;margin-top:6px"></div>
+
+    <div id="calcRecWrap" class="sim-panel calc-panel">
+      <div class="sim-h2">Receta · una tanda</div>
+      <div style="overflow-x:auto"><table id="calcRecTabla" class="calc-rec"></table></div>
+      <datalist id="calcCatList"></datalist>
+      <div class="calc-fila" style="margin-top:10px;align-items:flex-end">
+        <button class="btn btn-sm" id="calcAddFila" style="margin-bottom:11px">+ Insumo</button>
+        <div class="calc-field" style="width:150px"><label for="calcRinde">Unidades por tanda</label><input type="text" inputmode="numeric" id="calcRinde" class="calc-num" data-cb="receta.rinde"></div>
+        <div class="calc-sum" style="margin-bottom:11px">Materia prima de la tanda: <b id="calcRecTotal"></b></div>
       </div>
     </div>
-    <div class="card-title" style="margin-top:20px">Comparación por canal</div>
-    <div class="m3sub" style="margin-top:2px">"Le pagan" = lo que la cadena te factura, comparable con Rentabilidad.</div>
-    <div class="card" style="margin-top:10px"><div style="overflow-x:auto"><table id="calcTabla"></table></div></div>
+
+    <div class="calc-grid">
+      <div class="sim-panel calc-panel">
+        <div class="sim-h2">Empaque por unidad</div>
+        <div class="calc-grid2">
+          <div class="calc-field"><label for="calcEmpBolsa">Bolsa (₡)</label><input type="text" inputmode="decimal" id="calcEmpBolsa" class="calc-num" data-cb="emp.bolsa" data-dec="2"></div>
+          <div class="calc-field"><label for="calcEmpEtiq">Etiqueta (₡)</label><input type="text" inputmode="decimal" id="calcEmpEtiq" class="calc-num" data-cb="emp.etiqueta" data-dec="2"></div>
+          <div class="calc-field"><label for="calcEmpCaja">Caja de despacho (₡)</label><input type="text" inputmode="decimal" id="calcEmpCaja" class="calc-num" data-cb="emp.caja" data-dec="2"></div>
+          <div class="calc-field"><label for="calcEmpUpc">Unidades por caja</label><input type="text" inputmode="numeric" id="calcEmpUpc" class="calc-num" data-cb="emp.upc"></div>
+        </div>
+      </div>
+      <div class="sim-panel calc-panel">
+        <div class="sim-h2">Indirecto por unidad</div>
+        <div id="calcIndRec" class="calc-grid2">
+          <div class="calc-field"><label for="calcIndDia">Indirecto por día de planta (₡) · <span id="calcIndEtiq"></span></label><input type="text" inputmode="decimal" id="calcIndDia" class="calc-num" data-cb="indDia"></div>
+          <div class="calc-field"><label for="calcUdsDia">Unidades que salen en un día</label><input type="text" inputmode="numeric" id="calcUdsDia" class="calc-num" data-cb="udsDia"></div>
+        </div>
+        <div id="calcIndTerm" class="calc-grid2 hidden">
+          <div class="calc-field"><label for="calcTermMp">Materia prima (₡) · <span id="calcTermEtiq"></span></label><input type="text" inputmode="decimal" id="calcTermMp" class="calc-num" data-cb="term.mp" data-dec="2"></div>
+          <div class="calc-field"><label for="calcTermInd">Indirecto (₡) · Costos por producto</label><input type="text" inputmode="decimal" id="calcTermInd" class="calc-num" data-cb="term.ind" data-dec="2"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sim-panel calc-panel">
+      <div class="sim-h2">Costo</div>
+      <div class="calc-total" id="calcCostoTot"></div>
+      <div class="calc-flow" id="calcCostoDes"></div>
+      <div class="calc-vtxt" id="calcFaltan" style="color:var(--warn)"></div>
+    </div>
+  </div>
+
+  <!-- ── Pestaña PRECIO ── -->
+  <div id="calcPPrecio" class="hidden">
+    <div class="calc-fila" style="margin-top:14px;gap:6px">
+      <div id="calcCadenas" class="calc-chips"></div>
+      <span style="width:10px"></span>
+      <div id="calcCats" class="calc-chips"></div>
+    </div>
+    <div class="calc-grid">
+      <div class="sim-panel calc-panel">
+        <div class="sim-h2">Condiciones de la cadena</div>
+        <div class="calc-grid2">
+          <div class="calc-field"><label for="calcMc">Margen de la cadena %</label><input type="text" inputmode="decimal" id="calcMc" class="calc-num" data-cc="mc"></div>
+          <div class="calc-field"><label for="calcCedi">CEDI %</label><input type="text" inputmode="decimal" id="calcCedi" class="calc-num" data-cc="cedi"></div>
+          <div class="calc-field"><label for="calcFijo">Fijo %</label><input type="text" inputmode="decimal" id="calcFijo" class="calc-num" data-cc="fijo"></div>
+          <div class="calc-field"><label for="calcCom">Comisión %</label><input type="text" inputmode="decimal" id="calcCom" class="calc-num" data-cc="com"></div>
+        </div>
+        <label class="calc-check"><input type="checkbox" id="calcFijoFact"> Fijo descontado en la factura</label>
+        <div id="calcUberBox" class="calc-grid2 hidden" style="margin-top:8px">
+          <div class="calc-field"><label for="calcUberPct">% de las ventas por Uber</label><input type="text" inputmode="decimal" id="calcUberPct" class="calc-num" data-cc="uberPct"></div>
+          <div class="calc-field"><label for="calcUberCom">Comisión Uber %</label><input type="text" inputmode="decimal" id="calcUberCom" class="calc-num" data-cc="uberCom"></div>
+        </div>
+        <div class="calc-field" style="max-width:150px;margin-top:8px"><label for="calcIva">IVA al consumidor %</label><input type="text" inputmode="decimal" id="calcIva" class="calc-num" data-cb="iva" data-dec="2"></div>
+      </div>
+      <div class="sim-panel calc-panel">
+        <div class="sim-h2">Precios</div>
+        <div class="calc-sum" style="margin-bottom:10px">Costo: <b id="calcCostoP"></b></div>
+        <div class="calc-field calc-big"><label for="calcMn">Nuestro margen %</label><input type="text" inputmode="decimal" id="calcMn" class="calc-num" data-anc="mn"></div>
+        <div class="calc-field calc-big"><label for="calcPf">Precio a la cadena · factura sin IVA (₡)</label><input type="text" inputmode="decimal" id="calcPf" class="calc-num" data-anc="pf"></div>
+        <div class="calc-field calc-big"><label for="calcPvp">PVP · con IVA (₡)</label><input type="text" inputmode="decimal" id="calcPvp" class="calc-num" data-anc="pvp"></div>
+        <div class="calc-flow" id="calcFlow"></div>
+      </div>
+    </div>
+    <div class="sim-panel calc-panel">
+      <div class="sim-h2">Ventana de negociación</div>
+      <div class="calc-fila" style="align-items:flex-end">
+        <div class="calc-field" style="width:150px"><label for="calcMmin">Margen mínimo %</label><input type="text" inputmode="decimal" id="calcMmin" class="calc-num" data-cb="mmin" data-dec="2"></div>
+        <div class="calc-field" style="width:170px"><label for="calcTechoModo">PVP máximo</label>
+          <select id="calcTechoModo" class="calc-num" data-te="modo"><option value="monto">Monto</option><option value="ref">Otra cadena +</option></select></div>
+        <div class="calc-field" id="calcTechoMonto" style="width:150px"><label for="calcTechoMontoIn">PVP máximo (₡)</label><input type="text" inputmode="numeric" id="calcTechoMontoIn" class="calc-num" data-te="monto"></div>
+        <div id="calcTechoRef" class="calc-fila hidden" style="align-items:flex-end">
+          <div class="calc-field" style="width:170px"><label for="calcTechoRefSel">Cadena</label><select id="calcTechoRefSel" class="calc-num" data-te="ref"></select></div>
+          <div class="calc-field" style="width:90px"><label for="calcTechoX">Más</label><input type="text" inputmode="decimal" id="calcTechoX" class="calc-num" data-te="x"></div>
+          <div class="calc-field" style="width:70px"><label for="calcTechoXTipo">&nbsp;</label><select id="calcTechoXTipo" class="calc-num" data-te="xTipo"><option>%</option><option>₡</option></select></div>
+        </div>
+      </div>
+      <div class="calc-vtxt" id="calcTechoRefVal"></div>
+      <div id="calcVentana"></div>
+    </div>
   </div>
 </div>
 
@@ -9928,8 +10006,7 @@ function irASimulador(){
 }
 function irACalcPrecios(){
   _modShow('vCalcPrecios'); crumbSet('Finanzas','Calculadora de precios');
-  if(!_loaded.calc){ _loaded.calc=true; cargarCalcPrecios(); }
-  else if(CALC){ calcReset(); }   // ya cargó datos → arrancar en cero otra vez (sin arrastrar la visita anterior)
+  if(!_loaded.calc){ _loaded.calc=true; cargarCalcPrecios(); }   // la sesión recuerda receta y precio por cadena
 }
 function irAResultados(){
   _modShow('vResultados'); crumbSet('Finanzas','Resultados');
@@ -28387,15 +28464,19 @@ function simBuildUI(){
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// CALCULADORA DE PRECIOS DE VENTA (Finanzas) — dos direcciones. Costo/términos del motor
-// real; góndola y margen deseado los pone Andrea. Cálculo en el cliente. SOLO LECTURA.
-// A (góndola→): le pagan = góndola×(1−margCadena); neto = le pagan×(1−términos); ganancia = neto−costo.
-// B (costo→): neto = costo/(1−margen%); a cobrar = neto/(1−términos); góndola = a cobrar/(1−margCadena).
+// CALCULADORA DE PRECIOS (Finanzas, b128, 25-oct-2026) — dos pestañas: Costo y Precio.
+// Odoo: SOLO LECTURA (search_read de product.product, uom.uom y account.move.line, dentro de
+// LECTURA_OK). Supabase: las recetas se guardan en `calc_receta` (append-only, solo socias); si la
+// tabla no existe la calculadora sigue andando sin guardar y lo dice en la línea de estado.
+//  · Costo por unidad de venta = materia prima + empaque + indirecto. Un insumo SIN PRECIO no cuenta
+//    como ₡0: el total sale «incompleto» con lo que falta.
+//  · Precio: neto = factura × (1 − CEDI − fijo − comisión − %Uber × comisión Uber);
+//    lo que paga la cadena = factura × (1 − descuentos EN FACTURA) — hoy solo el fijo de Fresh
+//    Market (plantilla del 20-oct: Pan Blanco ₡3.718 → PVP ₡5.820); el CEDI y el fijo de
+//    Automercado son cobros aparte y no bajan su base.
+//    PVP sin IVA = lo que paga la cadena ÷ (1 − margen de la cadena); PVP = × (1 + IVA).
+//    nuestro margen = (neto − costo) ÷ neto.
 // ════════════════════════════════════════════════════════════════════════
-const CALC_MC_DEFAULT = 30;   // margen de cadena default (% sobre góndola), editable
-let calcRefData={}, CALC=null;
-let calcIng=[], calcUom={}, calcUomByCat={};   // catálogo de ingredientes de Odoo + unidades (modo receta)
-const CALC_UNID_NUEVO=['g','kg','ml','L','unidad'];   // unidades para ingredientes nuevos (etiqueta; precio y cantidad comparten unidad)
 // ── Formato es-CR para inputs editables (punto miles, coma decimales) + parseo tolerante ──
 function _crFmt(n,dec){ n=Number(n)||0; return n.toLocaleString('es-CR',{minimumFractionDigits:0,maximumFractionDigits:(dec==null?0:dec)}); }
 function _crInt(s){ s=String(s).replace(/[^\d]/g,''); return s?parseInt(s,10):0; }   // enteros: quita separadores de miles
@@ -28413,243 +28494,529 @@ function _crLive(el){
   let idx=0,seen=0; while(idx<f.length && seen<before){ if(/\d/.test(f[idx]))seen++; idx++; }
   try{ el.setSelectionRange(idx,idx); }catch(e){}
 }
+// Campo en blanco = no se sabe (null), nunca 0.
+function _crNum(s){ s=String(s==null?'':s).trim(); if(!/\d/.test(s)) return null; return _crDec(s); }
+// Cantidad de receta: «77», «0,5», «1/2», «½», «1 ½», «⅔».
+const CALC_FRAC={'½':1/2,'⅓':1/3,'⅔':2/3,'¼':1/4,'¾':3/4,'⅛':1/8};
+function calcParseCant(txt){
+  let s=String(txt==null?'':txt).trim(); if(!s) return null;
+  let tot=0, hay=false;
+  s=s.replace(/[½⅓⅔¼¾⅛]/g,function(m){ tot+=CALC_FRAC[m]; hay=true; return ' '; }).trim();
+  const fr=s.match(/(\d+)\s*\/\s*(\d+)\s*$/);
+  if(fr){ if(+fr[2]===0) return null; tot+=(+fr[1])/(+fr[2]); hay=true; s=s.slice(0,fr.index).trim(); }
+  if(s){ if(!/\d/.test(s)) return hay?tot:null; tot+=_crDec(s); hay=true; }
+  return hay?tot:null;
+}
+
+// Categorías de UoM de Odoo POR ID (medido 25-oct-2026, uom.uom.read): 2 = Peso (referencia kg [12]),
+// 6 = Volumen (referencia L [10]), 1 = Unidad (referencia Unidades [1]). Precio por la referencia =
+// precio en la UoM de la línea × factor de esa UoM (g: factor 1000 → ₡/g × 1000 = ₡/kg).
+const CALC_UOM_CAT={2:'kg',6:'L',1:'u'};
+const CALC_POR_TXT={kg:'kg',L:'L',u:'unidad'};
+const CALC_UNIDADES=['g','kg','ml','L','taza','cda','cdta','unidad'];
+const CALC_MEDIDA={taza:120,cda:15,cdta:5};          // g (o ml) por medida, por defecto; editable por fila
+const CALC_UNI_REF={g:['kg',0.001],kg:['kg',1],ml:['L',0.001],L:['L',1],unidad:['u',1]};
+const CALC_IND_FIJO={monto:185603, etiqueta:'jul–sep 2026'};   // medido 25-oct: ₡10.393.764 ÷ 56 días
+const CALC_CADENAS=[{k:'auto',label:'Automercado'},{k:'wm',label:'Walmart'},{k:'fresh',label:'Fresh Market'},{k:'dir',label:'Cafés y directo'}];
+const CALC_CATS=[{k:'frio',label:'Frío'},{k:'anaquel',label:'Anaquel'}];
+const _CALC_MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function calcDiaMes(ds){ const m=String(ds||'').match(/^\d{4}-(\d{2})-(\d{2})/); return m?(+m[2])+'-'+_CALC_MES[+m[1]-1]:''; }
+// Condiciones por cadena y categoría (Andrea, 25-oct). null = no se sabe todavía. Anaquel en blanco.
+function calcCondBase(){
+  const v=function(){ return {mc:null,cedi:null,fijo:null,com:null,fijoEnFactura:false,uberPct:null,uberCom:null}; };
+  const C={}; CALC_CADENAS.forEach(function(c){ C[c.k]={frio:v(),anaquel:v()}; });
+  Object.assign(C.auto.frio,{mc:30,cedi:8,fijo:5});
+  Object.assign(C.wm.frio,{com:6.43});
+  Object.assign(C.fresh.frio,{mc:30,fijo:3,fijoEnFactura:true,uberCom:12.5});
+  Object.assign(C.dir.frio,{cedi:0,fijo:0}); Object.assign(C.dir.anaquel,{cedi:0,fijo:0});
+  return C;
+}
+// Receta de ejemplo (una tanda = una bolsa). Precios del 25-oct; al cargar el catálogo de Odoo, las
+// filas con producto se refrescan con la última factura en vivo.
+function calcBrownie(){
+  return {nombre:'Premezcla Brownie', rinde:1, filas:[
+    {nombre:'Avena molida',      pid:461,  cant:'77', uni:'g',    gpu:null, precio:2650,     por:'kg', fuente:'factura',  fecha:'2026-10-19'},
+    {nombre:'Linaza molida',     pid:null, cant:'12', uni:'g',    gpu:null, precio:1650,     por:'kg', fuente:'estimado', fecha:null},
+    {nombre:'Panela granulada',  pid:522,  cant:'½',  uni:'taza', gpu:160,  precio:1782.18,  por:'kg', fuente:'factura',  fecha:'2026-10-01'},
+    {nombre:'Cacao en polvo',    pid:529,  cant:'27', uni:'g',    gpu:null, precio:8910.89,  por:'kg', fuente:'factura',  fecha:'2026-10-08'},
+    {nombre:'Chocolate',         pid:null, cant:'⅔',  uni:'taza', gpu:150,  precio:13274.34, por:'kg', fuente:'estimado', fecha:null},
+    {nombre:'Sal',               pid:459,  cant:'2',  uni:'g',    gpu:null, precio:396,      por:'kg', fuente:'factura',  fecha:'2026-10-12'},
+    {nombre:'Polvo de hornear',  pid:null, cant:'5',  uni:'g',    gpu:null, precio:null,     por:'kg', fuente:null,       fecha:null},
+    {nombre:'Vainilla en polvo', pid:null, cant:'¼',  uni:'cdta', gpu:5,    precio:null,     por:'kg', fuente:null,       fecha:null}]};
+}
+function calcFilaVacia(){ return {nombre:'', pid:null, cant:'', uni:'g', gpu:null, precio:null, por:'kg', fuente:null, fecha:null}; }
+function calcEstadoBase(){
+  return {tab:'costo', prod:'receta', receta:calcBrownie(), term:{mp:null, ind:null, label:'', unidad:''},
+    emp:{bolsa:null, etiqueta:null, caja:null, upc:null},
+    indDia:CALC_IND_FIJO.monto, indEtiq:CALC_IND_FIJO.etiqueta, udsDia:null,
+    cad:'auto', cat:'frio', cond:calcCondBase(), iva:13,
+    ancla:'mn', val:40, pfCad:{}, mmin:25,
+    techos:{auto:{modo:'monto',monto:null,ref:'auto',x:5,xTipo:'%'}, wm:{modo:'monto',monto:null,ref:'auto',x:5,xTipo:'%'},
+            fresh:{modo:'ref',monto:null,ref:'auto',x:5,xTipo:'%'}, dir:{modo:'monto',monto:null,ref:'auto',x:5,xTipo:'%'}},
+    guardadaId:null};
+}
+
+// ── Costo ───────────────────────────────────────────────────────────────
+// Costo de una fila de receta. {costo:null, falta:…} cuando no se puede saber — nunca ₡0 inventado.
+function calcFilaCosto(f){
+  const q=calcParseCant(f.cant);
+  if(q==null||q<=0) return {costo:null, falta:'cantidad'};
+  if(f.precio==null) return {costo:null, falta:'precio'};
+  let tipo, cantRef;
+  if(CALC_MEDIDA[f.uni]!=null){           // taza / cda / cdta → gramos (o ml si el precio va por L)
+    if(!(f.gpu>0)) return {costo:null, falta:'gramos por '+f.uni};
+    tipo = f.por==='L' ? 'L' : 'kg'; cantRef=q*f.gpu/1000;
+  }else{
+    const r=CALC_UNI_REF[f.uni]; if(!r) return {costo:null, falta:'unidad'};
+    tipo=r[0]; cantRef=q*r[1];
+  }
+  if(tipo!==f.por) return {costo:null, falta:'unidad ('+f.uni+' contra precio por '+CALC_POR_TXT[f.por]+')'};
+  return {costo:cantRef*f.precio, falta:null};
+}
+function calcFilaUsada(f){ return !!(String(f.nombre||'').trim() || String(f.cant||'').trim()); }
+function calcRecetaMP(rec){
+  let total=0; const faltan=[];
+  (rec.filas||[]).forEach(function(f){ if(!calcFilaUsada(f)) return;
+    const r=calcFilaCosto(f);
+    if(r.costo==null) faltan.push((String(f.nombre||'').trim()||'insumo sin nombre')+': falta '+r.falta);
+    else total+=r.costo; });
+  const rinde=rec.rinde>0?rec.rinde:null;
+  if(!rinde) faltan.push('unidades por tanda');
+  return {total, porUnidad:rinde?total/rinde:total, completo:!faltan.length, faltan};
+}
+function calcCostoU(S){
+  const faltan=[]; let mp, ind;
+  if(S.prod==='receta'){ const r=calcRecetaMP(S.receta); mp=r.porUnidad; r.faltan.forEach(function(x){ faltan.push(x); }); }
+  else { mp=S.term.mp; if(mp==null){ mp=0; faltan.push('materia prima'); } }
+  const e=S.emp; let emp=0, empHay=false;
+  if(e.bolsa!=null){ emp+=e.bolsa; empHay=true; }
+  if(e.etiqueta!=null){ emp+=e.etiqueta; empHay=true; }
+  if(e.caja!=null){ if(e.upc>0){ emp+=e.caja/e.upc; empHay=true; } else faltan.push('unidades por caja'); }
+  if(!empHay && e.caja==null) faltan.push('empaque');
+  if(S.prod==='receta'){
+    if(S.indDia!=null && S.udsDia>0) ind=S.indDia/S.udsDia;
+    else { ind=0; faltan.push(S.indDia==null?'indirecto por día':'unidades por día (indirecto)'); }
+  }else{ ind=S.term.ind; if(ind==null){ ind=0; faltan.push('indirecto'); } }
+  return {mp, emp, ind, total:mp+emp+ind, completo:!faltan.length, faltan};
+}
+
+// ── Precio ──────────────────────────────────────────────────────────────
+function calcDesc(cond){
+  const p=function(x){ return (x||0)/100; };
+  const uber=p(cond.uberPct)*p(cond.uberCom);
+  return {d:p(cond.cedi)+p(cond.fijo)+p(cond.com)+uber, dF:cond.fijoEnFactura?p(cond.fijo):0, uber};
+}
+// ancla: 'mn' (nuestro margen %) · 'pf' (precio a la cadena, factura sin IVA) · 'pvp' (con IVA).
+function calcPrecio(cond,ivaPct,C,ancla,val){
+  const ds=calcDesc(cond), d=ds.d, dF=ds.dF, iva=(ivaPct||0)/100, mc=cond.mc==null?null:cond.mc/100;
+  let pf=null;
+  if(val!=null){
+    if(ancla==='mn'){ if(C!=null && val<100 && d<1) pf=C/(1-val/100)/(1-d); }
+    else if(ancla==='pf') pf=val;
+    else if(ancla==='pvp'){ if(mc!=null && mc<1 && dF<1) pf=val/(1+iva)*(1-mc)/(1-dF); }
+  }
+  const out={pf:null, neto:null, base:null, pvpSin:null, pvp:(ancla==='pvp'?val:null), mn:(ancla==='mn'?val:null), gan:null, d, dF, uber:ds.uber, faltaMc:mc==null};
+  if(pf==null) return out;
+  out.pf=pf; out.neto=pf*(1-d); out.base=pf*(1-dF);
+  if(mc!=null && mc<1){ out.pvpSin=out.base/(1-mc); out.pvp=out.pvpSin*(1+iva); }
+  else if(ancla!=='pvp') out.pvp=null;
+  if(C!=null){ out.gan=out.neto-C; if(ancla!=='mn') out.mn=out.neto>0?(out.neto-C)/out.neto*100:null; }
+  return out;
+}
+// PVP máximo: monto en ₡, o el PVP de otra cadena + X % / + ₡X.
+function calcTechoPvp(t,refPvp){
+  if(!t) return null;
+  if(t.modo==='monto') return t.monto;
+  if(refPvp==null) return null;
+  if(t.x==null) return refPvp;
+  return t.xTipo==='₡' ? refPvp+t.x : refPvp*(1+t.x/100);
+}
+function calcVentana(cond,ivaPct,C,mmin,pvpMax){
+  const piso = (mmin!=null) ? calcPrecio(cond,ivaPct,C,'mn',mmin).pf : null;
+  const techo = (pvpMax!=null) ? calcPrecio(cond,ivaPct,C,'pvp',pvpMax).pf : null;
+  return {piso, techo, hay:(piso!=null&&techo!=null)?techo>=piso:null};
+}
+// Precio a la cadena de cada cadena en esta sesión: el recordado, o el que da el margen de ahora.
+function calcPfDe(S,k,C){
+  if(k===S.cad) return calcPrecio(S.cond[k][S.cat],S.iva,C,S.ancla,S.val).pf;
+  if(S.pfCad[k]!=null) return S.pfCad[k];
+  const mn=calcPrecio(S.cond[S.cad][S.cat],S.iva,C,S.ancla,S.val).mn;
+  return calcPrecio(S.cond[k][S.cat],S.iva,C,'mn',mn).pf;
+}
+function calcPvpDe(S,k,C){ const pf=calcPfDe(S,k,C); return pf==null?null:calcPrecio(S.cond[k][S.cat],S.iva,C,'pf',pf).pvp; }
+// Cambio de cadena: la que se deja recuerda su precio; la nueva arranca del suyo o del margen actual.
+function calcCambiarCadena(S,k,C){
+  if(k===S.cad) return;
+  const r=calcPrecio(S.cond[S.cad][S.cat],S.iva,C,S.ancla,S.val);
+  if(r.pf!=null) S.pfCad[S.cad]=r.pf;
+  const mn=r.mn!=null?r.mn:40;
+  S.cad=k;
+  if(S.pfCad[k]!=null){ S.ancla='pf'; S.val=S.pfCad[k]; } else { S.ancla='mn'; S.val=mn; }
+}
+
+// ── Catálogo de insumos (Odoo, solo lectura) ────────────────────────────
+// Cualquier producto comprable. Precio = la última factura de proveedor (in_invoice posteada,
+// display_type 'product'), sin IVA (balance ÷ cantidad, en colones), llevado a la referencia de su
+// categoría por product_uom_id → factor. Sin factura: standard_price en la UoM del producto, «promedio».
+function calcArmarCatalogo(prods,lineas,uoms){
+  const U={}; (uoms||[]).forEach(function(u){ U[u.id]={factor:u.factor||1, cat:u.category_id&&u.category_id[0]}; });
+  const porDe=function(uid){ const u=U[uid]; return (u&&CALC_UOM_CAT[u.cat])||'u'; };
+  const fac=function(uid){ return (U[uid]&&U[uid].factor)||1; };
+  const ult={};
+  (lineas||[]).forEach(function(l){ const pid=l.product_id&&l.product_id[0]; if(!pid||ult[pid]) return;
+    const uid=l.product_uom_id&&l.product_uom_id[0]; if(!uid) return;
+    const pu = (l.quantity>0 && l.balance>0) ? l.balance/l.quantity : (l.price_unit||0);
+    if(!(pu>0)) return;
+    ult[pid]={precio:pu*fac(uid), por:porDe(uid), fuente:'factura', fecha:String(l.date||'').slice(0,10)}; });
+  const cat={};
+  (prods||[]).forEach(function(p){ const uid=p.uom_id&&p.uom_id[0];
+    const base={pid:p.id, name:String(p.name||'').trim()};
+    if(ult[p.id]) cat[p.id]=Object.assign(base,ult[p.id]);
+    else if(p.standard_price>0) cat[p.id]=Object.assign(base,{precio:p.standard_price*fac(uid), por:porDe(uid), fuente:'promedio', fecha:null});
+    else cat[p.id]=Object.assign(base,{precio:null, por:porDe(uid), fuente:null, fecha:null}); });
+  return cat;
+}
+// Vincula una fila a un producto del catálogo (precio, unidad del precio y de dónde sale).
+function calcFilaDesdeCatalogo(f,g){
+  f.pid=g.pid; f.nombre=g.name; f.precio=g.precio; f.por=g.por; f.fuente=g.fuente; f.fecha=g.fecha;
+  if(g.por==='u' && f.uni!=='unidad') f.uni='unidad';
+  if(g.por==='L' && (f.uni==='g'||f.uni==='kg')) f.uni='ml';
+  if(g.por==='kg' && (f.uni==='ml'||f.uni==='L'||f.uni==='unidad')) f.uni='g';
+  return f;
+}
+// Refresca con el catálogo en vivo las filas que vienen de Odoo (las «estimado» las puso alguien a mano).
+function calcRefrescarFilas(rec,cat){
+  (rec.filas||[]).forEach(function(f){ const g=f.pid&&cat[f.pid];
+    if(g && f.fuente!=='estimado' && g.precio!=null){ f.precio=g.precio; f.por=g.por; f.fuente=g.fuente; f.fecha=g.fecha; } });
+}
+
+// ── Recetas guardadas (Supabase `calc_receta`, append-only) ─────────────
+function calcRecetaPayload(S,nota){
+  const e=S.emp;
+  return {nombre:String(S.receta.nombre||'').trim().slice(0,80), nota:(String(nota||'').trim().slice(0,300)||null),
+    datos:{insumos:(S.receta.filas||[]).filter(calcFilaUsada).map(function(f){ return {
+        producto_id:f.pid||null, nombre:String(f.nombre||'').trim(), cantidad:calcParseCant(f.cant), cantidad_txt:String(f.cant||'').trim(),
+        unidad:f.uni, gramos_por_unidad:(CALC_MEDIDA[f.uni]!=null && f.gpu>0)?f.gpu:null,
+        precio_kg:f.precio, precio_por:f.por, precio_de:(f.precio==null?'falta precio':(f.fuente||'estimado')), precio_fecha:f.fecha||null}; }),
+      bolsas_por_tanda:S.receta.rinde||null,
+      empaque:{bolsa:e.bolsa, etiqueta:e.etiqueta, caja:e.caja, bolsas_por_caja:e.upc},
+      indirecto_dia:S.indDia, bolsas_por_dia:S.udsDia}};
+}
+function calcVersionSiguiente(filas,nombre){
+  const n=String(nombre||'').trim(); let max=0;
+  (filas||[]).forEach(function(r){ if(String(r.nombre||'').trim()===n && +r.version>max) max=+r.version; });
+  return max+1;
+}
+// La versión vigente de cada receta (la de número más alto), por nombre.
+function calcUltimas(filas){
+  const m={}; (filas||[]).forEach(function(r){ if(!m[r.nombre] || +r.version>+m[r.nombre].version) m[r.nombre]=r; });
+  return Object.keys(m).sort(function(a,b){ return a.localeCompare(b,'es'); }).map(function(k){ return m[k]; });
+}
+function calcAplicarGuardada(S,row){
+  const d=row.datos||{};
+  S.prod='receta';
+  S.receta={nombre:row.nombre, rinde:d.bolsas_por_tanda!=null?+d.bolsas_por_tanda:null,
+    filas:(d.insumos||[]).map(function(x){ return {nombre:x.nombre||'', pid:x.producto_id||null,
+      cant:x.cantidad_txt||(x.cantidad!=null?_crFmt(x.cantidad,3):''), uni:x.unidad||'g', gpu:x.gramos_por_unidad,
+      precio:x.precio_kg, por:x.precio_por||'kg', fuente:(x.precio_kg==null?null:(x.precio_de==='falta precio'?'estimado':x.precio_de)), fecha:x.precio_fecha||null}; })};
+  const e=d.empaque||{};
+  S.emp={bolsa:e.bolsa==null?null:+e.bolsa, etiqueta:e.etiqueta==null?null:+e.etiqueta, caja:e.caja==null?null:+e.caja, upc:e.bolsas_por_caja==null?null:+e.bolsas_por_caja};
+  if(d.indirecto_dia!=null){ S.indDia=+d.indirecto_dia; }
+  S.udsDia=d.bolsas_por_dia==null?null:+d.bolsas_por_dia;
+  S.guardadaId=row.id;
+  return S;
+}
+function _calcSinTabla(err){
+  const m=String((err&&(err.message||err.details))||err||'');
+  return (err&&err.code==='PGRST205') || /calc_receta/.test(m) && /(not exist|schema cache|relation|could not find)/i.test(m);
+}
+
+// ── Estado de la vista ──────────────────────────────────────────────────
+let CALC=null, calcCat={}, calcTerm={}, calcGuardadas=[], calcSb={ok:false, msg:''}, calcOdooMsg='';
 
 async function cargarCalcPrecios(){
-  const st=document.getElementById('calcStatus'), body=document.getElementById('calcBody');
-  st.className='status s-info'; st.classList.remove('hidden'); st.innerHTML='<span class="spin"></span>Leyendo costos y términos reales de Odoo…';
-  body.style.display='none';
+  CALC=calcEstadoBase();
+  calcBuildUI(); calcPintarTodo();
+  calcEstado('Leyendo Odoo…');
+  const msgs=[];
+  // 1) Terminados + indirecto por día (misma regla de Costos por producto)
   try{
-    const {prods}=await computeCostos();   // costos reales (MP + indirecto por producto)
-    calcRefData={};
-    prods.forEach(p=>{ calcRefData[p.key]={label:p.label, mp:(p.mp.mpUnit||0)*(p.pack||1), indMes:p.indAsignado||0, unid:p.unidades||0}; });
-    // Catálogo de ingredientes que Andrea YA compra (hojas de todos los BOMs), con su precio real y unidad base
-    const ingMap={};
-    prods.forEach(p=>(p.mp.ingredientes||[]).forEach(g=>{ if(g.pid && !ingMap[g.pid]) ingMap[g.pid]={pid:g.pid, name:g.name, price:g.price||0, uom:g.uom}; }));
-    calcIng=Object.values(ingMap).sort((a,b)=>a.name.localeCompare(b.name,'es'));
-    // Catálogo de unidades de Odoo (para convertir cantidad → unidad del precio). Siembra también _uomFac.
-    calcUom={}; calcUomByCat={};
-    try{
-      const uoms=await odooCall('uom.uom','search_read',[[]],{fields:['id','name','factor','category_id']});
-      uoms.forEach(u=>{ const cat=u.category_id&&u.category_id[0]; calcUom[u.id]={name:u.name, factor:u.factor||1, cat}; _uomFac[u.id]=u.factor||1;
-        (calcUomByCat[cat]=calcUomByCat[cat]||[]).push({id:u.id, name:u.name, factor:u.factor||1}); });
-    }catch(e){ console.warn('uom.uom:',e); }
-    calcBuildUI(); calcReset();   // arranca en cero (sin arrastrar datos de la visita anterior)
-    st.classList.add('hidden'); body.style.display='block';
-  }catch(e){ console.error('cargarCalcPrecios:',e); st.className='status s-err'; st.innerHTML='No pude cargar la calculadora: '+esc(e&&e.message||e); }
-}
-function calcAplicarRef(key){ const r=calcRefData[key]; if(!r)return; CALC.mp=Math.round(r.mp); CALC.indMes=Math.round(r.indMes); CALC.unid=Math.round(r.unid); }
-function calcCostoU(){ return (CALC.mp||0) + (CALC.unid ? (CALC.indMes||0)/CALC.unid : 0); }
-// Enlaza un input numérico con formato es-CR: live = formatea miles al tipear (enteros); dec = decimales al salir
-function calcBindNum(id,prop,dec,live){
-  const el=document.getElementById(id); if(!el) return;
-  el.oninput=()=>{ if(live) _crLive(el); CALC[prop]=Math.max(0, dec?_crDec(el.value):_crInt(el.value)); calcRender(); };
-  el.onblur=()=>{ const v=CALC[prop]; el.value=(v===0||v==null)?'':_crFmt(v,dec); };
-}
-function calcBuildUI(){
-  const sel=document.getElementById('calcRef');
-  sel.innerHTML='<option value="">— Elegí un producto —</option>'+Object.keys(calcRefData).map(k=>'<option value="'+k+'">'+esc(calcRefData[k].label)+'</option>').join('');
-  sel.onchange=e=>{ CALC.ref=e.target.value; if(CALC.ref){ calcAplicarRef(CALC.ref); } else { CALC.mp=0; CALC.indMes=0; CALC.unid=0; } calcRender(); };
-  calcBindNum('calcMP','mp',0,true); calcBindNum('calcIndMes','indMes',0,true); calcBindNum('calcUnid','unid',0,true);
-  calcBindNum('calcGondola','gondola',0,true); calcBindNum('calcMargen','margen',2,false);
-  document.querySelectorAll('#calcSeg button').forEach(b=>b.onclick=()=>calcSetDir(b.dataset.dir));
-  document.querySelectorAll('#calcModeSeg button').forEach(b=>b.onclick=()=>calcSetMode(b.dataset.mode));
-  document.querySelectorAll('#calcMpSeg button').forEach(b=>b.onclick=()=>calcSetMpMode(b.dataset.mp));
-  const rinde=document.getElementById('calcRecRinde');
-  if(rinde){ rinde.oninput=()=>{ _crLive(rinde); CALC.receta.rinde=_crInt(rinde.value); calcRecSync(); calcRender(); };
-             rinde.onblur=()=>{ rinde.value=CALC.receta.rinde?_crFmt(CALC.receta.rinde,0):''; }; }
-  document.querySelectorAll('#calcRindeSeg button').forEach(b=>b.onclick=()=>calcSetRindeUnid(b.dataset.ru));
-}
-// Estado en cero: sin producto, campos en blanco, receta vacía, switches en default (dir A, modo existente)
-function calcReset(){
-  const canales = CANALES_PRECIO.map(c=>({label:c.label, mc:CALC_MC_DEFAULT, t:+(canalComProy(c,false)*100).toFixed(2), canal:c}));
-  CALC={dir:'A', mode:'existente', mpMode:'total', receta:{rinde:0, lines:[], rindeUnid:'individual'}, ref:'', mp:0, indMes:0, unid:0, gondola:0, margen:0, canales};
-  const sel=document.getElementById('calcRef'); if(sel) sel.value='';
-  const rinde=document.getElementById('calcRecRinde'); if(rinde) rinde.value='';
-  document.querySelectorAll('#calcRindeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.ru==='individual'));
-  document.querySelectorAll('#calcMpSeg button').forEach(b=>b.classList.toggle('on',b.dataset.mp==='total'));
-  calcRecRender();          // limpia la tabla de receta
-  calcSetDir('A');          // dirección default
-  calcSetMode('existente'); // dropdown visible, sin producto → todo en blanco (hace calcRender)
-}
-// Modo: "existente" = precarga datos reales de Odoo del producto elegido (editables) · "nuevo" = campos en blanco
-function calcSetMode(mode){
-  CALC.mode=mode;
-  document.querySelectorAll('#calcModeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===mode));
-  const rf=document.getElementById('calcRefField'); if(rf) rf.style.display = mode==='existente' ? '' : 'none';
-  const seg=document.getElementById('calcMpSeg'); if(seg) seg.classList.toggle('hidden', mode!=='nuevo');
-  const segNote=document.getElementById('calcMpSegNote'); if(segNote) segNote.classList.toggle('hidden', mode!=='nuevo');
-  const note=document.getElementById('calcModeNote');
-  if(mode==='existente'){
-    calcAplicarRef(CALC.ref);   // carga MP/indirecto/unidades reales del producto seleccionado
-    document.getElementById('calcMpTotal').classList.remove('hidden');
-    document.getElementById('calcMpReceta').classList.add('hidden');
-    if(note) note.textContent='Datos reales de Odoo, editables por si querés simular un cambio. Indirecto/u = indirecto del mes ÷ unidades.';
-    calcRender();
-  }else{
-    CALC.mp=0; CALC.indMes=0; CALC.unid=0;   // todo en blanco; la MP la define la forma elegida
-    if(note) note.textContent='Producto que aún no está en Odoo. Elegí cómo armar la materia prima. Indirecto/u = indirecto del mes ÷ unidades.';
-    calcSetMpMode(CALC.mpMode);   // aplica Forma 1/2/3 → hace su propio calcRender
-  }
-}
-// Forma de meter la MP en modo nuevo: "total" (escribo el costo) · "receta" (constructor de ingredientes Odoo + nuevos)
-function calcSetMpMode(m){
-  CALC.mpMode=m;
-  document.querySelectorAll('#calcMpSeg button').forEach(b=>b.classList.toggle('on',b.dataset.mp===m));
-  document.getElementById('calcMpTotal').classList.toggle('hidden', m!=='total');
-  document.getElementById('calcMpReceta').classList.toggle('hidden', m!=='receta');
-  const segNote=document.getElementById('calcMpSegNote');
-  if(m==='total'){
-    if(segNote) segNote.textContent='Escribí directo la materia prima por unidad, si ya la sabés.';
-    // conserva el CALC.mp que haya (lo edita el campo)
-  }else{
-    if(segNote) segNote.textContent='Sumá ingredientes de Odoo (precio real) y/o nuevos (a mano). MP/u = total de la receta ÷ unidades que rinde.';
-    calcRecRender(); calcRecSync();   // deriva CALC.mp de la receta
-  }
-  calcRender();
-}
-// ── Constructor de receta (Formas 2+3) ──────────────────────────────────
-// Costo de una línea: Odoo = cantidad convertida a la unidad del precio × precio real; nuevo = cantidad × precio (misma unidad).
-function calcRecLineCost(l){
-  const qty=+l.qty||0; if(qty<=0) return 0;
-  if(l.tipo==='nuevo') return qty*(+l.precio||0);
-  const ing=calcIng.find(g=>g.pid===l.pid); if(!ing) return 0;
-  const fBase=_uomFac[ing.uom]||1, fSel=_uomFac[l.uom]||fBase;   // qtyBase = qty × factor(base)/factor(elegida)
-  return qty*(fBase/fSel)*(ing.price||0);
-}
-function calcRecTotal(){ return (CALC.receta.lines||[]).reduce((s,l)=>s+calcRecLineCost(l),0); }
-// Unidad de la corrida: "paquete" solo si estamos en receta y Andrea eligió paquetes; si no, "unidad".
-// Define en qué unidad quedan MP/u, costo/u, góndola y margen (toda la corrida es consistente).
-function calcUnidWord(){ return (CALC.mode==='nuevo' && CALC.mpMode==='receta' && CALC.receta.rindeUnid==='paquete') ? 'paquete' : 'unidad'; }
-function calcSetRindeUnid(u){
-  CALC.receta.rindeUnid=u;
-  document.querySelectorAll('#calcRindeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.ru===u));
-  calcRecSync(); calcRender();
-}
-// Deriva MP/unidad de la receta y refresca los readouts (no reconstruye la tabla → no roba foco)
-function calcRecSync(){
-  const total=calcRecTotal(), rinde=CALC.receta.rinde||0, w=calcUnidWord();
-  if(CALC.mpMode==='receta') CALC.mp = rinde ? total/rinde : 0;
-  const t=document.getElementById('calcRecTotal'); if(t) t.textContent = total>0 ? cM(total) : '—';
-  const lbl=document.getElementById('calcRecMpULbl'); if(lbl) lbl.textContent = 'MP por '+w+':';
-  const u=document.getElementById('calcRecMpU'); if(u) u.textContent = (rinde && total>0) ? cM(total/rinde) : '—';
-}
-function calcRecAdd(tipo){
-  if(tipo==='odoo'){ const g=calcIng[0]; CALC.receta.lines.push({tipo:'odoo', pid:g?g.pid:null, qty:0, uom:g?g.uom:null}); }
-  else CALC.receta.lines.push({tipo:'nuevo', nombre:'', precio:0, qty:0, uom:'g'});
-  calcRecRender(); calcRecSync(); calcRender();
-}
-function calcRecUnidOpts(l){   // opciones de unidad para una línea
-  if(l.tipo==='nuevo') return CALC_UNID_NUEVO.map(u=>'<option'+(u===l.uom?' selected':'')+'>'+u+'</option>').join('');
-  const ing=calcIng.find(g=>g.pid===l.pid); const cat=ing&&calcUom[ing.uom]&&calcUom[ing.uom].cat;
-  const list=(cat&&calcUomByCat[cat]&&calcUomByCat[cat].length)?calcUomByCat[cat]
-            :(ing?[{id:ing.uom,name:(calcUom[ing.uom]||{}).name||'u'}]:[]);
-  return list.map(u=>'<option value="'+u.id+'"'+(u.id===l.uom?' selected':'')+'>'+esc(u.name)+'</option>').join('');
-}
-function calcRecRender(){
-  const tb=document.getElementById('calcRecTabla'); if(!tb) return;
-  const lines=CALC.receta.lines||[];
-  if(!lines.length){ tb.innerHTML='<tbody><tr><td class="muted" style="padding:8px 4px;font-size:12px">Agregá ingredientes con los botones de abajo ↓</td></tr></tbody>'; return; }
-  let h='<thead><tr><th>Ingrediente</th><th style="text-align:right">Precio</th><th style="text-align:right">Cant.</th><th>Unidad</th><th style="text-align:right">Costo</th><th></th></tr></thead><tbody>';
-  lines.forEach((l,i)=>{
-    const cost=calcRecLineCost(l);
-    const costCell='<td style="text-align:right"><strong class="rec-cost">'+(cost>0?cM(cost):'—')+'</strong></td>';
-    const xCell='<td><button class="calc-rec-x" data-i="'+i+'">✕</button></td>';
-    if(l.tipo==='odoo'){
-      const ing=calcIng.find(g=>g.pid===l.pid);
-      const opts=calcIng.map(g=>'<option value="'+g.pid+'"'+(g.pid===l.pid?' selected':'')+'>'+esc(g.name)+'</option>').join('');
-      const pu=ing?(calcUom[ing.uom]||{}).name||'':'';
-      h+='<tr><td><select class="calc-num rec-in" data-i="'+i+'" data-k="pid" style="min-width:150px">'+opts+'</select></td>'
-        +'<td style="text-align:right;color:var(--text-3);white-space:nowrap;font-size:12px">'+(ing?cM(ing.price):'—')+(pu?'<span style="color:var(--text-3)">/'+esc(pu)+'</span>':'')+'</td>'
-        +'<td style="text-align:right"><input type="text" inputmode="decimal" class="calc-tin rec-in" data-i="'+i+'" data-k="qty" value="'+(l.qty?_crFmt(l.qty,3):'')+'"></td>'
-        +'<td><select class="calc-num rec-in" data-i="'+i+'" data-k="uom" style="width:auto;min-width:60px">'+calcRecUnidOpts(l)+'</select></td>'
-        +costCell+xCell+'</tr>';
-    }else{
-      h+='<tr><td><input type="text" class="calc-num rec-in" data-i="'+i+'" data-k="nombre" value="'+esc(l.nombre||'')+'" placeholder="Ingrediente nuevo" style="min-width:150px"></td>'
-        +'<td style="text-align:right"><input type="text" inputmode="numeric" class="calc-tin rec-in" data-i="'+i+'" data-k="precio" value="'+(l.precio?_crFmt(l.precio,0):'')+'" style="width:66px"></td>'
-        +'<td style="text-align:right"><input type="text" inputmode="decimal" class="calc-tin rec-in" data-i="'+i+'" data-k="qty" value="'+(l.qty?_crFmt(l.qty,3):'')+'"></td>'
-        +'<td><select class="calc-num rec-in" data-i="'+i+'" data-k="uom" style="width:auto;min-width:60px">'+calcRecUnidOpts(l)+'</select></td>'
-        +costCell+xCell+'</tr>';
+    const r=await computeCostos();
+    calcTerm={};
+    r.prods.forEach(function(p){ const pack=p.pack||1;
+      calcTerm[p.key]={label:p.label, unidad:p.unidad||'por unidad', mp:(p.mp.mpUnit||0)*pack, ind:p.indPerSales||0}; });
+    if(r.totalDias>0 && r.poolAvg>0 && r.ventana && r.ventana.length){
+      const v=r.ventana, a=+v[0].D1.slice(5,7)-1, b=+v[v.length-1].D1.slice(5,7)-1, y=v[v.length-1].D1.slice(0,4);
+      const etiq=_CALC_MES[a]+'–'+_CALC_MES[b]+' '+y;
+      if(CALC.indEtiq===CALC_IND_FIJO.etiqueta && CALC.indDia===CALC_IND_FIJO.monto){ CALC.indDia=r.poolAvg/r.totalDias; CALC.indEtiq=etiq; }
     }
+  }catch(e){ console.warn('calculadora · costos:',e); msgs.push('terminados e indirecto: sin Odoo (indirecto fijo '+CALC_IND_FIJO.etiqueta+')'); }
+  // 2) Catálogo de insumos comprables + última factura
+  try{
+    const [prods,uoms]=await Promise.all([
+      odooCall('product.product','search_read',[[['purchase_ok','=',true]]],{fields:['id','name','uom_id','standard_price'],limit:5000}),
+      odooCall('uom.uom','search_read',[[]],{fields:['id','factor','category_id']})]);
+    (uoms||[]).forEach(function(u){ _uomFac[u.id]=u.factor||1; });
+    const lineas=await odooCall('account.move.line','search_read',
+      [[['move_id.move_type','=','in_invoice'],['parent_state','=','posted'],['display_type','=','product'],['product_id','in',prods.map(function(p){ return p.id; })]]],
+      {fields:['product_id','date','price_unit','quantity','balance','product_uom_id'],order:'date desc, id desc',limit:20000});
+    calcCat=calcArmarCatalogo(prods,lineas,uoms);
+    calcRefrescarFilas(CALC.receta,calcCat);
+  }catch(e){ console.warn('calculadora · catálogo:',e); msgs.push('catálogo de insumos sin Odoo: precios fijos del 25-oct'); }
+  calcOdooMsg=msgs.join(' · ');
+  calcBuildUI(); calcPintarTodo();
+  await calcCargarGuardadas();
+}
+async function calcCargarGuardadas(){
+  calcSb={ok:false, msg:''};
+  try{
+    const c=sbClient(); if(!c){ calcSb.msg='Guardar recetas: sin conexión con la base'; calcEstado(); return; }
+    const {data,error}=await c.from('calc_receta').select('id,nombre,version,datos,nota,creado_por,creado_en').order('version',{ascending:false});
+    if(error){ calcSb.msg=_calcSinTabla(error)?'Guardar recetas: falta crear la tabla':'Recetas guardadas: no se pudieron leer ('+(error.message||error)+')'; }
+    else { calcGuardadas=data||[]; calcSb.ok=true; }
+  }catch(e){ calcSb.msg=_calcSinTabla(e)?'Guardar recetas: falta crear la tabla':'Recetas guardadas: no se pudieron leer'; }
+  calcPintarGuardadas(); calcEstado();
+}
+async function calcGuardar(){
+  const nom=String(CALC.receta.nombre||'').trim();
+  const msg=document.getElementById('calcGuardarMsg');
+  const pon=function(t,color){ if(msg){ msg.textContent=t; msg.style.color=color||'var(--text-2)'; } };
+  if(CALC.prod!=='receta'){ pon('Solo se guardan recetas.','var(--warn)'); return; }
+  if(!nom){ pon('Falta el nombre de la receta.','var(--warn)'); return; }
+  if(!calcSb.ok){ pon(calcSb.msg||'Sin base de datos: no se guardó.','var(--warn)'); return; }
+  const c=sbClient(); if(!c){ pon('Sin conexión con la base: no se guardó.','var(--stop-tx)'); return; }
+  let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
+  if(!email){ pon('Sin sesión: no se guardó.','var(--stop-tx)'); return; }
+  const notaEl=document.getElementById('calcNota');
+  const p=calcRecetaPayload(CALC, notaEl?notaEl.value:'');
+  for(let intento=0; intento<2; intento++){
+    const {data:vs,error:e1}=await c.from('calc_receta').select('nombre,version').eq('nombre',p.nombre).order('version',{ascending:false}).limit(1);
+    if(e1){ pon('No se guardó: '+(e1.message||e1),'var(--stop-tx)'); return; }
+    const version=calcVersionSiguiente(vs,p.nombre);
+    const {error}=await c.from('calc_receta').insert([{nombre:p.nombre, version, datos:p.datos, nota:p.nota, creado_por:email}]);
+    if(!error){ pon('Guardada: '+p.nombre+' · versión '+version+'.','var(--good)'); if(notaEl) notaEl.value='';
+      await calcCargarGuardadas(); return; }
+    if(error.code!=='23505'){ pon('No se guardó: '+(error.message||error),'var(--stop-tx)'); return; }   // 23505 = otra versión entró primero → se relee
+  }
+  pon('No se guardó: la versión chocó dos veces, probá de nuevo.','var(--stop-tx)');
+}
+function calcEstado(cargando){
+  const el=document.getElementById('calcStatus'); if(!el) return;
+  const partes=[]; if(cargando) partes.push('<span class="spin"></span>'+esc(cargando));
+  if(calcOdooMsg) partes.push(esc(calcOdooMsg));
+  if(calcSb.msg) partes.push(esc(calcSb.msg));
+  el.innerHTML=partes.join('<br>'); el.classList.toggle('hidden',!partes.length);
+}
+
+// ── Armado de la vista ─────────────────────────────────────────────────
+function calcBuildUI(){
+  // Producto
+  const sel=document.getElementById('calcProd');
+  if(sel){
+    sel.innerHTML='<option value="receta">Receta</option><optgroup label="Terminados">'
+      +Object.keys(calcTerm).map(function(k){ return '<option value="'+k+'">'+esc(calcTerm[k].label)+'</option>'; }).join('')+'</optgroup>';
+    sel.value=CALC.prod; sel.onchange=function(){ calcElegirProd(sel.value); };
+  }
+  const dl=document.getElementById('calcCatList');
+  if(dl) dl.innerHTML=Object.keys(calcCat).map(function(k){ const g=calcCat[k]; return '<option value="'+esc(g.name+' · '+g.pid)+'"></option>'; }).join('');
+  document.querySelectorAll('#calcTabs button').forEach(function(b){ b.onclick=function(){ CALC.tab=b.dataset.t; calcPintarTodo(); }; });
+  const chC=document.getElementById('calcCadenas');
+  if(chC) chC.innerHTML=CALC_CADENAS.map(function(c){ return '<button class="sim-chip" data-k="'+c.k+'">'+esc(c.label)+'</button>'; }).join('');
+  document.querySelectorAll('#calcCadenas button').forEach(function(b){ b.onclick=function(){ calcCambiarCadena(CALC,b.dataset.k,calcCostoPrecio()); calcPintarTodo(); }; });
+  const chK=document.getElementById('calcCats');
+  if(chK) chK.innerHTML=CALC_CATS.map(function(c){ return '<button class="sim-chip" data-k="'+c.k+'">'+esc(c.label)+'</button>'; }).join('');
+  document.querySelectorAll('#calcCats button').forEach(function(b){ b.onclick=function(){ CALC.cat=b.dataset.k; calcPintarTodo(); }; });
+  // Campos con ruta en el estado (data-cb) — formato es-CR, en blanco = null
+  document.querySelectorAll('#vCalcPrecios [data-cb]').forEach(function(el){
+    el.oninput=function(){ calcSet(el.dataset.cb, _crNum(el.value)); calcRecalc(); };
+    el.onblur=function(){ calcPintarCampos(true); };
+  });
+  document.querySelectorAll('#vCalcPrecios [data-cc]').forEach(function(el){
+    el.oninput=function(){ calcCond()[el.dataset.cc]=_crNum(el.value); calcRecalc(); };
+    el.onblur=function(){ calcPintarCampos(true); };
+  });
+  const fe=document.getElementById('calcFijoFact'); if(fe) fe.onchange=function(){ calcCond().fijoEnFactura=fe.checked; calcRecalc(); };
+  document.querySelectorAll('#vCalcPrecios [data-anc]').forEach(function(el){
+    el.oninput=function(){ CALC.ancla=el.dataset.anc; CALC.val=_crNum(el.value); calcRecalc(); };
+    el.onblur=function(){ calcPintarCampos(true); };
+  });
+  document.querySelectorAll('#vCalcPrecios [data-te]').forEach(function(el){
+    const k=el.dataset.te;
+    const fn=function(){ const t=CALC.techos[CALC.cad];
+      if(k==='modo'||k==='ref'||k==='xTipo') t[k]=el.value; else t[k]=_crNum(el.value);
+      if(el.tagName==='SELECT') calcPintarTodo(); else calcRecalc(); };
+    if(el.tagName==='SELECT') el.onchange=fn; else { el.oninput=fn; el.onblur=function(){ calcPintarCampos(true); }; }
+  });
+  const nr=document.getElementById('calcRecNombre');
+  if(nr){ nr.oninput=function(){ CALC.receta.nombre=nr.value; }; }
+  const bg=document.getElementById('calcGuardar'); if(bg) bg.onclick=calcGuardar;
+  const ba=document.getElementById('calcAddFila'); if(ba) ba.onclick=function(){ CALC.receta.filas.push(calcFilaVacia()); calcPintarReceta(); calcRecalc(); };
+  const bn=document.getElementById('calcNueva'); if(bn) bn.onclick=function(){
+    CALC.prod='receta'; CALC.guardadaId=null; CALC.receta={nombre:'', rinde:1, filas:[calcFilaVacia(),calcFilaVacia(),calcFilaVacia()]};
+    CALC.emp={bolsa:null,etiqueta:null,caja:null,upc:null}; CALC.udsDia=null; calcPintarTodo(); };
+  const gs=document.getElementById('calcGuardadas'); if(gs) gs.onchange=function(){
+    const r=calcGuardadas.find(function(x){ return String(x.id)===gs.value; }); if(r){ calcAplicarGuardada(CALC,r); calcPintarTodo(); } };
+  const gv=document.getElementById('calcVersiones'); if(gv) gv.onchange=function(){
+    const r=calcGuardadas.find(function(x){ return String(x.id)===gv.value; }); if(r){ calcAplicarGuardada(CALC,r); calcPintarTodo(); } };
+}
+function calcSet(path,v){ const p=path.split('.'); let o=CALC; for(let i=0;i<p.length-1;i++) o=o[p[i]]; o[p[p.length-1]]=v; }
+function calcGet(path){ return path.split('.').reduce(function(o,k){ return o==null?null:o[k]; },CALC); }
+function calcCond(){ return CALC.cond[CALC.cad][CALC.cat]; }
+function calcElegirProd(k){
+  if(k==='receta'){ CALC.prod='receta'; }
+  else if(calcTerm[k]){ CALC.prod=k; const t=calcTerm[k]; CALC.term={mp:t.mp, ind:t.ind, label:t.label, unidad:t.unidad}; }
+  calcPintarTodo();
+}
+// Costo que usa la pestaña Precio: el total aunque esté incompleto (se marca), null si no hay nada.
+function calcCostoPrecio(){ const c=calcCostoU(CALC); return c.total>0?c.total:null; }
+function calcUnidadTxt(){ return CALC.prod==='receta' ? 'por unidad' : (CALC.term.unidad||'por unidad'); }
+
+// ── Pintado ────────────────────────────────────────────────────────────
+function calcPintarTodo(){
+  document.querySelectorAll('#calcTabs button').forEach(function(b){ b.classList.toggle('on',b.dataset.t===CALC.tab); });
+  const pc=document.getElementById('calcPCosto'), pp=document.getElementById('calcPPrecio');
+  if(pc) pc.classList.toggle('hidden',CALC.tab!=='costo'); if(pp) pp.classList.toggle('hidden',CALC.tab!=='precio');
+  const sel=document.getElementById('calcProd'); if(sel) sel.value=CALC.prod;
+  const esRec=CALC.prod==='receta';
+  ['calcRecWrap','calcIndRec','calcRecBar'].forEach(function(id){ const e=document.getElementById(id); if(e) e.classList.toggle('hidden',!esRec); });
+  const it=document.getElementById('calcIndTerm'); if(it) it.classList.toggle('hidden',esRec);
+  const nr=document.getElementById('calcRecNombre'); if(nr && document.activeElement!==nr) nr.value=CALC.receta.nombre||'';
+  document.querySelectorAll('#calcCadenas button').forEach(function(b){ b.classList.toggle('on',b.dataset.k===CALC.cad); });
+  document.querySelectorAll('#calcCats button').forEach(function(b){ b.classList.toggle('on',b.dataset.k===CALC.cat); });
+  const ub=document.getElementById('calcUberBox'); if(ub) ub.classList.toggle('hidden',CALC.cad!=='fresh');
+  const t=CALC.techos[CALC.cad];
+  const tm=document.getElementById('calcTechoMonto'), tr=document.getElementById('calcTechoRef');
+  if(tm) tm.classList.toggle('hidden',t.modo!=='monto'); if(tr) tr.classList.toggle('hidden',t.modo!=='ref');
+  if(t.ref===CALC.cad) t.ref=CALC.cad==='auto'?'fresh':'auto';
+  const rs=document.getElementById('calcTechoRefSel');
+  if(rs) rs.innerHTML=CALC_CADENAS.filter(function(c){ return c.k!==CALC.cad; }).map(function(c){ return '<option value="'+c.k+'"'+(c.k===t.ref?' selected':'')+'>'+esc(c.label)+'</option>'; }).join('');
+  const ms=document.getElementById('calcTechoModo'); if(ms) ms.value=t.modo;
+  const xs=document.getElementById('calcTechoXTipo'); if(xs) xs.value=t.xTipo;
+  calcPintarReceta(); calcRecalc(); calcPintarGuardadas();
+}
+function calcPintarGuardadas(){
+  const gs=document.getElementById('calcGuardadas'), gv=document.getElementById('calcVersiones'), box=document.getElementById('calcGuardBox');
+  if(box) box.classList.toggle('hidden',!calcSb.ok);
+  if(!gs||!gv) return;
+  const ult=calcUltimas(calcGuardadas), act=calcGuardadas.find(function(x){ return x.id===CALC.guardadaId; });
+  gs.innerHTML='<option value="">'+(ult.length?'Guardadas':'Sin recetas guardadas')+'</option>'
+    +ult.map(function(r){ return '<option value="'+r.id+'"'+(act&&act.nombre===r.nombre?' selected':'')+'>'+esc(r.nombre)+' · v'+r.version+'</option>'; }).join('');
+  const vers=act?calcGuardadas.filter(function(x){ return x.nombre===act.nombre; }).sort(function(a,b){ return b.version-a.version; }):[];
+  gv.classList.toggle('hidden',vers.length<2);
+  gv.innerHTML=vers.map(function(r){ return '<option value="'+r.id+'"'+(r.id===act.id?' selected':'')+'>v'+r.version+' · '+esc(String(r.creado_en||'').slice(0,10))+(r.nota?' · '+esc(r.nota):'')+'</option>'; }).join('');
+}
+function calcFuenteTag(f){
+  if(f.precio==null) return '<span class="calc-tag calc-tag-falta">falta precio</span>';
+  if(f.fuente==='factura') return '<span class="calc-tag calc-tag-fact">factura '+calcDiaMes(f.fecha)+'</span>';
+  if(f.fuente==='promedio') return '<span class="calc-tag">promedio</span>';
+  return '<span class="calc-tag calc-tag-est">estimado</span>';
+}
+function calcCostoCelda(f){
+  if(!calcFilaUsada(f)) return '';
+  const r=calcFilaCosto(f); return r.costo!=null?cM(r.costo):'<span class="calc-tag calc-tag-falta">'+esc(r.falta)+'</span>';
+}
+function calcPintarReceta(){
+  const tb=document.getElementById('calcRecTabla'); if(!tb) return;
+  const filas=CALC.receta.filas;
+  let h='<thead><tr><th>Insumo</th><th class="r">Cantidad</th><th>Unidad</th><th class="r">g por medida</th><th class="r">₡ por</th><th></th><th>Precio de</th><th class="r">Costo</th><th></th></tr></thead><tbody>';
+  filas.forEach(function(f,i){
+    const med=CALC_MEDIDA[f.uni]!=null;
+    h+='<tr data-i="'+i+'">'
+      +'<td><input type="text" class="calc-num calc-in" data-f="nombre" list="calcCatList" value="'+esc(f.nombre)+'" placeholder="Insumo" style="min-width:160px"></td>'
+      +'<td class="r"><input type="text" inputmode="decimal" class="calc-tin calc-in" data-f="cant" value="'+esc(f.cant)+'" style="width:60px"></td>'
+      +'<td><select class="calc-num calc-in" data-f="uni" style="width:auto;min-width:70px">'+CALC_UNIDADES.map(function(u){ return '<option'+(u===f.uni?' selected':'')+'>'+u+'</option>'; }).join('')+'</select></td>'
+      +'<td class="r">'+(med?'<input type="text" inputmode="decimal" class="calc-tin calc-in" data-f="gpu" value="'+(f.gpu!=null?_crFmt(f.gpu,2):'')+'" style="width:56px">':'')+'</td>'
+      +'<td class="r"><input type="text" inputmode="decimal" class="calc-tin calc-in" data-f="precio" value="'+(f.precio!=null?_crFmt(f.precio,2):'')+'" style="width:86px"></td>'
+      +'<td><select class="calc-num calc-in" data-f="por" style="width:auto;min-width:64px">'+['kg','L','u'].map(function(p){ return '<option value="'+p+'"'+(p===f.por?' selected':'')+'>'+CALC_POR_TXT[p]+'</option>'; }).join('')+'</select></td>'
+      +'<td class="calc-ft">'+calcFuenteTag(f)+'</td>'
+      +'<td class="r calc-fc">'+calcCostoCelda(f)+'</td>'
+      +'<td><button class="calc-rec-x" aria-label="Quitar">✕</button></td></tr>';
   });
   h+='</tbody>'; tb.innerHTML=h;
-  // inputs de texto/número: actualizan sin reconstruir (conservan foco); recalculan costo de su fila + totales
-  tb.querySelectorAll('input.rec-in').forEach(el=>{
-    el.oninput=()=>{
-      const i=+el.dataset.i, k=el.dataset.k;
-      if(k==='precio'){ _crLive(el); CALC.receta.lines[i].precio=_crInt(el.value); }
-      else if(k==='qty'){ CALC.receta.lines[i].qty=Math.max(0,_crDec(el.value)); }
-      else CALC.receta.lines[i][k]=el.value;   // nombre
-      const tr=el.closest('tr'), cc=tr&&tr.querySelector('.rec-cost'), lc=calcRecLineCost(CALC.receta.lines[i]);
-      if(cc) cc.textContent = lc>0?cM(lc):'—';
-      calcRecSync(); calcRender();
-    };
-    el.onblur=()=>{ const i=+el.dataset.i, k=el.dataset.k, L=CALC.receta.lines[i]; if(!L) return;
-      if(k==='qty') el.value = L.qty?_crFmt(L.qty,3):'';
-      else if(k==='precio') el.value = L.precio?_crFmt(L.precio,0):''; };
-  });
-  // selects (ingrediente / unidad): reconstruyen (al cambiar ingrediente, la unidad vuelve a su base)
-  tb.querySelectorAll('select.rec-in').forEach(el=>el.onchange=()=>{
-    const i=+el.dataset.i, k=el.dataset.k;
-    if(k==='pid'){ const pid=+el.value; CALC.receta.lines[i].pid=pid; const g=calcIng.find(x=>x.pid===pid); CALC.receta.lines[i].uom=g?g.uom:CALC.receta.lines[i].uom; }
-    else if(k==='uom'){ CALC.receta.lines[i].uom = (CALC.receta.lines[i].tipo==='odoo') ? +el.value : el.value; }
-    calcRecRender(); calcRecSync(); calcRender();
-  });
-  tb.querySelectorAll('.calc-rec-x').forEach(b=>b.onclick=()=>{ CALC.receta.lines.splice(+b.dataset.i,1); calcRecRender(); calcRecSync(); calcRender(); });
-}
-function calcSetDir(dir){
-  CALC.dir=dir;
-  document.querySelectorAll('#calcSeg button').forEach(b=>b.classList.toggle('on',b.dataset.dir===dir));
-  document.getElementById('calcInputA').classList.toggle('hidden',dir!=='A');
-  document.getElementById('calcInputB').classList.toggle('hidden',dir!=='B');
-  document.getElementById('calcInputTitle').textContent = dir==='A' ? 'Precio de góndola objetivo' : 'Margen que querés ganar';
-  document.getElementById('calcSegNote').textContent = dir==='A'
-    ? 'Desde el precio del estante: cuánto te queda después del margen de la cadena, sus términos y tu costo.'
-    : 'Desde tu costo + el margen que querés: a cuánto lo cobrás y a cuánto queda en góndola.';
-  calcRender();
-}
-function calcRender(){
-  const c=calcCostoU();
-  const _cl=document.getElementById('calcCostoULbl'); if(_cl) _cl.textContent='Costo por '+calcUnidWord()+':';
-  document.getElementById('calcCostoU').textContent = c>0 ? cM(c) : '—';
-  // reflejar valores con formato es-CR (por si cambió la referencia). Campo en 0 → en blanco. No pisa el campo con foco.
-  [['mp','calcMP',0],['indMes','calcIndMes',0],['unid','calcUnid',0],['gondola','calcGondola',0],['margen','calcMargen',2]].forEach(([prop,id,dec])=>{
-    const el=document.getElementById(id); if(el && document.activeElement!==el){ const v=CALC[prop]; el.value=(v===0||v==null)?'':_crFmt(v,dec); } });
-  const tabla=document.getElementById('calcTabla'); let h='';
-  if(CALC.dir==='A'){
-    h+='<thead><tr><th>Canal</th><th style="text-align:right">Marg. cadena</th><th style="text-align:right">Términos</th><th style="text-align:right">Le pagan</th><th style="text-align:right">Ingreso neto</th><th style="text-align:right">Ganancia</th><th style="text-align:right">Margen %</th></tr></thead><tbody>';
-    CALC.canales.forEach((ch,i)=>{
-      const mc=ch.mc/100, t=ch.t/100;
-      const lePagan=CALC.gondola*(1-mc), neto=lePagan*(1-t), gan=neto-c, margp=neto?gan/neto*100:0;
-      h+='<tr><td>'+esc(ch.label)+'</td>'
-        +'<td style="text-align:right"><input class="calc-tin" type="text" inputmode="decimal" data-mc="'+i+'" value="'+_crFmt(ch.mc,2)+'"> %</td>'
-        +'<td style="text-align:right"><input class="calc-tin" type="text" inputmode="decimal" data-t="'+i+'" value="'+_crFmt(ch.t,2)+'"> %</td>'
-        +'<td style="text-align:right">'+cM(lePagan)+'</td><td style="text-align:right">'+cM(neto)+'</td>'
-        +'<td style="text-align:right"><strong>'+cM(gan)+'</strong></td><td style="text-align:right"><strong>'+_pct(margp)+'</strong></td></tr>';
+  tb.querySelectorAll('tr[data-i]').forEach(function(tr){
+    const i=+tr.dataset.i, f=CALC.receta.filas[i];
+    const refrescar=function(){ const ft=tr.querySelector('.calc-ft'), fc=tr.querySelector('.calc-fc');
+      if(ft) ft.innerHTML=calcFuenteTag(f); if(fc) fc.innerHTML=calcCostoCelda(f); calcRecalc(); };
+    tr.querySelectorAll('input.calc-in').forEach(function(el){ const k=el.dataset.f;
+      el.oninput=function(){
+        if(k==='nombre'){
+          const m=el.value.match(/·\s*(\d+)\s*$/), g=m&&calcCat[+m[1]];
+          if(g){ calcFilaDesdeCatalogo(f,g); calcPintarReceta(); calcRecalc(); return; }
+          f.nombre=el.value; if(f.pid){ f.pid=null; if(f.fuente==='factura'||f.fuente==='promedio') f.fuente='estimado'; }
+        }else if(k==='cant'){ f.cant=el.value; }
+        else if(k==='gpu'){ f.gpu=_crNum(el.value); }
+        else if(k==='precio'){ f.precio=_crNum(el.value); f.fuente=f.precio==null?null:'estimado'; f.fecha=null; }
+        refrescar(); };
+      el.onblur=function(){ if(k==='gpu') el.value=f.gpu!=null?_crFmt(f.gpu,2):''; if(k==='precio') el.value=f.precio!=null?_crFmt(f.precio,2):''; };
     });
-    h+='</tbody>';
-    document.getElementById('calcInputNote').textContent='"Le pagan" es el precio de factura. Para calzar con Rentabilidad, ajustá el margen de cadena hasta que "le pagan" iguale tu precio de factura conocido.';
-  } else {
-    const m=CALC.margen/100, neto=(1-m)?c/(1-m):0;
-    h+='<thead><tr><th>Canal</th><th style="text-align:right">Marg. cadena</th><th style="text-align:right">Términos</th><th style="text-align:right">Ingreso neto</th><th style="text-align:right">Precio a cobrar</th><th style="text-align:right">Góndola resultante</th></tr></thead><tbody>';
-    CALC.canales.forEach((ch,i)=>{
-      const mc=ch.mc/100, t=ch.t/100;
-      const lePagan=(1-t)?neto/(1-t):0, gond=(1-mc)?lePagan/(1-mc):0;
-      h+='<tr><td>'+esc(ch.label)+'</td>'
-        +'<td style="text-align:right"><input class="calc-tin" type="text" inputmode="decimal" data-mc="'+i+'" value="'+_crFmt(ch.mc,2)+'"> %</td>'
-        +'<td style="text-align:right"><input class="calc-tin" type="text" inputmode="decimal" data-t="'+i+'" value="'+_crFmt(ch.t,2)+'"> %</td>'
-        +'<td style="text-align:right">'+cM(neto)+'</td><td style="text-align:right"><strong>'+cM(lePagan)+'</strong></td>'
-        +'<td style="text-align:right"><strong>'+cM(gond)+'</strong></td></tr>';
-    });
-    h+='</tbody>';
-    document.getElementById('calcInputNote').textContent='Margen sobre el ingreso neto (después de términos), igual para todos los canales. Cada canal da un precio a cobrar y una góndola distintos según sus términos.';
+    tr.querySelectorAll('select.calc-in').forEach(function(el){ el.onchange=function(){
+      const k=el.dataset.f; f[k]=el.value;
+      if(k==='uni' && CALC_MEDIDA[f.uni]!=null && f.gpu==null) f.gpu=CALC_MEDIDA[f.uni];
+      calcPintarReceta(); calcRecalc(); }; });
+    const x=tr.querySelector('.calc-rec-x'); if(x) x.onclick=function(){ CALC.receta.filas.splice(i,1); calcPintarReceta(); calcRecalc(); };
+  });
+}
+// Escribe en los campos el estado (no pisa el que tiene el foco, salvo al salir de él).
+function calcPintarCampos(blur){
+  const foco=blur?null:document.activeElement;
+  const pon=function(el,v,dec){ if(el && el!==foco) el.value=(v==null||!isFinite(v))?'':_crFmt(v,dec); };
+  document.querySelectorAll('#vCalcPrecios [data-cb]').forEach(function(el){ pon(el,calcGet(el.dataset.cb),+(el.dataset.dec||0)); });
+  const cond=calcCond();
+  document.querySelectorAll('#vCalcPrecios [data-cc]').forEach(function(el){ pon(el,cond[el.dataset.cc],2); });
+  const fe=document.getElementById('calcFijoFact'); if(fe) fe.checked=!!cond.fijoEnFactura;
+  const t=CALC.techos[CALC.cad];
+  document.querySelectorAll('#vCalcPrecios input[data-te]').forEach(function(el){ pon(el,t[el.dataset.te],el.dataset.te==='x'?2:0); });
+  const C=calcCostoPrecio(), r=calcPrecio(cond,CALC.iva,C,CALC.ancla,CALC.val);
+  const fld={mn:r.mn, pf:r.pf, pvp:r.pvp};
+  document.querySelectorAll('#vCalcPrecios [data-anc]').forEach(function(el){
+    if(el.dataset.anc===CALC.ancla && el===foco) return;
+    pon(el,fld[el.dataset.anc],el.dataset.anc==='mn'?1:0); });
+}
+function calcRecalc(){
+  if(!CALC) return;
+  const c=calcCostoU(CALC), u=calcUnidadTxt();
+  const sett=function(id,h){ const e=document.getElementById(id); if(e) e.innerHTML=h; };
+  // Costo
+  const rm=calcRecetaMP(CALC.receta);
+  sett('calcRecTotal', CALC.prod==='receta' ? cM(rm.total)+(rm.faltan.some(function(x){ return x.indexOf(': falta')>0; })?' <span class="calc-tag calc-tag-falta">incompleto</span>':'') : '');
+  sett('calcIndEtiq', esc(CALC.indEtiq||''));
+  sett('calcTermEtiq', esc(CALC.term.label||''));
+  sett('calcCostoTot', cM(c.total)+' <span class="calc-u">'+esc(u)+'</span>'+(c.completo?'':' <span class="calc-tag calc-tag-falta">incompleto</span>'));
+  sett('calcCostoDes', '<div><span>Materia prima</span><span>'+cM(c.mp)+'</span></div><div><span>Empaque</span><span>'+cM(c.emp)+'</span></div><div><span>Indirecto</span><span>'+cM(c.ind)+'</span></div>');
+  sett('calcFaltan', c.faltan.length?'Falta: '+esc(c.faltan.join(' · ')):'');
+  // Precio
+  const C=c.total>0?c.total:null, cond=calcCond(), r=calcPrecio(cond,CALC.iva,C,CALC.ancla,CALC.val);
+  sett('calcCostoP', (C!=null?cM(C):'—')+' <span class="calc-u">'+esc(u)+'</span>'+(c.completo?'':' <span class="calc-tag calc-tag-falta">incompleto</span>'));
+  let f='';
+  if(r.pf!=null){
+    const pct=function(x){ return _crFmt(x*100,2)+' %'; };
+    f+='<div><span>Factura a la cadena</span><span>'+cM(r.pf)+'</span></div>';
+    f+='<div><span>− descuentos ('+pct(r.d)+')</span><span>−'+cM(r.pf*r.d)+'</span></div>';
+    f+='<div><span>= Nos queda</span><span>'+cM(r.neto)+'</span></div>';
+    if(C!=null) f+='<div><span>− Costo</span><span>−'+cM(C)+'</span></div><div class="calc-gan"><span>= Ganancia '+esc(u)+'</span><span>'+(r.gan<0?'−':'')+cM(Math.abs(r.gan))+'</span></div>';
   }
-  tabla.innerHTML=h;
-  // términos/margen editables por fila (onchange = al salir del campo, sin perder foco al tipear)
-  tabla.querySelectorAll('input.calc-tin').forEach(inp=>inp.onchange=()=>{
-    const v=Math.max(0,_crDec(inp.value));
-    if(inp.dataset.mc!=null) CALC.canales[+inp.dataset.mc].mc=v; else CALC.canales[+inp.dataset.t].t=v;
-    calcRender();
-  });
+  if(r.faltaMc) f+='<div class="calc-warn"><span>Sin margen de la cadena: no hay PVP</span></div>';
+  if(cond.uberCom!=null && CALC.cad==='fresh') f+='<div class="calc-nota"><span>Uber: solo arriba del umbral mensual (pendiente)</span></div>';
+  sett('calcFlow',f);
+  // Ventana
+  const t=CALC.techos[CALC.cad];
+  const refPvp = t.modo==='ref' ? calcPvpDe(CALC,t.ref,C) : null;
+  const pvpMax=calcTechoPvp(t,refPvp);
+  sett('calcTechoRefVal', t.modo==='ref' ? (refPvp!=null?'PVP '+esc((CALC_CADENAS.find(function(x){ return x.k===t.ref; })||{}).label||'')+' '+cM(refPvp)+' → máx. '+cM(pvpMax):'sin PVP de referencia') : '');
+  const v=calcVentana(cond,CALC.iva,C,CALC.mmin,pvpMax);
+  let vh='';
+  if(v.piso!=null && v.techo!=null){
+    const xs=[v.piso,v.techo].concat(r.pf!=null?[r.pf]:[]);
+    const lo=Math.min.apply(null,xs)*0.92, hi=Math.max.apply(null,xs)*1.06, pos=function(x){ return ((x-lo)/(hi-lo)*100).toFixed(1)+'%'; };
+    vh='<div class="calc-bar">'+(v.hay?'<div class="calc-zone" style="left:'+pos(v.piso)+';width:calc('+pos(v.techo)+' - '+pos(v.piso)+')"></div>':'')
+      +'<span class="calc-lb calc-lb-t" style="left:'+pos(v.piso)+'">piso '+cM(v.piso)+'</span><span class="calc-lb calc-lb-t" style="left:'+pos(v.techo)+'">techo '+cM(v.techo)+'</span>'
+      +(r.pf!=null?'<div class="calc-mk" style="left:'+pos(r.pf)+'"></div><span class="calc-lb calc-lb-b" style="left:'+pos(r.pf)+'">tu precio '+cM(r.pf)+'</span>':'')+'</div>';
+    vh+= v.hay ? '<div class="calc-vtxt">Precio a la cadena entre '+cM(v.piso)+' y '+cM(v.techo)+' · ventana '+cM(v.techo-v.piso)+'</div>'
+               : '<div class="calc-vtxt" style="color:var(--stop-tx)">No hay ventana: el piso ('+cM(v.piso)+') pasa el techo ('+cM(v.techo)+').</div>';
+  }else if(v.piso!=null){ vh='<div class="calc-vtxt">Piso '+cM(v.piso)+' · sin techo'+(r.faltaMc?' (falta el margen de la cadena)':'')+'</div>'; }
+  else vh='<div class="calc-vtxt">Sin costo o sin margen mínimo: no hay piso.</div>';
+  sett('calcVentana',vh);
+  calcPintarCampos(false);
 }
 
 // ════════════════════════════════════════════════════════════════════════
