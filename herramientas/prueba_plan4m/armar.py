@@ -46,10 +46,10 @@ def constante(nombre):
     return None
 
 CONSTS = ["NIV_PROD","NIV_INFO","NIV_CFG_DEF","_rzN","NIV_CAP","_rzPersonas","FERIADOS","CIERRE_RESPALDO",
-          "CIERRE","CIERRE_BORDES_PRODUCEN","_calFer","_calFuente","_planTemp","_tempCache",
+          "CIERRE","CIERRE_BORDES_PRODUCEN","_calFer","_calFuente","_calHasta","_ritmoAviso","_planTemp","_tempCache",
           "NIV_HORNO","NIV_DERRAME_MIN","RAMPA_DIAS_SEM","_rzCierreMeta","RAMPA_PERS_BASE",
           "_DOW","_MESAB","_planCierre","_MESNOM2"]
-FUNCS  = ["_capDe","_personasDe","_esFeriado","_enCierre","_calDesdeFilas","_calAplicar","_calRespaldo","nivCalendario",
+FUNCS  = ["_capDe","_personasDe","_esFeriado","_cierreCubre","_enCierre","_enCierreAnio","_calCoberturaAviso","_ritmoVentana","_ritmoBloque","_calDesdeFilas","_calAplicar","_calRespaldo","nivCalendario",
           "_esProductivo","_diaSig","_isoWk","_ymd","_cierreShift","_mondayProd","_nomCorto","_rzBP",
           "_monKey","_planFinHorizonte","_planNSem","_semAbiertos","_semCierreMs","_bajoMetaCierre","_temporadaSem",
           "_planSalidaCierre","_planSem","_planRestarSalida","_layoutCerrado","_habilesMes","_temporadaCalc",

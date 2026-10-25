@@ -31,7 +31,7 @@ async function main(){
   eq("FALTAN vacio", FALTAN, []);
   // ── 1. CALENDARIO DESDE LA TABLA ──
   var cal = _calDesdeFilas(FILAS);
-  eq("5 tramos → UN bloque de cierre", cal.cierres, [{ini:'2026-12-18', fin:'2027-01-11'}]);
+  eq("5 tramos → UN bloque de cierre, de fin de año", cal.cierres, [{ini:'2026-12-18', fin:'2027-01-11', anio:true}]);
   eq("feriados: 12 dias", Object.keys(cal.fer).length, 12);
   eq("Navidad es feriado", cal.fer['2026-12-25'], 'Navidad');
   eq("dos cierres con un dia habil en medio NO se juntan",
@@ -126,6 +126,48 @@ async function main(){
   eq("viernes 18-dic NO es Cierre", c18.prod!=='Cierre', true);
   eq("etiquetas dic", _planTagsMes(2026*12+11).map(function(x){ return x.t; }), ['Cierre 18-dic','Feriado 1']);
   eq("etiquetas ene (1-ene cae adentro del cierre)", _planTagsMes(2027*12+0).map(function(x){ return x.t; }), ['Vuelta 11-ene']);
+  // ── 9. CIERRES QUE NO SON EL DE FIN DE AÑO (revisión de 1a782ff) ──
+  var Q = function(extra){ var c=_calDesdeFilas(FILAS.concat(extra)); _calAplicar(c, '2026-10-25'); return c; };
+  Q([{fecha:'2027-03-29',fecha_fin:null,tipo:'cierre'}]);
+  eq("cierre de 1 dia cierra su dia", _esProductivo('2027-03-29'), false);
+  Q([{fecha:'2027-03-29',fecha_fin:'2027-03-30',tipo:'cierre'}]);
+  eq("cierre de 2 dias cierra los dos; el 31 abre", ['2027-03-29','2027-03-30','2027-03-31'].map(_esProductivo), [false,false,true]);
+  eq("fin de año: los bordes siguen produciendo", ['2026-12-18','2027-01-11','2026-12-21'].map(_esProductivo), [true,true,false]);
+  var cq = Q([{fecha:'2027-03-22',fecha_fin:'2027-03-26',tipo:'cierre'},{fecha:'2027-03-29',fecha_fin:'2027-03-31',tipo:'cierre'},
+              {fecha:'2027-04-01',fecha_fin:null,tipo:'feriado',descripcion:'Jueves Santo'},{fecha:'2027-04-02',fecha_fin:'2027-04-05',tipo:'cierre'}]);
+  eq("tramos separados por fin de semana y feriado → un bloque", cq.cierres.filter(function(b){ return !b.anio; }).map(function(b){ return [b.ini,b.fin]; }), [['2027-03-22','2027-04-05']]);
+  eq("ningun dia del medio productivo", ['2027-03-22','2027-03-26','2027-03-29','2027-04-01','2027-04-05','2027-04-06'].map(_esProductivo), [false,false,false,false,false,true]);
+  eq("solo el bloque que cruza el 31-dic es de fin de año", cq.cierres.map(function(b){ return b.anio; }), [true,false]);
+  Q([{fecha:'2026-11-02',fecha_fin:'2026-11-03',tipo:'cierre'}]);
+  eq("un cierre de noviembre NO pasa a ser el CIERRE de la meta", [CIERRE, REAPERTURA], ['2026-12-18','2027-01-11']);
+  var cS=_calDesdeFilas(FILAS.concat([{fecha:'2027-03-29',fecha_fin:'2027-04-02',tipo:'cierre'}])); _calAplicar(cS, '2027-02-01');
+  eq("pasado el fin de año, Semana Santa NO es el CIERRE", CIERRE, '2026-12-18');
+  eq("Semana Santa no corta la venta (semana abierta para el ritmo)", _semAbiertos(new Date(2027,2,29)), 5);
+  eq("…pero no produce", _esProductivo('2027-03-31'), false);
+  _calAplicar(_calDesdeFilas([{fecha:'2027-03-29',fecha_fin:'2027-04-02',tipo:'cierre'}]), '2026-10-25');
+  eq("tabla sin cierre de fin de año → CIERRE del respaldo", CIERRE, '2026-12-18');
+  // ── 10. RITMO Y BASE DESPUES DEL CIERRE ──
+  _calAplicar(_calDesdeFilas(FILAS), '2026-10-25');
+  eq("antes de que arranque el cierre: sin bloque", _ritmoBloque('2026-10-25'), null);
+  var B = _ritmoBloque('2027-01-20');
+  eq("bloque del cierre en semanas", B, {ultimo:'2026-12-18', wkIni:'2026-W51', wkFin:'2027-W02'});
+  var W = ['2026-W43','2026-W44','2026-W45','2026-W46','2026-W47','2026-W48','2026-W49','2026-W50','2026-W51','2026-W52',
+           '2027-W02','2027-W03','2027-W04','2027-W05','2027-W06','2027-W07','2027-W08','2027-W09'];
+  var v1 = _ritmoVentana(W, 6, '2027-W04', B);
+  eq("ene: 2 semanas desde la vuelta → ritmo de antes del pico, marcado", [v1.win, /antes del cierre/.test(v1.marca)],
+     [['2026-W45','2026-W46','2026-W47','2026-W48','2026-W49','2026-W50'], true]);
+  var v2 = _ritmoVentana(W, 6, '2027-W09', B);
+  eq("feb: 7 semanas desde la vuelta → las ultimas 6, sin pico ni cierre", [v2.win, v2.marca], [['2027-W03','2027-W04','2027-W05','2027-W06','2027-W07','2027-W08'], '']);
+  eq("sin bloque: la ventana de siempre", _ritmoVentana(W.slice(0,8), 6, '2026-W51', null).win, W.slice(2,8));
+  eq("dic-2026 sin los dias del cierre: 14 habiles (no 23)", _habilesMes(2026*12+11), 14);
+  var pd2 = {}; pon2 = function(y,m,d0,d1,q){ for(var d=d0; d<=d1; d++){ var dt=new Date(y,m,d), w=dt.getDay(); if(w===0||w===6) continue; var ds=_ymd(dt); pd2[ds]={451:q}; } };
+  pon2(2025,9,1,31,10); pon2(2025,10,1,30,10); pon2(2025,11,1,19,20);   // dic-2025: vende hasta el vie 19 (cierre fuera de la tabla)
+  pon2(2024,9,1,31,10); pon2(2024,10,1,30,10); pon2(2024,11,1,20,20);
+  var T2 = _temporadaCalc(pd2, 2026*12+10, 2026*12+11, {451:50});
+  cerca("dic: los dias cerrados no cuentan → factor 2,0 (no 1,3)", T2[2026*12+11][451].f, 2.0);
+  // ── 11. COBERTURA DEL CALENDARIO ──
+  eq("horizonte a feb: falta 2027", _calCoberturaAviso('2027-02-25'), 'Feriados 2027 sin cargar desde 12-ene');
+  eq("horizonte que la tabla cubre: sin aviso", _calCoberturaAviso('2027-01-05'), '');
   // ── 8. VOLVER AL PLAN ACOTADO ──
   var ovs = {'2026-10-20':{}, '2026-10-26':{}, '2026-11-06':{}, '2026-11-09':{}, '2027-01-12':{}};
   eq("volver al plan: solo hoy → fin de la semana proxima", _rzVolverRango(ovs, '2026-10-25', new Date(2026,9,26)), ['2026-10-26','2026-11-06']);
