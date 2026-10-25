@@ -10210,19 +10210,25 @@ function _esFeriado(ds){ return _calFer[ds]||''; }
 function _cierreCubre(b, ds){ return (CIERRE_BORDES_PRODUCEN && b.anio) ? (ds>b.ini && ds<b.fin) : (ds>=b.ini && ds<=b.fin); }
 // Día no productivo por CUALQUIER cierre de la tabla.
 function _enCierre(ds){ return _calCierres.some(function(b){ return _cierreCubre(b, ds); }); }
-// Día dentro del cierre de FIN DE AÑO: el único en que además NO SE VENDE (la planta entera para).
+// Día dentro del cierre de FIN DE AÑO (el que pone CIERRE/REAPERTURA, la meta y la rampa).
 function _enCierreAnio(ds){ return _calCierres.some(function(b){ return b.anio && _cierreCubre(b, ds); }); }
+// DÍA SIN VENTA (Andrea, 25-oct-2026): en los días de cierre OBLIGATORIO se cierran ventas Y
+// producción. Son los días de cualquier cierre de la tabla (fin de año, Semana Santa, uno suelto) y
+// los feriados con `pago_obligatorio` (Navidad, Año Nuevo; Jueves y Viernes Santo cuando se carguen).
+// El resto de los feriados solo frena la producción: la venta sigue como venía.
+let _calFerObl={};   // {ds:true} feriados de pago obligatorio
+function _sinVenta(ds){ return _enCierre(ds) || !!_calFerObl[ds]; }
 // Filas de rrhh_feriado → {fer:{ds:descripcion}, cierres:[{ini,fin,anio}], hasta}. Puro. Un cierre
 // partido en tramos (16-oct: 18–24 dic · 25 · 26–31 · 1-ene · 2–11 ene) vuelve a ser UN bloque: dos
 // tramos se juntan si entre el fin de uno y el inicio del otro solo hay feriados o fin de semana —
 // ningún día del medio puede quedar productivo. `anio` = el bloque cruza el 31-dic.
 function _calDesdeFilas(filas){
-  const fer={}, rangos=[]; let hasta='';
+  const fer={}, ferObl={}, rangos=[]; let hasta='';
   (filas||[]).forEach(function(r){
-    const ini=String((r&&r.fecha)||'').slice(0,10), fin=String((r&&r.fecha_fin)||ini).slice(0,10);
+    const ini=String((r&&r.fecha)||'').slice(0,10), fin=String((r&&r.fecha_fin)||ini).slice(0,10), obl=(r&&(r.pago_obligatorio===true||r.pago_obligatorio==='t'||r.pago_obligatorio==='true'));
     if(!/^\d{4}-\d{2}-\d{2}$/.test(ini) || !/^\d{4}-\d{2}-\d{2}$/.test(fin) || fin<ini) return;
     if(r.tipo==='cierre') rangos.push({ini:ini, fin:fin});
-    else if(r.tipo==='feriado') for(let ds=ini; ds<=fin; ds=_diaSig(ds)) fer[ds]=r.descripcion||'Feriado';
+    else if(r.tipo==='feriado') for(let ds=ini; ds<=fin; ds=_diaSig(ds)){ fer[ds]=r.descripcion||'Feriado'; if(obl) ferObl[ds]=true; }
     else return;
     if(fin>hasta) hasta=fin;
   });
@@ -10233,7 +10239,7 @@ function _calDesdeFilas(filas){
     let d=b?_diaSig(b.fin):null; while(d && d<r.ini && (fer[d] || finde(d))) d=_diaSig(d);
     if(b && r.ini<=d){ if(r.fin>b.fin) b.fin=r.fin; } else cierres.push({ini:r.ini, fin:r.fin}); });
   cierres.forEach(function(b){ b.anio=_esBloqueAnio(b); });
-  return {fer:fer, cierres:cierres, hasta:hasta};
+  return {fer:fer, ferObl:ferObl, cierres:cierres, hasta:hasta};
 }
 // ¿Es el cierre de FIN DE AÑO? Toca la última semana de diciembre (24–31) o la primera de enero
 // (1–7). No alcanza con "cruza el 31-dic": si Personal carga primero solo «17–31 dic», ese bloque
@@ -10253,7 +10259,7 @@ function _esBloqueAnio(b){
 // el próximo que todavía no terminó; si no hay ninguno por delante, el último (ya pasado: la rampa
 // queda apagada sola); si la tabla no trae ninguno, el respaldo. Los demás cierres solo frenan días.
 function _calAplicar(cal, hoyStr){
-  _calFer=cal.fer; _calCierres=cal.cierres; _calHasta=cal.hasta||'';
+  _calFer=cal.fer; _calFerObl=cal.ferObl||{}; _calCierres=cal.cierres; _calHasta=cal.hasta||'';
   const anios=cal.cierres.filter(function(b){ return b.anio; });
   const prox=anios.filter(function(b){ return b.fin>=hoyStr; })[0];
   // SIN CIERRE DE FIN DE AÑO POR DELANTE en la tabla: NO se vuelve en silencio a la constante. Se
@@ -10269,7 +10275,7 @@ function _calAplicar(cal, hoyStr){
 }
 function _calFinAnioAviso(){ return _calFinAnioOk ? '' : 'Cierre de fin de año sin cargar'; }
 function _calRespaldo(motivo){
-  _calFer=FERIADOS; _calCierres=[{ini:CIERRE_RESPALDO, fin:REAPERTURA_RESPALDO, anio:true}]; _calHasta=REAPERTURA_RESPALDO;
+  _calFer=FERIADOS; _calFerObl={}; _calCierres=[{ini:CIERRE_RESPALDO, fin:REAPERTURA_RESPALDO, anio:true}]; _calHasta=REAPERTURA_RESPALDO;
   CIERRE=CIERRE_RESPALDO; REAPERTURA=REAPERTURA_RESPALDO; _calFuente='respaldo';
   _calFinAnioOk=(REAPERTURA_RESPALDO>=_ymd(new Date()));   // un respaldo ya pasado tampoco es meta
   _calAviso='Feriados y cierre del código, no de Días cerrados ('+motivo+')';
@@ -10287,7 +10293,7 @@ function _calCoberturaAviso(finDs){
 async function nivCalendario(){
   const c=sbClient(); if(!c){ _calRespaldo('sin sesión'); return; }
   try{
-    const {data,error}=await c.from('rrhh_feriado').select('fecha,fecha_fin,tipo,descripcion');
+    const {data,error}=await c.from('rrhh_feriado').select('fecha,fecha_fin,tipo,descripcion,pago_obligatorio');
     if(error) throw new Error(error.message||String(error));
     if(!data || !data.length) throw new Error('la tabla volvió vacía');
     _calAplicar(_calDesdeFilas(data), _ymd(new Date())); _calFuente='tabla'; _calAviso='';
@@ -10538,10 +10544,10 @@ function _planNSem(hoy, meses){
   let n=0; while(n<80){ const mon=new Date(mon0); mon.setDate(mon.getDate()+n*7); if(mon>fin) break; n++; }
   return n;
 }
-// Días lun–vie de la semana que NO caen en el cierre de FIN DE AÑO (el único sin venta). Un cierre
-// de otro tipo (Semana Santa) frena la producción de sus días pero no la venta: no resta acá.
+// Días lun–vie de la semana CON VENTA (_sinVenta: cierres y feriados de pago obligatorio). La venta
+// de la semana es ritmo × estos días ÷ 5; una semana sin ninguno queda cerrada y no consume.
 function _semAbiertos(mon){
-  let n=0; for(let i=0;i<5;i++){ const d=new Date(mon); d.setDate(d.getDate()+i); if(!_enCierreAnio(_ymd(d))) n++; } return n;
+  let n=0; for(let i=0;i<5;i++){ const d=new Date(mon); d.setDate(d.getDate()+i); if(!_sinVenta(_ymd(d))) n++; } return n;
 }
 function _semCierreMs(){ return _mondayProd(new Date(CIERRE+'T00:00:00')).getTime(); }
 // ¿La semana está bajo la meta de cierre? De hoy a la semana del cierre, si el cierre todavía viene.
@@ -10607,12 +10613,12 @@ function _planProdCeldas(mon, layout, pers, overrides, stock, pre, ritmoW){
 // existía o era otro negocio (Pizza antes de nov-2025, Galletas antes de abr-2026). Sin ningún año:
 // factor 1 con n=0, y la pantalla lo marca "sin historia". Ventas netas = facturas − NC, posteadas,
 // display_type='product', en uds por product_uom_id → factor (como nivRitmo).
-// Días hábiles (lun–vie) del mes A entre desdeDs y hastaDs (opcionales), SIN los días del cierre de
-// fin de año que trae el calendario: ahí no se vende, y contarlos bajaba la venta por día.
+// Días hábiles (lun–vie) del mes A entre desdeDs y hastaDs (opcionales), SIN los días sin venta que
+// trae el calendario (_sinVenta): contarlos bajaba la venta por día.
 function _habilesMes(A, desdeDs, hastaDs){
   const y=Math.floor(A/12), m=A%12, ult=new Date(y, m+1, 0).getDate(); let n=0;
   for(let d=1; d<=ult; d++){ const dt=new Date(y, m, d), ds=_ymd(dt);
-    if((desdeDs && ds<desdeDs) || (hastaDs && ds>hastaDs) || _enCierreAnio(ds)) continue;
+    if((desdeDs && ds<desdeDs) || (hastaDs && ds>hastaDs) || _sinVenta(ds)) continue;
     const w=dt.getDay(); if(w>0 && w<6) n++; }
   return n;
 }

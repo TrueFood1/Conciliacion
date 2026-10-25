@@ -22,9 +22,9 @@ var FILAS = [
   {fecha:'2026-09-15',fecha_fin:null,tipo:'feriado',descripcion:'Independencia'},
   {fecha:'2026-12-01',fecha_fin:null,tipo:'feriado',descripcion:'Abolición del Ejército'},
   {fecha:'2026-12-18',fecha_fin:'2026-12-24',tipo:'cierre',descripcion:'Cierre 18 al 24'},
-  {fecha:'2026-12-25',fecha_fin:null,tipo:'feriado',descripcion:'Navidad'},
+  {fecha:'2026-12-25',fecha_fin:null,tipo:'feriado',pago_obligatorio:true,descripcion:'Navidad'},
   {fecha:'2026-12-26',fecha_fin:'2026-12-31',tipo:'cierre',descripcion:'Cierre 26 al 31'},
-  {fecha:'2027-01-01',fecha_fin:null,tipo:'feriado',descripcion:'Año Nuevo'},
+  {fecha:'2027-01-01',fecha_fin:null,tipo:'feriado',pago_obligatorio:true,descripcion:'Año Nuevo'},
   {fecha:'2027-01-02',fecha_fin:'2027-01-11',tipo:'cierre',descripcion:'Cierre 2 al 11'}];
 
 async function main(){
@@ -56,7 +56,7 @@ async function main(){
   eq("error de la base → respaldo con el motivo", [_calFuente, /permission denied/.test(_calAviso)], ['respaldo', true]);
   _SB = cli({data:FILAS, error:null}); await nivCalendario();
   eq("lectura buena → tabla, sin aviso", [_calFuente, _calAviso, CIERRE, REAPERTURA], ['tabla','', '2026-12-18','2027-01-11']);
-  eq("lee rrhh_feriado con las 4 columnas", cli.ult, ["rrhh_feriado","fecha,fecha_fin,tipo,descripcion"]);
+  eq("lee rrhh_feriado con las 5 columnas", cli.ult, ["rrhh_feriado","fecha,fecha_fin,tipo,descripcion,pago_obligatorio"]);
   eq("feriado de la tabla que el respaldo no tenia (Jueves Santo)", _esFeriado('2026-04-02'), 'Jueves Santo');
   // ── 3. HORIZONTE ──
   eq("hoy + 4 meses", _ymd(_planFinHorizonte(new Date(2026,9,25), 4)), '2027-02-25');
@@ -142,7 +142,7 @@ async function main(){
   eq("un cierre de noviembre NO pasa a ser el CIERRE de la meta", [CIERRE, REAPERTURA], ['2026-12-18','2027-01-11']);
   var cS=_calDesdeFilas(FILAS.concat([{fecha:'2027-03-29',fecha_fin:'2027-04-02',tipo:'cierre'}])); _calAplicar(cS, '2027-02-01');
   eq("pasado el fin de año, Semana Santa NO es el CIERRE", CIERRE, '2026-12-18');
-  eq("Semana Santa no corta la venta (semana abierta para el ritmo)", _semAbiertos(new Date(2027,2,29)), 5);
+  eq("Semana Santa (cierre obligatorio) corta la venta: semana cerrada", [_semAbiertos(new Date(2027,2,29)), _planSem(new Date(2027,2,29), {451:100}).cerrada], [0, true]);
   eq("…pero no produce", _esProductivo('2027-03-31'), false);
   _calAplicar(_calDesdeFilas([{fecha:'2027-03-29',fecha_fin:'2027-04-02',tipo:'cierre'}]), '2026-10-25');
   eq("tabla sin cierre de fin de año → CIERRE del respaldo", CIERRE, '2026-12-18');
@@ -211,6 +211,25 @@ async function main(){
   eq("respaldo ya pasado: tambien avisa", _calFinAnioAviso(), 'Cierre de fin de año sin cargar');
   _AHORA = new _RealDate(2026, 9, 25, 10, 0, 0).getTime(); _SB = null; await nivCalendario();
   eq("respaldo vigente (hoy): sin aviso", _calFinAnioAviso(), '');
+  _calAplicar(_calDesdeFilas(FILAS), '2026-10-25');
+  // ── 15. DIAS SIN VENTA: CIERRES Y FERIADOS DE PAGO OBLIGATORIO (Andrea, 25-oct) ──
+  var cO = _calDesdeFilas(FILAS.concat([{fecha:'2027-03-25',fecha_fin:null,tipo:'feriado',pago_obligatorio:true,descripcion:'Jueves Santo'},
+                                        {fecha:'2027-03-26',fecha_fin:null,tipo:'feriado',pago_obligatorio:true,descripcion:'Viernes Santo'},
+                                        {fecha:'2027-04-12',fecha_fin:null,tipo:'feriado',pago_obligatorio:false,descripcion:'Juan Santamaría (lunes)'},
+                                        {fecha:'2027-02-09',fecha_fin:'2027-02-10',tipo:'cierre'}]));
+  _calAplicar(cO, '2027-03-07');
+  eq("pago obligatorio: sin venta ni produccion", [_sinVenta('2027-03-25'), _esProductivo('2027-03-25'), _semAbiertos(new Date(2027,2,22))], [true,false,3]);
+  eq("feriado comun: sin produccion, la venta sigue", [_sinVenta('2027-04-12'), _esProductivo('2027-04-12'), _semAbiertos(new Date(2027,3,12))], [false,false,5]);
+  eq("cierre de 2 dias: sin venta ni produccion", [_sinVenta('2027-02-10'), _esProductivo('2027-02-10'), _semAbiertos(new Date(2027,1,8))], [true,false,3]);
+  cerca("semana de Jueves/Viernes Santo: venta = 3/5 del ritmo", _planSem(new Date(2027,2,22), {451:100}).ritmo[451], 60);
+  eq("habiles de mar-2027 sin los dos dias obligatorios", _habilesMes(2027*12+2), 21);
+  eq("Navidad y Año Nuevo vienen marcados de la tabla", [!!cO.ferObl['2026-12-25'], !!cO.ferObl['2027-01-01'], !!cO.ferObl['2026-12-01']], [true,true,false]);
+  _AHORA = new _RealDate(2027, 1, 1, 10, 0, 0).getTime();          // lun 1-feb-2027: el horizonte cruza los tres casos
+  var LrO = nivLevel(R, fin, cfg).weeks, LpO = nivProyeccion(R, fin, cfg, 6);
+  eq("con dias sin venta: Resumen = Plan semana a semana", key(LrO), key(LpO));
+  _planInputs = {cfg:cfg, ritmo:R, fin:fin, finLunes:fin};
+  eq("…y = Plan con ediciones vacias", key(LpO), key(planProyeccionOv({}).slice(0,6)));
+  _AHORA = new _RealDate(2026, 9, 25, 10, 0, 0).getTime();
   _calAplicar(_calDesdeFilas(FILAS), '2026-10-25');
   // ── 8. VOLVER AL PLAN ACOTADO ──
   var ovs = {'2026-10-20':{}, '2026-10-26':{}, '2026-11-06':{}, '2026-11-09':{}, '2027-01-12':{}};
