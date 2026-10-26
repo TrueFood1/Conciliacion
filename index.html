@@ -5779,7 +5779,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 26 oct 2026 · b135';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 26 oct 2026 · b136';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -11230,6 +11230,15 @@ const _DF_DIA={dom:0,lun:1,mar:2,mie:3,jue:4,vie:5,sab:6};
 function _dfDia(s){ if(s==null) return null; const k=String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').slice(0,3); return _DF_DIA[k]!=null?_DF_DIA[k]:null; }
 function _dfAdd(ds,n){ const d=new Date(ds+'T00:00:00'); d.setDate(d.getDate()+n); return _ymd(d); }
 function _dfDow(ds){ return new Date(ds+'T00:00:00').getDay(); }
+// DEMORA EN DÍAS HÁBILES (Andrea, 26-oct): a True Food no se entrega sábado ni domingo. PriceSmart con
+// demora 1: lo pedido el viernes llega el LUNES, no el sábado. n=0 sigue siendo «el mismo día» (tienda).
+// n<0 cuenta hacia atrás (el último día para pedir y que llegue a tiempo).
+function _dfAddHab(ds,n){
+  n=+n||0; if(!n) return ds;
+  const paso=n>0?1:-1; let d=ds, k=Math.abs(n);
+  while(k>0){ d=_dfAdd(d,paso); const w=_dfDow(d); if(w!==0 && w!==6) k--; }
+  return d;
+}
 function _dfProx(desde, dow, incluir){ let ds=incluir?desde:_dfAdd(desde,1); for(let i=0;i<7 && _dfDow(ds)!==dow;i++) ds=_dfAdd(ds,1); return ds; }
 function _dfPrev(hasta, dow){ let ds=hasta; for(let i=0;i<7 && _dfDow(ds)!==dow;i++) ds=_dfAdd(ds,-1); return ds; }
 // Productos con día fijo (para sacarlos de "Comprar").
@@ -23242,7 +23251,7 @@ async function cpAlcance(){
     let U, pedirEl=null, llega, ci=null;
     // Sin día de pedido (huevo líquido, «se pide antes del jueves»): el límite es la entrega.
     if(fijo){ ci=_cpCicloProximo(fijo, hoy); U=ci.U; llega=ci.E; pedirEl=(_dfDia(fijo.pide)==null)?ci.E:ci.P; }
-    else { U=_dfAdd(hoy, +pv.demora||0); llega=U; }
+    else { U=_dfAddHab(hoy, +pv.demora||0); llega=U; }
     // ámbar = se acaba antes de que llegue la compra SIGUIENTE (cada `cada` semanas): va en esta.
     const color=(fallaC && fallaC<U) ? 'rojo' : (fallaC && fallaC<_dfAdd(U, 7*cada)) ? 'ambar' : 'verde';
     // LLEGA EL MISMO DÍA QUE SE ACABA (Andrea, 15-oct, avena): ya hay algo pedido que llega el día del faltante
@@ -23258,7 +23267,7 @@ async function cpAlcance(){
         const c=((cons[d]&&cons[d][pid])||0)-(deficit&&d===hoy?sinCargar:0);
         if(c>1e-9){ if(s1-c<-1e-9){ hueco=false; break; } s1-=c; }
         if(d!==llega) s1+=((rec[pid]||{})[d]||0); } }
-    const comprarAntes=(!fijo && fallaC) ? _dfAdd(fallaC, -(+pv.demora||0)) : null;
+    const comprarAntes=(!fijo && fallaC) ? _dfAddHab(fallaC, -(+pv.demora||0)) : null;
     const h=D.hist[pid]||{prom:0, margen:0};
     // Lo sugerido. Día fijo: el del motor de la tarjeta de BIO para ESE ciclo (validado con Lorena).
     // Sin día fijo: solo si no es verde, lo que se consume desde hoy hasta 2 semanas después de la
@@ -23976,7 +23985,7 @@ function _cpFechasPedido(g){
     if(R && R.ci.pasado && !R.registrada && !R.filas.some(function(f){ return f.ya>1e-9; }))
       return {modo:'registrar', pedido:R.ci.P, entrega:R.ci.E, uso:R.ci.U};
     return {modo:'pedir', pedido:hoy, entrega:g.ci.E, uso:g.ci.U}; }
-  return {modo:'pedir', pedido:hoy, entrega:_dfAdd(hoy, g.demora), uso:null};
+  return {modo:'pedir', pedido:hoy, entrega:_dfAddHab(hoy, g.demora), uso:null};
 }
 // ¿Ya pasó el límite de lo frío de ESTA semana? (hoy después del `pide`, antes o el día de su entrega)
 function _cpFrioTarde(g){
@@ -24506,7 +24515,7 @@ const _cpDiaTxt=function(d){ return d==null?'—':({lun:'lun',mar:'mar',mie:'mi�
 const _cpCadaTxt=function(pv){ const n=Math.max(1,+pv.cada_semanas||1); return n===1?'cada semana':('cada '+n+' semanas'); };
 // La línea de la lista: cómo se pide y SIEMPRE cuándo entregan (Andrea, 3-oct). Los productos se ven al abrir.
 function _cpProvResumen(pv, n){
-  const dem=+pv.demora||0, en=(dem===0)?'entrega el mismo día':('entrega en '+dem+' día'+(dem===1?'':'s'));
+  const dem=+pv.demora||0, en=(dem===0)?'entrega el mismo día':('entrega en '+dem+' día'+(dem===1?' hábil':'s hábiles'));
   if(pv.pide||pv.llega) return 'pide '+_cpDiaLargo(pv.pide)+' · entrega '+_cpDiaLargo(pv.llega);
   if(pv.canal==='app') return 'en su app · '+en;
   if(pv.canal==='tienda') return 'en tienda · '+en;
@@ -24515,7 +24524,7 @@ function _cpProvResumen(pv, n){
 function _cpProvCab(pv){
   let t;
   // Días completos y SIEMPRE cuándo entregan (Andrea, 3-oct): «Pide jueves · entrega lunes mediodía».
-  const dem=+pv.demora||0, en=(dem===0)?'entrega el mismo día':('entrega en '+dem+' día'+(dem===1?'':'s'));
+  const dem=+pv.demora||0, en=(dem===0)?'entrega el mismo día':('entrega en '+dem+' día'+(dem===1?' hábil':'s hábiles'));
   if(pv.pide||pv.llega) t='Pide '+_cpDiaLargo(pv.pide)+' · entrega '+_cpDiaLargo(pv.llega)+(pv.llega_hora?(' '+pv.llega_hora):'')+' · '+(_CP_CANAL[pv.canal]||pv.canal);
   else if(pv.canal==='tienda') t='Se compra en tienda · '+en;
   else t=(pv.canal==='app'?'Pide en su app':'Pide por WhatsApp')+' · '+en;
@@ -24597,7 +24606,7 @@ async function cpProveedores(){
     const fijo=!!(pv.pide||pv.llega);
     const camSeco=socia
       ? (fijo ? ('pide '+sel("cpProvCambia('pide',this.value)", pv.pide, dias(true))+' llega '+sel("cpProvCambia('llega',this.value)", pv.llega, dias(false)))
-              : ('pedir '+sel("cpProvCambia('demora',this.value)", pv.demora, [0,1,2,3,4,5,7,10,14].map(function(n){ return [n, n+' día'+(n===1?'':'s')]; }))+' antes'))
+              : ('pedir '+sel("cpProvCambia('demora',this.value)", pv.demora, [0,1,2,3,4,5,7,10,14].map(function(n){ return [n, n+' día'+(n===1?' hábil':'s hábiles')]; }))+' antes'))
         +' · '+sel("cpProvCambia('cada_semanas',this.value)", pv.cada_semanas||1, [1,2,3,4,6,8].map(function(n){ return [n, n===1?'cada semana':('cada '+n+' semanas')]; }))
       : esc(_cpProvCab(pv));
     if(bio){
