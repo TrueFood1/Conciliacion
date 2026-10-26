@@ -4954,7 +4954,7 @@ body:has(.de-fondo) #tkBtn{display:none}
   #vResumen .rz-c4h{font-size:10.5px;letter-spacing:.02em;line-height:1.3}
   /* La ventana de cobertura VA en el teléfono, en las cuatro tarjetas. Estaba oculta desde
      cuando las tres decían lo mismo; ahora "Por medir" y "Comprar" cubren ventanas DISTINTAS
-     (el lunes al 50% contra el lunes completo), así que esconderla dejaba el número ambiguo. */
+     (el día de medición al 50% contra el lunes completo), así que esconderla dejaba el número ambiguo. */
   #vResumen .rz-c4fecha{font-size:10.5px;margin:-2px 0 8px;line-height:1.3}
   #vResumen .rz-c4-desk{display:none} #vResumen .rz-c4-mov{display:inline}
   /* Por medir · Producciones registradas · las dos de Comprar. Lo que se mira todos los días
@@ -5779,7 +5779,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 26 oct 2026 · b136';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 26 oct 2026 · b137';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -10117,11 +10117,15 @@ const NIV_INFO={
   472:{nom:'Pizza',       prem:473, rend:20,  cap:12, cajaU:12, presDiv:2, presLbl:'paq'},
   519:{nom:'Galletas',    prem:517, rend:160, cap:1,  cajaU:12, presDiv:1, presLbl:'uds'},
 };
-// medirLunesFrac — cuánto del LUNES SIGUIENTE entra en "Por medir". Parámetro, no número
-// enterrado: se sobreescribe desde plan_config con la clave `medir_lunes_frac`.
-// El porqué del 0,5: el lunes en la mañana las socias miden lo que falta para ESE día más toda la
-// producción de la semana, y del lunes siguiente miden solo la mitad — porque esa mañana vuelven
-// y miden la otra mitad. El ciclo se traslapa a propósito; la ventana tiene que traslaparse igual.
+// medirDia + medirFrac — CUÁNDO se miden las premezclas y cuánto del día de medición SIGUIENTE
+// entra en "Por medir". Parámetros, no números enterrados (los lee `_medirCfg`):
+//   medirDia  0=dom … 6=sáb. Default 4 (JUEVES) desde el 26-oct-2026; antes era el lunes, fijo
+//             en el código. Clave `medir_dia` de plan_config (número o 'lun'…'dom').
+//   medirFrac 0–1. Clave `medir_frac`; se sigue leyendo `medir_lunes_frac` (la sembrada) por
+//             compatibilidad — las dos son la misma clave y gana la fila más reciente.
+// El porqué del 0,5: el día de medición en la mañana las socias miden lo que falta para ESE día más
+// toda la producción hasta el próximo día de medición, y de ese día miden solo la mitad — porque
+// esa mañana vuelven y miden la otra mitad. El ciclo se traslapa a propósito; la ventana también.
 // ════════════════════════════════════════════════════════════════════════
 // DETECCIÓN DE UNIDAD EQUIVOCADA EN FACTURAS (22-sep-2026)
 // ════════════════════════════════════════════════════════════════════════
@@ -10301,7 +10305,7 @@ function uomLineaMal(pid, uomId, uds){
 
 // planMeses: cuántos meses mira el Plan desde HOY (rodante). Clave `plan_meses` de plan_config; sin
 // fila, 4 (Andrea, 25-oct-2026). No confundir con `horizonte`: esas son SEMANAS de cobertura del motor.
-const NIV_CFG_DEF={ritmoVentana:6, colchon:3, colchonTemporada:4, horizonte:6, medirLunesFrac:0.5, planMeses:4, cierreSemEne:3};
+const NIV_CFG_DEF={ritmoVentana:6, colchon:3, colchonTemporada:4, horizonte:6, medirFrac:0.5, medirDia:4, planMeses:4, cierreSemEne:3};
 const _rzN=(n,d=0)=>(Number(n)||0).toLocaleString('es-CR',{minimumFractionDigits:d,maximumFractionDigits:d});
 // ── CAPACIDAD por Nº de personas (batches/día). Adelanto del futuro módulo RRHH. ──
 // El motor usa la tabla según cuánta gente hay esa semana (marca manual por semana ISO).
@@ -10552,7 +10556,7 @@ function _crDate(dt){
 // ── plan_config (Supabase; fila más reciente por clave manda). Fallback a defaults. ──
 async function nivConfig(){
   const cfg={ritmoVentana:NIV_CFG_DEF.ritmoVentana, colchonTemporada:NIV_CFG_DEF.colchonTemporada,
-             horizonte:NIV_CFG_DEF.horizonte, medirLunesFrac:NIV_CFG_DEF.medirLunesFrac, planMeses:NIV_CFG_DEF.planMeses,
+             horizonte:NIV_CFG_DEF.horizonte, medirFrac:NIV_CFG_DEF.medirFrac, medirDia:NIV_CFG_DEF.medirDia, planMeses:NIV_CFG_DEF.planMeses,
              cierreSemEne:NIV_CFG_DEF.cierreSemEne, colchon:{}, ventanas:[], diaFijo:[], sembrado:false};
   NIV_PROD.forEach(p=>cfg.colchon[p]=NIV_CFG_DEF.colchon);
   // SIN atrapa-errores: `plan_config` existe desde el 17-ago-2026 y está sembrada. Antes había un
@@ -10566,12 +10570,16 @@ async function nivConfig(){
     if(error) throw new Error('No pude leer la configuración del plan (plan_config): '+(error.message||error));
     if(!data||!data.length) return cfg;
     cfg.sembrado=true; const seen={};
-    for(const r of data){ if(seen[r.clave])continue; seen[r.clave]=1; const v=r.valor;
+    // `medir_frac` y `medir_lunes_frac` son LA MISMA clave (alias): gana la fila más reciente de las dos.
+    const _alias={medir_lunes_frac:'medir_frac'};
+    for(const r of data){ const ck=_alias[r.clave]||r.clave; if(seen[ck])continue; seen[ck]=1; const v=r.valor;
       if(r.clave==='ritmo_ventana') cfg.ritmoVentana=+v||cfg.ritmoVentana;
       else if(r.clave==='colchon_temporada') cfg.colchonTemporada=+v||cfg.colchonTemporada;
       else if(r.clave==='colchon_semanas' && v && typeof v==='object'){ for(const k in v) cfg.colchon[+k]=+v[k]; }
       else if(r.clave==='ventanas_estacionales' && Array.isArray(v)) cfg.ventanas=v;
-      else if(r.clave==='medir_lunes_frac' && v!=null && +v>=0 && +v<=1) cfg.medirLunesFrac=+v;
+      else if(ck==='medir_frac' && v!=null && v!=='' && +v>=0 && +v<=1) cfg.medirFrac=+v;
+      else if(r.clave==='medir_dia' && v!=null && v!==''){ const d=(typeof v==='number'||/^\d$/.test(String(v))) ? +v : _dfDia(v);
+        if(Number.isInteger(d) && d>=0 && d<=6) cfg.medirDia=d; }                          // fuera de 0..6 → el default (jueves)
       else if(r.clave==='plan_meses' && v!=null && Number.isInteger(+v) && +v>=1 && +v<=11) cfg.planMeses=+v;   // fuera de 1..11 → el default
       else if(r.clave==='cierre_semanas_enero' && v!=null && v!=='' && Number.isInteger(+v) && +v>=0 && +v<=8) cfg.cierreSemEne=+v;   // semanas de enero en la meta (b127)
       else if(r.clave==='compras_dia_fijo' && v && Array.isArray(v.insumos)) cfg.diaFijo=v.insumos;   // T-28
@@ -11108,7 +11116,7 @@ function _mpTipo(name){ const n=(name||'').toLowerCase();
 // sal [459] (las cinco premezclas de pan). Por ID, nunca por nombre.
 // AGRUPACIÓN VISUAL solamente — la ventana es única para todos (ver arriba).
 const MP_PREM_OTRO=[523,524,463,459];
-// 'medir'    = lo que consumen las socias el lunes al medir premezclas.
+// 'medir'    = lo que consumen las socias el día de medición (`_medirCfg`) al medir premezclas.
 // 'producir' = lo que pesa el equipo de producción en la etapa final.
 function _mpGrupo(pid, name){ const t=_mpTipo(name);
   return (t==='saco'||t==='azucar'||MP_PREM_OTRO.indexOf(pid)>=0) ? 'medir' : 'producir'; }
@@ -11184,8 +11192,10 @@ async function nivCompras(stock){
                 accion:_mpFuente(_mpTipo(nm)), nota:nota}); }
     return out; }
   // "comprar hoy" sobraba: el título de la tarjeta ya dice Comprar, y la línea rosa está para
-  // decir la VENTANA, que es el dato. El lunes entra COMPLETO acá — a diferencia de "Por medir",
-  // que lo cuenta al 50%. Son ventanas distintas y por eso cada una lo dice.
+  // decir la VENTANA, que es el dato. El lunes entra COMPLETO acá. Ojo: esta ventana es la de la
+  // compra semanal de Lorena (lunes), NO la de la medición — "Por medir" va hasta el próximo día de
+  // medición (`_medirCfg`) y lo cuenta al `frac`. Son ventanas distintas y por eso cada una lo dice.
+  // (Esta tarjeta no está montada: ver rzComprasHtml.)
   const fecha='cubre hasta el lun '+nextMon.getDate(), fecha2='ese día completo';
   return {
     premezclas:{fecha:fecha, fecha2:fecha2, items:items('medir')},
@@ -11197,7 +11207,9 @@ async function nivCompras(stock){
 // ════════════════════════════════════════════════════════════════════════
 // EL CASO: BIO Ingredients pasó a entregar los LUNES al mediodía, DESPUÉS de que las socias
 // miden las premezclas de la semana. Lo que llega un lunes recién se usa para medir el lunes
-// SIGUIENTE. La ventana única de nivCompras ("de hoy al lunes que viene") calculaba justo lo
+// SIGUIENTE. (26-oct-2026: la medición pasó al JUEVES — `_medirCfg().dia`. Con eso lo seco que
+// llega el lunes SÍ entra en la medición del jueves de esa semana; el que llega el MISMO día que
+// se mide, después de medir, sigue yendo a la medición siguiente.) La ventana única de nivCompras ("de hoy al lunes que viene") calculaba justo lo
 // que BIO ya no alcanza a traer, y lo que sí puede traer no lo calculaba nadie.
 //
 // LA CONFIGURACIÓN ES POR INSUMO, no por proveedor: BIO trae el huevo líquido los JUEVES.
@@ -11208,7 +11220,7 @@ async function nivCompras(stock){
 //                               como si se pidiera hoy)
 //   llega   'lun'…'vie'         día de entrega
 //   momento 'antes'|'despues'   la entrega llega antes o después de usarse ese día
-//   uso     'medicion'          lo usable recién en una medición de lunes (premezclas; y por
+//   uso     'medicion'          lo usable recién en una medición (día `_medirCfg().dia`; premezclas; y por
 //                               decisión de Andrea, también levadura y semillas de BIO)
 //           'produccion'        usable desde la producción del día (huevo líquido)
 //
@@ -11241,6 +11253,17 @@ function _dfAddHab(ds,n){
 }
 function _dfProx(desde, dow, incluir){ let ds=incluir?desde:_dfAdd(desde,1); for(let i=0;i<7 && _dfDow(ds)!==dow;i++) ds=_dfAdd(ds,1); return ds; }
 function _dfPrev(hasta, dow){ let ds=hasta; for(let i=0;i<7 && _dfDow(ds)!==dow;i++) ds=_dfAdd(ds,-1); return ds; }
+// EL DÍA DE MEDICIÓN y la fracción del siguiente (plan_config `medir_dia` / `medir_frac`; ver
+// NIV_CFG_DEF). Una sola lectura para Por medir, la tarjeta de día fijo y el motor de Compras:
+// ningún cálculo vuelve a tener el lunes (1) escrito a mano.
+function _medirCfg(){ const c=(typeof _rzCtx!=='undefined' && _rzCtx && _rzCtx.cfg)||{};
+  const d=(c.medirDia!=null && c.medirDia>=0 && c.medirDia<=6) ? +c.medirDia : NIV_CFG_DEF.medirDia;
+  const f=(c.medirFrac!=null && c.medirFrac>=0 && c.medirFrac<=1) ? +c.medirFrac : NIV_CFG_DEF.medirFrac;
+  return {dia:d, frac:f}; }
+// Hasta dónde cubre lo que se mide desde HOY: el próximo día de medición DESPUÉS de hoy (si hoy es
+// día de medición, el de la semana que viene), que entra al `frac`. Sin fechas fijas: la semana de
+// transición (se midió el lun 26-oct hasta el jue 29 a la mañana) sale sola de la misma regla.
+function _medirHasta(hoy){ return _dfProx(hoy, _medirCfg().dia, false); }
 // Productos con día fijo (para sacarlos de "Comprar").
 function _dfPids(){ return new Set(((_rzCtx&&_rzCtx.cfg&&_rzCtx.cfg.diaFijo)||[]).map(function(x){ return +x.producto_id; }).filter(Boolean)); }
 
@@ -11257,7 +11280,10 @@ function _dfCiclo(c, hoy){
   let U;
   if(c.uso==='produccion'){
     U=E; if(c.momento!=='antes'){ U=_dfAdd(E,1); for(let i=0;i<60 && !_esProductivo(U);i++) U=_dfAdd(U,1); }   // 60: cruza el cierre de diciembre
-  } else U=(_dfDow(E)===1 && c.momento==='antes') ? E : _dfProx(E,1,false);   // la medición es los lunes
+  } else { const md=_medirCfg().dia;   // el día de medición (jueves desde el 26-oct-2026)
+    // Llega ANTES de medir ese día → se usa esa misma medición; si llega después (o otro día),
+    // en la próxima medición.
+    U=(_dfDow(E)===md && c.momento==='antes') ? E : _dfProx(E,md,false); }
   // U2 = hasta dónde cubre este pedido: el pedido siguiente (`cada` semanas; sin config, 1).
   return {P:P, E:E, U:U, U2:_dfAdd(U, 7*Math.max(1, +c.cada||1)), sinDia:dP==null, pasado:pasado};
 }
@@ -11272,8 +11298,8 @@ function _dfPorFecha(hasta){
   return m;
 }
 // Batches por ventana. A = antes de U · B = la semana que arranca en U. Premezcla y producción van
-// en mapas aparte porque se consumen en momentos distintos: la premezcla al MEDIR (el lunes cubre
-// su semana + `frac` del lunes siguiente), lo directo el día que se produce.
+// en mapas aparte porque se consumen en momentos distintos: la premezcla al MEDIR (el día de medición
+// cubre hasta el siguiente, ese al `frac`), lo directo el día que se produce.
 function _dfVentanas(ci, uso, frac, porFecha, hoy){
   const premA={}, prodA={}, premB={}, prodB={};
   const add=function(m,t,w){ if(w<=0) return; for(const k in t) m[+k]=(m[+k]||0)+t[k]*w; };
@@ -11372,7 +11398,7 @@ async function nivDiaFijoDatos(cfg, mon0){
 async function nivDiaFijo(){
   const D=_rzCtx&&_rzCtx.dfDatos; if(!D) return null;
   if(D.error) return {error:D.error};
-  const hoy=_rzCtx.hoyStr, frac=(_rzCtx.cfg.medirLunesFrac!=null)?_rzCtx.cfg.medirLunesFrac:NIV_CFG_DEF.medirLunesFrac;
+  const hoy=_rzCtx.hoyStr, frac=_medirCfg().frac;
   const H=(_rzCtx.weeks&&_rzCtx.weeks.length)||2, finPlan=_dfAdd(_ymd(_rzMonday(H-1)),6);
   // Días de producción ya pasados que Odoo no tiene: su consumo todavía no salió del stock.
   const sinCargar=(_rzUltimas||[]).filter(function(u){ return u.kind==='sin'; });
@@ -22973,27 +22999,25 @@ function rzWeekBatchesFull(offset){ return _rzFutBatches(_rzCellsFull(offset)); 
 // Producción planeada por fecha (2 semanas, con ediciones + auto) → base de la lógica de compras.
 function _rzPerDate(){ const m={}; for(let o=0;o<2;o++){ _rzCellsFull(o).forEach(function(c){ const pr=c.prods||{}; if(!Object.keys(pr).length) return; const t=m[c.ds]=m[c.ds]||{}; for(const k in pr) t[+k]=(t[+k]||0)+pr[k]; }); } return m; }
 // (El calendario muestra la semana COMPLETA: días pasados = real de Odoo, hoy resaltado, futuro = plan.)
-// ── VENTANA DE "POR MEDIR": desde HOY hasta el LUNES SIGUIENTE inclusive, ese lunes al 50%. ──
-// No es la semana en curso (eso era lo que había, y se quedaba corto justo el lunes en la mañana,
-// que es cuando se mide). Las socias miden lo que falta para HOY más toda la producción hasta el
-// lunes que viene; de ese lunes miden la mitad, porque esa mañana vuelven y miden la otra mitad.
-// El traslape es deliberado — por eso el lunes entra fraccionado y no entero ni afuera.
+// ── VENTANA DE "POR MEDIR": desde HOY hasta el PRÓXIMO DÍA DE MEDICIÓN inclusive, ese día al `frac`. ──
+// El día de medición es un parámetro (`_medirCfg`, jueves desde el 26-oct-2026; antes, lunes).
+// Las socias miden lo que falta para HOY más toda la producción hasta la próxima medición; de ese
+// día miden la mitad, porque esa mañana vuelven y miden la otra mitad. Si HOY es día de medición,
+// la ventana va hasta el de la semana siguiente (`_medirHasta`). El traslape es deliberado — por eso
+// ese día entra fraccionado y no entero ni afuera.
 // Los batches quedan fraccionarios a propósito: nivAlistar redondea al final (Math.ceil sobre lo
 // que falta), así que partir acá y redondear allá no pierde media premezcla.
 function _rzMedirBatches(){
-  const frac=(_rzCtx && _rzCtx.cfg && _rzCtx.cfg.medirLunesFrac!=null) ? _rzCtx.cfg.medirLunesFrac : NIV_CFG_DEF.medirLunesFrac;
-  const nextMon=new Date(_rzCtx.mon0); nextMon.setDate(nextMon.getDate()+7);
-  const nextMonStr=_ymd(nextMon), perDate=_rzPerDate(), out={};
-  for(const ds in perDate){ if(ds<_rzCtx.hoyStr || ds>nextMonStr) continue;
-    const peso=(ds===nextMonStr)?frac:1, t=perDate[ds];
+  const frac=_medirCfg().frac, hasta=_medirHasta(_rzCtx.hoyStr), perDate=_rzPerDate(), out={};
+  for(const ds in perDate){ if(ds<_rzCtx.hoyStr || ds>hasta) continue;
+    const peso=(ds===hasta)?frac:1, t=perDate[ds];
     for(const k in t) out[+k]=(out[+k]||0)+t[k]*peso; }
   return out;
 }
 // Etiqueta de la ventana — es definición del dato (hasta cuándo cubre), no instrucción de uso.
 function _rzMedirLbl(){
-  const frac=(_rzCtx && _rzCtx.cfg && _rzCtx.cfg.medirLunesFrac!=null) ? _rzCtx.cfg.medirLunesFrac : NIV_CFG_DEF.medirLunesFrac;
-  const nextMon=new Date(_rzCtx.mon0); nextMon.setDate(nextMon.getDate()+7);
-  return {l1:'cubre hasta el lun '+nextMon.getDate(), l2:'ese día al '+_rzN(frac*100)+'%'};
+  const frac=_medirCfg().frac;
+  return {l1:'cubre hasta el '+_fechaCorta(_medirHasta(_rzCtx.hoyStr)), l2:'ese día al '+_rzN(frac*100)+'%'};   // «jue 29»
 }
 // Las dos líneas de la ventana, siempre en dos renglones: son dos datos distintos —hasta cuándo
 // cubre, y cómo cuenta ese último día— y corridos en una sola línea se leían como uno solo.
@@ -23177,11 +23201,12 @@ const _CP_CANAL={whatsapp:'WhatsApp', app:'en su app', tienda:'en tienda'};
 // ════════════════════════════════════════════════════════════════════════
 // Día por día, desde hoy y por 4 semanas: el plan (con ediciones y auto-relleno) pasado a
 // materia prima con el MISMO expansor de recetas, en el día en que se consume —la premezcla al
-// MEDIR (el lunes cubre su semana y `frac` del lunes siguiente), lo directo el día que se
-// produce—, descontando primero la premezcla que ya está hecha. La producción ya hecha y sin
+// MEDIR (el día de medición —`_medirCfg`, jueves— cubre hasta el siguiente, ese al `frac`), lo
+// directo el día que se produce—, descontando primero la premezcla que ya está hecha. La producción ya hecha y sin
 // cargar en Odoo (`_rzSinCargarBatches`) se carga hoy: su MP todavía no salió del stock.
 // Lo ya pedido (órdenes abiertas de CUALQUIER proveedor) entra el día que llega, DESPUÉS del
-// consumo de ese día: BIO llega el lunes al mediodía y la medición es a la mañana.
+// consumo de ese día: la medición es a la mañana y BIO llega al mediodía (lo seco el lunes, lo frío
+// el jueves). Con la medición el jueves, lo seco del lunes llega a tiempo para la de ESA semana.
 // «Alcanza hasta» va SIN margen (Andrea, 3-oct): el margen solo va en la cantidad sugerida.
 // Los tres colores, contra lo que llegaría si se pidiera HOY (U = primer día en que se puede usar):
 //   rojo  = se acaba antes de U: el proveedor ya no llega a tiempo.
@@ -23197,7 +23222,7 @@ async function cpAlcance(){
   if(!C) return null;
   if(!D||D.error) return {error:(D&&D.error)||'no hay datos de Odoo'};
   const hoy=_rzCtx.hoyStr, fin=_dfAdd(hoy, CP_DIAS_HORIZONTE-1);
-  const frac=(_rzCtx.cfg.medirLunesFrac!=null)?_rzCtx.cfg.medirLunesFrac:NIV_CFG_DEF.medirLunesFrac;
+  const frac=_medirCfg().frac, mdia=_medirCfg().dia;
   // 1 · batches por medir y por producir, por día
   const premLeft={}; NIV_PROD.forEach(function(p){ premLeft[p]=(_rzCtx.stock.premOh||{})[NIV_INFO[p].prem]||0; });
   const medir={}, prod={};
@@ -23210,8 +23235,10 @@ async function cpAlcance(){
   Object.keys(pf).sort().forEach(function(ds){ if(ds<hoy||ds>fin) return; const t=pf[ds];
     for(const k in t){ const p=+k, b=+t[k]||0; if(b<=0) continue; sum(prod, ds, p, b);
       const r=usarPrem(p, b); if(r<=1e-9) continue;
-      const lun=_dfPrev(ds, 1), med=function(d, q){ sum(medir, d<hoy?hoy:d, p, q); };
-      if(ds===lun){ med(_dfAdd(ds,-7), r*frac); med(ds, r*(1-frac)); } else med(lun, r); } });
+      // La medición que cubre `ds`: la última del día de medición ≤ ds. El día de medición mismo se
+      // reparte: `frac` lo midió la medición anterior, el resto la de ese día.
+      const dm=_dfPrev(ds, mdia), med=function(d, q){ sum(medir, d<hoy?hoy:d, p, q); };
+      if(ds===dm){ med(_dfAdd(ds,-7), r*frac); med(ds, r*(1-frac)); } else med(dm, r); } });
   // 2 · materia prima por día
   const cons={};
   const add=function(ds, m){ const c=cons[ds]=cons[ds]||{}; for(const k in m) c[+k]=(c[+k]||0)+m[k]; };
