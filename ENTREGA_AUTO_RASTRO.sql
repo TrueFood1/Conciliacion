@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- ENTREGA_AUTO_RASTRO.sql  ·  26-oct-2026  ·  NO SE CORRIÓ
+-- ENTREGA_AUTO_RASTRO.sql  ·  26-oct-2026  ·  APLICADO en producción por Andrea (26-oct), control 2·0·5·3·0·7·7·7·5·5·7·1, verificado desde afuera con pg_lector
 -- Validar en Odoo AL ENTREGAR (b132, decisión de Andrea del 26-oct). Reemplaza a
 -- ENTREGA_AUTO_POLITICAS.sql (que nunca se pegó): aquella abría las tablas del rastro
 -- al perfil «equipo», y con su token Daniel podía escribir un rastro falso por REST y
