@@ -5763,7 +5763,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 26 oct 2026 · b133';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 26 oct 2026 · b134';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -9890,13 +9890,16 @@ const cM = n => '₡'+Math.round(Number(n)||0).toLocaleString('es-CR');   // col
 //   empHold = razón por la que sigue INCOMPLETO aunque haya número (no se auto-completa al poner emp).
 // Fuente: Excel Analisis_Costos_TrueFood.xlsx, hoja "Costos de Empaque" (Colinas Alta Vista = cajas,
 //   Indelsa = bolsas PE, potes craft propios). Desglose por producto:
-//   Blanco 73,18 (bolsa 29,65 + caja 43,53) · Semillas 81,21 (37,68 + 43,53) · Francés 67,90 (24,37 + 43,53)
+//   Blanco 58,15 (bolsa 14,62 + caja 43,53) · Semillas 81,21 (37,68 + 43,53) · Francés 67,90 (24,37 + 43,53)
 //   · Buns 63,97 (20,44 + 43,53) · Galletas 412,66 (pote 394,84 + caja 17,82).
 // CAJA DE PAN (b129, 26-oct-2026): las cajas de Blanco, Semillas, Francés y Buns de Colinas de Alta Vista cuestan lo
 //   mismo. Pedido PJG-48842 del 26-oct: US$0,5724 sin IVA × 456,32 (tasa de Odoo del 26-oct) = ₡261,20 la caja ÷ 6
 //   unidades de venta = 43,53 (antes ₡239,40 → 39,90). La caja de GALLETAS y la master de PIZZA son distintas
 //   (Andrea, 26-oct, b130): siguen con su última factura (Galletas «caja masa» US$0,46, 30-mar-2026 → 17,82 por pote;
 //   Pizza «caja Pizza Crust» US$0,47, 26-sep-2025 → 39,67 por paquete).
+// BOLSA DE PAN BLANCO (b131, 26-oct-2026): Empaques Universales, factura 2608 del 13-oct (OP 38415), 327,78 kg por
+//   ₡737.398,34 sin IVA. Daniel pesó 10 bolsas = 65 g → 6,5 g la bolsa → 50.428 bolsas → ₡14,62 la bolsa (antes
+//   Indelsa ₡29,65). Las planchas (factura 2609, US$500) se pagan una sola vez y no van al costo por bolsa.
 // CRITERIO (verificado 12-ago-2026): ÚLTIMA COMPRA registrada de cada componente, con la caja
 //   master prorrateada entre las unidades que caben. Valida al céntimo contra Galletas:
 //   pote 65,36 + tapa 66,50 (Diamantes de Papel 8-may) + funda 262,98 (Ind. Cartón 9-jun) = 394,84.
@@ -9910,7 +9913,7 @@ const cM = n => '₡'+Math.round(Number(n)||0).toLocaleString('es-CR');   // col
 //   Con esto el empaque de Pizza queda completo (antes 417,43 con empHold «falta la bolsa»).
 const COSTOS_PROD = [
   // prodId FIJO por producto — búsqueda por ID, nunca por nombre (trampa 517/519 "Prueba Galletas"). kw/rx quedan solo informativos.
-  {key:'blanco',  label:'Pan Blanco',      prodId:451, kw:'Pan Blanco', rx:/pan\s*blanco/i,    batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'var(--p-blanco)', chkMP:805, chkInd:1462, chkTot:2267, emp:73.18,  empOK:true},
+  {key:'blanco',  label:'Pan Blanco',      prodId:451, kw:'Pan Blanco', rx:/pan\s*blanco/i,    batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'var(--p-blanco)', chkMP:805, chkInd:1462, chkTot:2267, emp:58.15,  empOK:true},
   {key:'semillas',label:'Pan de Semillas', prodId:452, kw:'Semillas',   rx:/semillas/i,        batch:21,  unitsPer:1, pack:1, unidad:'por unidad',        color:'var(--p-semillas)', chkMP:980, chkInd:1462, chkTot:2442, emp:81.21,  empOK:true},
   {key:'pizza',   label:'Pizza Crust',     prodId:472, kw:'Pizza',      rx:/pizza/i,           batch:10,  unitsPer:2, pack:1, batchOverride:10, unidad:'por paquete de 2',  color:'var(--p-pizza)', chkMP:422, chkInd:3070, chkTot:3492, emp:446.19, empOK:true},
   {key:'frances', label:'Pan Francés',     prodId:453, kw:'Franc',      rx:/franc[eé]s/i,      batch:15,  unitsPer:4, pack:1, unidad:'por paquete de 4',  color:'var(--p-frances)', emp:67.90,  empOK:true},
