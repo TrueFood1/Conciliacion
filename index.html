@@ -2553,6 +2553,7 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
        poner un nombre, no agrandar la miga. -->
   <div id="rpStatus" class="status hidden" style="margin-top:14px"></div>
   <div id="rpBody" style="margin-top:14px"></div>
+  <div id="rpOdooAuto" class="oa-caja"></div>
 </div>
 
 <!-- ── DESPACHOS: el lector de facturas (Daniel, 6:30 am) ────────────────── -->
@@ -2566,6 +2567,7 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
     <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
   </div>
   <div id="despStatus" class="status hidden" style="margin-top:14px"></div>
+  <div id="despOdooAuto" class="oa-caja"></div>
   <div id="despBody" style="margin-top:14px"></div>
 </div>
 
@@ -3962,6 +3964,11 @@ body.es-lectora .face-pend{display:block}
   font-family:var(--mono);font-size:12px;color:var(--text-3)}
 .de-lote-c{white-space:nowrap}
 .de-sinlote{color:var(--warn-2)}
+.dp-sinlote{color:var(--text-2)}
+/* Odoo al entregar (b132): una línea de estado por pedido, gris. No es alerta. */
+.oa-caja{margin-top:10px;font-size:12.5px;color:var(--text-2)}
+.oa-caja:empty{display:none}
+.oa-l{padding:2px 0}
 .de-vacia{padding:22px 0;text-align:center;color:var(--text-3);font-size:13px}
 .de-mal{padding:14px;margin:10px 0;border-radius:8px;font-size:13px;line-height:1.5;
   background:var(--warn-wash);border:1px solid var(--warn-edge);color:var(--warn-tx)}
@@ -12187,6 +12194,17 @@ async function rzDiagEscenarios(body){
 // SOLO LECTURA de Odoo (candado intacto). Nada escribe acá.
 // ════════════════════════════════════════════════════════════════════════
 const ENT_PROD=[451,452,453,503,472,519];                     // los 6 productos
+// ── LO QUE SALE POR ENTREGAS SIN LOTE (26-oct-2026, decisión de Andrea) ──
+// «Pan para moler GF (merma)» [481], lo único que compra Good Food: `consu` en Odoo, sin
+// lote, sin conteo. Son las mermas de producción y NO es uno de los seis terminados, así
+// que NO entra en ENT_PROD: ningún saldo, conteo ni alerta de inventario lo ve (todos van
+// por lote o por ENT_PROD). Solo existe para que su factura aparezca en Entregas, se
+// entregue sin elegir lote y la salida se valide en Odoo como las demás.
+// DESDE: la primera factura que todavía tenía su albarán abierto (…3595, 22-oct). Las de
+// antes ya se validaron a mano en Odoo; sin este corte volverían todas a «Por preparar».
+const ENT_SIN_LOTE={481:'Pan para moler GF (merma)'};
+const ENT_SIN_LOTE_DESDE='2026-10-22';
+function _entSinLote(pid){ return Object.prototype.hasOwnProperty.call(ENT_SIN_LOTE, +pid); }
 // Código de producto dentro del lote, formato DDD C / M AA. Cookie Dough = 6,
 // CONFIRMADO el 15-ago leyendo el chatter de WH/MO/01226 y 01228 ("089 6/9 26").
 // Hasta entonces figuraba como null y el regex solo aceptaba códigos 1-5, con lo
@@ -14488,10 +14506,15 @@ async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
   mv.forEach(function(m){ if((m.reversal_move_id||[]).length) anuladas[m.id]=1; });
   const ids=mv.map(function(m){return m.id;});
   const ls=await odooCall('account.move.line','search_read',
-    [[['move_id','in',ids],['display_type','=','product'],['product_id','in',ENT_PROD]]],
+    [[['move_id','in',ids],['display_type','=','product'],
+      ['product_id','in',ENT_PROD.concat(Object.keys(ENT_SIN_LOTE).map(Number))]]],
     {fields:['move_id','product_id','product_uom_id','quantity','sale_line_ids'],limit:5000,context:{lang:'es_CR'}});
-  const por={};
-  ls.forEach(function(l){ (por[l.move_id[0]]=por[l.move_id[0]]||[]).push(l); });
+  const por={}, fechaFac={};
+  mv.forEach(function(m){ fechaFac[m.id]=m.invoice_date; });
+  ls.forEach(function(l){
+    // Lo sin lote (ENT_SIN_LOTE) entra solo desde su corte: lo de antes ya se validó a mano.
+    if(_entSinLote(l.product_id[0]) && String(fechaFac[l.move_id[0]]||'')<ENT_SIN_LOTE_DESDE) return;
+    (por[l.move_id[0]]=por[l.move_id[0]]||[]).push(l); });
   // ── ¿ESTA FACTURA TIENE ALGO QUE DESPACHAR? ───────────────────────────
   const sinDesp = await despYaEntregado(mv, por);
   // ya despachadas (Supabase). Si falla, se muestran todas: mejor de más que de menos.
@@ -14551,7 +14574,8 @@ async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
         const uid=(l.product_uom_id&&l.product_uom_id[0])||1;
         const u=_despUom[uid], f=uomFac(uid);   // factor por la caché compartida, no por _despUom
         const q=l.quantity||0;
-        return {producto_id:l.product_id[0], producto:(NIV_INFO[l.product_id[0]]||{}).nom||l.product_id[1],
+        return {producto_id:l.product_id[0],
+                producto:(NIV_INFO[l.product_id[0]]||{}).nom||ENT_SIN_LOTE[l.product_id[0]]||l.product_id[1],
                 uom_id:uid, uom_nombre:(u&&u.name)||'?', uom_factor:f,
                 cant_uom:q, cant_uds:q/f};
       })
@@ -15572,6 +15596,8 @@ function _despLineaOK(f,i){
   // lote que elegir ni suma que cuadrar: pedirle un lote seria pedirle que diga
   // de donde salio algo que no salio. Va ANTES de todo lo demas a proposito.
   if(e.marca) return true;
+  // SIN LOTE POR DEFINICIÓN (ENT_SIN_LOTE, 26-oct): no hay lote que elegir.
+  if(_entSinLote(f.lineas[i].producto_id)) return true;
   // UN LOTE OBSOLETO DEJA LA LINEA SIN RESOLVER. No se borra la eleccion —eso es
   // trabajo de Daniel— pero no se puede seguir con ella puesta.
   if(_despObsoletosDe(f,i).length) return false;
@@ -15724,6 +15750,12 @@ function despRenderPedido(body){
         +'<div class="dp-nm-firma">'+esc(mk.por||'—')+' · '+esc(_despCuando(mk.en)||'')+'</div>'
         +'</div>'
         +'<button class="dp-deshacer" onclick="despDesmarcar('+i+')">Deshacer</button>';
+    }else if(_entSinLote(L.producto_id)){
+      // Sin selector ni «+ otro lote»: este producto no tiene lote (ENT_SIN_LOTE).
+      h+=_despCantHTML(f,i)
+        +'<div class="dp-l-bot">'+_despSinLoteHTML(L.producto_id,'dp-sinlote')+'</div>'
+        +'<div class="dp-l-fin dp-l-fin2">'
+        +'<button class="dp-nose" onclick="despMarcaAbrir('+i+')">No se entrega</button></div>';
     }else if(!e.partido){
       h+=_despCantHTML(f,i);      // ticket 29: solo aparece al CORREGIR
       // EL AVISO DEL LOTE OBSOLETO, arriba de todo. Es lo primero que hay que
@@ -16298,6 +16330,12 @@ function _despPendientes(f){
   if(marcadas) p.push(marcadas+(marcadas===1?' no se entrega':' no se entregan'));
   return {txt:p.join(' · '), frena:!!(sinLote||mal||obsoletos)};
 }
+// «sin lote» en UN lugar (26-oct): en un terminado es una anomalía (ámbar, `clase`); en lo que
+// no tiene lote por definición (ENT_SIN_LOTE) es el estado normal y va en gris.
+function _despSinLoteHTML(pid, clase){
+  return _entSinLote(pid) ? '<div class="de-lote dp-sinlote"><span>sin lote</span></div>'
+                          : '<div class="'+clase+'"><span>sin lote</span></div>';
+}
 function despEditar(i){ const f=_despFacAbierta(); if(!f) return;
   _despEst(f,i).editando=true; despRender(); }
 function despFinEdit(i){ const f=_despFacAbierta(); if(!f) return;
@@ -16825,6 +16863,7 @@ async function despConfirmar(entregar){
         Object.assign({alisto_id:ali.id, creado_por:quien}, _despSalidaPayload(fSal)));
       if(e6) throw new Error('el pedido quedó PREPARADO pero no pude marcar la salida: '
         +((e6&&e6.message)||e6)+' — marcala con el botón Entregar.');
+      entOdooAuto(ped.id);                 // b132: sin await — la entrega ya quedó
     }
     _despFac=(_despFac||[]).filter(function(x){ return x.factura_id!==f.factura_id; });
     // El borrador se CIERRA, no se borra: queda como evidencia de cómo se armó
@@ -16916,7 +16955,7 @@ function despRenderDialogoEntrega(){
         ? l.lotes.map(function(x){
             return '<div class="de-lote"><span>'+esc(x.lote)+'</span>'
                  +'<span class="de-lote-c">'+esc(_despCantLote(x.cant_uds,l))+'</span></div>'; }).join('')
-        : '<div class="de-lote de-sinlote"><span>sin lote</span></div>';
+        : _despSinLoteHTML(l.producto_id,'de-lote de-sinlote');
       return '<div class="de-lin"><div class="de-prod"><span>'+esc(_bsProd(l.producto_id))+'</span>'
         +'<span class="de-cant">'+esc(cant)+'</span></div>'+lotes+'</div>';
     }).join('');
@@ -17199,7 +17238,7 @@ function despRenderDialogoPreparar(){
           const c=(lotes.length===1 && (x.cant==null||x.cant==='')) ? cant : (+x.cant||0);
           return '<div class="de-lote"><span>'+esc(x.lote)+'</span>'
                +'<span class="de-lote-c">'+esc(_cantUom(c, L.uom_id, L.uom_nombre))+'</span></div>'; }).join('')
-      : '<div class="de-lote de-sinlote"><span>sin lote</span></div>';
+      : _despSinLoteHTML(L.producto_id,'de-lote de-sinlote');
     return '<div class="de-lin"><div class="de-prod"><span>'+esc(_bsProd(L.producto_id))+'</span>'
       +'<span class="de-cant">'+esc(_cantUom(cant, L.uom_id, un))+'</span></div>'+filas+'</div>';
   }).join('');
@@ -17291,6 +17330,7 @@ async function despEntregar(pedidoId){
       console.warn('salida registrada pero sin marca de verificación:', ev);
     }
     _despEntAbierto=0; _despEntFecha='';   // salió bien: se cierra el diálogo
+    entOdooAuto(pedidoId);                 // b132: sin await — la entrega ya quedó
   }catch(e){
     alert('No se pudo marcar la salida: '+((e&&e.message)||e)
       +'\n\nEl pedido sigue en Preparado: probá de nuevo.');
@@ -18203,7 +18243,7 @@ async function bsLeer(){
 // "automercado", y "Buñuelo" escribiendo "bunuelo".
 function _bsNorm(s){ return String(s==null?'':s).toLowerCase()
   .normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
-function _bsProd(pid){ return (NIV_INFO[pid]||{}).nom || ('#'+pid); }
+function _bsProd(pid){ return (NIV_INFO[pid]||{}).nom || ENT_SIN_LOTE[pid] || ('#'+pid); }
 
 function bsRender(){
   const body=document.getElementById('bsBody'); if(!body) return;
@@ -18745,6 +18785,53 @@ async function escrituraPedir(ruta, id, confirmar, huella){
   // tampoco es una respuesta del servidor, así que cuenta como sin respuesta.
   if(!js || typeof js!=='object') return {red:true, st:res.status};
   return {st:res.status, js:js};
+}
+
+// ── ODOO AL ENTREGAR (b132, 26-oct-2026, decisión de Andrea) ─────────────
+// Recién guardada la salida, el navegador de quien entregó le pide al servicio (POST /auto)
+// que la valide en Odoo —o que cree el traslado, si es sin factura— con la MISMA revisión
+// que usa Andrea desde Pendientes. Lo que no calza no se toca y queda en Pendientes, como
+// antes. LA ENTREGA NUNCA DEPENDE DE ESTO: se llama DESPUÉS de guardar, sin await de quien
+// llama, y si el servicio no contesta (Render dormido) el pedido queda pendiente como hoy.
+// Con el interruptor apagado (423 auto_apagada) no se muestra nada: es el estado normal.
+const ODOO_AUTO_ESPERA_MS=90000;     // Render Free tarda ~50 s en despertar
+const _odooAuto={};                  // pedido_id → {estado:'enviando'|'ok'|'pendiente', txt, en}
+async function entOdooAuto(pedidoId){
+  if(!pedidoId || (_perfil!=='socias' && _perfil!=='equipo')) return;
+  _odooAuto[pedidoId]={estado:'enviando', txt:'Odoo · pedido '+pedidoId+' · validando…', en:Date.now()};
+  _odooAutoPintar();
+  let R;
+  try{
+    R=await Promise.race([escrituraPedir('/auto', pedidoId, false),
+      new Promise(function(ok){ setTimeout(function(){ ok({red:true}); }, ODOO_AUTO_ESPERA_MS); })]);
+  }catch(e){ R={red:true}; }
+  const js=(R&&R.js)||{};
+  if(R && R.st===423 && js.motivo==='auto_apagada'){ delete _odooAuto[pedidoId]; _odooAutoPintar(); return; }
+  let txt;
+  if(R && R.st===200 && js.ok){
+    const doc=js.tipo==='traslado' ? js.picking_nombre : js.albaran;
+    txt='Odoo · pedido '+pedidoId+(js.tipo==='traslado'?' · trasladado':' · validado')+(doc?(' · '+doc):'');
+    _odooAuto[pedidoId]={estado:'ok', txt:txt, en:Date.now()};
+  }else{
+    const por=(!R||R.red) ? 'sin conexión' : ({descuadre:'no calza', salida_vieja:'fuera de tiempo'}[js.motivo]||'');
+    txt='Odoo · pedido '+pedidoId+' · queda en Pendientes'+(por?(' · '+por):'');
+    _odooAuto[pedidoId]={estado:'pendiente', txt:txt, en:Date.now()};
+  }
+  _odooAutoPintar();
+  try{ _pd=null; }catch(e){}           // Pendientes cambió: que se relea al entrar
+}
+// Una sola regla de cómo se dibuja, para las dos pantallas (Entregas y Sin factura):
+// lo de las últimas 12 h, lo más nuevo arriba, máximo 3.
+function _odooAutoHTML(){
+  const lim=Date.now()-12*3600000;
+  return Object.keys(_odooAuto).map(function(k){ return _odooAuto[k]; })
+    .filter(function(x){ return x.en>lim; })
+    .sort(function(a,z){ return z.en-a.en; }).slice(0,3)
+    .map(function(x){ return '<div class="oa-l oa-'+x.estado+'">'+esc(x.txt)+'</div>'; }).join('');
+}
+function _odooAutoPintar(){
+  ['despOdooAuto','rpOdooAuto'].forEach(function(id){
+    const el=document.getElementById(id); if(el) el.innerHTML=_odooAutoHTML(); });
 }
 
 // Cada rechazo del servidor, en el idioma de quien lo lee. El texto del
@@ -19542,6 +19629,8 @@ async function rpGuardar(){
           +((eT&&eT.message)||eT)+') — la salida SÍ quedó guardada.';
       }
     }
+    // b132: DESPUÉS del pendiente del traslado (la revisión lo exige) y sin await.
+    if(!avisoTraslado && (!_rp.cliente || _rp.tipo!=='venta')) entOdooAuto(ped.id);
     pon('var(--good)','Despacho #'+ped.id+' guardado — '+_rp.lineas.length+' línea'
       +(_rp.lineas.length===1?'':'s')+(_rp.cliente?(' de '+esc(_rp.cliente.nombre))
         :((_rp.destinatario||'').trim()?(' a '+esc(_rp.destinatario.trim())):''))
