@@ -11379,7 +11379,9 @@ async function nivDiaFijoDatos(cfg, mon0){
   }catch(e){}
   // Medición de premezcla cargada esta semana (aviso de Keylor; informativo, ver arriba).
   const prems=NIV_PROD.map(function(p){ return NIV_INFO[p].prem; });
-  const pm=await odooCall('mrp.production','search_read',[[['state','=','done'],['product_id','in',prems],['date_start','>=',_ymd(mon0)+' 06:00:00']]],{fields:['product_id']});
+  // Desde la ÚLTIMA medición (el día del parámetro, hoy incluido), no desde el lunes (b137).
+  const _ultMed=_dfPrev((_rzCtx&&_rzCtx.hoyStr)||_ymd(new Date()), _medirCfg().dia);
+  const pm=await odooCall('mrp.production','search_read',[[['state','=','done'],['product_id','in',prems],['date_start','>=',_ultMed+' 06:00:00']]],{fields:['product_id']});
   const premCargada={}; pm.forEach(function(m){ premCargada[m.product_id[0]]=1; });
   // Órdenes ya creadas DESDE Truefie (compra_pedido_odoo, T-28): el botón no se vuelve a ofrecer.
   // Si la tabla todavía no está pegada, simplemente no hay ninguna.
@@ -11442,7 +11444,7 @@ async function nivDiaFijo(){
     out.push(o);
   }
   const metaW0=_rzMetaEfectiva(0);
-  const keylor=(_dfDow(hoy)!==1) ? NIV_PROD.filter(function(p){ return (metaW0[p]||0)>0 && !D.premCargada[NIV_INFO[p].prem]; }) : [];
+  const keylor=(_dfDow(hoy)!==_medirCfg().dia) ? NIV_PROD.filter(function(p){ return (metaW0[p]||0)>0 && !D.premCargada[NIV_INFO[p].prem]; }) : [];
   return {grupos:out, sinCargar:sinCargar.map(function(u){ return u.ds; }), keylor:keylor, pedidoErr:D.pedidoErr, pedidoLineas:D.pedidoLineas};
 }
 // ÚLTIMAS producciones pasadas (chequeo de Keylor): plan del motor vs real Odoo.
@@ -23411,7 +23413,7 @@ function _cpCuandoTxt(g){
 // Los avisos de una tarjeta, como chips: rojo (ya no llega a tiempo), gris punteado (por cargar),
 // ámbar (con lo sugerido no llega a la compra siguiente). De a tres; el resto, «+N».
 // LO QUE YA VIENE Y NO LLEGA A TIEMPO (Andrea, 15-oct, caso avena): un insumo con algo ya pedido para este
-// ciclo (`ya`) que igual se acaba antes de que llegue —la medición del lunes es a la mañana y BIO llega a
+// ciclo (`ya`) que igual se acaba antes de que llegue —la medición es a la mañana y BIO llega a
 // mediodía— dice QUÉ viene, CUÁNDO llega y CUÁNDO se acaba: «136,08 kg en camino, llegan lun 19 al
 // mediodía; se acaba lun 19 en la mañana». Sin nada pedido, sigue el «falta …» de siempre. '' = no aplica.
 function _cpEnCaminoTxt(f){
