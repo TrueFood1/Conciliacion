@@ -27981,7 +27981,10 @@ async function venClientesCargar(forzar){
       odooCall('account.move','read_group',[[['move_type','=','out_invoice'],['state','=','posted'],['invoice_date','>=','2026-01-01']],['partner_id'],['partner_id']],{lazy:true}),
       cliContactosCargar(forzar)]);
     if(C.error) throw new Error('contactos: '+C.error);
-    const ids=[...new Set(fact.map(g=>g.partner_id&&g.partner_id[0]).filter(Boolean).concat(Object.keys(C.porMadre).map(Number)))];
+    // NO SON CLIENTES (Andrea, 26-oct): sus cuentas personales en Odoo, que facturan consumo propio. Por id,
+    // nunca por nombre. No se borran en Odoo: solo no se listan acá.
+    const NO_CLIENTES=new Set([26, 988]);
+    const ids=[...new Set(fact.map(g=>g.partner_id&&g.partner_id[0]).filter(Boolean).concat(Object.keys(C.porMadre).map(Number)))].filter(id=>!NO_CLIENTES.has(id));
     const [extra]=await Promise.all([cliOtrosNombresCampo(), grpEnlacesCargar()]);
     const parts=ids.length ? await odooCall('res.partner','read',[ids],{fields:['name','commercial_name'].concat(extra)}) : [];
     const clientes=parts.map(p=>({id:p.id, razon:p.name||'—', com:nombreComercialVisible(p.name, p.commercial_name),
