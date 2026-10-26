@@ -12202,6 +12202,8 @@ const ENT_PROD=[451,452,453,503,472,519];                     // los 6 productos
 // entregue sin elegir lote y la salida se valide en Odoo como las demás.
 // DESDE: la primera factura que todavía tenía su albarán abierto (…3595, 22-oct). Las de
 // antes ya se validaron a mano en Odoo; sin este corte volverían todas a «Por preparar».
+// DEVOLUCIONES: no se ofrece (dvProductosDeLaEntrega solo da chips con lote), así que una
+// devolución del 481 no puede tocar ningún saldo por lote; se corrige a mano en Odoo.
 const ENT_SIN_LOTE={481:'Pan para moler GF (merma)'};
 const ENT_SIN_LOTE_DESDE='2026-10-22';
 function _entSinLote(pid){ return Object.prototype.hasOwnProperty.call(ENT_SIN_LOTE, +pid); }
@@ -18813,7 +18815,7 @@ async function entOdooAuto(pedidoId){
     txt='Odoo · pedido '+pedidoId+(js.tipo==='traslado'?' · trasladado':' · validado')+(doc?(' · '+doc):'');
     _odooAuto[pedidoId]={estado:'ok', txt:txt, en:Date.now()};
   }else{
-    const por=(!R||R.red) ? 'sin conexión' : ({descuadre:'no calza', salida_vieja:'fuera de tiempo'}[js.motivo]||'');
+    const por=(!R||R.red) ? 'sin conexión' : ({descuadre:'no calza', salida_vieja:'fuera de tiempo', en_curso:'en curso'}[js.motivo]||'');
     txt='Odoo · pedido '+pedidoId+' · queda en Pendientes'+(por?(' · '+por):'');
     _odooAuto[pedidoId]={estado:'pendiente', txt:txt, en:Date.now()};
   }
@@ -18875,7 +18877,11 @@ const VAL_MOTIVO={
   producto_raro:'La salida tiene algo que no es un producto terminado.',
   cantidad_fraccion:'Una cantidad no da exacta en la unidad de Odoo.',
   sin_existencias:'Odoo no tiene en WH/Stock lo que salió. Hay que corregir el inventario antes.',
-  sin_reserva:'Odoo no reservó todo lo que salió. El traslado se canceló.'
+  sin_reserva:'Odoo no reservó todo lo que salió. El traslado se canceló.',
+  // exclusión y rastro del servicio (b132, ENTREGA_AUTO_RASTRO.sql)
+  en_curso:'Este pedido se está validando en este momento (al entregar). Probá en unos minutos.',
+  sin_rastro_auto:'Falta pegar ENTREGA_AUTO_RASTRO.sql en Truefie. No se tocó Odoo.',
+  reclamo_truefie:'Truefie no reconoció la clave del servicio (RASTRO_AUTO_CLAVE). No se tocó Odoo.'
 };
 
 function _valFecha(s){          // Odoo manda "2026-09-30 14:00:00" en UTC, sin zona
