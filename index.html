@@ -960,7 +960,10 @@ tr.r-ing td{background:#eff6ff}
 .home-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));   /* parejas: un texto largo no ensancha su columna */
   gap:9px;width:100%;max-width:680px}
 .home-mod-ops{order:1} .home-mod-com{order:2} .home-mod-ent{order:3}
-.home-mod-fin{order:4} .home-mod-conc{order:5} .home-mod-per{order:6} .home-mod-ven{order:7}
+.home-mod-fin{order:4} .home-mod-conc{order:5} .home-mod-per{order:6} .home-mod-ven{order:7} .home-mod-cont{order:8}
+/* El buscador se va pero su LUGAR se queda (Andrea, 26-oct): sin él, los módulos subían y el
+   saludo quedaba pegado arriba. Invisible y sin clic, ocupando lo mismo. */
+.home-soon .home-search{visibility:hidden}
 /* VENTAS (22-oct) es la séptima tarjeta: en escritorio la cuadrícula pasa a CUATRO columnas
    (Operaciones · Compras · Entregas · Finanzas / Conciliación · Personal · Ventas) para que no
    quede una huérfana. En teléfono siguen dos columnas: sin Conciliación son seis, parejas. */
@@ -1390,7 +1393,7 @@ tr.r-done td{background:rgba(192,208,72,.08)}
   --err-7:#D9776E;--err-8:#E5484D;--ok-2:#8EDE9F;
   /* acento de módulo */
   --m-fin:#378ADD;--m-ops:#C77DA0;--m-ops-2:#D4537E;--m-conc:#84BD00;--m-comp:#A27FEB;
-  --m-per:#FF671D;--m-ven:#3FB6A8;--magenta:#C964CF;--orange-2:#FF751F;
+  --m-per:#FF671D;--m-ven:#3FB6A8;--m-cont:#5CC8F0;--magenta:#C964CF;--orange-2:#FF751F;
   /* color de PRODUCTO (puntos y bordes, siempre con su nombre al lado) */
   --p-blanco:#378ADD;--p-semillas:#84BD00;--p-frances:#D4537E;--p-buns:#7F77DD;--p-pizza:#FF751F;
   --p-galletas:#ED93B1;
@@ -1497,7 +1500,7 @@ html[data-tema="claro"]{
   --err-7:#A8402F;--err-8:#C0393D;--ok-2:#2F7A45;
   /* acento de módulo */
   --m-fin:#1F66B3;--m-ops:#9E4C75;--m-ops-2:#B3325E;--m-conc:#4E7A00;--m-comp:#6E46CC;
-  --m-per:#C04400;--m-ven:#1C7E73;--magenta:#A23DA8;--orange-2:#C85400;
+  --m-per:#C04400;--m-ven:#1C7E73;--m-cont:#0F7FA8;--magenta:#A23DA8;--orange-2:#C85400;
   /* color de PRODUCTO (puntos y bordes, siempre con su nombre al lado) */
   --p-blanco:#378ADD;--p-semillas:#5E8C00;--p-frances:#D4537E;--p-buns:#7F77DD;--p-pizza:#D9600E;
   --p-galletas:#E07FA5;
@@ -2273,6 +2276,12 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
       <div class="home-mod home-mod-ven" onclick="abrirVentas()">
         <span class="home-mod-dot" style="background:var(--m-ven)"></span>
         <div class="home-mod-name" style="color:var(--text)">Ventas</div>
+      </div>
+      <!-- CONTENIDO (26-oct), celeste: Instagram, blog y banco de fotos. Solo socias (no está en
+           ACCESO_DEFAULT). En color (Andrea, 26-oct) aunque todavía no abre nada: el módulo se construye después. -->
+      <div class="home-mod home-mod-cont" style="cursor:default">
+        <span class="home-mod-dot" style="background:var(--m-cont)"></span>
+        <div class="home-mod-name" style="color:var(--text)">Contenido</div>
       </div>
     </div>
     <!-- La alerta de Entregas se fue del lobby (26-ago): cada módulo muestra sus
@@ -5770,7 +5779,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 26 oct 2026 · b134';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 26 oct 2026 · b135';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -6411,7 +6420,7 @@ async function accesoCargar(){
 // El lobby no dibuja lo que no le toca (los inertes "Pronto" tampoco).
 function accesoPintarLobby(){
   const map={finanzas:'home-mod-fin', conciliacion:'home-mod-conc', operaciones:'home-mod-ops',
-             compras:'home-mod-com', entregas:'home-mod-ent', personal:'home-mod-per', ventas:'home-mod-ven'};
+             compras:'home-mod-com', entregas:'home-mod-ent', personal:'home-mod-per', ventas:'home-mod-ven', contenido:'home-mod-cont'};
   for(const mod in map){
     const el=document.querySelector('#vLobby .'+map[mod]);
     if(el) el.style.display = accesoPuede(mod) ? '' : 'none';
