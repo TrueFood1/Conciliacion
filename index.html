@@ -6417,6 +6417,23 @@ async function accesoCargar(){
   _accesoMods = (v==='todo') ? 'todo' : (v || ACCESO_DEFAULT);
   accesoPintarLobby();
 }
+// «Hola» centrado en el hueco entre los tickets y la línea (Andrea, 26-oct). Desde que el buscador
+// quedó invisible, su lugar sigue ahí y el saludo quedaba arriba del hueco. No se puede resolver
+// solo con CSS: el margen de arriba es `auto` y cambia con el alto de la pantalla. Se mide y se
+// corre el saludo; el resto del lobby no se mueve.
+function lobbyCentrarHola(){
+  const hi=document.getElementById('homeHi'), sep=document.querySelector('#vLobby .home-sep'),
+        top=document.querySelector('#vLobby .home-hdr');
+  if(!hi||!sep||!top) return;
+  hi.style.transform='';
+  const hs=document.querySelector('#vLobby .home-soon');
+  if(!hs || hs.style.display==='none') return;          // el equipo no tiene el hueco: queda como está
+  const a=top.getBoundingClientRect().bottom, b=sep.getBoundingClientRect().top, r=hi.getBoundingClientRect();
+  if(!(b>a) || !r.height) return;
+  const d=Math.round((a+b)/2 - (r.top+r.height/2));
+  if(Math.abs(d)>1) hi.style.transform='translateY('+d+'px)';
+}
+window.addEventListener('resize',function(){ try{ lobbyCentrarHola(); }catch(e){} });
 // El lobby no dibuja lo que no le toca (los inertes "Pronto" tampoco).
 function accesoPintarLobby(){
   const map={finanzas:'home-mod-fin', conciliacion:'home-mod-conc', operaciones:'home-mod-ops',
@@ -6430,6 +6447,8 @@ function accesoPintarLobby(){
   // debería tener UNA sola cosa que hacer.
   const hs=document.querySelector('#vLobby .home-soon');
   if(hs) hs.style.display = (_accesoMods==='todo') ? '' : 'none';
+  lobbyCentrarHola();
+  try{ requestAnimationFrame(lobbyCentrarHola); setTimeout(lobbyCentrarHola,400); }catch(e){}   // si el lobby recién se mostró o cargó la fuente
   // UN SOLO módulo visible → el lobby deja de ser cuadrícula y pasa a ser portada:
   // saludo y tarjeta juntos y centrados, sin separador ni rótulo "TUS MÓDULOS"
   // (rotular una lista de uno es ruido).
