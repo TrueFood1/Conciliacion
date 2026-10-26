@@ -3421,6 +3421,10 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
 .rp-pie{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:18px}
 .rp-pie-l{font-size:11.5px;color:var(--text-3);white-space:nowrap}
 .rp-guardar{height:46px;font-size:14px;width:100%;margin-top:14px}
+.rp-agregar{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:14px;flex-wrap:wrap}
+.rp-agregar-l{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-end;gap:2px;text-align:right}
+.rp-agregar-que{font-size:12.5px;color:var(--text-2)}
+.rp-agregar .btn{min-width:120px;height:40px}
 /* ── EL SELECTOR DE CLIENTE (arreglado el 26-ago) ────────────────────────
    Estaba INSERVIBLE en iPhone por dos causas distintas:
 
@@ -5759,7 +5763,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 26 oct 2026 · b130';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 26 oct 2026 · b133';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -18998,14 +19002,18 @@ function rpRender(){
       // cajas de Francés era la caja dicha en unidades sueltas (30-sep).
       +((uds && cur.pres==='cj')?('<div class="rp-conv">= '+esc(_lotUds(uds,cur.pid))+'</div>'):'')
       +rpLotesHtml()
-      +'<div style="margin-top:14px"><button class="btn" onclick="rpAgregarLinea()">Agregar al despacho</button>'
-      +'<span id="rpLineaMsg" class="rp-nota" style="margin-left:10px"></span></div>'
+      // «Agregar» a la DERECHA y relleno lima (Andrea, 26-oct): el gris «Agregar al
+      // despacho» quedaba debajo de la lista de lotes y no se veía, y el único botón
+      // que llamaba la atención era «Guardar». Al lado dice QUÉ va a sumar.
+      +'<div class="rp-agregar"><div class="rp-agregar-l"><span class="rp-agregar-que">'+esc(_rpResumenCur())+'</span>'
+      +'<span id="rpLineaMsg" class="rp-nota"></span></div>'
+      +'<button class="btn btn-amarillo" onclick="rpAgregarLinea()">Agregar</button></div>'
       +'</div>';
   }
   h+='</div>';
 
   // ── 3 · LO CARGADO, LA FECHA Y EL BOTÓN ────────────────────────────────
-  h+='<div class="rp-sec"><div class="rp-sec-t">En este despacho</div>';
+  h+='<div class="rp-sec"><div class="rp-sec-t">'+(R.tipo==='sin'?'En esta salida':'En este despacho')+'</div>';
   if(!R.lineas.length) h+='<div class="cl-none">Todavía no hay líneas.</div>';
   else{
     h+='<table class="cl-tbl"><tr><th>Producto</th><th>Cantidad</th><th>Lotes</th><th></th></tr>';
@@ -19030,9 +19038,18 @@ function rpRender(){
     +(_rpVieja?('<span class="rp-nota" style="color:var(--warn)">no es hoy ('
       +esc(_despDiaFrase(R.fecha))+')</span>'):'')
     +'</div>'
-    +'<button class="btn btn-amarillo rp-guardar" id="rpSave" onclick="rpGuardar()">Guardar despacho</button>'
+    +'<button class="btn btn-amarillo rp-guardar" id="rpSave" onclick="rpGuardar()">'
+    +(R.tipo==='sin'?'Guardar salida':'Guardar despacho')+'</button>'
     +'<div id="rpSaveMsg" style="margin-top:10px;font-size:12.5px"></div></div>';
   body.innerHTML=h;
+}
+// Lo que «Agregar» va a sumar, en la unidad de venta: "2 cj · Pan Blanco · lote 291 / 2-27".
+function _rpResumenCur(){
+  const c=_rp.cur; if(!c.pid || !(+c.cant>0)) return '';
+  const I=NIV_INFO[c.pid]||{nom:c.pid};
+  const ls=Object.keys(c.lotes||{}).map(function(k){ return k===ENT_LOTE_INDET?'lote sin saber':k; });
+  return _rzN(+c.cant)+' '+_rpPresCorta(c.pid,c.pres)+' · '+I.nom
+    +(ls.length?(' · '+(ls.length>1?'lotes ':'lote ')+ls.join(', ')):'');
 }
 function rpUdsDe(pid,pres,n){ const I=NIV_INFO[pid]||{cajaU:1,presDiv:1};
   return pres==='cj' ? n*I.cajaU : n*I.presDiv; }
@@ -19361,6 +19378,13 @@ function rpEditarLinea(i){
 // ── Guardado: pedido → líneas → alisto → reparto por lote. Todo INSERT. ──
 async function rpGuardar(){
   if(_rpGuardando) return;
+  // Si quedó una línea completa sin tocar «Agregar», se agrega sola en vez de
+  // contestar «No hay ninguna línea cargada» (Andrea, 26-oct). Si le falta algo,
+  // rpAgregarLinea dice qué al lado de su botón y acá no se sigue.
+  if(_rp.cur && _rp.cur.pid && +_rp.cur.cant>0){
+    const n=_rp.lineas.length; rpAgregarLinea();
+    if(_rp.lineas.length===n) return;
+  }
   const msg=document.getElementById('rpSaveMsg'), btn=document.getElementById('rpSave');
   const pon=function(c,t){ msg.style.color=c; msg.textContent=t; };
   if(!_rp.tipo){ pon('var(--warn)','Falta el tipo de salida: venta con factura, o sin factura.'); return; }
