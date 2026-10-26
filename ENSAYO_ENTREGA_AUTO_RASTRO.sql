@@ -4,7 +4,7 @@
 -- datos inventados dentro de la transacción, y lo deshace TODO (rollback). NO SE CORRIÓ.
 --
 -- CÓMO SE LEE
---   Una tabla de 29 filas, TODAS con ok = true. Un RECHAZA da ok solo si el SQLSTATE
+--   Una tabla de 34 filas, TODAS con ok = true. Un RECHAZA da ok solo si el SQLSTATE
 --   es 42501. Las de esperado true/false son lo que devuelve la función. Si el editor
 --   dice "Success. No rows returned", no llegó al final y no vale.
 --   Necesita una socia, alguien de «equipo» y el asistente activos en acceso_usuario.
@@ -40,7 +40,9 @@ create function public._ent_odoo_clave_ok(p_clave text) returns boolean
                   where id = 1 and hash = encode(sha256(convert_to(coalesce(p_clave, ''), 'UTF8')), 'hex'));
 $f$;
 
--- ¿La salida VIGENTE del pedido la registró quien llama, hace menos de 30 min?
+-- ¿La salida VIGENTE del pedido la registró quien llama, hace menos de 30 min, y es la ÚNICA salida
+-- que tuvo el pedido (anuladas incluidas)? Una segunda salida —«Sale otro día», una corrección, o una
+-- inventada por REST sobre un pedido viejo— no dispara nada: queda para Pendientes.
 create function public._ent_odoo_salida_mia(p_pedido_id bigint) returns boolean
   language sql stable security definer set search_path = public as $f$
   select exists (select 1
@@ -48,8 +50,18 @@ create function public._ent_odoo_salida_mia(p_pedido_id bigint) returns boolean
                    join ent_alisto_vigente a on a.alisto_id = s.alisto_id
                   where a.pedido_id = p_pedido_id
                     and lower(s.creado_por) = lower(coalesce(auth.jwt() ->> 'email', ''))
-                    and s.registrado_en > now() - interval '30 minutes');
+                    and s.registrado_en > now() - interval '30 minutes')
+     and (select count(*) from ent_salida s2 join ent_alisto a2 on a2.id = s2.alisto_id
+           where a2.pedido_id = p_pedido_id) = 1;
 $f$;
+
+-- QUIÉN REGISTRÓ LA SALIDA SALE DEL TOKEN (revisión del 26-oct). Hasta hoy `ent_salida_ins` era
+-- `with check (true)` y `creado_por` texto libre: alguien de «equipo» podía insertar por REST una
+-- salida a nombre de otro. Los tres lugares de index.html que insertan (despConfirmar, despEntregar,
+-- rpGuardar) ya mandan `user.email` de la sesión, y las 64 salidas de los últimos 30 días tienen un
+-- correo de acceso_usuario (medido con pg_lector el 26-oct): nadie legítimo se rompe.
+alter policy ent_salida_ins on public.ent_salida
+  with check (lower(creado_por) = lower(coalesce(auth.jwt() ->> 'email', '')));
 
 create function public.ent_odoo_reclamar(p_clave text, p_pedido_id bigint, p_ruta text) returns boolean
   language plpgsql security definer set search_path = public as $f$
@@ -138,7 +150,7 @@ do $$
 declare
   v_socia text; v_equipo text; v_asist text; v_clave text := 'clave-de-ensayo';
   v_p1 bigint; v_p2 bigint; v_p3 bigint; v_p4 bigint; v_a bigint; v_s bigint;
-  v_pn1 bigint; v_n int; v_b boolean;
+  v_pn1 bigint; v_n int; v_b boolean; v_p5 bigint; v_a6 bigint;
   v_res jsonb := '[]'::jsonb;
 begin
   select email into v_socia  from v_acceso_usuario where perfil = 'socias' and activo order by id limit 1;
@@ -166,6 +178,13 @@ begin
   insert into ent_salida (alisto_id, creado_por) values (v_a, v_equipo) returning id into v_s;
   insert into ent_anulacion (entidad, entidad_id, motivo, creado_por) values ('salida', v_s, 'ensayo', v_socia);
   insert into ent_odoo_pendiente (tipo, pedido_id, fecha, creado_por) values ('traslado_interno', v_p1, current_date, v_equipo) returning id into v_pn1;
+  -- p5: Daniel, DOS salidas (la primera hace 5 min) · a6: un alisto para probar el insert de ent_salida
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por) values (current_date, 'manual', 'regalia', v_equipo) returning id into v_p5;
+  insert into ent_alisto (pedido_id, responsable, creado_por) values (v_p5, v_equipo, v_equipo) returning id into v_a;
+  insert into ent_salida (alisto_id, creado_por, creado_en) values (v_a, v_equipo, now() - interval '5 minutes');
+  insert into ent_salida (alisto_id, creado_por) values (v_a, v_equipo);
+  insert into ent_pedido (fecha_despacho, origen, motivo, creado_por) values (current_date, 'manual', 'regalia', v_equipo) returning id into v_a6;
+  insert into ent_alisto (pedido_id, responsable, creado_por) values (v_a6, v_equipo, v_equipo) returning id into v_a6;
 
   -- ── equipo (Daniel) ──
   perform set_config('request.jwt.claims', json_build_object('email', v_equipo, 'role', 'authenticated')::text, true);
@@ -287,6 +306,12 @@ begin
   exception when others then
     v_res := v_res || jsonb_build_object('p','S2 la socia reclama el pedido suelto','esperado','true','obtenido','RECHAZA: '||sqlstate||' · '||sqlerrm,'ok',false);
   end;
+  begin
+    insert into ent_salida (alisto_id, creado_por) values (v_a6, v_socia);
+    v_res := v_res || jsonb_build_object('p','E4 la socia registra una salida con SU correo','esperado','ENTRA','obtenido','ENTRA','ok',true);
+  exception when others then
+    v_res := v_res || jsonb_build_object('p','E4 la socia registra una salida con SU correo','esperado','ENTRA','obtenido','RECHAZA: '||sqlstate||' · '||sqlerrm,'ok',false);
+  end;
   perform set_config('request.jwt.claims', json_build_object('email', v_equipo, 'role', 'authenticated')::text, true);
   begin
     select ent_odoo_reclamar(v_clave, v_p1, 'auto') into v_b;
@@ -299,6 +324,30 @@ begin
     v_res := v_res || jsonb_build_object('p','S4 equipo no suelta el reclamo de la socia','esperado','false','obtenido',coalesce(v_b::text,'null'),'ok',v_b is not distinct from false);
   exception when others then
     v_res := v_res || jsonb_build_object('p','S4 equipo no suelta el reclamo de la socia','esperado','false','obtenido','RECHAZA: '||sqlstate||' · '||sqlerrm,'ok',false);
+  end;
+  begin
+    perform ent_odoo_reclamar(v_clave, v_p5, 'auto');
+    v_res := v_res || jsonb_build_object('p','R8 equipo reclama un pedido con DOS salidas','esperado','RECHAZA · 42501','obtenido','ENTRA','ok',false);
+  exception when others then
+    v_res := v_res || jsonb_build_object('p','R8 equipo reclama un pedido con DOS salidas','esperado','RECHAZA · 42501','obtenido','RECHAZA: '||sqlstate||' · '||sqlerrm,'ok',sqlstate='42501');
+  end;
+  begin
+    insert into ent_salida (alisto_id, creado_por) values (v_a6, v_equipo);
+    v_res := v_res || jsonb_build_object('p','E1 equipo registra una salida con SU correo','esperado','ENTRA','obtenido','ENTRA','ok',true);
+  exception when others then
+    v_res := v_res || jsonb_build_object('p','E1 equipo registra una salida con SU correo','esperado','ENTRA','obtenido','RECHAZA: '||sqlstate||' · '||sqlerrm,'ok',false);
+  end;
+  begin
+    insert into ent_salida (alisto_id, creado_por) values (v_a6, v_socia);
+    v_res := v_res || jsonb_build_object('p','E2 equipo registra una salida a nombre de la socia','esperado','RECHAZA · 42501','obtenido','ENTRA','ok',false);
+  exception when others then
+    v_res := v_res || jsonb_build_object('p','E2 equipo registra una salida a nombre de la socia','esperado','RECHAZA · 42501','obtenido','RECHAZA: '||sqlstate||' · '||sqlerrm,'ok',sqlstate='42501');
+  end;
+  begin
+    insert into ent_salida (alisto_id, creado_por) values (v_a6, upper(v_equipo));
+    v_res := v_res || jsonb_build_object('p','E3 equipo, su correo en MAYÚSCULAS','esperado','ENTRA','obtenido','ENTRA','ok',true);
+  exception when others then
+    v_res := v_res || jsonb_build_object('p','E3 equipo, su correo en MAYÚSCULAS','esperado','ENTRA','obtenido','RECHAZA: '||sqlstate||' · '||sqlerrm,'ok',false);
   end;
   perform set_config('role', 'postgres', true);
   update ent_odoo_reclamo set en = now() - interval '11 minutes' where pedido_id = v_p1;
@@ -357,6 +406,6 @@ end $$;
 
 select r->>'p' as prueba, r->>'esperado' as esperado, r->>'obtenido' as obtenido, (r->>'ok')::boolean as ok
   from jsonb_array_elements(current_setting('ensayo.res')::jsonb) r;
--- ESPERADO: 29 filas, todas ok = true.
+-- ESPERADO: 34 filas, todas ok = true.
 
 rollback;

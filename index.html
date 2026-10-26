@@ -18814,13 +18814,29 @@ async function entOdooAuto(pedidoId){
     const doc=js.tipo==='traslado' ? js.picking_nombre : js.albaran;
     txt='Odoo · pedido '+pedidoId+(js.tipo==='traslado'?' · trasladado':' · validado')+(doc?(' · '+doc):'');
     _odooAuto[pedidoId]={estado:'ok', txt:txt, en:Date.now()};
-  }else{
-    const por=(!R||R.red) ? 'sin conexión' : ({descuadre:'no calza', salida_vieja:'fuera de tiempo', en_curso:'en curso'}[js.motivo]||'');
+  }else if(_odooAutoRechazo(R)){
+    // «queda en Pendientes» SOLO cuando el servicio miró el pedido y dijo que no (revisión del 26-oct).
+    const por=({descuadre:'no calza', salida_vieja:'fuera de tiempo', salida_repetida:'ya había salido',
+                en_curso:'en curso'}[js.motivo]||'');
     txt='Odoo · pedido '+pedidoId+' · queda en Pendientes'+(por?(' · '+por):'');
     _odooAuto[pedidoId]={estado:'pendiente', txt:txt, en:Date.now()};
+  }else{
+    // Sin respuesta, servicio viejo (404), sin clave, SQL sin pegar, error interno: no se sabe qué pasó.
+    txt='Odoo · pedido '+pedidoId+' · sin confirmar';
+    _odooAuto[pedidoId]={estado:'sin', txt:txt, en:Date.now()};
   }
   _odooAutoPintar();
   try{ _pd=null; }catch(e){}           // Pendientes cambió: que se relea al entrar
+}
+// ¿Fue un «no» de la revisión (409, la salida es de otro, un interruptor de Odoo apagado), o algo de
+// infraestructura? Solo lo primero se dice «queda en Pendientes».
+function _odooAutoRechazo(R){
+  if(!R || R.red || !R.js) return false;
+  const m=R.js.motivo;
+  if(R.st===409) return true;
+  if(R.st===403) return m==='salida_ajena';
+  if(R.st===423) return m==='escritura_apagada' || m==='traslado_apagado';
+  return false;
 }
 // Una sola regla de cómo se dibuja, para las dos pantallas (Entregas y Sin factura):
 // lo de las últimas 12 h, lo más nuevo arriba, máximo 3.

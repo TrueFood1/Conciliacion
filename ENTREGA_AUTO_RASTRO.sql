@@ -20,13 +20,15 @@
 --     El rastro de /auto lo escribe ent_odoo_rastro_auto, con el nombre DEL TOKEN, solo
 --     si quien llama tiene el pedido reclamado; si es «equipo», además su salida
 --     vigente tiene que ser suya y de hace menos de 30 min.
+--   · ent_salida_ins: `creado_por` tiene que ser el correo DEL TOKEN (antes: with check true).
+--     Ver el comentario junto al alter policy.
 --   · NO toca las tablas del rastro: ni políticas ni grants. «equipo» sigue sin poder
 --     insertar en ent_odoo_validacion, ent_odoo_traslado ni ent_odoo_hecho.
 --   Las dos tablas nuevas reciben solas RLS y las 5 políticas del asistente (event
 --   triggers ensure_rls y asistente_politicas); sin grants no sirven de nada, y se
 --   cuentan abajo para que el control no sorprenda.
 --
--- ANTES: correr ENSAYO_ENTREGA_AUTO_RASTRO.sql. Tiene que dar las 29 filas ok.
+-- ANTES: correr ENSAYO_ENTREGA_AUTO_RASTRO.sql. Tiene que dar las 34 filas ok.
 -- DESPUÉS: pegar la línea de `clave_rastro_auto.py nueva` (su `returning` muestra 1 fila)
 --          y, desde afuera (pg_lector): select count(*) from ent_odoo_servicio_clave;  -- 1
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -66,7 +68,9 @@ create function public._ent_odoo_clave_ok(p_clave text) returns boolean
                   where id = 1 and hash = encode(sha256(convert_to(coalesce(p_clave, ''), 'UTF8')), 'hex'));
 $f$;
 
--- ¿La salida VIGENTE del pedido la registró quien llama, hace menos de 30 min?
+-- ¿La salida VIGENTE del pedido la registró quien llama, hace menos de 30 min, y es la ÚNICA salida
+-- que tuvo el pedido (anuladas incluidas)? Una segunda salida —«Sale otro día», una corrección, o una
+-- inventada por REST sobre un pedido viejo— no dispara nada: queda para Pendientes.
 create function public._ent_odoo_salida_mia(p_pedido_id bigint) returns boolean
   language sql stable security definer set search_path = public as $f$
   select exists (select 1
@@ -74,8 +78,18 @@ create function public._ent_odoo_salida_mia(p_pedido_id bigint) returns boolean
                    join ent_alisto_vigente a on a.alisto_id = s.alisto_id
                   where a.pedido_id = p_pedido_id
                     and lower(s.creado_por) = lower(coalesce(auth.jwt() ->> 'email', ''))
-                    and s.registrado_en > now() - interval '30 minutes');
+                    and s.registrado_en > now() - interval '30 minutes')
+     and (select count(*) from ent_salida s2 join ent_alisto a2 on a2.id = s2.alisto_id
+           where a2.pedido_id = p_pedido_id) = 1;
 $f$;
+
+-- QUIÉN REGISTRÓ LA SALIDA SALE DEL TOKEN (revisión del 26-oct). Hasta hoy `ent_salida_ins` era
+-- `with check (true)` y `creado_por` texto libre: alguien de «equipo» podía insertar por REST una
+-- salida a nombre de otro. Los tres lugares de index.html que insertan (despConfirmar, despEntregar,
+-- rpGuardar) ya mandan `user.email` de la sesión, y las 64 salidas de los últimos 30 días tienen un
+-- correo de acceso_usuario (medido con pg_lector el 26-oct): nadie legítimo se rompe.
+alter policy ent_salida_ins on public.ent_salida
+  with check (lower(creado_por) = lower(coalesce(auth.jwt() ->> 'email', '')));
 
 create function public.ent_odoo_reclamar(p_clave text, p_pedido_id bigint, p_ruta text) returns boolean
   language plpgsql security definer set search_path = public as $f$
@@ -180,8 +194,12 @@ select (select count(*) from pg_class c join pg_namespace n on n.oid = c.relname
        (select count(*) from pg_policy where polrelid = 'public.ent_odoo_traslado'::regclass) as pol_traslado,
        (select count(*) from pg_policy where polrelid = 'public.ent_odoo_hecho'::regclass) as pol_hecho,
        (select count(*) from pg_policy where polrelid = 'public.ent_odoo_reclamo'::regclass) as pol_reclamo,
-       (select count(*) from pg_policy where polrelid = 'public.ent_odoo_servicio_clave'::regclass) as pol_clave;
--- ESPERADO: 2 · 0 · 5 · 3 · 0 · 7 · 7 · 7 · 5 · 5
---   (7·7·7 medido con pg_lector el 26-oct: las tres tablas del rastro NO cambian)
+       (select count(*) from pg_policy where polrelid = 'public.ent_odoo_servicio_clave'::regclass) as pol_clave,
+       (select count(*) from pg_policy where polrelid = 'public.ent_salida'::regclass) as pol_salida,
+       (select count(*) from pg_policy where polrelid = 'public.ent_salida'::regclass and polname = 'ent_salida_ins'
+           and pg_get_expr(polwithcheck, polrelid) like '%auth.jwt()%') as salida_atada_al_token;
+-- ESPERADO: 2 · 0 · 5 · 3 · 0 · 7 · 7 · 7 · 5 · 5 · 7 · 1
+--   (7·7·7 y 7 medido con pg_lector el 26-oct: las tablas del rastro y ent_salida no ganan ni pierden
+--    políticas; ent_salida_ins cambia SOLO su with check)
 
 commit;
