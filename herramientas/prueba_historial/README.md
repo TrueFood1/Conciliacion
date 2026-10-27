@@ -35,7 +35,7 @@ diciendo que columna falta. Ya cazo una: `salida_id`.
 | pedido | por que esta |
 |---|---|
 | 67  | el corregido (3534 -> 3546): unidad, quien preparo, linea de correccion |
-| 134 | el gemelo SIN corregir — control, y la unidad nueva delata su error |
+| 134 | el gemelo de la 3544 — se corrigió el 22-sep, igual que el 67 |
 | 66  | los seis productos, para ejercitar cada envase |
 | 55  | cinco productos, uno sin lote |
 | 135 | preparado sin salida |

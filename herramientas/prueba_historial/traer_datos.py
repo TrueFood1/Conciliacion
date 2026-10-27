@@ -21,7 +21,7 @@ ped = ",".join(str(p) for p in PEDIDOS)
 datos = {
   # exactamente el .select() de bsLeer
   "v_ent_pedido_estado": j("""
-     select pedido_id, fecha_despacho, factura_id, factura_nombre, cliente_nombre, origen,
+     select pedido_id, fecha_despacho, factura_id, factura_nombre, cliente_id, cliente_nombre, origen,
             motivo, alisto_id, responsable, preparado_en, salida_en, salida_registrada_en,
             salida_id, estado, fecha_ab_re_04
        from v_ent_pedido_estado where pedido_id in (%s) order by fecha_ab_re_04 desc""" % ped),
@@ -37,8 +37,14 @@ datos = {
   "ent_alisto_lote": j("""select linea_id, lote, cant_uds, orden from ent_alisto_lote
                            where linea_id in (select l.id from ent_alisto_linea l
                                  join ent_alisto a on a.id=l.alisto_id where a.pedido_id in (%s))""" % ped),
-  "ent_pedido_linea": j("""select pedido_id, producto_id, uom_id, uom_nombre, uom_factor, presentacion
+  "ent_pedido_linea": j("""select pedido_id, producto_id, uom_id, uom_nombre, uom_factor, presentacion, cant_uds
                              from ent_pedido_linea where pedido_id in (%s)""" % ped),
+  # los rastros que bsLeer lee de cada pedido (guardas de «Sale otro dia» y la ficha)
+  "ent_devolucion_vigente": j("select devolucion_id, pedido_id from ent_devolucion_vigente where pedido_id in (%s)" % ped),
+  "ent_odoo_validacion": j("""select pedido_id, picking_nombre, validado_por, validado_en
+                                from ent_odoo_validacion where pedido_id in (%s)""" % ped),
+  "ent_odoo_traslado": j("""select pedido_id, picking_nombre, creado_por, creado_en
+                              from ent_odoo_traslado where pedido_id in (%s)""" % ped),
 }
 lec.cerrar()
 io.open(os.path.join(os.path.dirname(os.path.abspath(__file__)),"datos.json"),"w",encoding="utf-8").write(

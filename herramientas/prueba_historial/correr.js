@@ -15,8 +15,8 @@ function texto(html){
 // una prueba que pasa contra las dos versiones no prueba nada (leccion de b63).
 var ESPERADO = [
   // ── el caso obligatorio: el pedido corregido ──
-  {p:67, q:'Buns 1 Caja (6 paq.)',            por:'la cantidad va en cajas y paquetes, no "4 Caja"'},
-  {p:67, q:'212 / 1-27 1 Caja (6 paq.)',      por:'la cant. lote, en la misma unidad'},
+  {p:67, q:'Buns 1 caja (6 paq.)',            por:'la cantidad va en cajas y paquetes, no "4 caja"'},
+  {p:67, q:'212 / 1-27 1 caja (6 paq.)',      por:'la cant. lote, en la misma unidad'},
   {p:67, q:'Preparó Daniel',                  por:'el nombre, no el correo'},
   {p:67, q:'preparado 14 sep 2026',           por:'la fecha del alisto ORIGINAL, no la del pegado'},
   {p:67, q:'Corregido por Andrea',            por:'quien firmó la corrección, leído de los datos'},
@@ -25,22 +25,24 @@ var ESPERADO = [
   {p:67, no:'preparado 22 sep',                por:'la hora del pegado NO se muestra como "preparado" (15:26 sí sale, pero en la línea de corrección, que es su lugar)'},
   {p:67, no:'danielnu',                       por:'ya no se muestra el correo crudo'},
   // ── los que NO tienen corrección: se tienen que seguir viendo bien ──
-  {p:66, q:'Buns 2 Cajas (12 paq.)',          por:'Buns: paq de 4, 6 paq/caja'},
-  {p:66, q:'Pan Francés 15 Cajas (90 paq.)',  por:'Francés: paq de 4, 6 paq/caja'},
-  {p:66, q:'Pizza 4 Cajas (24 paq.)',         por:'Pizza: paq de 2, 6 paq/caja'},
-  {p:66, q:'Galletas 3 Cajas (36 uds)',       por:'Galletas: potes, caja de 12'},
-  {p:66, q:'Pan Blanco 14 Cajas (84 uds)',    por:'Blanco: unidad, caja de 6'},
-  {p:66, q:'Pan Semillas 9 Cajas (54 uds)',   por:'Semillas: unidad, caja de 6'},
+  {p:66, q:'Buns 2 cajas (12 paq.)',          por:'Buns: paq de 4, 6 paq/caja'},
+  {p:66, q:'Pan Francés 15 cajas (90 paq.)',  por:'Francés: paq de 4, 6 paq/caja'},
+  {p:66, q:'Pizza 4 cajas (24 paq.)',         por:'Pizza: paq de 2, 6 paq/caja'},
+  {p:66, q:'Galletas 3 cajas (36 unidades)',       por:'Galletas: potes, caja de 12'},
+  {p:66, q:'Pan Blanco 14 cajas (84 unidades)',    por:'Blanco: unidad, caja de 6'},
+  {p:66, q:'Pan Semillas 9 cajas (54 unidades)',   por:'Semillas: unidad, caja de 6'},
   {p:66, q:'Preparó Daniel · preparado 14 sep 2026', por:'sin corrección: fecha completa igual'},
   {p:66, no:'Corregido por',                  por:'un pedido sin corregir NO muestra línea de corrección'},
-  {p:55, q:'Pan Blanco 17 Cajas (102 uds)',   por:'cinco productos en un pedido'},
+  {p:55, q:'Pan Blanco 17 cajas (102 unidades)',   por:'cinco productos en un pedido'},
   {p:55, no:'Corregido por',                  por:'sin corrección'},
-  {p:135,q:'Pan Francés 2 Cajas (12 paq.)',   por:'pedido preparado, sin salida'},
-  {p:135,q:'sin salida registrada',           por:'no inventa una salida que no hay'},
+  // 135 salió el 28-sep (al armar la prueba estaba preparado, sin salida).
+  {p:135,q:'Pan Francés 2 cajas (12 paq.)',   por:'Francés en cajas y paquetes'},
+  {p:135,no:'sin salida registrada',          por:'ya salió: la ficha lo dice'},
   {p:135,no:'Corregido por',                  por:'sin corrección'},
-  // ── el gemelo sin corregir: la unidad nueva DELATA el error de la 3544 ──
-  {p:134,q:'Buns 1,5 paq.',                   por:'6 uds de Buns son 1,5 paquetes: un envase que no existe'},
-  {p:134,no:'Corregido por',                  por:'todavía no se corrigió'}
+  // ── el gemelo de la 3544: se corrigió el 22-sep (16:33), igual que el 67 ──
+  {p:134,q:'Buns 1 caja (6 paq.)',            por:'ya corregido: sale la caja entera'},
+  {p:134,q:'Corregido por Andrea',            por:'la corrección se ve, con quién la firmó'},
+  {p:134,q:'Buns 1,5 → 6 paq.',               por:'qué cambió, en una sola unidad'}
 ];
 (async function(){
   var L=[], ok=0, mal=0;

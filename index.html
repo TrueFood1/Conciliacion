@@ -4652,7 +4652,8 @@ body:has(.de-fondo) #tkBtn{display:none}
 .bx-masc{display:none;flex-direction:column;gap:12px}
 .bx-masc.abierto{display:flex}
 .bx-bar{position:fixed;left:0;right:0;bottom:0;z-index:120;display:flex;gap:10px;
-  padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+  padding:10px calc(16px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom))
+    calc(16px + env(safe-area-inset-left));
   background:var(--surface);border-top:1px solid var(--border)}
 .bx-bar .btn{flex:1;height:48px;font-size:15px}
 .bx-bar .btn:disabled{opacity:.4;cursor:default}
@@ -4661,6 +4662,7 @@ body:has(.de-fondo) #tkBtn{display:none}
   padding:2px 0 12px}
 .bx-res b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
 .bx-res-exc{color:var(--warn)}
+.bx-tag{font-size:12px;color:var(--text-2);border:1px solid var(--border-strong);border-radius:999px;padding:2px 9px}
 .bx-tot{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px}
 .bx-tot-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px 18px;margin-top:8px}
 .bx-tot-i{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--text-2);
@@ -18914,7 +18916,8 @@ function bsExportModelo(P, f, meta){
       +'las filas que calzan con el filtro.']);
   if(meta.odoo_ok===false) cab.push(['Factura', 'Sin verificar contra Odoo al exportar: puede no mostrar '
       +'una re-emisión por nota de crédito.']);
-  return {cab:cab, cols:cols, filas:filas, n_ped:nPed, n_fil:filas.length};
+  // `odoo_ok` viaja en el molde: la vista previa muestra el MISMO aviso que la cabecera.
+  return {cab:cab, cols:cols, filas:filas, n_ped:nPed, n_fil:filas.length, odoo_ok:meta.odoo_ok!==false};
 }
 
 // El valor de una celda como lo lee una persona (papel) y como lo guarda la hoja.
@@ -19069,12 +19072,18 @@ function _bxRangoTxt(a, b){
 }
 function _bxF(){ return {desde:_bx.desde, hasta:_bx.hasta, cliente:_bx.cliente,
                           lote:_bx.lote, producto:_bx.producto?String(_bx.producto):''}; }
-function _bxModelo(){
+// `f` explícito = los filtros de lo que la vista previa MUESTRA (ver `_bxVista`).
+function _bxModelo(f){
   if(!_bxDatos || !_bxDatos.P) return null;
-  const f=_bxF();
+  f=f||_bxF();
   const M=bsExportModelo(_bxDatos.P, f, {en:new Date(), por:_bxPor, odoo_ok:_bxDatos.odoo_ok===true});
   M.f=f; return M;
 }
+// LO QUE SE VE ES LO QUE SE BAJA. Los filtros del texto se aplican con 120 ms de
+// espera (`bxSet`); un toque en Excel dentro de esa ventana exportaría filtros que la
+// vista previa todavía no muestra. Por eso los botones exportan con los filtros del
+// ÚLTIMO pintado, no con los del campo.
+let _bxVista=null;
 
 function bsExportar(){
   _bsModo='exportar'; _bx.todo=false;
@@ -19233,8 +19242,21 @@ function _bxPintarPrev(){
     el.innerHTML='<div class="bx-error"><div>No pude leer el historial: '+esc(D.err)+'</div>'
       +'<button class="btn btn-sm" onclick="bxReintentar()">Reintentar</button></div>'; return; }
   const M=_bxModelo();
-  _bxBotones(!!(M && M.n_fil));
+  _bxVista=M ? M.f : null;
+  _bxBotones(!!M);
   el.innerHTML=bxPrevHTML(M, _bx.todo);
+}
+// El modelo de lo que se está viendo, con la hora de AHORA en la cabecera. Si no hay
+// filas, no se baja un archivo vacío: se muestra el estado vacío, en pantalla.
+function _bxModeloVisto(){
+  if(!_bxVista) return null;
+  const M=_bxModelo(_bxVista); if(!M) return null;
+  if(!M.n_fil){
+    const el=document.getElementById('bxPrev');
+    if(el){ el.innerHTML=bxPrevHTML(M, _bx.todo); try{ el.scrollIntoView({block:'start'}); }catch(e){} }
+    return null;
+  }
+  return M;
 }
 function _bxSkeleton(){
   let h='<div class="bx-res bx-sk-res"><span class="bx-sk" style="width:60%"></span></div><div class="bx-sk-filas">';
@@ -19261,9 +19283,11 @@ function bxPrevHTML(M, todo){
     +'<span><b>'+nCli+'</b> '+(nCli===1?'cliente':'clientes')+'</span>'
     +'<span>'+esc(_bxRangoTxt(M.f.desde, M.f.hasta))+'</span>'
     +(exc?('<span class="bx-res-exc">'+exc+' con excepción</span>'):'')
+    // El mismo aviso que la cabecera del archivo; se va solo cuando contesta Odoo.
+    +(M.odoo_ok?'':'<span class="bx-tag">Sin verificar contra Odoo</span>')
     +'</div>';
   const pids=BS_EXP_PRODS.filter(function(p){ return tot[p]; });
-  if(pids.length) h+='<div class="bx-tot"><div class="bx-lbl">'+(marca?'Lo que coincide, por producto':'Salió, por producto')+'</div>'
+  if(pids.length) h+='<div class="bx-tot"><div class="bx-lbl">'+(marca?'Por producto · lo que coincide':'Por producto')+'</div>'
     +'<div class="bx-tot-g">'+pids.map(function(p){
       return '<div class="bx-tot-i"><span>'+esc(_bsProd(p))+'</span><b>'+esc(_entPres(p, tot[p]))+'</b></div>'; }).join('')
     +'</div></div>';
@@ -19333,7 +19357,7 @@ function _bsExpNombre(M, ext){
 }
 // SIN await: el archivo sale dentro del toque.
 function bsExportarXLSX(){
-  const M=_bxModelo(); if(!M || !M.n_fil) return;
+  const M=_bxModeloVisto(); if(!M) return;
   try{
     if(typeof XLSX==='undefined') throw new Error('no cargó la librería de Excel');
     XLSX.writeFile(_bsExpArmarLibro(M), _bsExpNombre(M,'xlsx'));
@@ -19346,7 +19370,7 @@ function bsExportarXLSX(){
 let _bsExpVolver=null;
 function _bsExpTemaVolver(){ if(_bsExpVolver) _bsExpVolver(); }
 function bsExportarPDF(){
-  const M=_bxModelo(); if(!M || !M.n_fil) return;
+  const M=_bxModeloVisto(); if(!M) return;
   let pr=document.getElementById('bsPrint');
   if(!pr){ pr=document.createElement('div'); pr.id='bsPrint'; document.body.appendChild(pr); }
   pr.innerHTML=bsExportPrintHTML(M);

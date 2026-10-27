@@ -39,7 +39,7 @@ def constante(nombre):
 
 FUNCS = ["_saludoHuella","_quienNombre","_quienFirma","_entPresN","_entPres",
          "_entPresPlano","_entPresCambio","_entFechaLarga","_entColgarDetalle","bsLeer","bsDetalle",
-         "bsCorreccionHTML","_bsFacturaLbl","_bsProd","_despFacCorta",
+         "bsCorreccionHTML","_bsFacturaLbl","_bsFacturaNum","_entUniLbl","_entDescuadreHTML","_lotUds","_lotNum","_despNomProd","_bsProd","_despFacCorta",
          "_despCuando","_despCuandoSalida","_despHora","_despDia","_despDiaDe","_despHoy","_despYmd","_despDiaFrase","_ymd","esc"]
 CONSTS= ["NIV_INFO","SALUDO_NOMBRES","SALUDO_HUELLAS","_ENT_MES_AB","ENT_MOTIVO_N","_rzN",
          "_DOW","_MESAB","ENT_PROD"]
@@ -93,6 +93,8 @@ var CLIENTE={ from:function(t){ return _fakeSel(t); } };
 // Lo que el navegador pone y aca no hay. NINGUNO esta bajo prueba: si alguno
 // apareciera en una assertion, la prueba estaria midiendo el andamio.
 function bsDeshacerHTML(){ return ''; }
+function bsValidadoHTML(){ return ''; }
+function anuHTML(){ return ''; }
 // bsLeer pide el cliente por aca. Le damos el PostgREST de mentira.
 function sbClient(){ return CLIENTE; }
 """ % (os.path.relpath(SRC), datos, json.dumps(faltan))
