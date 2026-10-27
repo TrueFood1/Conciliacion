@@ -63,7 +63,7 @@ NUEVOS = {
   'm-comp':     ('#A27FEB', '#6E46CC', 'Compras'),
   'm-per':      ('#FF671D', '#C04400', 'Personal'),
   'm-ven':      ('#3FB6A8', '#1C7E73', 'Ventas'),
-  'm-cont':     ('#5CC8F0', '#0F7FA8', 'Contenido'),
+  'm-cont':     ('#5CC8F0', '#0C789F', 'Contenido'),
   'magenta':    ('#C964CF', '#A23DA8', 'acento por defecto'),
   'orange-2':   ('#FF751F', '#C85400', 'naranja de Automatización / Pizza'),
   # colores de PRODUCTO (puntos y bordes; la etiqueta va siempre al lado)
