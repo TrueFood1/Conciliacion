@@ -2392,18 +2392,21 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
     <div class="bs-exp-h"><span>Exportar historial</span>
       <button class="btn btn-sm" onclick="bsExportarCerrar()">Cerrar</button></div>
     <div class="bs-exp-2">
-      <label class="bs-exp-l">Desde<input id="bsExpDesde" class="bs-in" type="date"></label>
-      <label class="bs-exp-l">Hasta<input id="bsExpHasta" class="bs-in" type="date"></label>
+      <label class="bs-exp-l">Desde<input id="bsExpDesde" class="bs-in" type="date" onchange="bsExpInvalidar()"></label>
+      <label class="bs-exp-l">Hasta<input id="bsExpHasta" class="bs-in" type="date" onchange="bsExpInvalidar()"></label>
     </div>
-    <label class="bs-exp-l">Cliente<input id="bsExpCli" class="bs-in" type="search" list="bsExpCliLista" autocomplete="off"></label>
+    <label class="bs-exp-l">Cliente<input id="bsExpCli" class="bs-in" type="search" list="bsExpCliLista" autocomplete="off" oninput="bsExpInvalidar()"></label>
     <datalist id="bsExpCliLista"></datalist>
     <label class="bs-exp-chk"><input id="bsExpTodos" type="checkbox" onchange="bsExpTodosCambio()"> Todos los clientes</label>
-    <label class="bs-exp-l">Lote<input id="bsExpLote" class="bs-in" type="search" placeholder="224 / 2-27" autocomplete="off"></label>
-    <label class="bs-exp-l">Producto<select id="bsExpProd" class="bs-in"></select></label>
+    <label class="bs-exp-l">Lote<input id="bsExpLote" class="bs-in" type="search" placeholder="224 / 2-27" autocomplete="off" oninput="bsExpInvalidar()"></label>
+    <label class="bs-exp-l">Producto<select id="bsExpProd" class="bs-in" onchange="bsExpInvalidar()"></select></label>
     <div id="bsExpEst" class="status hidden"></div>
     <div class="bs-exp-acc">
-      <button class="btn btn-amarillo" onclick="bsExportarXLSX()">Excel</button>
-      <button class="btn" onclick="bsExportarPDF()">PDF</button>
+      <button class="btn btn-amarillo" onclick="bsExportarPreparar()">Preparar</button>
+    </div>
+    <div class="bs-exp-acc">
+      <button id="bsExpXlsx" class="btn" onclick="bsExportarXLSX()" disabled>Excel</button>
+      <button id="bsExpPdf" class="btn" onclick="bsExportarPDF()" disabled>Imprimir / Guardar PDF</button>
     </div>
   </div>
 </div>
@@ -4640,6 +4643,7 @@ body:has(.de-fondo) #tkBtn{display:none}
 .bs-exp-in .bs-in:disabled{opacity:.45}
 .bs-exp-acc{display:flex;gap:10px}
 .bs-exp-acc .btn{flex:1;height:44px}
+.bs-exp-acc .btn:disabled{opacity:.4;cursor:default}
 /* La hoja de impresión vive fuera de pantalla; solo existe para `window.print()`. */
 #bsPrint{display:none}
 @media print{
@@ -6779,6 +6783,7 @@ function _modShow(id){
   const _v=document.getElementById(id);
   _modFallo((_v && !_v.classList.contains('hidden')) ? '' : id);
   finMasCerrar();   // el "+" es de Finanzas: no sobrevive a un cambio de vista
+  bsExportarCerrar();   // el diálogo de exportar tampoco, y devuelve el tema si se imprimió
   aplicarModoProduccion();
 }
 // id vacío = todo bien, se esconde. id con valor = esa vista no se pudo mostrar.
@@ -6828,6 +6833,7 @@ function volverLobby(){
   document.body.removeAttribute('data-mod');     // …y sin módulo activo: el lobby no lleva acento de nadie
   _MOD_VIEWS.forEach(v=>{ const el=document.getElementById(v); if(el) el.classList.add('hidden'); });
   _modFallo('');   // el aviso de pantalla rota no sobrevive a volver al inicio
+  bsExportarCerrar();
   document.getElementById('appHeader').classList.add('hidden');
   document.getElementById('vLobby').classList.remove('hidden');
   accesoPintarLobby();
@@ -18752,6 +18758,16 @@ function _bsFacturaNum(p){
 // El cliente como lo dice la fila de la pantalla: "Regalía para una escuela".
 function _bsExpCliente(p){ const q=_entQuien(p); return q.nombre+(q.para?(' para '+q.para):''); }
 
+// EL LOTE SE COMPARA ENTERO, no como pedazo de texto: «27» por pedazo calzaba con
+// todo lote de 2027, y «208» con «1208». Se acepta el número solo («208» → el
+// número antes de « / », sin importar ceros a la izquierda) o la forma completa
+// («208 / 2-27», sin importar los espacios). Cualquier otra cosa, igual exacto.
+function _bsExpLoteCalza(lote, q){
+  const L=_bsNorm(lote).replace(/\s+/g,''), Q=_bsNorm(q).replace(/\s+/g,'');
+  if(!Q) return true;
+  if(/^\d+$/.test(Q)){ const m=/^(\d+)\//.exec(L); return !!m && (+m[1])===(+Q); }
+  return L===Q;
+}
 const BS_EXP_PRODS=[451,452,453,503,472,519].concat(Object.keys(ENT_SIN_LOTE).map(Number));
 
 /* ── EL MOLDE ────────────────────────────────────────────────────────────
@@ -18795,7 +18811,7 @@ function bsExportModelo(P, f, meta){
           return;
         }
         lts.forEach(function(x){
-          fila(x.cant_uds, x.lote||'', _bsExpExcLote(x), !qLote || _bsNorm(x.lote).indexOf(qLote)>=0);
+          fila(x.cant_uds, x.lote||'', _bsExpExcLote(x), !qLote || _bsExpLoteCalza(x.lote, qLote));
         });
       });
       if(marca && !fs.some(function(r){ return r.coincide; })) return;
@@ -18934,7 +18950,7 @@ async function bsExportLeer(f){
 }
 
 // ── EL DIÁLOGO ──────────────────────────────────────────────────────────
-let _bsExpM=null, _bsExpClave='', _bsExpOcupado=false, _bsExpVolver=null;
+let _bsExpM=null, _bsExpClave='', _bsExpOcupado=false, _bsExpVolver=null, _bsExpWB=null;
 function bsExportar(){
   const sh=document.getElementById('bsExpSheet'); if(!sh) return;
   const de=document.getElementById('bsExpDesde'), ha=document.getElementById('bsExpHasta');
@@ -18948,17 +18964,19 @@ function bsExportar(){
   if(dl){ const vistos={}, ops=[];
     (_bs||[]).forEach(function(p){ const n=_entQuien(p).nombre; if(n && !vistos[n]){ vistos[n]=1; ops.push(n); } });
     dl.innerHTML=ops.sort().map(function(n){ return '<option value="'+esc(n)+'">'; }).join(''); }
-  _bsExpM=null; _bsExpClave='';          // al abrir se lee de nuevo: nada viejo
-  _bsExpEstado('');
+  bsExpInvalidar();                       // al abrir se lee de nuevo: nada viejo
   sh.classList.remove('hidden');
 }
+// TODA salida del diálogo pasa por acá: «Cerrar», cambiar de vista (`_modShow`) y
+// volver al lobby (`volverLobby`). Devuelve el tema si quedó puesto el de imprimir.
 function bsExportarCerrar(){
   const sh=document.getElementById('bsExpSheet'); if(sh) sh.classList.add('hidden');
-  if(_bsExpVolver) _bsExpVolver();        // por si `afterprint` no llegó (iPad)
+  _bsExpTemaVolver();
 }
 function bsExpTodosCambio(){
   const t=document.getElementById('bsExpTodos'), i=document.getElementById('bsExpCli');
   if(t && i) i.disabled=t.checked;
+  bsExpInvalidar();
 }
 function _bsExpEstado(msg, err){
   const st=document.getElementById('bsExpEst'); if(!st) return;
@@ -18975,75 +18993,111 @@ function _bsExpFiltros(){
   if(!f.todos && !f.cliente) return {err:'Falta el cliente.'};
   return {f:f};
 }
-// Lee y arma UNA vez por juego de filtros: pedir Excel y después PDF con los
-// mismos filtros da exactamente las mismas filas.
-async function _bsExpPreparar(){
-  const r=_bsExpFiltros();
-  if(r.err){ _bsExpEstado(esc(r.err), true); return null; }
-  const clave=JSON.stringify(r.f);
-  if(_bsExpM && _bsExpClave===clave) return _bsExpM;
-  _bsExpEstado('<span class="spin"></span>Leyendo el historial…');
-  const L=await bsExportLeer(r.f);
-  let por='';
-  try{ const {data}=await sbClient().auth.getUser();
-       const em=((data&&data.user&&data.user.email)||'').trim();
-       por=_quienNombre(em)||em; }catch(e){}
-  _bsExpM=bsExportModelo(L.P, r.f, {en:new Date(), por:por, odoo_ok:L.odoo_ok});
-  _bsExpM.f=r.f; _bsExpClave=clave;
+// ── DOS PASOS, A PROPÓSITO ───────────────────────────────────────────────
+// Safari de iOS puede negarse a `window.print()` —y a la descarga— si llegan
+// mucho después del toque: leer Supabase y esperar a Odoo (hasta 30 s) rompe el
+// «gesto del usuario». Por eso:
+//   1. «Preparar» lee, arma el molde, la hoja de Excel y el papel.
+//   2. «Excel» e «Imprimir / Guardar PDF» SOLO entregan lo ya armado, sin ningún
+//      `await` antes de `writeFile` / `print()`, dentro de su propio toque.
+// Cambiar un filtro invalida lo preparado y apaga los dos botones.
+function bsExpInvalidar(){
+  _bsExpM=null; _bsExpClave=''; _bsExpWB=null;
+  const pr=document.getElementById('bsPrint'); if(pr) pr.innerHTML='';
   _bsExpEstado('');
+  _bsExpBotones(false);
+}
+function _bsExpBotones(listo){
+  ['bsExpXlsx','bsExpPdf'].forEach(function(id){ const b=document.getElementById(id); if(b) b.disabled=!listo; });
+}
+function _bsExpArmarLibro(M){
+  const aoa=bsExportAOA(M);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  const r0=aoa.length-M.filas.length;                 // primera fila de datos
+  const cF=M.cols.findIndex(function(c){ return c.k==='fecha'; });
+  for(let i=r0;i<aoa.length;i++){
+    const a=XLSX.utils.encode_cell({r:i, c:cF}); if(ws[a]) ws[a].z='dd/mm/yyyy';
+  }
+  ws['!cols']=M.cols.map(function(c){
+    return {wch:({fecha:11,cliente:28,factura:20,pedido:8,producto:14,cantidad:9,unidad:10,
+                  lote:15,excepcion:40,coincide:9})[c.k]||12}; });
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Historial');
+  return wb;
+}
+async function bsExportarPreparar(){
+  if(_bsExpOcupado) return; 
+  const r=_bsExpFiltros();
+  if(r.err){ _bsExpEstado(esc(r.err), true); return; }
+  _bsExpOcupado=true; bsExpInvalidar();
+  _bsExpEstado('<span class="spin"></span>Leyendo el historial…');
+  try{
+    const L=await bsExportLeer(r.f);
+    let por='';
+    try{ const {data}=await sbClient().auth.getUser();
+         const em=((data&&data.user&&data.user.email)||'').trim();
+         por=_quienNombre(em)||em; }catch(e){}
+    const M=bsExportModelo(L.P, r.f, {en:new Date(), por:por, odoo_ok:L.odoo_ok});
+    M.f=r.f;
+    if(typeof XLSX==='undefined') throw new Error('no cargó la librería de Excel');
+    _bsExpWB=_bsExpArmarLibro(M);
+    let pr=document.getElementById('bsPrint');
+    if(!pr){ pr=document.createElement('div'); pr.id='bsPrint'; document.body.appendChild(pr); }
+    pr.innerHTML=bsExportPrintHTML(M);
+    _bsExpM=M; _bsExpClave=JSON.stringify(r.f);
+    _bsExpEstado('Listo · '+M.n_ped+(M.n_ped===1?' pedido':' pedidos')+' · '
+      +M.n_fil+(M.n_fil===1?' fila':' filas'));
+    _bsExpBotones(true);
+  }catch(e){ bsExpInvalidar(); _bsExpEstado('No pude exportar: '+esc((e&&e.message)||String(e)), true); }
+  finally{ _bsExpOcupado=false; }
+}
+// Lo preparado sirve SOLO si los filtros siguen siendo los mismos. Síncrono.
+function _bsExpListo(){
+  const r=_bsExpFiltros();
+  if(!_bsExpM || r.err || JSON.stringify(r.f)!==_bsExpClave){ bsExpInvalidar(); return null; }
   return _bsExpM;
 }
 function _bsExpNombre(M, ext){
   return 'historial_entregas_'+M.f.desde+'_'+M.f.hasta+'.'+ext;
 }
-async function bsExportarXLSX(){
-  if(_bsExpOcupado) return; _bsExpOcupado=true;
-  try{
-    const M=await _bsExpPreparar(); if(!M) return;
-    if(typeof XLSX==='undefined') throw new Error('no cargó la librería de Excel');
-    const aoa=bsExportAOA(M);
-    const ws=XLSX.utils.aoa_to_sheet(aoa);
-    const r0=aoa.length-M.filas.length;                 // primera fila de datos
-    const cF=M.cols.findIndex(function(c){ return c.k==='fecha'; });
-    for(let i=r0;i<aoa.length;i++){
-      const a=XLSX.utils.encode_cell({r:i, c:cF}); if(ws[a]) ws[a].z='dd/mm/yyyy';
-    }
-    ws['!cols']=M.cols.map(function(c){
-      return {wch:({fecha:11,cliente:28,factura:20,pedido:8,producto:14,cantidad:9,unidad:10,
-                    lote:15,excepcion:40,coincide:9})[c.k]||12}; });
-    const wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Historial');
-    XLSX.writeFile(wb, _bsExpNombre(M,'xlsx'));
-  }catch(e){ _bsExpEstado('No pude exportar: '+esc((e&&e.message)||String(e)), true); }
-  finally{ _bsExpOcupado=false; }
+// SIN await: la descarga sale dentro del toque.
+function bsExportarXLSX(){
+  const M=_bsExpListo(); if(!M || !_bsExpWB) return;
+  try{ XLSX.writeFile(_bsExpWB, _bsExpNombre(M,'xlsx')); }
+  catch(e){ _bsExpEstado('No pude exportar: '+esc((e&&e.message)||String(e)), true); }
 }
 // `window.print()` imprime la PÁGINA, no un elemento: la hoja de impresión
-// (`@media print`) esconde todo lo que no sea #bsPrint. Y se imprime en el tema
-// CLARO: en oscuro el texto es hueso sobre papel blanco. Se vuelve al tema que
-// estaba al terminar.
-async function bsExportarPDF(){
-  if(_bsExpOcupado) return; _bsExpOcupado=true;
-  try{
-    const M=await _bsExpPreparar(); if(!M) return;
-    let pr=document.getElementById('bsPrint');
-    if(!pr){ pr=document.createElement('div'); pr.id='bsPrint'; document.body.appendChild(pr); }
-    pr.innerHTML=bsExportPrintHTML(M);
-    if(_bsExpVolver) _bsExpVolver();
-    const h=document.documentElement, antes=h.getAttribute('data-tema'), t0=document.title;
-    // El título se queda puesto HASTA `afterprint`: es el nombre que el diálogo
-    // propone para el PDF, y en el iPad `print()` no bloquea.
-    const volver=function(){
-      window.removeEventListener('afterprint', volver); _bsExpVolver=null;
-      if(antes) h.setAttribute('data-tema', antes); else h.removeAttribute('data-tema');
-      document.title=t0;
-    };
-    _bsExpVolver=volver;
-    h.setAttribute('data-tema','claro');
-    window.addEventListener('afterprint', volver);
-    document.title=_bsExpNombre(M,'pdf').replace(/\.pdf$/,'');
-    window.print();
-  }catch(e){ _bsExpEstado('No pude exportar: '+esc((e&&e.message)||String(e)), true); }
-  finally{ _bsExpOcupado=false; }
+// (`@media print`) esconde todo lo que no sea #bsPrint (ya armado en «Preparar»).
+// Se imprime en CLARO —en oscuro el texto es hueso sobre papel blanco— vía
+// `temaAplicar`, sin tocar la preferencia guardada de la cuenta. El tema de antes
+// vuelve en `afterprint`, al salir del modo impresión (`matchMedia`), y en
+// cualquier salida del diálogo (`bsExportarCerrar`).
+function _bsExpTemaVolver(){ if(_bsExpVolver) _bsExpVolver(); }
+function bsExportarPDF(){
+  const M=_bsExpListo(); if(!M) return;
+  _bsExpTemaVolver();
+  const h=document.documentElement;
+  const antes=(h.getAttribute('data-tema')==='claro')?'claro':'oscuro', t0=document.title;
+  let mq=null;
+  const enMq=function(e){ if(e && !e.matches) volver(); };
+  // El título se queda puesto hasta volver: es el nombre que el diálogo propone
+  // para el PDF, y en el iPad `print()` no bloquea.
+  const volver=function(){
+    _bsExpVolver=null;
+    window.removeEventListener('afterprint', volver);
+    try{ if(mq){ if(mq.removeEventListener) mq.removeEventListener('change', enMq);
+                 else if(mq.removeListener) mq.removeListener(enMq); } }catch(e){}
+    temaAplicar(antes);
+    document.title=t0;
+  };
+  _bsExpVolver=volver;
+  temaAplicar('claro');
+  window.addEventListener('afterprint', volver);
+  try{ mq=window.matchMedia && window.matchMedia('print');
+       if(mq){ if(mq.addEventListener) mq.addEventListener('change', enMq);
+               else if(mq.addListener) mq.addListener(enMq); } }catch(e){ mq=null; }
+  document.title=_bsExpNombre(M,'pdf').replace(/\.pdf$/,'');
+  window.print();
 }
 
 /* ══════════════════════════════════════════════════════════════════════
