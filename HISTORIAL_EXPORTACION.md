@@ -1,8 +1,16 @@
 # Exportación del Historial de Entregas — especificación
 
-**Estado: DECIDIDO, SIN CONSTRUIR.** Se construye en el punto 3 de la cola, en la
-misma pasada que el Bloque 4 + 3.2/3.3 — la columna "motivo de excepción" depende
-de campos que todavía no existen. **No abrir el exportador dos veces.**
+**Estado: CONSTRUIDO en b140 (27-oct-2026), sin probar todavía en el iPad.**
+La columna "motivo de excepción" sale de los campos del Bloque 4 + 3.2/3.3, que
+ya existen: `ent_alisto_linea.no_se_entrega` / `motivo_no_entrega` /
+`nota_no_entrega` / `cant_no_entregada` y, en `ent_alisto_lote_efectivo`, el lote
+`'NO DETERMINADO'` con `motivo_indeterminado` / `nota_indeterminado` /
+`corregido` / `lote_original`. Código: `bsExportar`, `bsExportModelo`,
+`bsExportarXLSX`, `bsExportarPDF` en `index.html`.
+
+⚠️ Lo de "Truefie no depende de ninguna librería externa" (más abajo) quedó
+viejo: `index.html` ya cargaba SheetJS por cdnjs para LEER Excel. El Excel se
+escribe con esa misma librería; el PDF sigue siendo hoja de impresión.
 
 Un solo molde, dos salidas: Excel y PDF con la misma disposición, para que no se
 desincronicen.

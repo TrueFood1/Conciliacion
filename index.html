@@ -2386,6 +2386,28 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
   </div>
 </div>
 
+<!-- Exportar el Historial de Entregas (b140): los filtros del archivo. Ver HISTORIAL_EXPORTACION.md. -->
+<div id="bsExpSheet" class="hidden">
+  <div class="bs-exp-in">
+    <div class="bs-exp-h"><span>Exportar historial</span>
+      <button class="btn btn-sm" onclick="bsExportarCerrar()">Cerrar</button></div>
+    <div class="bs-exp-2">
+      <label class="bs-exp-l">Desde<input id="bsExpDesde" class="bs-in" type="date"></label>
+      <label class="bs-exp-l">Hasta<input id="bsExpHasta" class="bs-in" type="date"></label>
+    </div>
+    <label class="bs-exp-l">Cliente<input id="bsExpCli" class="bs-in" type="search" list="bsExpCliLista" autocomplete="off"></label>
+    <datalist id="bsExpCliLista"></datalist>
+    <label class="bs-exp-chk"><input id="bsExpTodos" type="checkbox" onchange="bsExpTodosCambio()"> Todos los clientes</label>
+    <label class="bs-exp-l">Lote<input id="bsExpLote" class="bs-in" type="search" placeholder="224 / 2-27" autocomplete="off"></label>
+    <label class="bs-exp-l">Producto<select id="bsExpProd" class="bs-in"></select></label>
+    <div id="bsExpEst" class="status hidden"></div>
+    <div class="bs-exp-acc">
+      <button class="btn btn-amarillo" onclick="bsExportarXLSX()">Excel</button>
+      <button class="btn" onclick="bsExportarPDF()">PDF</button>
+    </div>
+  </div>
+</div>
+
 <!-- Hoja de clientes del Reporte: pantalla completa, buscador arriba, frecuentes primero. -->
 <div id="rpSheet" class="hidden">
   <div class="rp-sheet-in">
@@ -4600,6 +4622,46 @@ body:has(.de-fondo) #tkBtn{display:none}
 .bs-reg button{background:none;border:none;padding:0;margin-left:auto;cursor:pointer;
   font-family:var(--font);font-size:12px;color:var(--ent-line)}
 .bs-lista{display:flex;flex-direction:column;gap:6px;margin-top:14px;max-width:620px}
+/* ── Exportar el Historial (b140) ──
+   El botón va al final de la fila de chips, empujado a la derecha: es una acción
+   sobre todo el historial, no un quinto campo de búsqueda. */
+.bs-exp-btn{margin-left:auto;background:none;border:1px solid var(--border-strong);border-radius:999px;
+  color:var(--ent-line);font-family:var(--font);font-size:12px;padding:5px 13px;cursor:pointer}
+#bsExpSheet{position:fixed;inset:0;background:var(--scrim);z-index:140;display:flex;justify-content:center;
+  align-items:flex-start;overflow-y:auto;padding-top:env(safe-area-inset-top)}
+#bsExpSheet.hidden{display:none}
+.bs-exp-in{width:100%;max-width:460px;padding:18px 16px calc(24px + env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;gap:12px;box-sizing:border-box}
+.bs-exp-h{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-size:15px;font-weight:600;color:var(--text)}
+.bs-exp-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bs-exp-l{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--text-3);min-width:0}
+.bs-exp-chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);margin-top:-4px}
+.bs-exp-in .bs-in:disabled{opacity:.45}
+.bs-exp-acc{display:flex;gap:10px}
+.bs-exp-acc .btn{flex:1;height:44px}
+/* La hoja de impresión vive fuera de pantalla; solo existe para `window.print()`. */
+#bsPrint{display:none}
+@media print{
+  @page{size:landscape;margin:10mm}
+  body>*:not(#bsPrint){display:none!important}
+  html,body{background:var(--bg)!important}
+  #bsPrint{display:block;color:var(--text);font-family:var(--font);font-size:9pt}
+  .bsp-t{font-size:13pt;font-weight:600;margin-bottom:6pt}
+  .bsp-cab{border-collapse:collapse;margin-bottom:10pt;width:100%}
+  .bsp-cab th{text-align:left;font-weight:600;padding:1pt 10pt 1pt 0;vertical-align:top;white-space:nowrap;width:1%}
+  .bsp-cab td{padding:1pt 0;color:var(--text-2)}
+  .bsp-tab{border-collapse:collapse;width:100%;table-layout:auto}
+  .bsp-tab th{text-align:left;font-size:8pt;font-weight:600;color:var(--text-3);
+    border-bottom:1px solid var(--border-strong);padding:3pt 5pt}
+  .bsp-tab td{padding:3pt 5pt;border-bottom:.5pt solid var(--border);vertical-align:top;
+    overflow-wrap:anywhere}
+  .bsp-tab .r{text-align:right;white-space:nowrap}
+  .bsp-tab thead{display:table-header-group}
+  .bsp-tab tr{break-inside:avoid;page-break-inside:avoid}
+  .bsp-si td{font-weight:600}
+}
+
 .bs-fila{width:100%;text-align:left;background:var(--panel);border:1px solid var(--border);
   border-radius:10px;color:var(--text);font:inherit;font-family:var(--font);
   padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:3px}
@@ -5883,7 +5945,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 27 oct 2026 · b139';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 27 oct 2026 · b140';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -18431,6 +18493,7 @@ function bsRender(){
     +BS_CAMPOS.map(function(cp){
       return '<button class="bs-chip'+(cp.k===_bsCampo?' on':'')+'" '
         +'onclick="bsSetCampo(\''+cp.k+'\')">'+cp.n+'</button>'; }).join('')
+    +'<button class="bs-exp-btn" onclick="bsExportar()">Exportar</button>'
     +'</div></div>'
     // Un filtro que no se ve es un filtro que miente sobre cuántas filas hay.
     // "hoy" y "ayer" no llevan "el" delante; "vie 15" sí.
@@ -18576,12 +18639,10 @@ function bsCorreccionHTML(p){
 // `bsEnriquecerFacturas` leyendo Odoo en segundo plano; mientras no haya llegado
 // —o si Odoo no contesta— se dice lo mismo que se decía antes. El Historial no
 // espera a Odoo para abrir, y eso no se negocia (es de b53).
+// La regla vive en `_bsFacturaNum`, que también llena la columna del archivo exportado.
 function _bsFacturaLbl(p){
   if(!p.factura_nombre) return 'sin factura';
-  const v=p.fac_vigente;
-  if(v && v.nombre && v.reemplaza)
-    return 'factura '+_despFacCorta(v.nombre)+' (reemplaza a '+_despFacCorta(v.reemplaza)+')';
-  return 'factura '+_despFacCorta(p.factura_nombre);
+  return 'factura '+_bsFacturaNum(p);
 }
 
 // Fecha COMPLETA y sin relativos: "14 sep 2026, 09:12". `_despCuando` está pensado
@@ -18594,6 +18655,395 @@ function _entFechaLarga(iso){
   const z=function(n){ return (n<10?'0':'')+n; };
   return d.getDate()+' '+_ENT_MES_AB[d.getMonth()]+' '+d.getFullYear()
         +', '+z(d.getHours())+':'+z(d.getMinutes());
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   EXPORTAR EL HISTORIAL · Excel y PDF · b140 (27-oct-2026)
+   Especificación: HISTORIAL_EXPORTACION.md (decidida en septiembre).
+
+   UN SOLO MOLDE, DOS SALIDAS. `bsExportModelo()` arma cabecera + filas UNA vez;
+   `bsExportarXLSX()` lo pinta como hoja y `bsExportarPDF()` como papel. Ninguna
+   de las dos arma filas propias: si lo hicieran, se desincronizan.
+
+   SOLO LEE. Supabase (las mismas tablas y vistas que ya lee Entregas) y, para la
+   factura vigente, la misma lectura de Odoo que usa el Historial
+   (`entFacVigenteLeer`). No escribe en ningún lado ni abre llamadas nuevas a Odoo.
+
+   ⚠️ SIN TECHO SILENCIOSO. Consulta aparte, sin el `.limit(300)` de `bsLeer()`,
+   y paginando hasta recibir una página VACÍA — no hasta una "corta": si el
+   servidor tuviera un max-rows menor que la página, cortar en la primera corta
+   sería exactamente el techo callado que la especificación prohíbe.
+
+   ⚠️ LOS LOTES SALEN DE `ent_alisto_lote_efectivo`, NO de `ent_alisto_lote`:
+   es la vista que aplica las correcciones de lote y la que usa el saldo. Una
+   salida 'NO DETERMINADO' a la que después se le asignó su lote real sale con
+   el lote real y la corrección dicha en la columna de excepción.
+   ══════════════════════════════════════════════════════════════════════ */
+const BS_EXP_PAG=1000;     // filas por página de Supabase
+const BS_EXP_IN=150;       // ids por `.in()`, para no pasarse del largo de URL
+
+// FECHA = coalesce(salida_en, fecha_despacho), cada mitad en su tipo. La vista la
+// expone como `fecha_ab_re_04`, pero ahí `fecha_despacho` (un DATE) pasa a
+// timestamptz a medianoche UTC, que en hora CR es el día ANTERIOR a las 18:00.
+// Leyendo las dos mitades por separado el día sale bien en los dos casos.
+function _bsExpFecha(p){
+  if(p && p.salida_en) return _despDiaDe(p.salida_en);
+  const fd=String((p&&p.fecha_despacho)||'').slice(0,10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(fd) ? fd : _despDiaDe(p&&p.fecha_ab_re_04);
+}
+function _bsExpDMY(ymd){ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd||'');
+  return m ? (m[3]+'/'+m[2]+'/'+m[1]) : ''; }
+// Día de Excel (serial desde 30-dic-1899) desde 'aaaa-mm-dd', sin pasar por la zona
+// horaria del aparato: un Date local corre el día en la frontera.
+function _bsExpSerial(ymd){ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd||''); if(!m) return null;
+  return Math.round((Date.UTC(+m[1],+m[2]-1,+m[3])-Date.UTC(1899,11,30))/86400000); }
+function _bsExpAhora(d){
+  const z=function(n){ return (n<10?'0':'')+n; };
+  return _bsExpDMY(_despYmd(d))+' '+z(d.getHours())+':'+z(d.getMinutes());
+}
+// La unidad de venta, en palabra entera (un archivo no abrevia): paquetes para
+// Francés, Buns y Pizza; unidades para el resto. Sale de NIV_INFO por id —nunca
+// de `uom_nombre`, que llama "Dozens" a un paquete de 4.
+function _bsExpUni(pid, n){
+  const I=NIV_INFO[pid], uno=Math.abs((+n||0)-1)<1e-9;
+  if(I && I.presLbl==='paq') return uno?'paquete':'paquetes';
+  return uno?'unidad':'unidades';
+}
+function _bsExpCant(pid, uds){ const I=NIV_INFO[pid]; return (+uds||0)/((I&&+I.presDiv)||1); }
+function _bsExpMotTxt(lista, v){
+  const m=(lista||[]).find(function(x){ return x.v===v; });
+  return (m ? m.t : String(v||'sin motivo').replace(/_/g,' '));
+}
+// Los dos motivos viejos que la base sigue aceptando y la pantalla ya no ofrece
+// (ver ENT_INDET_MOTIVOS): una fila escrita con ellos se tiene que poder leer.
+const BS_EXP_INDET_VIEJOS=[{v:'caja_sin_sticker', t:'Caja sin sticker'},
+                           {v:'chofer_no_reporto', t:'El chofer no reportó'}];
+
+// LA COLUMNA «MOTIVO DE EXCEPCIÓN». Las dos excepciones significan cosas OPUESTAS
+// para el saldo y la columna las distingue por la primera palabra:
+//   «sin lote imputado · …»  salió y no se sabe de qué lote   (bajó el saldo)
+//   «no se entrega · …»      no salió                          (no bajó nada)
+function _bsExpExcLote(x){
+  if(!x) return '';
+  const mot=x.motivo_indeterminado
+    ? _bsExpMotTxt(ENT_INDET_MOTIVOS.concat(BS_EXP_INDET_VIEJOS), x.motivo_indeterminado) : '';
+  const nota=(x.nota_indeterminado||'').trim();
+  const det=(mot?(' · '+mot):'')+(nota?(': '+nota):'');
+  if(x.lote===ENT_LOTE_INDET) return 'sin lote imputado'+det;
+  if(x.corregido && x.lote_original===ENT_LOTE_INDET) return 'lote asignado después'+det;
+  if(x.corregido && x.lote_original && x.lote_original!==x.lote)
+    return 'lote corregido · antes '+x.lote_original;
+  return '';
+}
+function _bsExpExcLinea(l){
+  const mot=_bsExpMotTxt(ENT_NM_MOTIVOS, l.motivo_no_entrega);
+  const nota=(l.nota_no_entrega||'').trim();
+  return 'no se entrega · '+mot+(nota?(': '+nota):'');
+}
+// La factura como se nombra en el Historial. UNA regla para la columna del archivo
+// y para la ficha de la pantalla (`_bsFacturaLbl` la usa).
+function _bsFacturaNum(p){
+  if(!p || !p.factura_nombre) return 'sin factura';
+  const v=p.fac_vigente;
+  if(v && v.nombre && v.reemplaza)
+    return _despFacCorta(v.nombre)+' (reemplaza a '+_despFacCorta(v.reemplaza)+')';
+  return _despFacCorta(p.factura_nombre);
+}
+// El cliente como lo dice la fila de la pantalla: "Regalía para una escuela".
+function _bsExpCliente(p){ const q=_entQuien(p); return q.nombre+(q.para?(' para '+q.para):''); }
+
+const BS_EXP_PRODS=[451,452,453,503,472,519].concat(Object.keys(ENT_SIN_LOTE).map(Number));
+
+/* ── EL MOLDE ────────────────────────────────────────────────────────────
+   Entra: P = pedidos ya leídos (con `lineas[].lotes[]` y las marcas de
+   excepción), f = filtros, meta = {en: Date, por: nombre, odoo_ok}.
+   Sale: {cab, cols, filas, n_ped, n_fil}. Es puro: no lee nada, no toca el DOM.
+   ⚠️ Filtrar por lote o producto elige PEDIDOS y exporta el pedido entero; la
+   columna «coincide» marca qué filas calzaron. Un archivo con media factura no
+   cuadra contra la factura. */
+function bsExportModelo(P, f, meta){
+  f=f||{}; meta=meta||{};
+  const qCli=_bsNorm(f.cliente).trim(), qLote=_bsNorm(f.lote).trim();
+  const fProd=f.producto?(+f.producto):0;
+  const marca=!!(qLote||fProd);
+  const filas=[]; let nPed=0;
+  (P||[]).slice().map(function(p){ return {p:p, d:_bsExpFecha(p)}; })
+    .filter(function(o){ return o.d && o.d>=f.desde && o.d<=f.hasta; })
+    .filter(function(o){ return f.todos || !qCli
+      || _bsNorm(_bsExpCliente(o.p)).indexOf(qCli)>=0; })
+    .sort(function(a,z){ return a.d<z.d?-1:a.d>z.d?1:((+a.p.pedido_id)-(+z.p.pedido_id)); })
+    .forEach(function(o){
+      const p=o.p, base={fecha:o.d, cliente:_bsExpCliente(p), factura:_bsFacturaNum(p),
+                         pedido:+p.pedido_id};
+      const fs=[];
+      (p.lineas||[]).forEach(function(l){
+        const pid=+l.producto_id, prodOK=!fProd || pid===fProd;
+        const fila=function(uds, lote, exc, lotOK){
+          const n=_bsExpCant(pid, uds);
+          fs.push(Object.assign({}, base, {producto:_bsProd(pid), producto_id:pid, cantidad:n,
+            unidad:_bsExpUni(pid, n), lote:lote, excepcion:exc,
+            coincide: marca && prodOK && lotOK}));
+        };
+        if(l.no_se_entrega){
+          fila(l.cant_no_entregada!=null?l.cant_no_entregada:l.cant_uds, '', _bsExpExcLinea(l), !qLote);
+          return;
+        }
+        const lts=l.lotes||[];
+        if(!lts.length){
+          const sinPorDef=_entSinLote(pid);
+          fila(l.cant_uds, sinPorDef?'no lleva lote':'', sinPorDef?'':'sin lote registrado', !qLote);
+          return;
+        }
+        lts.forEach(function(x){
+          fila(x.cant_uds, x.lote||'', _bsExpExcLote(x), !qLote || _bsNorm(x.lote).indexOf(qLote)>=0);
+        });
+      });
+      if(marca && !fs.some(function(r){ return r.coincide; })) return;
+      nPed++; fs.forEach(function(r){ filas.push(r); });
+    });
+
+  const cols=[{k:'fecha',t:'Fecha'},{k:'cliente',t:'Cliente'},{k:'factura',t:'Factura'},
+    {k:'pedido',t:'Pedido'},{k:'producto',t:'Producto'},{k:'cantidad',t:'Cantidad'},
+    {k:'unidad',t:'Unidad'},{k:'lote',t:'Lote'},{k:'excepcion',t:'Motivo de excepción'}];
+  if(marca) cols.push({k:'coincide',t:'Coincide'});
+
+  const cab=[
+    ['Fechas', _bsExpDMY(f.desde)+' al '+_bsExpDMY(f.hasta)],
+    ['Cliente', f.todos ? 'todos' : (f.cliente||'').trim()],
+    ['Lote', qLote ? (f.lote||'').trim() : 'todos'],
+    ['Producto', fProd ? _bsProd(fProd) : 'todos'],
+    ['Exportado', (meta.en?_bsExpAhora(meta.en):'')+(meta.por?(' por '+meta.por):'')],
+    ['Contenido', nPed+(nPed===1?' pedido':' pedidos')+' · '+filas.length+(filas.length===1?' fila':' filas')
+      +' · una fila por lote'],
+    ['Definición de «Cliente»', 'Además del nombre del cliente, el filtro busca el motivo de la salida '
+      +'(Regalía, Reposición, Consumo interno…) y el destinatario. Una salida sin cliente aparece con su motivo.'],
+    ['Definición de «Fecha»', 'No es la fecha del pedido: es coalesce(salida_en, fecha_despacho) — la salida '
+      +'real del congelador cuando la hubo, y la fecha del pedido para lo que se preparó y todavía no salió.'],
+    ['Cantidad', 'En unidad de venta: paquetes para Pan Francés, Buns y Pizza; unidades para Pan Blanco, '
+      +'Pan Semillas y Galletas.']
+  ];
+  if(marca) cab.push(['Coincide', 'Con filtro de lote o producto se exporta el pedido completo; «sí» marca '
+      +'las filas que calzan con el filtro.']);
+  if(meta.odoo_ok===false) cab.push(['Factura', 'Sin verificar contra Odoo al exportar: puede no mostrar '
+      +'una re-emisión por nota de crédito.']);
+  return {cab:cab, cols:cols, filas:filas, n_ped:nPed, n_fil:filas.length};
+}
+
+// El valor de una celda como lo lee una persona (papel) y como lo guarda la hoja.
+function _bsExpTxt(r, k){
+  if(k==='fecha') return _bsExpDMY(r.fecha);
+  if(k==='cantidad') return _entPresN(r.cantidad);
+  if(k==='pedido') return '#'+r.pedido;
+  if(k==='coincide') return r.coincide?'sí':'';
+  return r[k]==null?'':String(r[k]);
+}
+function _bsExpCelda(r, k){
+  if(k==='fecha') return _bsExpSerial(r.fecha);
+  if(k==='cantidad' || k==='pedido') return +r[k];
+  return _bsExpTxt(r, k);
+}
+// La hoja como filas de celdas: título, cabecera, una vacía, encabezados, datos.
+// Lo usa `bsExportarXLSX` y es lo que se puede verificar sin la librería.
+function bsExportAOA(M){
+  const a=[['Historial de Entregas · True Food']];
+  M.cab.forEach(function(c){ a.push([c[0], c[1]]); });
+  a.push([]);
+  a.push(M.cols.map(function(c){ return c.t; }));
+  M.filas.forEach(function(r){ a.push(M.cols.map(function(c){ return _bsExpCelda(r, c.k); })); });
+  return a;
+}
+// El papel: el MISMO molde, como HTML. La hoja de impresión es CSS sobre esto.
+function bsExportPrintHTML(M){
+  return '<div class="bsp"><div class="bsp-t">Historial de Entregas · True Food</div>'
+    +'<table class="bsp-cab"><tbody>'+M.cab.map(function(c){
+      return '<tr><th>'+esc(c[0])+'</th><td>'+esc(c[1])+'</td></tr>'; }).join('')+'</tbody></table>'
+    +'<table class="bsp-tab"><thead><tr>'+M.cols.map(function(c){
+      return '<th'+((c.k==='cantidad'||c.k==='pedido')?' class="r"':'')+'>'+esc(c.t)+'</th>'; }).join('')
+    +'</tr></thead><tbody>'
+    +(M.filas.length ? M.filas.map(function(r){
+      return '<tr'+(r.coincide?' class="bsp-si"':'')+'>'+M.cols.map(function(c){
+        return '<td'+((c.k==='cantidad'||c.k==='pedido')?' class="r"':'')+'>'+esc(_bsExpTxt(r, c.k))+'</td>'; }).join('')+'</tr>';
+    }).join('') : '<tr><td colspan="'+M.cols.length+'">Ninguna entrega con esos filtros.</td></tr>')
+    +'</tbody></table></div>';
+}
+
+// ── LA LECTURA, sin techo ───────────────────────────────────────────────
+async function _bsExpTodas(armar){
+  let out=[], i=0;
+  for(;;){
+    const {data,error}=await armar().range(i, i+BS_EXP_PAG-1);
+    if(error) throw error;
+    const d=data||[]; if(!d.length) break;
+    out=out.concat(d); i+=d.length;
+  }
+  return out;
+}
+async function _bsExpEn(c, tabla, sel, col, ids, orden){
+  let out=[];
+  for(let i=0;i<ids.length;i+=BS_EXP_IN){
+    const tr=ids.slice(i, i+BS_EXP_IN);
+    out=out.concat(await _bsExpTodas(function(){ return c.from(tabla).select(sel).in(col, tr).order(orden); }));
+  }
+  return out;
+}
+function _bsExpDiaMas(ymd, n){ const d=new Date(ymd+'T12:00:00'); d.setDate(d.getDate()+n); return _despYmd(d); }
+async function bsExportLeer(f){
+  const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
+  // Un día de margen a cada lado en la consulta: el corte fino lo hace el molde
+  // en hora CR (ver `_bsExpFecha`).
+  const P=await _bsExpTodas(function(){ return c.from('v_ent_pedido_estado')
+    .select('pedido_id,fecha_despacho,factura_id,factura_nombre,cliente_id,cliente_nombre,origen,motivo,'
+           +'alisto_id,salida_id,salida_en,estado,fecha_ab_re_04')
+    .gte('fecha_ab_re_04', _bsExpDiaMas(f.desde,-1)).lt('fecha_ab_re_04', _bsExpDiaMas(f.hasta,2))
+    .order('pedido_id'); });
+  const pids=P.map(function(p){ return p.pedido_id; }).filter(Boolean);
+  const alis=P.map(function(p){ return p.alisto_id; }).filter(Boolean);
+  // El destinatario no es adorno acá: el filtro de cliente lo busca.
+  const D={}; (await _bsExpEn(c, 'ent_pedido', 'id,destinatario', 'id', pids, 'id'))
+    .forEach(function(x){ D[x.id]=x.destinatario; });
+  const L=await _bsExpEn(c, 'ent_alisto_linea',
+    'id,alisto_id,producto_id,cant_uds,no_se_entrega,motivo_no_entrega,nota_no_entrega,cant_no_entregada',
+    'alisto_id', alis, 'id');
+  const lids=L.map(function(l){ return l.id; });
+  const selLt='id,linea_id,lote,cant_uds,orden,lote_original,motivo_indeterminado,corregido';
+  let LT;
+  try{ LT=await _bsExpEn(c, 'ent_alisto_lote_efectivo', selLt+',nota_indeterminado', 'linea_id', lids, 'id'); }
+  catch(e){
+    // La nota de 'otro' es de CAMBIO_MOTIVOS_INDET.sql. Si esa columna no estuviera,
+    // se pierde la nota, no el archivo.
+    if(!/nota_indeterminado/.test((e&&e.message)||'')) throw e;
+    LT=await _bsExpEn(c, 'ent_alisto_lote_efectivo', selLt, 'linea_id', lids, 'id');
+  }
+  const porLinea={};
+  LT.forEach(function(x){ (porLinea[x.linea_id]=porLinea[x.linea_id]||[]).push(x); });
+  const porAli={};
+  L.forEach(function(l){
+    l.lotes=(porLinea[l.id]||[]).sort(function(a,z){ return (a.orden||0)-(z.orden||0); });
+    (porAli[l.alisto_id]=porAli[l.alisto_id]||[]).push(l);
+  });
+  P.forEach(function(p){ p.destinatario=D[p.pedido_id]||''; p.lineas=porAli[p.alisto_id]||[]; });
+  // La factura VIGENTE y su cliente, de Odoo, con la lectura que ya usa el
+  // Historial. Si Odoo no contesta el archivo sale igual y la cabecera lo dice.
+  let odooOK=true;
+  try{
+    await entFacVigenteLeer(P.map(function(p){ return p.factura_id; }));
+    P.forEach(function(p){ const v=_entFacVigDe(p);
+      if(v && v.reemplaza) p.fac_vigente={nombre:v.nombre, reemplaza:v.reemplaza, factura_id:v.id}; });
+  }catch(e){ odooOK=false; }
+  return {P:P, odoo_ok:odooOK};
+}
+
+// ── EL DIÁLOGO ──────────────────────────────────────────────────────────
+let _bsExpM=null, _bsExpClave='', _bsExpOcupado=false, _bsExpVolver=null;
+function bsExportar(){
+  const sh=document.getElementById('bsExpSheet'); if(!sh) return;
+  const de=document.getElementById('bsExpDesde'), ha=document.getElementById('bsExpHasta');
+  if(de && !de.value){ const h=_despHoy(); de.value=h.slice(0,8)+'01'; }
+  if(ha && !ha.value) ha.value=_despHoy();
+  const sel=document.getElementById('bsExpProd');
+  if(sel && !sel.options.length)
+    sel.innerHTML='<option value="">Todos</option>'+BS_EXP_PRODS.map(function(pid){
+      return '<option value="'+pid+'">'+esc(_bsProd(pid))+'</option>'; }).join('');
+  const dl=document.getElementById('bsExpCliLista');
+  if(dl){ const vistos={}, ops=[];
+    (_bs||[]).forEach(function(p){ const n=_entQuien(p).nombre; if(n && !vistos[n]){ vistos[n]=1; ops.push(n); } });
+    dl.innerHTML=ops.sort().map(function(n){ return '<option value="'+esc(n)+'">'; }).join(''); }
+  _bsExpM=null; _bsExpClave='';          // al abrir se lee de nuevo: nada viejo
+  _bsExpEstado('');
+  sh.classList.remove('hidden');
+}
+function bsExportarCerrar(){
+  const sh=document.getElementById('bsExpSheet'); if(sh) sh.classList.add('hidden');
+  if(_bsExpVolver) _bsExpVolver();        // por si `afterprint` no llegó (iPad)
+}
+function bsExpTodosCambio(){
+  const t=document.getElementById('bsExpTodos'), i=document.getElementById('bsExpCli');
+  if(t && i) i.disabled=t.checked;
+}
+function _bsExpEstado(msg, err){
+  const st=document.getElementById('bsExpEst'); if(!st) return;
+  if(!msg){ st.className='status hidden'; st.innerHTML=''; return; }
+  st.className='status '+(err?'s-err':'s-info'); st.innerHTML=msg;
+}
+function _bsExpFiltros(){
+  const v=function(id){ const e=document.getElementById(id); return e?String(e.value||'').trim():''; };
+  const t=document.getElementById('bsExpTodos');
+  const f={desde:v('bsExpDesde'), hasta:v('bsExpHasta'), cliente:v('bsExpCli'),
+           todos:!!(t&&t.checked), lote:v('bsExpLote'), producto:v('bsExpProd')};
+  if(!f.desde || !f.hasta) return {err:'Falta el rango de fechas.'};
+  if(f.desde>f.hasta) return {err:'«Desde» es posterior a «Hasta».'};
+  if(!f.todos && !f.cliente) return {err:'Falta el cliente.'};
+  return {f:f};
+}
+// Lee y arma UNA vez por juego de filtros: pedir Excel y después PDF con los
+// mismos filtros da exactamente las mismas filas.
+async function _bsExpPreparar(){
+  const r=_bsExpFiltros();
+  if(r.err){ _bsExpEstado(esc(r.err), true); return null; }
+  const clave=JSON.stringify(r.f);
+  if(_bsExpM && _bsExpClave===clave) return _bsExpM;
+  _bsExpEstado('<span class="spin"></span>Leyendo el historial…');
+  const L=await bsExportLeer(r.f);
+  let por='';
+  try{ const {data}=await sbClient().auth.getUser();
+       const em=((data&&data.user&&data.user.email)||'').trim();
+       por=_quienNombre(em)||em; }catch(e){}
+  _bsExpM=bsExportModelo(L.P, r.f, {en:new Date(), por:por, odoo_ok:L.odoo_ok});
+  _bsExpM.f=r.f; _bsExpClave=clave;
+  _bsExpEstado('');
+  return _bsExpM;
+}
+function _bsExpNombre(M, ext){
+  return 'historial_entregas_'+M.f.desde+'_'+M.f.hasta+'.'+ext;
+}
+async function bsExportarXLSX(){
+  if(_bsExpOcupado) return; _bsExpOcupado=true;
+  try{
+    const M=await _bsExpPreparar(); if(!M) return;
+    if(typeof XLSX==='undefined') throw new Error('no cargó la librería de Excel');
+    const aoa=bsExportAOA(M);
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    const r0=aoa.length-M.filas.length;                 // primera fila de datos
+    const cF=M.cols.findIndex(function(c){ return c.k==='fecha'; });
+    for(let i=r0;i<aoa.length;i++){
+      const a=XLSX.utils.encode_cell({r:i, c:cF}); if(ws[a]) ws[a].z='dd/mm/yyyy';
+    }
+    ws['!cols']=M.cols.map(function(c){
+      return {wch:({fecha:11,cliente:28,factura:20,pedido:8,producto:14,cantidad:9,unidad:10,
+                    lote:15,excepcion:40,coincide:9})[c.k]||12}; });
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Historial');
+    XLSX.writeFile(wb, _bsExpNombre(M,'xlsx'));
+  }catch(e){ _bsExpEstado('No pude exportar: '+esc((e&&e.message)||String(e)), true); }
+  finally{ _bsExpOcupado=false; }
+}
+// `window.print()` imprime la PÁGINA, no un elemento: la hoja de impresión
+// (`@media print`) esconde todo lo que no sea #bsPrint. Y se imprime en el tema
+// CLARO: en oscuro el texto es hueso sobre papel blanco. Se vuelve al tema que
+// estaba al terminar.
+async function bsExportarPDF(){
+  if(_bsExpOcupado) return; _bsExpOcupado=true;
+  try{
+    const M=await _bsExpPreparar(); if(!M) return;
+    let pr=document.getElementById('bsPrint');
+    if(!pr){ pr=document.createElement('div'); pr.id='bsPrint'; document.body.appendChild(pr); }
+    pr.innerHTML=bsExportPrintHTML(M);
+    if(_bsExpVolver) _bsExpVolver();
+    const h=document.documentElement, antes=h.getAttribute('data-tema'), t0=document.title;
+    // El título se queda puesto HASTA `afterprint`: es el nombre que el diálogo
+    // propone para el PDF, y en el iPad `print()` no bloquea.
+    const volver=function(){
+      window.removeEventListener('afterprint', volver); _bsExpVolver=null;
+      if(antes) h.setAttribute('data-tema', antes); else h.removeAttribute('data-tema');
+      document.title=t0;
+    };
+    _bsExpVolver=volver;
+    h.setAttribute('data-tema','claro');
+    window.addEventListener('afterprint', volver);
+    document.title=_bsExpNombre(M,'pdf').replace(/\.pdf$/,'');
+    window.print();
+  }catch(e){ _bsExpEstado('No pude exportar: '+esc((e&&e.message)||String(e)), true); }
+  finally{ _bsExpOcupado=false; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
