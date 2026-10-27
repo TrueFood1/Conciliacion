@@ -18940,8 +18940,8 @@ function bsExportModelo(P, f, meta){
       +' · una fila por lote'],
     ['Definición de «Cliente»', 'Además del nombre del cliente, el filtro busca el motivo de la salida '
       +'(Regalía, Reposición, Consumo interno…) y el destinatario. Una salida sin cliente aparece con su motivo.'],
-    ['Definición de «Fecha»', 'No es la fecha del pedido: es coalesce(salida_en, fecha_despacho) — la salida '
-      +'real del congelador cuando la hubo, y la fecha del pedido para lo que se preparó y todavía no salió.'],
+    ['Definición de «Fecha»', 'Es el día en que salió del congelador. Si el pedido está preparado y todavía no '
+      +'salió, es el día del pedido.'],
     ['Cantidad', 'En unidad de venta: paquetes para Pan Francés, Buns y Pizza; unidades para Pan Blanco, '
       +'Pan Semillas y Galletas.']
   ];
@@ -18955,6 +18955,8 @@ function bsExportModelo(P, f, meta){
 }
 
 // El valor de una celda como lo lee una persona (papel) y como lo guarda la hoja.
+// Helvetica de jsPDF solo trae Latin-1: lo que no entra (flechas, emojis) se cambia o se quita.
+function _bsExpPdfTxt(t){ return String(t).replace(/→/g,'->').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/[–—]/g,'-').replace(/…/g,'...').replace(/[^\x00-\xFF]/g,''); }
 function _bsExpTxt(r, k){
   if(k==='fecha') return _bsExpDMY(r.fecha);
   if(k==='cantidad') return _entPresN(r.cantidad);
@@ -19480,7 +19482,7 @@ function bsExportPDFDoc(M){
   doc.autoTable({
     startY:MG+32, margin:{left:MG, right:MG, bottom:30},
     head:[M.cols.map(function(c){ return c.t; })],
-    body:M.filas.length ? M.filas.map(function(r){ return M.cols.map(function(c){ return _bsExpTxt(r, c.k); }); })
+    body:M.filas.length ? M.filas.map(function(r){ return M.cols.map(function(c){ return _bsExpPdfTxt(_bsExpTxt(r, c.k)); }); })
                         : [[{content:'Ninguna entrega con esos filtros.', colSpan:M.cols.length}]],
     theme:'striped',
     styles:{font:'helvetica', fontSize:7.5, cellPadding:3, overflow:'linebreak', valign:'top', textColor:[30,30,30]},
@@ -19503,12 +19505,12 @@ function bsExportPDFDoc(M){
   });
   // Las dos definiciones, como nota al pie de la ÚLTIMA página (no se adivinan
   // mirando las columnas, pero tampoco van arriba tapando la tabla).
-  const defs=M.cab.filter(function(c){ return /^Definición/.test(c[0]); })
+  const defs=M.cab.filter(function(c){ return /^Definición|^Coincide/.test(c[0]); })
     .map(function(c){ return c[0].replace(/^Definición de /,'')+': '+c[1]; });
   if(defs.length){
     doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(110,110,110);
     const H=doc.internal.pageSize.getHeight();
-    const lin=doc.splitTextToSize(defs.join('   '), W-2*MG);
+    const lin=doc.splitTextToSize(_bsExpPdfTxt(defs.join('   ')), W-2*MG);
     let y=doc.lastAutoTable.finalY+14;
     if(y+lin.length*9>H-30){
       doc.addPage(); y=MG+8;
