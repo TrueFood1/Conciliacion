@@ -4772,28 +4772,6 @@ body:has(.de-fondo) #tkBtn{display:none}
   .bx-t tr.bx-si td.bx-lote{color:var(--ent-line);font-weight:600}
   .bx-t tr.bx-si td:first-child{box-shadow:inset 2px 0 0 var(--ent-line)}
 }
-/* La hoja de impresión vive fuera de pantalla; solo existe para `window.print()`. */
-#bsPrint{display:none}
-@media print{
-  @page{size:landscape;margin:10mm}
-  body>*:not(#bsPrint){display:none!important}
-  html,body{background:var(--bg)!important}
-  #bsPrint{display:block;color:var(--text);font-family:var(--font);font-size:9pt}
-  .bsp-t{font-size:13pt;font-weight:600;margin-bottom:6pt}
-  .bsp-cab{border-collapse:collapse;margin-bottom:10pt;width:100%}
-  .bsp-cab th{text-align:left;font-weight:600;padding:1pt 10pt 1pt 0;vertical-align:top;white-space:nowrap;width:1%}
-  .bsp-cab td{padding:1pt 0;color:var(--text-2)}
-  .bsp-tab{border-collapse:collapse;width:100%;table-layout:auto}
-  .bsp-tab th{text-align:left;font-size:8pt;font-weight:600;color:var(--text-3);
-    border-bottom:1px solid var(--border-strong);padding:3pt 5pt}
-  .bsp-tab td{padding:3pt 5pt;border-bottom:.5pt solid var(--border);vertical-align:top;
-    overflow-wrap:anywhere}
-  .bsp-tab .r{text-align:right;white-space:nowrap}
-  .bsp-tab thead{display:table-header-group}
-  .bsp-tab tr{break-inside:avoid;page-break-inside:avoid}
-  .bsp-si td{font-weight:600}
-}
-
 .bs-fila{width:100%;text-align:left;background:var(--panel);border:1px solid var(--border);
   border-radius:10px;color:var(--text);font:inherit;font-family:var(--font);
   padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:3px}
@@ -6077,7 +6055,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 27 oct 2026 · b142';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 27 oct 2026 · b143';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -18972,7 +18950,8 @@ function bsExportModelo(P, f, meta){
   if(meta.odoo_ok===false) cab.push(['Factura', 'Sin verificar contra Odoo al exportar: puede no mostrar '
       +'una re-emisión por nota de crédito.']);
   // `odoo_ok` viaja en el molde: la vista previa muestra el MISMO aviso que la cabecera.
-  return {cab:cab, cols:cols, filas:filas, n_ped:nPed, n_fil:filas.length, odoo_ok:meta.odoo_ok!==false};
+  return {cab:cab, cols:cols, filas:filas, n_ped:nPed, n_fil:filas.length, odoo_ok:meta.odoo_ok!==false,
+          en:meta.en||null, por:meta.por||''};
 }
 
 // El valor de una celda como lo lee una persona (papel) y como lo guarda la hoja.
@@ -18988,31 +18967,34 @@ function _bsExpCelda(r, k){
   if(k==='cantidad' || k==='pedido') return +r[k];
   return _bsExpTxt(r, k);
 }
-// La hoja como filas de celdas: título, cabecera, una vacía, encabezados, datos.
+// LA HOJA «Historial»: fila 1 = encabezados, después los datos. Nada arriba
+// (Andrea, 27-oct: abierto en el iPhone, el bloque de texto tapaba la tabla). La
+// cabecera —filtros, quién, cuándo, definiciones— va a la hoja «Información».
 // Lo usa `bsExportarXLSX` y es lo que se puede verificar sin la librería.
 function bsExportAOA(M){
-  const a=[['Historial de Entregas · True Food']];
-  M.cab.forEach(function(c){ a.push([c[0], c[1]]); });
-  a.push([]);
-  a.push(M.cols.map(function(c){ return c.t; }));
+  const a=[M.cols.map(function(c){ return c.t; })];
   M.filas.forEach(function(r){ a.push(M.cols.map(function(c){ return _bsExpCelda(r, c.k); })); });
   return a;
 }
-// El papel: el MISMO molde, como HTML. La hoja de impresión es CSS sobre esto.
-function bsExportPrintHTML(M){
-  return '<div class="bsp"><div class="bsp-t">Historial de Entregas · True Food</div>'
-    +'<table class="bsp-cab"><tbody>'+M.cab.map(function(c){
-      return '<tr><th>'+esc(c[0])+'</th><td>'+esc(c[1])+'</td></tr>'; }).join('')+'</tbody></table>'
-    +'<table class="bsp-tab"><thead><tr>'+M.cols.map(function(c){
-      return '<th'+((c.k==='cantidad'||c.k==='pedido')?' class="r"':'')+'>'+esc(c.t)+'</th>'; }).join('')
-    +'</tr></thead><tbody>'
-    +(M.filas.length ? M.filas.map(function(r){
-      return '<tr'+(r.coincide?' class="bsp-si"':'')+'>'+M.cols.map(function(c){
-        return '<td'+((c.k==='cantidad'||c.k==='pedido')?' class="r"':'')+'>'+esc(_bsExpTxt(r, c.k))+'</td>'; }).join('')+'</tr>';
-    }).join('') : '<tr><td colspan="'+M.cols.length+'">Ninguna entrega con esos filtros.</td></tr>')
-    +'</tbody></table></div>';
+function bsExportInfoAOA(M){
+  const a=[['Historial de Entregas · True Food', '']];
+  M.cab.forEach(function(c){ a.push([c[0], c[1]]); });
+  return a;
 }
-
+// LA LÍNEA DEL PDF (Andrea, 27-oct): una sola, bajo el título, en vez del bloque.
+// «1–27 oct 2026 · lote 236 · 50 pedidos · exportado 27-oct 17:02 por Andrea»
+function bsExportLinea(M){
+  const f=M.f||{}, z=function(n){ return (n<10?'0':'')+n; };
+  const p=[_bxRangoTxt(f.desde, f.hasta, true)];
+  if((f.cliente||'').trim()) p.push('cliente '+f.cliente.trim());
+  if((f.lote||'').trim()) p.push('lote '+f.lote.trim());
+  if(f.producto) p.push(_bsProd(+f.producto));
+  p.push(M.n_ped+(M.n_ped===1?' pedido':' pedidos'));
+  if(M.en) p.push('exportado '+M.en.getDate()+'-'+_ENT_MES_AB[M.en.getMonth()]+' '
+                  +z(M.en.getHours())+':'+z(M.en.getMinutes())+(M.por?(' por '+M.por):''));
+  if(!M.odoo_ok) p.push('facturas sin verificar contra Odoo');
+  return p.join(' · ');
+}
 // ── LA LECTURA, sin techo ───────────────────────────────────────────────
 async function _bsExpTodas(armar){
   let out=[], i=0;
@@ -19117,11 +19099,12 @@ function _bxRango(k){
   return [_despYmd(new Date(hoy.getFullYear(), hoy.getMonth(), 1, 12)), _despYmd(hoy)];
 }
 // "1–27 oct" · "28 sep – 27 oct" · con año solo si no es el actual.
-function _bxRangoTxt(a, b){
+// `conAnio`: el año siempre al final (el PDF sale de la pantalla y se archiva).
+function _bxRangoTxt(a, b, conAnio){
   const p=function(y){ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(y||''); return m?{a:+m[1],m:+m[2],d:+m[3]}:null; };
   const A=p(a), B=p(b); if(!A||!B) return '';
   const anio=new Date().getFullYear(), mes=function(x){ return _ENT_MES_AB[x.m-1]; };
-  const yA=(A.a!==B.a||A.a!==anio)?(' '+A.a):'', yB=(B.a!==anio||A.a!==B.a)?(' '+B.a):'';
+  const yA=(A.a!==B.a||(!conAnio&&A.a!==anio))?(' '+A.a):'', yB=(conAnio||B.a!==anio||A.a!==B.a)?(' '+B.a):'';
   if(A.a===B.a && A.m===B.m) return (A.d===B.d?'':(A.d+'–'))+B.d+' '+mes(B)+yB;
   return A.d+' '+mes(A)+yA+' – '+B.d+' '+mes(B)+yB;
 }
@@ -19148,13 +19131,13 @@ function bsExportar(){
          const em=((data&&data.user&&data.user.email)||'').trim();
          _bxPor=_quienNombre(em)||em; }catch(e){}
   })();
+  _bsExpLibs();                       // jsPDF se pide AHORA, no al tocar «PDF» (gesto de iOS)
   bsRender();
   try{ window.scrollTo(0,0); }catch(e){}
 }
 // TODA salida de la vista pasa por acá: la flecha, cambiar de vista (`_modShow`) y
-// volver al lobby (`volverLobby`). Devuelve el tema si quedó el de imprimir.
+// volver al lobby (`volverLobby`).
 function bsExportarCerrar(){
-  _bsExpTemaVolver();
   if(_bsModo!=='exportar') return;
   _bsModo='lista';
   if(document.getElementById('bx')) bsRender();
@@ -19285,7 +19268,8 @@ function _bxSugerencias(){
 
 // ── LA VISTA PREVIA: el molde, dibujado ─────────────────────────────────
 function _bxBotones(on){
-  ['bxXlsx','bxPdf'].forEach(function(id){ const b=document.getElementById(id); if(b) b.disabled=!on; });
+  const x=document.getElementById('bxXlsx'); if(x) x.disabled=!on;
+  _bxPdfBoton();
 }
 function _bxPintarPrev(){
   const el=document.getElementById('bxPrev'); if(!el) return;
@@ -19388,7 +19372,7 @@ function _bxNFiltrosM(M){ const f=M.f||{}; return !!((f.cliente||'').trim()||(f.
 function _bsExpArmarLibro(M){
   const aoa=bsExportAOA(M);
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  const r0=aoa.length-M.filas.length;                 // primera fila de datos
+  const r0=1;                                          // primera fila de datos
   const cF=M.cols.findIndex(function(c){ return c.k==='fecha'; });
   for(let i=r0;i<aoa.length;i++){
     const a=XLSX.utils.encode_cell({r:i, c:cF}); if(ws[a]) ws[a].z='dd/mm/yyyy';
@@ -19396,8 +19380,13 @@ function _bsExpArmarLibro(M){
   ws['!cols']=M.cols.map(function(c){
     return {wch:({fecha:11,cliente:28,factura:20,pedido:8,producto:14,cantidad:9,unidad:10,
                   lote:15,excepcion:40,coincide:9})[c.k]||12}; });
+  // Fila 1 fija y con filtro automático.
+  ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:Math.max(0,aoa.length-1), c:M.cols.length-1}})};
+  const info=XLSX.utils.aoa_to_sheet(bsExportInfoAOA(M));
+  info['!cols']=[{wch:26},{wch:110}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Historial');
+  XLSX.utils.book_append_sheet(wb, info, 'Información');
   return wb;
 }
 function _bxSlug(s){ return _bsNorm(s).replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30); }
@@ -19410,46 +19399,162 @@ function _bsExpNombre(M, ext){
     +(f.producto?('_'+_bxSlug(_bsProd(+f.producto))):'')
     +'.'+ext;
 }
-// SIN await: el archivo sale dentro del toque.
+// ── LA ENTREGA DEL ARCHIVO · b143 (27-oct-2026) ─────────────────────────
+// MEDIDO en el iPhone de Andrea (27-oct 17:02, b142, desde el ícono): `window.print()`
+// no hace NADA en modo standalone — la página pasaba a claro y ahí quedaba. Es la
+// evidencia que HISTORIAL_EXPORTACION.md pedía para cambiar a librería. Desde b143:
+//   · el PDF lo arma jsPDF + jspdf-autotable (cdnjs, versiones fijas), sin tocar el tema;
+//   · Excel y PDF salen como ARCHIVO y se entregan igual: hoja de compartir en un
+//     aparato táctil que la soporte (Guardar en Archivos, WhatsApp, Mail), y si no,
+//     descarga con <a download>; último recurso, abrir el blob.
+// Todo es síncrono desde el toque hasta `navigator.share` (iOS exige el gesto): las
+// librerías se cargan al ABRIR la vista Exportar, no al tocar el botón.
+const BS_PDF_LIBS=['https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+                   'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'];
+let _bsPdfLib='';            // '' sin pedir · 'cargando' · 'ok' · 'error'
+function _bsPdfListo(){ return !!(window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API
+                                  && window.jspdf.jsPDF.API.autoTable); }
+function _bsExpLibs(){
+  if(_bsPdfListo()){ _bsPdfLib='ok'; return; }
+  if(_bsPdfLib==='cargando' || _bsPdfLib==='ok') return;
+  _bsPdfLib='cargando';
+  let i=0;
+  const sig=function(){
+    if(i>=BS_PDF_LIBS.length){ _bsPdfLib=_bsPdfListo()?'ok':'error'; _bxPdfBoton(); return; }
+    const s=document.createElement('script'); s.src=BS_PDF_LIBS[i++]; s.async=false;
+    s.onload=sig; s.onerror=function(){ _bsPdfLib='error'; _bxPdfBoton(); };
+    document.head.appendChild(s);
+  };
+  sig();
+}
+// El botón de PDF se prende cuando hay vista previa Y librería. Si la librería no
+// cargó, se prende igual: tocarlo dice qué pasó en vez de quedarse mudo.
+function _bxPdfBoton(){
+  const b=document.getElementById('bxPdf');
+  if(b) b.disabled=!(_bxVista && (_bsPdfLib==='ok' || _bsPdfLib==='error'));
+}
+function _bsExpEntregar(blob, nombre){
+  let file=null;
+  try{ file=new File([blob], nombre, {type:blob.type}); }catch(e){ file=null; }
+  // La hoja de compartir solo en táctil: en la compu se espera una descarga, y
+  // Chrome/Safari de escritorio también dicen "puedo compartir".
+  let tactil=false;
+  try{ tactil=window.matchMedia('(pointer:coarse)').matches; }catch(e){}
+  if(file && tactil && navigator.canShare && navigator.canShare({files:[file]})){
+    navigator.share({files:[file], title:nombre}).catch(function(e){
+      if(!e || e.name!=='AbortError') _bsExpDescargar(blob, nombre); });
+    return;
+  }
+  _bsExpDescargar(blob, nombre);
+}
+function _bsExpDescargar(blob, nombre){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  if(typeof a.download!=='undefined'){
+    a.href=url; a.download=nombre; a.rel='noopener'; a.style.display='none';
+    document.body.appendChild(a); a.click(); a.remove();
+  } else {
+    window.open(url, '_blank');
+  }
+  setTimeout(function(){ try{ URL.revokeObjectURL(url); }catch(e){} }, 60000);
+}
+
+// EL PAPEL: el MISMO molde (`M`), como PDF apaisado. Cabecera con filtros, hora,
+// quién y las definiciones; la tabla con las columnas del archivo; las filas que
+// calzan con el filtro en negrita y sombreadas, las otras en gris; página N de M.
+function bsExportPDFDoc(M){
+  const J=window.jspdf.jsPDF;
+  const doc=new J({orientation:'landscape', unit:'pt', format:'a4'});
+  const W=doc.internal.pageSize.getWidth(), MG=28;
+  const marca=M.cols.some(function(c){ return c.k==='coincide'; });
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('Historial de Entregas · True Food', MG, MG+8);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(90,90,90);
+  doc.text(bsExportLinea(M), MG, MG+22);
+  doc.setTextColor(0,0,0);
+  const ancho={fecha:52,cliente:120,factura:72,pedido:40,producto:62,cantidad:44,unidad:46,lote:58,excepcion:'auto',coincide:44};
+  const cs={};
+  M.cols.forEach(function(c,i){ cs[i]={cellWidth:ancho[c.k]||'auto'};
+    if(c.k==='cantidad'||c.k==='pedido') cs[i].halign='right'; });
+  const total='{total}';
+  doc.autoTable({
+    startY:MG+32, margin:{left:MG, right:MG, bottom:30},
+    head:[M.cols.map(function(c){ return c.t; })],
+    body:M.filas.length ? M.filas.map(function(r){ return M.cols.map(function(c){ return _bsExpTxt(r, c.k); }); })
+                        : [[{content:'Ninguna entrega con esos filtros.', colSpan:M.cols.length}]],
+    theme:'striped',
+    styles:{font:'helvetica', fontSize:7.5, cellPadding:3, overflow:'linebreak', valign:'top', textColor:[30,30,30]},
+    headStyles:{fillColor:[255,255,255], textColor:[110,108,104], fontStyle:'bold', lineWidth:{bottom:.6}, lineColor:[200,200,200]},
+    alternateRowStyles:{fillColor:[248,248,246]},
+    columnStyles:cs,
+    showHead:'everyPage',
+    didParseCell:function(d){
+      if(d.section!=='body' || !marca || !M.filas.length) return;
+      const r=M.filas[d.row.index]; if(!r) return;
+      if(r.coincide){ d.cell.styles.fontStyle='bold'; d.cell.styles.fillColor=[236,240,214]; }
+      else d.cell.styles.textColor=[150,150,150];
+    },
+    didDrawPage:function(d){
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(120,120,120);
+      const h=doc.internal.pageSize.getHeight();
+      doc.text(_bsExpNombre(M,'pdf'), MG, h-14);
+      doc.text('Página '+d.pageNumber+' de '+total, W-MG, h-14, {align:'right'});
+    }
+  });
+  // Las dos definiciones, como nota al pie de la ÚLTIMA página (no se adivinan
+  // mirando las columnas, pero tampoco van arriba tapando la tabla).
+  const defs=M.cab.filter(function(c){ return /^Definición/.test(c[0]); })
+    .map(function(c){ return c[0].replace(/^Definición de /,'')+': '+c[1]; });
+  if(defs.length){
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(110,110,110);
+    const H=doc.internal.pageSize.getHeight();
+    const lin=doc.splitTextToSize(defs.join('   '), W-2*MG);
+    let y=doc.lastAutoTable.finalY+14;
+    if(y+lin.length*9>H-30){
+      doc.addPage(); y=MG+8;
+      doc.setFontSize(7.5); doc.text(_bsExpNombre(M,'pdf'), MG, H-14);
+      doc.text('Página '+doc.internal.getNumberOfPages()+' de '+total, W-MG, H-14, {align:'right'});
+      doc.setFontSize(7);
+    }
+    doc.text(lin, MG, y);
+  }
+  if(typeof doc.putTotalPages==='function') doc.putTotalPages(total);
+  return doc;
+}
+
+// FILA 1 FIJA. SheetJS 0.18.5 (la edición libre) no escribe el panel congelado: se
+// le agrega al XML de la hoja «Historial» ya armada. Si algo falla, el archivo sale
+// igual, sin la fila fija — es comodidad, no dato.
+function _bsExpCongelar(buf){
+  try{
+    const cfb=XLSX.CFB.read(new Uint8Array(buf), {type:'array'});
+    const i=cfb.FullPaths.findIndex(function(p){ return /\/xl\/worksheets\/sheet1\.xml$/.test(p); });
+    const e=i>=0 ? cfb.FileIndex[i] : null; if(!e || !e.content) return buf;
+    const x=new TextDecoder().decode(e.content);
+    const y=x.replace('<sheetView workbookViewId="0"/>',
+      '<sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'
+      +'<selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView>');
+    if(y===x) return buf;
+    e.content=new TextEncoder().encode(y); e.size=e.content.length;
+    return XLSX.CFB.write(cfb, {fileType:'zip', type:'array'});
+  }catch(err){ return buf; }
+}
+// SIN await desde el toque hasta la entrega.
 function bsExportarXLSX(){
   const M=_bxModeloVisto(); if(!M) return;
   try{
     if(typeof XLSX==='undefined') throw new Error('no cargó la librería de Excel');
-    XLSX.writeFile(_bsExpArmarLibro(M), _bsExpNombre(M,'xlsx'));
+    const buf=_bsExpCongelar(XLSX.write(_bsExpArmarLibro(M), {bookType:'xlsx', type:'array'}));
+    _bsExpEntregar(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
+                   _bsExpNombre(M,'xlsx'));
   }catch(e){ alert('No pude exportar: '+((e&&e.message)||String(e))); }
 }
-// `window.print()` imprime la PÁGINA: la hoja de impresión (`@media print`) esconde
-// todo lo que no sea #bsPrint. Se imprime en CLARO vía `temaAplicar`, sin tocar la
-// preferencia de la cuenta; el tema vuelve en `afterprint`, al salir del modo
-// impresión (`matchMedia`) y en toda salida de la vista (`bsExportarCerrar`).
-let _bsExpVolver=null;
-function _bsExpTemaVolver(){ if(_bsExpVolver) _bsExpVolver(); }
 function bsExportarPDF(){
   const M=_bxModeloVisto(); if(!M) return;
-  let pr=document.getElementById('bsPrint');
-  if(!pr){ pr=document.createElement('div'); pr.id='bsPrint'; document.body.appendChild(pr); }
-  pr.innerHTML=bsExportPrintHTML(M);
-  _bsExpTemaVolver();
-  const h=document.documentElement;
-  const antes=(h.getAttribute('data-tema')==='claro')?'claro':'oscuro', t0=document.title;
-  let mq=null;
-  const enMq=function(e){ if(e && !e.matches) volver(); };
-  const volver=function(){
-    _bsExpVolver=null;
-    window.removeEventListener('afterprint', volver);
-    try{ if(mq){ if(mq.removeEventListener) mq.removeEventListener('change', enMq);
-                 else if(mq.removeListener) mq.removeListener(enMq); } }catch(e){}
-    temaAplicar(antes);
-    document.title=t0;
-  };
-  _bsExpVolver=volver;
-  temaAplicar('claro');
-  window.addEventListener('afterprint', volver);
-  try{ mq=window.matchMedia && window.matchMedia('print');
-       if(mq){ if(mq.addEventListener) mq.addEventListener('change', enMq);
-               else if(mq.addListener) mq.addListener(enMq); } }catch(e){ mq=null; }
-  document.title=_bsExpNombre(M,'pdf').replace(/\.pdf$/,'');   // el nombre que propone el diálogo
-  window.print();
+  try{
+    if(!_bsPdfListo()){ _bsExpLibs(); throw new Error('no cargó la librería de PDF'); }
+    _bsExpEntregar(bsExportPDFDoc(M).output('blob'), _bsExpNombre(M,'pdf'));
+  }catch(e){ alert('No pude exportar: '+((e&&e.message)||String(e))); }
 }
 
 /* ══════════════════════════════════════════════════════════════════════

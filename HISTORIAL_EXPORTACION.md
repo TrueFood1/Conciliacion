@@ -93,7 +93,7 @@ primera y rompería la segunda.
 
 ## Lo que el archivo tiene que decir de sí mismo
 
-En una cabecera del Excel y en la primera página del PDF. **Esto no contradice la
+Desde b143: en la hoja «Información» del Excel y en la línea + nota al pie del PDF (ver «El PDF», abajo). **Esto no contradice la
 regla de "sin explicaciones en pantalla"**: esa regla es para pantallas, y esto es
 un papel que alguien va a leer sin tener el sistema delante — posiblemente un
 auditor, posiblemente dentro de un año.
@@ -148,7 +148,35 @@ pueden desincronizarse si ninguna de las dos arma sus propias filas.
 
 ---
 
-## El PDF: hoja de impresión, decidido
+## El PDF: CAMBIÓ el 27-oct-2026 (b143), con evidencia medida
+
+**Medido en el iPhone de Andrea, 27-oct 17:02, b142, desde el ícono (standalone):**
+tocar «PDF» pasaba la página a claro y no pasaba nada más — `window.print()` no
+hace nada en ese modo. Es exactamente la condición que esta especificación puso
+para cambiar a librería (ver «Cuándo se revisa», abajo).
+
+Desde b143:
+- **PDF con jsPDF 2.5.1 + jspdf-autotable 3.8.2** (cdnjs, versiones fijas), cargadas
+  al abrir la vista Exportar. Apaisado, del mismo molde (`bsExportModelo`), filas
+  que calzan resaltadas, «Página N de M». Sin cambio de tema.
+- **Entrega del archivo, igual para Excel y PDF**: hoja de compartir en aparato
+  táctil que la soporte (Guardar en Archivos, WhatsApp, Mail); si no, descarga con
+  `<a download>`; último recurso, abrir el archivo. Síncrono desde el toque.
+- **Lo que el archivo dice de sí mismo, reubicado (Andrea, 27-oct)**: abierto en el
+  iPhone, el bloque de texto arriba tapaba la tabla.
+  - Excel: la hoja «Historial» empieza en la fila 1 con los encabezados (fila 1
+    fija, filtro automático). Filtros, quién, cuándo, contenido y definiciones van
+    a una segunda hoja, «Información».
+  - PDF: UNA línea bajo el título — «1–27 oct 2026 · lote 236 · 50 pedidos ·
+    exportado 27-oct 17:02 por Andrea» — y las dos definiciones como nota al pie
+    de la última página.
+
+La hoja de impresión, su CSS y el cambio de tema se quitaron.
+
+---
+
+## (Histórico) El PDF: hoja de impresión, decidido el 10-sep
+
 
 **DECIDIDO el 10-sep-2026: opción A — hoja de impresión + `window.print()`.**
 
