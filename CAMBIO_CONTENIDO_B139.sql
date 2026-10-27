@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- CAMBIO_CONTENIDO_B139.sql  ·  27-oct-2026  ·  Contenido b139: categorías del banco, documentos y miniaturas
--- ⏳ NO APLICADO. Antes: ENSAYO_CONTENIDO_B139.sql (ensayo en seco, no deja nada). Después: la fila de
+-- ✅ APLICADO en producción por Andrea (27-oct), control 3·1·0·t·1·0·3·1·1; ensayo 37/37. Antes: ENSAYO_CONTENIDO_B139.sql (ensayo en seco, no deja nada). Después: la fila de
 --    control de abajo tiene que salir EXACTA. Este header se toca DESPUÉS de verificar, nunca antes.
 -- Va DESPUÉS de CONTENIDO.sql (aplicado el 27-oct). Para saber si está aplicado, mirar la base:
 --   `select id, public from storage.buckets where id = 'contenido-miniaturas'`.
