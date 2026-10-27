@@ -1,6 +1,13 @@
 # Exportación del Historial de Entregas — especificación
 
 **Estado: CONSTRUIDO en b140 (27-oct-2026), sin probar todavía en el iPad.**
+
+**b141 (27-oct-2026): el diálogo pasa a ser una VISTA con vista previa en vivo**
+(pedido de Andrea: ver antes de exportar). Fechas por atajos (Este mes por
+defecto), cliente/lote/producto opcionales y filtrando en memoria; la vista previa
+—resumen, totales por producto en unidad de venta, tabla en escritorio y tarjetas
+por pedido en teléfono— sale de `bsExportModelo`, el mismo molde de los archivos.
+Excel y PDF se arman en el toque, sin `await`.
 La columna "motivo de excepción" sale de los campos del Bloque 4 + 3.2/3.3, que
 ya existen: `ent_alisto_linea.no_se_entrega` / `motivo_no_entrega` /
 `nota_no_entrega` / `cant_no_entregada` y, en `ent_alisto_lote_efectivo`, el lote

@@ -2386,30 +2386,6 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
   </div>
 </div>
 
-<!-- Exportar el Historial de Entregas (b140): los filtros del archivo. Ver HISTORIAL_EXPORTACION.md. -->
-<div id="bsExpSheet" class="hidden">
-  <div class="bs-exp-in">
-    <div class="bs-exp-h"><span>Exportar historial</span>
-      <button class="btn btn-sm" onclick="bsExportarCerrar()">Cerrar</button></div>
-    <div class="bs-exp-2">
-      <label class="bs-exp-l">Desde<input id="bsExpDesde" class="bs-in" type="date" onchange="bsExpInvalidar()"></label>
-      <label class="bs-exp-l">Hasta<input id="bsExpHasta" class="bs-in" type="date" onchange="bsExpInvalidar()"></label>
-    </div>
-    <label class="bs-exp-l">Cliente<input id="bsExpCli" class="bs-in" type="search" list="bsExpCliLista" autocomplete="off" oninput="bsExpInvalidar()"></label>
-    <datalist id="bsExpCliLista"></datalist>
-    <label class="bs-exp-l">Lote<input id="bsExpLote" class="bs-in" type="search" placeholder="224 / 2-27" autocomplete="off" oninput="bsExpInvalidar()"></label>
-    <label class="bs-exp-l">Producto<select id="bsExpProd" class="bs-in" onchange="bsExpInvalidar()"></select></label>
-    <div id="bsExpEst" class="status hidden"></div>
-    <div class="bs-exp-acc">
-      <button class="btn btn-amarillo" onclick="bsExportarPreparar()">Preparar</button>
-    </div>
-    <div class="bs-exp-acc">
-      <button id="bsExpXlsx" class="btn" onclick="bsExportarXLSX()" disabled>Excel</button>
-      <button id="bsExpPdf" class="btn" onclick="bsExportarPDF()" disabled>Imprimir / Guardar PDF</button>
-    </div>
-  </div>
-</div>
-
 <!-- Hoja de clientes del Reporte: pantalla completa, buscador arriba, frecuentes primero. -->
 <div id="rpSheet" class="hidden">
   <div class="rp-sheet-in">
@@ -4624,24 +4600,110 @@ body:has(.de-fondo) #tkBtn{display:none}
 .bs-reg button{background:none;border:none;padding:0;margin-left:auto;cursor:pointer;
   font-family:var(--font);font-size:12px;color:var(--ent-line)}
 .bs-lista{display:flex;flex-direction:column;gap:6px;margin-top:14px;max-width:620px}
-/* ── Exportar el Historial (b140) ──
-   El botón va al final de la fila de chips, empujado a la derecha: es una acción
-   sobre todo el historial, no un quinto campo de búsqueda. */
+/* ── Exportar el Historial · vista con vista previa (b141) ──
+   Escritorio (≥900px): filtros a la izquierda, fijos al desplazar; la vista previa a
+   la derecha. Teléfono: filtros arriba (los de cliente/lote/producto plegables),
+   vista previa debajo y la barra de Excel/PDF pegada abajo. */
 .bs-exp-btn{margin-left:auto;background:none;border:1px solid var(--border-strong);border-radius:999px;
   color:var(--ent-line);font-family:var(--font);font-size:12px;padding:5px 13px;cursor:pointer}
-#bsExpSheet{position:fixed;inset:0;background:var(--scrim);z-index:140;display:flex;justify-content:center;
-  align-items:flex-start;overflow-y:auto;padding-top:env(safe-area-inset-top)}
-#bsExpSheet.hidden{display:none}
-.bs-exp-in{width:100%;max-width:460px;padding:18px 16px calc(24px + env(safe-area-inset-bottom));
-  display:flex;flex-direction:column;gap:12px;box-sizing:border-box}
-.bs-exp-h{display:flex;align-items:center;justify-content:space-between;gap:10px;
-  font-size:15px;font-weight:600;color:var(--text)}
-.bs-exp-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.bs-exp-l{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--text-3);min-width:0}
-.bs-exp-in .bs-in:disabled{opacity:.45}
-.bs-exp-acc{display:flex;gap:10px}
-.bs-exp-acc .btn{flex:1;height:44px}
-.bs-exp-acc .btn:disabled{opacity:.4;cursor:default}
+.bx{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+.bx-top{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.bx-back{background:none;border:none;color:var(--ent-line);font-family:var(--font);font-size:14px;
+  padding:10px 4px;min-height:44px;cursor:pointer}
+.bx-tit{font-size:17px;font-weight:600;color:var(--text);margin:0;flex:1}
+.bx-limpiar{background:none;border:none;color:var(--text-2);font-family:var(--font);font-size:13px;
+  padding:10px 4px;min-height:44px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.bx-grid{display:flex;flex-direction:column;gap:14px}
+.bx-fil{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;
+  display:flex;flex-direction:column;gap:12px}
+.bx-g{display:flex;flex-direction:column;gap:8px}
+.bx-lbl{font-size:12px;font-weight:600;color:var(--text-2)}
+.bx-l{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--text-2);min-width:0}
+.bx-in{width:100%;box-sizing:border-box;background:var(--field);border:1px solid var(--border-strong);
+  border-radius:10px;color:var(--text);font-family:var(--font);font-size:16px;font-weight:400;
+  height:44px;padding:0 12px;outline:none;-webkit-appearance:none;appearance:none}
+.bx-in:focus{border-color:var(--ent-line)}
+.bx-in::placeholder{color:var(--text-3)}
+.bx-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bx-chips{display:flex;flex-wrap:wrap;gap:6px}
+.bx-chip{background:var(--field);border:1px solid var(--border);border-radius:999px;color:var(--text-2);
+  font-family:var(--font);font-size:13px;padding:0 13px;min-height:36px;cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px}
+.bx-chip:hover{border-color:var(--border-strong);color:var(--text)}
+.bx-chip.on{background:var(--ent-fill);border-color:var(--ent-fill);color:var(--ent-fill-tx);font-weight:600}
+.bx-dot{width:8px;height:8px;border-radius:50%;flex:none}
+.bx-mas{display:flex;align-items:center;gap:8px;background:none;border:none;border-top:1px solid var(--border);
+  color:var(--text);font-family:var(--font);font-size:14px;font-weight:600;padding:12px 0 0;min-height:44px;
+  cursor:pointer;text-align:left}
+.bx-car{margin-left:auto;color:var(--text-3);font-size:12px}
+.bx-n{display:inline-block;min-width:20px;text-align:center;font-size:11.5px;font-weight:600;border-radius:999px;
+  padding:1px 7px;background:var(--ent-fill);color:var(--ent-fill-tx)}
+.bx-masc{display:none;flex-direction:column;gap:12px}
+.bx-masc.abierto{display:flex}
+.bx-bar{position:fixed;left:0;right:0;bottom:0;z-index:120;display:flex;gap:10px;
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+  background:var(--surface);border-top:1px solid var(--border)}
+.bx-bar .btn{flex:1;height:48px;font-size:15px}
+.bx-bar .btn:disabled{opacity:.4;cursor:default}
+.bx-prev{min-width:0}
+.bx-res{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;font-size:14px;color:var(--text-2);
+  padding:2px 0 12px}
+.bx-res b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+.bx-res-exc{color:var(--warn)}
+.bx-tot{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+.bx-tot-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px 18px;margin-top:8px}
+.bx-tot-i{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--text-2);
+  padding:4px 0;border-bottom:1px solid var(--border)}
+.bx-tot-i b{color:var(--text);font-weight:600;white-space:nowrap}
+.bx-tw{display:none}
+.bx-cards{display:flex;flex-direction:column;gap:8px}
+.bx-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+.bx-card-h{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.bx-card-c{font-size:14.5px;font-weight:600;color:var(--text);min-width:0}
+.bx-card-f{font-size:12.5px;color:var(--text-2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.bx-card-s{font-size:12px;color:var(--text-3);margin:2px 0 6px}
+.bx-card-l{display:grid;grid-template-columns:1fr auto;gap:1px 10px;padding:7px 0;border-top:1px solid var(--border);font-size:13px}
+.bx-card-p{color:var(--text)}
+.bx-card-q{color:var(--text);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.bx-card-lote{grid-column:1/-1;font-family:var(--mono);font-size:12px;color:var(--text-2)}
+.bx-card-x{grid-column:1/-1;font-size:12px;color:var(--warn)}
+.bx-card-l.bx-no{opacity:.45}
+.bx-card-l.bx-si .bx-card-lote{color:var(--ent-line);font-weight:600}
+.bx-mas-filas{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;
+  font-size:13px;color:var(--text-2)}
+.bx-vacio{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:40px 16px;
+  text-align:center;font-size:14px;color:var(--text-2)}
+.bx-error{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 16px;
+  display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;font-size:13.5px;color:var(--stop-tx)}
+.bx-sk-filas{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:16px}
+.bx-sk{display:block;height:14px;border-radius:6px;background:var(--wash-3);animation:bxPulso 1.2s ease-in-out infinite}
+.bx-sk-res .bx-sk{height:16px}
+@keyframes bxPulso{50%{opacity:.45}}
+@media (min-width:900px){
+  .bx{padding-bottom:24px}
+  .bx-grid{display:grid;grid-template-columns:290px minmax(0,1fr);gap:20px;align-items:start}
+  .bx-fil{position:sticky;top:12px}
+  .bx-mas{display:none}
+  .bx-masc{display:flex}
+  .bx-bar{position:static;padding:4px 0 0;background:none;border-top:none}
+  .bx-bar .btn{height:44px;font-size:14px}
+  .bx-tw{display:block;max-height:calc(100vh - 230px);overflow:auto;background:var(--surface);
+    border:1px solid var(--border);border-radius:12px}
+  .bx-cards{display:none}
+  .bx-t{width:100%;border-collapse:collapse;font-size:13px}
+  .bx-t th{position:sticky;top:0;z-index:1;background:var(--surface);text-align:left;font-size:11px;font-weight:500;
+    color:var(--text-3);padding:11px 10px 9px;border-bottom:1px solid var(--border);white-space:nowrap}
+  .bx-t td{padding:9px 10px;color:var(--text-2);vertical-align:top}
+  .bx-t td.r,.bx-t th.r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .bx-t td.r{color:var(--text)}
+  .bx-t td.nw{white-space:nowrap}
+  .bx-t td.bx-lote{font-family:var(--mono);font-size:12px;white-space:nowrap}
+  .bx-t td.bx-exc{color:var(--warn);font-size:12px}
+  .bx-t tr.bx-no td{opacity:.45}
+  .bx-t tr.bx-si td.bx-lote{color:var(--ent-line);font-weight:600}
+  .bx-t tr.bx-si td:first-child{box-shadow:inset 2px 0 0 var(--ent-line)}
+}
 /* La hoja de impresión vive fuera de pantalla; solo existe para `window.print()`. */
 #bsPrint{display:none}
 @media print{
@@ -5947,7 +6009,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 27 oct 2026 · b140';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 27 oct 2026 · b141';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -6781,7 +6843,7 @@ function _modShow(id){
   const _v=document.getElementById(id);
   _modFallo((_v && !_v.classList.contains('hidden')) ? '' : id);
   finMasCerrar();   // el "+" es de Finanzas: no sobrevive a un cambio de vista
-  bsExportarCerrar();   // el diálogo de exportar tampoco, y devuelve el tema si se imprimió
+  bsExportarCerrar();   // la vista «Exportar» tampoco, y devuelve el tema si se imprimió
   aplicarModoProduccion();
 }
 // id vacío = todo bien, se esconde. id con valor = esa vista no se pudo mostrar.
@@ -18485,6 +18547,7 @@ function _bsNorm(s){ return String(s==null?'':s).toLowerCase()
 function _bsProd(pid){ return (NIV_INFO[pid]||{}).nom || ENT_SIN_LOTE[pid] || ('#'+pid); }
 
 function bsRender(){
+  if(_bsModo==='exportar'){ _bxRender(); return; }   // b141: la vista «Exportar» vive en el mismo cuerpo
   const body=document.getElementById('bsBody'); if(!body) return;
   const esFecha=(_bsCampo==='fecha');
   const ph={cliente:'Nombre del cliente', lote:'Lote — 224 / 2-27',
@@ -18794,7 +18857,7 @@ function bsExportModelo(P, f, meta){
         const pid=+l.producto_id, prodOK=!fProd || pid===fProd;
         const fila=function(uds, lote, exc, lotOK){
           const n=_bsExpCant(pid, uds);
-          fs.push(Object.assign({}, base, {producto:_bsProd(pid), producto_id:pid, cantidad:n,
+          fs.push(Object.assign({}, base, {producto:_bsProd(pid), producto_id:pid, cantidad:n, uds:+uds||0,
             unidad:_bsExpUni(pid, n), lote:lote, excepcion:exc,
             coincide: marca && prodOK && lotOK}));
         };
@@ -18936,73 +18999,302 @@ async function bsExportLeer(f){
     (porAli[l.alisto_id]=porAli[l.alisto_id]||[]).push(l);
   });
   P.forEach(function(p){ p.destinatario=D[p.pedido_id]||''; p.lineas=porAli[p.alisto_id]||[]; });
-  // La factura VIGENTE y su cliente, de Odoo, con la lectura que ya usa el
-  // Historial. Si Odoo no contesta el archivo sale igual y la cabecera lo dice.
-  let odooOK=true;
+  return {P:P};
+}
+// La factura VIGENTE y su cliente, de Odoo, con la lectura que ya usa el Historial.
+// Va APARTE y después: la vista previa no espera a Odoo. true = verificada.
+async function _bsExpOdoo(P){
   try{
-    await entFacVigenteLeer(P.map(function(p){ return p.factura_id; }));
-    P.forEach(function(p){ const v=_entFacVigDe(p);
+    await entFacVigenteLeer((P||[]).map(function(p){ return p.factura_id; }));
+    (P||[]).forEach(function(p){ const v=_entFacVigDe(p);
       if(v && v.reemplaza) p.fac_vigente={nombre:v.nombre, reemplaza:v.reemplaza, factura_id:v.id}; });
-  }catch(e){ odooOK=false; }
-  return {P:P, odoo_ok:odooOK};
+    return true;
+  }catch(e){ return false; }
 }
 
-// ── EL DIÁLOGO ──────────────────────────────────────────────────────────
-let _bsExpM=null, _bsExpClave='', _bsExpOcupado=false, _bsExpVolver=null, _bsExpWB=null;
+// ── LA VISTA «EXPORTAR» · b141 (27-oct-2026) ─────────────────────────────
+// Reemplaza al diálogo de b140. Andrea quería VER antes de exportar: la vista
+// muestra en vivo lo mismo que va al archivo, armado por `bsExportModelo` —el
+// MISMO molde de las dos salidas—, así que lo que se ve es lo que se baja.
+//
+// LEE UNA VEZ POR RANGO DE FECHAS. Cliente, lote y producto filtran en memoria
+// sobre lo leído (el molde ya filtra): escribir en el lote no consulta nada.
+// Cambiar el rango sí lee, con 400 ms de espera y descartando la respuesta de
+// una consulta que quedó vieja (`_bxSeq`).
+//
+// La factura vigente (Odoo) llega DESPUÉS y repinta: la vista no espera a Odoo
+// para abrir. Si se exporta antes de que llegue, la cabecera del archivo lo dice.
+//
+// Excel y PDF se arman EN el toque y sin `await` (Safari de iOS exige el gesto).
+let _bsModo='lista';
+const BX_TOPE=100;
+const BX_PRESETS=[{k:'semana',t:'Esta semana'},{k:'semana_ant',t:'Semana pasada'},
+  {k:'mes',t:'Este mes'},{k:'mes_ant',t:'Mes pasado'},{k:'pers',t:'Personalizado'}];
+const BX_PRODS=[451,452,453,503,472,519];
+let _bx={preset:'mes', desde:'', hasta:'', cliente:'', lote:'', producto:0, abierto:false, todo:false};
+let _bxDatos=null, _bxSeq=0, _bxTimer=null, _bxPintarT=null, _bxPor='';
+
+function _bxRango(k){
+  const hoy=new Date(); hoy.setHours(12,0,0,0);
+  const lunes=new Date(hoy); lunes.setDate(hoy.getDate()-((hoy.getDay()+6)%7));
+  if(k==='semana') return [_despYmd(lunes), _despYmd(hoy)];
+  if(k==='semana_ant'){
+    const a=new Date(lunes); a.setDate(a.getDate()-7);
+    const b=new Date(lunes); b.setDate(b.getDate()-1);
+    return [_despYmd(a), _despYmd(b)];
+  }
+  if(k==='mes_ant') return [_despYmd(new Date(hoy.getFullYear(), hoy.getMonth()-1, 1, 12)),
+                            _despYmd(new Date(hoy.getFullYear(), hoy.getMonth(), 0, 12))];
+  return [_despYmd(new Date(hoy.getFullYear(), hoy.getMonth(), 1, 12)), _despYmd(hoy)];
+}
+// "1–27 oct" · "28 sep – 27 oct" · con año solo si no es el actual.
+function _bxRangoTxt(a, b){
+  const p=function(y){ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(y||''); return m?{a:+m[1],m:+m[2],d:+m[3]}:null; };
+  const A=p(a), B=p(b); if(!A||!B) return '';
+  const anio=new Date().getFullYear(), mes=function(x){ return _ENT_MES_AB[x.m-1]; };
+  const yA=(A.a!==B.a||A.a!==anio)?(' '+A.a):'', yB=(B.a!==anio||A.a!==B.a)?(' '+B.a):'';
+  if(A.a===B.a && A.m===B.m) return (A.d===B.d?'':(A.d+'–'))+B.d+' '+mes(B)+yB;
+  return A.d+' '+mes(A)+yA+' – '+B.d+' '+mes(B)+yB;
+}
+function _bxF(){ return {desde:_bx.desde, hasta:_bx.hasta, cliente:_bx.cliente,
+                          lote:_bx.lote, producto:_bx.producto?String(_bx.producto):''}; }
+function _bxModelo(){
+  if(!_bxDatos || !_bxDatos.P) return null;
+  const f=_bxF();
+  const M=bsExportModelo(_bxDatos.P, f, {en:new Date(), por:_bxPor, odoo_ok:_bxDatos.odoo_ok===true});
+  M.f=f; return M;
+}
+
 function bsExportar(){
-  const sh=document.getElementById('bsExpSheet'); if(!sh) return;
-  const de=document.getElementById('bsExpDesde'), ha=document.getElementById('bsExpHasta');
-  if(de && !de.value){ const h=_despHoy(); de.value=h.slice(0,8)+'01'; }
-  if(ha && !ha.value) ha.value=_despHoy();
-  const sel=document.getElementById('bsExpProd');
-  if(sel && !sel.options.length)
-    sel.innerHTML='<option value="">Todos</option>'+BS_EXP_PRODS.map(function(pid){
-      return '<option value="'+pid+'">'+esc(_bsProd(pid))+'</option>'; }).join('');
-  const dl=document.getElementById('bsExpCliLista');
-  if(dl){ const vistos={}, ops=[];
-    (_bs||[]).forEach(function(p){ const n=_entQuien(p).nombre; if(n && !vistos[n]){ vistos[n]=1; ops.push(n); } });
-    dl.innerHTML=ops.sort().map(function(n){ return '<option value="'+esc(n)+'">'; }).join(''); }
-  bsExpInvalidar();                       // al abrir se lee de nuevo: nada viejo
-  sh.classList.remove('hidden');
+  _bsModo='exportar'; _bx.todo=false;
+  if(!_bx.desde){ const r=_bxRango(_bx.preset); _bx.desde=r[0]; _bx.hasta=r[1]; }
+  if(!_bxPor) (async function(){
+    try{ const {data}=await sbClient().auth.getUser();
+         const em=((data&&data.user&&data.user.email)||'').trim();
+         _bxPor=_quienNombre(em)||em; }catch(e){}
+  })();
+  bsRender();
+  try{ window.scrollTo(0,0); }catch(e){}
 }
-// TODA salida del diálogo pasa por acá: «Cerrar», cambiar de vista (`_modShow`) y
-// volver al lobby (`volverLobby`). Devuelve el tema si quedó puesto el de imprimir.
+// TODA salida de la vista pasa por acá: la flecha, cambiar de vista (`_modShow`) y
+// volver al lobby (`volverLobby`). Devuelve el tema si quedó el de imprimir.
 function bsExportarCerrar(){
-  const sh=document.getElementById('bsExpSheet'); if(sh) sh.classList.add('hidden');
   _bsExpTemaVolver();
+  if(_bsModo!=='exportar') return;
+  _bsModo='lista';
+  if(document.getElementById('bx')) bsRender();
 }
-function _bsExpEstado(msg, err){
-  const st=document.getElementById('bsExpEst'); if(!st) return;
-  if(!msg){ st.className='status hidden'; st.innerHTML=''; return; }
-  st.className='status '+(err?'s-err':'s-info'); st.innerHTML=msg;
+
+function _bxRender(){
+  const body=document.getElementById('bsBody'); if(!body) return;
+  if(!document.getElementById('bx')) body.innerHTML=_bxEsqueleto();
+  _bxPintarFiltros();
+  _bxPedir();
 }
-function _bsExpFiltros(){
-  const v=function(id){ const e=document.getElementById(id); return e?String(e.value||'').trim():''; };
-  // CLIENTE OPCIONAL (Andrea, 27-oct): vacío = todos. Casi siempre se exporta por
-  // lote o por producto. El rango de fechas sí es obligatorio.
-  const f={desde:v('bsExpDesde'), hasta:v('bsExpHasta'), cliente:v('bsExpCli'),
-           lote:v('bsExpLote'), producto:v('bsExpProd')};
-  if(!f.desde || !f.hasta) return {err:'Falta el rango de fechas.'};
-  if(f.desde>f.hasta) return {err:'«Desde» es posterior a «Hasta».'};
-  return {f:f};
+function _bxEsqueleto(){
+  return '<div id="bx" class="bx">'
+    +'<div class="bx-top"><button class="bx-back" onclick="bsExportarCerrar()">‹ Historial</button>'
+    +'<h2 class="bx-tit">Exportar</h2>'
+    +'<button class="bx-limpiar" onclick="bxLimpiar()">Limpiar</button></div>'
+    +'<div class="bx-grid"><aside class="bx-fil">'
+    +'<div class="bx-g"><div class="bx-lbl">Fechas</div><div id="bxPresets" class="bx-chips"></div>'
+    +'<div id="bxPers" class="bx-2 hidden">'
+    +'<label class="bx-l">Desde<input id="bxDesde" class="bx-in" type="date" onchange="bxSetFecha()"></label>'
+    +'<label class="bx-l">Hasta<input id="bxHasta" class="bx-in" type="date" onchange="bxSetFecha()"></label>'
+    +'</div></div>'
+    +'<button id="bxMasBtn" class="bx-mas" onclick="bxMasToggle()"></button>'
+    +'<div id="bxMas" class="bx-masc">'
+    +'<label class="bx-l">Cliente<input id="bxCli" class="bx-in" type="search" list="bxCliLista" '
+    +'placeholder="Todos" autocomplete="off" oninput="bxSet(\'cliente\',this.value)"></label>'
+    +'<datalist id="bxCliLista"></datalist>'
+    +'<label class="bx-l">Lote<input id="bxLote" class="bx-in" type="search" list="bxLoteLista" '
+    +'placeholder="Todos" autocomplete="off" oninput="bxSet(\'lote\',this.value)"></label>'
+    +'<datalist id="bxLoteLista"></datalist>'
+    +'<div class="bx-l">Producto<div id="bxProds" class="bx-chips"></div></div>'
+    +'</div>'
+    +'<div class="bx-bar"><button id="bxXlsx" class="btn btn-amarillo" onclick="bsExportarXLSX()" disabled>Excel</button>'
+    +'<button id="bxPdf" class="btn" onclick="bsExportarPDF()" disabled>PDF</button></div>'
+    +'</aside><section id="bxPrev" class="bx-prev"></section></div></div>';
 }
-// ── DOS PASOS, A PROPÓSITO ───────────────────────────────────────────────
-// Safari de iOS puede negarse a `window.print()` —y a la descarga— si llegan
-// mucho después del toque: leer Supabase y esperar a Odoo (hasta 30 s) rompe el
-// «gesto del usuario». Por eso:
-//   1. «Preparar» lee, arma el molde, la hoja de Excel y el papel.
-//   2. «Excel» e «Imprimir / Guardar PDF» SOLO entregan lo ya armado, sin ningún
-//      `await` antes de `writeFile` / `print()`, dentro de su propio toque.
-// Cambiar un filtro invalida lo preparado y apaga los dos botones.
-function bsExpInvalidar(){
-  _bsExpM=null; _bsExpClave=''; _bsExpWB=null;
-  const pr=document.getElementById('bsPrint'); if(pr) pr.innerHTML='';
-  _bsExpEstado('');
-  _bsExpBotones(false);
+function _bxNFiltros(){ return (_bx.cliente.trim()?1:0)+(_bx.lote.trim()?1:0)+(_bx.producto?1:0); }
+function _bxPintarFiltros(){
+  const pr=document.getElementById('bxPresets');
+  if(pr) pr.innerHTML=BX_PRESETS.map(function(p){
+    return '<button class="bx-chip'+(p.k===_bx.preset?' on':'')+'" onclick="bxPreset(\''+p.k+'\')">'+p.t+'</button>'; }).join('');
+  const pe=document.getElementById('bxPers');
+  if(pe) pe.classList.toggle('hidden', _bx.preset!=='pers');
+  const de=document.getElementById('bxDesde'), ha=document.getElementById('bxHasta');
+  if(de && de.value!==_bx.desde) de.value=_bx.desde;
+  if(ha && ha.value!==_bx.hasta) ha.value=_bx.hasta;
+  const ci=document.getElementById('bxCli'), lo=document.getElementById('bxLote');
+  if(ci && ci.value!==_bx.cliente) ci.value=_bx.cliente;
+  if(lo && lo.value!==_bx.lote) lo.value=_bx.lote;
+  const ps=document.getElementById('bxProds');
+  if(ps) ps.innerHTML=BX_PRODS.map(function(pid){
+    return '<button class="bx-chip bx-chip-p'+(+_bx.producto===pid?' on':'')+'" onclick="bxProd('+pid+')">'
+      +'<span class="bx-dot" style="background:var(--p-'+({451:'blanco',452:'semillas',453:'frances',503:'buns',472:'pizza',519:'galletas'})[pid]+')"></span>'
+      +esc(_bsProd(pid))+'</button>'; }).join('');
+  const n=_bxNFiltros(), mb=document.getElementById('bxMasBtn'), mc=document.getElementById('bxMas');
+  if(mb) mb.innerHTML='Filtros'+(n?(' <span class="bx-n">'+n+'</span>'):'')+'<span class="bx-car">'+(_bx.abierto?'▴':'▾')+'</span>';
+  if(mc) mc.classList.toggle('abierto', _bx.abierto);
 }
-function _bsExpBotones(listo){
-  ['bsExpXlsx','bsExpPdf'].forEach(function(id){ const b=document.getElementById(id); if(b) b.disabled=!listo; });
+function bxMasToggle(){ _bx.abierto=!_bx.abierto; _bxPintarFiltros(); }
+function bxPreset(k){
+  _bx.preset=k;
+  if(k!=='pers'){ const r=_bxRango(k); _bx.desde=r[0]; _bx.hasta=r[1]; }
+  _bx.todo=false; _bxPintarFiltros(); _bxPedir();
 }
+function bxSetFecha(){
+  const de=document.getElementById('bxDesde'), ha=document.getElementById('bxHasta');
+  _bx.desde=(de&&de.value)||''; _bx.hasta=(ha&&ha.value)||'';
+  _bx.todo=false; _bxPedir();
+}
+// Por tecla: solo se repinta la vista previa (el campo no se toca, no pierde el foco).
+function bxSet(k, v){
+  _bx[k]=String(v==null?'':v); _bx.todo=false;
+  clearTimeout(_bxPintarT); _bxPintarT=setTimeout(function(){ _bxPintarFiltrosCuenta(); _bxPintarPrev(); }, 120);
+}
+function _bxPintarFiltrosCuenta(){
+  const n=_bxNFiltros(), mb=document.getElementById('bxMasBtn');
+  if(mb) mb.innerHTML='Filtros'+(n?(' <span class="bx-n">'+n+'</span>'):'')+'<span class="bx-car">'+(_bx.abierto?'▴':'▾')+'</span>';
+}
+function bxProd(pid){ _bx.producto=(+_bx.producto===pid)?0:pid; _bx.todo=false; _bxPintarFiltros(); _bxPintarPrev(); }
+function bxLimpiar(){
+  _bx.cliente=''; _bx.lote=''; _bx.producto=0; _bx.todo=false; _bx.preset='mes';
+  const r=_bxRango('mes'); _bx.desde=r[0]; _bx.hasta=r[1];
+  _bxPintarFiltros(); _bxPedir();
+}
+function bxVerTodo(){ _bx.todo=true; _bxPintarPrev(); }
+function bxReintentar(){ _bxDatos=null; _bxPedir(); }
+
+function _bxClave(){ return _bx.desde+'|'+_bx.hasta; }
+function _bxPedir(){
+  const ok=/^\d{4}-\d{2}-\d{2}$/.test(_bx.desde) && /^\d{4}-\d{2}-\d{2}$/.test(_bx.hasta) && _bx.desde<=_bx.hasta;
+  if(!ok){ clearTimeout(_bxTimer); _bxSeq++; _bxDatos={clave:'', err:'rango'}; _bxPintarPrev(); return; }
+  const clave=_bxClave();
+  if(_bxDatos && _bxDatos.clave===clave && (_bxDatos.P || _bxDatos.cargando)){ _bxPintarPrev(); return; }
+  _bxDatos={clave:clave, cargando:true};
+  _bxPintarPrev();
+  clearTimeout(_bxTimer);
+  const seq=++_bxSeq;
+  _bxTimer=setTimeout(function(){ _bxCargar(seq, clave); }, 400);
+}
+async function _bxCargar(seq, clave){
+  try{
+    const r=await bsExportLeer({desde:_bx.desde, hasta:_bx.hasta});
+    if(seq!==_bxSeq) return;                         // llegó tarde: hay otra en camino
+    _bxDatos={clave:clave, P:r.P, odoo_ok:null};
+  }catch(e){
+    if(seq!==_bxSeq) return;
+    _bxDatos={clave:clave, err:(e&&e.message)||String(e)};
+  }
+  _bxSugerencias(); _bxPintarPrev();
+  if(_bxDatos.P){
+    const P=_bxDatos.P;
+    const ok=await _bsExpOdoo(P);
+    if(seq!==_bxSeq || !_bxDatos || _bxDatos.P!==P) return;
+    _bxDatos.odoo_ok=ok; _bxSugerencias(); _bxPintarPrev();
+  }
+}
+function _bxSugerencias(){
+  const P=(_bxDatos&&_bxDatos.P)||[];
+  const cl={}, lt={};
+  P.forEach(function(p){ cl[_bsExpCliente(p)]=1;
+    (p.lineas||[]).forEach(function(l){ (l.lotes||[]).forEach(function(x){ if(x.lote) lt[x.lote]=1; }); }); });
+  const dc=document.getElementById('bxCliLista'), dl=document.getElementById('bxLoteLista');
+  if(dc) dc.innerHTML=Object.keys(cl).sort(function(a,z){ return a.localeCompare(z,'es'); })
+    .map(function(n){ return '<option value="'+esc(n)+'">'; }).join('');
+  if(dl) dl.innerHTML=Object.keys(lt).sort(function(a,z){ return _lotCmp(z,a); })
+    .map(function(n){ return '<option value="'+esc(n)+'">'; }).join('');
+}
+
+// ── LA VISTA PREVIA: el molde, dibujado ─────────────────────────────────
+function _bxBotones(on){
+  ['bxXlsx','bxPdf'].forEach(function(id){ const b=document.getElementById(id); if(b) b.disabled=!on; });
+}
+function _bxPintarPrev(){
+  const el=document.getElementById('bxPrev'); if(!el) return;
+  const D=_bxDatos;
+  if(D && D.err==='rango'){ _bxBotones(false);
+    el.innerHTML='<div class="bx-vacio">Rango de fechas inválido</div>'; return; }
+  if(!D || D.cargando){ _bxBotones(false); el.innerHTML=_bxSkeleton(); return; }
+  if(D.err){ _bxBotones(false);
+    el.innerHTML='<div class="bx-error"><div>No pude leer el historial: '+esc(D.err)+'</div>'
+      +'<button class="btn btn-sm" onclick="bxReintentar()">Reintentar</button></div>'; return; }
+  const M=_bxModelo();
+  _bxBotones(!!(M && M.n_fil));
+  el.innerHTML=bxPrevHTML(M, _bx.todo);
+}
+function _bxSkeleton(){
+  let h='<div class="bx-res bx-sk-res"><span class="bx-sk" style="width:60%"></span></div><div class="bx-sk-filas">';
+  for(let i=0;i<7;i++) h+='<span class="bx-sk" style="width:'+(92-i*6)+'%"></span>';
+  return h+'</div>';
+}
+// Pura: entra el molde, sale el HTML. Se prueba sin DOM.
+function bxPrevHTML(M, todo){
+  if(!M) return '';
+  const marca=M.cols.some(function(c){ return c.k==='coincide'; });
+  if(!M.n_fil) return '<div class="bx-vacio">'+(_bxNFiltrosM(M)?'Nada con esos filtros':'Nada en ese rango')+'</div>';
+  // El resumen. "líneas" = filas del archivo (una por lote).
+  const clientes={}, tot={}; let exc=0;
+  M.filas.forEach(function(r){
+    clientes[r.cliente]=1;
+    if(r.excepcion) exc++;
+    if(marca && !r.coincide) return;
+    if(/^no se entrega/.test(r.excepcion||'')) return;     // no salió: no suma
+    tot[r.producto_id]=(tot[r.producto_id]||0)+(+r.uds||0);
+  });
+  const nCli=Object.keys(clientes).length;
+  let h='<div class="bx-res"><span><b>'+M.n_ped+'</b> '+(M.n_ped===1?'pedido':'pedidos')+'</span>'
+    +'<span><b>'+M.n_fil+'</b> '+(M.n_fil===1?'línea':'líneas')+'</span>'
+    +'<span><b>'+nCli+'</b> '+(nCli===1?'cliente':'clientes')+'</span>'
+    +'<span>'+esc(_bxRangoTxt(M.f.desde, M.f.hasta))+'</span>'
+    +(exc?('<span class="bx-res-exc">'+exc+' con excepción</span>'):'')
+    +'</div>';
+  const pids=BS_EXP_PRODS.filter(function(p){ return tot[p]; });
+  if(pids.length) h+='<div class="bx-tot"><div class="bx-lbl">'+(marca?'Lo que coincide, por producto':'Salió, por producto')+'</div>'
+    +'<div class="bx-tot-g">'+pids.map(function(p){
+      return '<div class="bx-tot-i"><span>'+esc(_bsProd(p))+'</span><b>'+esc(_entPres(p, tot[p]))+'</b></div>'; }).join('')
+    +'</div></div>';
+  const vis=todo ? M.filas : M.filas.slice(0, BX_TOPE);
+  // Escritorio: las columnas del archivo, con dos juntadas para que quepa sin
+  // desplazar a lo ancho: la unidad va pegada a la cantidad, y «coincide» se ve
+  // como resaltado de la fila en vez de columna. Los VALORES son los del molde.
+  const cols=M.cols.filter(function(c){ return c.k!=='unidad' && c.k!=='coincide'; });
+  h+='<div class="bx-tw"><table class="bx-t"><thead><tr>'+cols.map(function(c){
+      return '<th'+((c.k==='cantidad'||c.k==='pedido')?' class="r"':'')+'>'+esc(c.t)+'</th>'; }).join('')
+    +'</tr></thead><tbody>'+vis.map(function(r){
+      const cl=marca?(r.coincide?'bx-si':'bx-no'):'';
+      return '<tr'+(cl?(' class="'+cl+'"'):'')+'>'+cols.map(function(c){
+        const t=_bsExpTxt(r, c.k)+(c.k==='cantidad'?(' '+r.unidad):'');
+        const k=(c.k==='cantidad'||c.k==='pedido')?'r':(c.k==='excepcion'?'bx-exc':(c.k==='lote'?'bx-lote':((c.k==='producto'||c.k==='fecha')?'nw':'')));
+        return '<td'+(k?(' class="'+k+'"'):'')+'>'+esc(t)+'</td>'; }).join('')+'</tr>'; }).join('')
+    +'</tbody></table></div>';
+  // Teléfono: por pedido, con sus líneas.
+  h+='<div class="bx-cards">';
+  let i=0;
+  while(i<vis.length){
+    const r0=vis[i], fs=[];
+    while(i<vis.length && vis[i].pedido===r0.pedido){ fs.push(vis[i]); i++; }
+    h+='<div class="bx-card"><div class="bx-card-h"><span class="bx-card-c">'+esc(r0.cliente)+'</span>'
+      +'<span class="bx-card-f">'+esc(_bsExpTxt(r0,'fecha'))+'</span></div>'
+      +'<div class="bx-card-s">#'+r0.pedido+' · '+esc(r0.factura==='sin factura'?'sin factura':('factura '+r0.factura))+'</div>'
+      +fs.map(function(r){
+        const cl=marca?(r.coincide?' bx-si':' bx-no'):'';
+        return '<div class="bx-card-l'+cl+'"><span class="bx-card-p">'+esc(r.producto)+'</span>'
+          +'<span class="bx-card-q">'+esc(_bsExpTxt(r,'cantidad')+' '+r.unidad)+'</span>'
+          +'<span class="bx-card-lote">'+esc(r.lote||'—')+'</span>'
+          +(r.excepcion?('<span class="bx-card-x">'+esc(r.excepcion)+'</span>'):'')+'</div>'; }).join('')
+      +'</div>';
+  }
+  h+='</div>';
+  if(vis.length<M.filas.length)
+    h+='<div class="bx-mas-filas"><span>'+vis.length+' de '+M.n_fil+' líneas</span>'
+      +'<button class="btn btn-sm" onclick="bxVerTodo()">Ver todo</button></div>';
+  return h;
+}
+function _bxNFiltrosM(M){ const f=M.f||{}; return !!((f.cliente||'').trim()||(f.lote||'').trim()||f.producto); }
+
 function _bsExpArmarLibro(M){
   const aoa=bsExportAOA(M);
   const ws=XLSX.utils.aoa_to_sheet(aoa);
@@ -19018,63 +19310,40 @@ function _bsExpArmarLibro(M){
   XLSX.utils.book_append_sheet(wb, ws, 'Historial');
   return wb;
 }
-async function bsExportarPreparar(){
-  if(_bsExpOcupado) return; 
-  const r=_bsExpFiltros();
-  if(r.err){ _bsExpEstado(esc(r.err), true); return; }
-  _bsExpOcupado=true; bsExpInvalidar();
-  _bsExpEstado('<span class="spin"></span>Leyendo el historial…');
-  try{
-    const L=await bsExportLeer(r.f);
-    let por='';
-    try{ const {data}=await sbClient().auth.getUser();
-         const em=((data&&data.user&&data.user.email)||'').trim();
-         por=_quienNombre(em)||em; }catch(e){}
-    const M=bsExportModelo(L.P, r.f, {en:new Date(), por:por, odoo_ok:L.odoo_ok});
-    M.f=r.f;
-    if(typeof XLSX==='undefined') throw new Error('no cargó la librería de Excel');
-    _bsExpWB=_bsExpArmarLibro(M);
-    let pr=document.getElementById('bsPrint');
-    if(!pr){ pr=document.createElement('div'); pr.id='bsPrint'; document.body.appendChild(pr); }
-    pr.innerHTML=bsExportPrintHTML(M);
-    _bsExpM=M; _bsExpClave=JSON.stringify(r.f);
-    _bsExpEstado('Listo · '+M.n_ped+(M.n_ped===1?' pedido':' pedidos')+' · '
-      +M.n_fil+(M.n_fil===1?' fila':' filas'));
-    _bsExpBotones(true);
-  }catch(e){ bsExpInvalidar(); _bsExpEstado('No pude exportar: '+esc((e&&e.message)||String(e)), true); }
-  finally{ _bsExpOcupado=false; }
-}
-// Lo preparado sirve SOLO si los filtros siguen siendo los mismos. Síncrono.
-function _bsExpListo(){
-  const r=_bsExpFiltros();
-  if(!_bsExpM || r.err || JSON.stringify(r.f)!==_bsExpClave){ bsExpInvalidar(); return null; }
-  return _bsExpM;
-}
+function _bxSlug(s){ return _bsNorm(s).replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30); }
+// "Historial_entregas_2026-10-01_a_2026-10-27_lote-208.xlsx"
 function _bsExpNombre(M, ext){
-  return 'historial_entregas_'+M.f.desde+'_'+M.f.hasta+'.'+ext;
+  const f=M.f||{};
+  return 'Historial_entregas_'+f.desde+'_a_'+f.hasta
+    +((f.cliente||'').trim()?('_cliente-'+_bxSlug(f.cliente)):'')
+    +((f.lote||'').trim()?('_lote-'+_bxSlug(f.lote)):'')
+    +(f.producto?('_'+_bxSlug(_bsProd(+f.producto))):'')
+    +'.'+ext;
 }
-// SIN await: la descarga sale dentro del toque.
+// SIN await: el archivo sale dentro del toque.
 function bsExportarXLSX(){
-  const M=_bsExpListo(); if(!M || !_bsExpWB) return;
-  try{ XLSX.writeFile(_bsExpWB, _bsExpNombre(M,'xlsx')); }
-  catch(e){ _bsExpEstado('No pude exportar: '+esc((e&&e.message)||String(e)), true); }
+  const M=_bxModelo(); if(!M || !M.n_fil) return;
+  try{
+    if(typeof XLSX==='undefined') throw new Error('no cargó la librería de Excel');
+    XLSX.writeFile(_bsExpArmarLibro(M), _bsExpNombre(M,'xlsx'));
+  }catch(e){ alert('No pude exportar: '+((e&&e.message)||String(e))); }
 }
-// `window.print()` imprime la PÁGINA, no un elemento: la hoja de impresión
-// (`@media print`) esconde todo lo que no sea #bsPrint (ya armado en «Preparar»).
-// Se imprime en CLARO —en oscuro el texto es hueso sobre papel blanco— vía
-// `temaAplicar`, sin tocar la preferencia guardada de la cuenta. El tema de antes
-// vuelve en `afterprint`, al salir del modo impresión (`matchMedia`), y en
-// cualquier salida del diálogo (`bsExportarCerrar`).
+// `window.print()` imprime la PÁGINA: la hoja de impresión (`@media print`) esconde
+// todo lo que no sea #bsPrint. Se imprime en CLARO vía `temaAplicar`, sin tocar la
+// preferencia de la cuenta; el tema vuelve en `afterprint`, al salir del modo
+// impresión (`matchMedia`) y en toda salida de la vista (`bsExportarCerrar`).
+let _bsExpVolver=null;
 function _bsExpTemaVolver(){ if(_bsExpVolver) _bsExpVolver(); }
 function bsExportarPDF(){
-  const M=_bsExpListo(); if(!M) return;
+  const M=_bxModelo(); if(!M || !M.n_fil) return;
+  let pr=document.getElementById('bsPrint');
+  if(!pr){ pr=document.createElement('div'); pr.id='bsPrint'; document.body.appendChild(pr); }
+  pr.innerHTML=bsExportPrintHTML(M);
   _bsExpTemaVolver();
   const h=document.documentElement;
   const antes=(h.getAttribute('data-tema')==='claro')?'claro':'oscuro', t0=document.title;
   let mq=null;
   const enMq=function(e){ if(e && !e.matches) volver(); };
-  // El título se queda puesto hasta volver: es el nombre que el diálogo propone
-  // para el PDF, y en el iPad `print()` no bloquea.
   const volver=function(){
     _bsExpVolver=null;
     window.removeEventListener('afterprint', volver);
@@ -19089,7 +19358,7 @@ function bsExportarPDF(){
   try{ mq=window.matchMedia && window.matchMedia('print');
        if(mq){ if(mq.addEventListener) mq.addEventListener('change', enMq);
                else if(mq.addListener) mq.addListener(enMq); } }catch(e){ mq=null; }
-  document.title=_bsExpNombre(M,'pdf').replace(/\.pdf$/,'');
+  document.title=_bsExpNombre(M,'pdf').replace(/\.pdf$/,'');   // el nombre que propone el diálogo
   window.print();
 }
 
