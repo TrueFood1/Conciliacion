@@ -37,6 +37,9 @@
 --   plan_meses               número 1–11 nivConfig()             NADIE (sin UI) — horizonte del plan (b126)
 --   compras_dia_fijo         objeto      nivConfig()             NADIE (sin UI) — se siembra con
 --                                                                COMPRAS_DIA_FIJO.sql (T-28, 2-oct-2026)
+--   calc_condiciones         objeto      calcCargarCondUsr()     calcGuardarCond() (b142, 27-oct-2026) —
+--                                                                condiciones de cadena escritas en la Calculadora,
+--                                                                {'wm.frio':{v:{mc,cedi,fijo,com,uberPct,uberCom},fecha}}
 --
 -- `compras_dia_fijo` = {insumos:[{producto_id, proveedor_id, proveedor, pide, llega, momento, uso}]}.
 -- Un insumo con fila acá sale de las tarjetas "Comprar" y va a la tarjeta "Pedido con día fijo"

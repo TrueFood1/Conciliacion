@@ -224,6 +224,99 @@ async function main(){
   SH.cad='wm'; eq("Hoy: Walmart sin factura en los datos → sin fila", calcHoy(SH, {auto:H}, 2000), null);
   var SR = calcEstadoBase(); eq("Hoy: receta → sin fila", calcHoy(SR, {auto:H}, 2000), null);
 
+  // ── 10. b142 · ¿Qué vas a cotizar? — costo del Simulador, recetas, cadenas sin condiciones ──
+  var PRODS = [
+    {key:'blanco', label:'Pan Blanco', prodId:451, pack:1, dias:9, unidades:1200, mp:{mpUnit:805}, indPerSales:0, emp:69.55, empCompleto:true, empRazon:''},
+    {key:'semillas', label:'Pan de Semillas', prodId:452, pack:1, dias:6, unidades:900, mp:{mpUnit:950}, emp:70, empCompleto:true},
+    {key:'pizza', label:'Pizza Crust', prodId:472, pack:1, dias:3, unidades:500, mp:{mpUnit:0, error:'sin BoM'}, emp:446.19, empCompleto:true},
+    {key:'frances', label:'Pan Francés', prodId:453, pack:1, dias:4, unidades:700, mp:{mpUnit:600}, emp:67.9, empCompleto:true},
+    {key:'buns', label:'Buns', prodId:503, pack:4, dias:5, unidades:800, mp:{mpUnit:100}, emp:null, empCompleto:false, empRazon:'sin dato de empaque'},
+    {key:'galletas', label:'Galletas', prodId:519, pack:1, dias:0, unidades:300, mp:{mpUnit:300}, emp:412.66, empCompleto:true}];
+  var POOL = 10393764;
+  var SB = simCostoBase(PRODS, POOL);
+  var totDias = 9+6+3+4+5;
+  cerca("Simulador base: indirecto Blanco = pozo × días/total ÷ unidades (igual que Costos)", SB.blanco.indU, POOL*9/totDias/1200, 1e-6);
+  cerca("Simulador base: Buns MP = mpUnit × pack", SB.buns.mp, 400, 1e-9);
+  // la tabla del Simulador recién abierto da lo mismo que simCostoBase
+  simMP={}; simDiasReal={}; simUnidReal={}; simEmp={}; simPoolAvg=POOL;
+  var B0 = simBaseDe(PRODS); simMP=B0.mp; simDiasReal=B0.dias; simUnidReal=B0.unid; simEmp=B0.emp; SIM={personas:3, dias:Object.assign({},B0.dias), batchDia:Object.assign({},SIM_BATCHDIA)};
+  cerca("la Calculadora usa el MISMO costo que la tabla del Simulador", simCalc().semillas.total, SB.semillas.total, 1e-9);
+  var Q = calcEstadoBase(); Q.cot = {tipo:'prod', k:'blanco'};
+  var qc = calcCostoCot(Q, SB, [], {});
+  cerca("cotizar Pan Blanco: total = MP + empaque + indirecto del Simulador", qc.total, 805+69.55+POOL*9/totDias/1200, 1e-6);
+  eq("Pan Blanco: completo, unidad de venta y pid", [qc.completo, qc.unidad, qc.pid], [true, 'por unidad', 451]);
+  eq("Pan Blanco: NO usa la receta abierta en Costo (brownie)", Q.prod==='receta' && Math.abs(qc.total-1935.23)>1, true);
+  Q.cot = {tipo:'prod', k:'pizza'}; qc = calcCostoCot(Q, SB, [], {});
+  eq("Pizza con MP en error: materia prima falta, no ₡0", [qc.mp, qc.completo, qc.faltan], [null, false, ['materia prima']]);
+  Q.cot = {tipo:'prod', k:'buns'}; qc = calcCostoCot(Q, SB, [], {});
+  eq("Buns sin empaque: falta empaque", [qc.emp, qc.faltan], [null, ['empaque']]);
+  Q.cot = {tipo:'prod', k:'galletas'}; qc = calcCostoCot(Q, SB, [], {});
+  eq("Galletas: indirecto ₡0 con su condición, no falta", [qc.ind, qc.indNota, qc.completo], [0, 'comparte el día', true]);
+  Q.cot = {tipo:'prod', k:'blanco'};
+  eq("sin Odoo: el costo del producto falta", calcCostoCot(Q, null, [], {}).faltan, ['costo del producto (sin Odoo)']);
+  // receta guardada incompleta
+  var GU = [{id:41, nombre:'Premezcla Brownie', version:2, datos:JSON.parse(JSON.stringify(PL.datos))}];
+  var QR = calcEstadoBase(); QR.prod='blanco'; QR.cot = {tipo:'rec', id:'41'};
+  var rc = calcCostoCot(QR, SB, GU, {});
+  eq("receta guardada incompleta: dice qué falta", [rc.completo, rc.faltan.indexOf('Polvo de hornear: falta precio')>=0, rc.label], [false, true, 'Premezcla Brownie · v2']);
+  cerca("receta guardada: el mismo costo que al abrirla", rc.total, calcCostoU(S5).total, 1e-9);
+  eq("receta: sin pid → sin «Hoy le facturas»", calcCotPid(QR), null);
+  eq("valor del selector ida y vuelta", [calcCotDeValor(calcCotValor({tipo:'prod',k:'buns'})), calcCotDeValor('r:41'), calcCotDeValor('p:nada'), calcCotDeValor('')],
+     [{tipo:'prod',k:'buns'}, {tipo:'rec',id:'41'}, null, null]);
+  // cadenas sin condiciones y fuente de cada valor
+  var QC = calcEstadoBase(); QC.cot={tipo:'prod', k:'blanco'}; calcAplicarMargenes(QC);
+  eq("Walmart anaquel: sin condiciones · Automercado frío: con", [calcSinCond(QC.cond.wm.anaquel), calcSinCond(QC.cond.auto.frio), calcSinCond(QC.cond.dir.frio)], [true, false, false]);
+  eq("fuente de cada valor", [calcCondTag('auto','frio','mc',451,{},29.2).t, calcCondTag('auto','frio','cedi',451,{},8).t, calcCondTag('wm','frio','com',451,{},6.43).t,
+     calcCondTag('wm','frio','mc',472,{},29.4).t, calcCondTag('wm','frio','cedi',451,{},null), calcCondTag('wm','anaquel','mc',451,{},null)],
+     ['góndola 25-oct','OC 25-oct','factura 10-ago','general',null,null]);
+  var U = {}; calcCondUsrPoner(U,'wm','anaquel','mc',27,'2026-10-27'); calcCondUsrPoner(U,'wm','anaquel','com',6.5,'2026-10-27');
+  eq("lo escrito se guarda por cadena + categoría", U, {'wm.anaquel':{v:{mc:27, com:6.5}, fecha:'2026-10-27'}});
+  eq("lo escrito se marca «tuyo · fecha»", calcCondTag('wm','anaquel','mc',451,U,27), {t:'tuyo · 27-oct', tuyo:true});
+  var LIM = calcCondUsrLimpio(JSON.parse(JSON.stringify(Object.assign({}, U, {'x.frio':{v:{mc:1}}, 'auto.frio':{v:{mc:'29', cedi:7}, fecha:'2026-10-26'}}))));
+  eq("al leer: solo cadenas y campos conocidos, solo números", LIM, {'wm.anaquel':{v:{mc:27, com:6.5}, fecha:'2026-10-27'}, 'auto.frio':{v:{cedi:7}, fecha:'2026-10-26'}});
+  calcCondUsr = LIM; var QU = calcEstadoBase(); QU.cot={tipo:'prod', k:'blanco'}; calcAplicarMargenes(QU);
+  eq("al elegir producto lo escrito gana sobre lo precargado", [QU.cond.wm.anaquel.mc, QU.cond.auto.frio.cedi, QU.cond.auto.frio.mc], [27, 7, 29.2]);
+  calcCondUsrPoner(LIM,'wm','anaquel','mc',null,'2026-10-28'); calcCondUsrPoner(LIM,'wm','anaquel','com',null,'2026-10-28');
+  eq("borrar todo lo escrito de una cadena la saca del mapa", LIM['wm.anaquel'], undefined);
+  calcCondUsr = {};
+  // «Hoy le facturas»: un Paquete de 4 y la cadena por el cliente
+  var PARTS = {713:{id:713, name:'Automercado S.A.', commercial_name:'Automercado', team_id:false, commercial_partner_id:[713,'x']},
+    5001:{id:5001, name:'AM Belén', commercial_name:false, team_id:false, commercial_partner_id:[713,'x']},
+    951:{id:951, name:'CORPORACION SUPERMERCADOS UNIDOS S.R.L.', commercial_name:'Walmart', team_id:false, commercial_partner_id:[951,'x']},
+    77:{id:77, name:'Fresh Market S.A.', commercial_name:'Fresh Market', team_id:false, commercial_partner_id:[77,'x']},
+    88:{id:88, name:'Café X S.A.', commercial_name:'Café X', team_id:[6,'HORECA'], commercial_partner_id:[88,'x']},
+    99:{id:99, name:'Alguien', commercial_name:false, team_id:false, commercial_partner_id:[99,'x']}};
+  eq("cadena del cliente", [5001,951,77,88,99].map(function(i){ return calcCadenaDePartner(PARTS[i]); }), ['auto','wm','fresh','dir',null]);
+  var LF = [{product_id:[453,'x'], date:'2026-10-20', price_unit:900, discount:0, product_uom_id:[1,'Unidades'], partner_id:[88,'x']},
+            {product_id:[453,'x'], date:'2026-10-19', price_unit:21150, discount:12.6, product_uom_id:[44,'Caja (Frances)'], partner_id:[5001,'x']},
+            {product_id:[453,'x'], date:'2026-10-12', price_unit:3300, discount:6.43, product_uom_id:[37,'Paquete de 4'], partner_id:[951,'x']},
+            {product_id:[453,'x'], date:'2026-10-05', price_unit:20000, discount:12.6, product_uom_id:[44,'Caja (Frances)'], partner_id:[713,'x']},
+            {product_id:[453,'x'], date:'2026-10-04', price_unit:1, discount:0, product_uom_id:[1,'Unidades'], partner_id:[99,'x']}];
+  var HC = calcArmarHoyCadenas(LF, function(id){ return calcCadenaDePartner(PARTS[id]); }, {453:37}, FAC);
+  cerca("Francés a un café en Unidades: ₡900 por pan → ₡3.600 por paquete de 4", HC.dir[453].pf, 3600, 1e-9);
+  cerca("Francés a Walmart en Paquete de 4: igual", HC.wm[453].pf, 3300, 1e-9);
+  eq("Francés a Automercado: la ÚLTIMA (19-oct), caja de 24 u → por paquete", [HC.auto[453].pf, HC.auto[453].fecha], [3525, '2026-10-19']);
+  eq("cliente sin cadena: no entra; Fresh sin factura: no hay fila", [Object.keys(HC).sort(), HC.fresh], [['auto','dir','wm'], undefined]);
+  var QH = calcEstadoBase(); QH.cot={tipo:'prod', k:'frances'}; QH.cad='wm'; calcAplicarMargenes(QH);
+  var hw = calcHoy(QH, HC, 2000);
+  eq("Hoy le facturas a Walmart: precio, fecha y descuento", [hw.pf, hw.fecha, hw.desc], [3300, '2026-10-12', 6.43]);
+  QH.cad='fresh'; eq("Fresh sin facturas recientes → null", calcHoy(QH, HC, 2000), null);
+  // Comparar cadenas
+  var QK = calcEstadoBase(); QK.cot={tipo:'prod', k:'frances'}; calcAplicarMargenes(QK); QK.ancla='mn'; QK.val=40;
+  var FK = calcCompararFilas(QK, 2000, HC);
+  eq("comparar: orígenes del precio", FK.map(function(f){ return f.origen||null; }), ['propuesto','factura 12-oct','mismo margen','factura 20-oct']);
+  cerca("comparar: Automercado al 40 %", FK[0].mn, 40, 1e-9);
+  cerca("comparar: Walmart a ₡3.300 → margen (3.300 × 0,9357 − 2.000) ÷ neto", FK[1].mn, (3300*0.9357-2000)/(3300*0.9357)*100, 1e-6);
+  QK.mminCad.dir = 50;
+  var FK2 = calcCompararFilas(QK, 2000, HC);
+  eq("comparar: café a ₡3.600 con mínimo 50 % → bajo el mínimo", [Math.round(FK2[3].mn*10)/10, FK2[3].bajo, FK2[0].bajo], [44.4, true, false]);
+  QK.cat='anaquel';
+  eq("comparar en anaquel: sin condiciones salvo directo", calcCompararFilas(QK, 2000, HC).map(function(f){ return !!f.sinCond; }), [true,true,true,false]);
+  // Ventana con cuatro marcas
+  var VH = calcVentanaHTML({piso:3000, techo:4200, hay:true}, 3525, 3800, '');
+  eq("ventana: piso, techo, hoy y propuesto con su número", ['piso '+cM(3000),'techo '+cM(4200),'hoy '+cM(3525),'propuesto '+cM(3800)].map(function(t){ return VH.indexOf(t)>=0; }), [true,true,true,true]);
+  eq("ventana sin datos: nada", calcVentanaHTML({piso:null, techo:null}, null, 3000, ''), '');
+
   print((mal ? "✗ " : "✓ ") + ok + "/" + (ok + mal) + " casos");
   if (mal) throw new Error(mal + " casos fallaron");
 }
