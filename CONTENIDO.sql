@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- CONTENIDO.sql  ·  27-oct-2026  ·  Módulo «Contenido» (b138): calendario, métricas, banco, revisión
--- ⏳ ESCRITO, NO APLICADO. Antes: ENSAYO_CONTENIDO.sql (ensayo en seco, no deja nada). Después: la fila de
+-- ✅ APLICADO en producción por Andrea (27-oct), control 4·30·0·0·INSERT,SELECT,UPDATE·0·0·2·2·4; ensayo 59/59; verificado desde afuera (REST anon 42501 en las 6). Antes: ENSAYO_CONTENIDO.sql (ensayo en seco, no deja nada). Después: la fila de
 --    control de abajo tiene que salir EXACTA. Este header se toca DESPUÉS de verificar, nunca antes.
 -- Para saber si está aplicado, mirar la base: `select to_regclass('public.contenido_post')`.
 --
