@@ -2397,7 +2397,6 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
     </div>
     <label class="bs-exp-l">Cliente<input id="bsExpCli" class="bs-in" type="search" list="bsExpCliLista" autocomplete="off" oninput="bsExpInvalidar()"></label>
     <datalist id="bsExpCliLista"></datalist>
-    <label class="bs-exp-chk"><input id="bsExpTodos" type="checkbox" onchange="bsExpTodosCambio()"> Todos los clientes</label>
     <label class="bs-exp-l">Lote<input id="bsExpLote" class="bs-in" type="search" placeholder="224 / 2-27" autocomplete="off" oninput="bsExpInvalidar()"></label>
     <label class="bs-exp-l">Producto<select id="bsExpProd" class="bs-in" onchange="bsExpInvalidar()"></select></label>
     <div id="bsExpEst" class="status hidden"></div>
@@ -4639,7 +4638,6 @@ body:has(.de-fondo) #tkBtn{display:none}
   font-size:15px;font-weight:600;color:var(--text)}
 .bs-exp-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .bs-exp-l{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--text-3);min-width:0}
-.bs-exp-chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);margin-top:-4px}
 .bs-exp-in .bs-in:disabled{opacity:.45}
 .bs-exp-acc{display:flex;gap:10px}
 .bs-exp-acc .btn{flex:1;height:44px}
@@ -18785,7 +18783,7 @@ function bsExportModelo(P, f, meta){
   const filas=[]; let nPed=0;
   (P||[]).slice().map(function(p){ return {p:p, d:_bsExpFecha(p)}; })
     .filter(function(o){ return o.d && o.d>=f.desde && o.d<=f.hasta; })
-    .filter(function(o){ return f.todos || !qCli
+    .filter(function(o){ return !qCli
       || _bsNorm(_bsExpCliente(o.p)).indexOf(qCli)>=0; })
     .sort(function(a,z){ return a.d<z.d?-1:a.d>z.d?1:((+a.p.pedido_id)-(+z.p.pedido_id)); })
     .forEach(function(o){
@@ -18825,7 +18823,7 @@ function bsExportModelo(P, f, meta){
 
   const cab=[
     ['Fechas', _bsExpDMY(f.desde)+' al '+_bsExpDMY(f.hasta)],
-    ['Cliente', f.todos ? 'todos' : (f.cliente||'').trim()],
+    ['Cliente', qCli ? (f.cliente||'').trim() : 'todos'],
     ['Lote', qLote ? (f.lote||'').trim() : 'todos'],
     ['Producto', fProd ? _bsProd(fProd) : 'todos'],
     ['Exportado', (meta.en?_bsExpAhora(meta.en):'')+(meta.por?(' por '+meta.por):'')],
@@ -18973,11 +18971,6 @@ function bsExportarCerrar(){
   const sh=document.getElementById('bsExpSheet'); if(sh) sh.classList.add('hidden');
   _bsExpTemaVolver();
 }
-function bsExpTodosCambio(){
-  const t=document.getElementById('bsExpTodos'), i=document.getElementById('bsExpCli');
-  if(t && i) i.disabled=t.checked;
-  bsExpInvalidar();
-}
 function _bsExpEstado(msg, err){
   const st=document.getElementById('bsExpEst'); if(!st) return;
   if(!msg){ st.className='status hidden'; st.innerHTML=''; return; }
@@ -18985,12 +18978,12 @@ function _bsExpEstado(msg, err){
 }
 function _bsExpFiltros(){
   const v=function(id){ const e=document.getElementById(id); return e?String(e.value||'').trim():''; };
-  const t=document.getElementById('bsExpTodos');
+  // CLIENTE OPCIONAL (Andrea, 27-oct): vacío = todos. Casi siempre se exporta por
+  // lote o por producto. El rango de fechas sí es obligatorio.
   const f={desde:v('bsExpDesde'), hasta:v('bsExpHasta'), cliente:v('bsExpCli'),
-           todos:!!(t&&t.checked), lote:v('bsExpLote'), producto:v('bsExpProd')};
+           lote:v('bsExpLote'), producto:v('bsExpProd')};
   if(!f.desde || !f.hasta) return {err:'Falta el rango de fechas.'};
   if(f.desde>f.hasta) return {err:'«Desde» es posterior a «Hasta».'};
-  if(!f.todos && !f.cliente) return {err:'Falta el cliente.'};
   return {f:f};
 }
 // ── DOS PASOS, A PROPÓSITO ───────────────────────────────────────────────

@@ -61,7 +61,8 @@ son dos herramientas con dos preguntas distintas.
 
 | filtro | ¿va? | por qué |
 |---|---|---|
-| **cliente + rango de fechas** | **obligatorio** | es la combinación que Andrea va a usar siempre |
+| **rango de fechas** | **obligatorio** | un archivo de auditoría se pide por mes o por semana |
+| **cliente** | **opcional** — vacío = todos | **decisión de Andrea, 27-oct-2026**: casi siempre se exporta por lote o por producto. Antes decía «cliente + rango de fechas, obligatorio» |
 | **lote** | **sí** | es *la* pregunta de un retiro: "¿a dónde fue todo lo del lote 208?". Con BRC Start en proceso, es el filtro que justifica el archivo |
 | **producto** | sí, como conveniencia | los datos ya están en la fila, no abre ningún camino nuevo |
 
