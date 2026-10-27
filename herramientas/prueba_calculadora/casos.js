@@ -269,15 +269,21 @@ async function main(){
   eq("fuente de cada valor", [calcCondTag('auto','frio','mc',451,{},29.2).t, calcCondTag('auto','frio','cedi',451,{},8).t, calcCondTag('wm','frio','com',451,{},6.43).t,
      calcCondTag('wm','frio','mc',472,{},29.4).t, calcCondTag('wm','frio','cedi',451,{},null), calcCondTag('wm','anaquel','mc',451,{},null)],
      ['góndola 25-oct','OC 25-oct','factura 10-ago','general',null,null]);
-  var U = {}; calcCondUsrPoner(U,'wm','anaquel','mc',27,'2026-10-27'); calcCondUsrPoner(U,'wm','anaquel','com',6.5,'2026-10-27');
-  eq("lo escrito se guarda por cadena + categoría", U, {'wm.anaquel':{v:{mc:27, com:6.5}, fecha:'2026-10-27'}});
-  eq("lo escrito se marca «tuyo · fecha»", calcCondTag('wm','anaquel','mc',451,U,27), {t:'tuyo · 27-oct', tuyo:true});
-  var LIM = calcCondUsrLimpio(JSON.parse(JSON.stringify(Object.assign({}, U, {'x.frio':{v:{mc:1}}, 'auto.frio':{v:{mc:'29', cedi:7}, fecha:'2026-10-26'}}))));
-  eq("al leer: solo cadenas y campos conocidos, solo números", LIM, {'wm.anaquel':{v:{mc:27, com:6.5}, fecha:'2026-10-27'}, 'auto.frio':{v:{cedi:7}, fecha:'2026-10-26'}});
+  var U = {}; calcCondUsrPoner(U,'wm','anaquel','p451','mc',27,'2026-10-27'); calcCondUsrPoner(U,'wm','anaquel','p451','com',6.5,'2026-10-27');
+  eq("lo escrito se guarda por cadena + categoría + producto", U, {'wm.anaquel.p451':{v:{mc:27, com:6.5}, fecha:'2026-10-27'}});
+  eq("lo escrito se marca «tú, fecha»", calcCondTag('wm','anaquel','mc',451,U,27,'p451'), {t:'tú, 27-oct', tuyo:true});
+  eq("y no se marca en otro producto", calcCondTag('wm','anaquel','mc',472,U,null,'p472'), null);
+  var LIM = calcCondUsrLimpio(JSON.parse(JSON.stringify(Object.assign({}, U, {'x.frio.p1':{v:{mc:1}}, 'wm.frio':{v:{mc:1}},
+     'wm.frio.p451':{v:{mc:'29', cedi:7, mc2:3}, fecha:'2026-10-26'}, 'auto.frio.rPremezcla Brownie':{v:{fijo:4}, fecha:'2026-10-26'}}))));
+  eq("al leer: solo cadena.categoría.producto conocidos, solo números", LIM, {'wm.anaquel.p451':{v:{mc:27, com:6.5}, fecha:'2026-10-27'},
+     'wm.frio.p451':{v:{cedi:7}, fecha:'2026-10-26'}, 'auto.frio.rPremezcla Brownie':{v:{fijo:4}, fecha:'2026-10-26'}});
+  calcCondUsrPoner(LIM,'wm','frio','p451','mc',25,'2026-10-27');
   calcCondUsr = LIM; var QU = calcEstadoBase(); QU.cot={tipo:'prod', k:'blanco'}; calcAplicarMargenes(QU);
-  eq("al elegir producto lo escrito gana sobre lo precargado", [QU.cond.wm.anaquel.mc, QU.cond.auto.frio.cedi, QU.cond.auto.frio.mc], [27, 7, 29.2]);
-  calcCondUsrPoner(LIM,'wm','anaquel','mc',null,'2026-10-28'); calcCondUsrPoner(LIM,'wm','anaquel','com',null,'2026-10-28');
-  eq("borrar todo lo escrito de una cadena la saca del mapa", LIM['wm.anaquel'], undefined);
+  eq("Blanco: lo escrito gana sobre lo precargado", [QU.cond.wm.anaquel.mc, QU.cond.wm.frio.cedi, QU.cond.wm.frio.mc], [27, 7, 25]);
+  QU.cot={tipo:'prod', k:'pizza'}; calcAplicarMargenes(QU);
+  eq("Pizza: el margen de Walmart escrito para Blanco NO la pisa", [QU.cond.wm.frio.mc, QU.cond.wm.anaquel.mc, QU.cond.wm.frio.cedi], [29.4, null, null]);
+  calcCondUsrPoner(LIM,'wm','anaquel','p451','mc',null,'2026-10-28'); calcCondUsrPoner(LIM,'wm','anaquel','p451','com',null,'2026-10-28');
+  eq("borrar todo lo escrito de una cadena la saca del mapa", LIM['wm.anaquel.p451'], undefined);
   calcCondUsr = {};
   // «Hoy le facturas»: un Paquete de 4 y la cadena por el cliente
   var PARTS = {713:{id:713, name:'Automercado S.A.', commercial_name:'Automercado', team_id:false, commercial_partner_id:[713,'x']},
@@ -297,6 +303,22 @@ async function main(){
   cerca("Francés a Walmart en Paquete de 4: igual", HC.wm[453].pf, 3300, 1e-9);
   eq("Francés a Automercado: la ÚLTIMA (19-oct), caja de 24 u → por paquete", [HC.auto[453].pf, HC.auto[453].fecha], [3525, '2026-10-19']);
   eq("cliente sin cadena: no entra; Fresh sin factura: no hay fila", [Object.keys(HC).sort(), HC.fresh], [['auto','dir','wm'], undefined]);
+  // anuladas fuera, cliente y rango
+  var LR = [{product_id:[451,'x'], date:'2026-10-21', price_unit:9999, discount:0, product_uom_id:[1,'u'], partner_id:[88,'x'], move_id:[701,'F1']},
+            {product_id:[451,'x'], date:'2026-10-20', price_unit:3525, discount:0, product_uom_id:[1,'u'], partner_id:[88,'x'], move_id:[702,'F2']},
+            {product_id:[451,'x'], date:'2026-10-02', price_unit:3300, discount:0, product_uom_id:[1,'u'], partner_id:[89,'x'], move_id:[703,'F3']},
+            {product_id:[451,'x'], date:'2026-10-01', price_unit:7000, discount:0, product_uom_id:[1,'u'], partner_id:[89,'x'], move_id:[704,'F4']}];
+  var MV = [{id:701, payment_state:'reversed', reversal_move_id:[801]}, {id:702, payment_state:'paid', reversal_move_id:[]},
+            {id:703, payment_state:'not_paid', reversal_move_id:[]}, {id:704, payment_state:'paid', reversal_move_id:[802]}];
+  var LRok = calcSinRevertidas(LR, MV);
+  eq("factura revertida (precio equivocado) no cuenta como «hoy»", LRok.map(function(l){ return l.move_id[0]; }), [702, 703]);
+  PARTS[89] = {id:89, name:'Soda Y S.A.', commercial_name:'Soda Y', team_id:[5,'Retail'], commercial_partner_id:[89,'x']};
+  var HD = calcArmarHoyCadenas(LRok, function(id){ return calcCadenaDePartner(PARTS[id]); }, {451:1}, FAC, function(id){ return PARTS[id].commercial_name; });
+  eq("Cafés y directo: el último precio con su cliente y el rango de 90 días", [HD.dir[451].pf, HD.dir[451].cliente, HD.dir[451].fecha, HD.dir[451].min, HD.dir[451].max],
+     [3525, 'Café X', '2026-10-20', 3300, 3525]);
+  var QD = calcEstadoBase(); QD.cot={tipo:'prod', k:'blanco'}; QD.cad='dir'; calcAplicarMargenes(QD);
+  eq("Hoy le facturas lleva cliente y rango", (function(h){ return [h.cliente, h.min, h.max]; })(calcHoy(QD, HD, 2000)), ['Café X', 3300, 3525]);
+  eq("Fresh Market: sin cliente en Odoo, no «sin facturas»", CALC_SIN_CLIENTE.fresh, 'Sin cliente Fresh Market en Odoo');
   var QH = calcEstadoBase(); QH.cot={tipo:'prod', k:'frances'}; QH.cad='wm'; calcAplicarMargenes(QH);
   var hw = calcHoy(QH, HC, 2000);
   eq("Hoy le facturas a Walmart: precio, fecha y descuento", [hw.pf, hw.fecha, hw.desc], [3300, '2026-10-12', 6.43]);

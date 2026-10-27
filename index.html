@@ -3067,7 +3067,7 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
           <div class="calc-field"><label for="calcUberCom">Comisión Uber % <span class="calc-src" data-src="uberCom"></span></label><input type="text" inputmode="decimal" id="calcUberCom" class="calc-num" data-cc="uberCom"></div>
         </div>
         <div class="calc-field" style="max-width:150px"><label for="calcIva">IVA al consumidor %</label><input type="text" inputmode="decimal" id="calcIva" class="calc-num" data-cb="iva" data-dec="2"></div>
-        <div class="calc-vtxt" id="calcCondMsg"></div>
+        <div class="calc-fila" style="align-items:center"><button class="btn btn-sm hidden" id="calcCondGuardar">Guardar condiciones</button><span class="calc-vtxt" id="calcCondMsg" style="margin-top:0"></span></div>
       </div>
       <div class="sim-panel calc-panel">
         <div class="sim-h2">Precios</div>
@@ -30416,9 +30416,9 @@ const CALC_COND_SRC={auto:{cedi:'OC 25-oct', fijo:'OC 25-oct'},      // OC A0035
   wm:{com:'factura 10-ago'},                                          // FE 00100001010000003462, discount 6,43 % en la línea
   fresh:{mc:'plantilla 20-oct', fijo:'plantilla 20-oct', uberCom:'supuesto'},
   dir:{cedi:'venta directa', fijo:'venta directa'}};
-function calcCondTag(cad,cat,f,pid,U,val){
-  const u=U&&U[cad+'.'+cat];
-  if(u && u.v && u.v[f]!=null) return {t:'tuyo'+(u.fecha?' · '+calcDiaMes(u.fecha):''), tuyo:true};
+function calcCondTag(cad,cat,f,pid,U,val,prod){
+  const u=calcCondUsrDe(U,cad,cat,prod);
+  if(u && u.v && u.v[f]!=null) return {t:'tú'+(u.fecha?', '+calcDiaMes(u.fecha):''), tuyo:true};
   if(val==null || cat!=='frio') return null;
   if(f==='mc' && (cad==='auto'||cad==='wm')){
     const conDato=!!(pid && CALC_MARGEN_CADENA.frio[cad] && CALC_MARGEN_CADENA.frio[cad][pid]!=null);
@@ -30429,23 +30429,30 @@ function calcCondTag(cad,cat,f,pid,U,val){
 }
 // Una cadena sin ningún dato en esa categoría (Walmart anaquel, todo anaquel hoy).
 function calcSinCond(cond){ return !cond || CALC_COND_CAMPOS.every(function(f){ return cond[f]==null; }); }
-// Condiciones escritas a mano, por cadena + categoría: {'wm.frio':{v:{com:6.5}, fecha:'2026-10-27'}}.
+// Condiciones escritas a mano, por cadena + categoría + LO QUE SE COTIZA (b142 revisión): el margen
+// de Walmart frío escrito para Blanco no pisa el de Pizza medido en góndola.
+//   {'wm.frio.p451':{v:{com:6.5}, fecha:'2026-10-27'}}   p<id> = terminado · r<nombre> = receta
 // Viven en plan_config, clave `calc_condiciones` (append-only, gana la fila más reciente).
+const CALC_COND_RX=/^(auto|wm|fresh|dir)\.(frio|anaquel)\.(p\d+|r.{1,80})$/;
 function calcCondUsrLimpio(v){
   const out={}; if(!v || typeof v!=='object') return out;
   Object.keys(v).forEach(function(key){
-    const e=v[key]; if(!/^(auto|wm|fresh|dir)\.(frio|anaquel)$/.test(key) || !e || typeof e!=='object' || !e.v || typeof e.v!=='object') return;
+    const e=v[key]; if(!CALC_COND_RX.test(key) || !e || typeof e!=='object' || !e.v || typeof e.v!=='object') return;
     const vv={}; CALC_COND_CAMPOS.forEach(function(f){ const n=e.v[f]; if(typeof n==='number' && isFinite(n)) vv[f]=n; });
     if(Object.keys(vv).length) out[key]={v:vv, fecha:String(e.fecha||'').slice(0,10)};
   });
   return out;
 }
-function calcAplicarCondUsr(S,U){
-  Object.keys(U||{}).forEach(function(key){ const p=key.split('.'), c=S.cond[p[0]]&&S.cond[p[0]][p[1]]; if(c) Object.assign(c,U[key].v); });
+function calcCondUsrDe(U,cad,cat,prod){ return (prod && U) ? U[cad+'.'+cat+'.'+prod] : null; }
+// Lo escrito para ESTE producto, sobre todas las cadenas y categorías.
+function calcAplicarCondUsr(S,U,prod){
+  if(!prod) return;
+  CALC_CADENAS.forEach(function(c){ CALC_CATS.forEach(function(k){ const e=calcCondUsrDe(U,c.k,k.k,prod); if(e) Object.assign(S.cond[c.k][k.k],e.v); }); });
 }
 // Escribir (val) o borrar (null) un campo. Borrar devuelve el campo a lo precargado.
-function calcCondUsrPoner(U,cad,cat,f,val,hoy){
-  const key=cad+'.'+cat, e=U[key]||{v:{}, fecha:hoy};
+function calcCondUsrPoner(U,cad,cat,prod,f,val,hoy){
+  if(!prod) return U;
+  const key=cad+'.'+cat+'.'+prod, e=U[key]||{v:{}, fecha:hoy};
   if(val==null) delete e.v[f]; else e.v[f]=val;
   e.fecha=hoy;
   if(Object.keys(e.v).length) U[key]=e; else delete U[key];
@@ -30454,13 +30461,29 @@ function calcCondUsrPoner(U,cad,cat,f,val,hoy){
 // Precio REAL a cada cadena: la última factura (out_invoice posteada, display_type 'product') por
 // producto, llevada a la unidad de venta por id de UoM: price_unit × factor(UoM línea) ÷ factor(UoM
 // del producto). `discount` es el de la línea (Automercado 12,6 · Walmart 6,43).
-function calcArmarHoy(lineas,prodUom,fac){
+// Precio de una línea en la unidad de venta del producto (por id de UoM). null si no se puede.
+function calcPfLinea(l,prodUom,fac){
+  const pid=l.product_id&&l.product_id[0], uid=l.product_uom_id&&l.product_uom_id[0];
+  if(!pid || !uid || prodUom[pid]==null) return null;
+  const fl=fac[uid], fp=fac[prodUom[pid]]; if(!fl || !fp) return null;
+  return (l.price_unit||0)*fl/fp;
+}
+// La última por producto, más el rango de precios de todas las líneas (mín–máx) y el cliente de la
+// última (`nombreDe(partner_id)`, opcional): «Cafés y directo» mezcla listas de precio.
+function calcArmarHoy(lineas,prodUom,fac,nombreDe){
   const out={};
-  (lineas||[]).forEach(function(l){ const pid=l.product_id&&l.product_id[0], uid=l.product_uom_id&&l.product_uom_id[0];
-    if(!pid || out[pid] || !uid || prodUom[pid]==null) return;
-    const fl=fac[uid], fp=fac[prodUom[pid]]; if(!fl || !fp) return;
-    out[pid]={pf:(l.price_unit||0)*fl/fp, desc:l.discount||0, fecha:String(l.date||'').slice(0,10)}; });
+  (lineas||[]).forEach(function(l){ const pid=l.product_id&&l.product_id[0], pf=calcPfLinea(l,prodUom,fac);
+    if(pf==null) return;
+    if(!out[pid]){ out[pid]={pf, desc:l.discount||0, fecha:String(l.date||'').slice(0,10), min:pf, max:pf};
+      if(nombreDe) out[pid].cliente=nombreDe(l.partner_id&&l.partner_id[0])||''; return; }
+    out[pid].min=Math.min(out[pid].min,pf); out[pid].max=Math.max(out[pid].max,pf); });
   return out;
+}
+// Facturas anuladas no cuentan: una factura con precio equivocado que se revirtió con nota de
+// crédito (payment_state 'reversed', o que tiene reversal_move_id) no puede ser «hoy».
+function calcSinRevertidas(lineas,movs){
+  const malas={}; (movs||[]).forEach(function(m){ if(m.payment_state==='reversed' || (m.reversal_move_id&&m.reversal_move_id.length)) malas[m.id]=1; });
+  return (lineas||[]).filter(function(l){ const mid=l.move_id&&l.move_id[0]; return mid && !malas[mid]; });
 }
 // La fila «Hoy» de un terminado en una cadena: precio real, lo que nos queda, góndola real, nuestro
 // margen real y el de la cadena; y cuánto se aparta el PVP que calcula la calculadora de la góndola.
@@ -30469,7 +30492,7 @@ function calcHoy(S,hoy,C){
   const h=hoy&&hoy[S.cad]&&hoy[S.cad][pid]; if(!h) return null;
   const neto=h.pf*(1-h.desc/100), iva=(S.iva||0)/100;
   const g=CALC_GONDOLA.pvp[S.cad]&&CALC_GONDOLA.pvp[S.cad][pid];
-  const out={pf:h.pf, fecha:h.fecha, desc:h.desc, neto, gondola:g==null?null:g, gondFecha:CALC_GONDOLA.fecha, gondFuente:CALC_GONDOLA.fuente[S.cad]||'',
+  const out={pf:h.pf, fecha:h.fecha, desc:h.desc, cliente:h.cliente||'', min:h.min!=null?h.min:h.pf, max:h.max!=null?h.max:h.pf, neto, gondola:g==null?null:g, gondFecha:CALC_GONDOLA.fecha, gondFuente:CALC_GONDOLA.fuente[S.cad]||'',
     mn:(C!=null&&neto>0)?(neto-C)/neto*100:null, mc:null, pvpCalc:null, dif:null};
   if(g!=null) out.mc=(1-neto/(g/(1+iva)))*100;
   out.pvpCalc=calcPrecio(S.cond[S.cad][S.cat],S.iva,C,'pf',h.pf).pvp;
@@ -30627,6 +30650,15 @@ function calcCotPid(S){
   if(S.cot.tipo==='prod'){ const P=calcCotProd(S.cot.k); return P?P.prodId:null; }
   return null;
 }
+// Clave de lo que se cotiza para las condiciones escritas: p<id> o r<nombre de la receta>.
+function calcCotClave(S){
+  const pid=calcCotPid(S); if(pid) return 'p'+pid;
+  if(!S.cot) return null;
+  if(S.cot.tipo==='abierta') return 'r'+String(S.receta.nombre||'').trim().slice(0,80);
+  if(S.cot.tipo==='rec'){ const r=(typeof calcGuardadas!=='undefined'?calcGuardadas:[]).find(function(x){ return String(x.id)===String(S.cot.id); });
+    return r?'r'+String(r.nombre).trim().slice(0,80):null; }
+  return null;
+}
 function calcCotValor(cot){ return !cot ? '' : cot.tipo==='prod' ? 'p:'+cot.k : cot.tipo==='rec' ? 'r:'+cot.id : 'abierta'; }
 function calcCotDeValor(v){
   v=String(v||'');
@@ -30673,6 +30705,8 @@ function calcCostoNulos(c){
 }
 // Cadena de un cliente de Odoo: por partner comercial (CALC_PARTNER), Fresh Market por nombre, y el
 // resto con clasificarCanal (la misma de Rentabilidad): HORECA y Retail = «Cafés y directo».
+// Cadena sin cliente en Odoo (revisado el 27-oct): lo dice en vez de «sin facturas recientes».
+const CALC_SIN_CLIENTE={fresh:'Sin cliente Fresh Market en Odoo'};
 function calcCadenaDePartner(p){
   if(!p) return null;
   const cp=(p.commercial_partner_id&&p.commercial_partner_id[0])||p.id;
@@ -30682,10 +30716,10 @@ function calcCadenaDePartner(p){
   return c==='auto' ? 'auto' : c==='walmart' ? 'wm' : (c==='horeca'||c==='retail') ? 'dir' : null;
 }
 // Líneas de factura de UN producto (date desc) → la última por cadena, en la unidad de venta.
-function calcArmarHoyCadenas(lineas,cadDe,prodUom,fac){
+function calcArmarHoyCadenas(lineas,cadDe,prodUom,fac,nombreDe){
   const g={};
   (lineas||[]).forEach(function(l){ const k=cadDe(l.partner_id&&l.partner_id[0]); if(k) (g[k]=g[k]||[]).push(l); });
-  const out={}; Object.keys(g).forEach(function(k){ out[k]=calcArmarHoy(g[k],prodUom,fac); });
+  const out={}; Object.keys(g).forEach(function(k){ out[k]=calcArmarHoy(g[k],prodUom,fac,nombreDe); });
   return out;
 }
 // Comparar cadenas: el precio a cada cadena es el propuesto (la elegida), el que se dejó escrito en
@@ -30787,7 +30821,7 @@ function _calcSinTabla(err){
 
 // ── Estado de la vista ──────────────────────────────────────────────────
 let CALC=null, calcCat={}, calcTerm={}, calcGuardadas=[], calcSb={ok:false, msg:''}, calcOdooMsg='';
-let calcSimCosto=null, calcCondUsr={}, calcCondGuardado='{}', calcEsSocia=false, _calcCondT=null;
+let calcSimCosto=null, calcCondUsr={}, calcCondGuardado='{}', calcEsSocia=false;
 // Lo que se cotiza se recuerda en la sesión del navegador (no en la base): es comodidad, no dato.
 function calcCotRecordar(){ try{ sessionStorage.setItem('tf_calc_cot',calcCotValor(CALC.cot)); }catch(e){} }
 function calcCotRecordado(){ try{ return calcCotDeValor(sessionStorage.getItem('tf_calc_cot')); }catch(e){ return null; } }
@@ -30824,7 +30858,9 @@ async function cargarCalcPrecios(){
     calcRefrescarFilas(CALC.receta,calcCat);
   }catch(e){ console.warn('calculadora · catálogo:',e); msgs.push('catálogo de insumos sin Odoo: precios fijos del 25-oct'); }
   calcOdooMsg=msgs.join(' · ');
-  // 3) Condiciones escritas por las socias (plan_config `calc_condiciones`)
+  // 3) Condiciones escritas por las socias (plan_config `calc_condiciones`). El perfil se resuelve
+  // ANTES: el botón de guardar solo aparece si accesoSocia() contestó que sí.
+  try{ calcEsSocia=await accesoSocia(); }catch(e){ calcEsSocia=false; }
   await calcCargarCondUsr(); calcAplicarMargenes(CALC);
   calcBuildUI(); calcPintarTodo();
   // 4) Lo que hoy se le factura a cada cadena: del producto elegido, al elegirlo
@@ -30851,14 +30887,18 @@ async function calcCargarHoyProd(pid){
     const desde=_ymd(new Date(Date.now()-90*86400000));
     const prods=await odooCall('product.product','read',[[pid]],{fields:['id','uom_id']});
     const prodUom={}; (prods||[]).forEach(function(x){ prodUom[x.id]=x.uom_id&&x.uom_id[0]; });
-    const lineas=await odooCall('account.move.line','search_read',
+    let lineas=await odooCall('account.move.line','search_read',
       [[['product_id','=',pid],['move_id.move_type','=','out_invoice'],['parent_state','=','posted'],['display_type','=','product'],['date','>=',desde]]],
-      {fields:['product_id','date','price_unit','discount','product_uom_id','partner_id'],order:'date desc, id desc',limit:500});
+      {fields:['product_id','date','price_unit','discount','product_uom_id','partner_id','move_id'],order:'date desc, id desc',limit:500});
+    const mids=[...new Set((lineas||[]).map(function(l){ return l.move_id&&l.move_id[0]; }).filter(Boolean))];
+    const movs=mids.length?await odooCall('account.move','read',[mids],{fields:['id','payment_state','reversal_move_id']}):[];
+    lineas=calcSinRevertidas(lineas,movs);
     const ids=[...new Set((lineas||[]).map(function(l){ return l.partner_id&&l.partner_id[0]; }).filter(Boolean))];
     const parts=ids.length?await odooCall('res.partner','read',[ids],{fields:['id','name','commercial_name','team_id','commercial_partner_id']}):[];
     const P={}; (parts||[]).forEach(function(x){ P[x.id]=x; });
     await uomFactores((lineas||[]).map(function(l){ return l.product_uom_id&&l.product_uom_id[0]; }).concat([prodUom[pid]]));
-    const porCad=calcArmarHoyCadenas(lineas,function(id){ return calcCadenaDePartner(P[id]); },prodUom,_uomFac);
+    const nom=function(id){ const x=P[id]; return x?String((typeof x.commercial_name==='string'&&x.commercial_name)||x.name||''):''; };
+    const porCad=calcArmarHoyCadenas(lineas,function(id){ return calcCadenaDePartner(P[id]); },prodUom,_uomFac,nom);
     CALC_CADENAS.forEach(function(c){ calcHoyData[c.k]=calcHoyData[c.k]||{}; if(porCad[c.k]&&porCad[c.k][pid]) calcHoyData[c.k][pid]=porCad[c.k][pid]; });
     calcHoyLeido[pid]=true;
   }catch(e){ console.warn('calculadora · facturas a cadenas:',e); calcHoyLeido[pid]='error'; }
@@ -30877,13 +30917,13 @@ async function calcCargarCondUsr(){
 async function calcGuardarCond(){
   const J=JSON.stringify(calcCondUsr); if(J===calcCondGuardado) return;
   const msg=function(t,color){ const el=document.getElementById('calcCondMsg'); if(el){ el.textContent=t; el.style.color=color||'var(--text-3)'; } };
-  if(!calcEsSocia){ msg('Solo en esta sesión'); return; }
+  if(!calcEsSocia) return;   // el botón no se muestra a quien no es socia
   const c=sbClient(); if(!c){ msg('Sin conexión con la base: no se guardó','var(--stop-tx)'); return; }
   let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
   try{
     const {error}=await c.from('plan_config').insert([{clave:'calc_condiciones', valor:JSON.parse(J), usuario:email||null}]);
     if(error){ msg('No se guardó: '+(error.message||error),'var(--stop-tx)'); return; }
-    calcCondGuardado=J; msg('Guardado');
+    calcCondGuardado=J; msg('Guardado'); calcRecalc();
   }catch(e){ msg('No se guardó: '+(e&&e.message||e),'var(--stop-tx)'); }
 }
 async function calcCargarGuardadas(){
@@ -30960,11 +31000,10 @@ function calcBuildUI(){
   document.querySelectorAll('#vCalcPrecios [data-cc]').forEach(function(el){
     el.oninput=function(){
       const f=el.dataset.cc, v=_crNum(el.value);
-      calcCondUsrPoner(calcCondUsr,CALC.cad,CALC.cat,f,v,_ymd(new Date()));
+      calcCondUsrPoner(calcCondUsr,CALC.cad,CALC.cat,calcCotClave(CALC),f,v,_ymd(new Date()));
       // En blanco = vuelve lo precargado (o vacío si no había nada).
       calcCond()[f]= v!=null ? v : calcCondBase(calcCotPid(CALC))[CALC.cad][CALC.cat][f];
       const m=document.getElementById('calcCondMsg'); if(m) m.textContent='';
-      clearTimeout(_calcCondT); _calcCondT=setTimeout(calcGuardarCond,1200);
       calcRecalc(); };
     el.onblur=function(){ calcPintarCampos(true); };
   });
@@ -30986,6 +31025,7 @@ function calcBuildUI(){
   const nr=document.getElementById('calcRecNombre');
   if(nr){ nr.oninput=function(){ CALC.receta.nombre=nr.value; }; }
   const bg=document.getElementById('calcGuardar'); if(bg) bg.onclick=calcGuardar;
+  const bcg=document.getElementById('calcCondGuardar'); if(bcg) bcg.onclick=calcGuardarCond;
   const ba=document.getElementById('calcAddFila'); if(ba) ba.onclick=function(){ CALC.receta.filas.push(calcFilaVacia()); calcPintarReceta(); calcRecalc(); };
   const bn=document.getElementById('calcNueva'); if(bn) bn.onclick=function(){
     CALC.prod='receta'; CALC.guardadaId=null; CALC.receta={nombre:'', rinde:1, filas:[calcFilaVacia(),calcFilaVacia(),calcFilaVacia()]};
@@ -31009,8 +31049,8 @@ function calcElegirProd(k){
 // mano por cadena + categoría (calcCondUsr) gana sobre lo precargado.
 function calcAplicarMargenes(S){
   const pid=calcCotPid(S);
-  ['auto','wm','fresh'].forEach(function(c){ S.cond[c].frio.mc=calcMcDe(c,pid); });
-  calcAplicarCondUsr(S,calcCondUsr);
+  S.cond=calcCondBase(pid);   // de cero: lo escrito para otro producto no se arrastra
+  calcAplicarCondUsr(S,calcCondUsr,calcCotClave(S));
   S.pfCad={};
 }
 function calcElegirCot(cot){
@@ -31154,9 +31194,11 @@ function calcPintarCampos(blur){
   const cond=calcCond(), pid=calcCotPid(CALC);
   document.querySelectorAll('#vCalcPrecios [data-cc]').forEach(function(el){ pon(el,cond[el.dataset.cc],2); });
   document.querySelectorAll('#vCalcPrecios [data-src]').forEach(function(el){
-    const t=calcCondTag(CALC.cad,CALC.cat,el.dataset.src,pid,calcCondUsr,cond[el.dataset.src]);
+    const t=calcCondTag(CALC.cad,CALC.cat,el.dataset.src,pid,calcCondUsr,cond[el.dataset.src],calcCotClave(CALC));
     el.textContent=t?'· '+t.t:''; el.classList.toggle('calc-src-tuyo',!!(t&&t.tuyo)); });
   document.querySelectorAll('#vCalcPrecios [data-mm]').forEach(function(el){ pon(el,CALC.mminCad[CALC.cad],2); });
+  const bcg=document.getElementById('calcCondGuardar');
+  if(bcg) bcg.classList.toggle('hidden', !calcEsSocia || JSON.stringify(calcCondUsr)===calcCondGuardado);
   const t=CALC.techos[CALC.cad];
   document.querySelectorAll('#vCalcPrecios input[data-te]').forEach(function(el){ pon(el,t[el.dataset.te],el.dataset.te==='x'?2:0); });
   const C=calcCostoPrecio(), r=calcPrecio(cond,CALC.iva,C,CALC.ancla,CALC.val);
@@ -31168,21 +31210,23 @@ function calcPintarCampos(blur){
 // «Hoy le facturas»: solo lectura; la última factura del producto a la cadena elegida.
 function calcPintarHoy(C,cc){
   const box=document.getElementById('calcHoy'); if(!box) return;
-  const pid=calcCotPid(CALC);
+  // Solo frío: las facturas son de producto congelado; en Anaquel no hay «hoy» con qué comparar.
+  const pid=CALC.cat==='frio' ? calcCotPid(CALC) : null;
   box.classList.toggle('hidden',!pid); if(!pid){ box.innerHTML=''; return; }
   const cad=(CALC_CADENAS.find(function(x){ return x.k===CALC.cad; })||{}).label||'';
   const tit='<div class="sim-h2" style="margin-bottom:8px">Hoy le facturas · '+esc(cad)+'</div>';
   const est=calcHoyLeido[pid];
   const h=calcHoy(CALC,calcHoyData,C);
   if(!h){
-    box.innerHTML=tit+'<div class="calc-vtxt">'+(est==='leyendo'?'<span class="spin"></span>Leyendo Odoo…':est==='error'?'Sin Odoo':'Sin facturas recientes')+'</div>';
+    box.innerHTML=tit+'<div class="calc-vtxt">'+(est==='leyendo'?'<span class="spin"></span>Leyendo Odoo…':est==='error'?'Sin Odoo':(CALC_SIN_CLIENTE[CALC.cad]||'Sin facturas recientes'))+'</div>';
     return;
   }
   const pct=function(x){ return x==null?'—':_crFmt(x,1)+' %'; };
   let dif='';
   if(h.dif!=null && Math.abs(h.dif)>=1) dif=' <span class="calc-tag calc-tag-est">calculado '+(h.dif>0?'+':'−')+cM(Math.abs(h.dif))+'</span>';
   box.innerHTML=tit+'<div class="calc-hoy">'
-    +'<div><span>Precio a la cadena</span><b>'+cM(h.pf)+'</b><small>sin IVA · factura '+calcDiaMes(h.fecha)+'</small></div>'
+    +'<div><span>Precio a la cadena</span><b>'+cM(h.pf)+'</b><small>sin IVA · '+(h.cliente&&CALC.cad==='dir'?esc(h.cliente)+', ':'factura ')+calcDiaMes(h.fecha)+'</small>'
+      +(h.max-h.min>=1?'<small>90 días: '+cM(h.min)+'–'+cM(h.max)+'</small>':'')+'</div>'
     +'<div><span>Nos queda</span><b>'+cM(h.neto)+'</b><small>desc. '+_crFmt(h.desc,2)+' %</small></div>'
     +'<div><span>Góndola</span><b>'+(h.gondola!=null?cM(h.gondola):'—')+dif+'</b><small>'+(h.gondola!=null?esc(h.gondFuente)+' · '+calcDiaMes(h.gondFecha):'sin dato')+'</small></div>'
     +'<div><span>Nuestro margen</span><b>'+pct(h.mn)+'</b><small>'+(cc&&!cc.completo?'costo incompleto':'sobre el neto')+'</small></div>'
