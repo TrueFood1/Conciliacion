@@ -109,7 +109,20 @@ begin
       (47, 'A8 anon lee el banco',                                            'anon', null,
            'select count(*) from public.contenido_banco', '42501'),
       (48, 'A9 anon edita un post',                                           'anon', null,
-           format('update public.contenido_post set texto = ''x'' where id = %s', v_post), '42501')
+           format('update public.contenido_post set texto = ''x'' where id = %s', v_post), '42501'),
+      -- secuencias de los id y función de trigger (S1, S5, S10 y S15 ya insertaron SIN permiso de secuencia)
+      (50, 'Q1 anon avanza la secuencia de posts',                            'anon', null,
+           'select nextval(''public.contenido_post_id_seq'')', '42501'),
+      (51, 'Q2 anon lee la secuencia del banco',                              'anon', null,
+           'select last_value from public.contenido_banco_id_seq', '42501'),
+      (52, 'Q3 socia avanza la secuencia de métricas',                        'authenticated', v_socia,
+           'select nextval(''public.contenido_metrica_id_seq'')', '42501'),
+      (53, 'Q4 socia reinicia la secuencia de estados',                       'authenticated', v_socia,
+           'select setval(''public.contenido_post_estado_id_seq'', 1)', '42501'),
+      (54, 'F1 anon ejecuta la función de trigger',                           'anon', null,
+           'select public.contenido_post_editado()', '42501'),
+      (55, 'F2 socia ejecuta la función de trigger',                          'authenticated', v_socia,
+           'select public.contenido_post_editado()', '42501')
     ) v(n, p, rol, email, q, esp)
     order by n
   loop
@@ -189,6 +202,24 @@ begin
   select count(*) into v_n from pg_class where relname in ('v_contenido_post', 'v_contenido_metrica_vigente')
      and 'security_invoker=true' = any (reloptions);
   v_res := v_res || jsonb_build_object('p', 'C3 las 2 vistas con security_invoker', 'esperado', '2', 'obtenido', v_n::text, 'ok', v_n = 2);
+
+  select (select count(*) from (values ('public.contenido_post'), ('public.contenido_post_estado'), ('public.contenido_metrica'),
+                                        ('public.contenido_banco'), ('public.v_contenido_post'), ('public.v_contenido_metrica_vigente')) t(o),
+                                (values ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE'), ('REFERENCES'), ('TRIGGER')) tp(p)
+                          where has_table_privilege('anon', t.o, tp.p))
+       + (select count(*) from (values ('public.contenido_post_id_seq'), ('public.contenido_post_estado_id_seq'),
+                                       ('public.contenido_metrica_id_seq'), ('public.contenido_banco_id_seq')) q(o),
+                               (values ('USAGE'), ('SELECT'), ('UPDATE')) qp(p)
+                         where has_sequence_privilege('anon', q.o, qp.p)) into v_n;
+  v_res := v_res || jsonb_build_object('p', 'C4 privilegios de anon en tablas, vistas y secuencias (has_*_privilege)', 'esperado', '0', 'obtenido', v_n::text, 'ok', v_n = 0);
+  select count(*) into v_n from (values ('public.contenido_post_id_seq'), ('public.contenido_post_estado_id_seq'),
+                                        ('public.contenido_metrica_id_seq'), ('public.contenido_banco_id_seq')) q(o),
+                                (values ('USAGE'), ('SELECT'), ('UPDATE')) qp(p)
+   where has_sequence_privilege('authenticated', q.o, qp.p);
+  v_res := v_res || jsonb_build_object('p', 'C5 privilegios de authenticated en las 4 secuencias', 'esperado', '0', 'obtenido', v_n::text, 'ok', v_n = 0);
+  select count(*) into v_n from (values ('anon'), ('authenticated')) rr(rol)
+   where has_function_privilege(rr.rol, 'public.contenido_post_editado()', 'EXECUTE');
+  v_res := v_res || jsonb_build_object('p', 'C6 anon o authenticated pueden ejecutar la función de trigger', 'esperado', '0', 'obtenido', v_n::text, 'ok', v_n = 0);
 
   perform set_config('ensayo.res', v_res::text, true);
 end $$;

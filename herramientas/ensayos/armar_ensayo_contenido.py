@@ -14,7 +14,7 @@ cab = """-- ══════════════════════�
 -- Prueba las tablas, vistas y políticas de CONTENIDO.sql y lo deshace todo (rollback).
 -- Armado por herramientas/ensayos/armar_ensayo_contenido.py: el bloque DDL es COPIA EXACTA de
 -- CONTENIDO.sql. Si se cambia aquél, se vuelve a armar éste; no se edita a mano.
--- ⏳ NO CORRIDO EN PRODUCCIÓN. Corrido en Postgres local (esquema público del respaldo del 23-oct, sin
+-- ⏳ NO CORRIDO EN PRODUCCIÓN. Corrido en Postgres local (59/59 ok, 27-oct) (esquema público del respaldo del 23-oct, sin
 --    datos, con los dos event triggers de producción y los permisos por defecto de producción).
 --
 -- CÓMO SE LEE
@@ -28,7 +28,7 @@ begin;
 -- ▼▼▼ BLOQUE DDL (copia de CONTENIDO.sql, sin begin/commit ni el control) ▼▼▼
 """
 out = (cab + ddl + '-- ▲▲▲ FIN BLOQUE DDL ▲▲▲\n\n' + cuerpo.rstrip() + '\n'
-       + '-- ESPERADO: 50 filas (49 sin una segunda socia activa, 48 sin además el asistente), todas ok = true.\n\n'
+       + '-- ESPERADO: 59 filas (58 sin una segunda socia activa, 57 sin además el asistente), todas ok = true.\n\n'
        + 'rollback;\n')
 assert out.count('\nbegin;\n') == 1 and out.count('commit;') == 0 and out.rstrip().endswith('rollback;')
 open(os.path.join(R, 'ENSAYO_CONTENIDO.sql'), 'w', encoding='utf-8').write(out)

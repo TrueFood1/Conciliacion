@@ -21,8 +21,12 @@
 --
 --   QUIÉN: solo socias leen y escriben (acceso_es_socia()). anon: nada (ni leer). equipo: nada.
 --   El asistente LEE por las 5 políticas automáticas (event trigger asistente_politicas) y no escribe.
---   Los permisos por defecto de producción dan SELECT/INSERT/UPDATE/DELETE a anon en toda tabla nueva
---   (T-148): por eso cada tabla y vista empieza con `revoke all … from anon, authenticated`.
+--   Los permisos por defecto de producción dan SELECT/INSERT/UPDATE/DELETE a anon en toda tabla nueva,
+--   USAGE/SELECT/UPDATE en toda secuencia y EXECUTE en toda función (T-148): por eso cada tabla, vista,
+--   secuencia de id y la función de trigger empiezan con un `revoke` a anon y authenticated (y la
+--   función, también a PUBLIC). Insertar no necesita la secuencia: las columnas son GENERATED ALWAYS AS
+--   IDENTITY y Postgres no pide permiso sobre su secuencia (medido en el ENSAYO, Q1–Q4).
+--   service_role CONSERVA todo (es el rol de servicio de Supabase, salta la RLS): a propósito, no se toca.
 --
 --   La carga de datos semilla (las 3 historias del 26-oct y los archivos del banco) NO va acá: está
 --   en PEGADO_CONTENIDO_SEMILLA.sql, fuera de git (lleva ids de Drive y métricas de la cuenta).
@@ -136,6 +140,10 @@ grant update (titulo, fecha_planeada, formato, pilar, producto_id, texto, enlace
               publicado_en, editado_por) on public.contenido_post to authenticated;
 grant update (nombre, tipo, categoria, producto_id, nota, activo, editado_por)
   on public.contenido_banco to authenticated;
+-- Las secuencias de los id y la función de trigger: nadie de afuera (ver el header).
+revoke all on sequence public.contenido_post_id_seq, public.contenido_post_estado_id_seq,
+                       public.contenido_metrica_id_seq, public.contenido_banco_id_seq from anon, authenticated;
+revoke execute on function public.contenido_post_editado() from public, anon, authenticated;
 
 create policy contenido_post_sel on public.contenido_post
   for select to authenticated using (acceso_es_socia());
@@ -179,28 +187,37 @@ create view public.v_contenido_metrica_vigente with (security_invoker = true) as
 revoke all on public.v_contenido_post, public.v_contenido_metrica_vigente from anon, authenticated;
 grant select on public.v_contenido_post, public.v_contenido_metrica_vigente to authenticated;
 
--- Control: 4 · 30 · 0 · 0 · INSERT,SELECT,UPDATE · 2 · 2 · 4
+-- Control: 4 · 30 · 0 · 0 · INSERT,SELECT,UPDATE · 0 · 0 · 2 · 2 · 4
 --   tablas con RLS · políticas (10 propias + 5 automáticas del asistente × 4 tablas) ·
---   grants a anon (tablas y vistas) · grants de DELETE a authenticated ·
---   privilegios de authenticated sobre contenido_post (tabla + columnas) ·
---   vistas con security_invoker · triggers de editado · índices propios
+--   privilegios de anon sobre las 4 tablas, 2 vistas y 4 secuencias (has_*_privilege: no depende de
+--   quién consulta) · DELETE de authenticated en las tablas · privilegios de authenticated sobre
+--   contenido_post (tabla + columnas) · privilegios de authenticated sobre las 4 secuencias ·
+--   roles que pueden ejecutar la función de trigger (anon, authenticated) · vistas con security_invoker ·
+--   triggers de editado · índices propios
+with t(o) as (values ('public.contenido_post'), ('public.contenido_post_estado'), ('public.contenido_metrica'),
+                     ('public.contenido_banco'), ('public.v_contenido_post'), ('public.v_contenido_metrica_vigente')),
+     q(o) as (values ('public.contenido_post_id_seq'), ('public.contenido_post_estado_id_seq'),
+                     ('public.contenido_metrica_id_seq'), ('public.contenido_banco_id_seq')),
+     tp(p) as (values ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE'), ('REFERENCES'), ('TRIGGER')),
+     qp(p) as (values ('USAGE'), ('SELECT'), ('UPDATE'))
 select (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
          where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity
            and c.relname in ('contenido_post', 'contenido_post_estado', 'contenido_metrica', 'contenido_banco')) as tablas_con_rls,
        (select count(*) from pg_policy where polrelid in ('public.contenido_post'::regclass, 'public.contenido_post_estado'::regclass,
                                                           'public.contenido_metrica'::regclass, 'public.contenido_banco'::regclass)) as politicas,
-       (select count(*) from information_schema.role_table_grants
-         where grantee = 'anon' and table_name in ('contenido_post', 'contenido_post_estado', 'contenido_metrica', 'contenido_banco',
-                                                   'v_contenido_post', 'v_contenido_metrica_vigente')) as grants_anon,
-       (select count(*) from information_schema.role_table_grants
-         where grantee = 'authenticated' and privilege_type = 'DELETE'
-           and table_name in ('contenido_post', 'contenido_post_estado', 'contenido_metrica', 'contenido_banco')) as delete_authenticated,
+       (select count(*) from t, tp where has_table_privilege('anon', t.o, tp.p))
+     + (select count(*) from q, qp where has_sequence_privilege('anon', q.o, qp.p)) as privs_anon,
+       (select count(*) from t, (values ('DELETE'), ('TRUNCATE')) d(p)
+         where t.o not like 'public.v\_%' and has_table_privilege('authenticated', t.o, d.p)) as borra_authenticated,
        (select string_agg(distinct privilege_type, ',' order by privilege_type) from (
           select privilege_type from information_schema.role_table_grants
            where grantee = 'authenticated' and table_name = 'contenido_post'
           union all
           select privilege_type from information_schema.role_column_grants
            where grantee = 'authenticated' and table_name = 'contenido_post') g) as privs_post,
+       (select count(*) from q, qp where has_sequence_privilege('authenticated', q.o, qp.p)) as privs_seq_authenticated,
+       (select count(*) from (values ('anon'), ('authenticated')) r(rol)
+         where has_function_privilege(r.rol, 'public.contenido_post_editado()', 'EXECUTE')) as funcion_ejecutable,
        (select count(*) from pg_class where relname in ('v_contenido_post', 'v_contenido_metrica_vigente')
            and 'security_invoker=true' = any (reloptions)) as vistas_invoker,
        (select count(*) from pg_trigger where not tgisinternal

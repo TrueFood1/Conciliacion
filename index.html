@@ -28628,13 +28628,19 @@ async function ctBancoRetirar(id){
 // ── POST ↔ VENTAS ─────────────────────────────────────────────────────
 // La semana ANTES (7 días antes del día del post) y la semana DESPUÉS (el día del post y los 6 que
 // siguen). El día del post = publicado_en en hora CR; sin publicar, la fecha planeada. Facturas
-// publicadas, por `date` de la línea (un date, sin huso), neto de notas de crédito. Solo los dos números
-// y la diferencia: nada en pantalla dice por qué se movieron. Semana después incompleta → sin diferencia.
+// publicadas, por `invoice_date` de la factura (un date, sin huso; no el `date` contable de la línea),
+// neto de notas de crédito. Solo los dos números y la diferencia: nada en pantalla dice por qué se
+// movieron. Si CUALQUIERA de las dos semanas incluye días que no pasaron (post a futuro a menos de 7
+// días, o la semana después en curso), se dice «n de 7 días» y no hay diferencia.
 function _ctAncla(p){ return p.publicado_en ? _ctCR(p.publicado_en) : (p.fecha_planeada||''); }
+// Una semana de 7 días cortada en hoy: «completa» solo si su último día ya terminó (es anterior a hoy).
+function _ctTramo(a, b, hoy){
+  const fin=b<hoy ? b : hoy, dias=fin<a ? 0 : Math.round((new Date(fin+'T12:00:00Z')-new Date(a+'T12:00:00Z'))/864e5)+1;
+  return {desde:a, hasta:fin, fin7:b, completa:b<hoy, empezo:a<=hoy, dias:dias};
+}
 function _ctVentanas(D){
-  const hoy=_ctHoyCR(), fin=_ctSumDias(D,6);
-  return {a1:_ctSumDias(D,-7), a2:_ctSumDias(D,-1), d1:D, d2:(fin<hoy ? fin : hoy), completa:fin<hoy, empezo:D<=hoy,
-          dias:Math.max(0, Math.round((new Date((fin<hoy?fin:hoy)+'T12:00:00Z')-new Date(D+'T12:00:00Z'))/864e5)+1)};
+  const hoy=_ctHoyCR();
+  return {antes:_ctTramo(_ctSumDias(D,-7), _ctSumDias(D,-1), hoy), despues:_ctTramo(D, _ctSumDias(D,6), hoy)};
 }
 function ctVenHTML(){
   const fecha=p=>_ctAncla(p);
@@ -28656,10 +28662,13 @@ function ctVenResHTML(p, D){
   let h='<div class="ct-sub" style="margin:0 0 12px">'+_ctProdHTML(pid)+' · '+(p.publicado_en?'publicado ':'planeado ')+esc(_ctFecha(D))+'</div>';
   if(!r || r.cargando) return h+'<div class="muted">Leyendo Odoo…</div>';
   if(r.error) return h+'<div class="status s-err">No pude leer Odoo: '+esc(r.error)+'</div>';
-  h+='<div class="ct-ven"><span>Semana antes</span><span class="ct-r">'+esc(rango(W.a1,W.a2))+'</span><span class="ct-v">'+esc(_entPresPlano(pid, r.antes))+'</span>';
-  if(!W.empezo) return h+'<span>Semana después</span><span class="ct-r">'+esc(rango(W.d1,_ctSumDias(D,6)))+'</span><span class="ct-r">todavía no empieza</span></div>';
-  h+='<span>Semana después</span><span class="ct-r">'+esc(rango(W.d1,W.d2))+(W.completa?'':' · '+W.dias+' de 7 días')+'</span><span class="ct-v">'+esc(_entPresPlano(pid, r.despues))+'</span>';
-  if(W.completa){ const d=r.despues-r.antes;
+  // Las dos semanas se dibujan con la MISMA regla (antes la incompleta solo se marcaba en «después»).
+  const fila=(nom, T, v)=>!T.empezo
+    ? '<span>'+nom+'</span><span class="ct-r">'+esc(rango(T.desde,T.fin7))+'</span><span class="ct-r">todavía no empieza</span>'
+    : '<span>'+nom+'</span><span class="ct-r">'+esc(rango(T.desde,T.hasta))+(T.completa?'':' · '+T.dias+' de 7 días')+'</span>'
+      +'<span class="ct-v">'+esc(_entPresPlano(pid, v))+'</span>';
+  h+='<div class="ct-ven">'+fila('Semana antes', W.antes, r.antes)+fila('Semana después', W.despues, r.despues);
+  if(W.antes.completa && W.despues.completa){ const d=r.despues-r.antes;
     h+='<span>Diferencia</span><span></span><span class="ct-v">'+(d>0?'+':d<0?'−':'')+esc(_entPresPlano(pid, Math.abs(d)))+'</span>'; }
   return h+'</div>';
 }
@@ -28672,19 +28681,22 @@ async function ctVenLeer(){
   try{
     if(!(SESSION && SESSION.uid)) await _esperarOdoo();
     if(!(SESSION && SESSION.uid)) throw new Error('sin conexión con Odoo');
-    const W=_ctVentanas(D), hasta=W.empezo ? W.d2 : W.a2;
-    const aml=await odooCall('account.move.line','search_read',
+    const W=_ctVentanas(D), desde=W.antes.desde, hasta=W.despues.empezo ? W.despues.hasta : W.antes.hasta;
+    let aml=[];
+    if(W.antes.empezo) aml=await odooCall('account.move.line','search_read',
       [[['parent_state','=','posted'],['move_id.move_type','in',['out_invoice','out_refund']],
-        ['display_type','=','product'],['product_id','=',p.producto_id],['date','>=',W.a1],['date','<=',hasta]]],
-      {fields:['quantity','product_uom_id','date','move_id'], limit:20000});
-    const mids=[...new Set(aml.map(l=>l.move_id && l.move_id[0]).filter(Boolean))], mt={};
+        ['display_type','=','product'],['product_id','=',p.producto_id],
+        ['move_id.invoice_date','>=',desde],['move_id.invoice_date','<=',hasta]]],
+      {fields:['quantity','product_uom_id','move_id'], limit:20000});
+    const mids=[...new Set(aml.map(l=>l.move_id && l.move_id[0]).filter(Boolean))], mt={}, fd={};
     for(let i=0;i<mids.length;i+=500)
-      (await odooCall('account.move','read',[mids.slice(i,i+500)],{fields:['move_type']})).forEach(m=>{ mt[m.id]=m.move_type; });
+      (await odooCall('account.move','read',[mids.slice(i,i+500)],{fields:['move_type','invoice_date']}))
+        .forEach(m=>{ mt[m.id]=m.move_type; fd[m.id]=m.invoice_date||''; });
     await uomFactores(aml.map(l=>l.product_uom_id && l.product_uom_id[0]));
     let antes=0, despues=0;
     aml.forEach(l=>{   // a unidades base por el id de la UoM (nunca el nombre), con signo de la nota de crédito
       const u=(l.product_uom_id ? uomFac(l.product_uom_id[0]) : 1)||1, s=(mt[l.move_id[0]]==='out_refund') ? -1 : 1, q=l.quantity/u*s;
-      if(l.date<=W.a2) antes+=q; else despues+=q; });
+      if(fd[l.move_id[0]]<=W.antes.fin7) antes+=q; else despues+=q; });
     _ct.ven[key]={antes:Math.round(antes*1e6)/1e6, despues:Math.round(despues*1e6)/1e6};
   }catch(e){ _ct.ven[key]={error:(e&&e.message)||String(e)}; }
   pintar();
