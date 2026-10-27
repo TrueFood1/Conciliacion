@@ -28603,7 +28603,9 @@ async function ctVenLeerTodo(){
     // en vuelta: si mientras leía se abrió otra pieza, la vuelta siguiente la encuentra
     for(let vuelta=0; vuelta<5; vuelta++){
       if(_ct.tab!=='met' || !_ct.posts) break;
-      const P=_ctMetPorPost(), L=_ctPublicadas(P), cola=_ctVenGrupos(L).map(g=>g.p);
+      // solo lo de los últimos 90 días se lee solo; lo más viejo, al abrir la pieza
+      const lim=new Date(Date.now()-90*864e5).toISOString().slice(0,10);
+      const P=_ctMetPorPost(), L=_ctPublicadas(P), cola=_ctVenGrupos(L).map(g=>g.p).filter(p=>(_ctAncla(p)||'')>=lim);
       const ab=L.find(x=>x.id===_ct.metAb); if(ab && ab.producto_id && _ctAncla(ab)) cola.unshift(ab);
       const falta=cola.filter(p=>!_ct.ven[_ctVenKey(p.producto_id, _ctAncla(p))]);
       if(!falta.length) break;
