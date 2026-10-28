@@ -6055,7 +6055,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 27 oct 2026 · b143';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 28 oct 2026 · b144';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -11543,7 +11543,11 @@ function _medirCfg(){ const c=(typeof _rzCtx!=='undefined' && _rzCtx && _rzCtx.c
 // Hasta dónde cubre lo que se mide desde HOY: el próximo día de medición DESPUÉS de hoy (si hoy es
 // día de medición, el de la semana que viene), que entra al `frac`. Sin fechas fijas: la semana de
 // transición (se midió el lun 26-oct hasta el jue 29 a la mañana) sale sola de la misma regla.
-function _medirHasta(hoy){ return _dfProx(hoy, _medirCfg().dia, false); }
+// LA VÍSPERA (Andrea, 28-oct-2026): si mañana es día de medición, la ventana va hasta el de la
+// semana siguiente. El miércoles se prepara la medición del jueves; con la regla sola, «cubre hasta
+// el jue 29» mostraba medio día y no lo que se iba a medir.
+function _medirHasta(hoy){ const d=_dfProx(hoy, _medirCfg().dia, false);
+  return d===_dfAdd(hoy,1) ? _dfAdd(d,7) : d; }
 // Productos con día fijo (para sacarlos de "Comprar").
 function _dfPids(){ return new Set(((_rzCtx&&_rzCtx.cfg&&_rzCtx.cfg.diaFijo)||[]).map(function(x){ return +x.producto_id; }).filter(Boolean)); }
 
