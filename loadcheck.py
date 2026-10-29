@@ -64,3 +64,11 @@ peor=[x for x in rot if any(MAL.search(str(v)) for v in x[1:])]
 if peor or any(not str(x[1]).startswith('caja de 6 paq') for x in rot):
     print('✗ ROTULO DE CAJA MAL para un producto en paquete:', peor or rot); sys.exit(1)
 print('✓ rótulo de caja en unidad de venta:', ' | '.join('%d %s' % (x[0], x[1]) for x in rot))
+
+# ── CERCA: EL CANDADO DE ODOO (E1, 29-oct-2026) ───────────────────────────
+# Ninguna escritura a Odoo ni credenciales tecleadas desde el navegador. Vive en un script
+# hermano para poder correrlo solo (y sobre una copia: `python3 candado_check.py otra.html`).
+r3=subprocess.run([sys.executable,os.path.join(os.path.dirname(os.path.abspath(__file__)),'candado_check.py'),'index.html'],
+                  capture_output=True,text=True)
+print((r3.stdout+r3.stderr).strip())
+if r3.returncode!=0: sys.exit(1)

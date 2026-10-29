@@ -2340,15 +2340,8 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
   <img src="Logo_Sec_Color.png" alt="True Food" class="login-logo">
   <div class="login-os">Sistema Operativo</div>
   <div class="login-form">
-    <input id="inUrl" type="hidden" value="https://demotruefood.odoo.com">
-    <input id="inDb" type="hidden" value="truefoodcr-17-0-stag-33955917">
-    <div class="field"><label>Usuario</label><input id="inUser" value="andrea@truefoodcr.com"></div>
-    <div class="field"><label>Contraseña</label><input id="inApiKey" type="password" value=""></div>
     <div id="loginStatus"></div>
-    <button class="btn btn-amarillo" style="width:100%;height:44px" onclick="doLogin()">Entrar</button>
-    <button class="btn" style="width:100%;height:40px;margin-top:8px" onclick="entrarProd()">Producción (solo lectura) →</button>
   </div>
-  <div class="login-foot">demo · demotruefood.odoo.com</div>
 </div>
 
 <!-- LOBBY -->
@@ -2478,42 +2471,9 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
 
 <!-- UPLOAD -->
 <div id="vUpload" class="hidden">
-  <div id="alertConn" class="hidden" style="font-size:11px;color:var(--text-3);letter-spacing:.02em;margin-bottom:14px"></div>
-
-  <!-- PASO 1 · Subí el extracto — puerta de entrada del flujo. Subir = limpiar + montar en Odoo, de una. -->
-  <div class="card" id="bacCard" style="margin-bottom:22px">
-    <div class="card-title">Subí el extracto del BAC</div>
-    <div class="m3sub" style="margin-top:2px">XLS del banco.</div>
-    <div class="uz" id="dzBac" onclick="document.getElementById('fBac').click()" style="margin-top:14px">
-      <input type="file" id="fBac" accept=".xls,.xlsx,.csv" style="display:none">
-      <div style="font-size:14px;font-weight:600" id="lblBac">Arrastrá o hacé clic — XLS del BAC</div>
-      <div style="font-size:11px;color:var(--text-h);margin-top:3px">XLS · XLSX · CSV</div>
-    </div>
-    <div id="montarStatus" class="status hidden" style="margin-top:.9rem"></div>
-    <button class="btn btn-sm hidden" id="btnOtroBac" onclick="otroExtracto()" style="margin-top:.8rem">↻ Subir otro extracto</button>
-  </div>
-
-  <!-- PASO 1 — Cobros por conciliar. Salen del extracto recién subido (entradas). Egresos: Pronto. -->
-  <div id="flujoCobros">
-    <div class="m3title" style="font-size:24px">Cobros por conciliar</div>
-    <div class="m3sub" style="margin-top:4px">Cobros del extracto.</div>
-    <div style="margin-top:12px"><div id="cobrosPendResumen" class="muted"></div></div>
-    <div style="background:var(--surface);border:.5px solid var(--border);border-radius:12px;padding:16px 18px;margin-top:24px">
-      <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin-bottom:12px">Ingresos · Cobros de clientes</div>
-      <div id="ingresosSec"><div class="muted" style="padding:6px 0">Subí el extracto del BAC arriba para ver los cobros del mes.</div></div>
-      <div id="conciliadosSec"></div>
-    </div>
-    <div style="background:var(--surface);border:.5px solid var(--border);border-radius:12px;padding:16px 18px;margin-top:16px">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)">Egresos · Pagos a proveedores</span>
-        <span class="area-soon">Pronto</span>
-      </div>
-      <div class="m3sub" style="margin-top:6px">La conciliación de pagos a proveedores se construye en una próxima etapa. Las comisiones/dietas/Uber las cierran reglas nativas de Odoo.</div>
-    </div>
-  </div>
-
-  <div style="margin-top:30px"><a onclick="toggleAvanzada()" style="cursor:pointer;color:var(--text-2);font-size:13px;font-weight:500">Búsqueda avanzada y extracto ▾</a></div>
-  <div id="avanzada" class="hidden" style="margin-top:14px">
+  <!-- E1 «candado» (29-oct-2026): fuera la subida del extracto (montaba líneas en Odoo), la lista de
+       cobros del extracto y la pestaña «Vincular» (escribían en Odoo). Queda lo que solo lee. -->
+  <div id="avanzada">
 
   <div id="loadingSection" class="hidden">
     <div class="status s-info" id="loadMsg">Cargando facturas de Odoo...</div>
@@ -2525,13 +2485,12 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
   <div class="m3card" id="m3card">
     <div class="m3head">
       <div class="m3title">Conciliación de cobros</div>
-      <div class="m3sub">La vinculación pide confirmación antes de escribir. El resto es solo lectura.</div>
+      <div class="m3sub">Solo lectura.</div>
     </div>
     <div class="m3nav">
       <button class="m3tab on" onclick="m3Tab('cobros',this)">Cobros</button>
       <button class="m3tab" onclick="m3Tab('cliente',this)">Por cliente</button>
       <button class="m3tab" onclick="m3Tab('detective',this)">Detective</button>
-      <button class="m3tab" onclick="m3Tab('vincular',this)">Vincular</button>
     </div>
 
     <!-- COBROS -->
@@ -2569,17 +2528,6 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
       <div id="detectiveOut" style="margin-top:.9rem;font-size:12px;line-height:1.5"></div>
     </div>
 
-    <!-- VINCULAR -->
-    <div class="m3pan" id="m3-pan-vincular">
-      <div class="m3sec-title">Vincular cobro → factura</div>
-      <div class="m3sec-desc">Vincula un cobro a su factura y la deja en "Pagado". Te muestra un resumen y pide confirmación dos veces antes de escribir en Odoo.</div>
-      <div class="field-row" style="align-items:flex-end">
-        <div class="field" style="margin-bottom:0"><label>Factura #</label><input id="inFactVinc" placeholder="00100001010000003250"></div>
-        <div class="field" style="margin-bottom:0"><label>Cobro: id de línea</label><input id="inLineaCobro" placeholder="121331"></div>
-        <button class="btn btn-sm" style="height:34px" onclick="previewVinculacion()">Previsualizar →</button>
-      </div>
-      <div id="vincOut" style="margin-top:.9rem;font-size:12px;line-height:1.5"></div>
-    </div>
   </div>
   </div><!-- /avanzada -->
 </div>
@@ -6066,7 +6014,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 28 oct 2026 · b145';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 29 oct 2026 · b147';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -6184,20 +6132,11 @@ const CLIENT_MAP = [
   {bac:'cnfl',odoo:'CNFL',tipo:'proveedor'},
 ];
 
-let SESSION = {url:'',db:'',uid:0,apiKey:'',user:''};
-// Odoo regenera el staging y le cambia el nombre a la base. Si da "database not
-// found", la herramienta reintenta sola con este valor. Cuando vuelva a cambiar,
-// pedile a Claude Code el nombre actual y se actualiza acá.
-const DB_ACTUAL='truefoodcr-17-0-stag-33955917';
-
-// Prellenar campos desde localStorage al cargar
-window.addEventListener('DOMContentLoaded', function(){
-  const saved = JSON.parse(localStorage.getItem('tf_conn') || '{}');
-  if(saved.url) document.getElementById('inUrl').value = saved.url;
-  if(saved.db)  document.getElementById('inDb').value  = saved.db;
-  if(saved.user)document.getElementById('inUser').value= saved.user;
-  if(saved.pw)  document.getElementById('inApiKey').value= saved.pw;
-});
+let SESSION = {url:'',db:'',uid:0};
+// E1 «candado» (29-oct-2026): hasta b145 la entrada a la demo guardaba usuario y clave de Odoo EN CLARO
+// en localStorage (`tf_conn`). Esa entrada ya no existe; acá se borra lo que haya quedado en cualquier
+// navegador que la usó. Sin aviso: no hay nada que hacer con eso.
+try{ localStorage.removeItem('tf_conn'); }catch(e){}
 let bacData=[],odooInvoices=[],odooBills=[],matches=[],curTab='revisar';
 
 function norm(s){
@@ -6248,8 +6187,6 @@ function yearOk(inv, bacFecha){
   return invY >= minYear;
 }
 
-const PROXY_URL = 'https://truefood-proxy.onrender.com/proxy';   // DEMO (proxy viejo, puerta web)
-
 // ── PROXY DE LECTURA (PRODUCCIÓN) ───────────────────────────────────────
 // Para truefood.odoo.com usamos el proxy NUEVO de solo lectura. La URL/DB/usuario/
 // key viven en render; el navegador solo manda {model,method,args,kwargs} + token.
@@ -6265,6 +6202,8 @@ const PROXY_LECTURA_URL   = 'https://truefood-proxy-lectura.onrender.com';
 const ESCRITURA_URL       = (location.hostname==='127.0.0.1' && /[?&]escritura=local\b/.test(location.search))
                             ? 'http://127.0.0.1:8787' : 'https://truefie-escritura.onrender.com';
 async function lecturaRpc(model, method, args=[], kwargs={}){
+  // La misma lista que `odooRpc`, también acá: el proxy la vuelve a aplicar, pero nada sale si no es lectura.
+  if(!LECTURA_OK.has(method)) throw new Error('🔒 Odoo · solo lectura — bloqueado: '+method+' ('+model+')');
   // El proxy exige un JWT de Supabase válido (login). Lo tomamos de la sesión actual.
   let token='';
   try{ const s=await sbClient().auth.getSession(); token=(s&&s.data&&s.data.session&&s.data.session.access_token)||''; }catch(e){}
@@ -6311,39 +6250,27 @@ function odooPintar(){
   if(b) b.style.display=e.txt?'inline-flex':'none';
 }
 
-// ── CANDADO DE PRODUCCIÓN ───────────────────────────────────────────────
-// Producción = truefood.odoo.com (y NO demotruefood). En prod: SOLO lectura.
+// ── CANDADO DE ODOO ─────────────────────────────────────────────────────
+// Producción = truefood.odoo.com (y NO demotruefood). Desde el navegador: SOLO lectura, en todo entorno.
 function esProd(u){ u=String(u||''); return /(?:^|\/\/)truefood\.odoo\.com/i.test(u) && !/demotruefood/i.test(u); }
 // Allowlist de métodos de lectura. TODO lo demás (create/write/unlink/action_post/
-// js_assign_outstanding_line/…) se bloquea en producción. Denegar por defecto.
+// js_assign_outstanding_line/…) se bloquea siempre (E1). Denegar por defecto.
 const LECTURA_OK = new Set(['search','search_read','read','search_count','read_group',
   'fields_get','name_search','name_get','default_get','get_views','load_views',
   'web_search_read','web_read','web_read_group','read_progress_bar']);
 
 async function odooRpc(endpoint, params){
-  // 🔒 En producción, bloquear cualquier método que no sea de lectura, ANTES de enviar.
-  if(esProd(SESSION.url) && params && params.method && !LECTURA_OK.has(params.method)){
-    const msg='🔒 PRODUCCIÓN · solo lectura — bloqueado: '+params.method+(params.model?(' ('+params.model+')'):'');
+  // 🔒 Cualquier método que no sea de lectura se bloquea ANTES de enviar, en TODO entorno (E1, 29-oct:
+  // hasta b145 solo en producción; fuera de prod iba al proxy viejo con usuario y clave tecleados).
+  if(!params || !params.method || !LECTURA_OK.has(params.method)){
+    const msg='🔒 Odoo · solo lectura — bloqueado: '+((params&&params.method)||'?')+(params&&params.model?(' ('+params.model+')'):'');
     console.warn(msg);
     throw new Error(msg);
   }
-  // En producción, rutear al proxy de SOLO LECTURA (contrato simple {model,method,args,kwargs}).
-  if(esProd(SESSION.url)){
-    return lecturaRpc(params.model, params.method, params.args||[], params.kwargs||{});
-  }
-  const res = await fetch(PROXY_URL + endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Basic ' + btoa(SESSION.user + ':' + SESSION.apiKey),
-      'x-odoo-url': SESSION.url,
-      'x-odoo-db': SESSION.db
-    },
-    body: JSON.stringify({jsonrpc:'2.0', method:'call', id:1, params})
-  });
-  const data = await res.json();
-  if(data.error) throw new Error(data.error.data?.message || data.error.message || 'Error Odoo');
-  return data.result;
+  // El ÚNICO camino a Odoo desde el navegador: el proxy de lectura, con el JWT de la sesión.
+  // Sin sesión de producción todavía (SESSION.url vacío) no se manda nada: ver `_esperarOdoo`.
+  if(!esProd(SESSION.url)) throw new Error('Sin conexión con Odoo');
+  return lecturaRpc(params.model, params.method, params.args||[], params.kwargs||{});
 }
 // ⚠️ TODA LECTURA DE PRODUCTOS VA EN es_CR (30-sep-2026). Sin contexto de idioma
 // Odoo contesta en inglés donde hay traducción: la unidad sale "Units" (Huevos, en
@@ -6360,98 +6287,36 @@ async function odooCall(model,method,args,kwargs={}){
   return odooRpc('/web/dataset/call_kw',{model,method,args,kwargs});
 }
 
-async function doLogin(isRetry){
-  if(!isRetry)window._dbRetry=false;
-  const url=document.getElementById('inUrl').value.trim().replace(/\/$/,'');
-  const db=document.getElementById('inDb').value.trim();
-  const user=document.getElementById('inUser').value.trim();
-  const apiKey=document.getElementById('inApiKey').value.trim();
+// Conectar a Odoo = SOLO producción, por el proxy de lectura con el JWT de Supabase (E1, 29-oct-2026).
+// Hasta b145 esto era `doLogin`, que además tenía una rama para la demo: mandaba usuario y clave
+// tecleados al proxy viejo y directo a Odoo, y los guardaba en claro en `tf_conn`. Ya no existe.
+async function _conectarOdoo(url, db){
   const st=document.getElementById('loginStatus');
-  st.innerHTML='<div class="status s-info">Conectando...</div>';
+  if(st) st.innerHTML='<div class="status s-info">Conectando...</div>';
   try{
-    let users;
-    if(esProd(url)){
-      // Producción: el proxy de lectura autentica con su propia cuenta de servicio (read-only).
-      // El navegador no manda usuario/clave; solo verificamos conectividad leyendo res.users.
-      users = await lecturaRpc('res.users','search_read',[[['login','=',user]]],{fields:['id','name'],limit:1});
-      if(!users||!users.length) users=[{id:1, name:'Producción · solo lectura'}];
-    } else {
-      const res=await fetch(PROXY_URL+'/web/dataset/call_kw',{
-        method:'POST',
-        headers:{
-          'Content-Type':'application/json',
-          'Authorization':'Basic '+btoa(user+':'+apiKey),
-          'x-odoo-url': url,
-          'x-odoo-db': db
-        },
-        body:JSON.stringify({jsonrpc:'2.0',method:'call',id:1,params:{
-          model:'res.users',method:'search_read',
-          args:[[['login','=',user]]],
-          kwargs:{fields:['id','name'],limit:1}
-        }})
-      });
-      const data=await res.json();
-      if(data.error){
-        const emsg=data.error.data?.message||data.error.message||'';
-        const lm=emsg.toLowerCase();
-        const baseNoExiste=lm.includes('database')&&(lm.includes('not found')||lm.includes('does not exist')||lm.includes('no existe'));
-        // Auto-corrección: si la base no existe (staging regenerado), reintentar con la actual.
-        if(baseNoExiste&&db!==DB_ACTUAL&&!window._dbRetry){
-          window._dbRetry=true;
-          document.getElementById('inDb').value=DB_ACTUAL;
-          st.innerHTML='<div class="status s-info">La base de datos cambió de nombre. Reintentando con la actual…</div>';
-          return doLogin(true);
-        }
-        if(baseNoExiste)throw new Error('La base de datos cambió de nombre y la que tengo guardada ya no existe. Pedile a Claude Code el nombre actual del staging y lo actualizo.');
-        throw new Error(emsg);
-      }
-      window._dbRetry=false;
-      users=data.result;
-    }
-    if(!users||!users.length)throw new Error('No se pudo verificar el usuario');
-    SESSION={url,db,uid:users[0].id,apiKey,user,journalId:null,actionInv:null,actionBill:null};
-    aplicarModoProduccion();   // enciende banner + cierra Conciliación si la sesión es producción
-    // Guardar credenciales en localStorage (solo demo; prod no persiste, se entra explícito)
-    if(!esProd(url)) localStorage.setItem('tf_conn', JSON.stringify({url,db,user,pw:apiKey}));
-    // Buscar diario BAC y IDs de acciones al conectar (solo demo: prod es solo lectura, sin escritura al BAC)
-    if(!esProd(url))try{
-      const journals=await fetch(url+'/web/dataset/call_kw',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Basic '+btoa(user+':'+apiKey)},
-        body:JSON.stringify({jsonrpc:'2.0',method:'call',id:2,params:{
-          model:'account.journal',method:'search_read',
-          args:[[['type','=','bank']]],
-          kwargs:{fields:['id','name'],limit:10}
-        }})
-      }).then(r=>r.json());
-      if(!journals.error){
-        const jList=journals.result||[];
-        const bac=jList.find(j=>/bac/i.test(j.name))||jList[0];
-        if(bac)SESSION.journalId=bac.id;
-      }
-    }catch(e){console.warn('No se pudo cargar diario BAC:',e);}
-    st.innerHTML='';
-    // QUIÉN ESTÁ CONECTADO (14-oct): en producción el nombre salía del usuario de Odoo cuyo login es el
-    // del campo `inUser`, que trae «andrea@…» escrito en el HTML — así que TODOS veían «Andrea
-    // Fernandez». Ahora es la persona de la sesión de Truefie (su nombre en acceso_usuario, o su correo).
+    // El proxy autentica con su propia cuenta de servicio (read-only). El navegador no manda usuario
+    // ni clave; solo verificamos conectividad leyendo res.users (mismo pedido que antes de E1).
+    let users = await lecturaRpc('res.users','search_read',[[['login','=','andrea@truefoodcr.com']]],{fields:['id','name'],limit:1});
+    if(!users||!users.length) users=[{id:1, name:'Producción · solo lectura'}];
+    SESSION={url,db,uid:users[0].id};
+    aplicarModoProduccion();   // pinta el estado de Odoo (banner)
+    if(st) st.innerHTML='';
+    // QUIÉN ESTÁ CONECTADO (14-oct): el nombre sale de la persona de la sesión de Truefie (su nombre en
+    // acceso_usuario, o su correo), no del usuario de Odoo.
     let quien=users[0].name;
-    if(esProd(url)){
-      try{
-        const {data:{user:su}}=await sbClient().auth.getUser();
-        const em=((su&&su.email)||'').trim().toLowerCase();
-        const {data:fil}=await sbClient().from('v_acceso_usuario').select('email,nombre').ilike('email',em).limit(5);
-        const mia=(fil||[]).filter(function(f){ return String(f.email||'').trim().toLowerCase()===em; })[0];
-        quien=(mia&&mia.nombre) || em || quien;
-      }catch(e){}
-    }
+    try{
+      const {data:{user:su}}=await sbClient().auth.getUser();
+      const em=((su&&su.email)||'').trim().toLowerCase();
+      const {data:fil}=await sbClient().from('v_acceso_usuario').select('email,nombre').ilike('email',em).limit(5);
+      const mia=(fil||[]).filter(function(f){ return String(f.email||'').trim().toLowerCase()===em; })[0];
+      quien=(mia&&mia.nombre) || em || quien;
+    }catch(e){}
     document.getElementById('connPill').style.display='block';
     document.getElementById('headerSub').textContent=quien+' · '+url;
-    document.getElementById('alertConn').textContent='✓ Conectado como '+quien;
-    document.getElementById('alertConn').classList.remove('hidden');
     document.getElementById('vLogin').classList.add('hidden');
     document.getElementById('vLobby').classList.remove('hidden');   // tras conectar → lobby
   }catch(e){
-    st.innerHTML='<div class="status s-err">Error: '+esc(e.message)+'</div>';
+    if(st) st.innerHTML='<div class="status s-err">Error: '+esc(e.message)+'</div>';
   }
 }
 
@@ -6834,9 +6699,7 @@ window.addEventListener('DOMContentLoaded', function(){
 // Entrar a producción en SOLO LECTURA: apunta la sesión a prod y conecta vía proxy de lectura.
 // No usa usuario/clave del formulario (la cuenta read-only vive en render).
 async function entrarProd(){
-  document.getElementById('inUrl').value='https://truefood.odoo.com';
-  document.getElementById('inDb').value='truefoodcr-17-0-10502262';
-  await doLogin();
+  await _conectarOdoo('https://truefood.odoo.com', 'truefoodcr-17-0-10502262');
 }
 
 // LAS FRANJAS DE «SOLO LECTURA» (14-oct): producción y el asistente, en el encabezado de los módulos Y en
@@ -6853,14 +6716,12 @@ function franjasPintar(){
   pon('homeFrAsis', asis, 'block');
 }
 // Navegación lobby ↔ herramienta (no toca la lógica de conexión a Odoo)
-// Enciende/apaga el modo producción (banner + pestaña Conciliación deshabilitada).
+// Pinta el estado de Odoo (banner). Hasta b145 además «deshabilitaba la pestaña Conciliación en
+// producción» con el selector `.face-concil`, que NINGÚN elemento tenía: la capa no existía. Desde E1
+// (29-oct) Conciliación no puede escribir por construcción: no queda en el navegador ningún llamado de
+// escritura a Odoo (lo vigila `candado_check.py`, que corre dentro de `loadcheck.py`).
 function aplicarModoProduccion(){
-  const prod=esProd(SESSION.url);
   franjasPintar();
-  document.querySelectorAll('.face-concil').forEach(t=>{
-    if(prod){ t.classList.add('dis'); t.disabled=true; t.title='Conciliación bloqueada en modo producción — solo lectura'; }
-    else { t.classList.remove('dis'); t.disabled=false; t.removeAttribute('title'); }
-  });
 }
 // Vistas de módulo (Finanzas + Conciliación + Operaciones + Entregas). Muestra UNA,
 // oculta el resto.
@@ -6936,9 +6797,8 @@ function abrirFinanzas(){ return esMovil() ? irACobros() : irAResultados(); }
 function abrirOperaciones(){ irAResumen(); }              // Operaciones → 1ª sub-pestaña
 function abrirContabilidad(){ abrirFinanzas(); }             // alias histórico
 function entrarHerramienta(){ abrirFinanzas(); }             // alias histórico
-function abrirConciliacion(){                                // módulo Conciliación (candado de 3 capas intacto)
+function abrirConciliacion(){                                // módulo Conciliación: solo lectura (E1, sin escrituras a Odoo)
   _modShow('vUpload'); crumbSet('Conciliación','Cobros');
-  renderCobrosExtracto();   // la lista de cobros sale del extracto subido (no de la pila vieja de Odoo)
 }
 function abrirPersonal(){ irAVacaciones(); }                 // módulo Personal → su única pantalla
 function abrirVentas(){ irAVenClientes(); }                  // módulo Ventas → su única pantalla (Clientes)
@@ -8739,10 +8599,10 @@ function parseBACRows(rows){
   return res;
 }
 
-// ── Subir = limpiar + montar en UN paso (sin diálogos) ──────────────────────
-const JOURNAL_BAC_COLONES=17;          // diario BAC Colones (cuenta corriente CRC) en el demo
-const MARCA_PRUEBA='[PRUEBA TF]';      // marca para identificar/borrar esta tanda en el demo
-const MESES_ES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+// ── Lectura del extracto (solo el archivo, sin Odoo) ─────────────────────────
+// E1 (29-oct-2026): la subida que montaba estas filas en Odoo (`account.bank.statement.line` create, en el
+// diario 17 del demo) se quitó con el resto de las escrituras de Conciliación. Estos dos lectores quedan
+// sin llamador: son la base del lector bilingüe del extracto, que va a vivir en un solo lugar.
 
 // Lee el XLS/CSV crudo como filas-por-índice (array de arrays), sin asumir encabezados.
 function leerExtractoCrudo(file,cb){
@@ -8781,97 +8641,6 @@ function limpiarExtractoJS(aoa){
     });
   }
   return filas;
-}
-
-function nombreMesDe(filas){
-  const cont={};
-  filas.forEach(f=>{const m=(f.fecha||'').slice(5,7);if(m)cont[m]=(cont[m]||0)+1;});
-  let mejor='',max=-1;
-  for(const m in cont){if(cont[m]>max){max=cont[m];mejor=m;}}
-  const idx=parseInt(mejor,10)-1;
-  return (idx>=0&&idx<12)?MESES_ES[idx]:'el período';
-}
-
-document.getElementById('fBac').onchange=function(e){
-  const f=e.target.files[0];if(!f)return;
-  subirYMontarBAC(f);
-};
-
-async function subirYMontarBAC(file){
-  const st=document.getElementById('montarStatus');
-  const di=(cls,txt)=>{st.className='status '+cls;st.classList.remove('hidden');st.innerHTML=txt;};
-  if(!SESSION.uid){di('s-err','Conectate primero a Odoo para cargar el extracto.');return;}
-  di('s-info','<span class="spin"></span>Leyendo el archivo…');
-  leerExtractoCrudo(file,async(aoa)=>{
-    let filas;
-    try{filas=limpiarExtractoJS(aoa);}catch(err){di('s-err','No pude leer el archivo. ¿Es el XLS del BAC?');return;}
-    if(!filas.length){di('s-err','No encontré movimientos en el archivo. ¿Es el extracto del BAC?');return;}
-
-    // Chequeo de saldo POR DETRÁS — único caso que frena
-    const neto=filas.reduce((a,f)=>a+f.monto,0);
-    const saldoIni=Math.round((filas[0].saldo-filas[0].monto)*100)/100;
-    const saldoFin=filas[filas.length-1].saldo;
-    const cuadra=Math.abs(Math.round((saldoIni+neto)*100)/100-saldoFin)<0.01;
-    const mes=nombreMesDe(filas);
-    if(!cuadra){
-      di('s-err','⚠ El extracto de '+mes+' no cuadra: saldo inicial + movimientos no da el saldo final del banco. No lo cargué — revisá que el archivo esté completo y volvé a subirlo.');
-      return;
-    }
-
-    bacData=filas;   // la lista de cobros (Ingresos) sale de estos movimientos
-    di('s-info','<span class="spin"></span>Montando el extracto de '+mes+'… '+filas.length+' movimientos.');
-    try{
-      const res=await montarLimpioEnBAC(filas);
-      if(res.errores>0){
-        di('s-warn','Cargué '+res.creadas+' de '+filas.length+' movimientos de '+mes+', pero '+res.errores+' fallaron. Avisame para revisarlo.');
-      }else{
-        di('s-ok','Listo, extracto de '+mes+' cargado ✓'+(res.saltadas?(' ('+res.saltadas+' ya estaban cargados)'):''));
-      }
-      document.getElementById('btnRun').classList.remove('hidden');
-      document.getElementById('lblBac').textContent='✓ '+file.name+' · '+filas.length+' movimientos';
-      document.getElementById('dzBac').classList.add('ok');
-      document.getElementById('btnOtroBac').classList.remove('hidden');
-      renderCobrosExtracto();   // poblar la lista de cobros con las entradas del extracto
-    }catch(err){
-      di('s-err','Hubo un problema al cargar en Odoo: '+err.message);
-    }
-  });
-}
-
-// Crea las líneas en el diario BAC Colones (id fijo). Anti-dup fecha+ref+monto + marca. NO concilia.
-async function montarLimpioEnBAC(filas){
-  let creadas=0,saltadas=0,errores=0;
-  for(const m of filas){
-    const monto=Math.round(m.monto*100)/100, ref=String(m.referencia||'');
-    try{
-      const prev=await odooCall('account.bank.statement.line','search_read',
-        [[['journal_id','=',JOURNAL_BAC_COLONES],['date','=',m.fecha],['ref','=',ref]]],
-        {fields:['id','amount'],limit:20});
-      if(prev.find(l=>Math.abs(Math.round(l.amount*100)/100-monto)<0.005)){saltadas++;continue;}
-      await odooCall('account.bank.statement.line','create',[{
-        journal_id:JOURNAL_BAC_COLONES,
-        date:m.fecha,
-        payment_ref:MARCA_PRUEBA+' '+m.descripcion,   // etiqueta/memo con marca de prueba
-        ref:ref,                                      // referencia del banco
-        amount:monto,                                 // con signo: − sale, + entra
-      }]);
-      creadas++;
-    }catch(e){
-      errores++;
-      if(errores>=3&&creadas===0)throw new Error('los primeros movimientos fallaron ('+e.message+')');
-    }
-  }
-  return {creadas,saltadas,errores};
-}
-
-// Reinicia el recuadro de subir extracto (solo presentación)
-function otroExtracto(){
-  document.getElementById('fBac').value='';
-  document.getElementById('dzBac').classList.remove('ok');
-  document.getElementById('lblBac').textContent='Arrastrá o hacé clic — XLS del BAC';
-  const st=document.getElementById('montarStatus');st.classList.add('hidden');st.innerHTML='';
-  document.getElementById('btnRun').classList.add('hidden');
-  document.getElementById('btnOtroBac').classList.add('hidden');
 }
 
 // MATCHING
@@ -9365,107 +9134,15 @@ function setTab(t,el){
   renderTable();
 }
 
-async function confirmarYRegistrar(gi){
-  console.log('confirmarYRegistrar called with gi='+gi);
-  const m=matches[gi];
-  if(!m){console.error('No match at index '+gi);return;}
-  console.log('Match type='+m.type+' inv='+JSON.stringify(m.inv?.name)+' monto='+m.bac.monto);
-  m.userStatus='registrando';
-  renderAll();
+// E1 «candado» (29-oct-2026): el clasificador viejo de Conciliación escribía en Odoo desde el navegador
+// (account.payment create/action_post, js_assign_outstanding_line, account.bank.statement.line create,
+// account.move create/action_post). Esas escrituras se quitaron: estas funciones quedan inertes para que
+// los botones que las nombran no revienten. La escritura, si vuelve, va por un carril de truefie-escritura.
+function _concSinEscritura(){
   const st=document.getElementById('regStatus');
-  st.classList.remove('hidden');st.className='status s-info';
-  st.textContent='Registrando pago en Odoo...';
-
-  if(m.type==='rule'&&!m.inv){
-    m.userStatus='confirmed';
-    st.className='status s-ok';
-    st.textContent='✓ Anotado — cuenta '+m.rule.c;
-    renderAll();return;
-  }
-
-  if(!m.inv){
-    console.error('No inv on match, aborting');
-    m.userStatus='pending';
-    st.className='status s-err';
-    st.textContent='Error: no hay factura asignada a este movimiento';
-    renderAll();return;
-  }
-
-  try{
-    console.log('Getting journal...');
-    let journalId=SESSION.journalId;
-    if(!journalId){
-      const journals=await odooCall('account.journal','search_read',[[['type','=','bank']]],{fields:['id','name'],limit:10});
-      console.log('Journals found:',journals.map(j=>j.name+':'+j.id));
-      const bac=journals.find(j=>/bac/i.test(j.name))||journals[0];
-      if(!bac)throw new Error('No se encontró diario BAC en Odoo');
-      journalId=bac.id;SESSION.journalId=journalId;
-    }
-    console.log('Using journal id='+journalId);
-    const esIngreso=m.bac.monto>0;
-    console.log('Creating payment esIngreso='+esIngreso+' partner='+m.inv.partner_id[0]+' amount='+Math.abs(m.inv.amount_residual||m.inv.amount_total));
-    const payId=await odooCall('account.payment','create',[{
-      payment_type: esIngreso?'inbound':'outbound',
-      partner_type: esIngreso?'customer':'supplier',
-      partner_id:   m.inv.partner_id[0],
-      amount:       Math.abs(m.inv.amount_residual||m.inv.amount_total),
-      date:         m.bac.fecha,
-      journal_id:   journalId,
-      ref:          m.bac.descripcion,
-    }]);
-    console.log('Payment created id='+payId);
-    await odooCall('account.payment','action_post',[[payId]]);
-    console.log('Payment posted');
-    const payObj=await odooCall('account.payment','read',[[payId]],{fields:['move_id']});
-    const moveId=payObj[0]?.move_id?.[0];
-    console.log('Payment move_id='+moveId);
-    if(moveId){
-      const payLines=await odooCall('account.move.line','search_read',
-        [[['move_id','=',moveId],['account_id.reconcile','=',true],['reconciled','=',false]]],
-        {fields:['id','name','debit','credit'],limit:10}
-      );
-      console.log('payLines='+JSON.stringify(payLines.map(l=>({id:l.id,debit:l.debit,credit:l.credit}))));
-      if(payLines.length){
-        const esIngreso2=m.bac.monto>0;
-        // Seleccionar la línea correcta: crédito para ingresos, débito para egresos
-        const targetLine=esIngreso2
-          ? (payLines.find(l=>l.credit>0)||payLines[0])
-          : (payLines.find(l=>l.debit>0)||payLines[0]);
-        console.log('Target line id='+targetLine.id+' inv.id='+m.inv.id);
-        try{
-          // Usar el mismo endpoint exacto que usa Odoo internamente
-          await odooRpc('/web/dataset/call_kw/account.move/js_assign_outstanding_line',{
-            model:'account.move',
-            method:'js_assign_outstanding_line',
-            args:[m.inv.id, targetLine.id],
-            kwargs:{
-              context:{
-                lang:'es_CR',
-                tz:'America/Costa_Rica',
-                uid:SESSION.uid,
-                allowed_company_ids:[1]
-              }
-            }
-          });
-          console.log('Reconciliado OK');
-        }catch(e1){
-          console.error('js_assign_outstanding_line error:',e1.message);
-        }
-      }
-    }
-    m.userStatus='registered';
-    m.payId=payId;
-    st.className='status s-ok';
-    st.textContent='✓ Pago registrado — factura '+m.inv.name+' queda "en proceso de pago" en Odoo';
-    renderAll();
-  }catch(e){
-    console.error('Error in confirmarYRegistrar:',e);
-    m.userStatus='pending';
-    st.className='status s-err';
-    st.textContent='Error: '+e.message;
-    renderAll();
-  }
+  if(st){ st.classList.remove('hidden'); st.className='status s-warn'; st.textContent='Conciliación no escribe en Odoo desde Truefie.'; }
 }
+async function confirmarYRegistrar(gi){ _concSinEscritura(); }
 
 function confirmar(i){matches[i].userStatus='confirmed';renderAll();}
 function resetM(i){matches[i].userStatus='pending';renderAll();}
@@ -9532,58 +9209,8 @@ function selectMonto(gi,ci){
   confirmarYRegistrar(gi);
 }
 
-// Devuelve el diario BAC (de la sesión o lo busca).
-async function getJournalBAC(){
-  if(SESSION.journalId)return SESSION.journalId;
-  const journals=await odooCall('account.journal','search_read',[[['type','=','bank']]],{fields:['id','name'],limit:10});
-  const bac=journals.find(j=>/bac/i.test(j.name))||journals[0];
-  if(!bac)throw new Error('No se encontró diario bancario BAC en Odoo');
-  SESSION.journalId=bac.id;
-  return bac.id;
-}
-
-// ════════════════════════════════════════════════════════════════════════
-// ETAPA 1 (prueba de concepto) — Crear UNA línea de extracto en el banco BAC.
-// SOLO crea la línea (NO la concilia). La conciliación la hacés vos a mano en
-// Odoo. Incluye candado anti-duplicados por firma (fecha + monto + descripción)
-// y deja la marca visible "[PRUEBA TF]" para encontrarla y borrarla fácil.
-// ════════════════════════════════════════════════════════════════════════
-async function importarLineaBAC(gi){
-  const m=matches[gi];
-  // Marca/firma reconocible
-  const ref='[PRUEBA TF] '+m.bac.descripcion;
-  if(!confirm('Prueba Etapa 1 (Odoo DEMO):\n\nVa a CREAR una línea de extracto en el banco BAC con estos datos:\n• Fecha: '+m.bac.fecha+'\n• Monto: '+fmt(m.bac.monto)+' ('+(m.bac.monto>0?'ingreso':'egreso')+')\n• Detalle: '+m.bac.descripcion+'\n\nNO la concilia (eso lo hacés vos en Odoo). ¿Crear la línea?'))return;
-  const st=document.getElementById('regStatus');
-  st.classList.remove('hidden');st.className='status s-info';
-  st.textContent='Creando línea de prueba en el BAC...';
-  try{
-    const journalId=await getJournalBAC();
-    // Candado anti-duplicados: misma fecha + misma descripción (payment_ref) + mismo monto
-    const prev=await odooCall('account.bank.statement.line','search_read',
-      [[['journal_id','=',journalId],['date','=',m.bac.fecha],['payment_ref','=',ref]]],
-      {fields:['id','amount'],limit:5});
-    const dup=prev.find(l=>Math.round(l.amount)===Math.round(m.bac.monto));
-    if(dup){
-      st.className='status s-warn';
-      st.textContent='⚠ Esa línea ya estaba importada (id '+dup.id+'). No se duplicó. Marca: '+ref;
-      return;
-    }
-    // Crear la línea de extracto (positivo = ingreso, negativo = egreso)
-    const lineId=await odooCall('account.bank.statement.line','create',[{
-      journal_id:journalId,
-      date:m.bac.fecha,
-      payment_ref:ref,
-      amount:m.bac.monto,
-    }]);
-    m.bslId=lineId;
-    st.className='status s-ok';
-    st.textContent='✓ Línea creada en el BAC (id '+lineId+'). Ahora andá a Odoo → Contabilidad → BAC → Conciliar. Para borrarla buscá la marca: '+ref;
-  }catch(e){
-    console.error('importarLineaBAC error:',e);
-    st.className='status s-err';
-    st.textContent='Error al crear la línea: '+e.message;
-  }
-}
+// ETAPA 1 (prueba de concepto en la demo): creaba UNA línea de extracto en el banco BAC.
+async function importarLineaBAC(gi){ _concSinEscritura(); }   // inerte desde E1 (ver _concSinEscritura)
 
 // ════════════════════════════════════════════════════════════════════════
 // M3 — Diagnóstico de cobros de cliente (SOLO LECTURA). NO escribe en Odoo.
@@ -9659,8 +9286,6 @@ function verMas(which){
   if(which==='cobros'){_cobrosN+=PAG;renderCobrosList();}
   else if(which==='fac'){_facN+=PAG;renderFacList();}
   else if(which==='faccli'){_facCliN+=PAG;renderFacCli();}
-  else if(which==='ingresos'){_cobrosPendN+=PAG;renderIngresos();}
-  else if(which==='entradas'){_entradasN+=PAG;renderCobrosExtracto();}
 }
 function renderCobrosList(){
   const c=document.getElementById('cobrosList');if(!c)return;
@@ -9779,104 +9404,6 @@ function renderFacCli(){
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// PARTE 1 — Vinculación cobro → factura. previewVinculacion() SOLO LEE y muestra
-// un resumen; ejecutarVinculacion() escribe en Odoo y se llama SOLO desde el botón
-// de confirmación. Matching por ID DE LÍNEA del cobro, NUNCA por monto.
-// ════════════════════════════════════════════════════════════════════════
-async function previewVinculacion(){
-  const num=document.getElementById('inFactVinc').value.trim();
-  const lid=parseInt(document.getElementById('inLineaCobro').value.trim());
-  const out=document.getElementById('vincOut');
-  if(!num||!lid){out.innerHTML='<span style="color:#C2410C">Completá factura # y el id de línea del cobro.</span>';return;}
-  out.innerHTML='<span style="color:var(--blue)">Leyendo (solo lectura)…</span>';
-  try{
-    const facs=await odooCall('account.move','search_read',[[['name','=',num],['move_type','=','out_invoice']]],
-      {fields:['id','name','partner_id','amount_residual','payment_state','currency_id'],limit:1});
-    if(!facs.length){out.innerHTML='<span style="color:#DC2626">No existe factura out_invoice '+esc(num)+'.</span>';return;}
-    const f=facs[0];
-    const accCobrar=await getCuentaPorCodigo(CUENTA_COBRAR);
-    // El cobro se identifica por su ID DE LÍNEA (no por monto)
-    const cl=await odooCall('account.move.line','read',[[lid]],
-      {fields:['id','move_name','ref','account_id','partner_id','credit','debit','reconciled','parent_state']});
-    if(!cl.length){out.innerHTML='<span style="color:#DC2626">No existe la línea de cobro id '+lid+'.</span>';return;}
-    const c=cl[0];
-    const probl=[];
-    if(c.parent_state!=='posted')probl.push('el cobro NO está posted (estado: '+c.parent_state+')');
-    if(!c.account_id||(accCobrar&&c.account_id[0]!==accCobrar.id))probl.push('el cobro no está en la cuenta '+CUENTA_COBRAR);
-    if(c.reconciled)probl.push('el cobro ya está conciliado');
-    if((c.credit||0)<=0)probl.push('la línea no es un crédito (dinero recibido)');
-    if(c.partner_id&&f.partner_id&&c.partner_id[0]!==f.partner_id[0])probl.push('cliente del cobro ('+((c.partner_id&&c.partner_id[1])||'')+') ≠ cliente de la factura ('+((f.partner_id&&f.partner_id[1])||'')+')');
-    const sobrante=(c.credit||0)-(f.amount_residual||0);
-    let html='<div style="font-weight:600">Resumen (todavía NO se escribió nada en Odoo)</div>';
-    html+='<div style="margin-top:6px;padding:8px;background:var(--bg2);border-radius:6px">';
-    html+='Factura: <strong>'+esc(f.name)+'</strong> · '+esc((f.partner_id&&f.partner_id[1])||'')+'<br>';
-    html+='Adeudado: <strong>'+diagFmt(f.amount_residual)+'</strong> · Estado actual: '+esc(f.payment_state)+'<br>';
-    html+='Cobro: <strong>'+esc(c.move_name||'')+'</strong>'+(c.ref?' · ref '+esc(c.ref):'')+' (línea '+c.id+') · '+diagFmt(c.credit)+'<br>';
-    html+='Sobrante: <strong style="color:'+(sobrante>0?'#C2410C':(sobrante<-0.005?'#DC2626':'var(--green-d)'))+'">'+diagFmt(sobrante)+'</strong> '+(sobrante>0.005?'→ write-off a '+CUENTA_SOBRANTE:(sobrante<-0.005?'(cobro menor que el adeudado → quedaría PARCIAL, no recomendado)':'(calza exacto)'));
-    html+='</div>';
-    if(f.currency_id&&!/CRC|colon/i.test(f.currency_id[1]||''))probl.push('factura en '+((f.currency_id&&f.currency_id[1])||'')+' (no colones)');
-    if(probl.length){
-      html+='<div style="margin-top:8px;color:#DC2626;font-weight:600">⛔ No se puede ejecutar:</div><ul style="margin:4px 0 0 18px;color:#DC2626">'+probl.map(p=>'<li>'+esc(p)+'</li>').join('')+'</ul>';
-      out.innerHTML=html;return;
-    }
-    html+='<div style="margin-top:10px;padding:8px;background:var(--amber-l);color:var(--amber);border-radius:6px;font-size:11px">Al confirmar: 1) vincula el cobro a la factura (js_assign_outstanding_line) → "Pagado"'+(sobrante>0.005?'; 2) escribe el sobrante '+diagFmt(sobrante)+' a la cuenta '+CUENTA_SOBRANTE+'.':'.')+' Esto SÍ escribe en Odoo (demo).</div>';
-    html+='<button class="btn btn-g btn-sm" style="margin-top:8px" onclick="ejecutarVinculacion('+f.id+','+c.id+','+(f.partner_id?f.partner_id[0]:0)+','+sobrante.toFixed(2)+')">✓ Confirmar y vincular</button>';
-    out.innerHTML=html;
-  }catch(e){console.error('previewVinculacion:',e);out.innerHTML='<span style="color:#DC2626">Error: '+esc(e.message)+'</span>';}
-}
-
-// opts.outId = id del div de salida (default 'vincOut'); opts.onDone() se llama al
-// terminar con éxito. La lógica de Odoo (js_assign + write-off + verificación) NO cambia.
-async function ejecutarVinculacion(facturaId,lineaId,partnerId,sobrante,opts){
-  opts=opts||{};
-  sobrante=parseFloat(sobrante)||0;
-  const out=document.getElementById(opts.outId||'vincOut');
-  if(!opts.skipConfirm && !confirm('Confirmás VINCULAR en Odoo (DEMO)?\n\n• Factura id '+facturaId+'  ←  cobro línea '+lineaId+(sobrante>0.005?'\n• Sobrante '+sobrante.toFixed(2)+' → cuenta '+CUENTA_SOBRANTE:'')+'\n\nEsto escribe en Odoo.'))return;
-  out.innerHTML='<span style="color:var(--blue)">Vinculando cobro a la factura…</span>';
-  try{
-    // 1) Vincular el cobro (línea) a la factura — mismo mecanismo ya probado
-    await odooRpc('/web/dataset/call_kw/account.move/js_assign_outstanding_line',{
-      model:'account.move',method:'js_assign_outstanding_line',
-      args:[facturaId,lineaId],
-      kwargs:{context:{lang:'es_CR',tz:'America/Costa_Rica',uid:SESSION.uid,allowed_company_ids:[1]}}
-    });
-    let pasos='✓ Cobro vinculado a la factura.';
-    // 2) Write-off del sobrante a 999997 (si el cobro fue mayor que el adeudado)
-    if(sobrante>0.005){
-      out.innerHTML='<span style="color:var(--blue)">'+pasos+' Escribiendo el sobrante a '+CUENTA_SOBRANTE+'…</span>';
-      const accCobrar=await getCuentaPorCodigo(CUENTA_COBRAR);
-      const accSob=await getCuentaPorCodigo(CUENTA_SOBRANTE);
-      if(!accSob)throw new Error('No se encontró la cuenta '+CUENTA_SOBRANTE);
-      const diarios=await odooCall('account.journal','search_read',[[['type','=','general']]],{fields:['id'],limit:1});
-      if(!diarios.length)throw new Error('No se encontró un diario tipo "general/varios"');
-      const moveId=await odooCall('account.move','create',[{
-        move_type:'entry',journal_id:diarios[0].id,ref:'Write-off sobrante cobro línea '+lineaId+' → factura id '+facturaId,
-        line_ids:[
-          [0,0,{account_id:accCobrar.id,partner_id:partnerId,debit:sobrante,credit:0,name:'Sobrante cobro (cliente pagó de más)'}],
-          [0,0,{account_id:accSob.id,debit:0,credit:sobrante,name:'Ganancia por descuento de efectivo'}]
-        ]
-      }]);
-      await odooCall('account.move','action_post',[[moveId]]);
-      // Reconciliar la línea 1102010 del write-off contra el resto del cobro original → cierra el sobrante
-      const woLines=await odooCall('account.move.line','search_read',[[['move_id','=',moveId],['account_id','=',accCobrar.id]]],{fields:['id'],limit:1});
-      if(woLines.length){
-        await odooRpc('/web/dataset/call_kw',{model:'account.move.line',method:'reconcile',args:[[woLines[0].id,lineaId]],kwargs:{}});
-        pasos+=' ✓ Sobrante registrado en '+CUENTA_SOBRANTE+' y conciliado.';
-      } else { pasos+=' ⚠ No se ubicó la línea del write-off para conciliar.'; }
-    }
-    // 3) Verificación post-ejecución
-    const f=(await odooCall('account.move','read',[[facturaId]],{fields:['name','payment_state','amount_residual']}))[0];
-    const c=(await odooCall('account.move.line','read',[[lineaId]],{fields:['reconciled']}))[0];
-    const ok=(f.payment_state==='paid'&&Math.abs(f.amount_residual)<0.01);
-    out.innerHTML='<div style="color:var(--green-d);font-weight:600">'+pasos+'</div>'
-      +'<div style="margin-top:6px">Factura '+esc(f.name)+': estado <strong>'+esc(f.payment_state)+'</strong> · adeudado <strong>'+diagFmt(f.amount_residual)+'</strong></div>'
-      +'<div>Cobro (línea '+lineaId+') conciliada: <strong>'+(c.reconciled?'sí':'no')+'</strong></div>'
-      +(ok?'<div style="margin-top:4px;color:var(--green-d);font-weight:600">✓ ÉXITO: factura en "Pagado", adeudado ₡0.</div>':'<div style="margin-top:4px;color:#C2410C">⚠ Revisá en Odoo: no quedó en "paid"/₡0.</div>');
-    if(ok&&typeof opts.onDone==='function')opts.onDone();   // p.ej. quitar el cobro de la lista del flujo
-  }catch(e){console.error('ejecutarVinculacion:',e);out.innerHTML='<span style="color:#DC2626">Error: '+esc(e.message)+'</span>';}
-}
-
-// ════════════════════════════════════════════════════════════════════════
 // DETECTIVE (read-only) — propone qué factura(s) abiertas del cliente cubren un
 // pago, por monto + fecha. Combinaciones de 1, 2 y 3 facturas (3 solo si ≤40
 // elegibles). Orden: exacto → sobrante → cantidad → fecha. NO ejecuta nada.
@@ -9894,10 +9421,9 @@ async function detectiveMatch(){
   if(!D){out.innerHTML='<span style="color:#C2410C">Poné la fecha del pago para proponer.</span>';return;}
   return detectiveCore(pid,P,D,out,{});
 }
-// opts.cobro (cuando viene del flujo) = la línea de cobro 1102010; habilita "Usar esta".
+// Solo propone (E1, 29-oct): los botones «Usar esta» que llevaban a escribir en Odoo se quitaron.
 async function detectiveCore(pid,P,D,out,opts){
   opts=opts||{};
-  _usarCtx=[];   // contexto fresco de los botones "Usar esta" de este render
   out.innerHTML='<span style="color:var(--blue)">Buscando combinaciones (solo lectura)…</span>';
   try{
     // Facturas abiertas del cliente — state=posted excluye canceladas
@@ -9946,28 +9472,6 @@ async function detectiveCore(pid,P,D,out,opts){
         +'<span class="prop-badge '+(exacto?'exacto':'sobra')+'">'+(exacto?'calce exacto':'sobrante '+diagFmt(p.sobrante))+'</span></div>';
       p.combo.forEach(f=>{card+='<div class="prop-fac"><span class="num">'+esc(f.name||'')+'</span><span>'+fmtFecha(f.invoice_date)+'</span><span style="font-family:var(--mono)">'+diagFmt(f.amount_residual)+'</span></div>';});
       card+='<div class="prop-foot"><span>Total '+diagFmt(p.total)+'</span><span>Pago '+diagFmt(P)+'</span><span>Sobrante <strong>'+diagFmt(p.sobrante)+'</strong>'+(p.sobrante>0.005?' → '+CUENTA_SOBRANTE:'')+'</span></div>';
-      let btnUsar;
-      if(opts.stLine){
-        if(p.combo.length===1){
-          const sl=opts.stLine, k=_usarCtx.length;
-          _usarCtx.push({stLineId:sl.id,partnerId:sl.partnerId,partnerName:sl.partnerName,
-            facId:p.combo[0].id,facName:p.combo[0].name,residual:p.combo[0].amount_residual,
-            monto:P,sobrante:p.sobrante,fecha:sl.fecha,referencia:sl.referencia,descripcion:sl.descripcion,
-            outId:out.id,listIdx:sl.listIdx});
-          btnUsar='<button class="btn-usar" onclick="usarEsta('+k+')">Usar esta</button>';
-        } else {
-          btnUsar='<button class="btn-usar" disabled title="Varias facturas — próximamente" style="opacity:.5;cursor:not-allowed">Varias facturas · próximamente</button>';
-        }
-      } else if(opts.cobro){
-        if(p.combo.length===1){
-          btnUsar='<button class="btn-usar" onclick="conciliarConFactura('+opts.cobro.id+','+p.combo[0].id+','+p.combo[0].amount_residual+')">Usar esta</button>';
-        } else {
-          btnUsar='<button class="btn-usar" disabled title="Varias facturas — próximamente" style="opacity:.5;cursor:not-allowed">Varias facturas · próximamente</button>';
-        }
-      } else {
-        btnUsar='<button class="btn-usar" title="Disponible desde el flujo de cobros (todavía no ejecuta acá)">Usar esta</button>';
-      }
-      card+='<div style="margin-top:8px;text-align:right">'+btnUsar+'</div>';
       html+=card+'</div>';
     });
     if(props.length>20)html+='<div style="color:var(--text-h);font-size:11px;margin-top:4px">(mostrando las 20 mejores de '+props.length+')</div>';
@@ -9975,228 +9479,6 @@ async function detectiveCore(pid,P,D,out,opts){
   }catch(e){console.error('detectiveMatch:',e);out.innerHTML='<span style="color:#DC2626">Error: '+esc(e.message)+'</span>';}
 }
 
-// ════════════════════════════════════════════════════════════════════════
-// FLUJO ÚNICO DE 3 PASOS (M3) — Paso 1: lista de cobros de cliente pendientes
-// (líneas 1102010 de Odoo). Reusa detectiveCore (Paso 2) y ejecutarVinculacion
-// (Paso 3). NO duplica el motor; lo orquesta.
-// ════════════════════════════════════════════════════════════════════════
-let _cobrosPend=[],_cobrosPendN=20;
-async function cargarCobrosPend(){
-  const sec=document.getElementById('ingresosSec'),res=document.getElementById('cobrosPendResumen');
-  sec.innerHTML='<span style="color:var(--blue)">Cargando cobros pendientes de Odoo (solo lectura)… ~30s si el proxy dormía.</span>';
-  try{
-    const acc=await getCuentaPorCodigo(CUENTA_COBRAR);
-    if(!acc){sec.innerHTML='<span style="color:#DC2626">No se encontró la cuenta '+CUENTA_COBRAR+'.</span>';return;}
-    const lines=await odooCall('account.move.line','search_read',
-      [[['account_id','=',acc.id],['reconciled','=',false],['credit','>',0],['parent_state','=','posted'],['partner_id','!=',false]]],
-      {fields:['id','move_name','ref','partner_id','credit','date'],limit:300,order:'date desc'});
-    _cobrosPend=lines;_cobrosPendN=PAG;
-    if(res)res.innerHTML='<strong style="font-size:15px">'+_cobrosPend.length+'</strong> <span class="muted">cobros de cliente por conciliar</span>';
-    renderIngresos();
-  }catch(e){console.error('cargarCobrosPend:',e);sec.innerHTML='<span style="color:#DC2626">Error: '+esc(e.message)+'</span>';}
-}
-function renderIngresos(){
-  const sec=document.getElementById('ingresosSec');if(!sec)return;
-  if(!_cobrosPend.length){sec.innerHTML='<div class="muted" style="padding:10px 0">No hay cobros de cliente pendientes por conciliar.</div>';return;}
-  let h='<table class="tbl-clara"><tr><th>Fecha</th><th>Cliente</th><th style="text-align:right">Monto</th><th></th></tr>';
-  _cobrosPend.slice(0,_cobrosPendN).forEach(c=>{
-    h+='<tr>'
-      +'<td class="fecha">'+fmtFecha(c.date)+'</td>'
-      +'<td class="cli-b">'+esc((c.partner_id&&c.partner_id[1])||'')+'</td>'
-      +'<td class="monto">'+diagFmt(c.credit)+'</td>'
-      +'<td style="text-align:right;white-space:nowrap"><button class="btn btn-sm btn-confirm" onclick="conciliarCobro('+c.id+')">Conciliar →</button></td>'
-      +'</tr>';
-    h+='<tr><td colspan="4" style="padding:0;border:none"><div id="cobroDetIn'+c.id+'" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin:2px 0 12px"></div></td></tr>';
-  });
-  sec.innerHTML=h+'</table>'+btnVerMas(_cobrosPendN,_cobrosPend.length,'ingresos');
-}
-// Paso 2: abre el detective inline, pre-cargado con el cobro
-async function conciliarCobro(cobroId){
-  const c=_cobrosPend.find(x=>x.id===cobroId);if(!c)return;
-  const detIn=document.getElementById('cobroDetIn'+cobroId);if(!detIn)return;
-  if(detIn.style.display!=='none'){detIn.style.display='none';return;}
-  _cobrosPend.forEach(x=>{const d=document.getElementById('cobroDetIn'+x.id);if(d)d.style.display='none';});
-  detIn.style.display='';
-  detIn.innerHTML='<span style="color:var(--blue)">Buscando facturas para '+esc((c.partner_id&&c.partner_id[1])||'')+'…</span>';
-  await detectiveCore(c.partner_id[0],c.credit,String(c.date||''),detIn,{cobro:c});
-}
-// Paso 3: confirma con la vinculación existente (1 factura); al éxito, el cobro sale de la lista
-async function conciliarConFactura(cobroId,facturaId,facturaResidual){
-  const c=_cobrosPend.find(x=>x.id===cobroId);if(!c)return;
-  const sobrante=c.credit-(parseFloat(facturaResidual)||0);
-  await ejecutarVinculacion(facturaId,c.id,c.partner_id[0],sobrante,{outId:'cobroDetIn'+cobroId,onDone:function(){
-    _cobrosPend=_cobrosPend.filter(x=>x.id!==cobroId);
-    const res=document.getElementById('cobrosPendResumen');if(res)res.innerHTML='<strong style="font-size:15px">'+_cobrosPend.length+'</strong> <span class="muted">cobros de cliente por conciliar</span>';
-    setTimeout(renderIngresos,1400);  // dejar ver el ✓ un momento y refrescar
-  }});
-}
-// ════════════════════════════════════════════════════════════════════════
-// COBROS DEL EXTRACTO (Ingresos) — la lista sale del extracto subido (bacData),
-// las ENTRADAS (monto>0). NO de la pila 1102010 vieja de Odoo.
-// "Conciliar →" abre el detective inline (propuesta) resolviendo el cliente por
-// nombre. El confirmar-a-Pagado desde el extracto es el próximo paso.
-// ════════════════════════════════════════════════════════════════════════
-let _entradas=[],_entradasN=PAG;
-let _usarCtx=[];          // contexto de cada botón "Usar esta" del render actual del detective
-let _conciliados=[];      // resumen de cobros ya conciliados en esta sesión
-
-// Nombre de cliente legible a partir de la descripción del banco.
-function clienteDeDescripcion(desc){
-  let s=String(desc||'')
-    .replace(/^TEF\s+DE:\s*/i,'')      // "TEF DE:MERCADO PACUARE" → "MERCADO PACUARE"
-    .replace(/^SINPE\s+MOVIL\s*/i,'')  // "SINPE MOVIL TrueFoods…" → "TrueFoods…"
-    .replace(/\s+/g,' ').trim();
-  return s||String(desc||'').trim()||'(sin detalle)';
-}
-
-function renderCobrosExtracto(){
-  const sec=document.getElementById('ingresosSec'),res=document.getElementById('cobrosPendResumen');
-  if(!sec)return;
-  _entradas=(bacData||[]).filter(m=>m.monto>0 && !_conciliadosKey[claveEntrada(m)]);
-  if(res)res.innerHTML=_entradas.length
-    ?('<strong style="font-size:15px">'+_entradas.length+'</strong> <span class="muted">cobros del extracto por conciliar</span>')
-    :'';
-  if(!_entradas.length){sec.innerHTML='<div class="muted" style="padding:6px 0">Subí el extracto del BAC arriba para ver los cobros del mes.</div>';return;}
-  let h='<table class="tbl-clara"><tr><th>Fecha</th><th>Cliente</th><th style="text-align:right">Monto</th><th></th></tr>';
-  _entradas.slice(0,_entradasN).forEach((m,i)=>{
-    h+='<tr>'
-      +'<td class="fecha">'+fmtFecha(m.fecha)+'</td>'
-      +'<td class="cli-b">'+esc(clienteDeDescripcion(m.descripcion))+'</td>'
-      +'<td class="monto">'+diagFmt(m.monto)+'</td>'
-      +'<td style="text-align:right;white-space:nowrap"><button class="btn btn-sm btn-confirm" onclick="conciliarEntrada('+i+')">Conciliar →</button></td>'
-      +'</tr>';
-    h+='<tr><td colspan="4" style="padding:0;border:none"><div id="entDet'+i+'" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin:2px 0 12px"></div></td></tr>';
-  });
-  sec.innerHTML=h+'</table>'+btnVerMas(_entradasN,_entradas.length,'entradas');
-}
-
-// Paso 2: abre el detective inline para la entrada del extracto. Resuelve el
-// cliente por nombre y reusa detectiveCore para proponer la factura.
-// Paso 2: toca "Conciliar →" — alterna abrir/cerrar la propuesta inline.
-async function conciliarEntrada(i){
-  const det=document.getElementById('entDet'+i);if(!det)return;
-  if(det.style.display!=='none'){det.style.display='none';return;}   // colapsar si ya está abierta
-  _entradas.forEach((x,j)=>{const d=document.getElementById('entDet'+j);if(d)d.style.display='none';});
-  det.style.display='';
-  await abrirPropuestas(i);
-}
-
-// Resuelve el cliente, ubica la línea de extracto en Odoo y abre el detective (propuesta).
-async function abrirPropuestas(i){
-  const m=_entradas[i];const det=document.getElementById('entDet'+i);if(!m||!det)return;
-  const cli=clienteDeDescripcion(m.descripcion);
-  det.innerHTML='<span style="color:var(--blue)"><span class="spin"></span>Buscando el cliente «'+esc(cli)+'» en Odoo…</span>';
-  try{
-    let lista=await odooCall('res.partner','search_read',
-      [[['name','ilike',cli],['customer_rank','>',0]]],{fields:['id','name'],limit:8});
-    if(!lista.length)lista=await odooCall('res.partner','search_read',[[['name','ilike',cli]]],{fields:['id','name'],limit:8});
-    if(!lista.length){
-      det.innerHTML='<div class="muted" style="line-height:1.5">No encontré un cliente que calce con <strong>«'+esc(cli)+'»</strong> en Odoo.<br>Probá la <a onclick="document.getElementById(\'avanzada\').classList.remove(\'hidden\');" style="color:#A23DA8;cursor:pointer">Búsqueda avanzada</a> por número de factura o por cliente.</div>';
-      return;
-    }
-    const exacta=lista.find(p=>norm(p.name)===norm(cli));
-    const p=exacta||lista[0];
-    det.innerHTML='<span style="color:var(--blue)"><span class="spin"></span>Buscando la línea del extracto y las facturas de '+esc(p.name)+'…</span>';
-    // ubicar la statement line creada al montar (llave fecha+ref+monto)
-    const stId=await buscarStatementLineId(m);
-    if(!stId){
-      det.innerHTML='<div style="color:#C2410C;line-height:1.5">No encontré la línea de este cobro en el extracto de Odoo. ¿Montaste el extracto? Volvé a subirlo y reintentá.</div>';
-      return;
-    }
-    await detectiveCore(p.id,m.monto,String(m.fecha||''),det,
-      {stLine:{id:stId,partnerId:p.id,partnerName:p.name,fecha:m.fecha,referencia:m.referencia,monto:m.monto,descripcion:m.descripcion,listIdx:i}});
-  }catch(e){det.innerHTML='<span style="color:#DC2626">Error: '+esc(e.message)+'</span>';}
-}
-
-// Busca el id de la account.bank.statement.line del cobro (misma llave anti-dup: fecha+ref+monto).
-async function buscarStatementLineId(m){
-  const ref=String(m.referencia||''), monto=Math.round(m.monto*100)/100;
-  const prev=await odooCall('account.bank.statement.line','search_read',
-    [[['journal_id','=',JOURNAL_BAC_COLONES],['date','=',m.fecha],['ref','=',ref]]],
-    {fields:['id','amount'],limit:20});
-  const hit=prev.find(l=>Math.abs(Math.round(l.amount*100)/100-monto)<0.005);
-  return hit?hit.id:null;
-}
-
-// "Usar esta" → panel de confirmación HUMANO inline (sin diálogo gris).
-function usarEsta(k){
-  const c=_usarCtx[k];if(!c)return;
-  const out=document.getElementById(c.outId);if(!out)return;
-  const sob=c.sobrante;
-  const sobTxt=sob>0.005
-    ?'<div class="conf-row"><span>Sobrante (pagó de más)</span><strong>'+diagFmt(sob)+' → cuenta '+CUENTA_SOBRANTE+' (ganancia)</strong></div>'
-    :(sob<-0.005?'<div class="conf-row" style="color:#DC2626"><span>Atención</span><strong>el cobro es MENOR que la factura: quedaría parcial</strong></div>':'');
-  out.innerHTML=
-    '<div class="conf-panel">'
-    +'<div class="conf-title">Confirmá la conciliación</div>'
-    +'<div class="conf-row"><span>Cliente</span><strong>'+esc(c.partnerName)+'</strong></div>'
-    +'<div class="conf-row"><span>Factura</span><strong>'+esc(c.facName||('id '+c.facId))+'</strong></div>'
-    +'<div class="conf-row"><span>Monto del cobro</span><strong>'+diagFmt(c.monto)+'</strong></div>'
-    +'<div class="conf-row"><span>Monto de la factura</span><strong>'+diagFmt(c.residual)+'</strong></div>'
-    +sobTxt
-    +'<div class="conf-what">Al confirmar, la factura <strong>'+esc(c.facName||'')+'</strong> queda <strong>Pagada</strong> y sale de cuentas por cobrar.</div>'
-    +'<div class="conf-act">'
-    +'<button class="btn btn-sm" onclick="abrirPropuestas('+c.listIdx+')">Cancelar</button>'
-    +'<button class="btn btn-sm btn-confirm" onclick="ejecutarConciliacionStatement('+k+')">Sí, conciliar y marcar Pagada</button>'
-    +'</div><div id="confEjec'+k+'" style="margin-top:8px"></div></div>';
-}
-
-// Ejecuta: prepara la contrapartida de la statement line en cuentas por cobrar y delega
-// en el motor probado (ejecutarVinculacion: js_assign_outstanding_line + write-off + verificación).
-async function ejecutarConciliacionStatement(k){
-  const c=_usarCtx[k];if(!c)return;
-  const ejec=document.getElementById('confEjec'+k)||document.getElementById(c.outId);
-  ejec.innerHTML='<span style="color:var(--blue)"><span class="spin"></span>Conciliando la línea del extracto con la factura…</span>';
-  try{
-    const accCobrar=await getCuentaPorCodigo(CUENTA_COBRAR);
-    if(!accCobrar)throw new Error('No se encontró la cuenta '+CUENTA_COBRAR);
-    // 1) Dejar la contrapartida de la statement line en cuentas por cobrar, con el cliente
-    const contraId=await prepararContrapartida(c.stLineId,c.partnerId,accCobrar.id);
-    // 2) Conciliar contra la factura con el motor probado (sin el confirm gris)
-    await ejecutarVinculacion(c.facId,contraId,c.partnerId,c.sobrante,{
-      outId:'confEjec'+k, skipConfirm:true,
-      onDone:function(){
-        _conciliados.push({fecha:c.fecha,cliente:c.partnerName,factura:c.facName,monto:c.monto});
-        _conciliadosKey[claveEntrada(c)]=true;     // marcar para sacarlo de la lista de Ingresos
-        setTimeout(function(){ renderCobrosExtracto(); renderConciliados(); },1200);
-      }
-    });
-  }catch(e){ejec.innerHTML='<span style="color:#DC2626">No se pudo conciliar: '+esc(e.message)+'</span>';}
-}
-// Llave estable de un cobro del extracto (fecha + referencia + monto).
-function claveEntrada(x){return (x.fecha||'')+'|'+(x.referencia||'')+'|'+Math.round((x.monto||0)*100);}
-let _conciliadosKey={};
-
-// Mueve la contrapartida de la statement line (hoy en cuenta transitoria) a cuentas por
-// cobrar y le pone el cliente, para que quede como crédito pendiente conciliable.
-async function prepararContrapartida(stLineId,partnerId,recvAccId){
-  // poner el cliente en la línea de extracto
-  await odooCall('account.bank.statement.line','write',[[stLineId],{partner_id:partnerId}]);
-  // leer el asiento y sus líneas
-  const stl=(await odooCall('account.bank.statement.line','read',[[stLineId]],{fields:['move_id','journal_id','amount']}))[0];
-  const moveId=stl.move_id[0];
-  const jr=(await odooCall('account.journal','read',[[stl.journal_id[0]]],{fields:['default_account_id','suspense_account_id']}))[0];
-  const bankAccId=jr.default_account_id&&jr.default_account_id[0];
-  const lines=await odooCall('account.move.line','read',[ (await odooCall('account.move','read',[[moveId]],{fields:['line_ids']}))[0].line_ids ],
-    {fields:['id','account_id','debit','credit','reconciled']});
-  // la contrapartida = la línea que NO está en la cuenta bancaria (la transitoria/suspense)
-  const contra=lines.find(l=>l.account_id&&l.account_id[0]!==bankAccId);
-  if(!contra)throw new Error('no ubiqué la contrapartida de la línea de extracto');
-  // moverla a cuentas por cobrar + cliente (así js_assign_outstanding_line la puede aplicar a la factura)
-  await odooCall('account.move.line','write',[[contra.id],{account_id:recvAccId,partner_id:partnerId}]);
-  return contra.id;
-}
-
-function renderConciliados(){
-  const sec=document.getElementById('conciliadosSec');if(!sec)return;
-  if(!_conciliados.length){sec.innerHTML='';return;}
-  let h='<div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin:26px 0 4px">Ya conciliados esta sesión ('+_conciliados.length+')</div>';
-  h+='<table class="tbl-clara"><tr><th>Fecha</th><th>Cliente</th><th>Factura</th><th style="text-align:right">Monto</th></tr>';
-  _conciliados.forEach(c=>{h+='<tr><td class="fecha">'+fmtFecha(c.fecha)+'</td><td class="cli-b">'+esc(c.cliente)+'</td><td class="num">'+esc(c.factura||'')+'</td><td class="monto">'+diagFmt(c.monto)+'</td></tr>';});
-  sec.innerHTML=h+'</table>';
-}
-
-function toggleAvanzada(){document.getElementById('avanzada').classList.toggle('hidden');}
 
 // ════════════════════════════════════════════════════════════════════════
 // DASHBOARD DE COSTOS (cara 1) — costo total vivo por producto, leído de Odoo.
@@ -23297,9 +22579,10 @@ async function lobbyAlertas(){
   if(!fresco){
     // Mientras lee (hasta ~35 s: el plan entero y Odoo), «…» en gris: ni vacío ni «Al día».
     ['homeOpsAlerta','homeComAlerta'].forEach(function(id){ const e=document.getElementById(id); if(e && !e.textContent) _lobAl(id,'…'); });
-    // ⚠️ ESPERAR LA CONEXIÓN A PRODUCCIÓN (3-oct). `odooRpc` elige el proxy por `SESSION.url`:
-    // antes de que `entrarProd` la llene, la llamada va al proxy de demo sin credenciales y vuelve
-    // «Error Odoo». Era la causa de las alertas en blanco de Operaciones y Compras. Y si el proxy
+    // ⚠️ ESPERAR LA CONEXIÓN A PRODUCCIÓN (3-oct). `odooRpc` solo manda si `SESSION.url` es producción:
+    // antes de que `entrarProd` la llene, la llamada falla (hasta b145 iba al proxy de demo y volvía
+    // «Error Odoo»; desde E1 vuelve «Sin conexión con Odoo» sin salir). Era la causa de las alertas
+    // en blanco de Operaciones y Compras. Y si el proxy
     // está dormido (Render tarda hasta ~40 s), se reintenta tres veces: a los 2, 5 y 10 s.
     if(!_lobRzProm) _lobRzProm=(async function(){
       await _esperarOdoo();
@@ -32278,98 +31561,8 @@ async function obtenerEstructuraProveedor(partnerId,prov){
   return{accountId,taxIds};
 }
 
-// Registra UN pago (egreso) contra una factura y lo concilia. Reusa el mismo
-// mecanismo que el resto de la herramienta (js_assign_outstanding_line).
-async function registrarPagoContraFactura(invId,partnerId,amount,fecha,ref,journalId){
-  const payId=await odooCall('account.payment','create',[{
-    payment_type:'outbound',partner_type:'supplier',partner_id:partnerId,
-    amount:Math.abs(amount),date:fecha,journal_id:journalId,ref:ref,
-  }]);
-  await odooCall('account.payment','action_post',[[payId]]);
-  const payObj=await odooCall('account.payment','read',[[payId]],{fields:['move_id']});
-  const moveId=payObj[0]&&payObj[0].move_id&&payObj[0].move_id[0];
-  if(moveId){
-    const payLines=await odooCall('account.move.line','search_read',
-      [[['move_id','=',moveId],['account_id.reconcile','=',true],['reconciled','=',false]]],
-      {fields:['id','debit','credit'],limit:10});
-    if(payLines.length){
-      const targetLine=payLines.find(l=>l.debit>0)||payLines[0];
-      try{
-        await odooRpc('/web/dataset/call_kw/account.move/js_assign_outstanding_line',{
-          model:'account.move',method:'js_assign_outstanding_line',
-          args:[invId,targetLine.id],
-          kwargs:{context:{lang:'es_CR',tz:'America/Costa_Rica',uid:SESSION.uid,allowed_company_ids:[1]}}
-        });
-      }catch(e){console.error('reconcile pago error:',e.message);}
-    }
-  }
-  return payId;
-}
-
-// PROPONE → vos confirmás en el preview → acá crea la factura ya llena y la
-// salda con 1 pago (simple) o 2 pagos por separado (base + IVA).
-async function crearYpagarFactura(gi){
-  cerrarPanel();
-  const m=matches[gi];
-  const p=m.prov;
-  if(!p){console.error('crearYpagarFactura sin prov en match',gi);return;}
-  const st=document.getElementById('regStatus');
-  st.classList.remove('hidden');st.className='status s-info';
-  st.textContent='Creando factura para '+p.odooName+'...';
-  m.userStatus='registrando';renderAll();
-  try{
-    const journalId=await getJournalBAC();
-    const partners=await odooCall('res.partner','search_read',[[['name','ilike',p.odooName]]],{fields:['id','name'],limit:5});
-    if(!partners.length)throw new Error('No se encontró el proveedor "'+p.odooName+'" en Odoo');
-    const partnerId=partners[0].id;
-
-    const est=await obtenerEstructuraProveedor(partnerId,p);
-    if(!est.accountId)throw new Error('No se encontró la cuenta '+p.cuenta+' en Odoo');
-    const base=Math.abs(m.bac.monto);
-    const lineVals={name:p.producto,account_id:est.accountId,quantity:1,price_unit:base};
-    if(p.comportamiento==='base_iva'){
-      if(!est.taxIds.length)throw new Error('No se encontró el impuesto "'+p.impuesto+'" en Odoo');
-      lineVals.tax_ids=[[6,0,est.taxIds]];
-    }else{
-      lineVals.tax_ids=[[6,0,[]]];
-    }
-    const invId=await odooCall('account.move','create',[{
-      move_type:'in_invoice',partner_id:partnerId,invoice_date:m.bac.fecha,
-      invoice_line_ids:[[0,0,lineVals]]
-    }]);
-    await odooCall('account.move','action_post',[[invId]]);
-    const inv=(await odooCall('account.move','read',[[invId]],{fields:['name','amount_total','amount_residual','partner_id','invoice_date']}))[0];
-
-    // El banco manda: avisar si el total de Odoo difiere del de los cargos.
-    const totalBanco=p.comportamiento==='base_iva'?base+Math.abs(m.ivaPair.monto):base;
-    const dif=Math.abs((inv.amount_total||0)-totalBanco);
-    const avisoTotal=dif>TOL_TOTAL_FACTURA
-      ?' ⚠ El total en Odoo ('+fmt(inv.amount_total)+') difiere del banco ('+fmt(totalBanco)+') por '+fmt(dif)+'. Revisá la factura en Odoo.'
-      :'';
-
-    // Pagos: base+IVA = dos pagos por separado; simple = un solo pago.
-    if(p.comportamiento==='base_iva'){
-      st.textContent='Aplicando pago de la base...';renderAll();
-      await registrarPagoContraFactura(invId,partnerId,base,m.bac.fecha,m.bac.descripcion,journalId);
-      st.textContent='Aplicando pago del IVA...';renderAll();
-      await registrarPagoContraFactura(invId,partnerId,Math.abs(m.ivaPair.monto),m.ivaPair.fecha,m.ivaPair.descripcion,journalId);
-    }else{
-      st.textContent='Registrando pago...';renderAll();
-      await registrarPagoContraFactura(invId,partnerId,base,m.bac.fecha,m.bac.descripcion,journalId);
-    }
-
-    m.inv={id:invId,name:inv.name,partner_id:inv.partner_id,amount_total:inv.amount_total,amount_residual:0,invoice_date:inv.invoice_date};
-    m.userStatus='registered';m.payId=true;
-    st.className=avisoTotal?'status s-warn':'status s-ok';
-    st.textContent='✓ Factura '+inv.name+' creada para '+p.odooName+' — queda "en proceso de pago".'+avisoTotal;
-    renderAll();
-  }catch(e){
-    console.error('Error en crearYpagarFactura:',e);
-    m.userStatus='pending';
-    st.className='status s-err';st.textContent='Error: '+e.message;
-    renderAll();
-  }
-}
+// Creaba la factura del proveedor y la saldaba con pagos (base + IVA) en Odoo.
+async function crearYpagarFactura(gi){ cerrarPanel(); _concSinEscritura(); }   // inerte desde E1 (ver _concSinEscritura)
 
 // Preview de la factura propuesta. Nada se ejecuta hasta que confirmás acá.
 function mostrarPreview(gi){
