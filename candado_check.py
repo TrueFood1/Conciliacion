@@ -53,7 +53,7 @@ RUTAS_ODOO = re.compile(r'/jsonrpc|/xmlrpc|execute_kw|/web/session/authenticate|
 FETCH_OK = ('PROXY_LECTURA_URL', 'ESCRITURA_URL')
 
 # .html de la raíz que el chequeo NO revisa. Vacía a propósito: agregar uno es una
-# decisión de la dueña (p. ej. prueba.html, copia de b55 con el login de la demo).
+# decisión de la dueña (prueba.html, copia de b55, se borró en b147).
 EXCEPCIONES = set()
 
 # ── lexer: quita comentarios de JS respetando strings, templates y regex ──

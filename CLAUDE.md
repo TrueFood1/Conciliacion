@@ -34,9 +34,9 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
      propósito al final del script y después de `accept="image/*` —el texto que en la
      primera versión abría un falso comentario y le tapaba ~2.800 líneas— y falla si
      el chequeo no la ve.
-     ⚠️ **Hoy `loadcheck` falla por `prueba.html`** (copia de b55 publicada, con el
-     login de la demo, `tf_conn` y escrituras): lo destraba la decisión de Andrea
-     (borrarla o anotarla en `EXCEPCIONES`).
+     Revisa todos los `.html` de la raíz: `prueba.html` (copia de b55 publicada, con el
+     login de la demo, `tf_conn` y escrituras) se borró en b147 por decisión de Andrea
+     (29-oct). Un `.html` nuevo en la raíz entra al chequeo solo.
      La escritura a Odoo existe solo por los carriles de `truefie-escritura`
      (`ESCRITURA_URL`), con su llave en Render.
      ⚠️ Hasta b145 esta capa se citaba como «Conciliación bloqueada en prod» y
