@@ -14,7 +14,7 @@
 --   2 · contenido_banco.tipo: 'documento' YA lo admite desde b139 (medido el 28-oct con pg_lector:
 --       foto · video · documento). Se vuelve a escribir el CHECK con los mismos tres valores para que
 --       este archivo deje el estado completo aunque la base viniera de otro lado; no cambia nada.
-  3 · ARCHIVA (activo = false, sin borrar) las 20 fotos de producto, planta y en_tienda: el banco
+--  3 · ARCHIVA (activo = false, sin borrar) las 20 fotos de producto, planta y en_tienda: el banco
 --       queda con lo importante de tener a la mano (pedido de Andrea, 28-oct). Siguen activas
 --       logos_supermercados (2) y empaque (1). Volver atrás: update … set activo = true,
 --       editado_por = '…' where editado_por = 'archivo-b146-28oct'.
