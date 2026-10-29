@@ -370,6 +370,8 @@ tr.prod-row.open .pcaret{transform:rotate(90deg)}
 .ct-bk-ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
   color:var(--text-3);font-size:11.5px}
 .ct-bk-ico{width:30px;height:30px}
+.ct-bk-pdf{width:44px;height:53px}
+.ct-bk-img img.ct-bk-hoja{object-position:top}
 .ct-desc{opacity:.55}
 .ct-f{width:74px;flex:none;font-size:12px;color:var(--text-2);font-variant-numeric:tabular-nums}
 .ct-t{flex:1;min-width:0;color:var(--text);font-size:13.5px}
@@ -6066,7 +6068,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 28 oct 2026 · b145';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 29 oct 2026 · b146';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -29184,9 +29186,10 @@ const CT_PILARES=[['recetas','Recetas'],['porque','Por qué'],['nosotras','Nosot
 const CT_MOMENTOS=[['parcial','Parcial'],['24h','24 h'],['7d','7 días'],['final','Final']];
 const CT_MET=[['alcance','Alcance'],['vistas','Vistas'],['me_gusta','Me gusta'],['respuestas','Respuestas'],
   ['guardados','Guardados'],['compartidos','Compartidos'],['clics_enlace','Clics de enlace'],['seguidores','Seguidores']];
-// Categorías del banco (b139): las mismas 12 del CHECK de CAMBIO_CONTENIDO_B139.sql, en sus tres grupos.
+// Categorías del banco: las mismas 13 del CHECK de CAMBIO_CONTENIDO_FICHAS.sql (b146: las 12 de b139
+// + fichas), en sus tres grupos. Las fichas técnicas son PDF para mandar a clientes, sin precios.
 const CT_CAT_GRUPOS=[
-  ['Producto', [['producto','Producto'],['empaque','Empaques'],['tabla_nutricional','Tablas nutricionales']]],
+  ['Producto', [['producto','Producto'],['empaque','Empaques'],['tabla_nutricional','Tablas nutricionales'],['fichas','Fichas técnicas']]],
   ['Para historias', [['desayunos','Desayunos'],['almuerzos_cenas','Almuerzos y cenas'],['meriendas','Meriendas y antojos'],
                       ['nosotras','Nosotras'],['planta','Planta y equipo'],['en_tienda','En el súper']]],
   ['Marca', [['certificaciones','Certificaciones y sellos'],['logos_supermercados','Logos de supermercados'],['marca','Logos y marca']]]];
@@ -29645,8 +29648,8 @@ function ctBancoHTML(){
   if(S && _ct.bkNuevo) h+='<div class="card"><div class="ct-grid">'
     +'<label class="ct-full">Enlace o id de Drive<input id="ctb-drive" autocomplete="off" inputmode="url"></label>'
     +'<label class="ct-full">Nombre<input id="ctb-nombre" maxlength="200"></label>'
-    +'<label>Tipo<select id="ctb-tipo">'+_ctOpts(CT_TIPOS, 'foto')+'</select></label>'
-    +'<label>Categoría<select id="ctb-cat">'+CT_CAT_GRUPOS.map(g=>'<optgroup label="'+esc(g[0])+'">'+_ctOpts(g[1], _ct.fCat||'producto')+'</optgroup>').join('')+'</select></label>'
+    +'<label>Tipo<select id="ctb-tipo">'+_ctOpts(CT_TIPOS, _ctTipoDe(_ct.fCat))+'</select></label>'
+    +'<label>Categoría<select id="ctb-cat" onchange="ctBkCatAlta(this.value)">'+CT_CAT_GRUPOS.map(g=>'<optgroup label="'+esc(g[0])+'">'+_ctOpts(g[1], _ct.fCat||'producto')+'</optgroup>').join('')+'</select></label>'
     +'<label>Producto<select id="ctb-prod">'+_ctOpts(CT_PROD_OPTS(), _ct.fProd, 'Ninguno o varios')+'</select></label>'
     +'<label class="ct-full">Nota<input id="ctb-nota" maxlength="500"></label>'
     +'<label class="ct-full">Miniatura (opcional)<input id="ctb-mini" type="file" accept="image/*,video/*"></label></div>'
@@ -29656,12 +29659,17 @@ function ctBancoHTML(){
   if(S) h+='<input id="ctMiniIn" type="file" accept="image/*,video/*" class="hidden" onchange="ctMiniElegido(this)">';
   return h;
 }
+// Las categorías de documentos (fichas, certificaciones) arrancan el alta en Documento; se puede cambiar.
+const CT_CAT_DOC=['fichas','certificaciones'];
+function _ctTipoDe(cat){ return CT_CAT_DOC.includes(cat) ? 'documento' : 'foto'; }
+function ctBkCatAlta(cat){ const t=document.getElementById('ctb-tipo'); if(t) t.value=_ctTipoDe(cat); }
+// Una categoría sin nada en el banco no se muestra (b146); la del filtro puesto, sí. El alta las ofrece todas.
 function ctBkChipsHTML(){
-  const B=_ctBkBase(), n={}; B.forEach(b=>{ n[b.categoria]=(n[b.categoria]||0)+1; });
+  const B=_ctBkBase(), n={}, hay=new Set((_ct.banco||[]).map(b=>b.categoria)); B.forEach(b=>{ n[b.categoria]=(n[b.categoria]||0)+1; });
   const chip=(k, nom, c)=>'<button class="ct-chip'+(_ct.fCat===k?' on':'')+(c?'':' ct-chip-0')+'" onclick="ctBkCat(\''+k+'\')">'
     +esc(nom)+'<span class="ct-chip-n">'+c+'</span></button>';
   let h='<div class="ct-chips"><div class="ct-chg">'+chip('', 'Todo', B.length)+'</div>';
-  CT_CAT_GRUPOS.forEach(([g, L])=>{
+  CT_CAT_GRUPOS.forEach(([g, L])=>{ L=L.filter(([k])=>hay.has(k) || _ct.fCat===k); if(!L.length) return;
     h+='<div class="ct-chg"><span class="ct-chg-h">'+esc(g)+'</span>'+L.map(([k,nom])=>chip(k, nom, n[k]||0)).join('')+'</div>'; });
   return h+'</div>';
 }
@@ -29676,12 +29684,20 @@ const CT_ICO={
   foto:'<path d="M4 7h3l1.5-2h7L17 7h3v12H4z"/><circle cx="12" cy="13" r="3.5"/>',
   video:'<rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3z"/>',
   documento:'<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>'};
-function _ctIco(tipo){ return '<svg class="ct-bk-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">'
+// Documento sin miniatura: hoja con la esquina doblada y la etiqueta PDF (tokens, sin imagen).
+const CT_ICO_PDF='<svg class="ct-bk-pdf" viewBox="0 0 40 48" aria-hidden="true">'
+  +'<path d="M7 2.5h18l9.5 9.5v33.5H7z" fill="var(--surface)" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>'
+  +'<path d="M25 2.5V12h9.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>'
+  +'<path d="M12 33h17M12 38h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>'
+  +'<rect x="2" y="17" width="25" height="11" rx="2" fill="var(--stop-tx)"/>'
+  +'<text x="14.5" y="25.3" text-anchor="middle" font-size="8" font-weight="700" font-family="inherit" fill="var(--surface)">PDF</text></svg>';
+function _ctIco(tipo){ if(tipo==='documento') return CT_ICO_PDF;
+  return '<svg class="ct-bk-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">'
   +(CT_ICO[tipo]||CT_ICO.foto)+'</svg>'; }
 function _ctMiniVigente(id){ const m=_ct.mini[id]; return m && (Date.now()-m.t)<(CT_MINI_VIDA-300)*1000 ? m : null; }
 function ctBkImgHTML(b){
   const m=_ctMiniVigente(b.drive_id);
-  return (m && m.url ? '<img loading="lazy" alt="" src="'+esc(m.url)+'" onerror="this.remove()">'
+  return (m && m.url ? '<img loading="lazy" alt="" src="'+esc(m.url)+'" onerror="this.remove()"'+(b.tipo==='documento' ? ' class="ct-bk-hoja"' : '')+'>'
                      : '<span class="ct-bk-ph">'+_ctIco(b.tipo)+'<span>Abrir en Drive</span></span>')
     +'<span class="ct-bk-tipo">'+esc(_ctLbl(CT_TIPOS, b.tipo)||b.tipo)+'</span>';
 }
