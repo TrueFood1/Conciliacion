@@ -1,6 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- CAMBIO_CONTENIDO_FICHAS.sql  ·  28-oct-2026  ·  Contenido b146: categoría «Fichas técnicas» en el banco
--- ⏳ NO CORRIDO EN PRODUCCIÓN. Antes: ENSAYO_CONTENIDO_FICHAS.sql (ensayo en seco, no deja nada).
+-- ✅ APLICADO en producción por Andrea el 29-oct-2026. Control 2 · 1 · 1 · t · 0 · 20 · 3. Verificado desde afuera
+--    (VERIFICAR_B146, 2 · 1 · 1 · 23 · 20 · 3). NO VOLVER A CORRER. Antes se corrió ENSAYO_CONTENIDO_FICHAS.sql.
 --    Después: la fila de control de abajo tiene que salir EXACTA. Este header se toca DESPUÉS de
 --    verificar, nunca antes.
 -- Va DESPUÉS de CAMBIO_CONTENIDO_B139.sql (aplicado el 27-oct). Para saber si está aplicado, mirar la base:

@@ -4,7 +4,7 @@
 -- documento de prueba cargado como socia, el archivo de las 20 fotos, y lo deshace todo (rollback).
 -- El bloque DDL es COPIA EXACTA de CAMBIO_CONTENIDO_FICHAS.sql (sin begin/commit ni el control).
 -- Si se cambia aquél, se vuelve a copiar acá.
--- ⏳ NO CORRIDO EN PRODUCCIÓN NI EN LOCAL.
+-- ✅ CORRIDO en producción por Andrea el 29-oct-2026: 19/19 ok, terminó en rollback.
 --
 -- CÓMO SE LEE
 --   Una tabla con TODAS las filas en ok = true. Un RECHAZA da ok solo si el SQLSTATE esperado es
