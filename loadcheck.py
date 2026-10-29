@@ -66,9 +66,31 @@ if peor or any(not str(x[1]).startswith('caja de 6 paq') for x in rot):
 print('✓ rótulo de caja en unidad de venta:', ' | '.join('%d %s' % (x[0], x[1]) for x in rot))
 
 # ── CERCA: EL CANDADO DE ODOO (E1, 29-oct-2026) ───────────────────────────
-# Ninguna escritura a Odoo ni credenciales tecleadas desde el navegador. Vive en un script
-# hermano para poder correrlo solo (y sobre una copia: `python3 candado_check.py otra.html`).
-r3=subprocess.run([sys.executable,os.path.join(os.path.dirname(os.path.abspath(__file__)),'candado_check.py'),'index.html'],
+# Ninguna escritura a Odoo ni credenciales tecleadas desde el navegador, en NINGÚN .html de la
+# raíz (Pages los publica todos). Vive en un script hermano para poder correrlo solo.
+# Antes, la PRUEBA NEGATIVA: si el chequeo no ve una escritura metida a propósito, no sirve.
+# Se mete en dos lugares: al final del script grande y justo después del `accept="image/*`
+# que en la primera versión abría un falso comentario y le tapaba ~2.800 líneas (29-oct).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import candado_check
+_CEBO = "\nodooCall('account.move','write',[[1],{ref:'cebo'}]);\nfetch('https://truefood.odoo.com/jsonrpc');\n"
+def _cebo_visto(txt, donde):
+    lin = txt[:donde].count('\n') + 2            # la línea del odooCall del cebo
+    malos = candado_check.revisar_texto(txt)
+    return (any(m.startswith('l. %d · ESCRITURA a Odoo (write)' % lin) for m in malos)
+            and any(m.startswith('l. %d · ' % (lin + 1)) and 'fetch' in m for m in malos))
+_html = open('index.html', encoding='utf-8').read()
+_cierre = _html.index(body) + len(body)              # fin del script grande
+_m = re.search(r'accept="image/\*[^\n]*;\n', _html)
+_lugares = [('final del script', _cierre)] + ([('después de accept="image/*"', _m.end() - 1)] if _m else [])
+if not _m:
+    print('✗ prueba negativa del candado: no encontré la línea de accept="image/*" (¿cambió?)'); sys.exit(1)
+for _nom, _pos in _lugares:
+    _t = _html[:_pos] + _CEBO + _html[_pos:]
+    if not _cebo_visto(_t, _pos):
+        print('✗ el chequeo del candado NO VE una escritura metida a propósito (%s): no sirve' % _nom); sys.exit(1)
+print('✓ prueba negativa del candado: ve la escritura metida al final y después de accept="image/*"')
+r3=subprocess.run([sys.executable,os.path.join(os.path.dirname(os.path.abspath(__file__)),'candado_check.py')],
                   capture_output=True,text=True)
 print((r3.stdout+r3.stderr).strip())
 if r3.returncode!=0: sys.exit(1)

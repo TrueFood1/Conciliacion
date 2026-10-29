@@ -19,8 +19,24 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
      subida del extracto que montaba líneas, «Vincular», el flujo de 3 pasos y el
      proxy viejo con usuario y clave; el clasificador viejo quedó inerte
      (`_concSinEscritura`). Lo vigila **`candado_check.py`**, que corre dentro de
-     `loadcheck.py` y FALLA si vuelve el proxy viejo, `tf_conn` guardado,
-     credenciales a Odoo o un método que no sea de lectura en una llamada a Odoo.
+     `loadcheck.py` sobre **todos los `.html` de la raíz** (Pages los publica todos;
+     lista `EXCEPCIONES` vacía) y FALLA si aparece: el proxy viejo; `setItem('tf_conn')`;
+     `Authorization: Basic` o `x-odoo-url/db`; una llamada `odooCall`/`lecturaRpc`/
+     `odooRpc` con un método fuera de su lista de lectura, o con el método en una
+     variable fuera de los dos envoltorios; `LECTURA_OK` con algo que no sea lectura;
+     los textos `js_assign_outstanding_line`, `action_post`, `reconcile`, `unlink`,
+     `button_*`… o un `call_kw/<modelo>/<método>`; un `fetch` que no empiece por
+     `PROXY_LECTURA_URL` o `ESCRITURA_URL` (o que lleve `odoo.com`, `/jsonrpc`,
+     `/xmlrpc`, `execute_kw`, `/web/session/authenticate` o `/web/dataset/call_kw`),
+     `fetch` usado como alias, `XMLHttpRequest` o `sendBeacon`. No busca `'create'`/
+     `'write'` sueltos (Supabase los usa). Quita comentarios con un lexer que respeta
+     strings, templates y regex, y antes de revisar `loadcheck` mete una escritura a
+     propósito al final del script y después de `accept="image/*` —el texto que en la
+     primera versión abría un falso comentario y le tapaba ~2.800 líneas— y falla si
+     el chequeo no la ve.
+     ⚠️ **Hoy `loadcheck` falla por `prueba.html`** (copia de b55 publicada, con el
+     login de la demo, `tf_conn` y escrituras): lo destraba la decisión de Andrea
+     (borrarla o anotarla en `EXCEPCIONES`).
      La escritura a Odoo existe solo por los carriles de `truefie-escritura`
      (`ESCRITURA_URL`), con su llave en Render.
      ⚠️ Hasta b145 esta capa se citaba como «Conciliación bloqueada en prod» y
@@ -583,9 +599,10 @@ Productos terminados (IDs de producción):
   encabezado les reserva el lugar: `.hdr-right` 152 px y `.home-hdr-right` 158 px en
   escritorio, `padding-right:140px` en teléfono. Un botón nuevo en esa esquina = agrandar
   las tres reservas.
-- **«Error Odoo» en la primera carga = `SESSION.url` vacío.** Las lecturas que salen antes
-  de que `entrarProd` llene `SESSION.url` van al proxy de demo y fallan (fue la causa del
-  lobby en blanco en Safari, 3-oct). Cualquier lectura nueva que corra antes de conectar
+- **«Sin conexión con Odoo» en la primera carga = `SESSION.url` vacío.** Las lecturas que
+  salen antes de que `entrarProd` llene `SESSION.url` no salen: `odooRpc` las corta con
+  «Sin conexión con Odoo» (desde E1, b147; antes iban al proxy de demo y volvían «Error
+  Odoo», que fue la causa del lobby en blanco en Safari, 3-oct). Cualquier lectura nueva que corra antes de conectar
   puede fallar igual: esperar a `_esperarOdoo()`.
 
 ### Modo claro / oscuro (estándar del sistema, 4-oct-2026)
