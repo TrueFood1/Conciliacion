@@ -46,7 +46,7 @@ create table public.flujo_compromiso (
   constraint flujo_compromiso_vigencia check (vigente_hasta is null or vigente_hasta >= vigente_desde),
   constraint flujo_compromiso_ventana check (
     (categoria = 'ventana') = (apaga is not null)
-    and (categoria <> 'ventana' or (periodicidad = 'unica' and fecha is not null and fecha_hasta >= fecha
+    and (categoria <> 'ventana' or (periodicidad = 'unica' and fecha is not null and fecha_hasta is not null and fecha_hasta >= fecha
          and cardinality(apaga) > 0 and apaga <@ array['fijo', 'variable', 'MP', 'financiero', 'unico', 'venta']
          and sentido is null and monto is null and moneda is null))),
   -- todo lo que no es ventana mueve plata: sentido, moneda y monto (0 solo en una baja)
