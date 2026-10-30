@@ -6016,7 +6016,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 29 oct 2026 · b148';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 30 oct 2026 · b149';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -29195,7 +29195,7 @@ async function cobLoad(which){
   // Corte por fecha (COB_DESDE): las viejas incobrables ensucian e inflan el total.
   let rows=await odooCall('account.move','search_read',
     [[['move_type','=',mt],['state','=','posted'],['amount_residual','>',0],['invoice_date','>=',COB_DESDE[which]]]],
-    {fields:['name','ref','number_electronic','invoice_date','invoice_date_due','amount_residual','amount_residual_signed','currency_id','partner_id'].concat(which==='cobrar'?['narration']:[]),limit:5000});
+    {fields:['name','ref','number_electronic','invoice_date','invoice_date_due','amount_residual','amount_residual_signed','currency_id','partner_id'].concat(which==='cobrar'?['narration']:['receiver_message_id']),limit:5000});
   if(which==='pagar'){
     // Excluir Gastos Adicionales (cuenta 640103 = compensación de IVA, NO pagos reales de Andrea).
     // Criterio robusto = la cuenta (no la referencia): captura las que traen ref con número de
@@ -29275,14 +29275,17 @@ function renderCob(){
 function _cobPartner(r){ const razon=(r.partner_id&&r.partner_id[1])||'—';
   const loc=r._local ? ' <span class="'+(r._local===COB_SIN_LOCAL?'cob-sinlocal':'cob-local')+'">· '+esc(r._local)+'</span>' : '';
   return (r._com ? esc(r._com)+loc+' <span class="muted" style="font-size:11px">· '+esc(razon)+'</span>' : esc(razon)+loc); }
-// Documento: en Por pagar = número del PROVEEDOR (campo `ref`, "Referencia del
-// proveedor"), con el consecutivo interno de Odoo como referencia chica; si el
-// proveedor no trae número (~28%), cae al interno. En Por cobrar = nuestro nº de
-// factura (`name`) + ref/FE como secundario. (number_electronic no se usa en compras: 0% poblado.)
+// Documento: en Por pagar = consecutivo del comprobante electrónico del PROVEEDOR
+// (`receiver_message_id`, pestaña «Comprobante Electrónico»; b149: lo tienen todas las abiertas
+// desde ene-2026, y donde también hay `ref` los últimos 4 coinciden), con el consecutivo interno
+// de Odoo como referencia chica. Si no hay comprobante cae a `ref` ("Referencia del proveedor"),
+// y si tampoco, al interno. En Por cobrar = nuestro nº de factura (`name`) + ref/FE como
+// secundario. (number_electronic no se usa en compras: 0% poblado.)
 // REGLA GENERAL (no por caso): en Por pagar manda el consecutivo del PROVEEDOR. El número
 // interno de Odoo nunca se muestra a secas — solo aparece como fallback cuando el proveedor
 // no trae consecutivo, y siempre rotulado "interno N".
 function _cobUlt4(s){ const t=String(s||'').replace(/\s+/g,''); return t?('…'+t.slice(-4)):''; }
+function _cobNumProv(r){ const c=r.receiver_message_id&&r.receiver_message_id[1]; return String(c||r.ref||'').trim(); }
 // Por cobrar (b121): cada comprobante se nombra por sus últimos 4 dígitos. Si dos de la cartera
 // comparten esos 4, se les pone el tipo adelante (posiciones 9-10 del consecutivo de Hacienda).
 const COB_TIPO={'01':'FE','02':'ND','03':'NC','04':'TE'};
@@ -29292,20 +29295,21 @@ function _cobChoca(name){ return (_cobChoque[_cobU4(name)]||0)>1 && !!_cobTipo(n
 function _cobCorto(name){ return (_cobChoca(name)?_cobTipo(name)+' ':'')+'…'+_cobU4(name); }
 function _cobNombreMsg(name){ return (_cobChoca(name)?_cobTipo(name):'Factura')+' '+_cobU4(name); }
 // Buscador: por cliente (razón social, nombre comercial, otros nombres) o por factura (número
-// completo o últimos 4). En Por pagar el número es el del proveedor (`ref`).
+// completo o últimos 4). En Por pagar el número es el del proveedor (comprobante o `ref`).
 function _cobCoincide(r, q){
   if(!q) return true;
   const dig=q.replace(/[\s….]/g,'');
   if(/^\d{4,}$/.test(dig)){
-    const docs=[r.name, r.ref].map(x=>String(x||'').replace(/\s+/g,''));
+    const docs=[r.name, r.ref, r.receiver_message_id&&r.receiver_message_id[1]].map(x=>String(x||'').replace(/\s+/g,''));
     if(docs.some(x=>x && (x===dig || x.endsWith(dig)))) return true;
   }
   return coincideBusqueda(q, r._busca||[(r.partner_id&&r.partner_id[1])||'']);
 }
 function _cobDoc(r, corto){
   if(_cobTab==='pagar'){
-    if(r.ref && String(r.ref).trim())
-      return '<span class="cob-cons">'+esc(_cobUlt4(r.ref))+'</span> <span class="cob-consfull">'+esc(r.ref)+'</span>'
+    const np=_cobNumProv(r);
+    if(np)
+      return '<span class="cob-cons">'+esc(_cobUlt4(np))+'</span> <span class="cob-consfull">'+esc(np)+'</span>'
         +(r.name?' <span class="muted" style="font-size:11px">· interno '+esc(r.name)+'</span>':'');
     return '<span class="muted" style="font-size:11px">sin nº de proveedor · </span>interno '+esc(r.name||'—');
   }
