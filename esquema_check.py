@@ -104,6 +104,7 @@ CERRADA_ANON      = {'ent_alisto_lote_efectivo', 'ent_salido_del_congelador_desd
                      'v_ent_excepcion_pendiente', 'v_ent_excepcion_pendiente_pedido',
                      'ent_conteo_correccion_vigente',
                      'ent_odoo_validacion', 'ent_pedido_odoo_descarte', 'ent_odoo_traslado',
+                     'ent_devolucion_reemplazo', 'ent_reemplazo_desde_ancla',
                      # CONTENIDO (b138, 27-oct): nacen con `revoke all … from anon` (CONTENIDO.sql). Son de
                      # socias; que la anon key las lea —aunque sea vacías— es una fuga.
                      'contenido_post', 'contenido_post_estado', 'contenido_metrica', 'contenido_banco',

@@ -6016,7 +6016,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 30 oct 2026 · b149';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 30 oct 2026 · b150';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -13401,7 +13401,7 @@ async function rpCalcSaldos(g){
   return p ? p.saldo : null;
 }
 // El cálculo completo: el saldo Y de qué está hecho. Devuelve
-//   {saldo:{clave:uds}, detalle:{clave:{ancla,produccion,salidas,devoluciones,merma}},
+//   {saldo:{clave:uds}, detalle:{clave:{ancla,produccion,salidas,devoluciones,cambios,merma}},
 //    mermaSinLote:{pid:uds}, mermaDudosa:{pid:uds}, mermaSinLoteDet, mermaDudosaDet}
 async function _rpCalcularPuntas(g){
   const c=sbClient(); if(!c) return null;
@@ -13411,7 +13411,7 @@ async function _rpCalcularPuntas(g){
   // Desglose por lote. Se llena en paralelo con `s` — mismo recorrido, mismos
   // números: el detalle no puede contradecir al saldo porque sale del mismo paso.
   const det={}, D=function(k){ return det[k]=det[k]||
-    {ancla:0, correccion:0, produccion:0, salidas:0, devoluciones:0, merma:0, mermaPorOrigen:0,
+    {ancla:0, correccion:0, produccion:0, salidas:0, devoluciones:0, cambios:0, merma:0, mermaPorOrigen:0,
      cors:[]}; };
   const {data:lin}=await c.from('ent_conteo_linea').select('producto_id,lote,uds').eq('conteo_id',A.id);
   const enAncla={};
@@ -13506,6 +13506,21 @@ async function _rpCalcularPuntas(g){
     +'y Despachos puede bloquear producto que sí está.'); }catch(_){} }
   (dev||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote;
     s[k]=(s[k]||0)+(+r.uds||0); D(k).devoluciones+=(+r.uds||0); });
+
+  // ── LO QUE SALE EN UN CAMBIO (b150, 30-oct) ────────────────────────────
+  // `disponible = … + devoluciones − cambios − merma`. Cuando la devolución es un
+  // CAMBIO, lo devuelto vuelve a su lote (la punta de arriba) y sale otro del mismo
+  // producto, del lote que eligió Daniel: eso resta acá. No es un pedido ni pasa por
+  // `ent_salido_del_congelador_desde_ancla` — si pasara, dispararía el traslado
+  // interno y Odoo descontaría dos veces. Cuelga de la devolución: anularla deshace
+  // las dos mitades (las dos vistas salen de `ent_devolucion_vigente`).
+  // El error se DICE por la dirección del daño: si esta lectura falla el saldo
+  // queda ALTO —se ofrece el pan que ya se le dio al cliente— y nada lo delata.
+  const {data:cam,error:eCam}=await c.from('ent_reemplazo_desde_ancla').select('lote,producto_id,uds');
+  if(eCam){ try{ console.error('[Truefie] no pude leer los cambios ('
+    +((eCam&&eCam.message)||eCam)+'): el saldo por lote queda por ENCIMA de lo real.'); }catch(_){} }
+  (cam||[]).forEach(function(r){ const k=r.producto_id+'|'+r.lote;
+    s[k]=(s[k]||0)-(+r.uds||0); D(k).cambios+=(+r.uds||0); });
 
   // ── LA QUINTA PUNTA (b52) — lo que se DESECHÓ ──────────────────────────
   // `disponible = ancla + producción − salidas + devoluciones − merma`.
@@ -17211,6 +17226,7 @@ function _lotDesglose(pid, lote){
   add('producción', d.produccion, '+');
   add('salidas', d.salidas, '−');
   add('devoluciones', d.devoluciones, '+');
+  add('cambios', d.cambios, '−');
   add('merma', d.merma, '−');
   // ⚠️ DE DÓNDE SALIÓ EL VÍNCULO, cuando no salió de `production_id`. Va
   // pegado a la merma y no como término aparte porque NO es otra resta: son
@@ -20673,7 +20689,24 @@ function pdRender(){
 const DV_CAUSAS=[{v:'producto_equivocado', t:'Producto equivocado'},
                  {v:'otro',                t:'Otro'}];
 const DV_NOTA_MIN=6;      // el MISMO numero que ENT_NM_NOTA_MIN y ENT_INDET_NOTA_MIN
+// ── QUE SE HIZO CON LA DEVOLUCION (b150, Andrea 30-oct) ─────────────────
+// Los dos valores del check `ent_devolucion_resolucion_ok`. POR DEVOLUCION ENTERA y
+// no por linea: la NC es una por devolucion (`ent_odoo_pendiente.devolucion_id`), la
+// causa tambien, y el candado de la base ("un cambio no lleva pendiente de Odoo")
+// cuelga de la cabecera. Una devolucion mixta se registra como dos.
+//   devolucion · vuelve al lote (suma) y queda la NC pendiente — como siempre.
+//   cambio     · vuelve al lote (suma) y sale otro del MISMO producto, del lote que
+//                elige Daniel (`ent_devolucion_reemplazo`, resta). Sin NC: el cliente
+//                se quedo con lo que pago. Sin traslado interno: en Odoo no cambio
+//                nada neto. Por eso NO pasa por `rpGuardar` —ese camino crea el
+//                traslado y Odoo descontaria dos veces— ni por ent_pedido.
+const DV_RESOLUCIONES=[{v:'devolucion', t:'Solo devolución'},
+                       {v:'cambio',     t:'Cambio por otro del mismo producto'}];
 let _dv=null, _dvGuardando=false, _dvVerTodas=false, _dvErr='';
+// Lotes y saldo para elegir lo que sale en un cambio. Se leen con las MISMAS funciones
+// que "Sin factura" (`entLotesActivos` + `_rpCalcularPuntas` + `entLotesDisponibles`):
+// la regla de que se ofrece vive en una sola parte. null = no leido todavia.
+let _dvLot=null;
 
 function irADevoluciones(){
   _modShow('vDevoluciones'); crumbSet('Entregas','Devoluciones');
@@ -20711,7 +20744,7 @@ async function dvLeer(){
             +'origen,motivo,alisto_id,preparado_en,estado,fecha_ab_re_04')
      .order('fecha_ab_re_04',{ascending:false}).limit(300),
     c.from('ent_devolucion_vigente')
-     .select('devolucion_id,fecha,recibido_en,cliente_id,cliente_nombre,pedido_id,causa,nota,creado_por')
+     .select('devolucion_id,fecha,recibido_en,cliente_id,cliente_nombre,pedido_id,causa,nota,creado_por,resolucion')
      .order('recibido_en',{ascending:false}).limit(100) ]);
   if(pe.error) throw pe.error;
   if(de.error) throw de.error;
@@ -20725,9 +20758,21 @@ async function dvLeer(){
       .in('devolucion_id', devs.map(function(d){ return d.devolucion_id; }));
     lins=dl||[];
   }
-  const porDev={};
+  // Lo que salio en su lugar, solo de las que son cambio. Si no se puede leer se
+  // DICE: una fila de cambio sin su reemplazo diria que no salio nada.
+  let reem=[];
+  const cams=devs.filter(function(d){ return d.resolucion==='cambio'; });
+  if(cams.length){
+    const {data:dr,error:eR}=await c.from('ent_devolucion_reemplazo')
+      .select('devolucion_id,producto_id,lote,cant_uds')
+      .in('devolucion_id', cams.map(function(d){ return d.devolucion_id; }));
+    if(eR) throw eR;
+    reem=dr||[];
+  }
+  const porDev={}, porDevR={};
   lins.forEach(function(l){ (porDev[l.devolucion_id]=porDev[l.devolucion_id]||[]).push(l); });
-  devs.forEach(function(d){ d.lineas=porDev[d.devolucion_id]||[]; });
+  reem.forEach(function(r){ (porDevR[r.devolucion_id]=porDevR[r.devolucion_id]||[]).push(r); });
+  devs.forEach(function(d){ d.lineas=porDev[d.devolucion_id]||[]; d.reemplazo=porDevR[d.devolucion_id]||[]; });
   return {peds:todas.filter(function(p){ return p.origen==='factura' && p.cliente_id!=null; }),
           devs:devs,
           fuera:{manual:todas.filter(function(p){ return p.origen!=='factura'; }).length,
@@ -20736,9 +20781,10 @@ async function dvLeer(){
 }
 function _dvNueva(){
   return {cliente:null, entrega:null, pid:null, lotes:{}, lineas:[],
-          causa:'', nota:'', causaEditar:false, fecha:_despHoy(), editando:-1};
+          causa:'', nota:'', causaEditar:false, fecha:_despHoy(), editando:-1,
+          resolucion:'', resEditar:false, reemp:{}};
 }
-function dvNueva(){ _dv.n=_dvNueva(); _dv.modo='nueva'; _dvVerTodas=false; dvRender(); }
+function dvNueva(){ _dv.n=_dvNueva(); _dv.modo='nueva'; _dvVerTodas=false; _dvLot=null; dvRender(); }
 function dvVolver(){ _dv.modo='lista'; _dv.n=null; dvRender(); }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -20774,6 +20820,9 @@ function dvListaHTML(){
       +'<div class="bs-f2"><span class="bs-sub">'+esc(cau)
       +(d.nota?(' · '+esc(d.nota)):'')+'</span>'
       +'<span class="bs-fac">#'+d.pedido_id+'</span></div>'
+      +(d.resolucion==='cambio'
+        ? ('<div class="bs-f2"><span class="bs-sub">Cambio · sale '
+           +esc(_dvReempTxt(d.reemplazo)||'sin lo que salió')+'</span></div>') : '')
       +dvAnularHTML(d)
       +'</div>';
   });
@@ -20836,9 +20885,12 @@ function dvAnularHTML(d){
     // Es correcto —la NC puede haberse emitido ya en Odoo, y anular acá no la
     // borra de alla— pero tiene que DECIRSE, no que alguien lo descubra dos
     // semanas despues mirando Pendientes.
-    +'<div class="dv-anu-av">El inventario vuelve solo. <b>La nota de crédito NO se '
-    +'deshace</b>: su pendiente sigue en la lista de las socias, porque puede haberse '
-    +'emitido ya en Odoo.</div>'
+    +(d.resolucion==='cambio'
+      ? '<div class="dv-anu-av">El inventario vuelve solo: deja de sumar lo que volvió '
+        +'y de restar lo que salió en su lugar.</div>'
+      : '<div class="dv-anu-av">El inventario vuelve solo. <b>La nota de crédito NO se '
+        +'deshace</b>: su pendiente sigue en la lista de las socias, porque puede haberse '
+        +'emitido ya en Odoo.</div>')
     +'<input class="dv-anu-n" maxlength="140" placeholder="Por qué se anula (opcional)" '
     +'value="'+esc(_dvAnuNota[id]||'')+'" oninput="_dvAnuNota['+id+']=this.value">'
     +'<button class="btn btn-sm" onclick="dvAnular('+id+')">Anular</button>'
@@ -20855,7 +20907,7 @@ async function dvAnular(id){
       entidad:'devolucion', entidad_id:id, motivo:(nota||null),
       creado_por:(user&&user.email)||'desconocido'});
     if(error) throw error;
-    _dvAnulando=0; delete _dvAnuNota[id];
+    _dvAnulando=0; delete _dvAnuNota[id]; _dvLot=null;
     // El saldo por lote cambio: lo que Despachos y el Reporte tengan leido quedo viejo.
     // ⚠️ `_pd` TAMBIEN, Y ESTA ES LA QUE FALTABA (17-sep). `pdCargar(false)` sale
     // por el camino corto si `_pd` ya existe —`if(_pd && !force) return`— y
@@ -21003,6 +21055,27 @@ function dvFormHTML(){
                : '<div style="margin-top:8px"><button class="btn btn-sm" onclick="dvCausaListo()">Listo</button></div>'))
           : '');
     }
+    h+='</div>';
+  }
+
+  // ── 5 · QUE SE HIZO (b150) ───────────────────────────────────────────
+  // Mismo gesto que la causa: pesa mientras falta, contestada se achica a un
+  // renglon. Sin elegirla no se guarda — un cambio guardado por inercia como
+  // devolucion dejaria una NC por una factura que esta bien.
+  if(N.lineas.length){
+    const lista=!N.resolucion || N.resEditar;
+    const r=DV_RESOLUCIONES.find(function(x){ return x.v===N.resolucion; });
+    h+='<div class="rp-sec"><div class="rp-sec-t">Qué se hizo</div>';
+    if(!lista){
+      h+='<div class="rp-clisel"><span>'+esc(r?r.t:N.resolucion)+'</span>'
+        +'<button onclick="dvResEditar()" title="Cambiar">✎</button></div>';
+    }else{
+      h+='<div class="rp-mot">'
+        +DV_RESOLUCIONES.map(function(x){ return '<button class="'+(N.resolucion===x.v?'on':'')+'" '
+          +'onclick="dvResolucion(\''+x.v+'\')">'+esc(x.t)+'</button>'; }).join('')+'</div>'
+        +(!N.resolucion?'<div class="rp-nota rp-falta">Sin esto no se puede guardar.</div>':'');
+    }
+    if(N.resolucion==='cambio') h+=dvReempHTML();
     h+='</div>';
   }
 
@@ -21162,15 +21235,15 @@ function dvAbrirClientes(){
 }
 function dvCliente(id,nombre){
   const N=_dv.n;
-  if(id==null){ N.cliente=null; N.entrega=null; N.pid=null; N.lotes={}; N.lineas=[]; }
+  if(id==null){ N.cliente=null; N.entrega=null; N.pid=null; N.lotes={}; N.lineas=[]; N.reemp={}; }
   else N.cliente={id:id,nombre:nombre};
   _dvVerTodas=false; dvRender();
 }
 async function dvEntrega(pid){
   const N=_dv.n;
-  if(pid==null){ N.entrega=null; N.pid=null; N.lotes={}; N.lineas=[]; dvRender(); return; }
+  if(pid==null){ N.entrega=null; N.pid=null; N.lotes={}; N.lineas=[]; N.reemp={}; dvRender(); return; }
   N.entrega=_dv.peds.find(function(p){ return p.pedido_id===pid; })||null;
-  N.pid=null; N.lotes={}; N.lineas=[]; N.editando=-1; dvRender();
+  N.pid=null; N.lotes={}; N.lineas=[]; N.reemp={}; N.editando=-1; dvRender();
   try{
     // ⚠️ SE REUSA `_entColgarDetalle`, la MISMA funcion del Historial y del dialogo
     // de Entregar. Trae las lineas con sus lotes Y el uom_factor congelado. Una
@@ -21253,7 +21326,127 @@ function dvCausaLista(){
   return String(N.nota||'').trim().length>=DV_NOTA_MIN;
 }
 function dvListo(){ const N=_dv&&_dv.n;
-  return !!(N && N.entrega && N.lineas.length && dvCausaLista() && _despFechaOK(N.fecha)); }
+  return !!(N && N.entrega && N.lineas.length && dvCausaLista() && dvResolucionLista()
+            && _despFechaOK(N.fecha)); }
+
+// ── EL CAMBIO · elegir que se hizo y, si es cambio, el lote que sale (b150) ──
+function dvResolucion(v){
+  const N=_dv.n; N.resolucion=v; N.resEditar=false;
+  if(v==='cambio' && !_dvLot) dvCargarLotesCambio();
+  dvRender();
+}
+function dvResEditar(){ _dv.n.resEditar=true; dvRender(); }
+function dvResolucionLista(){
+  const N=_dv&&_dv.n; if(!N) return false;
+  if(N.resolucion==='devolucion') return true;
+  if(N.resolucion!=='cambio') return false;
+  // cada producto que volvio tiene algo que sale en su lugar
+  const f=_dvReempFilas();
+  return N.lineas.every(function(l){
+    return f.some(function(x){ return x.producto_id===+l.producto_id; }); });
+}
+async function dvCargarLotesCambio(){
+  _dvLot={cargando:true}; dvRender();
+  try{
+    const g=await entLotesActivos(3);
+    const p=await _rpCalcularPuntas(g);
+    _dvLot={g:g, saldo:(p?p.saldo:null), corteMs:(p?p.corteMs:null)};
+  }catch(e){ _dvLot={err:(e&&e.message)||String(e)}; }
+  dvRender();
+}
+// Lo que sale, como filas listas para `ent_devolucion_reemplazo`. Recorre LAS LINEAS
+// CARGADAS, no `N.reemp`: un producto que se quito de la devolucion deja su eleccion
+// vieja en `reemp` y no tiene que salir.
+// Se escribe en la unidad de MANEJO (paquete / unidad), igual que lo que volvio, y
+// `cant_uds = cant_man x presDiv`. La base lo vuelve a exigir
+// (`ent_devolucion_reemplazo_escala_ok`).
+function _dvReempFilas(){
+  const N=_dv.n, out=[];
+  N.lineas.forEach(function(l){
+    const pid=+l.producto_id, M=_dvManejo(pid), R=N.reemp[pid]||{};
+    Object.keys(R).forEach(function(lote){
+      const v=+R[lote]||0; if(!(v>0)) return;
+      out.push({producto_id:pid, lote:lote, cant_man:v, cant_uds:v*M.div,
+                man_nombre:M.nombre, man_div:M.div});
+    });
+  });
+  return out;
+}
+// COMO SE DICE lo que salio en un cambio: «1 paq. de Buns (286 / 2-27)». UNA funcion
+// para la lista de devoluciones y para la confirmacion, en la unidad de venta.
+function _dvReempTxt(filas){
+  const por={}, orden=[];
+  (filas||[]).forEach(function(r){ const p=+r.producto_id;
+    if(!por[p]){ por[p]={uds:0, lotes:[]}; orden.push(p); }
+    por[p].uds+=(+r.cant_uds||0);
+    if(por[p].lotes.indexOf(r.lote)<0) por[p].lotes.push(r.lote); });
+  return orden.map(function(p){ return _entPresPlano(p, por[p].uds)+' de '+_lotNom(p)
+    +' ('+por[p].lotes.join(' · ')+')'; }).join(' · ');
+}
+// Por cada producto que volvio, los lotes que se pueden elegir HOY —la misma capa
+// que "Sin factura"— y lo ya elegido aunque haya quedado fuera del filtro (la regla
+// del 15-sep: el filtro decide que se ofrece, nunca le borra una eleccion a nadie).
+function dvReempHTML(){
+  const N=_dv.n;
+  if(!_dvLot || _dvLot.cargando) return '<div class="cl-none">Leyendo lotes…</div>';
+  if(_dvLot.err) return '<div class="status s-err">No pude leer los lotes: '+esc(_dvLot.err)
+    +' <button class="btn btn-sm" onclick="dvCargarLotesCambio()">Reintentar</button></div>';
+  let h='';
+  N.lineas.forEach(function(l){
+    const pid=+l.producto_id, R=N.reemp[pid]||{}, M=_dvManejo(pid);
+    const ls=entLotesDisponibles(_dvLot.g, _dvLot.saldo, _dvLot.corteMs, pid)
+      .map(function(x){ return {lote:x.lote, saldo:x.saldo, activo:x.activo}; });
+    Object.keys(R).forEach(function(lt){
+      if(!ls.some(function(x){ return x.lote===lt; }))
+        ls.push({lote:lt, saldo:null, activo:true, fuera:true}); });
+    let tot=0, sobre=false;
+    h+='<div class="rp-cond"><div class="rp-sec-t">'+esc(_lotNom(pid))+' · sale en su lugar</div>';
+    if(!ls.length) h+='<div class="cl-none">No queda saldo de ningún lote de este producto.</div>';
+    ls.forEach(function(L){
+      const sel=(R[L.lote]!=null), v=+R[L.lote]||0;
+      if(sel) tot+=v;
+      const exc=sel && L.saldo!=null && (v*M.div)>(L.saldo+0.0001); if(exc) sobre=true;
+      const q=esc(L.lote).replace(/'/g,'&#39;');
+      h+='<div class="rp-lote'+(sel?' on':'')+(L.activo?'':' viejo')+'">'
+        +'<button class="rp-lotebtn" onclick="dvReempLote('+pid+',\''+q+'\')">'
+        +'<span class="rp-lote-n">'+esc(L.lote)+'</span>'
+        +(L.fuera ? '<span class="rp-saldo">ya elegido — sin saldo</span>'
+          : (L.saldo!=null ? ('<span class="rp-saldo">quedan '+esc(_lotUds(L.saldo,pid))+'</span>') : ''))
+        +'</button>'
+        +(sel?('<input type="number" min="0" step="any" inputmode="decimal" class="cl-in rp-lotein" '
+          +'value="'+esc(R[L.lote])+'" oninput="dvReempCant('+pid+',\''+q+'\',this.value)"'
+          +(exc?' style="border-color:var(--warn)"':'')+'>'):'')
+        +'</div>';
+    });
+    // AVISA, NO FRENA, igual que el exceso de lo que vuelve: el congelador manda
+    // sobre el sistema, y un saldo que se queda corto no puede impedir el cambio.
+    if(sobre) h+='<div class="dv-exceso">Sale más de lo que queda en el lote.</div>';
+    if(tot>0 && Math.abs(tot-l.total_man)>0.0001)
+      h+='<div class="dv-exceso">Sale '+esc(_dvManTxt(tot,pid))+' · volvió '+esc(_dvManTxt(l.total_man,pid))+'.</div>';
+    h+='</div>';
+  });
+  return h;
+}
+// Tocar un lote lo elige con LA MISMA CANTIDAD que volvio (lo que falte para
+// llegar, si ya hay otro lote elegido); tocarlo de nuevo lo suelta.
+function dvReempLote(pid, lote){
+  const N=_dv.n, R=(N.reemp[pid]=N.reemp[pid]||{});
+  if(R[lote]!=null){ delete R[lote]; dvRender(); return; }
+  const l=N.lineas.find(function(x){ return +x.producto_id===+pid; });
+  let otros=0; Object.keys(R).forEach(function(k){ otros+=(+R[k]||0); });
+  const falta=Math.max(0, ((l&&l.total_man)||0)-otros);
+  R[lote]=falta>0 ? String(Math.round(falta*1000)/1000) : '';
+  dvRender();
+}
+function dvReempCant(pid, lote, v){
+  const N=_dv.n; (N.reemp[pid]=N.reemp[pid]||{})[lote]=(v==null?'':v);
+  dvRender();
+  // el foco vuelve al mismo campo: re-renderizar lo pierde (como `dvLote`)
+  const els=document.querySelectorAll('#dvBody .rp-lotein');
+  for(const e of els){ const a=e.getAttribute('oninput')||'';
+    if(a.indexOf('dvReempCant('+pid+",'"+lote+"'")===0){
+      e.focus(); try{ e.setSelectionRange(e.value.length,e.value.length); }catch(_){} break; } }
+}
 function dvFueraHTML(){
   const f=_dv.fuera; if(!f.manual && !f.sinCliente) return '';
   // ⚠️ UNA LINEA, Y DICE QUE HACER (17-sep). Antes eran cinco renglones
@@ -21281,16 +21474,19 @@ function dvConfirmarHTML(){
   //     unico que tiene que leer antes de guardar. Vuelve el dia que exista la
   //     accion de editar una devolucion ya registrada, y ahi mismo.
   // Queda SOLO el resumen: que vuelve, de que entrega y cuando.
-  let h='<div class="dv-conf"><div class="dv-conf-t">Esto SUMA al congelador</div>'
+  const cambio=(N.resolucion==='cambio'), sale=cambio?_dvReempTxt(_dvReempFilas()):'';
+  let h='<div class="dv-conf"><div class="dv-conf-t">'
+    +(cambio?'Esto SUMA y RESTA en el congelador':'Esto SUMA al congelador')+'</div>'
     +'Vuelve <b>'+esc(que)+'</b> de la entrega <b>'+esc(_entFacRotulo(N.entrega))
     +'</b> de <b>'+esc(N.cliente.nombre)+'</b>, llegado el <b>'
-    +esc(N.fecha===_despHoy()?'hoy':N.fecha)+'</b>.</div>';
+    +esc(N.fecha===_despHoy()?'hoy':N.fecha)+'</b>.'
+    +(cambio&&sale?(' Sale <b>'+esc(sale)+'</b> en su lugar.'):'')+'</div>';
   // El bloque del error, vacio hasta que haga falta. Va ARRIBA del boton para que
   // quede entre lo que se leyo y lo que se toca — ver `_dvErrMostrar`.
   h+='<div id="dvErr" class="hidden"></div>';
   h+='<div class="dv-acc">'
     +'<button id="dvSave" class="btn btn-amarillo" '+(dvListo()&&!_dvGuardando?'':'disabled')
-    +' onclick="dvGuardar()">'+(_dvGuardando?'Registrando…':'Registrar la devolución')+'</button>'
+    +' onclick="dvGuardar()">'+(_dvGuardando?'Registrando…':(N.resolucion==='cambio'?'Registrar el cambio':'Registrar la devolución'))+'</button>'
     +'<span id="dvMsg" class="dv-msg"></span></div>';
   return h;
 }
@@ -21342,6 +21538,8 @@ async function dvGuardar(){
     if(!N||!N.entrega) f.push('elegir la entrega');
     else if(!N.lineas.length) f.push('agregar al menos una línea');
     if(N && !dvCausaLista()) f.push(N.causa==='otro'?('escribir la nota (mínimo '+DV_NOTA_MIN+' caracteres)'):'elegir la causa');
+    if(N && N.lineas.length && !dvResolucionLista())
+      f.push(N.resolucion==='cambio'?'elegir el lote que sale en su lugar':'elegir qué se hizo');
     if(N && !_despFechaOK(N.fecha)) f.push('corregir el día que llegó');
     _dvErrMostrar('No se puede registrar todavía: falta '+esc(f.join(' · ')||'algo')+'.');
     return;
@@ -21387,6 +21585,7 @@ async function dvGuardar(){
       fecha:N.fecha, cliente_id:N.cliente.id, cliente_nombre:N.cliente.nombre,
       pedido_id:N.entrega.pedido_id, causa:N.causa,
       nota:(N.causa==='otro'?String(N.nota||'').trim():null),
+      resolucion:N.resolucion,
       creado_por:email}).select('id').single();
     if(e1) throw e1;
 
@@ -21394,6 +21593,28 @@ async function dvGuardar(){
     const {error:e2}=await c.from('ent_devolucion_linea').insert(
       filas.map(function(x){ return Object.assign({devolucion_id:dev.id}, x); }));
     if(e2) throw e2;
+
+    // 3 · EN UN CAMBIO: lo que sale en su lugar, y NADA para Odoo. Ni NC (la
+    // factura quedo bien) ni traslado (salio 1 y volvio 1). La base lo exige igual:
+    // `ent_odoo_pendiente_ins` rechaza un pendiente colgado de un cambio.
+    // Cortado entre el 2 y este paso, lo devuelto ya suma y lo que salio todavia no
+    // resta: el saldo queda ALTO. El mensaje lo dice con la salida: anular y volver
+    // a registrar, que deshace las dos mitades juntas.
+    if(N.resolucion==='cambio'){
+      paso='lo que sale en su lugar (la devolución YA suma al congelador y esto todavía NO '
+        +'resta: anulala y registrala de nuevo)';
+      const fr=_dvReempFilas();
+      if(!fr.length) throw new Error('no hay ningún lote elegido para lo que sale');
+      const {error:e5}=await c.from('ent_devolucion_reemplazo').insert(fr.map(function(x){
+        return {devolucion_id:dev.id, producto_id:x.producto_id, lote:x.lote, cant_uds:x.cant_uds,
+                uom_id:0, uom_nombre:x.man_nombre, cant_uom:x.cant_man,
+                uom_factor:(x.man_div>0?(1/x.man_div):1)}; }));
+      if(e5) throw e5;
+      pon('var(--good,#3E9E62)','✓ Registrado el cambio. Vuelve al congelador y sale '+esc(_dvReempTxt(fr))+'.');
+      try{ _despLotes=null; _despSaldo=null; _rpLotes=null; _rpSaldo=null; _pd=null; _dvLot=null; }catch(e){}
+      setTimeout(function(){ dvCargar(true); }, 1200);
+      return;
+    }
 
     // 3 · LA ALERTA DE LA NC, con el payload COMPLETO de lo que va a ir a Odoo. No
     // es un recordatorio: es la nota de credito ya armada. El dia que se abra el
@@ -21420,7 +21641,7 @@ async function dvGuardar(){
     // Medido el 17-sep: la fila estaba en la base (ent_odoo_pendiente id 4) y la
     // pantalla no la mostraba. Invalidar el saldo y no la lista de pendientes es
     // acordarse de la mitad.
-    try{ _despLotes=null; _despSaldo=null; _rpLotes=null; _rpSaldo=null; _pd=null; }catch(e){}
+    try{ _despLotes=null; _despSaldo=null; _rpLotes=null; _rpSaldo=null; _pd=null; _dvLot=null; }catch(e){}
     setTimeout(function(){ dvCargar(true); }, 1200);
   }catch(e){
     const det=(e&&(e.message||e.msg))||String(e);
@@ -21430,7 +21651,8 @@ async function dvGuardar(){
     // otra vez. Va a la consola porque es donde sobrevive a que nadie mire.
     try{ console.error('[Truefie] Devoluciones · FALLO en:', paso, '·', cod, det,
       '· payload:', JSON.stringify({fecha:N.fecha, cliente_id:N.cliente&&N.cliente.id,
-        pedido_id:N.entrega&&N.entrega.pedido_id, causa:N.causa,
+        pedido_id:N.entrega&&N.entrega.pedido_id, causa:N.causa, resolucion:N.resolucion,
+        reemplazo:(N.resolucion==='cambio'?_dvReempFilas().map(function(x){ return x.producto_id+'|'+x.lote+'='+x.cant_man+'→'+x.cant_uds+'u'; }):null),
         lineas:N.lineas.map(function(l){ return {p:l.producto_id, man:l.man_nombre,
           f:l.lotes.map(function(x){ return x.lote+'='+x.cant_man+'→'+x.cant_uds+'u'; })}; })}),
       '· error completo:', e); }catch(_){}
