@@ -1,6 +1,6 @@
 -- ════════════════════════════════════════════════════════════════════════
 -- CAMBIO_DEVOLUCION_CAMBIO.sql · 30-oct-2026 · b150
--- ⛔ NO SE CORRIO. Este header se cambia DESPUES de verificar, nunca antes.
+-- ✅ PEGADO por Andrea en producción el 30-oct-2026 (después del ENSAYO cd5597f7, 35/35). Control 1·2·1·7·1·1·f·0; verificado desde afuera (2 objetos nuevos, columna resolucion, 7 políticas). esquema_check ✓.
 --
 -- QUE PIDIO ANDREA (30-oct): al registrar una devolucion, Daniel elige que se hizo.
 --   1 · SOLO DEVOLUCION  -> como hoy: el producto vuelve a su lote (suma) y queda
