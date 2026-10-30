@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- FLUJO_TABLAS.sql  ·  24-oct-2026  ·  T-275 F1 · Flujo de caja vivo en Finanzas
--- ⛔ SIN APLICAR. Escrito en seco. No se corrió contra Supabase ni contra ningún Postgres
+-- ✅ PEGADO por Andrea en producción el 30-oct-2026 (después del ENSAYO e54ad3d0, 38/38). Control 4 · 28 · 0 · INSERT,SELECT · 4 · 0 y verificado desde afuera con pg_lector.
 --    (en la Mac no hay Postgres): pasó solo por compila_sql.py (parser real) y lint_sql_ensayo.py.
 --    Primero va ENSAYO_FLUJO_TABLAS.sql (termina en rollback). Este header se toca DESPUÉS de
 --    verificar, nunca sobre lo que alguien anunció que iba a hacer.
