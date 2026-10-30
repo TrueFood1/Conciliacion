@@ -29280,8 +29280,9 @@ function _cobExtNota(n, todasUSD){ return n+(n===1?' factura':' facturas')+(toda
 //  · Semana lunes a domingo, FLUJO_SEMANAS desde el lunes de la semana de `hoy` (o del ancla). No se
 //    usa _mondayProd, que el sábado salta al lunes siguiente y perdería la semana que cierra.
 //  · El ancla es el saldo al CIERRE de su día: lo fechado ese día o antes ya está adentro.
-//  · Fin de semana o feriado: una SALIDA se adelanta al hábil anterior (sin caer en el ancla o
-//    antes) y una ENTRADA se corre al hábil siguiente. Lo diario no se mueve.
+//  · Fin de semana o feriado: entradas Y salidas se corren al hábil SIGUIENTE (Andrea, 29-oct: «como
+//    el Excel»; hasta F2 la salida se adelantaba al anterior). Lo diario no se mueve. No toca la ventana
+//    del cierre: esa apaga por fecha de DEVENGO, y correr la fecha de caja no cambia el devengo.
 //  · Un solo tipo de cambio (`flujo_tc`, Andrea 24-oct) para todo lo que está en dólares, también
 //    las facturas de Odoo: el equivalente de cobLoad usa el tipo de cada factura y aquí se reemplaza.
 //  · CxP: cobLoad('pagar') ya saca las «adicional» por la cuenta 640103. El motor NO repite el
@@ -29302,10 +29303,10 @@ function flujoLunes(iso){ return flujoMas(iso, 1-flujoDow(iso)); }
 function flujoEntre(a,b){ return Math.round((flujoD(b)-flujoD(a))/86400000); }          // b − a, en días
 function flujoUltimoDia(iso){ const d=flujoD(iso); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth()+1, 0)).getUTCDate(); }
 function flujoHabil(iso, feriados){ return flujoDow(iso)<6 && !(feriados&&feriados.has(iso)); }
-// sentido > 0 entrada (hacia adelante) · sentido < 0 salida (hacia atrás, nunca hasta `piso` o antes).
+// Al hábil SIGUIENTE, entre o salga (Andrea, 29-oct). `sentido` y `piso` quedan en la firma porque los
+// llamadores los pasan; ya no cambian nada (hacia adelante nunca se cae en el ancla o antes).
 function flujoMoverHabil(iso, sentido, piso, feriados){
   if(flujoHabil(iso,feriados)) return iso;
-  if(sentido<0){ let d=iso; for(let i=0;i<10;i++){ d=flujoMas(d,-1); if(piso&&d<=piso) break; if(flujoHabil(d,feriados)) return d; } }
   let d=iso; for(let i=0;i<10;i++){ d=flujoMas(d,1); if(flujoHabil(d,feriados)) return d; }
   return iso;
 }

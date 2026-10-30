@@ -20,10 +20,11 @@ eq('lunes de un domingo', flujoLunes('2026-10-25'), '2026-10-19');
 eq('lunes de un lunes', flujoLunes('2026-10-26'), '2026-10-26');
 
 // 2. Día hábil: salida hacia atrás, entrada hacia adelante, nunca hasta el ancla
-eq('salida en domingo → viernes', flujoMoverHabil('2026-11-15', -1, '2026-10-24', null), '2026-11-13');
+eq('salida en domingo → lunes (hábil siguiente, Andrea 29-oct)', flujoMoverHabil('2026-11-15', -1, '2026-10-24', null), '2026-11-16');
 eq('entrada en sábado → lunes', flujoMoverHabil('2026-10-31', 1, '2026-10-24', null), '2026-11-02');
 eq('salida el domingo después del ancla del sábado → lunes', flujoMoverHabil('2026-10-25', -1, '2026-10-24', null), '2026-10-26');
-eq('feriado 25-dic (viernes), salida → jueves', flujoMoverHabil('2026-12-25', -1, '2026-10-24', new Set(['2026-12-25'])), '2026-12-24');
+eq('feriado 25-dic (viernes), salida → lunes 28', flujoMoverHabil('2026-12-25', -1, '2026-10-24', new Set(['2026-12-25'])), '2026-12-28');
+eq('feriado 1-ene (viernes), salida → lunes 4', flujoMoverHabil('2027-01-01', -1, '2026-10-24', new Set(['2027-01-01'])), '2027-01-04');
 
 // 3. Horizonte: 26 semanas desde el lunes de la semana del ancla
 var r0=flujoCalcular({ancla:ANCLA, compromisos:[], cxc:[], cxp:[], tc:500});
@@ -39,7 +40,7 @@ var r1=flujoCalcular({ancla:ANCLA, tc:500, compromisos:[
 var q=r1.partidas.filter(function(p){return p.ref==='q';}).map(function(p){return p.devengo;});
 eq('quincena devenga 31-oct, 15 y 30-nov, 15 y 31-dic, 15 y 31-ene, 15 y 28-feb',
    q.slice(0,9), ['2026-10-31','2026-11-15','2026-11-30','2026-12-15','2026-12-31','2027-01-15','2027-01-31','2027-02-15','2027-02-28']);
-eq('31-oct (sábado) se paga el viernes 30', r1.partidas[0].fecha, '2026-10-30');
+eq('31-oct (sábado) se paga el lunes 2-nov', r1.partidas[0].fecha, '2026-11-02');
 
 // 5. Append-only: un monto nuevo desde una fecha, una corrección y una baja
 var hist=[
@@ -171,6 +172,20 @@ var rp=flujoCalcular({ancla:{fecha:'2026-10-26', saldo:0}, tc:500, compromisos:[
   fila({clave:'m', periodicidad:'mensual', dias:[20], vigente_desde:'2026-09-01', monto:3000, plazo_dias:19, categoria:'MP'})]});
 eq('devengada en el ancla, pagada a 10 días: entra el 5-nov', rp.partidas.filter(function(p){return p.ref==='h';}).map(function(p){return [p.devengo,p.fecha];}), [['2026-10-26','2026-11-05']]);
 eq('pagada antes del ancla: no entra', rp.partidas.filter(function(p){return p.ref==='g';}).length, 0);
-eq('mensual del 20-oct a 19 días: 8-nov es domingo, se paga el viernes 6', rp.partidas.filter(function(p){return p.ref==='m';})[0].fecha, '2026-11-06');
+eq('mensual del 20-oct a 19 días: 8-nov es domingo, se paga el lunes 9', rp.partidas.filter(function(p){return p.ref==='m';})[0].fecha, '2026-11-09');
+
+// 17. Hábil siguiente y ventana del cierre: correr la fecha de CAJA no cambia el DEVENGO, que es lo que
+//     mira la ventana. Compra del jueves 17-dic (antes del cierre) que vence el domingo 20 → lunes 21,
+//     y se cuenta; compra del 21-dic (dentro del cierre) → apagada aunque se pague en enero.
+var rv=flujoCalcular({ancla:ANCLA, tc:500, feriados:['2026-12-25','2027-01-01'], compromisos:[
+  fila({clave:'c1', categoria:'MP', periodicidad:'unica', dias:null, fecha:'2026-12-17', vigente_desde:'2026-12-17', monto:1000, plazo_dias:3}),
+  fila({clave:'c2', categoria:'MP', periodicidad:'unica', dias:null, fecha:'2026-12-21', vigente_desde:'2026-12-21', monto:1000, plazo_dias:30}),
+  fila({clave:'v', categoria:'ventana', sentido:null, monto:null, moneda:null, periodicidad:'unica', dias:null, fecha:'2026-12-18', fecha_hasta:'2027-01-10', apaga:['MP'], vigente_desde:'2026-12-18'})]});
+eq('compra antes del cierre pagadera en domingo: lunes 21-dic y se cuenta', rv.partidas.filter(function(p){return p.ref==='c1';}).map(function(p){return p.fecha;}), ['2026-12-21']);
+eq('compra dentro del cierre: apagada aunque se pague en enero', [rv.partidas.some(function(p){return p.ref==='c2';}), rv.apagadas.some(function(p){return p.ref==='c2';})], [false,true]);
+eq('salida del 1-ene (feriado) cae el lunes 4-ene, fuera del cierre por devengo y sin apagarse', flujoCalcular({ancla:ANCLA, tc:500, feriados:['2027-01-01'], compromisos:[
+  fila({clave:'a', categoria:'fijo', dias:[1], monto:100}),
+  fila({clave:'v', categoria:'ventana', sentido:null, monto:null, moneda:null, periodicidad:'unica', dias:null, fecha:'2026-12-18', fecha_hasta:'2027-01-10', apaga:['MP'], vigente_desde:'2026-12-18'})]})
+  .partidas.filter(function(p){return p.devengo==='2027-01-01';}).map(function(p){return p.fecha;}), ['2027-01-04']);
 
 print((mal?'FALLA':'OK')+' · '+ok+' de '+(ok+mal)+' casos');
