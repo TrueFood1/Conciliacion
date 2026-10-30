@@ -202,4 +202,19 @@ eq('fila sin el campo cuenta como proveedor', flujoSentidoHabil({sentido:'salida
 eq('una entrada nunca va al anterior', flujoSentidoHabil({sentido:'entrada', proveedor:false}), 1);
 eq('no proveedor que caería en el ancla o antes → siguiente', flujoMoverHabil('2026-10-25', -1, '2026-10-24', null), '2026-10-26');
 
+// 19. Fechas fijadas a mano y día de pago del cliente (decisiones del 28-oct)
+var rf=flujoCalcular({ancla:{fecha:'2026-10-28', saldo:0}, tc:500,
+  cxc:[fac('A1','2026-10-28',1000,713), fac('A2','2026-11-04',1000,713), fac('A3','2026-10-21',1000,713), fac('W1','2026-10-28',1000,951)],
+  cxp:[fac('B1','2026-10-21',500,40), fac('B2','2026-10-24',500,40)],
+  opciones:{atrasoCliente:{713:10, 951:10}, diaPagoCliente:{713:5},
+            fechas:{A1:{fecha:'2026-10-30', motivo:'pronto pago'}, B2:{fecha:'2026-11-20', motivo:'rodado'}}}});
+var ff=function(ref){ var p=rf.partidas.filter(function(x){return x.ref===ref;})[0]; return p&&p.fecha; };
+eq('pronto pago: la fecha fijada manda sobre vencimiento + atraso', [ff('A1'), rf.partidas.filter(function(x){return x.ref==='A1';})[0].fijada], ['2026-10-30','pronto pago']);
+eq('Automercado paga el viernes en o antes: 4-nov + 10 = sáb 14 → vie 13', ff('A2'), '2026-11-13');
+eq('21-oct + 10 = sáb 31-oct → vie 30', ff('A3'), '2026-10-30');
+eq('CSU sin día de pago: sáb 7-nov → lunes 9', ff('W1'), '2026-11-09');
+eq('proveedor vencido → primer día después del ancla; rodado → su fecha', [ff('B1'), ff('B2')], ['2026-10-29','2026-11-20']);
+eq('día de pago que caería en el ancla o antes: primer día después', flujoCalcular({ancla:{fecha:'2026-10-28', saldo:0}, tc:500,
+  cxc:[fac('A4','2026-10-15',1000,713)], opciones:{atrasoCliente:{713:10}, diaPagoCliente:{713:5}}}).partidas[0].fecha, '2026-10-29');
+
 print((mal?'FALLA':'OK')+' · '+ok+' de '+(ok+mal)+' casos');

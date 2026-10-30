@@ -29397,6 +29397,17 @@ function flujoMontoFila(r, tc){
   if(r._ext&&r._ext.cur==='USD'&&tc>0) return Math.round(r._ext.c*tc);
   return Number(r._crc)||0;
 }
+// Fecha FIJADA a mano para una factura (pronto pago, pago rodado…): opciones.fechas = {ref: {fecha, motivo}}.
+// Manda sobre el vencimiento y la gracia; la factura sigue viniendo viva de Odoo (monto, si ya se pagó).
+// Si la fecha fijada ya pasó (≤ ancla), se toma el primer día después del ancla.
+function _flujoFijada(r, ctx){
+  const f=ctx.opciones.fechas, x=f&&(f[r.name]||(r.number_electronic&&f[r.number_electronic]));
+  if(!x||!flujoD(x.fecha)) return null;
+  return {fecha:x.fecha>ctx.ancla?x.fecha:flujoMas(ctx.ancla,1), motivo:x.motivo||'fecha fijada a mano'};
+}
+// Día de la semana en que paga un cliente (opciones.diaPagoCliente = {cpid: 1…7}): la fecha esperada se
+// lleva a ese día de la semana, el más cercano EN O ANTES (Automercado: los viernes, Andrea 28-oct).
+function flujoAlDia(iso, dia){ return flujoMas(iso, -((flujoDow(iso)-dia+7)%7)); }
 function _flujoExcluida(r, excl){ const k=[r.name, r.number_electronic].filter(Boolean); for(const x of k){ if(excl[x]) return excl[x]; } return null; }
 // Por cobrar: fecha esperada = vencimiento + atraso real del cliente (por commercial_partner_id; si no
 // hay, `atrasoDefecto`). Si esa fecha ya pasó: hasta `cxcGraciaDias` de atraso extra se espera el
@@ -29410,16 +29421,19 @@ function flujoPartidasCxC(rows, ctx){
     const due=r.invoice_date_due||r.invoice_date;
     if(!due){ fuera.push({ref:r.name, odoo:r.id||null, origen:'cxc', concepto, monto, motivo:'sin vencimiento'}); return; }
     const pid=r._cpid||(r.partner_id&&r.partner_id[0]);
+    const fij=_flujoFijada(r, ctx);
     const atraso=(o.atrasoCliente&&o.atrasoCliente[pid]!=null)?Number(o.atrasoCliente[pid]):(Number(o.atrasoDefecto)||0);
-    let esp=flujoMas(due, atraso);
-    if(esp<=ctx.ancla){
+    let esp=fij?fij.fecha:flujoMas(due, atraso);
+    const dia=!fij&&o.diaPagoCliente&&Number(o.diaPagoCliente[pid]);
+    if(dia>=1&&dia<=7) esp=flujoAlDia(esp, dia);
+    if(!fij&&esp<=ctx.ancla){
       const tarde=flujoEntre(esp, ctx.ancla);
       if(tarde>o.cxcGraciaDias){ fuera.push({ref:r.name, odoo:r.id||null, origen:'cxc', concepto, monto, motivo:'vencida: '+tarde+' días después de la fecha esperada'}); return; }
       esp=flujoMas(ctx.ancla,1);
     }
     const fecha=flujoMoverHabil(esp, 1, ctx.ancla, ctx.feriados);
     if(fecha>ctx.hasta){ fuera.push({ref:r.name, odoo:r.id||null, origen:'cxc', concepto, monto, motivo:'se espera después del horizonte ('+fecha+')'}); return; }
-    partidas.push({fecha, devengo:r.invoice_date||due, monto, categoria:'cxc', concepto, ref:r.name, odoo:r.id||null, vence:due, origen:'cxc', tentativo:false, moneda:r._ext?r._ext.cur:'CRC'});
+    partidas.push({fecha, devengo:r.invoice_date||due, monto, categoria:'cxc', concepto, ref:r.name, odoo:r.id||null, vence:due, origen:'cxc', tentativo:false, moneda:r._ext?r._ext.cur:'CRC', fijada:fij?fij.motivo:null});
   });
   return {partidas, fuera};
 }
@@ -29434,15 +29448,16 @@ function flujoPartidasCxP(rows, ctx){
     const due=r.invoice_date_due||r.invoice_date;
     if(!due){ fuera.push({ref:r.name, odoo:r.id||null, origen:'cxp', concepto, monto:-monto, motivo:'sin vencimiento'}); return; }
     const pid=r._cpid||(r.partner_id&&r.partner_id[0]);
-    let esp=flujoMas(due, (o.atrasoProveedor&&o.atrasoProveedor[pid]!=null)?Number(o.atrasoProveedor[pid]):0);
-    if(esp<=ctx.ancla){
+    const fij=_flujoFijada(r, ctx);
+    let esp=fij?fij.fecha:flujoMas(due, (o.atrasoProveedor&&o.atrasoProveedor[pid]!=null)?Number(o.atrasoProveedor[pid]):0);
+    if(!fij&&esp<=ctx.ancla){
       const edad=flujoEntre(due, ctx.ancla);
       if(edad>o.cxpViejaDias){ fuera.push({ref:r.name, odoo:r.id||null, origen:'cxp', concepto, monto:-monto, motivo:'vieja: venció hace '+edad+' días, a revisión'}); return; }
       esp=flujoMas(ctx.ancla,1);
     }
     const fecha=flujoMoverHabil(esp, 1, ctx.ancla, ctx.feriados);            // factura de proveedor: hábil siguiente
     if(fecha>ctx.hasta){ fuera.push({ref:r.name, odoo:r.id||null, origen:'cxp', concepto, monto:-monto, motivo:'vence después del horizonte ('+fecha+')'}); return; }
-    partidas.push({fecha, devengo:r.invoice_date||due, monto:-monto, categoria:'cxp', concepto, ref:r.name, odoo:r.id||null, vence:due, origen:'cxp', tentativo:false, moneda:r._ext?r._ext.cur:'CRC'});
+    partidas.push({fecha, devengo:r.invoice_date||due, monto:-monto, categoria:'cxp', concepto, ref:r.name, odoo:r.id||null, vence:due, origen:'cxp', tentativo:false, moneda:r._ext?r._ext.cur:'CRC', fijada:fij?fij.motivo:null});
   });
   return {partidas, fuera};
 }
@@ -29829,6 +29844,7 @@ function fjOrigenHTML(p){
     L.push('<b>Factura de Odoo '+esc(p.ref||'')+'</b>'+(p.odoo?' · id '+esc(String(p.odoo)):''));
     L.push((p.origen==='cxc'?'Por cobrar':'Por pagar')+(p.devengo?' · emitida '+esc(_fjFa(p.devengo)):'')+(p.vence?' · vence '+esc(_fjFa(p.vence)):'')
       +(p.fecha&&!p._tipo?' · en caja '+esc(_fjFa(p.fecha)):'')+usd);
+    if(p.fijada) L.push('Fecha fijada: '+esc(p.fijada));
     L.push('Saldo pendiente '+_fjExacto(p.monto));
     if(p.odoo) L.push('<div class="fj-oacc"><button class="btn btn-sm" onclick="entPdfAbrir('+Number(p.odoo)+','+esc(JSON.stringify(String(p.ref||'')))+','+esc(JSON.stringify(String(p.concepto||'')))+')">Ver PDF</button></div>');
   } else if(p.origen==='compromiso'){
