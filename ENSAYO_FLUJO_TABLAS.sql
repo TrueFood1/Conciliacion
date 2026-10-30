@@ -38,6 +38,7 @@ create table public.flujo_compromiso (
   vigente_hasta  date,
   activo         boolean not null default true,                            -- false = baja desde vigente_desde
   tentativo      boolean not null default false,                           -- se suma, pero se dibuja aparte (y hay un saldo sin tentativos)
+  proveedor      boolean not null default true,                            -- día no hábil: proveedor → hábil SIGUIENTE; si no (planilla, impuestos…) → ANTERIOR (Andrea 29-oct)
   regla          text check (length(regla) <= 300),                        -- p. ej. «desde tal mes — regla de Andrea»
   fuente         text not null check (length(btrim(fuente)) between 1 and 200),
   creado_por     text not null check (length(btrim(creado_por)) > 0),
@@ -53,6 +54,7 @@ create table public.flujo_compromiso (
     categoria = 'ventana' or (sentido is not null and moneda is not null and monto is not null
                               and (monto > 0 or not activo))),
   constraint flujo_compromiso_unica check (periodicidad <> 'unica' or fecha is not null),
+  constraint flujo_compromiso_proveedor check (proveedor or sentido = 'salida'),  -- «no proveedor» es solo de una salida
   constraint flujo_compromiso_fecha_hasta check (categoria = 'ventana' or fecha_hasta is null),
   constraint flujo_compromiso_dias check (
     case periodicidad
@@ -238,7 +240,16 @@ begin
       (29, 'C14 ventas que no son una lista',                                   'authenticated', v_socia,
            format(sup, 'flujo_ventas', '''{"canal": "A"}''::jsonb', v_socia), '23514'),
       (30, 'E4 alguien de equipo anota un supuesto',                            'authenticated', v_equipo,
-           format(sup, 'flujo_excluir', '''[]''::jsonb', v_equipo), '42501')
+           format(sup, 'flujo_excluir', '''[]''::jsonb', v_equipo), '42501'),
+      -- proveedor: decide a qué hábil va un pago que cae en sábado, domingo o feriado
+      (31, 'S8 socia: planilla como NO proveedor (hábil anterior)',             'authenticated', v_socia,
+           'insert into public.flujo_compromiso (clave, concepto, categoria, sentido, monto, moneda, periodicidad, dias, '
+           'vigente_desde, proveedor, fuente, creado_por) values (''planilla'', ''Prueba'', ''fijo'', ''salida'', 5, ''CRC'', '
+           '''quincenal'', array[15,31]::smallint[], date ''2026-11-01'', false, ''ensayo'', ' || quote_literal(v_socia) || ')', null),
+      (32, 'C15 una ENTRADA marcada como no proveedor',                         'authenticated', v_socia,
+           'insert into public.flujo_compromiso (clave, concepto, categoria, sentido, monto, moneda, periodicidad, dias, '
+           'vigente_desde, proveedor, fuente, creado_por) values (''x_10'', ''Prueba'', ''unico'', ''entrada'', 5, ''CRC'', '
+           '''mensual'', array[1]::smallint[], date ''2026-11-01'', false, ''ensayo'', ' || quote_literal(v_socia) || ')', '23514')
     ) v(n, p, rol, email, q, esp)
     order by n
   loop
@@ -255,7 +266,7 @@ begin
     v_res := v_res || jsonb_build_object('p', r.p, 'esperado', coalesce('RECHAZA · ' || r.esp, 'ENTRA'), 'obtenido', v_obt, 'ok', v_ok);
   end loop;
 
-  -- lecturas: equipo no ve nada; la socia ve lo que entró (2 compromisos, 2 anclas, 1 corrida, 1 supuesto = 6)
+  -- lecturas: equipo no ve nada; la socia ve lo que entró (3 compromisos, 2 anclas, 1 corrida, 1 supuesto = 7)
   perform set_config('request.jwt.claims', json_build_object('email', v_equipo, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   select (select count(*) from public.flujo_compromiso) + (select count(*) from public.flujo_ancla)
@@ -267,7 +278,7 @@ begin
   select (select count(*) from public.flujo_compromiso) + (select count(*) from public.flujo_ancla)
        + (select count(*) from public.flujo_corrida) + (select count(*) from public.flujo_supuesto) into v_n;
   perform set_config('role', 'postgres', true);
-  v_res := v_res || jsonb_build_object('p', 'S6 la socia ve las 6 filas (S1–S5 y S7)', 'esperado', '6', 'obtenido', v_n::text, 'ok', v_n = 6);
+  v_res := v_res || jsonb_build_object('p', 'S6 la socia ve las 7 filas (S1–S5, S7 y S8)', 'esperado', '7', 'obtenido', v_n::text, 'ok', v_n = 7);
   if v_asis is not null then
     perform set_config('request.jwt.claims', json_build_object('email', v_asis, 'role', 'authenticated')::text, true);
     perform set_config('role', 'authenticated', true);
@@ -297,6 +308,6 @@ end $$;
 
 select r->>'p' as prueba, r->>'esperado' as esperado, r->>'obtenido' as obtenido, (r->>'ok')::boolean as ok
   from jsonb_array_elements(current_setting('ensayo.res')::jsonb) r;
--- ESPERADO: 36 filas (35 si no hay perfil asistente activo), todas ok = true.
+-- ESPERADO: 38 filas (37 si no hay perfil asistente activo), todas ok = true.
 
 rollback;

@@ -58,6 +58,7 @@ create table public.flujo_compromiso (
   vigente_hasta  date,
   activo         boolean not null default true,                            -- false = baja desde vigente_desde
   tentativo      boolean not null default false,                           -- se suma, pero se dibuja aparte (y hay un saldo sin tentativos)
+  proveedor      boolean not null default true,                            -- día no hábil: proveedor → hábil SIGUIENTE; si no (planilla, impuestos…) → ANTERIOR (Andrea 29-oct)
   regla          text check (length(regla) <= 300),                        -- p. ej. «desde tal mes — regla de Andrea»
   fuente         text not null check (length(btrim(fuente)) between 1 and 200),
   creado_por     text not null check (length(btrim(creado_por)) > 0),
@@ -73,6 +74,7 @@ create table public.flujo_compromiso (
     categoria = 'ventana' or (sentido is not null and moneda is not null and monto is not null
                               and (monto > 0 or not activo))),
   constraint flujo_compromiso_unica check (periodicidad <> 'unica' or fecha is not null),
+  constraint flujo_compromiso_proveedor check (proveedor or sentido = 'salida'),  -- «no proveedor» es solo de una salida
   constraint flujo_compromiso_fecha_hasta check (categoria = 'ventana' or fecha_hasta is null),
   constraint flujo_compromiso_dias check (
     case periodicidad

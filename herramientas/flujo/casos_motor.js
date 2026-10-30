@@ -20,11 +20,12 @@ eq('lunes de un domingo', flujoLunes('2026-10-25'), '2026-10-19');
 eq('lunes de un lunes', flujoLunes('2026-10-26'), '2026-10-26');
 
 // 2. Día hábil: salida hacia atrás, entrada hacia adelante, nunca hasta el ancla
-eq('salida en domingo → lunes (hábil siguiente, Andrea 29-oct)', flujoMoverHabil('2026-11-15', -1, '2026-10-24', null), '2026-11-16');
+eq('hacia atrás (no proveedor): domingo → viernes', flujoMoverHabil('2026-11-15', -1, '2026-10-24', null), '2026-11-13');
+eq('hacia adelante (proveedor): domingo → lunes', flujoMoverHabil('2026-11-15', 1, '2026-10-24', null), '2026-11-16');
 eq('entrada en sábado → lunes', flujoMoverHabil('2026-10-31', 1, '2026-10-24', null), '2026-11-02');
 eq('salida el domingo después del ancla del sábado → lunes', flujoMoverHabil('2026-10-25', -1, '2026-10-24', null), '2026-10-26');
-eq('feriado 25-dic (viernes), salida → lunes 28', flujoMoverHabil('2026-12-25', -1, '2026-10-24', new Set(['2026-12-25'])), '2026-12-28');
-eq('feriado 1-ene (viernes), salida → lunes 4', flujoMoverHabil('2027-01-01', -1, '2026-10-24', new Set(['2027-01-01'])), '2027-01-04');
+eq('feriado 25-dic: no proveedor → jueves 24, proveedor → lunes 28', [flujoMoverHabil('2026-12-25', -1, '2026-10-24', new Set(['2026-12-25'])), flujoMoverHabil('2026-12-25', 1, '2026-10-24', new Set(['2026-12-25']))], ['2026-12-24','2026-12-28']);
+eq('feriado 1-ene: no proveedor → jueves 31, proveedor → lunes 4', [flujoMoverHabil('2027-01-01', -1, '2026-10-24', new Set(['2027-01-01'])), flujoMoverHabil('2027-01-01', 1, '2026-10-24', new Set(['2027-01-01']))], ['2026-12-31','2027-01-04']);
 
 // 3. Horizonte: 26 semanas desde el lunes de la semana del ancla
 var r0=flujoCalcular({ancla:ANCLA, compromisos:[], cxc:[], cxp:[], tc:500});
@@ -187,5 +188,18 @@ eq('salida del 1-ene (feriado) cae el lunes 4-ene, fuera del cierre por devengo 
   fila({clave:'a', categoria:'fijo', dias:[1], monto:100}),
   fila({clave:'v', categoria:'ventana', sentido:null, monto:null, moneda:null, periodicidad:'unica', dias:null, fecha:'2026-12-18', fecha_hasta:'2027-01-10', apaga:['MP'], vigente_desde:'2026-12-18'})]})
   .partidas.filter(function(p){return p.devengo==='2027-01-01';}).map(function(p){return p.fecha;}), ['2027-01-04']);
+
+// 18. Proveedor o no (Andrea, 29-oct): las quincenas son al revés que los proveedores.
+var rq=flujoCalcular({ancla:{fecha:'2026-10-26', saldo:0}, tc:500, compromisos:[
+  fila({clave:'pl', periodicidad:'quincenal', dias:[15,31], vigente_desde:'2026-10-27', monto:100, proveedor:false}),
+  fila({clave:'pv', periodicidad:'mensual', dias:[15], vigente_desde:'2026-11-01', monto:100})],
+  cxp:[fac('PX','2026-11-14',1000,30)]});
+var fq=function(ref){ return rq.partidas.filter(function(p){return p.ref===ref;}).map(function(p){return p.fecha;}).slice(0,2); };
+eq('quincena del sábado 31-oct (no proveedor) → viernes 30-oct; la del domingo 15-nov → viernes 13-nov', fq('pl'), ['2026-10-30','2026-11-13']);
+eq('proveedor del domingo 15-nov → lunes 16-nov', fq('pv')[0], '2026-11-16');
+eq('factura de Odoo que vence el sábado 14-nov → lunes 16-nov', rq.partidas.filter(function(p){return p.ref==='PX';})[0].fecha, '2026-11-16');
+eq('fila sin el campo cuenta como proveedor', flujoSentidoHabil({sentido:'salida'}), 1);
+eq('una entrada nunca va al anterior', flujoSentidoHabil({sentido:'entrada', proveedor:false}), 1);
+eq('no proveedor que caería en el ancla o antes → siguiente', flujoMoverHabil('2026-10-25', -1, '2026-10-24', null), '2026-10-26');
 
 print((mal?'FALLA':'OK')+' · '+ok+' de '+(ok+mal)+' casos');

@@ -29280,9 +29280,11 @@ function _cobExtNota(n, todasUSD){ return n+(n===1?' factura':' facturas')+(toda
 //  · Semana lunes a domingo, FLUJO_SEMANAS desde el lunes de la semana de `hoy` (o del ancla). No se
 //    usa _mondayProd, que el sábado salta al lunes siguiente y perdería la semana que cierra.
 //  · El ancla es el saldo al CIERRE de su día: lo fechado ese día o antes ya está adentro.
-//  · Fin de semana o feriado: entradas Y salidas se corren al hábil SIGUIENTE (Andrea, 29-oct: «como
-//    el Excel»; hasta F2 la salida se adelantaba al anterior). Lo diario no se mueve. No toca la ventana
-//    del cierre: esa apaga por fecha de DEVENGO, y correr la fecha de caja no cambia el devengo.
+//  · Fin de semana o feriado (Andrea, 29-oct): un pago a PROVEEDOR va al hábil SIGUIENTE (las facturas
+//    de Odoo y todo compromiso con proveedor = true); lo que no es proveedor (planilla, aguinaldo,
+//    impuestos, banco: proveedor = false) se ADELANTA al hábil anterior, sin caer en el ancla o antes.
+//    Los cobros van al siguiente. Lo diario no se mueve. No toca la ventana del cierre: esa apaga por
+//    fecha de DEVENGO, y mover la fecha de caja no cambia el devengo.
 //  · Un solo tipo de cambio (`flujo_tc`, Andrea 24-oct) para todo lo que está en dólares, también
 //    las facturas de Odoo: el equivalente de cobLoad usa el tipo de cada factura y aquí se reemplaza.
 //  · CxP: cobLoad('pagar') ya saca las «adicional» por la cuenta 640103. El motor NO repite el
@@ -29303,13 +29305,17 @@ function flujoLunes(iso){ return flujoMas(iso, 1-flujoDow(iso)); }
 function flujoEntre(a,b){ return Math.round((flujoD(b)-flujoD(a))/86400000); }          // b − a, en días
 function flujoUltimoDia(iso){ const d=flujoD(iso); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth()+1, 0)).getUTCDate(); }
 function flujoHabil(iso, feriados){ return flujoDow(iso)<6 && !(feriados&&feriados.has(iso)); }
-// Al hábil SIGUIENTE, entre o salga (Andrea, 29-oct). `sentido` y `piso` quedan en la firma porque los
-// llamadores los pasan; ya no cambian nada (hacia adelante nunca se cae en el ancla o antes).
+// sentido > 0 → hábil SIGUIENTE (cobros, proveedores) · sentido < 0 → hábil ANTERIOR (no proveedor),
+// nunca hasta `piso` (el ancla) o antes: si no hay hábil entre el ancla y la fecha, va al siguiente.
 function flujoMoverHabil(iso, sentido, piso, feriados){
   if(flujoHabil(iso,feriados)) return iso;
+  if(sentido<0){ let d=iso; for(let i=0;i<10;i++){ d=flujoMas(d,-1); if(piso&&d<=piso) break; if(flujoHabil(d,feriados)) return d; } }
   let d=iso; for(let i=0;i<10;i++){ d=flujoMas(d,1); if(flujoHabil(d,feriados)) return d; }
   return iso;
 }
+// Hacia dónde se mueve un compromiso que cae en día no hábil: solo una SALIDA con proveedor = false va
+// al anterior. Una fila sin el campo (vieja) cuenta como proveedor, que es el default de la tabla.
+function flujoSentidoHabil(f){ return (f.sentido!=='entrada' && f.proveedor===false) ? -1 : 1; }
 function flujoCent(colones){ return Math.round((Number(colones)||0)*100); }
 
 // ── compromisos (append-only, como rrhh_neto_quincena) ──
@@ -29376,10 +29382,10 @@ function flujoExpandirCompromisos(filas, ancla, hasta, ctx){
       const sent=f.sentido==='entrada'?1:-1, plazo=Number(f.plazo_dias)||0;
       const caja=plazo?flujoMas(d,plazo):d;
       if(caja<=ancla) continue;                                  // ya está en el saldo del ancla
-      const fecha=f.periodicidad==='diaria'?caja:flujoMoverHabil(caja, sent, ancla, ctx.feriados);
+      const fecha=f.periodicidad==='diaria'?caja:flujoMoverHabil(caja, flujoSentidoHabil(f), ancla, ctx.feriados);
       if(fecha>hasta) continue;
       partidas.push({fecha, devengo:d, monto:sent*c, categoria:f.categoria, concepto:f.concepto,
-        ref:clave, origen:'compromiso', tentativo:!!f.tentativo, moneda:f.moneda||'CRC',
+        ref:clave, origen:'compromiso', tentativo:!!f.tentativo, moneda:f.moneda||'CRC', proveedor:f.proveedor!==false,
         fila:f.id!=null?f.id:null, regla:f.regla||null, fuente:f.fuente||null});   // F2: el origen que abre la pantalla
     }
   });
@@ -29434,7 +29440,7 @@ function flujoPartidasCxP(rows, ctx){
       if(edad>o.cxpViejaDias){ fuera.push({ref:r.name, odoo:r.id||null, origen:'cxp', concepto, monto:-monto, motivo:'vieja: venció hace '+edad+' días, a revisión'}); return; }
       esp=flujoMas(ctx.ancla,1);
     }
-    const fecha=flujoMoverHabil(esp, -1, ctx.ancla, ctx.feriados);
+    const fecha=flujoMoverHabil(esp, 1, ctx.ancla, ctx.feriados);            // factura de proveedor: hábil siguiente
     if(fecha>ctx.hasta){ fuera.push({ref:r.name, odoo:r.id||null, origen:'cxp', concepto, monto:-monto, motivo:'vence después del horizonte ('+fecha+')'}); return; }
     partidas.push({fecha, devengo:r.invoice_date||due, monto:-monto, categoria:'cxp', concepto, ref:r.name, odoo:r.id||null, vence:due, origen:'cxp', tentativo:false, moneda:r._ext?r._ext.cur:'CRC'});
   });
@@ -29610,6 +29616,7 @@ function flujoValidarCompromiso(f){
     if(['CRC','USD'].indexOf(f.moneda)<0) return 'Moneda inválida';
     const m=Number(f.monto); if(f.monto==null||isNaN(m)||m<0) return 'Monto inválido';
     if(!(m>0)&&f.activo!==false) return 'Monto en cero (solo una baja)';
+    if(f.proveedor===false&&f.sentido!=='salida') return '«No proveedor» es solo de una salida';
   }
   if(f.periodicidad==='unica'&&!iso(f.fecha)) return 'Falta la fecha';
   const d=f.dias;
@@ -29826,7 +29833,7 @@ function fjOrigenHTML(p){
     if(p.odoo) L.push('<div class="fj-oacc"><button class="btn btn-sm" onclick="entPdfAbrir('+Number(p.odoo)+','+esc(JSON.stringify(String(p.ref||'')))+','+esc(JSON.stringify(String(p.concepto||'')))+')">Ver PDF</button></div>');
   } else if(p.origen==='compromiso'){
     const f=_fj.comp.find(x=>x.id===p.fila)||null;
-    L.push('<b>Compromiso «'+esc(p.concepto)+'»</b>'+(p.tentativo?' · tentativo':''));
+    L.push('<b>Compromiso «'+esc(p.concepto)+'»</b>'+(p.tentativo?' · tentativo':'')+(p.monto<0&&p.proveedor===false?' · no proveedor':''));
     L.push(esc(FJ_CAT[p.categoria]||p.categoria)+(f?' · '+esc(FJ_PER[f.periodicidad]||f.periodicidad):'')+' · devenga '+esc(_fjFa(p.devengo))
       +(p.fecha!==p.devengo?' · en caja '+esc(_fjFa(p.fecha)):'')+usd+' · '+_fjExacto(p.monto));
     if(p.regla) L.push('Nota: '+esc(p.regla));
@@ -29863,7 +29870,7 @@ function fjAbrirAlta(tipo, id){
     _fj.form={clave:b.clave||'', concepto:b.concepto||'', categoria:b.categoria||'fijo', sentido:b.sentido||'salida',
       monto:b.monto!=null?String(b.monto).replace('.',','):'', moneda:b.moneda||'CRC', periodicidad:b.periodicidad||'mensual',
       dias:(b.dias||[]).join(', '), fecha:b.fecha||'', fecha_hasta:b.fecha_hasta||'', apaga:(b.apaga||[]).slice(),
-      plazo_dias:String(b.plazo_dias||0), vigente_desde:_fj.hoy, vigente_hasta:'', tentativo:!!b.tentativo,
+      plazo_dias:String(b.plazo_dias||0), vigente_desde:_fj.hoy, vigente_hasta:'', tentativo:!!b.tentativo, proveedor:b.proveedor!==false,
       regla:b.regla||'', fuente:b.fuente||'', baja:tipo==='baja'};
     if(tipo==='baja') _fj.alta='comp';
   }
@@ -29907,7 +29914,7 @@ function fjPintarAlta(){
     } else {
       g=inp('concepto','Concepto','text',{ancho:true, ro:!nueva})
         +sel('categoria','Categoría',[['fijo','Fijo'],['variable','Variable'],['MP','Materia prima'],['financiero','Financiero'],['unico','Único'],['venta','Venta'],['ventana','Ventana (apaga)']],true);
-      if(!ven) g+=sel('sentido','Mueve',[['salida','Sale'],['entrada','Entra']])+inp('monto','Monto por vez','text',{dec:true})+sel('moneda','Moneda',[['CRC','₡'],['USD','US$']]);
+      if(!ven) g+=sel('sentido','Mueve',[['salida','Sale'],['entrada','Entra']],true)+inp('monto','Monto por vez','text',{dec:true})+sel('moneda','Moneda',[['CRC','₡'],['USD','US$']]);
       if(ven) g+=inp('fecha','Desde','date')+inp('fecha_hasta','Hasta (incluido)','date')
         +'<label class="ancho">Apaga<div class="fj-apaga">'+['fijo','variable','MP','financiero','unico','venta'].map(c=>'<label><input type="checkbox" data-apaga="'+c+'"'+(F.apaga.indexOf(c)>=0?' checked':'')+'>'+esc(FJ_CAT[c])+'</label>').join('')+'</div></label>';
       else {
@@ -29918,6 +29925,7 @@ function fjPintarAlta(){
       }
       g+=inp('vigente_desde','Vigente desde','date')+inp('vigente_hasta','Vigente hasta','date');
       if(!ven) g+=chk('tentativo','Tentativo');
+      if(!ven&&F.sentido!=='entrada') g+=chk('proveedor','Proveedor');
       g+=inp('regla','Nota','text',{ancho:true})+inp('fuente','Fuente','text',{ancho:true});
     }
   }
@@ -29947,7 +29955,8 @@ function fjFilaCompromiso(F){
     sentido:ven?null:F.sentido, monto:monto, moneda:ven?null:F.moneda, periodicidad:per, dias:dias,
     fecha:(per==='unica')?nulo(F.fecha):null, fecha_hasta:ven?nulo(F.fecha_hasta):null, apaga:ven?(F.apaga||[]):null,
     plazo_dias:ven?0:(_fjNum(F.plazo_dias)||0), vigente_desde:F.vigente_desde, vigente_hasta:nulo(F.vigente_hasta),
-    activo:true, tentativo:ven?false:!!F.tentativo, regla:nulo(String(F.regla||'').trim()), fuente:String(F.fuente||'').trim()};
+    activo:true, tentativo:ven?false:!!F.tentativo, proveedor:(ven||F.sentido==='entrada')?true:F.proveedor!==false,
+    regla:nulo(String(F.regla||'').trim()), fuente:String(F.fuente||'').trim()};
   return {fila:f};
 }
 async function fjGuardar(){
