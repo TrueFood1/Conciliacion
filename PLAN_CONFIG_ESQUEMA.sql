@@ -26,11 +26,20 @@
 --   colchon_semanas          objeto      nivConfig()             NADIE (sin UI)
 --   ventanas_estacionales    array       nivConfig()             NADIE (sin UI)
 --   medir_lunes_frac         número 0–1  nivConfig()             NADIE (sin UI)
+--   medir_frac               número 0–1  nivConfig()             NADIE (sin UI) — alias de medir_lunes_frac
+--                                                                (b137, 26-oct-2026): gana la fila más reciente de las dos
+--   medir_dia                0–6 o 'lun'…'dom'  nivConfig()      NADIE (sin UI) — día de medición de premezclas;
+--                                                                sin fila, 4 = JUEVES (b137, 26-oct-2026; antes lunes fijo)
 --   cierre_fecha_autowm      fecha       cierreConfig()          cierreGuardar()
 --   cierre_fecha_resto       fecha       cierreConfig()          cierreGuardar()
---   cierre_galletas_dic_cj   número      cierreConfig()          cierreGuardar()
+--   cierre_galletas_dic_cj   número      NADIE desde b128        NADIE (se quitó el campo, 25-oct-2026)
+--   cierre_semanas_enero     número 0–8  nivConfig()             cierreGuardarFechas('pl') (b127)
+--   plan_meses               número 1–11 nivConfig()             NADIE (sin UI) — horizonte del plan (b126)
 --   compras_dia_fijo         objeto      nivConfig()             NADIE (sin UI) — se siembra con
 --                                                                COMPRAS_DIA_FIJO.sql (T-28, 2-oct-2026)
+--   calc_condiciones         objeto      calcCargarCondUsr()     calcGuardarCond() (b142, 27-oct-2026) —
+--                                                                condiciones de cadena escritas en la Calculadora,
+--                                                                {'wm.frio':{v:{mc,cedi,fijo,com,uberPct,uberCom},fecha}}
 --
 -- `compras_dia_fijo` = {insumos:[{producto_id, proveedor_id, proveedor, pide, llega, momento, uso}]}.
 -- Un insumo con fila acá sale de las tarjetas "Comprar" y va a la tarjeta "Pedido con día fijo"

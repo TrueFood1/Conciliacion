@@ -103,7 +103,14 @@ SENSIBLE_LISTA    = {'acceso_usuario', 'v_acceso_usuario',
 CERRADA_ANON      = {'ent_alisto_lote_efectivo', 'ent_salido_del_congelador_desde_ancla',
                      'v_ent_excepcion_pendiente', 'v_ent_excepcion_pendiente_pedido',
                      'ent_conteo_correccion_vigente',
-                     'ent_odoo_validacion', 'ent_pedido_odoo_descarte', 'ent_odoo_traslado'}
+                     'ent_odoo_validacion', 'ent_pedido_odoo_descarte', 'ent_odoo_traslado',
+                     'ent_devolucion_reemplazo', 'ent_reemplazo_desde_ancla',
+                     # b151 (30-oct): nacen con `revoke all … from anon` (CAMBIO_RECUENTO_PENDIENTE.sql).
+                     'ent_recuento_pendiente', 'ent_recuento_pendiente_abierto',
+                     # CONTENIDO (b138, 27-oct): nacen con `revoke all … from anon` (CONTENIDO.sql). Son de
+                     # socias; que la anon key las lea —aunque sea vacías— es una fuga.
+                     'contenido_post', 'contenido_post_estado', 'contenido_metrica', 'contenido_banco',
+                     'v_contenido_post', 'v_contenido_metrica_vigente'}
 def es_sensible(t):
     return t in SENSIBLE_LISTA or t in CERRADA_ANON or t.startswith(SENSIBLE_PREFIJOS)
 

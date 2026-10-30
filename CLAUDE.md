@@ -8,15 +8,50 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
 
 ## Reglas madre (aplican siempre)
 
-- **Producción es SOLO LECTURA.** Candado de 3 capas: allowlist deny-by-default
-  en `odooRpc` + Conciliación bloqueada en prod + banner del estado de Odoo
-  (`odooEstado`/`odooPintar`, b112). Nunca debilitarlo ni rodearlo.
+- **Producción es SOLO LECTURA.** Candado de 3 capas (como quedó en E1, b147,
+  29-oct-2026), cada una con su nombre en el código:
+  1. **`LECTURA_OK`**: lista cerrada de métodos de lectura, deny-by-default, que
+     `odooRpc` y `lecturaRpc` aplican **en todo entorno** antes de mandar nada. El
+     único camino a Odoo desde el navegador es `lecturaRpc` → proxy de lectura con
+     el JWT de Supabase; sin sesión de producción `odooRpc` no manda nada.
+  2. **El navegador no tiene código que escriba en Odoo.** Conciliación quedó en
+     solo lectura (Cobros sin aplicar, Por cliente, Detective): se quitaron la
+     subida del extracto que montaba líneas, «Vincular», el flujo de 3 pasos y el
+     proxy viejo con usuario y clave; el clasificador viejo quedó inerte
+     (`_concSinEscritura`). Lo vigila **`candado_check.py`**, que corre dentro de
+     `loadcheck.py` sobre **todos los `.html` de la raíz** (Pages los publica todos;
+     lista `EXCEPCIONES` vacía) y FALLA si aparece: el proxy viejo; `setItem('tf_conn')`;
+     `Authorization: Basic` o `x-odoo-url/db`; una llamada `odooCall`/`lecturaRpc`/
+     `odooRpc` con un método fuera de su lista de lectura, o con el método en una
+     variable fuera de los dos envoltorios; `LECTURA_OK` con algo que no sea lectura;
+     los textos `js_assign_outstanding_line`, `action_post`, `reconcile`, `unlink`,
+     `button_*`… o un `call_kw/<modelo>/<método>`; un `fetch` que no empiece por
+     `PROXY_LECTURA_URL` o `ESCRITURA_URL` (o que lleve `odoo.com`, `/jsonrpc`,
+     `/xmlrpc`, `execute_kw`, `/web/session/authenticate` o `/web/dataset/call_kw`),
+     `fetch` usado como alias, `XMLHttpRequest` o `sendBeacon`. No busca `'create'`/
+     `'write'` sueltos (Supabase los usa). Quita comentarios con un lexer que respeta
+     strings, templates y regex, y antes de revisar `loadcheck` mete una escritura a
+     propósito al final del script y después de `accept="image/*` —el texto que en la
+     primera versión abría un falso comentario y le tapaba ~2.800 líneas— y falla si
+     el chequeo no la ve.
+     Revisa todos los `.html` de la raíz: `prueba.html` (copia de b55 publicada, con el
+     login de la demo, `tf_conn` y escrituras) se borró en b147 por decisión de Andrea
+     (29-oct). Un `.html` nuevo en la raíz entra al chequeo solo.
+     La escritura a Odoo existe solo por los carriles de `truefie-escritura`
+     (`ESCRITURA_URL`), con su llave en Render.
+     ⚠️ Hasta b145 esta capa se citaba como «Conciliación bloqueada en prod» y
+     **no existía**: `aplicarModoProduccion` apagaba `.face-concil`, un selector
+     que ningún elemento tenía.
+  3. **El usuario de Odoo del proxy** (uid 28): ver abajo, NO es una capa completa.
+  Y el banner del estado de Odoo (`odooEstado`/`odooPintar`, b112) es lo que se ve,
+  no una capa que frene. Nunca debilitarlo ni rodearlo.
   El banner ya no dice "producción · solo lectura" (decisión de Andrea, 19-oct:
   sonaba a que la socia no puede hacer nada, y escribe en Supabase y por los
   carriles de truefie-escritura). Dice lo mismo en el inicio y en los módulos:
   «● Conectado a Odoo» en la versión publicada contra producción; **«⚠ Conectado
   a Odoo · copia local»** si Truefie no se sirve desde Pages; **«⚠ Odoo de
-  pruebas»** si el Odoo no es producción (los dos en ámbar y negrita); y
+  pruebas»** si el Odoo no es producción (los dos en ámbar y negrita; desde E1
+  Truefie ya no tiene entrada a la demo, así que este último hoy no se alcanza); y
   «● Sin conexión con Odoo» en rojo si el proxy no contesta. Su trabajo es que
   nadie confunda datos reales con pruebas: cualquier cambio tiene que seguir
   distinguiendo esos casos a la vista.
@@ -307,8 +342,9 @@ Andrea trabaja en varios chats aparte y pega los pedidos acá. Para saber de qu�
 - Proxies en Render:
   - `truefood-proxy-lectura.onrender.com` — PRODUCCIÓN, Node (`server.js`),
     valida JWT de Supabase con **ES256 vía JWKS** (no HS256).
-  - `truefood-proxy.onrender.com/proxy` — DEMO (viejo, puerta web con
-    usuario+contraseña; **rechaza API keys**).
+  - El proxy viejo de la DEMO (puerta web con usuario+contraseña) ya **no se usa
+    desde Truefie** (E1, b147): `candado_check.py` falla si su URL vuelve a
+    `index.html`. Los scripts Python de la demo (`odoo_demo.py`) van aparte.
 - Supabase (proyecto `tomijkqnmpjcraaoeviq.supabase.co`): login del sistema +
   historial de conteos (tabla con RLS). El anon key es público por diseño.
 - Publicación: GitHub Pages sirve `main` → `truefood1.github.io/Conciliacion/`.
@@ -601,9 +637,10 @@ Productos terminados (IDs de producción):
   encabezado les reserva el lugar: `.hdr-right` 152 px y `.home-hdr-right` 158 px en
   escritorio, `padding-right:140px` en teléfono. Un botón nuevo en esa esquina = agrandar
   las tres reservas.
-- **«Error Odoo» en la primera carga = `SESSION.url` vacío.** Las lecturas que salen antes
-  de que `entrarProd` llene `SESSION.url` van al proxy de demo y fallan (fue la causa del
-  lobby en blanco en Safari, 3-oct). Cualquier lectura nueva que corra antes de conectar
+- **«Sin conexión con Odoo» en la primera carga = `SESSION.url` vacío.** Las lecturas que
+  salen antes de que `entrarProd` llene `SESSION.url` no salen: `odooRpc` las corta con
+  «Sin conexión con Odoo» (desde E1, b147; antes iban al proxy de demo y volvían «Error
+  Odoo», que fue la causa del lobby en blanco en Safari, 3-oct). Cualquier lectura nueva que corra antes de conectar
   puede fallar igual: esperar a `_esperarOdoo()`.
 
 ### Modo claro / oscuro (estándar del sistema, 4-oct-2026)

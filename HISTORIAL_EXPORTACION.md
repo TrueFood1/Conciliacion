@@ -1,8 +1,23 @@
 # Exportación del Historial de Entregas — especificación
 
-**Estado: DECIDIDO, SIN CONSTRUIR.** Se construye en el punto 3 de la cola, en la
-misma pasada que el Bloque 4 + 3.2/3.3 — la columna "motivo de excepción" depende
-de campos que todavía no existen. **No abrir el exportador dos veces.**
+**Estado: CONSTRUIDO en b140 (27-oct-2026), sin probar todavía en el iPad.**
+
+**b141 (27-oct-2026): el diálogo pasa a ser una VISTA con vista previa en vivo**
+(pedido de Andrea: ver antes de exportar). Fechas por atajos (Este mes por
+defecto), cliente/lote/producto opcionales y filtrando en memoria; la vista previa
+—resumen, totales por producto en unidad de venta, tabla en escritorio y tarjetas
+por pedido en teléfono— sale de `bsExportModelo`, el mismo molde de los archivos.
+Excel y PDF se arman en el toque, sin `await`.
+La columna "motivo de excepción" sale de los campos del Bloque 4 + 3.2/3.3, que
+ya existen: `ent_alisto_linea.no_se_entrega` / `motivo_no_entrega` /
+`nota_no_entrega` / `cant_no_entregada` y, en `ent_alisto_lote_efectivo`, el lote
+`'NO DETERMINADO'` con `motivo_indeterminado` / `nota_indeterminado` /
+`corregido` / `lote_original`. Código: `bsExportar`, `bsExportModelo`,
+`bsExportarXLSX`, `bsExportarPDF` en `index.html`.
+
+⚠️ Lo de "Truefie no depende de ninguna librería externa" (más abajo) quedó
+viejo: `index.html` ya cargaba SheetJS por cdnjs para LEER Excel. El Excel se
+escribe con esa misma librería; el PDF sigue siendo hoja de impresión.
 
 Un solo molde, dos salidas: Excel y PDF con la misma disposición, para que no se
 desincronicen.
@@ -53,7 +68,8 @@ son dos herramientas con dos preguntas distintas.
 
 | filtro | ¿va? | por qué |
 |---|---|---|
-| **cliente + rango de fechas** | **obligatorio** | es la combinación que Andrea va a usar siempre |
+| **rango de fechas** | **obligatorio** | un archivo de auditoría se pide por mes o por semana |
+| **cliente** | **opcional** — vacío = todos | **decisión de Andrea, 27-oct-2026**: casi siempre se exporta por lote o por producto. Antes decía «cliente + rango de fechas, obligatorio» |
 | **lote** | **sí** | es *la* pregunta de un retiro: "¿a dónde fue todo lo del lote 208?". Con BRC Start en proceso, es el filtro que justifica el archivo |
 | **producto** | sí, como conveniencia | los datos ya están en la fila, no abre ningún camino nuevo |
 
@@ -77,7 +93,7 @@ primera y rompería la segunda.
 
 ## Lo que el archivo tiene que decir de sí mismo
 
-En una cabecera del Excel y en la primera página del PDF. **Esto no contradice la
+Desde b143: en la hoja «Información» del Excel y en la línea + nota al pie del PDF (ver «El PDF», abajo). **Esto no contradice la
 regla de "sin explicaciones en pantalla"**: esa regla es para pantallas, y esto es
 un papel que alguien va a leer sin tener el sistema delante — posiblemente un
 auditor, posiblemente dentro de un año.
@@ -132,7 +148,35 @@ pueden desincronizarse si ninguna de las dos arma sus propias filas.
 
 ---
 
-## El PDF: hoja de impresión, decidido
+## El PDF: CAMBIÓ el 27-oct-2026 (b143), con evidencia medida
+
+**Medido en el iPhone de Andrea, 27-oct 17:02, b142, desde el ícono (standalone):**
+tocar «PDF» pasaba la página a claro y no pasaba nada más — `window.print()` no
+hace nada en ese modo. Es exactamente la condición que esta especificación puso
+para cambiar a librería (ver «Cuándo se revisa», abajo).
+
+Desde b143:
+- **PDF con jsPDF 2.5.1 + jspdf-autotable 3.8.2** (cdnjs, versiones fijas), cargadas
+  al abrir la vista Exportar. Apaisado, del mismo molde (`bsExportModelo`), filas
+  que calzan resaltadas, «Página N de M». Sin cambio de tema.
+- **Entrega del archivo, igual para Excel y PDF**: hoja de compartir en aparato
+  táctil que la soporte (Guardar en Archivos, WhatsApp, Mail); si no, descarga con
+  `<a download>`; último recurso, abrir el archivo. Síncrono desde el toque.
+- **Lo que el archivo dice de sí mismo, reubicado (Andrea, 27-oct)**: abierto en el
+  iPhone, el bloque de texto arriba tapaba la tabla.
+  - Excel: la hoja «Historial» empieza en la fila 1 con los encabezados (fila 1
+    fija, filtro automático). Filtros, quién, cuándo, contenido y definiciones van
+    a una segunda hoja, «Información».
+  - PDF: UNA línea bajo el título — «1–27 oct 2026 · lote 236 · 50 pedidos ·
+    exportado 27-oct 17:02 por Andrea» — y las dos definiciones como nota al pie
+    de la última página.
+
+La hoja de impresión, su CSS y el cambio de tema se quitaron.
+
+---
+
+## (Histórico) El PDF: hoja de impresión, decidido el 10-sep
+
 
 **DECIDIDO el 10-sep-2026: opción A — hoja de impresión + `window.print()`.**
 
