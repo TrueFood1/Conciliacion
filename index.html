@@ -21386,6 +21386,13 @@ function _dvReempTxt(filas){
 // Por cada producto que volvio, los lotes que se pueden elegir HOY —la misma capa
 // que "Sin factura"— y lo ya elegido aunque haya quedado fuera del filtro (la regla
 // del 15-sep: el filtro decide que se ofrece, nunca le borra una eleccion a nadie).
+// ⚠️ Y TAMBIEN LOS LOTES EN CERO, a diferencia de "Sin factura" (revision del 30-oct):
+//   · el MISMO lote que vuelve. El saldo se leyo ANTES de sumar lo devuelto, y la
+//     bolsa nueva puede salir justo de ahi: su disponible es saldo + lo que volvio.
+//   · los agotados que el ancla conoce (saldo leido y <= 0).
+// Si se ofrecieran solo los de saldo > 0, un producto sin saldo en el sistema no
+// tendria lote que elegir, el cambio no se podria guardar y Daniel terminaria en
+// "Solo devolucion" con una NC que no corresponde. El exceso avisa, no frena.
 function dvReempHTML(){
   const N=_dv.n;
   if(!_dvLot || _dvLot.cargando) return '<div class="cl-none">Leyendo lotes…</div>';
@@ -21394,24 +21401,38 @@ function dvReempHTML(){
   let h='';
   N.lineas.forEach(function(l){
     const pid=+l.producto_id, R=N.reemp[pid]||{}, M=_dvManejo(pid);
+    const volvio={};                       // uds que vuelven a cada lote, de ESTA devolucion
+    (l.lotes||[]).forEach(function(x){ volvio[x.lote]=(volvio[x.lote]||0)+(+x.cant_uds||0); });
     const ls=entLotesDisponibles(_dvLot.g, _dvLot.saldo, _dvLot.corteMs, pid)
       .map(function(x){ return {lote:x.lote, saldo:x.saldo, activo:x.activo}; });
+    // `entLotesUnion` y no `entLotesSelector`: el selector esconde los viejos agotados,
+    // y aca un agotado que el ancla conoce es justo lo que hay que poder elegir.
+    ((entLotesUnion(_dvLot.g, _dvLot.saldo)[pid])||[]).forEach(function(x){
+      if(x.lote===ENT_LOTE_INDET || !DV_LOTE_OK.test(String(x.lote||''))) return;
+      if(ls.some(function(y){ return y.lote===x.lote; })) return;
+      if(volvio[x.lote]!=null || (x.saldo!=null && x.saldo<=0))
+        ls.push({lote:x.lote, saldo:x.saldo, activo:x.activo}); });
+    Object.keys(volvio).forEach(function(lt){
+      if(!ls.some(function(y){ return y.lote===lt; })) ls.push({lote:lt, saldo:null, activo:true}); });
+    // el disponible de cada lote cuenta lo que vuelve en esta misma devolucion
+    ls.forEach(function(x){ if(volvio[x.lote]!=null) x.saldo=(x.saldo||0)+volvio[x.lote]; });
+    ls.sort(entLoteCmpSel);
     Object.keys(R).forEach(function(lt){
       if(!ls.some(function(x){ return x.lote===lt; }))
         ls.push({lote:lt, saldo:null, activo:true, fuera:true}); });
     let tot=0, sobre=false;
     h+='<div class="rp-cond"><div class="rp-sec-t">'+esc(_lotNom(pid))+' · sale en su lugar</div>';
-    if(!ls.length) h+='<div class="cl-none">No queda saldo de ningún lote de este producto.</div>';
     ls.forEach(function(L){
       const sel=(R[L.lote]!=null), v=+R[L.lote]||0;
       if(sel) tot+=v;
       const exc=sel && L.saldo!=null && (v*M.div)>(L.saldo+0.0001); if(exc) sobre=true;
       const q=esc(L.lote).replace(/'/g,'&#39;');
-      h+='<div class="rp-lote'+(sel?' on':'')+(L.activo?'':' viejo')+'">'
+      const ago=(L.saldo!=null && L.saldo<=0);
+      h+='<div class="rp-lote'+(sel?' on':'')+(ago?' ago':'')+(L.activo?'':' viejo')+'">'
         +'<button class="rp-lotebtn" onclick="dvReempLote('+pid+',\''+q+'\')">'
         +'<span class="rp-lote-n">'+esc(L.lote)+'</span>'
         +(L.fuera ? '<span class="rp-saldo">ya elegido — sin saldo</span>'
-          : (L.saldo!=null ? ('<span class="rp-saldo">quedan '+esc(_lotUds(L.saldo,pid))+'</span>') : ''))
+          : (L.saldo!=null ? ('<span class="rp-saldo">'+(ago?'agotado':('quedan '+esc(_lotUds(L.saldo,pid))))+'</span>') : ''))
         +'</button>'
         +(sel?('<input type="number" min="0" step="any" inputmode="decimal" class="cl-in rp-lotein" '
           +'value="'+esc(R[L.lote])+'" oninput="dvReempCant('+pid+',\''+q+'\',this.value)"'
@@ -21601,8 +21622,10 @@ async function dvGuardar(){
     // resta: el saldo queda ALTO. El mensaje lo dice con la salida: anular y volver
     // a registrar, que deshace las dos mitades juntas.
     if(N.resolucion==='cambio'){
+      // Anular es solo de socias (`dvPuedeAnular`, y la base lo exige): a Daniel no
+      // se le pide algo que no puede hacer.
       paso='lo que sale en su lugar (la devolución YA suma al congelador y esto todavía NO '
-        +'resta: anulala y registrala de nuevo)';
+        +'resta: avisale a una socia para que la anule, y después registrala de nuevo)';
       const fr=_dvReempFilas();
       if(!fr.length) throw new Error('no hay ningún lote elegido para lo que sale');
       const {error:e5}=await c.from('ent_devolucion_reemplazo').insert(fr.map(function(x){
