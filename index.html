@@ -4488,6 +4488,15 @@ body:has(.de-fondo) #tkBtn{display:none}
   background:rgba(229,72,77,.10);border:1px solid rgba(229,72,77,.35)}
 .dp-obs-t{font-size:12px;font-weight:600;color:var(--stop-tx,var(--err-8))}
 .dp-obs-m{font-size:11.5px;color:var(--text-2);line-height:1.45}
+/* Lote en 0 en Truefie (b151): pregunta, no error. Ambar mientras falta la
+   respuesta; gris con borde rojo cuando ya se confirmo (va a quedar negativo). */
+.dp-en0{display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:8px;
+  background:rgba(233,162,59,.10);border:1px solid rgba(233,162,59,.45)}
+.dp-en0.ok{background:transparent;border-color:var(--stop-tx,var(--err-8))}
+.dp-en0-t{font-size:12px;font-weight:600;color:var(--warn)}
+.dp-en0.ok .dp-en0-t{color:var(--stop-tx,var(--err-8))}
+.dp-en0-m{font-size:11.5px;color:var(--text-2);line-height:1.45}
+.dp-en0-b{display:flex;gap:8px;justify-content:flex-end}
 /* El <option> del lote muerto tambien se rotula, porque en iOS el selector es
    una rueda nativa y no se puede pintar: el texto es la unica via. */
 .dp-otro:hover{text-decoration:underline}
@@ -4575,8 +4584,13 @@ body:has(.de-fondo) #tkBtn{display:none}
 .el-lote-u{color:var(--text-3);font-size:11.5px;margin-left:7px}
 /* En cero: se ve, no grita. Es lo contrario del selector, donde se manda al fondo. */
 .el-lote.cero .el-lote-n,.el-lote.cero .el-lote-c{color:var(--text-3)}
-/* Negativo: anomalía, y las anomalías se ven. Ámbar, que es el que avisa. */
-.el-lote.neg .el-lote-c{color:var(--warn)}
+/* Negativo (b151): rojo y «pendiente de recuento». Salió producto que Truefie no
+   tenía; hasta que se cuente, el número no es confiable. */
+.el-lote.neg .el-lote-c,.el-lote.neg .el-lote-n{color:var(--stop-tx,var(--err-8))}
+.el-rec{font-family:var(--font, inherit);font-size:10px;color:var(--stop-tx,var(--err-8));
+  border:1px solid var(--stop-tx,var(--err-8));border-radius:999px;padding:1px 6px;margin-left:6px;white-space:nowrap}
+.pd-rec-n{color:var(--stop-tx,var(--err-8));font-family:var(--mono);margin-left:4px}
+.cl-tag-neg{color:var(--stop-tx,var(--err-8));border-color:var(--stop-tx,var(--err-8))}
 /* ── Desglose del saldo: Ancla · Producción · Salidas · Devoluciones · Merma ──
    Va DEBAJO del renglón del lote y en un escalón tipográfico menos: es de qué está
    hecho el número de arriba, no otro número que compita con él. Envuelve en
@@ -6016,7 +6030,7 @@ button:disabled, button[disabled], .btn:disabled{
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 30 oct 2026 · b150';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 30 oct 2026 · b151';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -12662,6 +12676,7 @@ function _clUds(pid, cajas, sueltas){
 // fila apuntando a la misma clave de _clVal — el bug de las dos filas otra vez.
 // `base` son los lotes de Odoo del producto, que el render ya separó de los
 // huérfanos; si no se pasa, se derivan acá.
+function _clNeg(pid, lote){ return !!(_clSaldo && _clSaldo[pid+'|'+lote]!=null && _clSaldo[pid+'|'+lote]<0); }
 function _clLotesDe(pid, base){
   const out=[], vistos={};
   (base || Object.values((_clLotes&&_clLotes.lotes)||{})
@@ -12670,7 +12685,8 @@ function _clLotesDe(pid, base){
   ((entLotesUnion(_clLotes, _clSaldo))[+pid]||[]).forEach(function(x){
     if(x.lote===ENT_LOTE_INDET) return;   // no es una caja: no se cuenta
     if(x.activo || vistos[x.lote]) return;
-    if(!(x.saldo!=null && x.saldo>0)) return;
+    // Los NEGATIVOS tambien (b151): son los que mas hay que contar.
+    if(!(x.saldo!=null && x.saldo!==0)) return;
     vistos[x.lote]=1;
     out.push({key:'v:'+pid+':'+x.lote, canon:x.lote, viejo:true, saldo:x.saldo});
   });
@@ -12823,8 +12839,10 @@ function _clRender(){
               +(L.extra?' <span class="cl-tag">agregado</span>':'')
               // El saldo va en unidad de VENTA y rotulado "según sistema": es lo que
               // habría que encontrar, no lo que hay. Lo que hay lo dice el congelador.
-              +(L.viejo?(' <span class="cl-tag cl-tag-v">fuera de ventana · según sistema '
+              +(L.viejo && !(L.saldo<0)?(' <span class="cl-tag cl-tag-v">fuera de ventana · según sistema '
                          +esc(_lotUds(L.saldo,pid))+'</span>'):'')
+              +(_clNeg(pid,L.canon)?(' <span class="cl-tag cl-tag-neg">pendiente de recuento · según sistema '
+                         +esc(_lotUds(_clSaldo[pid+'|'+L.canon],pid))+'</span>'):'')
               +(L.buscar?' <span class="cl-tag cl-tag-b" title="'+esc(L.razon||'')
                          +'">a buscar · el sistema no lo tiene</span>':'')
               +'<span class="cl-desg" id="'+id+'_d">'+(p0?esc(_clDesg(pid,u0,p0)):'')+'</span>'
@@ -15262,6 +15280,7 @@ function _despLineaOK(f,i){
   // UN LOTE OBSOLETO DEJA LA LINEA SIN RESOLVER. No se borra la eleccion —eso es
   // trabajo de Daniel— pero no se puede seguir con ella puesta.
   if(_despObsoletosDe(f,i).length) return false;
+  if(_despEn0De(f,i).some(function(x){ return !x.ok; })) return false;
   if(!lt.length) return false;
   if(!e.partido) return true;
   const suma=lt.reduce(function(s,x){ return s+(+x.cant||0); },0);
@@ -15334,10 +15353,80 @@ function _despObsoletosDe(f,i){
     // Se arrastra el objeto ENTERO. Reconstruirlo campo por campo perdia
     // `agotado`, y la tarjeta decia "ya no existe" sobre un lote que existe y
     // solo se acabo — justo la distincion que estos dos mensajes vienen a hacer.
-    if(o) out.push(Object.assign({j:j}, o));
+    // EL AGOTADO YA NO ES OBSOLETO (b151): existe, y si Daniel lo tiene en la mano
+    // se despacha con el aviso del lote en 0 (`_despEn0De`). Frenarlo lo mandaba
+    // al papel, que es justo lo que no puede pasar.
+    // AL CORREGIR una preparacion sigue frenando: ese camino guarda por
+    // ent_corregir_alisto y no abre el pendiente, asi que un lote en 0 ahi
+    // quedaria negativo sin rastro (revisor, 30-oct).
+    if(o && (!o.agotado || despCorrigiendo())) out.push(Object.assign({j:j}, o));
   });
   return out;
 }
+// ── LOTE EN 0 EN TRUEFIE, CON PRODUCTO FISICO (b151, Andrea 30-oct) ────────
+// El caso: Blanco 250 en 0 y dos panes en el congelador que salieron a Intimo.
+// Se deja elegir, con un aviso que Daniel tiene que contestar. Con «Sí» la salida
+// se registra normal y el lote queda NEGATIVO —no se ajusta ni se reparte nada en
+// otros lotes—; al guardar se abre un pendiente de recuento (`ent_recuento_pendiente`)
+// que las socias ven en Pendientes. Un lote en −2 a la vista es mejor que una resta
+// escondida en el lote equivocado.
+// Devuelve los lotes de la linea que figuran en 0: {j, lote, ok} (ok = confirmado).
+function _despEn0De(f,i){
+  const e=_despEst(f,i);
+  if(e.marca || despCorrigiendo()) return [];
+  const L=f.lineas[i], out=[];
+  (e.lotes||[]).forEach(function(x,j){
+    const o=_despLoteObsoleto(L.producto_id, x&&x.lote);
+    if(o && o.agotado) out.push({j:j, lote:x.lote, ok:!!(x.en0 && x.en0.por)});
+  });
+  return out;
+}
+// Las filas de pendiente que deja un pedido: una por lote confirmado en 0 que
+// queda bajo cero. `saldo` es el de `_despSaldo` (unidades base, como ent_*); la
+// fila sale en UNIDAD DE VENTA. Pura, sin base ni DOM: la prueba la llama sola.
+function _despRecuentoFilas(f, saldo){
+  const out=[], acum={};
+  f.lineas.forEach(function(L,i){
+    const e=_despEst(f,i); if(e.marca) return;
+    const I=NIV_INFO[L.producto_id]||{presDiv:1,presLbl:'uds'};
+    const lotes=e.partido ? e.lotes : [{lote:e.lotes[0].lote, cant:e.cant, en0:e.lotes[0].en0}];
+    lotes.forEach(function(x,j){
+      if(!x.lote || !(+x.cant>0) || !(x.en0 && x.en0.por)) return;
+      const k=L.producto_id+'|'+x.lote;
+      const uds=(+x.cant||0)/L.uom_factor;
+      acum[k]=(acum[k]||0)+uds;
+      const res=(saldo && saldo[k]!=null ? +saldo[k] : 0)-acum[k];
+      if(res<0) out.push({i:i, j:j, producto_id:L.producto_id, lote:x.lote,
+        saldo_resultante:Math.round(res/(+I.presDiv||1)*1000)/1000,
+        unidad_venta:(I.presLbl==='paq'?'paquete':'unidad')});
+    });
+  });
+  return out;
+}
+function _despEn0HTML(f,i){
+  const ls=_despEn0De(f,i); if(!ls.length) return '';
+  const pid=f.lineas[i].producto_id;
+  return ls.map(function(x){
+    if(x.ok) return '<div class="dp-en0 ok"><span class="dp-en0-t">'+esc(x.lote)
+      +' · en 0 en Truefie</span><span class="dp-en0-m">Confirmado con producto físico. '
+      +'Queda pendiente de recuento.</span></div>';
+    return '<div class="dp-en0"><span class="dp-en0-t">'+esc(x.lote)+'</span>'
+      +'<span class="dp-en0-m">Este lote figura en 0 en Truefie. ¿Hay producto físico de este '
+      +'lote en el congelador?</span><div class="dp-en0-b">'
+      +'<button class="btn btn-sm" onclick="despEn0No('+i+','+x.j+')">Cancelar</button>'
+      +'<button class="btn btn-sm btn-confirm" onclick="despEn0Si('+i+','+x.j+')">Sí, despachar</button>'
+      +'</div></div>';
+  }).join('');
+}
+async function despEn0Si(i,j){ const f=_despFacAbierta(); if(!f) return;
+  const x=_despEst(f,i).lotes[j]; if(!x) return;
+  x.en0={por:(await _despQuien())||'desconocido', en:new Date().toISOString()};
+  boGuardarFactura(false); despRender(); }
+// Cancelar deja la linea sin lote, como antes de elegir: no se registra nada.
+function despEn0No(i,j){ const f=_despFacAbierta(); if(!f) return;
+  const e=_despEst(f,i), x=e.lotes[j]; if(!x) return;
+  x.lote=''; delete x.en0;
+  boGuardarFactura(false); despRender(); }
 function _despLotesDe(pid){
   // LA REGLA NO VIVE ACA. Las tres capas estan juntas arriba, al lado de
   // `entLotesUnion` y `entLotesSelector`, y esta pantalla solo elige la tercera y
@@ -15427,6 +15516,7 @@ function despRenderPedido(body){
         +'<span class="dp-obs-t">'+esc(_ob[0].lote)
         +(_ob[0].agotado?' ya no queda':' ya no existe')+'</span>'
         +'<span class="dp-obs-m">'+esc(_ob[0].msg)+'</span></div>';
+      h+=_despEn0HTML(f,i);
       // Un centinela elegido se anuncia: la tarjeta no puede parecer normal
       // cuando lo que va a salir no tiene lote conocido.
       const _ind=(e.lotes[0]&&e.lotes[0].lote===ENT_LOTE_INDET)?e.lotes[0].indet:null;
@@ -15451,6 +15541,7 @@ function despRenderPedido(body){
         +(_obP.length===1?(_obP[0].agotado?' ya no queda':' ya no existe')
                          :' ya no estan disponibles')+'</span>'
         +'<span class="dp-obs-m">'+esc(_obP[0].msg)+'</span></div>';
+      h+=_despEn0HTML(f,i);
       e.lotes.forEach(function(lt,j){
         h+='<div class="dp-l-bot">'+_despSel(i,j,lt,disp,'p',L.producto_id)
           +'<input class="dp-lq" type="number" min="0" step="any" inputmode="decimal" '
@@ -15932,10 +16023,22 @@ function _despSel(i,j,lt,disp,cls,pid){
     _viejos.forEach(function(d){ h+=_op(d); });
     h+='</optgroup>';
   }
+  // LOS QUE FIGURAN EN 0 (b151). Al fondo y aparte: se eligen solo si Daniel tiene
+  // el producto en la mano, y el aviso de la tarjeta se lo pregunta.
+  const _en0=(_est==='ok' && !despCorrigiendo()) ? entLotesSelector(_despLotes, _despSaldo, pid).filter(function(d){
+      return d.saldo!=null && d.saldo<=0 && !disp.some(function(x){ return x.lote===d.lote; }); })
+    : [];
+  if(_en0.length){
+    h+='<optgroup label="En 0 en Truefie">';
+    _en0.forEach(function(d){ h+='<option value="'+esc(d.lote)+'"'+(lt.lote===d.lote?' selected':'')
+      +'>'+esc(d.lote+' — en 0 en Truefie')+'</option>'; });
+    h+='</optgroup>';
+  }
   // EL LOTE YA ELEGIDO QUE NO ESTA EN LA LISTA. Sin esto, un lote tecleado a
   // mano se perderia en cada re-render. Pero si ADEMAS quedo obsoleto, se rotula:
   // el mismo <option> tiene que poder decir "esto ya no existe".
-  if(lt.lote && !disp.some(function(d){return d.lote===lt.lote;})){
+  if(lt.lote && !disp.some(function(d){return d.lote===lt.lote;})
+     && !_en0.some(function(d){return d.lote===lt.lote;})){
     const _o=(disp.length && lt.lote!==ENT_LOTE_INDET) ? _despLoteObsoleto(pid, lt.lote) : null;
     h+='<option value="'+esc(lt.lote)+'" selected>'
       +esc(lt.lote+(_o?(_o.agotado?' — ya no queda':' — ya no existe'):''))+'</option>';
@@ -15965,7 +16068,7 @@ function _despSumaMsg(f,i){
 // NO es un aviso que se pueda ignorar: deja la línea incompleta y el botón
 // deshabilitado, igual que si faltara el lote.
 function _despPendientes(f){
-  let sinLote=0, mal=0, marcadas=0, obsoletos=0;
+  let sinLote=0, mal=0, marcadas=0, obsoletos=0, en0=0;
   f.lineas.forEach(function(L,i){
     // LAS MARCADAS SE CUENTAN PRIMERO. `_despLineaOK` devuelve true para ellas,
     // asi que si se consultara antes saldrian por el return y no se contarian
@@ -15973,6 +16076,7 @@ function _despPendientes(f){
     // no se entregan. Se cuentan aca y se sigue de largo.
     if(_despEst(f,i).marca){ marcadas++; return; }
     if(_despObsoletosDe(f,i).length){ obsoletos++; return; }
+    if(_despEn0De(f,i).some(function(x){ return !x.ok; })){ en0++; return; }
     if(_despLineaOK(f,i)) return;
     if(!_despLotesEfectivos(f,i).length) sinLote++; else mal++;
   });
@@ -15988,8 +16092,9 @@ function _despPendientes(f){
   // Los obsoletos SI frenan: la eleccion apunta a un lote que no existe.
   if(obsoletos) p.push(obsoletos===1 ? 'Un lote elegido ya no esta disponible'
                                      : obsoletos+' lotes elegidos ya no estan disponibles');
+  if(en0) p.push(en0===1 ? 'Falta confirmar un lote en 0' : 'Falta confirmar '+en0+' lotes en 0');
   if(marcadas) p.push(marcadas+(marcadas===1?' no se entrega':' no se entregan'));
-  return {txt:p.join(' · '), frena:!!(sinLote||mal||obsoletos)};
+  return {txt:p.join(' · '), frena:!!(sinLote||mal||obsoletos||en0)};
 }
 // «sin lote» en UN lugar (26-oct): en un terminado es una anomalía (ámbar, `clase`); en lo que
 // no tiene lote por definición (ENT_SIN_LOTE) es el estado normal y va en gris.
@@ -16067,6 +16172,7 @@ function despSetLote(i,j,v){ const f=_despFacAbierta(); if(!f) return;
          && !confirm(r.msg+'\n\n¿Lo dejo igual? Si el lote no existe, esa salida no se resta de ningún lote real.')){
         despRender(); return; } } }
   e.lotes[j].lote=v;
+  delete e.lotes[j].en0;            // la confirmacion era de OTRO lote
   if(!e.partido) e.lotes[0].cant=e.cant;
   boGuardarFactura(false);          // elegir un lote sube al instante
   despRender(); }
@@ -16392,6 +16498,15 @@ async function despConfirmar(entregar){
   f.lineas.forEach(function(L,i){
     _despObsoletosDe(f,i).forEach(function(o){ _obs.push(L.producto+': '+o.lote); });
   });
+  const _en0sc=[];
+  f.lineas.forEach(function(L,i){
+    _despEn0De(f,i).forEach(function(x){ if(!x.ok) _en0sc.push(L.producto+': '+x.lote); });
+  });
+  if(_en0sc.length){
+    alert('No guardo: falta confirmar que hay producto físico de '
+      +(_en0sc.length===1?'este lote en 0':'estos lotes en 0')+'.\n\n'+_en0sc.join('\n'));
+    return;
+  }
   if(_obs.length){
     alert('No guardo: '+(_obs.length===1?'este lote ya no existe':'estos lotes ya no existen')
       +'.\n\n'+_obs.join('\n')
@@ -16464,6 +16579,9 @@ async function despConfirmar(entregar){
     const {data:ali,error:e3}=await c.from('ent_alisto').insert({
       pedido_id:ped.id, responsable:quien, creado_por:quien}).select('id').single();
     if(e3) throw e3;
+    // Los pendientes de recuento se calculan ANTES de escribir los lotes, contra el
+    // saldo que se veia al elegir. `_alIds[i][j]` = la fila de ent_alisto_lote.
+    const _rec=_despRecuentoFilas(f, _despSaldo), _alIds={};
     for(let i=0;i<f.lineas.length;i++){
       const L=f.lineas[i], e=_despEst(f,i), mk=e.marca;
       // ── LA LINEA MARCADA VA POR OTRO CAMINO ────────────────────────────
@@ -16515,8 +16633,31 @@ async function despConfirmar(entregar){
             if(x.indet.motivo==='otro') fl.nota_indeterminado=x.indet.nota;
           }
           return fl; });
-      if(lotes.length){ const {error:e5}=await c.from('ent_alisto_lote').insert(lotes); if(e5) throw e5; }
+      if(lotes.length){
+        const {data:alL,error:e5}=await c.from('ent_alisto_lote').insert(lotes).select('id,orden');
+        if(e5) throw e5;
+        // `orden` es la posicion entre los lotes CON cantidad; se vuelve a `j` igual que arriba.
+        const _js=[]; e.lotes.forEach(function(x,j){ if(x.lote && +x.cant>0) _js.push(j); });
+        _alIds[i]={}; (alL||[]).forEach(function(r){ _alIds[i][e.partido?_js[r.orden]:0]=r.id; });
+      }
     }
+    // ── EL PENDIENTE DE RECUENTO (b151) ────────────────────────────────
+    // NO ABORTA SI FALLA: el pedido ya existe y el lote ya quedo negativo, que se
+    // ve en Inventario. Pero se DICE al final, no se traga.
+    const _recFallos=[];
+    for(const r of _rec){
+      const alId=_alIds[r.i] && _alIds[r.i][r.j];
+      try{
+        if(!alId) throw new Error('no encontre la linea de lote recien guardada');
+        const {error:eR}=await c.from('ent_recuento_pendiente').insert({
+          producto_id:r.producto_id, lote:r.lote, saldo_resultante:r.saldo_resultante,
+          unidad_venta:r.unidad_venta, alisto_lote_id:alId, pedido_id:ped.id,
+          motivo:'despacho con lote en 0', creado_por:quien});
+        if(eR) throw eR;
+      }catch(eR){ _recFallos.push(r.lote+': '+((eR&&eR.message)||eR)); }
+    }
+    if(_recFallos.length) alert('La salida quedó registrada, pero no pude abrir el pendiente de recuento de '
+      +_recFallos.join(' · ')+'.\n\nEl lote igual queda en negativo en Inventario. Avisale a Andrea o Lorena.');
     // La segunda etapa, solo si se pidió. `salida_en` queda en el now() de la
     // base: la hora real de salida es ESTA, no la de preparación.
     if(entregar){
@@ -17357,7 +17498,8 @@ function lotRender(){
       h+='<div class="el-lote'+(cero?' cero':'')+(neg?' neg':'')+'"'
         +' data-producto="'+pid+'" data-lote="'+esc(x.lote)+'">'
         +'<span class="el-lote-n">'+esc(x.lote)
-        +_corMarca(_lotPuntas && _lotPuntas.detalle && _lotPuntas.detalle[pid+'|'+x.lote])+'</span>'
+        +_corMarca(_lotPuntas && _lotPuntas.detalle && _lotPuntas.detalle[pid+'|'+x.lote])
+        +(neg?'<span class="el-rec">pendiente de recuento</span>':'')+'</span>'
         +'<span class="el-lote-c">'+esc(cj)
         // Las unidades al lado SOLO si dicen algo distinto: "4 u   4 u" es ruido.
         +(cj!==u?('<span class="el-lote-u">'+esc(u)+'</span>'):'')+'</span></div>'
@@ -20267,6 +20409,16 @@ async function pdCargar(force){
 }
 async function pdLeer(){
   const c=sbClient(); if(!c) throw new Error('sin sesión de Supabase');
+  // ── LOTES PENDIENTES DE RECUENTO (b151) ─────────────────────────────────
+  // Antes del return temprano, igual que las excepciones: no dependen de la lista
+  // de pedidos. Si la lectura falla se dice en la seccion, no se esconde.
+  let rec=[], recErr='';
+  try{
+    const {data:rd,error:rE}=await c.from('ent_recuento_pendiente_abierto')
+      .select('id,producto_id,lote,saldo_resultante,unidad_venta,pedido_id,creado_por,creado_en')
+      .order('creado_en',{ascending:true});
+    if(rE) throw rE; rec=rd||[];
+  }catch(rE){ recErr=(rE&&rE.message)||String(rE); }
   // ⚠️ VA ANTES QUE TODO, Y NO ES ESTETICA. Estaba abajo, junto a l4, y ahi quedaba
   // DESPUES del `return` temprano de "no hay pedidos": con la bandeja vacia la
   // seccion entera desaparecia sin decir nada. Las excepciones no dependen de la
@@ -20369,7 +20521,7 @@ async function pdLeer(){
     .order('creado_en',{ascending:false}).limit(300);
   if(e1) throw e1;
   const ids=(peds||[]).map(function(p){return p.id;});
-  if(!ids.length) return {l2:[],l3:[],l4:[],exc:exc,odoo:odoo};
+  if(!ids.length) return {l2:[],l3:[],l4:[],exc:exc,odoo:odoo,rec:rec,recErr:recErr};
   const q=function(t,sel){ return c.from(t).select(sel).in('pedido_id',ids); };
   const [mot,fac,als,anu]=await Promise.all([
     q('ent_pedido_motivo_vigente','pedido_id,motivo,clasificado_en'),
@@ -20421,7 +20573,7 @@ async function pdLeer(){
               factura:x.factura_nombre||'', detalle:x.detalle||''};
     });
   }catch(e){ l4=[]; }    // la vista puede no existir todavía: no rompe Pendientes
-  return {l2:l2,l3:l3,l4:l4,exc:exc,odoo:odoo};
+  return {l2:l2,l3:l3,l4:l4,exc:exc,odoo:odoo,rec:rec,recErr:recErr};
 }
 // ── CÓMO SE NOMBRA UNA FILA QUE NO TIENE CLIENTE ────────────────────────
 // Una salida sin factura NO tiene cliente: tiene MOTIVO y, a veces, destinatario.
@@ -20445,6 +20597,24 @@ function _pdCuando(fecha, dias){
   if(dias<=7) return rel;
   const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fecha||''));
   return rel + (m ? (' · '+(+m[3])+' '+PD_MES[(+m[2])-1]) : '');
+}
+// El saldo de la fila ya viene en unidad de venta (lo guarda asi la base).
+function _pdRecuentoHTML(ls, err){
+  if(err) return '<div class="card rp-z"><div class="card-title">Pendientes de recuento</div>'
+    +'<div class="rp-nota dp-mal">No pude leerlos: '+esc(err)+'</div></div>';
+  if(!ls.length) return '';
+  let h='<div class="card rp-z"><div class="card-title">Pendientes de recuento'
+    +' <span class="pd-cnt on">'+ls.length+'</span></div>';
+  ls.forEach(function(r){
+    const n=+r.saldo_resultante||0, u=r.unidad_venta==='paquete'?'paq.':(Math.abs(n)===1?'unidad':'unidades');
+    h+='<div class="pd-fila"><div class="pd-fila-c">'
+      +'<div class="pd-quien">'+esc((NIV_INFO[r.producto_id]||{}).nom||('id '+r.producto_id))
+      +' · '+esc(r.lote)+' <span class="pd-rec-n">'+esc(_entPresN(n)+' '+u)+'</span></div>'
+      +'<div class="pd-meta">despacho con lote en 0 · pedido #'+r.pedido_id+' · '
+      +esc(r.creado_por||'—')+' · '+esc(_despCuando(r.creado_en)||'')+'</div>'
+      +'</div></div>';
+  });
+  return h+'</div>';
 }
 function pdRender(){
   const body=document.getElementById('pdBody'); if(!body||!_pd) return;
@@ -20500,6 +20670,11 @@ function pdRender(){
   const _bkH=_bk?_entBucketsHTML(_bk):'';
   if(_bkH) h+='<div class="card rp-z"><div class="card-title">Producción sin lote legible</div>'
     +_bkH.replace('margin-top:16px','margin-top:2px')+'</div>';
+
+  // ── 1b · LOTES PENDIENTES DE RECUENTO (b151) ─────────────────────────
+  // Salió producto de un lote que Truefie tenía en 0 y el lote quedó negativo.
+  // Rompe el saldo igual que el 1: va pegado a él. Se cierra con un recuento.
+  h+=_pdRecuentoHTML(_pd.rec||[], _pd.recErr||'');
 
   // ── 2 · FACTURAS SIN DESPACHAR HACE 3+ DÍAS HÁBILES ──────────────────
   // Salen de la MISMA lista que alimenta "Por preparar": no es una consulta
