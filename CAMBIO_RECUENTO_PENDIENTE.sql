@@ -1,6 +1,9 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- CAMBIO_RECUENTO_PENDIENTE.sql  ·  30-oct-2026  ·  b151
--- ⛔ NO PEGADO EN PRODUCCION. Este header se cambia DESPUES de verificarlo desde afuera.
+-- ✅ PEGADO EN PRODUCCION por Andrea el 30-oct-2026 (despues de ENSAYO_RECUENTO_PENDIENTE.sql: 30 de 30,
+--    rollback verificado desde afuera). Fila de control 1 · 1 · 3 · 1 · 4 · INSERT,SELECT · 0 · true.
+--    Verificado DESPUES desde afuera con pg_lector: 0 filas, 3 triggers, authenticated INSERT,SELECT,
+--    anon sin permisos en tabla ni vista, vista con security_invoker=true.
 -- ✅ Probado SOLO en local (Postgres 17, espejo del respaldo del 23-oct): ENSAYO_RECUENTO_PENDIENTE.sql
 --    30/30 con rollback verificado, y este archivo (con rollback en vez de commit) dio la fila
 --    de control 1 · 1 · 3 · 1 · 4 · INSERT,SELECT · 0 · t. Falta el ensayo y el pegado en produccion.
