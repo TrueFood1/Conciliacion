@@ -870,6 +870,13 @@ tr.r-ing td{background:#eff6ff}
 .fj-fuera .fj-fh{display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:13px;color:var(--text);padding:10px 2px}
 .fj-fuera .fj-fh span{color:var(--text-3);font-size:12px}
 .fj-fuera .fj-p{grid-template-columns:minmax(0,1fr) auto}
+.fj-g{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:9px 0;border-top:1px solid var(--line);cursor:pointer}
+.fj-g:first-child{border-top:none}
+.fj-g .c{color:var(--text);font-weight:500}
+.fj-g .c span{color:var(--text-3);font-weight:400;font-size:12px;margin-left:6px}
+.fj-g .m{color:var(--text);font-weight:500}
+.fj-g .m.sale{color:var(--text-2)}
+.fj-gps{grid-column:1/-1;padding-left:12px;border-left:1px solid var(--border);cursor:default}
 .fj-fuera .fj-mot{grid-column:1/-1;font-size:12px;color:var(--text-3);margin-top:-4px}
 .fj-form{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:14px}
 .fj-form .fj-fh2{font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px}
@@ -29811,7 +29818,7 @@ function fjPintar(){
       +'<td class="fj-es">'+(s.entradas?_fjM(s.entradas):'')+'</td><td class="fj-es">'+(s.salidas?_fjM(-s.salidas):'')+'</td>'
       +'<td class="fj-sal'+(s.saldoFinal<0?' fj-neg':'')+'">'+_fjM(s.saldoFinal)+'</td>'
       +(hayTent?'<td class="'+(s.saldoFinalFirme<0?'fj-neg':'')+'">'+(s.saldoFinalFirme!==s.saldoFinal?_fjM(s.saldoFinalFirme):'')+'</td>':'')+'</tr>');
-    if(ab) h.push('<tr class="fj-det"><td colspan="'+(hayTent?5:4)+'"><div class="fj-dres">'+[s.entradas?'Entradas '+_fjM(s.entradas):'', s.salidas?'salidas '+_fjM(-s.salidas):''].filter(Boolean).join(' · ')+'</div>'+fjPartidasHTML(ps, 'p'+i)+'</td></tr>');
+    if(ab) h.push('<tr class="fj-det"><td colspan="'+(hayTent?5:4)+'"><div class="fj-dres">'+[s.entradas?'Entradas '+_fjM(s.entradas):'', s.salidas?'salidas '+_fjM(-s.salidas):''].filter(Boolean).join(' · ')+'</div>'+fjGruposHTML(ps, 'p'+i)+'</td></tr>');
   });
   h.push('</tbody></table>');
   $('fjSemanas').innerHTML=h.join('');
@@ -29822,6 +29829,25 @@ function fjPintar(){
   let f='<div class="card fj-fuera"><div class="fj-fh" onclick="fjFuera()"><div>Fuera del flujo · '+fu.length+'</div><span>'+_fjM(tot)+(_fj.fueraAb?' ▾':' ▸')+'</span></div>';
   if(_fj.fueraAb) f+=fjPartidasHTML(fu, 'f', true);
   $('fjFuera').innerHTML=f+'</div>';
+}
+// Semana → grupos con subtotal → partidas → origen (Andrea, 30-oct). Entradas primero, de mayor a
+// menor; después las salidas, la más grande primero. Las partidas se dibujan con fjPartidasHTML.
+const FJ_GRUPO={cxc:'Cobros de facturas', venta:'Ventas supuestas', cxp:'Facturas de proveedores', MP:'Materia prima',
+  fijo:'Fijos', variable:'Variables', financiero:'Financiero', unico:'Únicos'};
+function fjGruposHTML(ps, pref){
+  if(!ps.length) return fjPartidasHTML(ps, pref);
+  const g={};
+  ps.forEach(p=>{ const k=p.categoria||'otro'; (g[k]=g[k]||{k, ps:[], tot:0}); g[k].ps.push(p); g[k].tot+=Number(p.monto)||0; });
+  const gs=Object.values(g).sort((a,b)=>(a.tot>=0)!==(b.tot>=0)?(a.tot>=0?-1:1):Math.abs(b.tot)-Math.abs(a.tot));
+  const out=['<div class="fj-ps">'];
+  gs.forEach(x=>{
+    const key=pref+':'+x.k, ab=_fj.grpAb===key;
+    out.push('<div class="fj-g" onclick="fjGrp(\''+key+'\',event)"><div class="c">'+esc(FJ_GRUPO[x.k]||FJ_CAT[x.k]||x.k)
+      +'<span>'+x.ps.length+'</span></div><div class="m'+(x.tot<0?' sale':'')+'">'+_fjM(x.tot)+(ab?' ▾':' ▸')+'</div>'
+      +(ab?'<div class="fj-gps" onclick="event.stopPropagation()">'+fjPartidasHTML(x.ps, key)+'</div>':'')+'</div>');
+  });
+  out.push('</div>');
+  return out.join('');
 }
 // UNA función para dibujar una lista de partidas (semana o «fuera»): la regla de cómo se ve una
 // partida y su origen vive acá y en fjOrigenHTML, no en cada lista.
@@ -29872,8 +29898,9 @@ function fjOrigenHTML(p){
   if(p._tipo==='apagada') L.push('Apagado por la ventana «'+esc(p.ventana)+'» (por fecha de devengo)');
   return L.map(x=>/^<div/.test(x)?x:'<div>'+x+'</div>').join('');
 }
-function fjRango(todo){ _fj.todo=!!todo; _fj.semAb=null; _fj.partAb=null; fjPintar(); }
-function fjSem(i){ _fj.semAb=_fj.semAb===i?null:i; _fj.partAb=null; fjPintar(); }
+function fjRango(todo){ _fj.todo=!!todo; _fj.semAb=null; _fj.grpAb=null; _fj.partAb=null; fjPintar(); }
+function fjSem(i){ _fj.semAb=_fj.semAb===i?null:i; _fj.grpAb=null; _fj.partAb=null; fjPintar(); }
+function fjGrp(k,ev){ if(ev) ev.stopPropagation(); _fj.grpAb=_fj.grpAb===k?null:k; _fj.partAb=null; fjPintar(); }
 function fjPart(k,ev){ if(ev) ev.stopPropagation(); _fj.partAb=_fj.partAb===k?null:k; fjPintar(); }
 function fjFuera(){ _fj.fueraAb=!_fj.fueraAb; _fj.partAb=null; fjPintar(); }
 
