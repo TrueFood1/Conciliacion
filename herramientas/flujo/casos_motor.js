@@ -218,3 +218,13 @@ eq('día de pago que caería en el ancla o antes: primer día después', flujoCa
   cxc:[fac('A4','2026-10-15',1000,713)], opciones:{atrasoCliente:{713:10}, diaPagoCliente:{713:5}}}).partidas[0].fecha, '2026-10-29');
 
 print((mal?'FALLA':'OK')+' · '+ok+' de '+(ok+mal)+' casos');
+
+// 13. Planilla (no proveedor) que cae en no hábil y se paga el hábil anterior = día del ancla o antes:
+//     ya está en el saldo, no se corre al lunes (planilla del 31-oct pagada el 30, ancla del 30; Andrea 30-oct)
+var rPl=flujoCalcular({ancla:{fecha:'2026-10-30', saldo:1000000}, tc:500, compromisos:[
+  fila({clave:'pl', concepto:'Planilla', periodicidad:'quincenal', dias:[15,31], monto:100, proveedor:false})]});
+eq('planilla del sábado 31-oct con ancla del viernes 30: no aparece; la primera es la del 13-nov',
+   rPl.partidas.filter(function(p){return p.ref==='pl';})[0].fecha, '2026-11-13');
+var rPl2=flujoCalcular({ancla:{fecha:'2026-10-29', saldo:1000000}, tc:500, compromisos:[
+  fila({clave:'pl', concepto:'Planilla', periodicidad:'quincenal', dias:[15,31], monto:100, proveedor:false})]});
+eq('con ancla del jueves 29 la del 31-oct sí sale, el viernes 30', rPl2.partidas.filter(function(p){return p.ref==='pl';})[0].fecha, '2026-10-30');

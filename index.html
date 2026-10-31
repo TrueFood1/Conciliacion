@@ -29313,6 +29313,7 @@ function flujoMoverHabil(iso, sentido, piso, feriados){
   let d=iso; for(let i=0;i<10;i++){ d=flujoMas(d,1); if(flujoHabil(d,feriados)) return d; }
   return iso;
 }
+function _flujoHabilAntes(iso, feriados){ let d=iso; for(let i=0;i<10;i++){ d=flujoMas(d,-1); if(flujoHabil(d,feriados)) return d; } return d; }
 // Hacia dónde se mueve un compromiso que cae en día no hábil: solo una SALIDA con proveedor = false va
 // al anterior. Una fila sin el campo (vieja) cuenta como proveedor, que es el default de la tabla.
 function flujoSentidoHabil(f){ return (f.sentido!=='entrada' && f.proveedor===false) ? -1 : 1; }
@@ -29382,6 +29383,10 @@ function flujoExpandirCompromisos(filas, ancla, hasta, ctx){
       const sent=f.sentido==='entrada'?1:-1, plazo=Number(f.plazo_dias)||0;
       const caja=plazo?flujoMas(d,plazo):d;
       if(caja<=ancla) continue;                                  // ya está en el saldo del ancla
+      // Una salida no proveedor (planilla) que cae en no hábil se paga el hábil ANTERIOR; si ese día es
+      // el ancla o antes, ya salió del banco y está en el saldo. Antes se corría al lunes y se restaba
+      // dos veces (planilla del 31-oct pagada el viernes 30, ancla del 30: Andrea, 30-oct).
+      if(f.periodicidad!=='diaria'&&flujoSentidoHabil(f)<0&&!flujoHabil(caja,ctx.feriados)&&_flujoHabilAntes(caja,ctx.feriados)<=ancla) continue;
       const fecha=f.periodicidad==='diaria'?caja:flujoMoverHabil(caja, flujoSentidoHabil(f), ancla, ctx.feriados);
       if(fecha>hasta) continue;
       partidas.push({fecha, devengo:d, monto:sent*c, categoria:f.categoria, concepto:f.concepto,
