@@ -1,6 +1,6 @@
 ---
 name: retomar
-description: Arranque de sesión en el repo Conciliacion. Lee el bloque más reciente de BITACORA.md y, en un solo turno, reporta dónde quedamos, los pendientes y el estado de ramas — comparando lo que la bitácora grabó contra el estado REAL del remoto con git ls-remote (caza si main se movió por web entre sesiones). Invocar con /retomar al empezar a trabajar.
+description: Arranque de sesión en el repo Conciliacion. Lee el bloque más reciente de BITACORA.md y, en un solo turno, reporta dónde quedamos, los pendientes y el estado de ramas — comparando lo que la bitácora grabó contra el estado REAL del remoto con git ls-remote (caza si main se movió por web entre sesiones) — y revisa los tickets no resueltos (los que cambiaron y los sin revisar). Invocar con /retomar al empezar a trabajar.
 ---
 
 <!-- ───────────────────────────────────────────────────────────────────────
@@ -33,7 +33,18 @@ description: Arranque de sesión en el repo Conciliacion. Lee el bloque más rec
 
   ⚠ MODIFICADA el 2026-09-04, después de restaurarla: se le agregó el
   «Paso 0 — Sello del respaldo», que NO venía en el original y está
-  rotulado como agregado ahí mismo. El resto del cuerpo sigue siendo textual.
+  rotulado como agregado ahí mismo.
+  ⚠ MODIFICADA el 2026-10-19 (decisiones de Andrea): se le agregó el «Paso 2b —
+  Tickets: los revisa y los escribe CC», el «Paso 2c — De Lorena, solo para
+  información» y sus partes del reporte, rotulados ahí mismo. Más tarde ese día, la «Regla de cierre»
+  del Paso 2b (preguntas respondidas y lo que se ve en pantalla los cierra CC) y «explicado → disponible». CC escribe directo con truefie_cc (TICKETS_CC_AMPLIADO.sql). Reemplaza,
+  por ahora, al revisor diario por GitHub Actions (T-149, pospuesto).
+  ⚠ MODIFICADA el 2026-10-22 (protocolo de cierre, Andrea 21-oct): el Paso 1 lee el último
+  CIERRE_DIA_<fecha>.md y las entradas ✅ LISTO (el /cierre viejo se retiró). Rotulado ahí mismo.
+  ⚠ MODIFICADA el 2026-10-20 (decisión de Andrea, T-171): Lorena publica a main sin el
+  OK de Andrea; el Paso 2 distingue «main movido por Lorena» (publicación normal) del
+  aviso ⚠, y el grupo de Lorena muestra lo que publicó. Rotulado ahí mismo. El resto
+  del cuerpo sigue siendo textual.
 ─────────────────────────────────────────────────────────────────────── -->
 
 # /retomar — cargar contexto al abrir sesión
@@ -79,9 +90,16 @@ apagar la alarma en vez de atender el fuego.
 
 ## Paso 1 — Leer la bitácora
 
-Leé `Conciliacion/BITACORA.md` y tomá el **bloque `# 📍 DÓNDE QUEDAMOS` más
-reciente** (el de más arriba). De ahí salen: la fecha/título, "Dónde quedamos",
-"Pendientes" y el "Estado de ramas" que grabó el último `/cierre`.
+**Desde el 22-oct-2026 (protocolo de cierre, Andrea 21-oct) el día se cierra con `/cierre-dia`**, que
+deja `respaldo-truefie/trabajo/cierres/CIERRE_DIA_<fecha>.md`, y cada sesión deja una entrada
+`## ✅ LISTO · <fecha hora> · chat «…»` arriba de `Conciliacion/BITACORA.md`. Leé, en este orden:
+1. el **`CIERRE_DIA_*.md` más reciente** (`ls respaldo-truefie/trabajo/cierres/ | tail -1`): estado de
+   ramas, BUILD publicado y próximo libre, tickets por origen, lo que espera a una socia;
+2. las **entradas `✅ LISTO` posteriores** a ese cierre (lo que cerraron las sesiones después);
+3. si no hay ningún `CIERRE_DIA`, el **bloque `# 📍 DÓNDE QUEDAMOS` más reciente** (el formato viejo).
+Si el último `CIERRE_DIA` es de antes de ayer y hay entradas `✅ LISTO` después, decirlo: **hay un día
+sin cerrar** (lo cubre el próximo `/cierre-dia`). En el reporte, el «grabado» de las ramas sale del
+último cierre que haya, del formato que sea.
 
 ## Paso 2 — Chequeo de sanidad del remoto (en vivo)
 
@@ -97,6 +115,106 @@ Compará los hashes de `dev` y `main` que grabó el "Estado de ramas" de la
 bitácora contra los de ahora (local y origin). Lo que se busca cazar: que
 alguien haya movido `main` (u otra rama) por la web **entre sesiones** — el
 agujero del 6-jul, pero detectado al abrir en vez de al cerrar.
+
+**Desde el 20-oct (decisión de Andrea, T-171) Lorena publica a `main` sin el OK de Andrea**, así que
+un `main` movido puede ser una publicación normal. Si `main` cambió, mirá de quién son los commits
+nuevos: `git -C Conciliacion log --format='%h %an %s' <main grabado>..origin/main`.
+- **Todos de Lorena** → no es alarma: «main pasó a <bNN>, publicado por Lorena». Va también al grupo
+  del Paso 2c, con qué toca del trabajo de Andrea si toca algo (mismo criterio que el Paso 2c del
+  `/cierre`). Igual hay que traerlo con `git fetch` antes de seguir.
+- **De otra persona, o por la web sin autor claro** → el aviso ⚠ de siempre.
+
+## Paso 2b — Tickets: los revisa y los escribe CC (AGREGADO el 2026-10-19, decisiones de Andrea)
+
+CC escribe **directo en la base con su rol `truefie_cc`** (TICKETS_CC_AMPLIADO.sql, 19-oct), en tickets de
+Truefie **y** en los pendientes propios de Andrea. La clave está en el llavero de la Mac de Andrea y la lee
+`tk_estado.py`: nunca aparece en pantalla, en el chat ni en el repo. **Todo cambio va primero con `--seco`**
+(la base lo juzga y lo deshace) y después de verdad.
+
+**¿Hay clave?** `security find-generic-password -s truefie-cc-db -a truefie_cc >/dev/null 2>&1`.
+Si **no** está (por ejemplo, en la compu de Lorena): este paso **solo lee y propone**; no escribe nada y lo
+dice en el reporte.
+
+**Lo que la base NO deja, nunca:** descartar, posponer, reabrir algo cerrado/pospuesto/descartado, escribir
+«qué se espera» o «criterio», cambiar o borrar. Eso es de las socias, desde la pantalla.
+
+### 1 · Leer (solo lectura)
+```bash
+python3 Conciliacion/herramientas/tickets/revisar_tickets.py --desde <fecha del último DÓNDE QUEDAMOS>
+```
+Se revisan dos grupos: los marcados `CAMBIÓ` y todos los «sin revisar». Los demás no se tocan.
+
+### 2 · Tickets de Truefie
+- **Explicar** cada «sin revisar» sin «En palabras claras» (cuatro renglones, en el lenguaje de Andrea, medido):
+  `python3 Conciliacion/herramientas/tk_estado.py explicar <n> --que-es "…" --por-que "…" --falta "chico|mediano|grande. …" --recomienda "HACER|CERRAR|DESCARTAR. …" --seco` → sin `--seco`.
+  **Y después pasarlo a «disponible»** (Andrea, 19-oct): un ticket explicado ya está revisado, salvo que en
+  esta misma vuelta CC lo cierre o lo bloquee. `tk_estado.py mover <n> disponible --nota "Revisado y explicado
+  por CC el <fecha>." --seco` → sin `--seco`. Vale también para los propios.
+- **Cerrar con evidencia** los ya resueltos: solo si se puede nombrar en una línea el build (`b108`) o el
+  commit donde quedó resuelto, y se verificó en el código o en git. Sin eso, no se cierra.
+  `python3 Conciliacion/herramientas/tk_estado.py cerrar <n> --evidencia "<qué y dónde>" --build b<NN> --cierre "<una línea>" --seco` → sin `--seco`.
+- **Regla de cierre (Andrea, 19-oct), vale también para los propios:**
+  - **Preguntas** (tipo `duda`): si CC la responde, la respuesta escrita en el ticket (su «En palabras
+    claras») **es** la evidencia, y CC lo cierra. La guarda de la base igual pide el build/commit (o
+    `archivo:` en un propio) dentro de la evidencia: `--evidencia "respuesta: <en una línea>, medido en b<NN>"`.
+  - **Lo que se ve en pantalla**: antes de dejárselo a Andrea, CC lo comprueba **él mismo en Truefie con su
+    navegador** (Pages, con la sesión ya abierta), y si se ve bien lo cierra:
+    `--evidencia "pantalla: <url> · <qué se vio> · b<NN>"`. **Solo mirar**: nunca tocar un botón que escribe
+    (Revisar, Crear, Guardar, Validar…). Si no hay sesión o no se puede ver, queda para Andrea con una línea.
+- **Marcar** (prioridad y riesgos) si hace falta: `tk_estado.py marcar <n> --prioridad … --toca-numeros si|no --escribe-en-base si|no --razon "…" --seco`.
+
+### 3 · Pendientes propios de Andrea, EN ESTE ORDEN
+**(a) Primero CC.** Si se resuelve con las herramientas de esta sesión (leer el repo, Drive, Zoho, Odoo en
+solo lectura, armar un archivo o un borrador), CC lo resuelve y lo **cierra con evidencia verificable**: un
+commit o build, o una línea `archivo: <ruta>`, `correo: <de quién, asunto, fecha>`, `enlace: <url>`.
+- CC **no manda nada a terceros** (correos, WhatsApp) sin el OK de Andrea en esta sesión, ni escribe en
+  Odoo o Supabase fuera de sus carriles.
+- Si CC lo hizo pero la evidencia no es verificable desde afuera: **`en_validacion`** con una nota de 20
+  letras o más (`tk_estado.py mover <n> en_validacion --nota "…" --seco`), para que Andrea lo cierre.
+
+**(b) Después, Instinct.** Solo lo que CC **no** puede y Instinct **sí** podría (correo, calendario,
+averiguar algo, escribirle a alguien): un mensaje **listo para que Andrea se lo mande a Instinct por
+WhatsApp**, con este formato:
+```
+Instinct: <qué hacer, en una o dos líneas>.
+Resultado que esperamos: <qué tiene que quedar hecho o qué dato traer>.
+Antes de mandar cualquier correo a otra persona, mostrámelo y esperá mi OK.
+(Ticket T-<n>)
+```
+Sin claves, sin montos de salarios ni datos sensibles. Al ticket se le agrega un anuncio
+(`tk_estado.py anunciar <n> --texto "Mensaje para Instinct listo el <fecha>." --seco`).
+
+**(c) Lo demás, para Andrea.** Lo que ni CC ni Instinct pueden: queda para ella, con **una línea** de qué
+necesita de ella.
+
+### 4 · Nunca
+Cerrar porque «parece viejo», recomendar CERRAR sin la evidencia escrita, ni escribir sin `--seco` antes.
+
+## Paso 2c — De Lorena, solo para información (AGREGADO el 2026-10-19, decisión de Andrea)
+
+**Lorena no usa Tickets.** Anota sus pendientes en `PENDIENTES.md`, con títulos `## P<n> · <estado> · <título>`,
+y trabaja en sus propias ramas. Este paso **solo lee** y lo muestra **al final del reporte**, en un grupo aparte.
+
+1. **Sus ramas**: las del remoto cuyo último commit es de ella.
+   ```bash
+   git -C Conciliacion fetch -q origin
+   git -C Conciliacion for-each-ref refs/remotes/origin --format='%(refname:short)|%(authorname)|%(committerdate:short)' | grep -i '|lorena'
+   ```
+2. **De cada rama**, lo justo:
+   - el BUILD: `git -C Conciliacion show <rama>:index.html | grep -o "const BUILD = '[^']*'"`;
+   - lo que no está en dev: `git -C Conciliacion log --oneline origin/dev..<rama>` (hasta 5);
+   - sus pendientes: `git -C Conciliacion show <rama>:PENDIENTES.md | grep '^## P'` (solo el título y el estado).
+   Y los `## P…` que ya estén en el `PENDIENTES.md` de dev.
+   ⚠️ En zsh, con la rama en una variable, escribir `"${rama}:PENDIENTES.md"` con llaves: `$rama:P…` es un
+   modificador de zsh (`:P` = ruta real) y git recibe otra cosa (pasó al armar este paso, 19-oct).
+3. **Las reglas del grupo**:
+   - **NO** se cargan como tickets, **NO** se resuelven, **NO** van a «Andrea decide» ni a ningún resumen de
+     tareas, y **NO** se toca nada en las ramas de Lorena. Decide ella.
+   - Solo títulos y estados: **nunca montos, salarios ni datos de personas**, aunque estén en el archivo.
+   - Un aviso, una línea y solo si pasa: si una rama de Lorena usa un número de BUILD que **ya está publicado en
+     main** (o que usa otra rama), decirlo dentro del grupo, como dato para coordinar, no como tarea.
+4. **Sin cambios desde el último cierre** (ninguna rama de ella con commits más nuevos que la bitácora):
+   «De Lorena: sin cambios desde el <fecha>.», en una línea.
 
 ## Paso 3 — Reportar (un solo turno)
 
@@ -116,8 +234,29 @@ Estado de ramas (bitácora vs realidad ahora)
   dev  → grabado <hash7> · hoy <hash7>   <✓ sin cambios | ⚠ ...>
   main → grabado <hash7> · hoy <hash7>   <✓ sin cambios | ⚠ ...>
   <línea final: "Nadie tocó el remoto desde el último cierre, podés seguir."
+   o "main pasó a <bNN>, publicado por Lorena — traé con git fetch antes de seguir."
    o el aviso: "⚠ origin/main cambió desde el cierre — traé con git fetch
    antes de seguir.">
+
+Tickets (Paso 2b · lo que CC escribió con truefie_cc)
+  Explicaciones escritas      T-<n> · <recomendación en una línea>
+  Marcas puestas              T-<n> · <prioridad> · <razón corta>
+  Cerrados con evidencia      T-<n> · <título corto> · <evidencia>
+  Propios
+    (a) resueltos por CC      T-<n> · <qué se hizo> · <evidencia, o «en validación: cerralo vos»>
+    (b) para Instinct         T-<n> · <qué> — mensaje listo para copiar:
+                              «Instinct: … Resultado que esperamos: … Antes de mandar cualquier
+                               correo a otra persona, mostrámelo y esperá mi OK. (Ticket T-<n>)»
+    (c) para Andrea           T-<n> · <una línea: qué necesita de ella>
+  Cambiaron desde el último cierre (sin acción)   T-<n> · <qué cambió>
+  revisé N · escribí X (explicaciones E · marcas M · cierres C) · Instinct I · Andrea decide Y
+  <si no había clave: «Sin la clave de truefie_cc en esta compu: no escribí nada, solo propongo.»>
+
+De Lorena (solo para información · Paso 2c)
+  <si publicó: Publicó b<NN> en main · <qué toca del trabajo de Andrea, o «no toca lo tuyo»>>
+  <rama> · <fecha> · <BUILD> · <N> commits que no están en dev
+    P<n> · <estado> · <título>
+  <si pasa: ⚠ <rama> usa el número <bNN>, que ya está publicado en main>
 ```
 
 Si `BITACORA.md` no existe o no tiene ningún bloque `DÓNDE QUEDAMOS`, decilo

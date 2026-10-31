@@ -1,6 +1,8 @@
 # Respaldo de las skills locales
 
-Copia versionada de las skills `/cierre` y `/retomar`. **Esta carpeta es el
+Copia versionada de las skills `/listo`, `/cierre-dia`, `/retomar` y `/cierre` (retirada el 22-oct-2026),
+con los scripts de `/listo` (`listo.py`, `turno.py`) y de `/cierre-dia` (`cierre_dia.py`): viven al lado de
+su skill para no depender de la rama que tenga la carpeta compartida. **Esta carpeta es el
 respaldo, no la copia viva.**
 
 La copia viva va en `Practica CC/.claude/skills/<nombre>/SKILL.md` — o sea
@@ -22,7 +24,7 @@ Dos razones:
 Desde esta carpeta:
 
 ```bash
-VIVA="$(git rev-parse --show-toplevel)/../.claude/skills" && mkdir -p "$VIVA" && cp -R cierre retomar "$VIVA/"
+VIVA="$(git rev-parse --show-toplevel)/../.claude/skills" && mkdir -p "$VIVA" && cp -R listo cierre-dia retomar cierre "$VIVA/"
 ```
 
 Después hay que reiniciar la sesión: las skills se leen al arrancar.
@@ -33,7 +35,7 @@ Después hay que reiniciar la sesión: las skills se leen al arrancar.
 R="$(git rev-parse --show-toplevel)" && diff -r "$R/../.claude/skills" "$R/herramientas/skills" --exclude=README.md
 ```
 
-`/cierre` ya corre ese `diff` solo: es su **Paso 0**, y va antes del commit, así
+`/cierre-dia` compara cada archivo vivo contra el de `origin/dev` y lo dice en «Copias» (antes lo hacía el Paso 0 del `/cierre`), y va antes del commit, así
 que lo que cambie en la copia viva entra en el mismo commit. La skill se
 respalda a sí misma.
 

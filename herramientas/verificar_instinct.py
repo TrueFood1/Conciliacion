@@ -13,7 +13,8 @@ Qué prueba, con el interruptor ENCENDIDO (ENCENDER_ASISTENTE.sql):
     vacía a propósito: si el candado fallara, la base la rechaza igual por NOT NULL (23502) y no
     queda nada escrito; por eso un 23502 se marca como FALLA del candado, no como éxito.
   · Proxy de lectura (Odoo): le lee.
-  · Servicio de escritura: no es socia → 403 en /quien y en /insumo.
+  · Servicio de escritura: no es socia → 403 en /quien; en /insumo (fase 2, 19-oct) 403 por la llave que
+    falte (asistente_apagado, sin_permiso) o, con las dos puestas, porque la propuesta 1 no es suya.
 
     python3 herramientas/verificar_instinct.py            # con el interruptor encendido
     python3 herramientas/verificar_instinct.py --apagado  # después de APAGAR_ASISTENTE.sql (espera bloqueos)
@@ -130,9 +131,13 @@ def main():
     st, js, _ = pedir("GET", ESCRITURA + "/quien", cab={"Authorization": "Bearer " + tok})
     ver("servicio de escritura /quien (no es socia)", "403 sin_rol", "%s %s" % (st, (js or {}).get("motivo") if isinstance(js, dict) else ""),
         st == 403 and isinstance(js, dict) and js.get("motivo") == "sin_rol")
+    # /insumo (fase 2, 19-oct): ya no es «sin_rol». Con INSUMO_ASISTENTE_ENCENDIDO apagado en Render → 403
+    # asistente_apagado; encendido pero sin el permiso de Truefie → 403 sin_permiso. Con las dos llaves
+    # puestas, la propuesta 1 es de una socia → 403 propuesta_ajena. En ningún caso llega a Odoo.
     st, js, _ = pedir("POST", ESCRITURA + "/insumo", {"propuesta_id": 1}, {"Authorization": "Bearer " + tok})
-    ver("servicio de escritura /insumo", "403 sin_rol", "%s %s" % (st, (js or {}).get("motivo") if isinstance(js, dict) else ""),
-        st == 403 and isinstance(js, dict) and js.get("motivo") == "sin_rol")
+    mot = (js or {}).get("motivo") if isinstance(js, dict) else ""
+    ver("servicio de escritura /insumo (propuesta de una socia)", "403 asistente_apagado · sin_permiso · propuesta_ajena",
+        "%s %s" % (st, mot), st == 403 and mot in ("asistente_apagado", "sin_permiso", "propuesta_ajena"))
 
     print("\nInstinct · %s · %d pruebas\n" % ("APAGADO" if apagado else "ENCENDIDO", len(filas)))
     print("| | prueba | esperado | obtenido |\n|---|---|---|---|")

@@ -279,13 +279,43 @@ y Simulador. Acá vive solo lo ESTABLE; el estado de avance vive en `BITACORA.md
   `conexion_prod.env`; confirmar presencia con sí/no, sin mostrar la key.
 - Explicar en español simple; reportar con evidencia (números, no adjetivos).
 
-## Cierre de sesión (regla fija)
+## Cierre de sesión (regla fija · protocolo de cierre, Andrea 21-oct-2026)
 
-Al cierre de **toda sesión donde se tocó código**, correr el checklist de
-[`CIERRE_TECNICO.md`](CIERRE_TECNICO.md) **sin que haya que pedirlo**.
+**El 20-oct** seis sesiones de CC en paralelo cerraron cada una con el `/cierre` viejo: cuatro ESTADOS el
+mismo día, un prompt perdido entre chats, el choque de BUILD b114/b115 y un cierre de dos horas. Desde el
+22-oct:
+
+- **`/listo` — cada sesión, al terminar SU tarea**, sin que haya que pedirlo: toma el turno, nada sin
+  commitear, push de **su** rama (nunca `main`), tickets con su línea `Origen: chat «…»` y una entrada
+  `✅ LISTO` arriba de la `BITACORA.md`. No escribe el ESTADO ni corre el cierre del día.
+- **`/cierre-dia` — UNA sola sesión, cuando Andrea lo pide:** junta el día de los 4 repos y escribe
+  `respaldo-truefie/trabajo/cierres/CIERRE_DIA_<fecha>.md` + un bloque para el chat de Claude.ai. **El
+  ESTADO lo escribe Claude.ai**, no CC. Si un día quedó sin cierre, el siguiente lo cubre.
+- **Turno:** antes de `/listo` o `/cierre-dia`, la marca local `Practica CC/.turno_cierre.json` (no va a
+  git; `.claude/skills/listo/turno.py`). Si la tiene otra sesión, se espera; a los 30 minutos se da por
+  abandonada.
+- **Una carpeta por sesión:** la sesión que necesite otra rama trabaja en **su propio worktree**
+  (`git -C Conciliacion worktree add <scratchpad>/wt-<tarea> <rama>`), **nunca cambiando de rama en la
+  carpeta compartida**: otra sesión puede estar trabajando ahí.
+- El `/cierre` viejo quedó **retirado**. [`CIERRE_TECNICO.md`](CIERRE_TECNICO.md) sigue siendo el
+  checklist técnico (secretos, `esquema_check`, `loadcheck`) que se corre antes de commitear y de publicar.
 
 - El **push va a `dev`** (respaldo, siempre).
-- A **`main`** solo con **decisión explícita de Andrea** (`main` sirve la versión publicada por GitHub Pages).
+- A **`main`** solo con **decisión explícita de una socia —Andrea o Lorena—** (`main` sirve la versión
+  publicada por GitHub Pages). Las dos tienen el mismo poder de decisión (Andrea, 20-oct-2026, T-171):
+  cualquiera publica sin la autorización de la otra, y se avisan cuando lo publicado toque o pueda tocar
+  el trabajo de la otra. El `/cierre` arma ese aviso.
+
+## Origen de los pedidos (regla fija, Andrea, 20-oct-2026)
+
+Andrea trabaja en varios chats aparte y pega los pedidos acá. Para saber de qué chat salió cada cosa:
+
+- Si un prompt arranca con **`[Origen: chat «…»]`**, ese nombre va en **cada ticket que se cree o se toque
+  por ese prompt**. La tabla `ticket` no tiene columna «origen», así que:
+  - en un ticket **nuevo**, la descripción termina con `Origen: chat «…».`;
+  - en un ticket que ya existía, va un anuncio (`tk_estado.py anunciar`) que empieza con `Origen: chat «…» ·`.
+- En el **`/cierre`**, lo hecho y lo pendiente se listan **agrupados por chat de origen**.
+- Si un prompt **no trae la línea de origen**, se pregunta de qué chat viene **antes de crear tickets**.
 
 ## Seguridad
 
@@ -294,6 +324,14 @@ Al cierre de **toda sesión donde se tocó código**, correr el checklist de
 
 ## Entorno y datos fijos
 
+- **Postgres local para ensayos** (desde el 20-oct-2026): binarios oficiales de PostgreSQL
+  **17.6** (EnterpriseDB, firmados, Team ID `26QKX55P9K`) en **`Practica CC/postgres17/pgsql/`**,
+  fuera del repo y sin instalar nada en el sistema. No se borra entre sesiones.
+  `sh herramientas/pg_local.sh up` levanta un clúster temporal en `/tmp/zzpg` (puerto 55432) y
+  `down` lo apaga y borra; `PG_BIN=<otra carpeta>` cambia los binarios. El Postgres de Homebrew
+  del 15-oct ya no está en la Mac. El espejo de producción para un ensayo se arma con
+  `respaldo-truefie/trabajo/seguridad/t148/armar_local.sh` desde el respaldo diario (los datos
+  reales quedan solo en el clúster temporal).
 - Local: `python3 -m http.server 8765` → probar en **Safari**
   (`http://127.0.0.1:8765/index.html`, recarga Cmd+Shift+R). El Chrome
   corporativo bloquea localhost ("Access denied" no es un bug de la herramienta).

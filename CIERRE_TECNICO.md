@@ -2,6 +2,12 @@
 
 Este checklist se corre al final de **toda sesión donde se tocó código**, sin que haya que pedirlo.
 
+> **Desde el 22-oct-2026 (protocolo de cierre, Andrea 21-oct):** el cierre de cada sesión es **`/listo`**
+> (`.claude/skills/listo/`), y el del día, **`/cierre-dia`**, lo corre una sola sesión. Este checklist es
+> lo técnico que va ANTES de `/listo`: pasos 1-3 (status, secretos, commit) siempre; 5-6 (`BUILD`,
+> `esquema_check`, `loadcheck`) solo si se publica. El paso 4 lo hace `/listo` (push de SU rama, nunca
+> `main`). Trabajar en otra rama = **su propio worktree**, nunca cambiar de rama en la carpeta compartida.
+
 1. **`git status`** — ¿quedó algo sin commitear?
 2. **Chequeo de secretos** sobre lo modificado: API keys, tokens, datos bancarios, correos personales. Ojo especial con archivos de **datos** que el `.gitignore` no matchea (el repo es público y sirve GitHub Pages).
 3. **Commit** con mensaje descriptivo de la sesión.
@@ -98,7 +104,27 @@ Este checklist se corre al final de **toda sesión donde se tocó código**, sin
    falso, y se creyó durante semanas. La base sí estaba cubierta; el trabajo del
    día, no.
 
-7. **¿Publicar?** Solo si Andrea lo dice explícito → `merge dev → main` + push. Si no, `main` se queda sirviendo la versión publicada vieja.
+9. **Cada pendiente nuevo es un ticket** (decisiones de Andrea, 19-oct-2026). Nada queda pendiente
+   solo en la bitácora: lo nuevo de la sesión va como ticket en su módulo o en «Mis pendientes».
+   1. Buscar si ya existe, en cualquier estado:
+      `python3 herramientas/tickets/revisar_tickets.py --todos --buscar "<palabra clave>"`.
+   2. Los que faltan, a `herramientas/tickets/tanda_<fecha>.json` (gitignored) con su explicación en
+      los cuatro renglones y, si hace falta, su marca.
+   3. **Con la clave de truefie_cc** (llavero de la Mac de Andrea): CC los carga directo, en una
+      transacción, `python3 herramientas/tk_estado.py tanda <json> --seco` y después sin `--seco`.
+      **Sin la clave** (compu de Lorena): `python3 herramientas/tickets/armar_tickets.py <json>
+      PEGADO_TICKETS_<FECHA>` → ensayo + pegado para que lo pegue ella.
+   4. Verificar desde afuera; recién ahí cada línea de Pendientes de la bitácora lleva su T-<n>. Si no se
+      cargó: `⏳ ticket por cargar`.
+   5. Lo que la base no deja, nunca: descartar, posponer, reabrir, criterio, cambiar o borrar. Eso es
+      de las socias, desde la pantalla.
+
+7. **¿Publicar?** Solo si la socia de la sesión —Andrea o Lorena— lo dice explícito → a `main` + push.
+   Si no, `main` se queda sirviendo la versión publicada vieja. **Andrea y Lorena tienen el mismo poder
+   de decisión** (Andrea, 20-oct-2026, T-171): cualquiera de las dos publica sin la autorización de la
+   otra. Lo que sí es obligatorio es **avisarse** cuando lo publicado toque o pueda tocar el trabajo de
+   la otra (sus módulos, sus ramas, archivos compartidos, el esquema o el número de BUILD): el `/cierre`
+   arma ese aviso listo para mandar.
 
 ## Contexto de ramas
 
@@ -111,4 +137,5 @@ Este checklist se corre al final de **toda sesión donde se tocó código**, sin
   ⚠️ `git branch X origin/main` deja el upstream apuntando a **`main`**: un
   `git push` pelado publica sin querer. Medido al armar b57. Se desarma con
   `git branch --unset-upstream`, o se evita creando la rama con `--no-track`.
-- **`main`** — la versión publicada. GitHub Pages la sirve. Solo se mueve con decisión explícita de Andrea.
+- **`main`** — la versión publicada. GitHub Pages la sirve. La mueve Andrea o Lorena, cualquiera de las
+  dos sin la autorización de la otra, avisándose si toca el trabajo de la otra (20-oct-2026, T-171).
