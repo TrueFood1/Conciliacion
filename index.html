@@ -10031,6 +10031,10 @@ function uomLineaMal(pid, uomId, uds){
 
 // planMeses: cuántos meses mira el Plan desde HOY (rodante). Clave `plan_meses` de plan_config; sin
 // fila, 4 (Andrea, 25-oct-2026). No confundir con `horizonte`: esas son SEMANAS de cobertura del motor.
+// COLCHÓN DE COMPRA (Andrea, 2-nov-2026: «mientras estemos apretadas, en todos un colchón, pero más pequeño»):
+// se pide con la MITAD del margen histórico (semana más alta de 6 − promedio). El aviso «difiere» sigue
+// usando el margen completo: solo cambia cuánto se compra.
+const CP_COLCHON_FRAC=0.5;
 const NIV_CFG_DEF={ritmoVentana:6, colchon:3, colchonTemporada:4, horizonte:6, medirFrac:0.5, medirDia:4, planMeses:4, cierreSemEne:3};
 const _rzN=(n,d=0)=>(Number(n)||0).toLocaleString('es-CR',{minimumFractionDigits:d,maximumFractionDigits:d});
 // ── CAPACIDAD por Nº de personas (batches/día). Adelanto del futuro módulo RRHH. ──
@@ -11158,10 +11162,10 @@ async function nivDiaFijo(){
         (D.pedidoLineas||[]).forEach(function(l){ if(l.pid!==pid) return; if((l.ds||'')<ci.E) antesE+=l.qty; else enE+=l.qty; });
         stE=st+antesE; ya=enE; }
       const sobra=Math.max(0, stE-a), rojo=Math.max(0, a-stE);
-      const bruto=Math.max(0, A+h.margen-sobra), pedir=Math.max(0, bruto-ya);
+      const bruto=Math.max(0, A+h.margen*CP_COLCHON_FRAC-sobra), pedir=Math.max(0, bruto-ya);
       const difiere=(A>1e-9||h.prom>1e-9) && Math.abs(A-h.prom)>Math.max(h.margen,1e-9);
       return {pid:pid, nombre:(inf.name||('id '+pid)).replace(/^\[[^\]]*\]\s*/,''), uom:uom, stock:st, antes:a, sobra:sobra, rojo:rojo,
-              A:A, B:h.prom, margen:h.margen, ya:ya, bruto:bruto, pedir:pedir, difiere:difiere,
+              A:A, B:h.prom, margen:h.margen*CP_COLCHON_FRAC, ya:ya, bruto:bruto, pedir:pedir, difiere:difiere,
               falta:Math.max(0, A-sobra-ya)}; });   // falta = lo que no alcanza en el periodo, SIN margen
   }
   for(const k of orden){ const g=grupos[k], ci=_dfCiclo(g.cfg, hoy);
@@ -24237,7 +24241,7 @@ async function cpAlcance(){
       for(const d of dias){ if(d>H) break; q+=((cons[d]||{})[pid]||0); r+=((rec[pid]||{})[d]||0); }
       const stQ=deficit?0:st; if(deficit) q-=sinCargar;
       falta=Math.max(0, q-stQ-r);
-      if(color!=='verde') sug=Math.max(0, q+h.margen-stQ-r); }
+      if(color!=='verde') sug=Math.max(0, q+h.margen*CP_COLCHON_FRAC-stQ-r); }
     // SOLO MARGEN Y MENOS DE MEDIO SACO → NO SE SUGIERE (Andrea, 15-oct, caso almidón: 2,84 kg de margen se
     // volvían 1 saco de 25 kg). `falta` es lo que no alcanza SIN margen: si es 0, lo sugerido es puro margen,
     // y si además es menos de la mitad de la unidad de compra (saco, múltiplo), no vale un empaque entero.
@@ -24245,7 +24249,7 @@ async function cpAlcance(){
     return {pid:pid, nombre:(inf.name||i.nombre||('id '+pid)).replace(/^\[[^\]]*\]\s*/,'').trim(), uom:uom, proveedor_id:+i.proveedor_id,
             sinCargar:sinCargar, deficit:deficit, fallaC:fallaC,
             stock:st, falla:falla, ultimo:ultimo, color:color, U:U, llega:llega, pedirEl:pedirEl, comprarAntes:comprarAntes,
-            fijo:!!fijo, ci:ci, sug:sug, falta:falta, cada:cada, margen:h.margen, ya:D.pedido[pid]||0, hueco:hueco}; });
+            fijo:!!fijo, ci:ci, sug:sug, falta:falta, cada:cada, margen:h.margen*CP_COLCHON_FRAC, ya:D.pedido[pid]||0, hueco:hueco}; });
   // 5 · por pedido: proveedor + entrega (BIO tiene dos: lo del lunes y el huevo líquido del jueves)
   const grupos=[], gk={};
   filas.forEach(function(f){ const pv=_cpCfgProv(f.proveedor_id)||{};
