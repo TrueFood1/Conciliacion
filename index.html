@@ -3084,6 +3084,15 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
       <div class="calc-field" style="max-width:420px"><label for="calcCot">¿Qué vas a cotizar?</label><select id="calcCot" class="calc-num"></select></div>
       <div id="calcCotCosto"></div>
     </div>
+    <div id="calcBorBox" class="sim-panel calc-panel hidden" style="margin-top:14px">
+      <div class="calc-fila">
+        <div class="calc-field" style="flex:1;min-width:180px"><label for="calcBorSel">Borradores</label><select id="calcBorSel" class="calc-num"></select></div>
+        <div class="calc-field" style="flex:2;min-width:200px"><label for="calcBorNombre">Nombre</label><input type="text" id="calcBorNombre" class="calc-num" maxlength="120"></div>
+        <button class="btn btn-sm btn-p" id="calcBorGuardar" style="align-self:flex-end;margin-bottom:11px">Guardar borrador</button>
+        <button class="btn btn-sm hidden" id="calcBorArchivar" style="align-self:flex-end;margin-bottom:11px">Archivar</button>
+      </div>
+      <div id="calcBorMsg" class="calc-vtxt"></div>
+    </div>
     <div class="calc-fila calc-sel" style="margin-top:14px;gap:6px">
       <div id="calcCadenas" class="calc-chips"></div>
       <span class="calc-sep"></span>
@@ -31596,6 +31605,9 @@ function _calcSinTabla(err){
 // ── Estado de la vista ──────────────────────────────────────────────────
 let CALC=null, calcCat={}, calcTerm={}, calcGuardadas=[], calcSb={ok:false, msg:''}, calcOdooMsg='';
 let calcSimCosto=null, calcCondUsr={}, calcCondGuardado='{}', calcEsSocia=false;
+// Borradores de la pestaña Precio (Supabase `calc_borrador`, append-only, solo socias). calcBorAbierto =
+// uuid del borrador que se está viendo: guardar de nuevo le agrega una versión en vez de crear otro.
+let calcBorradores=[], calcBorOk=false, calcBorAbierto=null, calcBorNomDe=undefined, calcBorGuardando=false;
 // Lo que se cotiza se recuerda en la sesión del navegador (no en la base): es comodidad, no dato.
 function calcCotRecordar(){ try{ sessionStorage.setItem('tf_calc_cot',calcCotValor(CALC.cot)); }catch(e){} }
 function calcCotRecordado(){ try{ return calcCotDeValor(sessionStorage.getItem('tf_calc_cot')); }catch(e){ return null; } }
@@ -31640,6 +31652,7 @@ async function cargarCalcPrecios(){
   // 4) Lo que hoy se le factura a cada cadena: del producto elegido, al elegirlo
   calcCargarHoyProd(calcCotPid(CALC));
   await calcCargarGuardadas();
+  await calcCargarBorradores();
 }
 // Un terminado de Costos por producto → lo que usa la calculadora, por unidad de venta. Sin dato o
 // con error → null (sale «falta»), nunca ₡0. Indirecto ₡0 sin días propios va con su condición.
@@ -31737,6 +31750,83 @@ async function calcGuardar(){
   }
   pon('No se guardó: la versión chocó dos veces, probá de nuevo.','var(--stop-tx)');
 }
+// ── Borradores de Precio ────────────────────────────────────────────────
+// Lo que se guarda es el escenario, no los costos: al abrirlo, el costo se vuelve a leer en vivo
+// (Odoo y recetas de hoy) y lo que se conserva es lo que la socia decidió (cadena, margen, PVP, techos).
+const CALC_BOR_CAMPOS=['prod','cot','cad','cat','cond','iva','ancla','val','pfCad','mminCad','techos','emp','udsDia','term','termTocado','receta','guardadaId'];
+function calcBorDatos(S){
+  const d={v:1}; CALC_BOR_CAMPOS.forEach(function(k){ if(S[k]!==undefined) d[k]=S[k]; });
+  return JSON.parse(JSON.stringify(d));
+}
+function calcBorNombreAuto(){
+  const cs=document.getElementById('calcCot'), o=cs&&cs.selectedOptions&&cs.selectedOptions[0];
+  const cad=(CALC_CADENAS.find(function(c){ return c.k===CALC.cad; })||{}).label||CALC.cad;
+  const cat=(CALC_CATS.find(function(c){ return c.k===CALC.cat; })||{}).label||CALC.cat;
+  const hoy=new Date(), f=hoy.getDate()+'-'+_CALC_MES[hoy.getMonth()];
+  return ((o&&o.textContent)||'Cotización')+' · '+cad+' '+cat.toLowerCase()+' · '+f;
+}
+function calcBorMsg(t,color){ const m=document.getElementById('calcBorMsg'); if(m){ m.textContent=t||''; m.style.color=color||'var(--text-2)'; } }
+async function calcCargarBorradores(){
+  calcBorOk=false; calcBorradores=[];
+  if(calcEsSocia){
+    try{
+      const c=sbClient();
+      if(c){
+        const {data,error}=await c.from('calc_borrador_vigente').select('id,borrador,nombre,datos,creado_por,creado_en').order('creado_en',{ascending:false});
+        if(error) calcBorMsg(error.code==='PGRST205'||/calc_borrador[^ ]* (does not exist|not found)|schema cache/i.test(String(error.message||''))?'Borradores: falta crear la tabla':'Borradores: no se pudieron leer','var(--warn)');
+        else { calcBorradores=data||[]; calcBorOk=true; }
+      }
+    }catch(e){ calcBorMsg('Borradores: no se pudieron leer','var(--warn)'); }
+  }
+  calcPintarBorradores();
+}
+function calcPintarBorradores(){
+  const box=document.getElementById('calcBorBox'); if(box) box.classList.toggle('hidden',!calcEsSocia);
+  const sel=document.getElementById('calcBorSel'), nom=document.getElementById('calcBorNombre'), arc=document.getElementById('calcBorArchivar');
+  if(!sel) return;
+  const act=calcBorradores.find(function(b){ return b.borrador===calcBorAbierto; });
+  sel.innerHTML='<option value="">'+(calcBorradores.length?'Nuevo':'Sin borradores')+'</option>'
+    +calcBorradores.map(function(b){ return '<option value="'+esc(b.borrador)+'"'+(b.borrador===calcBorAbierto?' selected':'')+'>'+esc(b.nombre)+'</option>'; }).join('');
+  if(nom){ if(calcBorNomDe!==calcBorAbierto){ nom.value=act?act.nombre:''; calcBorNomDe=calcBorAbierto; } nom.placeholder=CALC?calcBorNombreAuto():''; }
+  if(arc) arc.classList.toggle('hidden',!act);
+}
+function calcAbrirBorrador(uuid){
+  calcBorMsg('');
+  if(!uuid){ calcBorAbierto=null; calcPintarBorradores(); return; }
+  const b=calcBorradores.find(function(x){ return x.borrador===uuid; }); if(!b) return;
+  const d=b.datos||{}, base=calcEstadoBase();
+  CALC_BOR_CAMPOS.forEach(function(k){ if(d[k]!==undefined) base[k]=d[k]; });
+  base.tab='precio'; base.indDia=CALC.indDia; base.indEtiq=CALC.indEtiq;
+  CALC=base; calcBorAbierto=uuid;
+  if(CALC.prod!=='receta' && !CALC.termTocado && calcTerm[CALC.prod]){ const t=calcTerm[CALC.prod];
+    CALC.term={mp:t.mp, ind:t.ind, emp:t.emp, pid:t.pid, label:t.label, unidad:t.unidad, indNota:t.indNota}; }
+  if(CALC.receta) calcRefrescarFilas(CALC.receta,calcCat);
+  calcCotRecordar(); calcPintarTodo(); calcPintarBorradores();
+  calcCargarHoyProd(calcCotPid(CALC));
+  calcBorMsg('Abierto · guardado el '+String(b.creado_en||'').slice(0,10)+'. Los costos son los de hoy.');
+}
+async function calcGuardarBorrador(archivar){
+  if(calcBorGuardando) return;
+  calcBorGuardando=true;
+  try{ await _calcGuardarBorrador(archivar); } finally { calcBorGuardando=false; }
+}
+async function _calcGuardarBorrador(archivar){
+  if(!calcBorOk){ calcBorMsg('Sin base de datos: no se guardó.','var(--warn)'); return; }
+  const c=sbClient(); if(!c){ calcBorMsg('Sin conexión con la base: no se guardó.','var(--stop-tx)'); return; }
+  let email=''; try{ const {data}=await c.auth.getUser(); email=(data&&data.user&&data.user.email)||''; }catch(e){}
+  if(!email){ calcBorMsg('Sin sesión: no se guardó.','var(--stop-tx)'); return; }
+  const act=calcBorradores.find(function(b){ return b.borrador===calcBorAbierto; });
+  if(archivar && !act) return;
+  const nomEl=document.getElementById('calcBorNombre');
+  const nombre=(String(nomEl&&nomEl.value||'').trim()||(act?act.nombre:calcBorNombreAuto())).slice(0,120);
+  const uuid=act?act.borrador:(crypto.randomUUID?crypto.randomUUID():'10000000-1000-4000-8000-100000000000'.replace(/[018]/g,function(ch){ return (ch^crypto.getRandomValues(new Uint8Array(1))[0]&15>>ch/4).toString(16); }));
+  const fila={borrador:uuid, nombre, datos:archivar?(act.datos||{}):calcBorDatos(CALC), archivado:!!archivar, creado_por:email};
+  const {error}=await c.from('calc_borrador').insert([fila]);
+  if(error){ calcBorMsg('No se guardó: '+(error.message||error),'var(--stop-tx)'); return; }
+  calcBorAbierto=archivar?null:uuid;
+  await calcCargarBorradores();
+  calcBorMsg(archivar?'Archivado: '+nombre+'.':'Guardado: '+nombre+'.', archivar?'var(--text-2)':'var(--good)');
+}
 function calcEstado(cargando){
   const el=document.getElementById('calcStatus'); if(!el) return;
   const partes=[]; if(cargando) partes.push('<span class="spin"></span>'+esc(cargando));
@@ -31799,6 +31889,9 @@ function calcBuildUI(){
   const nr=document.getElementById('calcRecNombre');
   if(nr){ nr.oninput=function(){ CALC.receta.nombre=nr.value; }; }
   const bg=document.getElementById('calcGuardar'); if(bg) bg.onclick=calcGuardar;
+  const bbs=document.getElementById('calcBorSel'); if(bbs) bbs.onchange=function(){ calcAbrirBorrador(this.value); };
+  const bbg=document.getElementById('calcBorGuardar'); if(bbg) bbg.onclick=function(){ calcGuardarBorrador(false); };
+  const bba=document.getElementById('calcBorArchivar'); if(bba) bba.onclick=function(){ calcGuardarBorrador(true); };
   const bcg=document.getElementById('calcCondGuardar'); if(bcg) bcg.onclick=calcGuardarCond;
   const ba=document.getElementById('calcAddFila'); if(ba) ba.onclick=function(){ CALC.receta.filas.push(calcFilaVacia()); calcPintarReceta(); calcRecalc(); };
   const bn=document.getElementById('calcNueva'); if(bn) bn.onclick=function(){
@@ -31873,7 +31966,7 @@ function calcPintarTodo(){
   if(rs) rs.innerHTML=CALC_CADENAS.filter(function(c){ return c.k!==CALC.cad; }).map(function(c){ return '<option value="'+c.k+'"'+(c.k===t.ref?' selected':'')+'>'+esc(c.label)+'</option>'; }).join('');
   const ms=document.getElementById('calcTechoModo'); if(ms) ms.value=t.modo;
   const xs=document.getElementById('calcTechoXTipo'); if(xs) xs.value=t.xTipo;
-  calcPintarReceta(); calcRecalc(); calcPintarGuardadas();
+  calcPintarReceta(); calcRecalc(); calcPintarGuardadas(); calcPintarBorradores();
 }
 // Selector «¿Qué vas a cotizar?»: Productos (los seis terminados) y Recetas guardadas (la vigente de
 // cada una, más la abierta en Costo si no está guardada).
