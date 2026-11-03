@@ -5227,6 +5227,7 @@ body:has(.de-fondo) #tkBtn{display:none}
 #vResumen .rz-c4fecha span{display:block;line-height:1.35}
 #vResumen .rz-c4line{font-size:13px;color:var(--text);line-height:1.5}
 #vResumen .rz-c4line.rz-ok{color:var(--ok-olive)}
+#vResumen .rz-c4sig{margin-top:10px;padding-top:9px;border-top:.5px solid var(--border)}
 #vResumen .rz-c4none{font-size:12.5px;color:var(--text-3)}
 /* VA DE LA SEMANA: progreso meta−producido por producto */
 #vResumen .rz-vsrow{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:3px 0;font-size:13px}
@@ -6167,7 +6168,7 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 2 nov 2026 · b154';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 3 nov 2026 · b155';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -11276,6 +11277,7 @@ const _SVG_PPL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strok
 let _rzCtx=null;                 // {cfg,ritmo,stock,w0,weeks,real,hoyStr,mon0}
 let _rzOverrides={};             // {ds:{producto_id,batches,tipo}} — la fila más reciente por fecha manda
 let _rzAlistar=[{premez:[],compras:[]},{premez:[],compras:[]}];
+let _rzAlistarProx=null;   // la semana siguiente, solo cuando la actual ya está medida (b155)
 let _rzEdit=null;                // ds de la celda en modo edición (o null)
 let _rzSel=null;                 // ds del día seleccionado para intercambiar (tocar-tocar)
 let _rzAviso='';                 // motivo visible cuando un intercambio no se puede hacer
@@ -23944,8 +23946,9 @@ function _rzPerDate(){ const m={}; for(let o=0;o<2;o++){ _rzCellsFull(o).forEach
 // ese día entra fraccionado y no entero ni afuera.
 // Los batches quedan fraccionarios a propósito: nivAlistar redondea al final (Math.ceil sobre lo
 // que falta), así que partir acá y redondear allá no pierde media premezcla.
-function _rzMedirBatches(){
-  const frac=_medirCfg().frac, hasta=_medirHasta(_rzCtx.hoyStr), perDate=_rzPerDate(), out={};
+// `hastaX` (opcional): otra ventana con la misma regla — la de la semana siguiente (b155).
+function _rzMedirBatches(hastaX){
+  const frac=_medirCfg().frac, hasta=hastaX||_medirHasta(_rzCtx.hoyStr), perDate=_rzPerDate(), out={};
   for(const ds in perDate){ if(ds<_rzCtx.hoyStr || ds>hasta) continue;
     const peso=(ds===hasta)?frac:1, t=perDate[ds];
     for(const k in t) out[+k]=(out[+k]||0)+t[k]*peso; }
@@ -23965,6 +23968,11 @@ async function rzRecalcAlistar(){ _rzRecalcAuto();
   // UN solo mapa: el de la ventana. El segundo (semana 1) se calculaba y no lo leía nadie, y con
   // la ventana nueva —que ya se mete en la semana siguiente— habría contado el traslape dos veces.
   _rzAlistar=await nivAlistar([_rzMedirBatches()], _rzCtx.stock);
+  // YA ESTÁ TODO (Andrea, 3-nov-2026): la tarjeta pasa a la semana siguiente —hasta el día de medición
+  // que viene después—, para poder adelantar la medición. Lo de esta ventana ya está en el stock y se descuenta.
+  _rzAlistarProx=null;
+  if(!((_rzAlistar[0]&&_rzAlistar[0].premez)||[]).length){
+    try{ _rzAlistarProx=await nivAlistar([_rzMedirBatches(_dfAdd(_medirHasta(_rzCtx.hoyStr),7))], _rzCtx.stock); }catch(e){ _rzAlistarProx=null; } }
   _rzCompras=await nivCompras(_rzCtx.stock);
   try{ _rzDiaFijo=await nivDiaFijo(); }catch(e){ _rzDiaFijo={error:String(e&&e.message||e)}; }
   try{ _cpAlc=await cpAlcance(); }catch(e){ _cpAlc={error:String(e&&e.message||e)}; } }   // Compras v2
@@ -24007,7 +24015,15 @@ function rzVaSemanaCard(){
 // TARJETA "Por medir": una línea (oliva si ya está todo).
 function rzMedirCard(){
   const pm=(_rzAlistar[0]&&_rzAlistar[0].premez)||[];
-  const txt=pm.length?pm.map(function(x){return x.n+' '+x.prod.replace(/^Pan /,'');}).join(' · '):'ya está todo ✓';
+  const lista=function(a){ return a.map(function(x){return x.n+' '+x.prod.replace(/^Pan /,'');}).join(' · '); };
+  if(!pm.length && _rzAlistarProx){
+    const px=(_rzAlistarProx[0]&&_rzAlistarProx[0].premez)||[], h=_medirHasta(_rzCtx.hoyStr);
+    return '<div class="rz-card4 rz-c4-medir"><div class="rz-c4h">Por medir</div>'
+      +'<div class="rz-c4line rz-ok">medido hasta el '+esc(_fechaCorta(h))+' ✓</div>'
+      +'<div class="rz-c4sig">'+_rzVentanaHtml('próxima: hasta el '+_fechaCorta(_dfAdd(h,7)), 'ese día al '+_rzN(_medirCfg().frac*100)+'%')
+      +'<div class="rz-c4line'+(px.length?'':' rz-ok')+'">'+esc(px.length?lista(px):'ya está todo ✓')+'</div></div></div>';
+  }
+  const txt=pm.length?lista(pm):'ya está todo ✓';
   return '<div class="rz-card4 rz-c4-medir"><div class="rz-c4h">Por medir</div>'
     +(function(v){ return _rzVentanaHtml(v.l1, v.l2); })(_rzMedirLbl())
     +'<div class="rz-c4line'+(pm.length?'':' rz-ok')+'">'+esc(txt)+'</div></div>';
