@@ -1,5 +1,5 @@
 -- CALC_BORRADOR.sql — Borradores de la Calculadora de precios (Andrea, 2-nov-2026)
--- ESTADO: SIN CORRER. El header se toca DESPUÉS de verificar desde afuera, nunca antes.
+-- ESTADO: APLICADO por Andrea el 4-nov-2026 ~15:45 CR. Control 7 · 2 · 1 · t · INSERT,SELECT · 0; verificado desde afuera (calc_borrador 7 columnas, sel+ins, vista, 0 filas).
 --
 -- QUÉ ES
 --   Un «borrador» es el escenario de la pestaña Precio tal como se dejó: lo que se cotiza, la
