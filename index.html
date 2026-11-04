@@ -6168,7 +6168,7 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 3 nov 2026 · b155';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 4 nov 2026 · b156';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -10036,10 +10036,14 @@ function uomLineaMal(pid, uomId, uds){
 // se pide con la MITAD del margen histórico (semana más alta de 6 − promedio). Excepción: HUEVOS [520]
 // conserva el colchón completo (están viniendo más pequeños y no se sabe cuántos se van a usar).
 // El aviso «difiere» sigue usando el margen completo: solo cambia cuánto se compra.
-const CP_COLCHON_FRAC=0.5, CP_COLCHON_COMPLETO=[520];
+// SIN COLCHÓN (Andrea, 4-nov-2026: «el huevo líquido se daña, se compra cuando se necesite»): lo
+// perecedero que se usa por tanda se pide SOLO por el plan. Caso: el 30-oct, sin galletas hasta el
+// 27-nov, el colchón (6 kg de margen de dos tandas en 6 semanas) pidió una bolsa entera: P00689.
+const CP_COLCHON_FRAC=0.5, CP_COLCHON_COMPLETO=[520], CP_SIN_COLCHON=[521];
 // Piso: nunca menos de 1 día de uso promedio (prom semanal ÷ 7). Lo pidió Andrea para la harina de garbanzo
 // y la levadura, que con la mitad quedaban en menos de 1 día; como piso general, vale para todos.
-function _cpColchon(pid, h){ if(CP_COLCHON_COMPLETO.indexOf(+pid)>=0) return h.margen;
+function _cpColchon(pid, h){ if(CP_SIN_COLCHON.indexOf(+pid)>=0) return 0;
+  if(CP_COLCHON_COMPLETO.indexOf(+pid)>=0) return h.margen;
   return Math.max(h.margen*CP_COLCHON_FRAC, (h.prom||0)/7); }
 const NIV_CFG_DEF={ritmoVentana:6, colchon:3, colchonTemporada:4, horizonte:6, medirFrac:0.5, medirDia:4, planMeses:4, cierreSemEne:3};
 const _rzN=(n,d=0)=>(Number(n)||0).toLocaleString('es-CR',{minimumFractionDigits:d,maximumFractionDigits:d});
