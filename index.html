@@ -3537,6 +3537,13 @@ body.es-socia .face-op{display:block}
 #vOrdenesProd .op-in:focus{outline:none;border-color:var(--mod)}
 #vOrdenesProd .op-in.op-n{text-align:right;font-variant-numeric:tabular-nums}
 #vOrdenesProd .op-f2{grid-column:span 2}
+#vOrdenesProd .op-in.op-in-s{height:34px;padding:6px 8px;font-size:13.5px;max-width:96px}
+#vOrdenesProd .op-tb .op-in.op-in-obs{max-width:none;min-width:140px;text-align:left}
+#vOrdenesProd .op-tb-det td{padding-top:4px;padding-bottom:4px}
+#vOrdenesProd .op-tb-det{min-width:600px}
+#vOrdenesProd .op-tb-det .op-in.op-in-s{min-width:62px}
+#vOrdenesProd .op-btn.op-btn-s{padding:6px 10px;font-size:12.5px}
+#vOrdenesProd .op-tb tr.op-fuera td{color:var(--stop-tx)}
 #vOrdenesProd .op-pair{display:flex;gap:6px}
 #vOrdenesProd .op-pair .op-in{flex:1}
 #vOrdenesProd .op-pair select.op-in{flex:1.3}
@@ -3607,6 +3614,7 @@ body.es-socia .face-op{display:block}
       <div class="op-card" id="opFotos"></div>
       <div id="opForm"></div>
       <div id="opCons"></div>
+      <div id="opDet"></div>
       <div id="opAcc"></div>
       <div id="opPrevia"></div>
     </div>
@@ -9988,6 +9996,7 @@ function _opNuevo(){
        merma:{cantidad:'', unidad:''}, sobrante:{cantidad:'', unidad:''}, premTxt:'', nota:''},
     cons:{}, consNom:{}, consConf:{}, receta:null, recetaPid:null, recetaErr:'', uomNom:{},
     prem:null, premPid:null, premErr:'',
+    det:[], proc:{}, lotes:{}, respO:{}, cascara:'', leidoC:{}, hojas:[],
     paso:'editar', previa:null, ordenPrevia:'', msg:'', cls:'', enviando:false, creada:null,
     borr:null, borrErr:'', borrCargando:false};
 }
@@ -9995,10 +10004,11 @@ async function irAOrdenesProd(){
   _modShow('vOrdenesProd'); crumbSet('Operaciones','Órdenes de Producción');
   if(_socia!==true){ await accesoSocia(); if(_socia!==true){ irAResumen(); return; } }
   if(!_op) _op=_opNuevo();
+  try{ _bsExpLibs(); }catch(e){}      // jsPDF se pide al ENTRAR, no al tocar «Ver reporte» (gesto de iOS)
   opRender();
   opBorrCargar();
 }
-function opRender(){ opRenderFotos(); opRenderSide(); opRenderForm(); opRenderCons(); opRenderAcc(); opRenderPrevia(); opRenderBorr(); }
+function opRender(){ opRenderFotos(); opRenderSide(); opRenderForm(); opRenderCons(); opRenderDet(); opRenderAcc(); opRenderPrevia(); opRenderBorr(); }
 function _opEl(id){ return document.getElementById(id); }
 
 // ── NÚMEROS: se escriben y se leen en es-CR (coma decimal) ──────────────
@@ -10097,7 +10107,7 @@ function opRenderFotos(){
   let msg=O.msgF, cls=O.clsF;
   if(O.achicando) { msg='Preparando '+O.achicando+' foto'+(O.achicando===1?'':'s')+'…'; cls='op-busy'; }
   h+='<div class="op-msg '+(cls||'')+'">'+esc(msg||'')+'</div>';
-  if(O.resp && O.resp.length) h+='<div class="op-msg">Responsables: '+esc(O.resp.map(_opTxt).join(' · '))+'</div>';
+  if(Array.isArray(O.resp) && O.resp.length) h+='<div class="op-msg">Responsables: '+esc(O.resp.map(_opTxt).join(' · '))+'</div>';
   if(O.avisosL.length) h+='<ul class="op-lst op-lst-a">'+O.avisosL.map(function(a){ return '<li>'+esc(_opTxt(a))+'</li>'; }).join('')+'</ul>';
   if(O.notasL.length) h+='<ul class="op-lst">'+O.notasL.map(function(a){ return '<li>'+esc(_opTxt(a))+'</li>'; }).join('')+'</ul>';
   el.innerHTML=h;
@@ -10152,6 +10162,10 @@ function _opAplicarLectura(L){
     if(m && m.unidad==='desconocida' && +m.cantidad>0 && NIV_INFO[F.pid] && NIV_INFO[F.pid].presDiv>1) O.conf[k]='baja'; });
   O.avisosL=Array.isArray(L.avisos)?L.avisos:[]; O.notasL=Array.isArray(L.notas)?L.notas:[];
   O.resp=Array.isArray(L.responsables)?L.responsables:[];
+  // Lo que vino del papel, para el punto verde del reporte (se borra al corregirlo a mano).
+  O.leidoC={};
+  ['producto_id','lote','fecha','hora_inicio','batches','merma','sobrante'].forEach(function(k){ if(L[k]!=null && L[k]!=='') O.leidoC[k]=1; });
+  _opLecturaDetalle(L);
   F.cantTocada=false;
   _opVolverAEditar();
   if(F.pid){ opRecetaCargar(); opPremCargar(); }
@@ -10164,7 +10178,7 @@ function _opConf(campo){
 }
 function _opConfCons(pid){
   const O=_op, c=O.conf||{};
-  const v=O.consConf[pid] || c['consumos.'+pid] || c['consumo.'+pid] || c['consumos['+pid+']'] || (O.consNom[pid] && c[O.consNom[pid]]) || '';
+  const v=c['consumo.'+pid] || O.consConf[pid] || '';
   return (v==='media'||v==='baja') ? v : '';
 }
 function _opConfCls(v){ return v ? (' op-c-'+v) : ''; }
@@ -10267,7 +10281,8 @@ function opProd(pid){
     O.f.premTxt='';
   }
   if(O.conf) delete O.conf.producto_id;
-  _opVolverAEditar(); opRenderForm(); opRecetaCargar(); opPremCargar();
+  if(O.leidoC) delete O.leidoC.producto_id;
+  _opVolverAEditar(); opRenderForm(); opRecetaCargar(); opPremCargar(); opRenderDet();
 }
 function opCampo(campo, el){
   const O=_op; if(!O) return; const F=O.f, v=el.value;
@@ -10276,12 +10291,13 @@ function opCampo(campo, el){
   else F[campo]=v;
   if(campo==='cajas' || campo==='sueltas') F.cantTocada=(String(F.cajas).trim()!=='' || String(F.sueltas).trim()!=='');
   _opDesmarcar(campo==='cajas'||campo==='sueltas'?'cantidad':campo, el);
+  if(O.leidoC) delete O.leidoC[campo];
   _opVolverAEditar();
-  if(campo==='batches') opRenderCons();
+  if(campo==='batches'){ opRenderCons(); opRenderDet(); }
   if(campo==='premTxt') opRenderPremChips();
   opDerivados();
 }
-function opMermaU(k, el){ const O=_op; if(!O) return; O.f[k].unidad=el.value; _opDesmarcar(k, el); _opVolverAEditar(); opDerivados(); }
+function opMermaU(k, el){ const O=_op; if(!O) return; O.f[k].unidad=el.value; _opDesmarcar(k, el); if(O.leidoC) delete O.leidoC[k]; _opVolverAEditar(); opDerivados(); }
 // Lo que se recalcula sin redibujar el formulario (para no perder el foco al escribir).
 function opDerivados(){
   const O=_op; if(!O) return; const F=O.f, I=NIV_INFO[F.pid];
@@ -10404,7 +10420,9 @@ function opRenderCons(){
       +filas.map(function(f){
         const d=_opDesvio(f), desv=(d!=null && Math.abs(d)>OP_DESVIO), v=_opConfCons(f.pid);
         const recTxt=(f.receta==null) ? (f.fuera?'no está':'—') : (_opFmtG(f.receta)+(f.uom?(' '+f.uom):''));
-        return '<tr class="'+(desv?'op-desv':'')+'" id="opCr_'+f.pid+'"><td class="op-c1">'+esc(f.nombre)+(f.fuera?' <span class="op-tag">fuera de la receta</span>':'')+'</td>'
+        if(f.fuera) return '<tr class="op-fuera" id="opCr_'+f.pid+'"><td class="op-c1">'+esc(f.nombre)+'</td><td class="n">no está en la receta</td>'
+          +'<td class="n">'+esc(_opFmtG(f.val))+'</td><td class="n"><button class="op-btn op-btn-s" onclick="opConsQuitar('+f.pid+')">Quitar</button></td></tr>';
+        return '<tr class="'+(desv?'op-desv':'')+'" id="opCr_'+f.pid+'"><td class="op-c1">'+esc(f.nombre)+'</td>'
           +'<td class="n">'+esc(recTxt)+'</td>'
           +'<td class="n"><div class="op-f'+_opConfCls(v)+'">'+(v?'<span class="op-l" style="justify-content:flex-end">'+_opConfTag(v)+'</span>':'')
           +'<input class="op-in op-n" type="text" inputmode="decimal" autocomplete="off" value="'+esc(f.val!=null?_opFmt(f.val):(f.receta!=null?_opFmt(f.receta):''))+'"'
@@ -10415,16 +10433,279 @@ function opRenderCons(){
   h+='</div>';
   el.innerHTML=h;
 }
+// Un componente que no está en la receta no se manda (el servidor lo rechaza: 422 consumo_fuera_de_receta).
+// Se corrige acá: era otro componente de la receta mal leído, o no va.
+function opConsQuitar(pid){ const O=_op; if(!O) return; delete O.cons[pid]; delete O.consNom[pid]; delete O.consConf[pid];
+  _opVolverAEditar(); opRenderCons(); }
 function opCons(pid, el){
   const O=_op; if(!O) return; const n=_opNum(el.value);
   if(String(el.value).trim()==='' ) delete O.cons[pid]; else if(isFinite(n)) O.cons[pid]=n;
   if(O.consConf) delete O.consConf[pid];
-  _opDesmarcar('consumos.'+pid, el);
+  _opDesmarcar('consumo.'+pid, el);
   _opVolverAEditar();
   const f=_opConsFilas().filter(function(x){ return x.pid===pid; })[0]; if(!f) return;
   const d=_opDesvio(f), tr=_opEl('opCr_'+pid), dv=_opEl('opDv_'+pid);
   if(tr) tr.classList.toggle('op-desv', d!=null && Math.abs(d)>OP_DESVIO);
   if(dv) dv.textContent=_opDvTxt(d);
+}
+
+
+// ── HOJA POR BATCH Y PROCESO (MA-RE-01/02/03) ───────────────────────────
+// Lo que trae la lectura además de la orden: no va a Odoo como dato, va al REPORTE (PDF) que reemplaza
+// las tres hojas y que se adjunta a la orden. Se puede corregir a mano igual que la orden.
+const OP_DET_ING=[['huevos_u','Huevos (u)'],['huevos_g','Huevos (g)'],['aceite_g','Aceite (g)'],['aceite_extra_g','Aceite extra (g)'],['almidon_extra_g','Almidón extra (g)']];
+const OP_DET_PROC=[['batido_ini','Batido desde'],['batido_fin','hasta'],['moldeo_ini','Moldeo desde'],['moldeo_fin','hasta'],['horno_c','Horno (°C)'],['horno_min','Tiempo (min)']];
+const OP_PROC=[['peso_promedio_g','Peso promedio (g)'],['cuchillas_antes','Cuchillas antes'],['cuchillas_despues','Cuchillas después'],['textura','Textura'],['sabor','Sabor'],['bolsa','Bolsa'],['romana_ok','Romana']];
+const OP_LOTES=[['huevos','Huevos'],['aceite','Aceite'],['levadura','Levadura'],['semillas','Semillas'],['linaza','Linaza'],['girasol','Girasol'],['bolsa','Bolsa']];
+const OP_RESP=[['ingredientes','Ingredientes'],['batido','Batido y horneado'],['empaque','Corte y empaque']];
+// Hasta esta fecha (inclusive) las fotos del papel también se adjuntan a la orden; después, solo el PDF.
+const OP_ADJUNTAR_FOTOS_HASTA='2026-11-18';
+// Un valor leído, como texto editable: true/false → sí/no, números en es-CR.
+function _opVal(v){
+  if(v==null) return ''; if(v===true) return 'sí'; if(v===false) return 'no';
+  if(typeof v==='number') return _opFmt(v); return String(v);
+}
+function _opLotesVisibles(pid){ return OP_LOTES.filter(function(l){
+  return pid===452 || ['semillas','linaza','girasol'].indexOf(l[0])<0 || (_op && _op.lotes[l[0]]); }); }
+function _opDetFilas(){ const O=_op, b=_opInt(O.f.batches);
+  const n=Math.max(isFinite(b)?b:0, O.det.length); while(O.det.length<n) O.det.push({}); return n; }
+function opRenderDet(){
+  const el=_opEl('opDet'), O=_op; if(!el||!O) return;
+  if(!NIV_INFO[O.f.pid]){ el.innerHTML=''; return; }
+  const n=_opDetFilas();
+  const celda=function(i, k){ return '<td class="n"><input class="op-in op-in-s'+(/_ini|_fin/.test(k)?'':' op-n')+'" type="text" inputmode="'+(/_ini|_fin/.test(k)?'text':'decimal')
+    +'" autocomplete="off" value="'+esc(O.det[i][k]||'')+'" oninput="opDet('+i+',\''+k+'\',this)"></td>'; };
+  const tabla=function(cols, conObs){
+    return '<div class="op-scroll"><table class="op-tb op-tb-det"><thead><tr><th>Batch</th>'
+      +cols.map(function(c){ return '<th class="n">'+esc(c[1])+'</th>'; }).join('')+(conObs?'<th>Observaciones</th>':'')+'</tr></thead><tbody>'
+      +(n ? Array.from({length:n}).map(function(_, i){ return '<tr><td>'+(i+1)+'</td>'+cols.map(function(c){ return celda(i, c[0]); }).join('')
+        +(conObs?('<td><input class="op-in op-in-s op-in-obs" type="text" autocomplete="off" value="'+esc(O.det[i].obs||'')+'" oninput="opDet('+i+',\'obs\',this)"></td>'):'')+'</tr>'; }).join('')
+         : '<tr><td colspan="'+(cols.length+2)+'" class="op-g">Sin batches.</td></tr>')
+      +'</tbody></table></div>';
+  };
+  const campo=function(grupo, k, label){
+    const key=grupo+'.'+k, v=_opConf(key);
+    return '<div class="op-f'+_opConfCls(v)+'"><span class="op-l">'+esc(label)+_opConfTag(v)+'</span>'
+      +'<input class="op-in" type="text" autocomplete="off" value="'+esc(O[grupo][k]||'')+'" oninput="opProc(\''+grupo+'\',\''+k+'\',this)"></div>';
+  };
+  el.innerHTML='<div class="op-card"><div class="op-h">Ingredientes · MA-RE-01</div>'+tabla(OP_DET_ING, true)
+    +'<div class="op-row">'+campo('respO','ingredientes','Responsable')+campo('proc','romana_ok','Romana')
+    +'<div class="op-f"><span class="op-l">Cáscara de huevos (g)</span><input class="op-in op-n" type="text" inputmode="decimal" autocomplete="off" value="'+esc(O.cascara||'')+'" oninput="opCascara(this)"></div></div></div>'
+    +'<div class="op-card"><div class="op-h">Batido hasta horneado · MA-RE-02</div>'+tabla(OP_DET_PROC, false)
+    +'<div class="op-row">'+campo('respO','batido','Responsable')+'</div></div>'
+    +'<div class="op-card"><div class="op-h">Corte y empaque · MA-RE-03</div><div class="op-row" style="margin-top:0">'
+    +campo('respO','empaque','Responsable')+OP_PROC.filter(function(p){ return p[0]!=='romana_ok'; }).map(function(p){ return campo('proc', p[0], p[1]); }).join('')+'</div></div>'
+    +'<div class="op-card"><div class="op-h">Lotes de insumos</div><div class="op-row" style="margin-top:0">'
+    +_opLotesVisibles(O.f.pid).map(function(l){ return campo('lotes', l[0], l[1]); }).join('')+'</div></div>';
+}
+function opDet(i, k, el){ const O=_op; if(!O) return; (O.det[i]=O.det[i]||{})[k]=el.value; }
+function opProc(grupo, k, el){ const O=_op; if(!O) return; O[grupo][k]=el.value; delete O.leidoC[grupo+'.'+k]; _opDesmarcar(grupo+'.'+k, el); }
+function opCascara(el){ if(_op){ _op.cascara=el.value; delete _op.leidoC.cascara_g; } }
+function _opLecturaDetalle(L){
+  const O=_op;
+  O.det=(Array.isArray(L.batches_detalle)?L.batches_detalle:[]).slice().sort(function(a,b){ return (+a.n||0)-(+b.n||0); })
+    .map(function(d){ const r={}; OP_DET_ING.concat(OP_DET_PROC).forEach(function(c){ r[c[0]]=_opVal(d[c[0]]); }); r.obs=_opVal(d.obs); return r; });
+  O.proc={}; O.lotes={}; O.respO={};
+  const P=L.proceso||{}, LI=L.lotes_insumos||{}, R=L.responsables;
+  OP_PROC.forEach(function(p){ if(P[p[0]]!=null && P[p[0]]!==''){ O.proc[p[0]]=_opVal(P[p[0]]); O.leidoC['proc.'+p[0]]=1; } });
+  OP_LOTES.forEach(function(p){ if(LI[p[0]]!=null && LI[p[0]]!==''){ O.lotes[p[0]]=_opVal(LI[p[0]]); O.leidoC['lotes.'+p[0]]=1; } });
+  if(R && typeof R==='object' && !Array.isArray(R))
+    OP_RESP.forEach(function(p){ if(R[p[0]]){ O.respO[p[0]]=String(R[p[0]]); O.leidoC['respO.'+p[0]]=1; } });
+  if(L.cascara_g!=null && L.cascara_g!==''){ O.cascara=_opVal(L.cascara_g); O.leidoC.cascara_g=1; }
+  // De qué hoja es cada foto, si el lector lo dice (para el nombre del adjunto).
+  O.hojas=(Array.isArray(L.fotos)?L.fotos:[]).map(function(f){ return (f&&f.hoja)||''; });
+}
+
+// ── EL REPORTE DE PRODUCCIÓN (PDF A4) ───────────────────────────────────
+// Reemplaza MA-RE-01, 02 y 03. Se arma con jsPDF + autotable, las MISMAS librerías y versiones del PDF
+// del Historial (BS_PDF_LIBS, `_bsExpLibs`): vectorial, liviano, y sin depender del tema de la pantalla.
+// El diseño sigue Reporte_Blanco_308.html (aprobado por estructura). Leyenda de puntos: verde leído del
+// papel · ámbar calculado o elegido al registrar · gris no está en el papel.
+function _opNomArchivo(pid){ return String(_opProdNom(pid)).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,''); }
+function _opReporteNombre(){ return 'Reporte_produccion_'+_opNomArchivo(_op.f.pid)+'_'+(_opInt(_op.f.lote)||'')+'.pdf'; }
+// Estado de un dato para el punto: 'ok' leído y sin tocar · 'warn' calculado, elegido o corregido · 'no' vacío.
+function _opDotDe(key, val){
+  if(val==null || String(val).trim()==='' || String(val).trim()==='—') return 'no';
+  return (_op.leidoC[key] && !_opConf(key)) ? 'ok' : 'warn';
+}
+function _opVence(fecha){ const m=/^(\d{4})-(\d\d)/.exec(fecha||''); if(!m) return '';
+  let y=+m[1], mo=+m[2]+9; if(mo>12){ mo-=12; y++; } return String(mo).padStart(2,'0')+'-'+y; }
+function _opFechaLarga(ds){ const m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(ds||''); if(!m) return '';
+  const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));
+  const DL=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  return DL[d.getUTCDay()]+' '+(+m[3])+'-'+_OP_MES[+m[2]-1]+'-'+m[1]; }
+function _opReporteDoc(){
+  const O=_op, F=O.f, I=NIV_INFO[F.pid]||{}, div=I.presDiv||1, T=_bsExpPdfTxt;
+  const J=window.jspdf.jsPDF, doc=new J({unit:'pt', format:'a4'});
+  const W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight(), MG=37;
+  const C={t:[22,22,26], t2:[85,83,77], t3:[138,135,127], b:[226,225,220], s:[246,245,241], ok:[78,122,0], warn:[154,100,16], no:[184,182,175], acc:[179,50,94]};
+  const col=function(c){ doc.setTextColor(c[0],c[1],c[2]); };
+  const fill=function(c){ doc.setFillColor(c[0],c[1],c[2]); };
+  const draw=function(c){ doc.setDrawColor(c[0],c[1],c[2]); };
+  const N=function(x){ const n=_opNum(x); return isFinite(n)?n:null; };
+  const venta=function(n){ return (n==null)?'—':(_opFmtG(n)+' '+(div>1?'paq':'u')); };
+  const uLbl=function(m){ return (m && m.unidad==='paquete') ? 'paq' : 'u'; };
+  let y=MG;
+  const espacio=function(h){ if(y+h>H-MG){ doc.addPage(); y=MG; } };
+  // Encabezado
+  fill(C.acc); doc.roundedRect(MG, y+2, 9, 9, 2, 2, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(17); col(C.t);
+  doc.text(T(_opProdNom(F.pid)+' · lote '+(F.lote||'—')), MG+15, y+11);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); col(C.t2);
+  const mo=(O.creada&&O.creada.nombre) ? ('Odoo: '+O.creada.nombre) : 'Odoo: orden en borrador';
+  doc.text(T(_opFechaLarga(F.fecha)+' · vence '+_opVence(F.fecha)+' · '+mo), MG, y+26);
+  doc.setFontSize(7.5); col(C.t3);
+  doc.text(['Reporte de producción · Truefie','reemplaza MA-RE-01, MA-RE-02 y MA-RE-03','True Food CR'].map(T), W-MG, y+4, {align:'right', lineHeightFactor:1.4});
+  y+=34; draw(C.t); doc.setLineWidth(1.5); doc.line(MG, y, W-MG, y); y+=10;
+  // Los cuatro números
+  const b=_opInt(F.batches), rendV=_opRendU()/div, cont=_opContado();
+  const temps=O.det.map(function(d){ return N(d.horno_c); }).filter(function(x){ return x!=null; });
+  const mins=O.det.map(function(d){ return N(d.horno_min); }).filter(function(x){ return x!=null; });
+  const rango=function(a){ if(!a.length) return ''; const lo=Math.min.apply(null,a), hi=Math.max.apply(null,a); return lo===hi?_opFmtG(lo):(_opFmtG(lo)+'-'+_opFmtG(hi)); };
+  const mermaN=N(F.merma.cantidad)||0, sobN=N(F.sobrante.cantidad)||0;
+  const hero=[
+    ['PRODUCIDO', venta(cont), cont!=null?_entPres(F.pid, cont*div):''],
+    ['BATCHES', isFinite(b)?String(b):'—', isFinite(b)?(b+' premezclas · '+_opFmtG(rendV)+' '+(div>1?'paq':'u')+' c/u = '+_opFmtG(b*rendV)):''],
+    ['MERMA', mermaN?(_opFmtG(mermaN)+' '+uLbl(F.merma)):'0', mermaN?'desecho en Odoo':(sobN?('sobró '+_opFmtG(sobN)+' '+uLbl(F.sobrante)):'')],
+    ['PESO PROMEDIO', O.proc.peso_promedio_g?(O.proc.peso_promedio_g+' g'):'—', (temps.length?('horno '+rango(temps)+' °C'):'')+(mins.length?(' · '+rango(mins)+' min'):'')]
+  ];
+  const hw=(W-2*MG-3*8)/4;
+  hero.forEach(function(h, i){ const x=MG+i*(hw+8);
+    fill(C.s); doc.roundedRect(x, y, hw, 52, 5, 5, 'F');
+    doc.setFont('helvetica','normal'); doc.setFontSize(6.5); col(C.t3); doc.text(T(h[0]), x+9, y+13);
+    doc.setFont('helvetica','bold'); doc.setFontSize(15); col(C.t); doc.text(T(h[1]), x+9, y+31);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); col(C.t2); doc.text(doc.splitTextToSize(T(h[2]), hw-14)[0]||'', x+9, y+44);
+  });
+  y+=64;
+  // Títulos y renglones
+  const sec=function(t, der, x0, x1){ x0=x0||MG; x1=x1||(W-MG); espacio(40);
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); col(C.t3); doc.text(T(t.toUpperCase()), x0, y+8);
+    if(der){ doc.setFont('helvetica','normal'); doc.text(T(der), x1, y+8, {align:'right'}); }
+    y+=14; };
+  const renglon=function(lbl, val, tag, dot, x0, x1, ancho){ x0=x0||MG; x1=x1||(W-MG); ancho=ancho||110; espacio(18);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); col(C.t2); doc.text(T(lbl), x0, y+10.5);
+    col(C.t); doc.setFont('helvetica','bold'); const v=T(val||'—'); doc.text(v, x0+ancho, y+10.5);
+    if(tag){ const w=doc.getTextWidth(v); doc.setFont('helvetica','normal'); doc.setFontSize(7); col(C.t3);
+      doc.text(doc.splitTextToSize(T(tag), x1-x0-ancho-w-24)[0]||'', x0+ancho+w+6, y+10.5); }
+    if(dot){ fill(C[dot]); doc.circle(x1-3, y+7.5, 2.6, 'F'); }
+    draw(C.b); doc.setLineWidth(.5); doc.line(x0, y+15.5, x1, y+15.5); y+=16.5; };
+  const tabla=function(head, body, opts){
+    opts=opts||{};
+    doc.autoTable(Object.assign({
+      startY:y, margin:{left:MG, right:MG, bottom:MG}, head:[head.map(function(h){ return T(h); })],
+      body:body.map(function(r){ return r.map(function(c){ return (c&&typeof c==='object')?c:T(c==null?'':String(c)); }); }),
+      theme:'plain',
+      styles:{font:'helvetica', fontSize:8, cellPadding:{top:2.8,bottom:2.8,left:4,right:4}, textColor:C.t, lineColor:C.b, lineWidth:{bottom:.5}},
+      headStyles:{fontSize:7, fontStyle:'bold', textColor:C.t3, lineColor:C.t3, lineWidth:{bottom:.6}},
+    }, opts));
+    y=doc.lastAutoTable.finalY+6; };
+  // La orden
+  sec('La orden');
+  const jul=_opJul(F.fecha), lote=_opInt(F.lote);
+  const bomTxt=(O.previa&&O.previa.vals&&O.previa.vals.bom_id) ? (' · receta BoM '+(Array.isArray(O.previa.vals.bom_id)?O.previa.vals.bom_id[0]:O.previa.vals.bom_id)) : '';
+  renglon('Producto', _opProdNom(F.pid)+' ['+F.pid+']'+bomTxt, '', _opDotDe('producto_id', F.pid));
+  renglon('Lote', F.lote, jul==null?'':(isFinite(lote)&&Math.abs(lote-jul)>1 ? ('juliano del día: '+jul+' · no calza') : ('= día juliano del '+(+F.fecha.slice(8))+'-'+_OP_MES[+F.fecha.slice(5,7)-1])), _opDotDe('lote', F.lote));
+  const prem=_opPremLista();
+  renglon('Premezcla consumida', prem.join(', '), prem.length?'la elige quien registra':'', prem.length?'warn':'no');
+  const espT=isFinite(b) ? (_opFmtG(b*rendV)+(mermaN?(' - '+_opFmtG(mermaN)+' merma'):'')+(sobN?(' + '+_opFmtG(sobN)+' sobrante'):'')+' = '+venta(cont)) : venta(cont);
+  renglon('Cantidad', espT, 'el papel no trae el total', cont!=null?'warn':'no');
+  const quien={}; OP_RESP.forEach(function(p){ const n=String(O.respO[p[0]]||'').trim(); if(n){ (quien[n]=quien[n]||[]).push(p[1].toLowerCase()); } });
+  const respT=Object.keys(quien).map(function(n){ return n+' ('+quien[n].join(', ')+')'; }).join(' · ');
+  renglon('Responsables', respT, '', respT?(OP_RESP.every(function(p){ return !O.respO[p[0]] || O.leidoC['respO.'+p[0]]; })?'ok':'warn'):'no');
+  // Ingredientes por batch (MA-RE-01)
+  y+=4;
+  sec('Ingredientes · MA-RE-01', [O.respO.ingredientes?('Responsable: '+O.respO.ingredientes):'', O.proc.romana_ok?('romana: '+O.proc.romana_ok):''].filter(Boolean).join(' · '));
+  const sum=function(k){ let s=0, hay=false; O.det.forEach(function(d){ const n=N(d[k]); if(n!=null){ s+=n; hay=true; } }); return hay?_opFmtG(s):''; };
+  const nDet=_opDetFilas(), filasDet=Array.from({length:nDet}).map(function(_, i){ return O.det[i]||{}; });
+  const numCols={}; [1,2,3,4,5].forEach(function(i){ numCols[i]={halign:'right'}; });
+  tabla(['Batch'].concat(OP_DET_ING.map(function(c){ return c[1]; }), ['Observaciones']),
+    filasDet.map(function(d, i){ return [String(i+1)].concat(OP_DET_ING.map(function(c){ return d[c[0]]||'—'; }), [d.obs||'']); })
+      .concat([[{content:'Total', styles:{fontStyle:'bold'}}].concat(OP_DET_ING.map(function(c){ return {content:T(sum(c[0])), styles:{fontStyle:'bold'}}; }),
+        [{content:T(O.cascara?('cáscara de huevos: '+(isFinite(_opNum(O.cascara))?_opFmtG(_opNum(O.cascara)):O.cascara)+' g'):''), styles:{fontStyle:'bold'}}])]),
+    {columnStyles:numCols});
+  // Consumo para Odoo + lotes de insumos, lado a lado
+  y+=4; espacio(120);
+  const mitad=(W-2*MG-16)/2, xR=MG+mitad+16, y0=y;
+  const cs=(O.previa && Array.isArray(O.previa.consumos) && O.previa.consumos.length)
+    ? O.previa.consumos.map(function(c){ const u=Array.isArray(c.uom)?c.uom[1]:(c.uom||''); return {nombre:c.nombre, receta:c.receta, val:c.queda, uom:u}; })
+    : _opConsFilas().filter(function(f){ return !f.fuera; }).map(function(f){ return {nombre:f.nombre, receta:f.receta, val:(f.val!=null?f.val:f.receta), uom:f.uom}; });
+  sec('Consumo para Odoo', isFinite(b)?('receta × '+b+' -> registrado'):'', MG, MG+mitad);
+  doc.autoTable({startY:y, margin:{left:MG, right:W-MG-mitad, bottom:MG}, tableWidth:mitad, theme:'plain',
+    head:[['Componente','Receta','Registrado']],
+    body:cs.map(function(c){ const d=(+c.receta>0 && c.val!=null)?(c.val-c.receta)/c.receta:null, desv=d!=null&&Math.abs(d)>OP_DESVIO;
+      const u=c.uom?(' '+c.uom):'';
+      return [{content:T(c.nombre||''), styles:desv?{fontStyle:'bold'}:{}}, T(c.receta==null?'—':(_opFmtG(c.receta)+u)),
+              {content:T((c.val==null?'—':(_opFmtG(c.val)+u))+(desv?('  '+_opDvTxt(d).replace('−','-')):'')), styles:desv?{fontStyle:'bold', textColor:C.warn}:{}}]; }),
+    styles:{font:'helvetica', fontSize:8, cellPadding:{top:2.8,bottom:2.8,left:4,right:4}, textColor:C.t, lineColor:C.b, lineWidth:{bottom:.5}},
+    headStyles:{fontSize:7, fontStyle:'bold', textColor:C.t3, lineColor:C.t3, lineWidth:{bottom:.6}},
+    columnStyles:{1:{halign:'right'}, 2:{halign:'right'}}});
+  const yIzq=doc.lastAutoTable.finalY, pagIzq=doc.internal.getCurrentPageInfo().pageNumber;
+  y=y0; sec('Lotes de insumos · MA-RE-02/03', '', xR, W-MG);
+  _opLotesVisibles(F.pid).forEach(function(l){ const v=O.lotes[l[0]]||'';
+    renglon(l[0]==='bolsa'?('Bolsa '+_opProdNom(F.pid)):l[1], v, '', _opDotDe('lotes.'+l[0], v), xR, W-MG, 80); });
+  if(doc.internal.getCurrentPageInfo().pageNumber<pagIzq) doc.setPage(pagIzq);
+  y=Math.max(y, yIzq)+10;
+  // Batido hasta horneado (MA-RE-02)
+  sec('Batido hasta horneado · MA-RE-02', O.respO.batido?('Responsable: '+O.respO.batido):'');
+  const rango2=function(a, z){ return (a||z) ? ((a||'?')+' - '+(z||'?')) : '—'; };
+  tabla(['Batch','Batido','Moldeo y fermentación','Horno (°C)','Tiempo (min)'],
+    filasDet.map(function(d, i){ return [String(i+1), rango2(d.batido_ini, d.batido_fin), rango2(d.moldeo_ini, d.moldeo_fin), d.horno_c||'—', d.horno_min||'—']; }),
+    {columnStyles:{3:{halign:'right'}, 4:{halign:'right'}}});
+  // Corte y empaque (MA-RE-03)
+  y+=4;
+  sec('Corte y empaque · MA-RE-03', O.respO.empaque?('Responsable: '+O.respO.empaque):'');
+  const P=O.proc;
+  renglon('Cuchillas antes / después', (P.cuchillas_antes||'—')+' / '+(P.cuchillas_despues||'—'), '',
+    (P.cuchillas_antes||P.cuchillas_despues)?((_opDotDe('proc.cuchillas_antes',P.cuchillas_antes)==='warn'||_opDotDe('proc.cuchillas_despues',P.cuchillas_despues)==='warn')?'warn':'ok'):'no', null, null, 130);
+  const tsb=[P.textura,P.sabor,P.bolsa];
+  renglon('Textura · sabor · bolsa', tsb.map(function(v){ return v||'—'; }).join(' · '), '',
+    tsb.some(Boolean)?(['textura','sabor','bolsa'].some(function(k){ return P[k] && _opDotDe('proc.'+k,P[k])==='warn'; })?'warn':'ok'):'no', null, null, 130);
+  renglon('Peso promedio', P.peso_promedio_g?(P.peso_promedio_g+' g'):'', '', _opDotDe('proc.peso_promedio_g', P.peso_promedio_g), null, null, 130);
+  const obs=[mermaN?(_opFmtG(mermaN)+' '+(uLbl(F.merma)==='paq'?'paq':'u')+' de merma'):'', sobN?('sobró '+_opFmtG(sobN)+' '+uLbl(F.sobrante)):'', String(F.nota||'').trim()].filter(Boolean).join(' · ');
+  renglon('Observaciones', obs||'—', (mermaN&&div===1)?('unidad: '+(F.pid===519?'pote':'pan')):'', obs?(_opConf('merma')?'warn':'ok'):'no', null, null, 130);
+  // Leyenda y pie
+  espacio(30); y+=4; draw(C.b); doc.setLineWidth(.5); doc.line(MG, y, W-MG, y); y+=12;
+  let x=MG; doc.setFont('helvetica','normal'); doc.setFontSize(7);
+  [['ok','leído del papel'],['warn','calculado o elegido al registrar'],['no','no está en el papel']].forEach(function(l){
+    fill(C[l[0]]); doc.circle(x+3, y-2.5, 2.6, 'F'); col(C.t3); doc.text(T(l[1]), x+9, y); x+=doc.getTextWidth(T(l[1]))+24; });
+  y+=14; col(C.t2); doc.setFontSize(7.5);
+  const fotos=(_opHoy()<=OP_ADJUNTAR_FOTOS_HASTA && O.fotos.length) ? ' · las fotos de las hojas van adjuntas a la orden' : '';
+  doc.text(doc.splitTextToSize(T('Registrado desde Truefie el '+_opFechaLarga(_opHoy()).toLowerCase()+(_miEmail?(' por '+_miEmail):'')+fotos+'.'), W-2*MG), MG, y);
+  const np=doc.internal.getNumberOfPages();
+  for(let p=1; p<=np; p++){ doc.setPage(p); doc.setFontSize(7); col(C.t3);
+    doc.text(T(_opReporteNombre()), MG, H-18); doc.text('Página '+p+' de '+np, W-MG, H-18, {align:'right'}); }
+  return doc;
+}
+// «Ver reporte»: SIN await desde el toque (iOS exige el gesto para compartir o abrir).
+function opVerReporte(){
+  const O=_op; if(!O || !NIV_INFO[O.f.pid]){ _opMsg('Falta: producto','op-amb'); return; }
+  try{
+    if(!_bsPdfListo()){ _bsExpLibs(); throw new Error('no cargó la librería de PDF; probá de nuevo en unos segundos'); }
+    const blob=_opReporteDoc().output('blob'), nombre=_opReporteNombre();
+    let tactil=false; try{ tactil=window.matchMedia('(pointer:coarse)').matches; }catch(e){}
+    if(!tactil){ const url=URL.createObjectURL(blob); const w=window.open(url, '_blank');
+      if(w){ setTimeout(function(){ try{ URL.revokeObjectURL(url); }catch(e){} }, 120000); return; }
+      URL.revokeObjectURL(url); }
+    _bsExpEntregar(blob, nombre);
+  }catch(e){ _opMsg('No se pudo armar el reporte: '+((e&&e.message)||String(e)),'op-mal'); }
+}
+// Los adjuntos de la orden: el PDF siempre; las fotos achicadas hasta OP_ADJUNTAR_FOTOS_HASTA.
+function _opAdjuntos(){
+  const O=_op, lote=_opInt(O.f.lote)||'';
+  const pdf=_opReporteDoc().output('datauristring');
+  const adj=[{nombre:_opReporteNombre(), tipo:'application/pdf', datos:pdf.slice(pdf.indexOf(',')+1)}];
+  if(_opHoy()<=OP_ADJUNTAR_FOTOS_HASTA){
+    const cuenta={};
+    O.fotos.forEach(function(f, i){
+      // La hoja la dice el lector (lectura.fotos[i].hoja); si no la dice, el orden de siempre: 01, 02, 03.
+      let h=String((O.hojas&&O.hojas[i])||'').replace(/^MA-RE-?/i,'').replace(/\D/g,'');
+      if(!h && i<3) h=String(i+1);
+      const pref=h ? ('MA-RE-'+h.padStart(2,'0')) : 'MA-RE';
+      cuenta[pref]=(cuenta[pref]||0)+1;
+      adj.push({nombre:pref+'_'+lote+'_'+cuenta[pref]+'.jpg', tipo:f.tipo, datos:f.datos});
+    });
+  }
+  return adj;
 }
 
 // ── LA ORDEN, como la pide el contrato ──────────────────────────────────
@@ -10445,8 +10726,10 @@ function _opOrden(){
     mm[k]={cantidad:(n>0?n:0), unidad:u||(uns[0]?uns[0][0]:'u')};
   });
   // Se mandan solo los consumos que se apartan de la receta (o todos los leídos, si la receta no se pudo leer).
+  // Los que no están en la receta NO se mandan: frenan la vista previa hasta que se corrijan.
+  _opConsFilas().forEach(function(f){ if(f.fuera) falta.push(f.nombre+' no está en la receta'); });
   const consumos=_opConsFilas().filter(function(f){
-    if(f.val==null || !isFinite(f.val)) return false;
+    if(f.fuera || f.val==null || !isFinite(f.val)) return false;
     return f.receta==null || Math.abs(f.val-f.receta)>1e-9; })
     .map(function(f){ return {producto_id:f.pid, cantidad:Math.round(f.val*10000)/10000}; });
   const prem=_opPremLista();
@@ -10466,8 +10749,9 @@ const OP_MOTIVO={
   cuerpo_invalido:'Truefie armó mal el pedido. No se tocó Odoo.',
   ruta:'El servicio no conoce esta ruta todavía. No se tocó Odoo.',
   lector_sin_llave:'El lector de fotos no está encendido.',
-  lector_error:'El lector de fotos falló. No se leyó nada.',
+  lector_raro:'El lector de fotos devolvió algo que no se entiende. No se leyó nada.',
   fotos_invalidas:'Las fotos no llegaron bien al servicio.',
+  consumo_fuera_de_receta:'Hay un componente que no está en la receta. Corregilo antes de seguir.',
   producto_raro:'Ese producto no es un terminado.',
   sin_bom:'El producto no tiene lista de materiales activa en Odoo.',
   orden_repetida:'Ya hay en Odoo una orden de este producto con ese lote. No se crea otra.',
@@ -10505,7 +10789,8 @@ function opRenderAcc(){
   let h='';
   if(O.paso==='editar')
     h='<div class="op-acc"><button class="op-btn op-btnp"'+(O.enviando||O.leyendo?' disabled':'')+' onclick="opPrevia()">'
-      +(O.enviando?'Revisando…':'Vista previa')+'</button></div>';
+      +(O.enviando?'Revisando…':'Vista previa')+'</button>'
+      +'<button class="op-btn"'+(NIV_INFO[O.f.pid]?'':' disabled')+' onclick="opVerReporte()">Ver reporte</button></div>';
   h+='<div class="op-msg '+(O.cls||'')+'" style="white-space:pre-line">'+esc(O.msg||'')+'</div>';
   el.innerHTML=h;
 }
@@ -10527,7 +10812,13 @@ async function opCrear(){
   const r=_opOrden();
   if(JSON.stringify(r.orden)!==O.ordenPrevia){ _opVolverAEditar(); _opMsg('La orden cambió desde la vista previa: revisala de nuevo.','op-amb'); return; }
   O.enviando=true; O.msg='Creando en Odoo…'; O.cls='op-busy'; opRenderPrevia();
-  const R=await _escrituraPost('/produccion', {orden:r.orden, confirmar:true, huella:O.previa.huella});
+  // Los adjuntos van SOLO al confirmar y FUERA de la huella: la vista previa es de la orden, no del papel.
+  let adj;
+  try{
+    if(!_bsPdfListo()){ _bsExpLibs(); throw new Error('no cargó la librería de PDF; probá de nuevo en unos segundos'); }
+    adj=_opAdjuntos();
+  }catch(e){ O.enviando=false; O.msg='No se pudo armar el reporte: '+((e&&e.message)||String(e))+'. No se tocó Odoo.'; O.cls='op-mal'; opRenderPrevia(); return; }
+  const R=await _escrituraPost('/produccion', {orden:Object.assign({}, r.orden, {adjuntos:adj}), confirmar:true, huella:O.previa.huella});
   O.enviando=false;
   const js=(R&&R.js)||{};
   if(R.red){ O.msg='No hubo respuesta: no se sabe si Odoo creó la orden. Mirá «En borrador en Odoo» antes de reintentar.'; O.cls='op-mal';
@@ -10536,9 +10827,7 @@ async function opCrear(){
     O.msg=OP_MOTIVO.huella_vieja; O.cls='op-amb'; opRenderPrevia(); opRenderAcc(); return; }
   if(R.st===423){ O.msg=OP_MOTIVO.produccion_apagada; O.cls=''; opRenderPrevia(); return; }
   if(!js.ok){ O.msg=_opMotivo(R); O.cls='op-mal'; opRenderPrevia(); return; }
-  // El nombre de la MO: el contrato dice «el resultado trae el nombre de la MO» sin nombrar el campo.
-  const nombre=js.mo_nombre || js.nombre || js.mo || (js.mo_name) || (js.legible && (js.legible.orden || js.legible.mo)) || '';
-  O.creada={nombre:nombre, id:js.mo_id||js.id||null, avisos:js.avisos||[]};
+  O.creada={nombre:js.mo_nombre||'', id:js.mo_id||null, avisos:js.avisos||[]};
   O.paso='hecho'; O.msg=''; O.cls='';
   opRenderAcc(); opRenderPrevia(); opBorrCargar(true);
 }
@@ -10565,6 +10854,17 @@ function _opLegibleHTML(P){
   }
   return filas.length ? '<div class="op-kv">'+filas.map(function(f){ return '<div class="k">'+esc(f[0])+'</div><div>'+esc(f[1])+'</div>'; }).join('')+'</div>' : '';
 }
+// La merma la crea el servidor como desecho EN BORRADOR ligado a la orden. Si la revisión lo describe
+// (`desecho`), se dice eso; si no, se dice lo que manda la orden.
+function _opDesechoTxt(P){
+  const d=P && P.desecho;
+  const u=function(x){ return x==='paquete'?'paq.':(x==='u'?'u':(x||'')); };
+  if(d && typeof d==='object' && !Array.isArray(d) && d.cantidad!=null)
+    return _opFmtG(+d.cantidad)+' '+(d.uom?(Array.isArray(d.uom)?d.uom[1]:d.uom):u(d.unidad))+' · en borrador';
+  let o=null; try{ o=JSON.parse(_op.ordenPrevia||'null'); }catch(e){}
+  if(o && o.merma && +o.merma.cantidad>0) return _opFmtG(+o.merma.cantidad)+' '+u(o.merma.unidad)+' · en borrador';
+  return '';
+}
 function _opUomNom(u){ const id=Array.isArray(u)?u[0]:u; return (_op&&_op.uomNom[id]) || (Array.isArray(u)?u[1]:'') || ''; }
 function opRenderPrevia(){
   const el=_opEl('opPrevia'), O=_op; if(!el||!O) return;
@@ -10573,7 +10873,7 @@ function opRenderPrevia(){
     el.innerHTML='<div class="op-card"><div class="op-h">En Odoo</div>'
       +'<div class="op-hecho"><b>'+esc(c.nombre||'La orden')+'</b> · en borrador · la confirman Keylor o Andrea en Odoo</div>'
       +(c.avisos&&c.avisos.length?'<ul class="op-lst op-lst-a">'+c.avisos.map(function(a){ return '<li>'+esc(_opTxt(a))+'</li>'; }).join('')+'</ul>':'')
-      +'<div class="op-acc"><button class="op-btn" onclick="opNueva()">Otra orden</button></div></div>';
+      +'<div class="op-acc"><button class="op-btn" onclick="opVerReporte()">Ver reporte</button><button class="op-btn" onclick="opNueva()">Otra orden</button></div></div>';
     return;
   }
   if(O.paso!=='revisar' || !O.previa){ el.innerHTML=''; return; }
@@ -10595,9 +10895,12 @@ function opRenderPrevia(){
     h+='<div class="op-h" style="margin-top:16px;margin-bottom:0">Notas en la orden</div>'
       +ch.map(function(t){ return '<div class="op-chat">'+esc(String(_opTxt(t)).replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,''))+'</div>'; }).join('');
   }
+  const ds=_opDesechoTxt(P);
+  if(ds) h+='<div class="op-kv" style="margin-top:12px"><div class="k">Desecho</div><div>'+esc(ds)+'</div></div>';
   const av=Array.isArray(P.avisos)?P.avisos:[];
   if(av.length) h+='<ul class="op-lst op-lst-a" style="margin-top:14px">'+av.map(function(a){ return '<li>'+esc(_opTxt(a))+'</li>'; }).join('')+'</ul>';
   h+='<div class="op-acc"><button class="op-btn op-btnp"'+(O.enviando?' disabled':'')+' onclick="opCrear()">'+(O.enviando?'Creando…':'Crear en borrador en Odoo')+'</button>'
+    +'<button class="op-btn" onclick="opVerReporte()">Ver reporte</button>'
     +'<button class="op-btn"'+(O.enviando?' disabled':'')+' onclick="opEditar()">Volver a editar</button></div>'
     +'<div class="op-msg '+(O.cls||'')+'" style="white-space:pre-line">'+esc(O.msg||'')+'</div></div>';
   el.innerHTML=h;
