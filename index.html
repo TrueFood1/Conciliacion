@@ -10458,6 +10458,12 @@ const OP_DET_PROC=[['batido_ini','Batido desde'],['batido_fin','hasta'],['moldeo
 const OP_PROC=[['peso_promedio_g','Peso promedio (g)'],['cuchillas_antes','Cuchillas antes'],['cuchillas_despues','Cuchillas después'],['textura','Textura'],['sabor','Sabor'],['bolsa','Bolsa'],['romana_ok','Romana']];
 const OP_LOTES=[['huevos','Huevos'],['aceite','Aceite'],['levadura','Levadura'],['semillas','Semillas'],['linaza','Linaza'],['girasol','Girasol'],['bolsa','Bolsa']];
 const OP_RESP=[['ingredientes','Ingredientes'],['batido','Batido y horneado'],['empaque','Corte y empaque']];
+// Una persona, un nombre (Andrea, 4-nov): las hojas la escriben de varias formas («Ney» en MA-RE-02,
+// «Neybel Rivera» en MA-RE-03) y el reporte la mostraba como dos responsables distintos.
+const OP_PERSONAS={ney:'Ney (Neybel Rivera)',neybel:'Ney (Neybel Rivera)','neybel rivera':'Ney (Neybel Rivera)',nelbel:'Ney (Neybel Rivera)'};
+function _opPersona(n){ const t=String(n==null?'':n).trim(); if(!t) return '';
+  const k=t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ');
+  return OP_PERSONAS[k]||OP_PERSONAS[k.split(' ')[0]]||t; }
 // Hasta esta fecha (inclusive) las fotos del papel también se adjuntan a la orden; después, solo el PDF.
 const OP_ADJUNTAR_FOTOS_HASTA='2026-11-18';
 // Un valor leído, como texto editable: true/false → sí/no, números en es-CR.
@@ -10510,7 +10516,7 @@ function _opLecturaDetalle(L){
   OP_PROC.forEach(function(p){ if(P[p[0]]!=null && P[p[0]]!==''){ O.proc[p[0]]=_opVal(P[p[0]]); O.leidoC['proc.'+p[0]]=1; } });
   OP_LOTES.forEach(function(p){ if(LI[p[0]]!=null && LI[p[0]]!==''){ O.lotes[p[0]]=_opVal(LI[p[0]]); O.leidoC['lotes.'+p[0]]=1; } });
   if(R && typeof R==='object' && !Array.isArray(R))
-    OP_RESP.forEach(function(p){ if(R[p[0]]){ O.respO[p[0]]=String(R[p[0]]); O.leidoC['respO.'+p[0]]=1; } });
+    OP_RESP.forEach(function(p){ if(R[p[0]]){ O.respO[p[0]]=_opPersona(R[p[0]]); O.leidoC['respO.'+p[0]]=1; } });
   if(L.cascara_g!=null && L.cascara_g!==''){ O.cascara=_opVal(L.cascara_g); O.leidoC.cascara_g=1; }
   // De qué hoja es cada foto, si el lector lo dice (para el nombre del adjunto).
   O.hojas=(Array.isArray(L.fotos)?L.fotos:[]).map(function(f){ return (f&&f.hoja)||''; });
@@ -10609,12 +10615,12 @@ function _opReporteDoc(){
   renglon('Premezcla consumida', prem.join(', '), prem.length?'la elige quien registra':'', prem.length?'warn':'no');
   const espT=isFinite(b) ? (_opFmtG(b*rendV)+(mermaN?(' - '+_opFmtG(mermaN)+' merma'):'')+(sobN?(' + '+_opFmtG(sobN)+' sobrante'):'')+' = '+venta(cont)) : venta(cont);
   renglon('Cantidad', espT, 'el papel no trae el total', cont!=null?'warn':'no');
-  const quien={}; OP_RESP.forEach(function(p){ const n=String(O.respO[p[0]]||'').trim(); if(n){ (quien[n]=quien[n]||[]).push(p[1].toLowerCase()); } });
+  const quien={}; OP_RESP.forEach(function(p){ const n=_opPersona(O.respO[p[0]]); if(n){ (quien[n]=quien[n]||[]).push(p[1].toLowerCase()); } });
   const respT=Object.keys(quien).map(function(n){ return n+' ('+quien[n].join(', ')+')'; }).join(' · ');
   renglon('Responsables', respT, '', respT?(OP_RESP.every(function(p){ return !O.respO[p[0]] || O.leidoC['respO.'+p[0]]; })?'ok':'warn'):'no');
   // Ingredientes por batch (MA-RE-01)
   y+=4;
-  sec('Ingredientes · MA-RE-01', [O.respO.ingredientes?('Responsable: '+O.respO.ingredientes):'', O.proc.romana_ok?('romana: '+O.proc.romana_ok):''].filter(Boolean).join(' · '));
+  sec('Ingredientes · MA-RE-01', [O.respO.ingredientes?('Responsable: '+_opPersona(O.respO.ingredientes)):'', O.proc.romana_ok?('romana: '+O.proc.romana_ok):''].filter(Boolean).join(' · '));
   const sum=function(k){ let s=0, hay=false; O.det.forEach(function(d){ const n=N(d[k]); if(n!=null){ s+=n; hay=true; } }); return hay?_opFmtG(s):''; };
   const nDet=_opDetFilas(), filasDet=Array.from({length:nDet}).map(function(_, i){ return O.det[i]||{}; });
   const numCols={}; [1,2,3,4,5].forEach(function(i){ numCols[i]={halign:'right'}; });
@@ -10646,14 +10652,14 @@ function _opReporteDoc(){
   if(doc.internal.getCurrentPageInfo().pageNumber<pagIzq) doc.setPage(pagIzq);
   y=Math.max(y, yIzq)+10;
   // Batido hasta horneado (MA-RE-02)
-  sec('Batido hasta horneado · MA-RE-02', O.respO.batido?('Responsable: '+O.respO.batido):'');
+  sec('Batido hasta horneado · MA-RE-02', O.respO.batido?('Responsable: '+_opPersona(O.respO.batido)):'');
   const rango2=function(a, z){ return (a||z) ? ((a||'?')+' - '+(z||'?')) : '—'; };
   tabla(['Batch','Batido','Moldeo y fermentación','Horno (°C)','Tiempo (min)'],
     filasDet.map(function(d, i){ return [String(i+1), rango2(d.batido_ini, d.batido_fin), rango2(d.moldeo_ini, d.moldeo_fin), d.horno_c||'—', d.horno_min||'—']; }),
     {columnStyles:{3:{halign:'right'}, 4:{halign:'right'}}});
   // Corte y empaque (MA-RE-03)
   y+=4;
-  sec('Corte y empaque · MA-RE-03', O.respO.empaque?('Responsable: '+O.respO.empaque):'');
+  sec('Corte y empaque · MA-RE-03', O.respO.empaque?('Responsable: '+_opPersona(O.respO.empaque)):'');
   const P=O.proc;
   renglon('Cuchillas antes / después', (P.cuchillas_antes||'—')+' / '+(P.cuchillas_despues||'—'), '',
     (P.cuchillas_antes||P.cuchillas_despues)?((_opDotDe('proc.cuchillas_antes',P.cuchillas_antes)==='warn'||_opDotDe('proc.cuchillas_despues',P.cuchillas_despues)==='warn')?'warn':'ok'):'no', null, null, 130);
