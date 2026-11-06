@@ -24936,7 +24936,8 @@ function cpAbrirPedido(gi, gis){
   const filas=[].concat.apply([], partes.map(function(x){ return x.filas; }));
   const v={}; filas.forEach(function(f){ v[f.pid]=_cpSugPaq(f); });
   _cpReg={gi:ks[0], partes:partes, multi:partes.length>1, filas:filas, valores:v, paso:'editar', previa:null, propuestaId:null, verTodos:false, msg:'', cls:'',
-          llego:false, llegoDia:_rzCtx.hoyStr, fe:'', nota:''};
+          llego:false, llegoDia:_rzCtx.hoyStr, fe:'', nota:'',
+          atraso:(ks.length>1)?null:_cpAtrasoPosible(_cpAlc.grupos[ks[0]])};
   cpPintarPills(); cpRender(); try{ window.scrollTo(0,0); }catch(e){}
 }
 // Lo sugerido en la unidad del panel: empaques hacia arriba, o la unidad del producto (g → kg).
@@ -24982,8 +24983,28 @@ function _cpFrioTarde(g){
 // real (hasta 30 días atrás) y el consecutivo de su FE. Pedido = llegada; no hay mensaje al proveedor.
 const CP_LLEGO_DIAS=30;
 function _cpFechasReg(P, g){
-  return P.llego ? {modo:'llego', pedido:P.llegoDia, entrega:P.llegoDia, uso:null} : _cpFechasPedido(g);
+  if(P.llego) return {modo:'llego', pedido:P.llegoDia, entrega:P.llegoDia, uso:null};
+  if(P.atraso && P.atraso.on) return {modo:'pedir', pedido:_rzCtx.hoyStr, entrega:_rzCtx.hoyStr, uso:null, atrasoDe:P.atraso.era};
+  return _cpFechasPedido(g);
 }
+// PEDIDO ATRASADO (Andrea, 6-nov): el martes 3-nov se pidieron los huevos de ESA semana (lun → lun) y
+// Truefie los anotó como la entrega del lun 9, porque pasado el día de pedido el ciclo salta al
+// siguiente. Llegaron ese mismo martes, y la P00692 «del 9» frenó el pedido verdadero del 9
+// (`ya_creado_ciclo`). Si la entrega de ESTA semana ya pasó (hace 6 días o menos) y no tiene orden de
+// Truefie, el armado pregunta: esta semana (llega hoy) o la entrega siguiente. Viene marcada esta semana.
+// Frío no: pasado su límite, va al jueves siguiente y avisa (parte 4, 15-oct).
+function _cpAtrasoPosible(g){
+  if(!g || !g.fijo || _cpEsFrio(g) || !g.ci) return null;
+  const hoy=_rzCtx.hoyStr, fijo=((_rzCtx.cfg.diaFijo)||[]).find(function(x){ return +x.producto_id===+g.items[0].pid; });
+  if(!fijo || _dfDia(fijo.pide)==null) return null;
+  const F=_cpFechasPedido(g); if(F.modo!=='pedir') return null;            // «registrar» (b82) ya cubre su caso
+  const era=_dfCiclo(fijo, _dfAdd(g.ci.E, -7)).E;
+  if(!(era<hoy && era>=_dfAdd(hoy,-6))) return null;
+  const reg=((_rzCtx.dfDatos&&_rzCtx.dfDatos.registradas)||[]).some(function(x){
+    return +x.proveedor_id===+g.proveedor_id && x.entrega_dia>=era && x.entrega_dia<=hoy; });
+  return reg ? null : {era:era, sig:g.ci.E, on:true};
+}
+function cpAtraso(on){ const P=_cpReg; if(!P||!P.atraso) return; P.atraso.on=!!on; P.previa=null; P.propuestaId=null; P.msg=''; cpRenderRegistro(); }
 function cpLlego(){ const P=_cpReg; if(!P) return; P.llego=!P.llego; P.previa=null; P.propuestaId=null; P.msg=''; cpRenderRegistro(); }
 function cpRegCampo(campo, v){ const P=_cpReg; if(!P) return; P[campo]=v; P.previa=null; P.propuestaId=null; }
 // ══ ARMADO · REVISAR · LISTO (parte 1, 14-oct-2026) ══════════════════════
@@ -25071,7 +25092,10 @@ function _cpArmadoHtml(P){
       : F.modo==='registrar' ? (_cpF('pidió', F.pedido)+' <span class="cp-sep">·</span> '+_cpF('llega', F.entrega))
       : tienda ? _cpF('compra', F.pedido)
       : _cpF('llega', F.entrega); };
-  if(!multi) h+='<div class="cp-arf">'+fechas(C[0].F)+'</div>'
+  if(!multi && P.atraso) h+='<div class="cp-seg" role="group" aria-label="Para qué entrega">'
+      +'<button class="'+(P.atraso.on?'on':'')+'" onclick="cpAtraso(true)">Esta semana</button>'
+      +'<button class="'+(P.atraso.on?'':'on')+'" onclick="cpAtraso(false)">'+esc(_cpMay(_fechaCorta(P.atraso.sig)))+'</button></div>';
+  if(!multi) h+='<div class="cp-arf">'+fechas(C[0].F)+(C[0].F.atrasoDe?(' <span class="cp-sep">·</span> <span class="cp-g">atrasado, era '+esc(_fechaCorta(C[0].F.atrasoDe))+'</span>'):'')+'</div>'
       +(C[0].F.frioTarde?('<div class="cp-lav cp-lav-a cp-arfr">'+esc(_cpFrioTardeTxt(C[0].F))+'</div>'):'');
   const linea=function(c, f){
     const s=_cpSugPaq(f), n=+P.valores[f.pid]||0, r=c.AP.res[f.pid], q=_dfDesdePanel(f, n);
