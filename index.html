@@ -2543,6 +2543,7 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
   <div class="fm-h">Entregas</div>
   <button onclick="entMasIr('lotes')">Inventario<span class="sub">Cuánto queda de cada lote, hoy</span></button>
   <button onclick="entMasIr('conteo')">Conteo<span class="sub">La foto del congelador que ancla los saldos por lote</span></button>
+  <button onclick="entMasIr('tienda')">Tienda<span class="sub">Pedidos de la tienda en línea</span></button>
 </div>
 
 <!-- "+" de Finanzas en teléfono: las vistas de análisis. Solo móvil (CSS). -->
@@ -2791,6 +2792,20 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
   </div>
   <div id="elStatus" class="status hidden" style="margin-top:14px"></div>
   <div id="elBody" style="margin-top:14px"></div>
+</div>
+
+<!-- ── TIENDA: pedidos de la tienda en línea. Socias confirman el pago; el equipo entrega y factura. ── -->
+<div id="vTienda" class="hidden">
+  <div class="faces faces-ent">
+    <button class="face" onclick="irADespachos()">Entregas</button>
+    <button class="face" onclick="irAReporte()">Sin factura</button>
+    <button class="face" onclick="irADevoluciones()">Devoluciones</button>
+    <button class="face" onclick="irAEntBuscar()">Historial</button>
+    <button class="face face-pend" onclick="irAPendientes()">Pendientes</button>
+    <button class="face face-mas face-mas-ent" onclick="entMasToggle(event)" aria-label="Más vistas">+</button>
+  </div>
+  <div id="tdStatus" class="status hidden" style="margin-top:14px"></div>
+  <div id="tdBody" style="margin-top:14px"></div>
 </div>
 
 <div id="vPendientes" class="hidden">
@@ -3732,6 +3747,29 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
   padding:10px 0;border-bottom:1px solid var(--border)}
 .pd-fila:last-of-type{border-bottom:none}
 .pd-fila-c{min-width:0;flex:1}
+/* ── Tienda en línea ── */
+.td-seg{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.td-s{appearance:none;background:none;border:1px solid var(--border-strong);border-radius:999px;padding:7px 12px;font:600 13px/1 var(--font);color:var(--text-2);cursor:pointer}
+.td-s.on{color:var(--text);border-color:var(--ent-line)}
+.td-et{font-size:12px;color:var(--text-3);margin-bottom:10px}
+.td-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.td-top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.td-nom{font-size:14px;font-weight:600;color:var(--text);min-width:0;overflow-wrap:anywhere}
+.td-num{color:var(--text-3);font-weight:400;margin-right:6px;font-variant-numeric:tabular-nums}
+.td-tot{flex:none;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+.td-meta{font-size:12px;color:var(--text-3);margin-top:3px;overflow-wrap:anywhere}
+.td-ent{font-size:13px;color:var(--text);margin-top:8px;overflow-wrap:anywhere}
+.td-lins{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+.td-lins td{padding:3px 0;color:var(--text-2)}
+.td-lins td:first-child{color:var(--text)}
+.td-lins td:last-child{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.td-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.td-dia{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.td-dia input{font:16px var(--font);padding:5px 8px;border:1px solid var(--border-m);border-radius:8px;background:var(--field);color:var(--text)}
+.dp-tienda .dp-nose{display:none}
+.dp-tienda button.dp-l-cant{pointer-events:none}
+.dp-tienda .dp-lapiz{display:none}
+@media(max-width:700px){.dp-tab{padding:7px 6px;gap:5px;font-size:13px}}
 .pd-quien{font-size:13.5px;color:var(--text);line-height:1.35}
 .pd-para{color:var(--text-3);font-weight:400}
 .pd-meta{font-size:11px;color:var(--text-3);margin-top:2px;font-variant-numeric:tabular-nums}
@@ -6491,7 +6529,7 @@ function sbClient(){ if(!_sb && window.supabase) _sb=window.supabase.createClien
 // las políticas `asistente_no_*`), el servicio de escritura (403, solo socias) y `acceso_es_socia()`.
 // Las lecturas pasan intactas; de las RPC, solo las de leer (lista cerrada).
 var _perfil=null, _sbL=null;     // `var`: sbClient puede correr antes que la línea del `let` de acceso
-const _SOLO_LECTURA_RPC=['tema_vigente','acceso_es_socia','acceso_perfil','asistente_encendido'];
+const _SOLO_LECTURA_RPC=['tema_vigente','acceso_es_socia','acceso_perfil','asistente_encendido','tienda_por_entregar','tienda_para_facturar','tienda_por_preparar'];
 const SOLO_LECTURA_TXT='Instinct · solo lectura: no se guardó nada.';
 function _soloLecturaStub(){
   const r={data:null, error:{message:SOLO_LECTURA_TXT, code:'SOLO_LECTURA'}, status:403, count:null};
@@ -6650,7 +6688,7 @@ const ACCESO_VISTAS = {
   conciliacion: ['vUpload'],
   operaciones:  ['vProduccion','vMermas','vInventario','vPlan','vResumen','vConteo'],
   compras:      ['vCompras'],     // b82: módulo propio, ligado a Operaciones (lee su plan e inventario)
-  entregas:     ['vConteoLote','vReporte','vPendientes','vDespachos','vEntBuscar','vEntLotes','vDevoluciones'],
+  entregas:     ['vConteoLote','vReporte','vPendientes','vDespachos','vEntBuscar','vEntLotes','vDevoluciones','vTienda'],
   personal:     ['vVacaciones','vCalendario','vSolicitar','vDiasCerrados','vPagoQuincena'],
   ventas:       ['vVenClientes'],   // 22-oct: fuera de ACCESO_DEFAULT → solo quien ve 'todo'
   contenido:    ['vContenido'],     // 27-oct (b138): igual que Ventas, solo socias (y el asistente, que lee)
@@ -12016,7 +12054,10 @@ const ENT_PROD=[451,452,453,503,472,519];                     // los 6 productos
 // devolución del 481 no puede tocar ningún saldo por lote; se corrige a mano en Odoo.
 const ENT_SIN_LOTE={481:'Pan para moler GF (merma)'};
 const ENT_SIN_LOTE_DESDE='2026-10-22';
-function _entSinLote(pid){ return Object.prototype.hasOwnProperty.call(ENT_SIN_LOTE, +pid); }
+// Línea de Tienda sin producto de Entregas todavía (Premezcla para Brownie, hasta su primera producción):
+// sale sin lote y queda el rastro en `tienda_pedido_linea`. Nunca se escribe en ent_*.
+const ENT_TIENDA_SIN_ID=-1;
+function _entSinLote(pid){ return +pid===ENT_TIENDA_SIN_ID || Object.prototype.hasOwnProperty.call(ENT_SIN_LOTE, +pid); }
 // Código de producto dentro del lote, formato DDD C / M AA. Cookie Dough = 6,
 // CONFIRMADO el 15-ago leyendo el chatter de WH/MO/01226 y 01228 ("089 6/9 26").
 // Hasta entonces figuraba como null y el regex solo aceptaba códigos 1-5, con lo
@@ -13909,7 +13950,7 @@ try{
 let _despSinDesp=[], _despForzar={};
 // Sub-pestaña abierta en Despachos: 'preparar' | 'entregar'. Arranca en preparar,
 // que es el trabajo de la mañana.
-let _despTab='preparar';
+let _despTab='preparar', _despTienda=null, _despTiendaErr='', _despTiendaAviso=null;
 const UOM_CAT_UNIDAD = 1;   // uom.category [1] «Unidad» (en_US «Unit») — por id, nunca por nombre
 let _despFac=null, _despUom=null, _despErr='', _despAbierto=null, _despLotes=null,
     _despSaldo=null, _despEdit={}, _despGuardando=false;
@@ -14322,11 +14363,13 @@ async function despRefacturasEnDuda(mv, ya){
   return out;
 }
 async function despLeerFacturas(desdeTodo, hasta, desdeVentana){
-  const mv=await odooCall('account.move','search_read',
+  const _mv=await odooCall('account.move','search_read',
     [[['move_type','=','out_invoice'],['state','=','posted'],
       ['invoice_date','>=',desdeTodo],['invoice_date','<=',hasta]]],
-    {fields:['id','name','invoice_date','partner_id','reversal_move_id','invoice_origin'],limit:500,
+    {fields:['id','name','invoice_date','partner_id','reversal_move_id','invoice_origin','ref'],limit:500,
      order:'invoice_date desc, id desc',context:{lang:'es_CR'}});
+  // Un tiquete de la Tienda ya salió del congelador por su propio flujo: prepararlo acá bajaría el saldo dos veces.
+  const mv=_mv.filter(function(m){ return !_tdEsTiquete(m); });
   if(!mv.length) return [];
   // Las anuladas por nota de crédito NO van a "Por preparar": preparar contra una
   // factura que dejó de existir es sacar producto del congelador contra un documento
@@ -14434,7 +14477,7 @@ async function despCargarEstado(){
   try{
     const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
     const {data,error}=await c.from('v_ent_pedido_estado')
-      .select('pedido_id,cliente_nombre,factura_id,factura_nombre,alisto_id,estado,preparado_en,salida_en,'
+      .select('pedido_id,cliente_nombre,factura_id,factura_nombre,alisto_id,estado,preparado_en,salida_en,origen,'
              +'salida_registrada_en,n_lineas')
       .order('preparado_en',{ascending:false}).limit(200);
     if(error) throw error;
@@ -14625,7 +14668,7 @@ function despRender(){
     return '<div class="dp-ped'+(vieja?' vieja':(f.fecha===hoy?' hoy':''))+'">'
       +'<div class="dp-top"><span class="dp-cli">'+esc(f.cliente)+'</span></div>'
       +'<div class="dp-sub">'+n+(n===1?' producto':' productos')
-      +' · factura '+esc(_despFacCorta(f.factura))
+      +(f.tienda ? (' · '+esc(f.factura)+' · '+_tdEntregaHTML(f.tienda)) : (' · factura '+esc(_despFacCorta(f.factura))))
       +' · <span class="dp-dia'+(f.fecha===hoy?' hoy':'')+'">'+esc(_despDia(f.fecha))+'</span></div>'
       +'<div class="dp-acc">'
       // ⚠️ DICE "Preparar" Y NO "Preparar y entregar" AUNQUE EL MOCKUP PEDÍA LO
@@ -14635,8 +14678,10 @@ function despRender(){
       // existe, pero un paso más adelante, en el pie del pedido ya con los lotes
       // puestos. Un botón que promete dos cosas y abre una pantalla es una
       // etiqueta que miente.
-      +'<button class="dp-btn-pri" onclick="despAbrir('+f.factura_id+')">Preparar</button>'
-      +entPdfBtn(f.factura_id, f.factura, f.cliente, 'grande')
+      +(f.tienda && f.tienda.soloSinLote
+         ? '<button class="dp-btn-pri" onclick="despTiendaEntregarSinLote('+f.factura_id+')">Entregado</button>'
+         : '<button class="dp-btn-pri" onclick="despAbrir('+f.factura_id+')">Preparar</button>')
+      +(f.tienda?'':entPdfBtn(f.factura_id, f.factura, f.cliente, 'grande'))
       +'</div></div>';
   };
 
@@ -14656,9 +14701,21 @@ function despRender(){
     +'<div class="dp-tabs">'
     +stab('preparar','Por preparar',(_despFac===null?'·':fs.length))
     +stab('entregar','Por entregar',(_despEstado===null?'·':prep.length))
+    +stab('tienda','Tienda',(_despTienda===null?'·':(_despTienda.length+_td.conf.length)))
     +'</div><div class="dp-lista">';
 
-  if(_despTab==='preparar'){
+  if(_despTab==='tienda'){
+    if(_despTiendaAviso) h+='<div class="status '+_despTiendaAviso.cls+'" style="margin-bottom:12px">'+esc(_despTiendaAviso.txt)+'</div>';
+    h+=_tdTiqHTML();
+    if(_despTiendaErr) h+='<div class="dp-vacia dp-mal">No pude leer los pedidos de la tienda: '+esc(_despTiendaErr)+'</div>';
+    else if(_despTienda===null) h+='<div class="dp-vacia">Leyendo…</div>';
+    else if(!_despTienda.length && !_td.conf.length) h+='<div class="dp-vacia">Nada por preparar.</div>';
+    else{
+      if(_td.conf.length) h+='<div class="td-et">Por confirmar pago · montos con IVA</div>'+_td.conf.map(function(p,i){ return _tdTarjeta(p,'conf',i); }).join('');
+      if(_despTienda.length && _td.conf.length) h+='<div class="td-et" style="margin-top:16px">Por preparar</div>';
+      h+=_despTienda.map(function(f){ return tarjeta(f,false); }).join('');
+    }
+  }else if(_despTab==='preparar'){
     // ⚠️ "ANTERIORES SIN DESPACHAR" DEJA DE SER UNA SECCIÓN APARTE (26-ago).
     // Eran las MISMAS de "Por preparar", solo que viejas: separarlas obligaba a
     // mirar dos listas para saber qué falta despachar. Van adentro, marcadas con
@@ -14723,7 +14780,7 @@ function despRender(){
            compite con "Entregar", que es el gesto de todos los días.
            No se ofrece sobre una factura ANULADA: ahí no hay nada que
            corregir, hay que hablar con Andrea, y el cartel ya lo dice. */
-        const btnCorr = anulada ? ''
+        const btnCorr = (anulada||r.origen==='tienda') ? ''
           : '<button class="dp-corr"'+((ocupado||_despCorrCargando)?' disabled':'')
             +' onclick="despCorregirAbrir('+r.pedido_id+')">'
             +(_despCorrCargando?'Abriendo…':'Corregir preparación')+'</button>';
@@ -14862,13 +14919,14 @@ function despSinFacturaHTML(motivo){
     +esc(DESP_SINFAC[motivo]||DESP_SINFAC.vacia)+'</span>'
     +'<button class="dp-sinfac-b" onclick="irAReporte()">Registrar sin factura</button></div>';
 }
-function despActualizar(){ despCargar(true, true); }   // A · a un toque
+function despActualizar(){ _despTiendaAviso=null; despCargar(true, true); despTiendaCargar(); }   // A · a un toque
 // B · al entrar a la pantalla y al volver de segundo plano, si esta viejo.
 // No corre si nunca se leyo (de eso se encarga la carga normal) ni si ya hay una
 // relectura andando.
 function despRefrescarSiViejo(){
   if(_despRefrescando || !_despFac || !_despViejo()) return;
   despCargar(true, true);
+  despTiendaCargar();
 }
 window.addEventListener('DOMContentLoaded', function(){
   document.addEventListener('visibilitychange', function(){
@@ -15179,7 +15237,7 @@ function boGuardarFactura(agrupar){
 }
 function boRestaurarFactura(fid){
   const loc=_boLee()[_boK('factura',fid)];
-  const f=(_despFac||[]).find(function(x){ return x.factura_id===fid; });
+  const f=(_despFac||[]).concat(_despTienda||[]).find(function(x){ return x.factura_id===fid; });
   if(f && loc && loc.datos) _boAplicarFactura(f, loc.datos);   // lo local, ya
   _boBajar('factura', fid);                                    // la nube, cuando llegue
 }
@@ -15589,7 +15647,7 @@ function _despLotesDe(pid){
 }
 
 function despRenderPedido(body){
-  const f=(_despFac||[]).find(function(x){ return x.factura_id===_despAbierto; });
+  const f=_despFacAbierta();
   if(!f){ _despAbierto=null; despRender(); return; }
   // "← Volver" y no "← Resumen": el título de la pantalla ya dice Resumen y
   // repetirlo dos veces en la misma esquina no orienta, confunde.
@@ -15604,10 +15662,10 @@ function despRenderPedido(body){
           +'las dos quedan en el historial.</div>')
        : '')
     +'<div class="dp-cab"><div class="dp-cab-cli">'+esc(f.cliente)+'</div>'
-    +'<div class="dp-cab-sub">'+esc(_despFacCorta(f.factura))
-    +entPdfBtn(f.factura_id, f.factura, f.cliente)+' · '+esc(_despDia(f.fecha))+' · '
+    +'<div class="dp-cab-sub">'+(f.tienda?(esc(f.factura)+' · '+_tdEntregaHTML(f.tienda)):(esc(_despFacCorta(f.factura))
+    +entPdfBtn(f.factura_id, f.factura, f.cliente)))+' · '+esc(_despDia(f.fecha))+' · '
     +f.lineas.length+(f.lineas.length===1?' producto':' productos')+'</div></div>';
-  h+='<div class="dp-lin">';
+  h+='<div class="dp-lin'+(f.tienda?' dp-tienda':'')+'">';
   f.lineas.forEach(function(L,i){
     const e=_despEst(f,i), disp=_despLotesDe(L.producto_id);
     const mk=e.marca;
@@ -16177,7 +16235,7 @@ function _despSel(i,j,lt,disp,cls,pid){
   }
   // LOS QUE FIGURAN EN 0 (b151). Al fondo y aparte: se eligen solo si Daniel tiene
   // el producto en la mano, y el aviso de la tarjeta se lo pregunta.
-  const _en0=(_est==='ok' && !despCorrigiendo()) ? entLotesSelector(_despLotes, _despSaldo, pid).filter(function(d){
+  const _en0=(_est==='ok' && !despCorrigiendo() && !(_despFacAbierta()||{}).tienda) ? entLotesSelector(_despLotes, _despSaldo, pid).filter(function(d){
       return d.saldo!=null && d.saldo<=0 && !disp.some(function(x){ return x.lote===d.lote; }); })
     : [];
   if(_en0.length){
@@ -16570,7 +16628,8 @@ function _despMotivoTxt(v){
 }
 function despMasLote(i){ const f=_despFacAbierta(); if(!f) return;
   _despEst(f,i).lotes.push({lote:'',cant:null}); boGuardarFactura(false); despRender(); }
-function _despFacAbierta(){ return (_despFac||[]).find(function(x){ return x.factura_id===_despAbierto; }); }
+// Tienda entra por acá con factura_id negativo (−número): el resto de la pantalla no se entera.
+function _despFacAbierta(){ return (_despFac||[]).concat(_despTienda||[]).find(function(x){ return x.factura_id===_despAbierto; }); }
 
 // ¿Este lote escrito a mano existe de verdad? Un lote inventado no es un registro sin efecto:
 // las unidades salen del congelador contra una clave `producto|lote` que no le corresponde a
@@ -16637,6 +16696,68 @@ function _loteConocido(pid, txt, g, saldo){
 // vista pide alisto vigente), que es exactamente lo que hay que hacer —
 // reintentar. Y si lo que falla es la SALIDA, el pedido queda en "Preparado" con
 // su botón Entregar: tampoco se pierde nada.
+async function _despRecuentoEscribir(c, _rec, _alIds, pedId, quien){
+  const _recFallos=[];
+  for(const r of _rec){
+    const alId=_alIds[r.i] && _alIds[r.i][r.j];
+    try{
+      if(!alId) throw new Error('no encontre la linea de lote recien guardada');
+      const {error:eR}=await c.from('ent_recuento_pendiente').insert({
+        producto_id:r.producto_id, lote:r.lote, saldo_resultante:r.saldo_resultante,
+        unidad_venta:r.unidad_venta, alisto_lote_id:alId, pedido_id:pedId,
+        motivo:'despacho con lote en 0', creado_por:quien});
+      if(eR) throw eR;
+    }catch(eR){ _recFallos.push(r.lote+': '+((eR&&eR.message)||eR)); }
+  }
+  if(_recFallos.length) alert('La salida quedó registrada, pero no pude abrir el pendiente de recuento de '
+    +_recFallos.join(' · ')+'.\n\nEl lote igual queda en negativo en Inventario. Avisale a Andrea o Lorena.');
+}
+async function _despTrasGuardar(f, pedId){
+  _despFac=(_despFac||[]).filter(function(x){ return x.factura_id!==f.factura_id; });
+  // El borrador se CIERRA, no se borra: queda como evidencia de cómo se armó
+  // la entrega, ligado al pedido que acaba de nacer. No tira si falla.
+  await boCerrar('factura', f.factura_id, pedId);
+  _despOlvidar(f.factura_id);   // solo ESTA: lo de las otras facturas sigue en pie
+  _despAbierto=null; _despPedFecha=''; _despPrepAbierto=0;   // nada se hereda al pedido siguiente
+  despRender();
+  despCargarEstado();    // pasa a "Preparado" (o a "Entregados hoy")
+  despCargarLotes();     // el saldo por lote cambió
+}
+// Lo que Daniel eligió, en la forma de `tienda_preparar`. Las líneas sin producto de Entregas no viajan.
+function _despTiendaLineas(f){
+  const lineas=[];
+  f.lineas.forEach(function(L,i){
+    if(_entSinLote(L.producto_id)) return;
+    const e=_despEst(f,i), ind=(e.lotes[0]&&e.lotes[0].lote===ENT_LOTE_INDET)?e.lotes[0].indet:null;
+    lineas.push({producto_id:L.producto_id, lotes:_despLotesEfectivos(f,i).map(function(x){
+      const orig=e.lotes.find(function(y){ return y.lote===x.lote; })||{}, indet=orig.indet||(x.lote===ENT_LOTE_INDET?ind:null);
+      const fl={lote:x.lote, cant_uom:+x.cant||0};
+      if(x.lote===ENT_LOTE_INDET && indet)
+        fl.indet={motivo:indet.motivo, por:indet.por, en:indet.en, nota:(indet.motivo==='otro'?indet.nota:null)};
+      return fl; })});
+  });
+  return lineas;
+}
+async function _despConfirmarTienda(c, f, entregar, fSal, quien){
+  const lineas=_despTiendaLineas(f);
+  const _rec=_despRecuentoFilas(f, _despSaldo);
+  const sal=entregar?_despSalidaPayload(fSal):{};
+  const {data, error}=await c.rpc('tienda_preparar',{p_id:f.tienda.id, p_lineas:lineas, p_entregar:!!entregar,
+    p_salida_en:sal.salida_en||null, p_nota:sal.nota||null});
+  if(error) throw new Error(_tdErrorTxt(error));
+  // `orden` vuelve a `j` igual que en una factura: posición entre los lotes con cantidad.
+  const _alIds={};
+  (data.lotes||[]).forEach(function(r){
+    const i=f.lineas.findIndex(function(L){ return L.producto_id===r.producto_id; });
+    if(i<0) return;
+    const e=_despEst(f,i), js=[];
+    e.lotes.forEach(function(x,j){ if(x.lote && +x.cant>0) js.push(j); });
+    (_alIds[i]=_alIds[i]||{})[e.partido?js[r.orden]:0]=r.id;
+  });
+  await _despRecuentoEscribir(c, _rec, _alIds, data.ent_pedido_id, quien);
+  await _despTrasGuardar(f, data.ent_pedido_id);
+  _tdTrasEntrega(entregar?f.tienda.numero:0);
+}
 async function despConfirmar(entregar){
   if(_despGuardando) return;
   const f=_despFacAbierta(); if(!f) return;
@@ -16685,6 +16806,8 @@ async function despConfirmar(entregar){
     const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
     const {data:{user}}=await c.auth.getUser();
     const quien=(user&&user.email)||'desconocido';
+    // TIENDA: los mismos chequeos de arriba, y la escritura en una sola transacción de la base.
+    if(f.tienda){ await _despConfirmarTienda(c, f, entregar, fSal, quien); return; }
     const {data:ped,error:e1}=await c.from('ent_pedido').insert({
       // Si la salida se está cargando con fecha de atrás, el pedido es de ese día
       // también. fecha_ab_re_04 igual prefiere salida_en; esto es para que la fila
@@ -16796,20 +16919,7 @@ async function despConfirmar(entregar){
     // ── EL PENDIENTE DE RECUENTO (b151) ────────────────────────────────
     // NO ABORTA SI FALLA: el pedido ya existe y el lote ya quedo negativo, que se
     // ve en Inventario. Pero se DICE al final, no se traga.
-    const _recFallos=[];
-    for(const r of _rec){
-      const alId=_alIds[r.i] && _alIds[r.i][r.j];
-      try{
-        if(!alId) throw new Error('no encontre la linea de lote recien guardada');
-        const {error:eR}=await c.from('ent_recuento_pendiente').insert({
-          producto_id:r.producto_id, lote:r.lote, saldo_resultante:r.saldo_resultante,
-          unidad_venta:r.unidad_venta, alisto_lote_id:alId, pedido_id:ped.id,
-          motivo:'despacho con lote en 0', creado_por:quien});
-        if(eR) throw eR;
-      }catch(eR){ _recFallos.push(r.lote+': '+((eR&&eR.message)||eR)); }
-    }
-    if(_recFallos.length) alert('La salida quedó registrada, pero no pude abrir el pendiente de recuento de '
-      +_recFallos.join(' · ')+'.\n\nEl lote igual queda en negativo en Inventario. Avisale a Andrea o Lorena.');
+    await _despRecuentoEscribir(c, _rec, _alIds, ped.id, quien);
     // La segunda etapa, solo si se pidió. `salida_en` queda en el now() de la
     // base: la hora real de salida es ESTA, no la de preparación.
     if(entregar){
@@ -16819,15 +16929,7 @@ async function despConfirmar(entregar){
         +((e6&&e6.message)||e6)+' — marcala con el botón Entregar.');
       entOdooAuto(ped.id);                 // b132: sin await — la entrega ya quedó
     }
-    _despFac=(_despFac||[]).filter(function(x){ return x.factura_id!==f.factura_id; });
-    // El borrador se CIERRA, no se borra: queda como evidencia de cómo se armó
-    // la entrega, ligado al pedido que acaba de nacer. No tira si falla.
-    await boCerrar('factura', f.factura_id, ped.id);
-    _despOlvidar(f.factura_id);   // solo ESTA: lo de las otras facturas sigue en pie
-    _despAbierto=null; _despPedFecha=''; _despPrepAbierto=0;   // nada se hereda al pedido siguiente
-    despRender();
-    despCargarEstado();    // pasa a "Preparado" (o a "Entregados hoy")
-    despCargarLotes();     // el saldo por lote cambió
+    await _despTrasGuardar(f, ped.id);
   }catch(e){
     // El diálogo SE CIERRA si falló: el error va por alert y la pantalla del
     // pedido queda visible para corregir. Dejarlo abierto taparía lo que hay que tocar.
@@ -16917,7 +17019,7 @@ function despRenderDialogoEntrega(){
 
   return _despDialogoHTML({
     cliente: _entQuien(r).nombre, cuerpo: cuerpo, listo: listo, ocupado: ocupado,
-    sub: (r.factura_nombre?('…'+String(r.factura_nombre).slice(-4)):'sin factura')
+    sub: (r.factura_nombre?('…'+String(r.factura_nombre).slice(-4)):_entFacRotulo(r))
          +' · preparado '+_despHora(r.preparado_en),
     extraCab: entPdfBtn(r.factura_id, r.factura_nombre, r.cliente_nombre),
     fecha: _despEntFecha, setFecha: 'despSetFecha', cerrar: 'despCerrarEntrega()',
@@ -17204,8 +17306,8 @@ function despRenderDialogoPreparar(){
   if(pend.txt) cuerpo+='<div class="de-'+(pend.frena?'mal':'nota')+'">'+esc(pend.txt)+'</div>';
   return _despDialogoHTML({
     cliente: _entQuien(f).nombre, cuerpo: cuerpo, listo: !pend.frena, ocupado: _despGuardando,
-    sub: (f.factura?('…'+String(f.factura).slice(-4)):'sin factura')
-         +' · '+(entregar?'sale del congelador ahora':'queda esperando el camión'),
+    sub: (f.tienda?f.factura:(f.factura?('…'+String(f.factura).slice(-4)):'sin factura'))
+         +' · '+(entregar?'sale del congelador ahora':(f.tienda?'queda listo para entregar':'queda esperando el camión')),
     fecha: _despPedFecha, setFecha: (entregar?'despSetPedFecha':''),
     cerrar: 'despCerrarPrep()',
     ok: 'despConfirmar('+(entregar?'true':'false')+')',
@@ -17259,6 +17361,16 @@ async function despEntregar(pedidoId){
   _despEntregando=pedidoId; despRender();
   try{
     const c=sbClient(); if(!c) throw new Error('no hay sesión de Supabase');
+    if(r.origen==='tienda'){
+      const sal=_despSalidaPayload(_despEntFecha);
+      const {error}=await c.rpc('tienda_entregar_preparado',{p_ent_pedido:pedidoId, p_salida_en:sal.salida_en||null, p_nota:sal.nota||null});
+      if(error) throw new Error(_tdErrorTxt(error));
+      _despEntAbierto=0; _despEntFecha='';
+      _tdTrasEntrega((/^Tienda #(\d+)/.exec(String(r.cliente_nombre||''))||[])[1]|0);
+      _despEntregando=0;
+      await despCargarEstado();
+      return;
+    }
     const {data:{user}}=await c.auth.getUser();
     const quien=(user&&user.email)||'desconocido';
     // Sin fecha tocada el payload va vacío y gana el `default now()` de la base:
@@ -17299,6 +17411,7 @@ function irADespachos(){
   _modShow('vDespachos'); crumbSet('Entregas','Entregas');   // la miga muestra uno solo
   entPdfPrecalentar();      // el proxy despierta mientras Daniel mira la bandeja
   boCargarAbiertos();       // lo sin cerrar, visible de una (requisito 2)
+  despTiendaCargar();
   despCargar(false);
   despRefrescarSiViejo();   // B · si la lista ya estaba pero vieja, se relee detras
 }
@@ -17340,6 +17453,245 @@ function irAEntLotes(){
   _modShow('vEntLotes'); crumbSet('Entregas','Inventario');
   lotCargar(false);
 }
+// ══ TIENDA EN LÍNEA ═════════════════════════════════════════════════════════════
+// Datos del público: todo texto pasa por `esc`, y a los onclick solo les llega el índice de la lista.
+// Las RPC de la base validan perfil y transición; estos botones solo deciden qué se dibuja.
+let _td={seg:null, conf:[], ent:[], fact:[], dia:null, diaElegido:false, diaPide:0, factTxt:'', ocupado:false, error:''};
+function _tdHoy(){ return new Date(Date.now()-6*3600000).toISOString().slice(0,10); }   // día en hora CR (UTC−6)
+function _tdErrorTxt(e){
+  const m=String((e&&e.message)||e||'');
+  if(/tienda:perfil/.test(m)) return 'Sin permiso para esto.';
+  if(/tienda:estado/.test(m)) return 'Ese pedido ya cambió de estado: recargá la lista.';
+  if(/tienda:no_existe/.test(m)) return 'Ese pedido no existe.';
+  if(/tienda:motivo/.test(m)) return 'El motivo necesita entre 3 y 300 caracteres.';
+  if(/tienda:parcial/.test(m)) return 'Un pedido de la tienda se prepara completo.';
+  if(/tienda:ya_preparado/.test(m)) return 'Ese pedido ya está preparado.';
+  if(/tienda:sin_preparar/.test(m)) return 'Falta prepararlo: elegí los lotes primero.';
+  if(/tienda:sin_lotes/.test(m)) return 'Ese pedido no lleva lote: se entrega directo.';
+  if(/tienda:entregado_sin_salida/.test(m)) return 'Falta prepararlo y registrar su salida desde Entregas.';
+  if(/tienda:salida_sin_entregado/.test(m)) return 'Esa salida se registra desde el pedido de la Tienda.';
+  if(/tienda:entregado/.test(m)) return 'Ese pedido ya se entregó y no se puede deshacer.';
+  if(/tienda:fecha/.test(m)) return 'La fecha de salida no se acepta.';
+  if(/schema cache|Could not find|PGRST20/i.test(m)) return 'Falta pegar TIENDA_TRUEFIE.sql en Supabase.';
+  return m;
+}
+// Para meter el texto de un error de tienda en una frase que ya termina con su propio punto.
+function _tdSinPunto(m){ return /tienda:/.test(String(m)) ? _tdErrorTxt(m).replace(/\.$/,'') : m; }
+// Id del cliente «Venta en línea» en Odoo real. 0 = todavía no existe: queda la marca `ref` que pone el servicio.
+const TIENDA_CLIENTE_ODOO=0;
+function _tdEsTiquete(m){ return !!m && (/^TIENDA-\d+$/.test(String(m.ref||''))
+  || (TIENDA_CLIENTE_ODOO>0 && !!m.partner_id && m.partner_id[0]===TIENDA_CLIENTE_ODOO)); }
+function _tdCant(l){
+  const c=Number(l.cantidad)||0, u=String(l.unidad_venta||'');
+  const nom = c===1 ? u : (u==='unidad' ? 'unidades' : (/^paquete de/.test(u) ? 'paquetes'+u.slice(7) : u));
+  return c+' '+esc(nom);
+}
+function _tdEntregaHTML(p){
+  const nom={planta:'Recoge en planta', propio:'Mensajero propio', envio:'Envío'}[p.entrega]||esc(p.entrega);
+  return '<b>'+nom+'</b>'+(p.direccion?' · '+esc(p.direccion):'');
+}
+// UNA sola tarjeta para las tres listas. modo: 'conf' (socias) · 'ent' (entregar) · 'fact' (facturar).
+function _tdTarjeta(p, modo, i){
+  const fecha=(d)=>new Date(d).toLocaleString('es-CR',{timeZone:'America/Costa_Rica',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  const metodo={sinpe:'SINPE',transferencia:'Transferencia'}[p.metodo_pago]||esc(p.metodo_pago);
+  const lins=(p.lineas||[]).map(function(l){
+    return '<tr><td>'+_tdCant(l)+' · '+esc(l.nombre)+(l.sin_lote?' <span class="td-meta">sin lote</span>':'')+'</td>'
+      +(modo==='ent'?'<td></td>':'<td>'+cM(l.precio_crc*l.cantidad)+(modo==='fact'?' <span class="td-meta">('+cM(l.precio_crc)+' c/u)</span>':'')+'</td>')+'</tr>'; }).join('');
+  const envio=(modo!=='ent' && p.envio_crc>0)?'<tr><td>Envío</td><td>'+cM(p.envio_crc)+'</td></tr>':'';
+  let acc='';
+  if(modo==='conf' && _socia){
+    acc='<button class="btn btn-sm btn-g" onclick="tdPago('+i+')">Pago recibido</button>'
+       +'<button class="btn btn-sm btn-warn" onclick="tdRechazar('+i+')">Rechazar</button>'
+       +'<button class="btn btn-sm" onclick="tdComprobante('+i+')">Ver comprobante</button>';
+  }
+  if(modo==='ent') acc='<button class="btn btn-sm" onclick="tdIrPreparar()">Ver en Entregas</button>';
+  const cuando = modo==='conf' ? fecha(p.creado_en) : (p.pagado_en?('Pagado '+fecha(p.pagado_en)):'');
+  const estado = (modo==='fact' && p.estado==='entregado') ? ' · Entregado' : '';
+  return '<div class="td-card"><div class="td-top"><div class="td-nom"><span class="td-num">#'+Number(p.numero)+'</span>'+esc(p.nombre)+'</div>'
+    +(modo==='ent'?'':'<div class="td-tot">'+cM(p.total_crc)+'</div>')+'</div>'
+    +'<div class="td-meta">'+cuando+estado+' · '+metodo+' · <a href="tel:'+String(p.telefono||'').replace(/[^\d+]/g,'')+'">'+esc(p.telefono)+'</a></div>'
+    +'<div class="td-ent">'+_tdEntregaHTML(p)+'</div>'
+    +'<table class="td-lins">'+lins+envio+'</table>'
+    +(acc?'<div class="td-acc">'+acc+'</div>':'')+'</div>';
+}
+async function irATienda(){
+  _modShow('vTienda'); crumbSet('Entregas','Tienda');
+  entBarraALaActiva('vTienda');
+  await accesoSocia();
+  if(!_td.seg) _td.seg='ent';
+  // Sin un día elegido, la vista sigue al día de hoy aunque la pestaña haya quedado abierta de un día para otro.
+  const hoy=_tdHoy();
+  if(!_td.diaElegido && _td.dia!==hoy){ _td.dia=hoy; _td.fact=[]; _td.factTxt='Leyendo ese día…'; tdRender(); }
+  tdCargar();
+}
+// Gana el último pedido, no la última respuesta en llegar. Devuelve false si esta lectura ya quedó vieja.
+// Si falla, la lista se vacía: nunca queda la de un día bajo la fecha de otro.
+async function _tdLeerDia(c){
+  const n=++_td.diaPide;
+  let r; try{ r=await c.rpc('tienda_para_facturar',{p_dia:_td.dia}); }catch(e){ r={error:e}; }
+  if(n!==_td.diaPide) return false;
+  if(r.error){ _td.fact=[]; _td.factTxt='No se pudo leer este día.'; throw r.error; }
+  _td.fact=r.data||[]; _td.factTxt='';
+  return true;
+}
+async function tdCargar(){
+  const st=document.getElementById('tdStatus'), c=sbClient();
+  if(!c) return false;
+  st.className='status s-info'; st.classList.remove('hidden'); st.innerHTML='<span class="spin"></span>Leyendo pedidos…';
+  let leyo=true;
+  try{
+    const tareas=[c.rpc('tienda_por_entregar').then(function(r){ if(r.error) throw r.error; _td.ent=r.data||[]; }), _tdLeerDia(c)];
+    await Promise.all(tareas);
+    _td.error=''; st.classList.add('hidden');
+  }catch(e){ leyo=false; _td.error=_tdErrorTxt(e); st.className='status s-err'; st.textContent='No pude leer los pedidos: '+_td.error; }
+  tdRender();
+  return leyo;
+}
+function tdSeg(k){ _td.seg=k; tdRender(); }
+async function tdDiaSet(v){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(v||'')) return;
+  _td.dia=v; _td.diaElegido=(v!==_tdHoy());
+  _td.fact=[]; _td.factTxt='Leyendo ese día…'; tdRender();
+  const st=document.getElementById('tdStatus');
+  try{ if(!(await _tdLeerDia(sbClient()))) return; st.classList.add('hidden'); }
+  catch(e){ st.className='status s-err'; st.classList.remove('hidden'); st.textContent='No pude leer ese día: '+_tdErrorTxt(e); }
+  tdRender();
+}
+function tdDia(delta){ const d=new Date(_td.dia+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+delta); tdDiaSet(d.toISOString().slice(0,10)); }
+function _tdSegBtn(k,txt,n){ return '<button class="td-s'+(_td.seg===k?' on':'')+'" onclick="tdSeg(\''+k+'\')">'+txt+' <span class="pd-cnt">'+n+'</span></button>'; }
+function tdRender(){
+  const b=document.getElementById('tdBody'); if(!b) return;
+  let h='<div class="td-seg">'+_tdSegBtn('ent','Por entregar',_td.ent.length)+_tdSegBtn('fact','Para facturar',_td.fact.length)+'</div>';
+  if(_td.seg==='ent'){
+    h+=_td.ent.length?_td.ent.map(function(p,i){ return _tdTarjeta(p,'ent',i); }).join(''):'<div class="muted">Nada por entregar.</div>';
+  }else{
+    const tot=_td.fact.reduce(function(a,p){ return a+(Number(p.total_crc)||0); },0);
+    h+='<div class="td-dia"><button class="btn btn-sm" onclick="tdDia(-1)" aria-label="Día anterior">‹</button>'
+      +'<input type="date" value="'+esc(_td.dia)+'" onchange="tdDiaSet(this.value)">'
+      +'<button class="btn btn-sm" onclick="tdDia(1)" aria-label="Día siguiente">›</button></div>'
+      +'<div class="td-et">Montos con IVA · por día de pago recibido'+(_td.fact.length?' · '+_td.fact.length+(_td.fact.length===1?' pedido':' pedidos')+' · '+cM(tot):'')+'</div>';
+    h+=_td.fact.length?_td.fact.map(function(p,i){ return _tdTarjeta(p,'fact',i); }).join(''):'<div class="muted">'+esc(_td.factTxt||'Sin pedidos pagados ese día.')+'</div>';
+  }
+  b.innerHTML=h;
+}
+async function _tdAccion(fn, args, okTxt){
+  if(_td.ocupado) return; _td.ocupado=true;
+  try{
+    const {error}=await sbClient().rpc(fn,args);
+    if(error) throw error;
+    await despTiendaCargar();
+    _tdAviso(_despTiendaErr?'s-err':'s-ok', _despTiendaErr ? okTxt+' Pero no pude recargar la lista: '+_despTiendaErr+'. Lo que se ve puede estar viejo.' : okTxt);
+  }catch(e){ _tdAviso('s-err', _tdErrorTxt(e)); }
+  _td.ocupado=false;
+}
+function tdPago(i){ const p=_td.conf[i]; if(!p) return;
+  if(!confirm('¿Pago recibido en el pedido #'+p.numero+' por '+cM(p.total_crc)+'?')) return;
+  _tdAccion('tienda_marcar_pago',{p_id:p.id},'Pedido #'+p.numero+': pago recibido.'); }
+function tdRechazar(i){ const p=_td.conf[i]; if(!p) return;
+  const m=prompt('Motivo del rechazo del pedido #'+p.numero+':',''); if(m===null) return;
+  _tdAccion('tienda_rechazar',{p_id:p.id,p_motivo:m},'Pedido #'+p.numero+': rechazado.'); }
+// Safari bloquea window.open después de un await: la pestaña se abre ya y luego recibe la URL (firmada 2 min).
+async function tdComprobante(i){
+  const p=_td.conf[i]; if(!p) return;
+  let w=null; try{ w=window.open('', '_blank'); }catch(e){}
+  try{
+    const {data,error}=await sbClient().storage.from('tienda-comprobantes').createSignedUrl(p.comprobante_path, 120);
+    if(error) throw error;
+    if(w) w.location.href=data.signedUrl; else window.location.href=data.signedUrl;
+  }catch(e){
+    if(w) try{ w.close(); }catch(e2){}
+    _tdAviso('s-err', 'No pude abrir el comprobante: '+_tdErrorTxt(e));
+  }
+}
+function _tdAFac(p){
+  const lineas=(p.lineas||[]).map(function(l){
+    const pid=(l.producto_id==null)?ENT_TIENDA_SIN_ID:Number(l.producto_id), fac=(l.uom_factor==null)?1:Number(l.uom_factor);
+    return {producto:l.nombre, producto_id:pid, cant_uom:Number(l.cantidad), cant_uds:Number(l.cantidad)/fac,
+            uom_id:(l.uom_id==null)?1:Number(l.uom_id), uom_nombre:l.unidad_venta, uom_factor:fac};
+  });
+  return {factura_id:-Number(p.numero), factura:'Tienda #'+Number(p.numero), cliente:p.nombre, cliente_id:0,
+          fecha:new Date(Date.parse(p.pagado_en||p.creado_en)-6*3600000).toISOString().slice(0,10), enVentana:true,
+          lineas:lineas, tienda:Object.assign({soloSinLote:lineas.every(function(L){ return _entSinLote(L.producto_id); })}, p)};
+}
+// Los pagos por confirmar viven en la pestaña Tienda; solo las lectoras los leen.
+function _tdLeerConf(c){
+  return c.from('tienda_pedido')
+      .select('id,numero,creado_en,nombre,telefono,entrega,direccion,metodo_pago,comprobante_path,subtotal_crc,envio_crc,total_crc,tienda_pedido_linea(nombre,unidad_venta,cantidad,precio_crc)')
+      .eq('estado','por_confirmar_pago').order('numero')
+      .then(function(r){ if(r.error) throw r.error;
+        _td.conf=(r.data||[]).map(function(p){ p.lineas=p.tienda_pedido_linea||[]; return p; }); });
+}
+function _tdAviso(cls, txt){ _despTiendaAviso={cls:cls, txt:txt}; if(!_despAbierto) despRender(); }
+let _despTiq=[], _despTiqErr='', _tdTiqOcupado=0, _tdTiqMotivos={};
+async function _tdLeerTiq(c){
+  const {data,error}=await c.from('tienda_tiquete').select('estado,error,intentos,tienda_pedido(numero,nombre)')
+    .in('estado',['pendiente','en_curso','error']).order('creado_en');
+  // Solo se tolera la tabla inexistente (el SQL aún sin pegar). Lo demás se dice arriba de la lista.
+  if(error){ _despTiq=[]; _despTiqErr=(error.code==='PGRST205'||error.code==='42P01')?'':(error.message||'error de lectura'); return; }
+  _despTiqErr=''; _despTiq=data||[];
+}
+// Por qué no se creó, en palabras del servicio. Vale también cuando la fila sigue `pendiente` (apagado, sin configurar).
+function _tdTiqMotivo(R){
+  if(!R || R.red) return 'El servicio de Odoo no contestó: el tiquete sigue pendiente.';
+  if(R.js && R.js.ok) return '';
+  return (R.js && R.js.texto) || ('No se pudo crear (error '+R.st+').');
+}
+// `manual` = Reintentar. El automático al entregar nunca le gana a un aviso que ya esté en pantalla.
+async function _tdTiquete(numero, manual){
+  if(!numero || _tdTiqOcupado===numero) return;
+  _tdTiqOcupado=numero;
+  if(!_despAbierto && _despTab==='tienda') despRender();
+  let R=null;
+  try{ R=await _escrituraPost('/tiquete',{numero:numero}); }catch(e){}
+  _tdTiqOcupado=0;
+  const m=_tdTiqMotivo(R);
+  if(m) _tdTiqMotivos[numero]=m; else delete _tdTiqMotivos[numero];
+  if(manual) _tdAviso(m?'s-err':'s-ok', m?('Pedido #'+numero+': '+m):('Pedido #'+numero+': tiquete creado.'));
+  else if(m && !_despTiendaAviso) _tdAviso('s-err', 'Pedido #'+numero+' entregado. Tiquete: '+m);
+  despTiendaCargar();
+}
+function _tdTiqHTML(){
+  const avisoErr=_despTiqErr?('<div class="status s-err" style="margin-bottom:12px">No pude leer los tiquetes: '+esc(_despTiqErr)+'</div>'):'';
+  if(!_despTiq.length) return avisoErr;
+  const txt={pendiente:'Sin crear', en_curso:'Creando…'};
+  return avisoErr+'<div class="td-et">Tiquetes sin crear en Odoo</div>'+_despTiq.map(function(t){
+    const p=t.tienda_pedido||{}, ocup=(_tdTiqOcupado===p.numero);
+    return '<div class="td-card"><div class="td-top"><div class="td-nom"><span class="td-num">#'+Number(p.numero)+'</span>'+esc(p.nombre)+'</div></div>'
+      +'<div class="td-meta">'+esc(t.error||_tdTiqMotivos[p.numero]||txt[t.estado]||'')+(t.intentos?(' · '+Number(t.intentos)+(t.intentos===1?' intento':' intentos')):'')+'</div>'
+      +(_socia?'<div class="td-acc"><button class="btn btn-sm"'+(ocup?' disabled':'')+' onclick="_tdTiquete('+Number(p.numero)+',true)">'+(ocup?'Creando…':'Reintentar')+'</button></div>':'')
+      +'</div>'; }).join('');
+}
+async function despTiendaCargar(){
+  try{
+    const c=sbClient(); if(!c) return;
+    await accesoSocia();
+    const {data,error}=await c.rpc('tienda_por_preparar');
+    if(error) throw error;
+    if(_lectora) await Promise.all([_tdLeerConf(c), _tdLeerTiq(c)]);
+    _despTienda=(data||[]).map(_tdAFac); _despTiendaErr='';
+  }catch(e){ _despTiendaErr=_tdErrorTxt(e); }
+  if(!_despAbierto) despRender();
+}
+// El paso común tras preparar o entregar, en pantalla. En la base, «Entregado» es solo `_tienda_entregar`.
+// Con `numero`, el pedido quedó entregado: el tiquete se pide sin esperarlo. Si falla, queda en `tienda_tiquete`.
+function _tdTrasEntrega(numero){
+  if(numero) _tdTiquete(numero);
+  despTiendaCargar();
+  try{ if(!document.getElementById('vTienda').classList.contains('hidden')) tdCargar(); }catch(e){}
+}
+// Pedido sin ningún producto de lote: no hay nada que preparar, se entrega directo.
+async function despTiendaEntregarSinLote(fid){
+  const f=(_despTienda||[]).find(function(x){ return x.factura_id===fid; }); if(!f||_despGuardando) return;
+  if(!confirm('¿Entregado el pedido #'+f.tienda.numero+'?')) return;
+  _despGuardando=true;
+  try{
+    const {error}=await sbClient().rpc('tienda_marcar_entregado',{p_id:f.tienda.id});
+    if(error) throw error;
+    _tdTrasEntrega(f.tienda.numero);
+  }catch(e){ alert('No se pudo marcar: '+_tdErrorTxt(e)); }
+  _despGuardando=false;
+}
+function tdIrPreparar(){ _despTab='tienda'; irADespachos(); }
 async function lotCargar(force){
   const st=document.getElementById('elStatus');
   if(_lot && !force){ lotRender(); return; }
@@ -17846,9 +18198,12 @@ function _entQuien(o){
 // Y el rótulo de dónde iría el número de factura. Una salida sin factura no
 // tiene un número que esconder: tiene un motivo. Decir "sin factura" ahí es
 // información —explica por qué no hay PDF— y el hueco no lo era.
+// Una venta de tienda no tiene factura de Odoo y tampoco es «sin factura»: se nombra por su pedido.
+function _entEsTienda(o){ return !!o && !o.factura_nombre && (o.origen==='tienda' || /^Tienda #\d+/.test(String(o.cliente_nombre||''))); }
 function _entFacRotulo(o){
   o=o||{};
   if(o.factura_nombre) return _despFacCorta(o.factura_nombre);
+  if(_entEsTienda(o)){ const m=/^Tienda #\d+/.exec(String(o.cliente_nombre||'')); return m?m[0]:'Tienda'; }
   return 'sin factura';
 }
 
@@ -18282,7 +18637,7 @@ function bsFiltrar(){
       // por teléfono y el que aparece en las notas de Odoo («pedido 154»).
       +'<span class="bs-f2"><span class="bs-sub">#'+p.pedido_id+' · '+n+(n===1?' producto':' productos')
       +(p.estado==='preparado'?' · preparado, sin salir':'')+'</span>'
-      +'<span class="bs-fac'+(p.factura_nombre?'':' bs-sinfac')+'">'
+      +'<span class="bs-fac'+((p.factura_nombre||_entEsTienda(p))?'':' bs-sinfac')+'">'
       +esc(_entFacRotulo(p))+'</span>'
       +entPdfBtn(p.factura_id, p.factura_nombre, p.cliente_nombre)+'</span></button>'
       +(ab?bsDetalle(p):'');
@@ -18363,7 +18718,7 @@ function bsCorreccionHTML(p){
 // espera a Odoo para abrir, y eso no se negocia (es de b53).
 // La regla vive en `_bsFacturaNum`, que también llena la columna del archivo exportado.
 function _bsFacturaLbl(p){
-  if(!p.factura_nombre) return 'sin factura';
+  if(!p.factura_nombre) return _entFacRotulo(p);
   return 'factura '+_bsFacturaNum(p);
 }
 
@@ -18465,7 +18820,7 @@ function _bsExpExcLinea(l){
 // La factura como se nombra en el Historial. UNA regla para la columna del archivo
 // y para la ficha de la pantalla (`_bsFacturaLbl` la usa).
 function _bsFacturaNum(p){
-  if(!p || !p.factura_nombre) return 'sin factura';
+  if(!p || !p.factura_nombre) return _entFacRotulo(p);
   const v=p.fac_vigente;
   if(v && v.nombre && v.reemplaza)
     return _despFacCorta(v.nombre)+' (reemplaza a '+_despFacCorta(v.reemplaza)+')';
@@ -18963,7 +19318,7 @@ function bxPrevHTML(M, todo){
     while(i<vis.length && vis[i].pedido===r0.pedido){ fs.push(vis[i]); i++; }
     h+='<div class="bx-card"><div class="bx-card-h"><span class="bx-card-c">'+esc(r0.cliente)+'</span>'
       +'<span class="bx-card-f">'+esc(_bsExpTxt(r0,'fecha'))+'</span></div>'
-      +'<div class="bx-card-s">#'+r0.pedido+' · '+esc(r0.factura==='sin factura'?'sin factura':('factura '+r0.factura))+'</div>'
+      +'<div class="bx-card-s">#'+r0.pedido+' · '+esc((r0.factura==='sin factura'||/^Tienda #/.test(r0.factura))?r0.factura:('factura '+r0.factura))+'</div>'
       +fs.map(function(r){
         const cl=marca?(r.coincide?' bx-si':' bx-no'):'';
         return '<div class="bx-card-l'+cl+'"><span class="bx-card-p">'+esc(r.producto)+'</span>'
@@ -19202,6 +19557,7 @@ let _bsDes=0, _bsDesNota={}, _bsDesGuardando=0;
    detrás y no está solo. */
 function bsPuedeDeshacer(p){
   if(_socia!==true)           return false;  // null = todavía no se sabe: no se ofrece
+  if(p && p.origen==='tienda') return false; // ya se cobró y salió: la base lo rechaza (tienda:entregado)
   if(!p || p.estado!=='entregado') return false;
   if(!p.salida_id)            return false;  // sin salida vigente no hay nada que anular
   if(!p.alisto_id)            return false;  // `v_ent_pedido_estado` hace join interno
@@ -19305,7 +19661,7 @@ async function bsDeshacer(id){
     _bsDesGuardando=0;
     try{ console.error('[Truefie] Historial · no pude deshacer la entrega', id, e); }catch(_){}
     bsFiltrar();
-    pon('No se pudo deshacer: '+((e&&e.message)||e)+'. No se cambió nada.', true);
+    pon('No se pudo deshacer: '+_tdSinPunto((e&&e.message)||String(e))+'. No se cambió nada.', true);
   }
 }
 
@@ -19378,6 +19734,7 @@ function _anuDevTxt(dv){
 }
 function anuHTML(id, donde, p){
   if(_socia!==true || !id) return '';
+  if(p && p.origen==='tienda' && p.estado==='entregado') return '';
   const A=_anu, mio=(A.id===id);
   const bloq=_anuBloqueo(p);
   if(bloq) return '<div class="bs-anu anu-l"><div class="anu-bloq">'+esc(bloq)+'</div></div>';
@@ -19463,7 +19820,7 @@ async function anuConfirmar(){
     // Sin respuesta no se sabe si la base la grabó: se dice así, y no «no se cambió nada».
     A.msg=/fetch|network|load failed/i.test(m)
       ? 'No hubo respuesta: no se sabe si se anuló. Refrescá la pantalla antes de reintentar.'
-      : ('No se anuló: '+_anuTexto(m)+'. No se cambió nada.');
+      : ('No se anuló: '+_anuTexto(_tdSinPunto(m))+'. No se cambió nada.');
     _anuPintar(); return;
   }
   const id=A.id, donde=A.donde, dv=_anuDevTxt(data.devuelve);
@@ -20704,7 +21061,7 @@ async function pdLeer(){
               cliente_id:p.cliente_id, motivo:mv, dias:dias,
               origen:p.origen, destinatario:p.destinatario};
     if(ANU[p.id]) return;                       // anulado (§29): no es un pendiente
-    if(mv==='venta' && !F[p.id]) l2.push(it);
+    if(mv==='venta' && !F[p.id] && p.origen!=='tienda') l2.push(it);   // tienda: venta sin factura de Odoo
     if(mv==='sin_clasificar') l3.push(it);
   });
   // ── SALIDAS SIN VERIFICAR (o contra factura anulada) ──────────────────
@@ -22123,7 +22480,7 @@ function pdExcHTML(){
       // dentro del gesto para que Safari de iOS no la bloquee, y **devuelve cadena
       // vacía cuando no hay factura_id**. O sea que el pedido manual no necesita un
       // `if` acá: el control no existe, en vez de existir y fallar.
-      +(p.factura_nombre?(' · '+esc(p.factura_nombre)+entPdfBtn(p.factura_id,p.factura_nombre,p.cliente_nombre)):' · sin factura')
+      +(p.factura_nombre?(' · '+esc(p.factura_nombre)+entPdfBtn(p.factura_id,p.factura_nombre,p.cliente_nombre)):(' · '+esc(_entFacRotulo(p))))
       // `n_no_entrega` y NO `n`: `n` cuenta las dos ramas de la vista y diría "6
       // líneas" sobre una tarjeta que dibuja 4. Se cuenta lo que se muestra.
       +' · '+p.n_no_entrega+(p.n_no_entrega===1?' línea':' líneas')
@@ -22250,7 +22607,7 @@ function pdOdooHTML(){
         +'<div class="pd-exc-cli">'+esc(quien)+'</div>'
         +'<div class="pd-exc-dias">'+(d===null?'—':(d<=0?'hoy':(d===1?'1 día':d+' días')))+'</div></div>'
         +'<div class="pd-exc-meta">#'+x.pedido_id
-        +(x.factura_nombre?(' · '+esc(x.factura_nombre)):' · sin factura')
+        +(x.factura_nombre?(' · '+esc(x.factura_nombre)):(' · '+esc(_entFacRotulo(x))))
         +' · '+x.lineas.length+(x.lineas.length===1?' línea':' líneas')+'</div>';
       // EL PAYLOAD, A LA VISTA. Es lo que hay que copiar a Odoo, y por eso se
       // muestra entero en vez de resumido: la socia lo lee mientras lo crea alla.
@@ -22366,7 +22723,7 @@ function pdtHTML(ls, T){
   if(_socia!==true) return _pdLecturaHTML(T.t, ls.map(function(x){
     const d=_pdExcDias(x.fecha);
     return {quien:x.cliente_nombre||x.destinatario||'—', cuando:(d===null?'':(d<=0?'hoy':(d===1?'1 día':d+' días'))),
-            meta:'#'+x.pedido_id+' · sin factura',
+            meta:'#'+x.pedido_id+' · '+_entFacRotulo(x),
             det:(x.lineas||[]).map(function(l){ return _lotNom(l.producto_id)+' · '+_entPres(l.producto_id, l.cant_uds)+' · '+l.lote; })}; }));
   const TD=_pdt.tanda;
   // Se puede crear: la vista previa del servidor dijo que sí, o todavía no
@@ -32321,7 +32678,8 @@ function entMasIr(k){ entMasCerrar();
   if(k==='historial')  return irAEntBuscar();
   if(k==='pendientes') return irAPendientes();
   if(k==='lotes')      return irAEntLotes();
-  if(k==='reporte')    return irAReporte(); }
+  if(k==='reporte')    return irAReporte();
+  if(k==='tienda')     return irATienda(); }
 function finMasToggle(ev){ if(ev) ev.stopPropagation();
   const p=document.getElementById('finMas'); if(p) p.classList.toggle('hidden'); }
 function finMasCerrar(){ const p=document.getElementById('finMas'); if(p) p.classList.add('hidden'); }
