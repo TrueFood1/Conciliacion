@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- PROD_ORDEN_ODOO.sql  ·  4-nov-2026  ·  El rastro de las órdenes de producción creadas desde Truefie
--- ⛔ NO SE CORRIÓ. Lo pega Andrea en el editor SQL de Supabase. El header y la bitácora se tocan DESPUÉS de
+-- ✅ APLICADO en producción por Andrea el 9-nov-2026. Control 1 · 3 · 4 · 0 · INSERT,SELECT · 14 · 1 · 0 (el 3 incluye asistente_ve_todo, que agrega el disparador), verificado con pg_lector.
 --    verificar (la fila de control de abajo, y desde afuera con pg_lector), nunca antes.
 -- Para saber si está aplicado, mirar la base: `select to_regclass('public.prod_orden_odoo')`.
 --
@@ -69,7 +69,7 @@ create policy prod_orden_odoo_ins on public.prod_orden_odoo
   for insert to authenticated with check (acceso_es_socia() and creado_por = (auth.jwt() ->> 'email'));
 
 -- CONTROL, adentro de la transacción y justo antes del commit. ESPERADO: una fila
---   1 · 2 · 4 · 0 · INSERT,SELECT · 14 · 1 · 0
+--   1 · 3 · 4 · 0 · INSERT,SELECT · 14 · 1 · 0  (corregido: 3 con asistente_ve_todo)
 --   (4 = las restrictivas del asistente que pone el disparador; si sale 0, el disparador no está y hay que avisar
 --    ANTES de seguir. 14 = los CHECK con nombre po_*. 1 = el unique de mo_id. 0 = filas.)
 --   Si el editor dice «Success. No rows returned», NO corrió hasta acá.
