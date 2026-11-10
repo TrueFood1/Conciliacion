@@ -6351,7 +6351,7 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 10 nov 2026 · b159';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 10 nov 2026 · b160';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -10331,7 +10331,7 @@ function opCampo(campo, el){
   _opDesmarcar(campo==='cajas'||campo==='sueltas'?'cantidad':campo, el);
   if(O.leidoC) delete O.leidoC[campo];
   _opVolverAEditar();
-  if(campo==='batches'){ opRenderCons(); opRenderDet(); }
+  if(campo==='batches'){ opRenderCons(); opRenderDet(); opRenderPremChips(); }
   if(campo==='premTxt') opRenderPremChips();
   opDerivados();
 }
@@ -10399,8 +10399,16 @@ async function opPremCargar(){
 function opRenderPremChips(){
   const el=_opEl('opPremChips'), O=_op; if(!el||!O) return;
   const sel=_opPremLista();
-  el.style.marginBottom=(O.prem&&O.prem.length)?'6px':'0';
-  el.innerHTML=(O.prem||[]).map(function(m){
+  // Solo las órdenes de premezcla más recientes que alcanzan para los batches de esta producción
+  // (1 premezcla = 1 batch): si la última no alcanza, se suma la anterior, y así (Andrea, 10-nov).
+  // Las ya marcadas se muestran siempre.
+  const b=_opNum(O.f.batches); let suma=0;
+  const lista=(O.prem||[]).filter(function(m){
+    const marcada=sel.indexOf(m.name)>=0;
+    if(b>0 && suma>=b && !marcada) return false;
+    suma+=Number(m.product_qty)||0; return true; });
+  el.style.marginBottom=lista.length?'6px':'0';
+  el.innerHTML=lista.map(function(m){
     return '<button class="op-chip'+(sel.indexOf(m.name)>=0?' on':'')+'" onclick="opPremToggle(\''+esc(m.name)+'\')">'+esc(m.name)
       +' <span class="op-g">'+esc(_opFechaCR(m.date_start))+'</span></button>'; }).join('');
 }
