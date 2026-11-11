@@ -10046,7 +10046,13 @@ async function irAOrdenesProd(){
   opRender();
   opBorrCargar();
 }
-function opRender(){ opRenderFotos(); opRenderSide(); opRenderForm(); opRenderCons(); opRenderDet(); opRenderAcc(); opRenderPrevia(); opRenderBorr(); }
+function opRender(){ opRenderFotos(); opRenderSide(); opRenderForm(); opRenderCons(); opRenderDet(); opRenderAcc(); opRenderPrevia(); opRenderBorr(); _opMostrarForm(); }
+// PRIMERO LAS FOTOS (Andrea, 11-nov): al entrar solo se ve el reporte en papel. El formulario aparece
+// cuando se leyeron las fotos o cuando se elige «Registrar a mano»; antes no hay nada que llenar.
+function _opFormVisible(){ const O=_op; return !!(O && (O.leido || O.manual || O.paso!=='editar')); }
+function _opMostrarForm(){ const v=_opFormVisible();
+  ['opForm','opCons','opDet','opAcc','opPrevia'].forEach(function(id){ const e=_opEl(id); if(e) e.classList.toggle('hidden', !v); }); }
+function opManual(){ const O=_op; if(!O) return; O.manual=true; opRender(); const e=_opEl('opForm'); if(e) try{ e.scrollIntoView({block:'start', behavior:'smooth'}); }catch(_){} }
 function _opEl(id){ return document.getElementById(id); }
 
 // ── NÚMEROS: se escriben y se leen en es-CR (coma decimal) ──────────────
@@ -10145,6 +10151,7 @@ function opRenderFotos(){
   let msg=O.msgF, cls=O.clsF;
   if(O.achicando) { msg='Preparando '+O.achicando+' foto'+(O.achicando===1?'':'s')+'…'; cls='op-busy'; }
   h+='<div class="op-msg '+(cls||'')+'">'+esc(msg||'')+'</div>';
+  if(!_opFormVisible() && !O.leyendo) h+='<button class="op-btn" style="margin-top:4px" onclick="opManual()">Registrar a mano</button>';
   if(Array.isArray(O.resp) && O.resp.length) h+='<div class="op-msg">Responsables: '+esc(O.resp.map(_opTxt).join(' · '))+'</div>';
   if(O.avisosL.length) h+='<ul class="op-lst op-lst-a">'+O.avisosL.map(function(a){ return '<li>'+esc(_opTxt(a))+'</li>'; }).join('')+'</ul>';
   if(O.notasL.length) h+='<ul class="op-lst">'+O.notasL.map(function(a){ return '<li>'+esc(_opTxt(a))+'</li>'; }).join('')+'</ul>';
