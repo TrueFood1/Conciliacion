@@ -10395,10 +10395,17 @@ async function opPremCargar(){
   O.premPid=pid; O.prem=null; O.premErr='';
   try{
     await _esperarOdoo();
-    const desde=new Date(Date.now()-30*864e5).toISOString().slice(0,10)+' 00:00:00';
-    const r=await odooCall('mrp.production','search_read',[[['product_id','=',I.prem],['state','=','done'],['date_start','>=',desde]]],
-      {fields:['name','date_start','product_qty'], order:'date_start desc', limit:10});
+    const desde=new Date(Date.now()-90*864e5).toISOString().slice(0,10)+' 00:00:00';
+    const [r, st]=await Promise.all([
+      odooCall('mrp.production','search_read',[[['product_id','=',I.prem],['state','=','done'],['date_start','>=',desde]]],
+        {fields:['name','date_start','product_qty'], order:'date_start desc', limit:30}),
+      odooCall('product.product','read',[[I.prem]],{fields:['qty_available']}) ]);
     if(O.premPid!==pid) return;
+    // CUÁNTAS QUEDAN DE CADA ORDEN (Andrea, 11-nov). La premezcla no lleva lote, así que se reparte
+    // la existencia de Odoo como se gasta, primero lo más viejo (FIFO): lo que queda en el
+    // congelador es de las órdenes MÁS NUEVAS. Se recorre de la más nueva a la más vieja.
+    let resto=Math.max(0, Number(st&&st[0]&&st[0].qty_available)||0);
+    (r||[]).forEach(function(m){ const q=Number(m.product_qty)||0; m.quedan=Math.min(q, resto); resto-=m.quedan; });
     O.prem=r||[];
   }catch(e){ O.premErr=String(e&&e.message||e); O.prem=[]; }
   opRenderPremChips();
@@ -10406,18 +10413,20 @@ async function opPremCargar(){
 function opRenderPremChips(){
   const el=_opEl('opPremChips'), O=_op; if(!el||!O) return;
   const sel=_opPremLista();
-  // Solo las órdenes de premezcla más recientes que alcanzan para los batches de esta producción
-  // (1 premezcla = 1 batch): si la última no alcanza, se suma la anterior, y así (Andrea, 10-nov).
-  // Las ya marcadas se muestran siempre.
+  // PRIMERO LA MÁS VIEJA QUE TODAVÍA TIENE (Andrea, 11-nov): solo las órdenes con premezcla en el
+  // congelador, de la más vieja a la más nueva, hasta juntar los batches de esta producción
+  // (1 premezcla = 1 batch). Cada una dice cuántas quedan. Las ya marcadas se muestran siempre.
   const b=_opNum(O.f.batches); let suma=0;
-  const lista=(O.prem||[]).filter(function(m){
-    const marcada=sel.indexOf(m.name)>=0;
-    if(b>0 && suma>=b && !marcada) return false;
-    suma+=Number(m.product_qty)||0; return true; });
+  const lista=(O.prem||[]).filter(function(m){ return m.quedan>0 || sel.indexOf(m.name)>=0; })
+    .slice().reverse().filter(function(m){
+      const marcada=sel.indexOf(m.name)>=0;
+      if(b>0 && suma>=b && !marcada) return false;
+      suma+=m.quedan||0; return true; });
   el.style.marginBottom=lista.length?'6px':'0';
   el.innerHTML=lista.map(function(m){
     return '<button class="op-chip'+(sel.indexOf(m.name)>=0?' on':'')+'" onclick="opPremToggle(\''+esc(m.name)+'\')">'+esc(m.name)
-      +' <span class="op-g">'+esc(_opFechaCR(m.date_start))+'</span></button>'; }).join('');
+      +' <span class="op-g">'+esc(_opFechaCR(m.date_start))+' · quedan '+esc(_opFmtG(m.quedan||0))+'</span></button>'; }).join('')
+    +((O.prem && !lista.length) ? '<span class="op-g">Odoo no tiene premezcla en existencia.</span>' : '');
 }
 function opPremToggle(nm){
   const O=_op; if(!O) return; const l=_opPremLista(), i=l.indexOf(nm);
