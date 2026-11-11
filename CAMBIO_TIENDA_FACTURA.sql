@@ -9,24 +9,26 @@
 -- QUÉ CAMBIA (medido contra producción el 11-nov con pg_lector; 0 pedidos, correlativo en 2):
 --   1. tienda_pedido: correo, fe_tipo, fe_numero, fe_nombre, fe_correo (todas NULL-ables) + dos CHECK
 --      (correo válido; factura completa o vacía, con el formato del número por tipo).
---   2. tienda_tiquete: correo_estado (esperando · enviado · error · sin_correo), correo_detalle,
---      correo_intentos, correo_en. Las escribe SOLO el servicio, con su clave.
+--   2. tienda_tiquete: correo_estado (enviando · esperando · enviado · error · sin_correo), correo_detalle,
+--      correo_intentos, correo_en, correo_reclamado_en. Las escribe SOLO el servicio, con su clave.
 --   3. tienda_crear_pedido: la misma de hoy + `correo` y `factura` {tipo, numero, nombre, correo}. Sin esos
 --      campos (la página vieja) entra igual que hoy. Errores nuevos: tienda:correo · tienda:factura.
 --   4. tienda_tiquete_reclamar: la misma de hoy + `correo` y `factura` en el pedido que recibe el servicio.
---   5. Tres RPC del servicio: tienda_comprobante_leer · _marcar · _pendientes (clave del servicio; socias o
---      equipo, que es el robot de /repaso). Ninguna tabla nueva: no dispara asistente_politicas.
+--   5. Cuatro RPC del servicio: tienda_comprobante_leer · _reclamar (el turno: uno solo manda el correo;
+--      vencido a los 10 min) · _marcar · _pendientes (clave del servicio; socias o equipo, que es el robot de /repaso). Ninguna tabla nueva: no dispara asistente_politicas.
 --   _tienda_json_pedido, tienda_por_entregar/_por_preparar/_para_facturar NO cambian: Daniel no ve la cédula
 --   ni el correo. Truefie los lee de tienda_pedido con la política de socias que ya existe.
 --   Las dos funciones que se reemplazan se comparan antes con el md5 de su cuerpo medido el 11-nov: si alguien
 --   las tocó, el pegado aborta sin hacer nada.
 --
--- ORDEN DE PUBLICACIÓN: 1) ESTE SQL · 2) truefie-escritura (rama tienda-factura) · 3) la tienda (web) ·
---   4) Truefie. Al revés: la página nueva contra la base vieja manda correo y factura y la base vieja los
+-- ORDEN DE PUBLICACIÓN: 1) ESTE SQL · 2) truefie-escritura (rama tienda-factura) · 3) ENCENDER en Render
+--   TIQUETE_FACTURA, TIQUETE_CORREO y TIQUETE_CORREO_DE · 4) la tienda (web) · 5) Truefie. Con la web arriba y
+--   TIQUETE_FACTURA apagado, un pedido con factura queda en error (no se emite tiquete en su lugar); y
+--   tienda_comprobante_pendientes solo mira los últimos 7 días: un correo apagado más de una semana ya no se manda solo. Al revés: la página nueva contra la base vieja manda correo y factura y la base vieja los
 --   IGNORA en silencio (el pedido entra sin factura). Por eso este va primero.
 --
 -- CONTROL (la última fila antes del commit). ESPERADO:
---   5 · 4 · 2 · 3 · 3 · 0 · true · false · true · true · 6 · 6
+--   5 · 5 · 2 · 4 · 4 · 0 · true · false · true · true · 6 · 6
 --   columnas en pedido · columnas en tiquete · checks · RPC nuevas · las ejecuta authenticated · las ejecuta
 --   anon (0) · anon crea pedidos · authenticated no · crear_pedido nueva · reclamar nueva · políticas de
 --   tienda_pedido · políticas de tienda_tiquete (no cambian).
@@ -76,11 +78,13 @@ alter table public.tienda_pedido add constraint tienda_pedido_factura_ok check (
       and length(fe_correo) <= 160 and fe_correo ~ '^[^@\s<>"'',;]+@[^@\s<>"'',;]+\.[A-Za-z]{2,}$'));
 
 -- §2 · EL ESTADO DEL CORREO DEL COMPROBANTE, al lado del tiquete. Lo escribe SOLO el servicio (con su clave).
+--      «enviando» = alguien tiene el turno (correo_reclamado_en): el cron, el botón o un doble clic no mandan dos.
 alter table public.tienda_tiquete
-  add column correo_estado   text check (correo_estado in ('esperando','enviado','error','sin_correo')),
+  add column correo_estado   text check (correo_estado in ('enviando','esperando','enviado','error','sin_correo')),
   add column correo_detalle  text,
   add column correo_intentos integer not null default 0,
-  add column correo_en       timestamptz;
+  add column correo_en       timestamptz,
+  add column correo_reclamado_en timestamptz;
 
 -- §3 · tienda_crear_pedido: la de hoy + correo (opcional en la base, la página lo pide) + factura (opcional).
 --      `create or replace` conserva los permisos: anon ejecuta, authenticated no (lo mide el control).
@@ -258,7 +262,7 @@ begin
 end;
 $$;
 
--- §5 · EL COMPROBANTE POR CORREO: tres RPC del servicio, con su clave, para socias y equipo (el robot de
+-- §5 · EL COMPROBANTE POR CORREO: cuatro RPC del servicio, con su clave, para socias y equipo (el robot de
 --      /repaso es equipo). Solo sobre tiquetes ya «creado» en Odoo. La dirección la da la base, nunca quien llama.
 create function public.tienda_comprobante_leer(p_clave text, p_numero bigint) returns jsonb
 language plpgsql security definer set search_path = ''
@@ -279,6 +283,28 @@ begin
   return jsonb_build_object('estado', t.estado, 'move_id', t.move_id, 'factura', v.fe_tipo is not null,
     'nombre', coalesce(v.fe_nombre, v.nombre), 'destino', coalesce(v.fe_correo, v.correo),
     'total_crc', v.total_crc, 'correo_estado', t.correo_estado);
+end;
+$$;
+
+-- El turno: UNO solo pasa a «enviando» (la fila queda bloqueada por el update; el segundo ve el estado ya cambiado).
+-- Un turno de más de 10 minutos (el servicio se cayó a la mitad) se puede retomar. «enviado» no se reclama nunca.
+create function public.tienda_comprobante_reclamar(p_clave text, p_numero bigint) returns boolean
+language plpgsql security definer set search_path = ''
+as $$
+declare v_perfil text := public.acceso_perfil(); v_n int;
+begin
+  if not public._ent_odoo_clave_ok(p_clave) then
+    raise exception 'tienda_comprobante_reclamar: clave del servicio inválida' using errcode = '42501';
+  end if;
+  if v_perfil is null or v_perfil not in ('socias','equipo') then raise exception 'tienda:perfil'; end if;
+  update public.tienda_tiquete t
+     set correo_estado = 'enviando', correo_reclamado_en = now(), actualizado_en = now()
+    from public.tienda_pedido p
+   where p.id = t.pedido_id and p.numero = p_numero and t.estado = 'creado'
+     and t.correo_estado is distinct from 'enviado'
+     and (t.correo_estado is distinct from 'enviando' or t.correo_reclamado_en < now() - interval '10 minutes');
+  get diagnostics v_n = row_count;
+  return v_n = 1;
 end;
 $$;
 
@@ -318,24 +344,26 @@ begin
   select coalesce(jsonb_agg(x.numero order by x.numero), '[]'::jsonb) into v_r from (
     select p.numero from public.tienda_tiquete t join public.tienda_pedido p on p.id = t.pedido_id
      where t.estado = 'creado' and t.creado_en > now() - interval '7 days'
-       and (t.correo_estado is null or t.correo_estado = 'esperando' or (t.correo_estado = 'error' and t.correo_intentos < 5))
+       and (t.correo_estado is null or t.correo_estado = 'esperando' or (t.correo_estado = 'error' and t.correo_intentos < 5)
+            or (t.correo_estado = 'enviando' and t.correo_reclamado_en < now() - interval '10 minutes'))
      order by p.numero limit 20) x;
   return v_r;
 end;
 $$;
 
 revoke all on function public.tienda_comprobante_leer(text,bigint), public.tienda_comprobante_marcar(text,bigint,text,text),
-                       public.tienda_comprobante_pendientes(text) from public, anon, authenticated;
+                       public.tienda_comprobante_pendientes(text), public.tienda_comprobante_reclamar(text,bigint)
+  from public, anon, authenticated;
 grant execute on function public.tienda_comprobante_leer(text,bigint), public.tienda_comprobante_marcar(text,bigint,text,text),
-                          public.tienda_comprobante_pendientes(text) to authenticated;
+                          public.tienda_comprobante_pendientes(text), public.tienda_comprobante_reclamar(text,bigint) to authenticated;
 
--- CONTROL, justo antes del commit. ESPERADO: 5 · 4 · 2 · 3 · 3 · 0 · true · false · true · true · 6 · 6
+-- CONTROL, justo antes del commit. ESPERADO: 5 · 5 · 2 · 4 · 4 · 0 · true · false · true · true · 6 · 6
 with rpc(f) as (values ('public.tienda_comprobante_leer(text,bigint)'), ('public.tienda_comprobante_marcar(text,bigint,text,text)'),
-                       ('public.tienda_comprobante_pendientes(text)'))
+                       ('public.tienda_comprobante_pendientes(text)'), ('public.tienda_comprobante_reclamar(text,bigint)'))
 select (select count(*) from information_schema.columns where table_schema='public' and table_name='tienda_pedido'
          and column_name in ('correo','fe_tipo','fe_numero','fe_nombre','fe_correo')) as columnas_pedido,
        (select count(*) from information_schema.columns where table_schema='public' and table_name='tienda_tiquete'
-         and column_name in ('correo_estado','correo_detalle','correo_intentos','correo_en')) as columnas_tiquete,
+         and column_name in ('correo_estado','correo_detalle','correo_intentos','correo_en','correo_reclamado_en')) as columnas_tiquete,
        (select count(*) from pg_constraint where conrelid='public.tienda_pedido'::regclass
          and conname in ('tienda_pedido_correo_ok','tienda_pedido_factura_ok')) as checks,
        (select count(*) from rpc where to_regprocedure(f) is not null) as rpc_nuevas,

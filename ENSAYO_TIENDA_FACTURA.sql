@@ -3,8 +3,8 @@
 -- Aplica CAMBIO_TIENDA_FACTURA.sql, lo prueba con pedidos de mentira y lo deshace todo.
 --
 -- CÓMO SE LEE
---   Dos cosas: el aviso «ENSAYO OK: 38 de 38» (pestaña de mensajes) y la fila de control con
---   5 · 4 · 2 · 3 · 3 · 0 · true · false · true · true · 6 · 6
+--   Dos cosas: el aviso «ENSAYO OK: 46 de 46» (pestaña de mensajes) y la fila de control con
+--   5 · 5 · 2 · 4 · 4 · 0 · true · false · true · true · 6 · 6
 --   Si una prueba falla, aborta con «FALLA …» y no muestra la fila. Si el editor dice
 --   "Success. No rows returned", no llegó al final y no vale.
 -- LO ÚNICO QUE QUEDA: F1 y F2 entran por tienda_crear_pedido y consumen DOS números del correlativo de
@@ -54,11 +54,13 @@ alter table public.tienda_pedido add constraint tienda_pedido_factura_ok check (
       and length(fe_correo) <= 160 and fe_correo ~ '^[^@\s<>"'',;]+@[^@\s<>"'',;]+\.[A-Za-z]{2,}$'));
 
 -- §2 · EL ESTADO DEL CORREO DEL COMPROBANTE, al lado del tiquete. Lo escribe SOLO el servicio (con su clave).
+--      «enviando» = alguien tiene el turno (correo_reclamado_en): el cron, el botón o un doble clic no mandan dos.
 alter table public.tienda_tiquete
-  add column correo_estado   text check (correo_estado in ('esperando','enviado','error','sin_correo')),
+  add column correo_estado   text check (correo_estado in ('enviando','esperando','enviado','error','sin_correo')),
   add column correo_detalle  text,
   add column correo_intentos integer not null default 0,
-  add column correo_en       timestamptz;
+  add column correo_en       timestamptz,
+  add column correo_reclamado_en timestamptz;
 
 -- §3 · tienda_crear_pedido: la de hoy + correo (opcional en la base, la página lo pide) + factura (opcional).
 --      `create or replace` conserva los permisos: anon ejecuta, authenticated no (lo mide el control).
@@ -236,7 +238,7 @@ begin
 end;
 $$;
 
--- §5 · EL COMPROBANTE POR CORREO: tres RPC del servicio, con su clave, para socias y equipo (el robot de
+-- §5 · EL COMPROBANTE POR CORREO: cuatro RPC del servicio, con su clave, para socias y equipo (el robot de
 --      /repaso es equipo). Solo sobre tiquetes ya «creado» en Odoo. La dirección la da la base, nunca quien llama.
 create function public.tienda_comprobante_leer(p_clave text, p_numero bigint) returns jsonb
 language plpgsql security definer set search_path = ''
@@ -257,6 +259,28 @@ begin
   return jsonb_build_object('estado', t.estado, 'move_id', t.move_id, 'factura', v.fe_tipo is not null,
     'nombre', coalesce(v.fe_nombre, v.nombre), 'destino', coalesce(v.fe_correo, v.correo),
     'total_crc', v.total_crc, 'correo_estado', t.correo_estado);
+end;
+$$;
+
+-- El turno: UNO solo pasa a «enviando» (la fila queda bloqueada por el update; el segundo ve el estado ya cambiado).
+-- Un turno de más de 10 minutos (el servicio se cayó a la mitad) se puede retomar. «enviado» no se reclama nunca.
+create function public.tienda_comprobante_reclamar(p_clave text, p_numero bigint) returns boolean
+language plpgsql security definer set search_path = ''
+as $$
+declare v_perfil text := public.acceso_perfil(); v_n int;
+begin
+  if not public._ent_odoo_clave_ok(p_clave) then
+    raise exception 'tienda_comprobante_reclamar: clave del servicio inválida' using errcode = '42501';
+  end if;
+  if v_perfil is null or v_perfil not in ('socias','equipo') then raise exception 'tienda:perfil'; end if;
+  update public.tienda_tiquete t
+     set correo_estado = 'enviando', correo_reclamado_en = now(), actualizado_en = now()
+    from public.tienda_pedido p
+   where p.id = t.pedido_id and p.numero = p_numero and t.estado = 'creado'
+     and t.correo_estado is distinct from 'enviado'
+     and (t.correo_estado is distinct from 'enviando' or t.correo_reclamado_en < now() - interval '10 minutes');
+  get diagnostics v_n = row_count;
+  return v_n = 1;
 end;
 $$;
 
@@ -296,16 +320,18 @@ begin
   select coalesce(jsonb_agg(x.numero order by x.numero), '[]'::jsonb) into v_r from (
     select p.numero from public.tienda_tiquete t join public.tienda_pedido p on p.id = t.pedido_id
      where t.estado = 'creado' and t.creado_en > now() - interval '7 days'
-       and (t.correo_estado is null or t.correo_estado = 'esperando' or (t.correo_estado = 'error' and t.correo_intentos < 5))
+       and (t.correo_estado is null or t.correo_estado = 'esperando' or (t.correo_estado = 'error' and t.correo_intentos < 5)
+            or (t.correo_estado = 'enviando' and t.correo_reclamado_en < now() - interval '10 minutes'))
      order by p.numero limit 20) x;
   return v_r;
 end;
 $$;
 
 revoke all on function public.tienda_comprobante_leer(text,bigint), public.tienda_comprobante_marcar(text,bigint,text,text),
-                       public.tienda_comprobante_pendientes(text) from public, anon, authenticated;
+                       public.tienda_comprobante_pendientes(text), public.tienda_comprobante_reclamar(text,bigint)
+  from public, anon, authenticated;
 grant execute on function public.tienda_comprobante_leer(text,bigint), public.tienda_comprobante_marcar(text,bigint,text,text),
-                          public.tienda_comprobante_pendientes(text) to authenticated;
+                          public.tienda_comprobante_pendientes(text), public.tienda_comprobante_reclamar(text,bigint) to authenticated;
 -- ▲▲▲ FIN DEL BLOQUE DDL ▲▲▲
 
 -- ▼▼▼ LAS PRUEBAS (solo en el ensayo) ▼▼▼
@@ -439,9 +465,21 @@ begin
   if public.tienda_comprobante_marcar('clave-ensayo', -31, 'esperando', null) then raise exception 'FALLA C16 enviado se pisó'; end if;
   if public.tienda_comprobante_pendientes('clave-ensayo') @> '[-31]'::jsonb then raise exception 'FALLA C17 enviado sigue pendiente'; end if;
   perform pg_temp.rechaza($q$select public.tienda_comprobante_marcar('clave-ensayo', -31, 'mandado', null)$q$, 'tienda:datos', 'C18 estado inválido');
+  -- El turno: uno solo pasa; el segundo no; vencido se retoma; enviado nunca
+  if not public.tienda_comprobante_reclamar('clave-ensayo', -32) then raise exception 'FALLA K1 el primero toma el turno'; end if;
+  if public.tienda_comprobante_reclamar('clave-ensayo', -32) then raise exception 'FALLA K2 el segundo también lo tomó'; end if;
+  if public.tienda_comprobante_pendientes('clave-ensayo') @> '[-32]'::jsonb then raise exception 'FALLA K3 turno vivo en pendientes'; end if;
+  perform pg_temp.rechaza($q$select public.tienda_comprobante_reclamar('mala', -32)$q$, '42501', 'K4 clave mala reclama turno');
+  if public.tienda_comprobante_reclamar('clave-ensayo', -31) then raise exception 'FALLA K5 reclamó un enviado'; end if;
+  reset role;
+  update public.tienda_tiquete set correo_reclamado_en = now() - interval '11 minutes' where pedido_id = b;
+  perform pg_temp.yo('zz-equipo@prueba.truefie');
+  if not (public.tienda_comprobante_pendientes('clave-ensayo') @> '[-32]'::jsonb) then raise exception 'FALLA K6 turno vencido no vuelve a pendientes'; end if;
+  if not public.tienda_comprobante_reclamar('clave-ensayo', -32) then raise exception 'FALLA K7 turno vencido no se retoma'; end if;
+  if not public.tienda_comprobante_marcar('clave-ensayo', -32, 'error', 'correo_fallo: SMTP') then raise exception 'FALLA K8 marcar suelta el turno'; end if;
   reset role;
   if (select correo_estado||correo_intentos||(correo_en is not null)::text from public.tienda_tiquete where pedido_id=a) <> 'enviado0true'
-     or (select correo_estado||correo_intentos||correo_detalle from public.tienda_tiquete where pedido_id=b) <> 'error5correo_fallo: SMTP'
+     or (select correo_estado||correo_intentos||correo_detalle from public.tienda_tiquete where pedido_id=b) <> 'error6correo_fallo: SMTP'
     then raise exception 'FALLA C19 lo que quedó en la tabla'; end if;
   insert into public.tienda_tiquete (pedido_id) values (u1);
   perform pg_temp.yo('zz-socia@prueba.truefie');
@@ -450,17 +488,17 @@ begin
   reset role;
   if md5(coalesce((select string_agg(pedido_id::text||estado||coalesce(correo_estado,''), ',' order by pedido_id) from public.tienda_tiquete
                     where pedido_id not in (u1,u2,a,b,c)),'')) <> huella then raise exception 'FALLA C21 un tiquete real cambió'; end if;
-  raise notice 'ENSAYO OK: 38 de 38';
+  raise notice 'ENSAYO OK: 46 de 46';
 end $t$;
 -- ▲▲▲ FIN DE LAS PRUEBAS ▲▲▲
 
--- CONTROL. ESPERADO: 5 · 4 · 2 · 3 · 3 · 0 · true · false · true · true · 6 · 6
+-- CONTROL. ESPERADO: 5 · 5 · 2 · 4 · 4 · 0 · true · false · true · true · 6 · 6
 with rpc(f) as (values ('public.tienda_comprobante_leer(text,bigint)'), ('public.tienda_comprobante_marcar(text,bigint,text,text)'),
-                       ('public.tienda_comprobante_pendientes(text)'))
+                       ('public.tienda_comprobante_pendientes(text)'), ('public.tienda_comprobante_reclamar(text,bigint)'))
 select (select count(*) from information_schema.columns where table_schema='public' and table_name='tienda_pedido'
          and column_name in ('correo','fe_tipo','fe_numero','fe_nombre','fe_correo')) as columnas_pedido,
        (select count(*) from information_schema.columns where table_schema='public' and table_name='tienda_tiquete'
-         and column_name in ('correo_estado','correo_detalle','correo_intentos','correo_en')) as columnas_tiquete,
+         and column_name in ('correo_estado','correo_detalle','correo_intentos','correo_en','correo_reclamado_en')) as columnas_tiquete,
        (select count(*) from pg_constraint where conrelid='public.tienda_pedido'::regclass
          and conname in ('tienda_pedido_correo_ok','tienda_pedido_factura_ok')) as checks,
        (select count(*) from rpc where to_regprocedure(f) is not null) as rpc_nuevas,
