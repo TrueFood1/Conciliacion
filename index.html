@@ -18632,21 +18632,27 @@ async function _tdLeerFe(c, numeros){
   }catch(e){}
 }
 // Una línea con la factura (si la pidió) y otra con el comprobante: a qué correo va y, ya en Odoo, si salió.
+// Cédula, nombre de la factura y correos SOLO para socias (Andrea, 11-nov): el asistente no los necesita (la factura la
+// emite el servicio) y ve solo «Pidió factura» y el estado del correo. ⚠️ Es de pantalla: la política
+// asistente_ve_todo de la base sigue dejándole leer esas columnas.
 function _tdFeHTML(p){
   const f=_tdFe[Number(p.numero)]; if(!f) return '';
+  const ve=(_socia===true);
   let h='';
-  if(f.fe_tipo) h+='<div class="td-meta"><b>Factura electrónica</b> · '+esc(TD_FE_TIPO[f.fe_tipo]||f.fe_tipo)+' '+esc(f.fe_numero)
-    +' · '+esc(f.fe_nombre)+'</div>';
-  const dest=f.fe_correo||f.correo, t=f.tiq;
+  if(f.fe_tipo) h+='<div class="td-meta"><b>Factura electrónica</b>'+(ve?(' · '+esc(TD_FE_TIPO[f.fe_tipo]||f.fe_tipo)+' '+esc(f.fe_numero)
+    +' · '+esc(f.fe_nombre)):'')+'</div>';
+  const dest=f.fe_correo||f.correo, t=f.tiq, a=(ve?' · '+esc(dest):'');
   if(!dest) return h+'<div class="td-meta">Sin correo: el comprobante no se envía</div>';
-  if(!t || t.estado!=='creado') return h+'<div class="td-meta">Comprobante a '+esc(dest)+'</div>';
-  if(t.correo_estado==='enviado') return h+'<div class="td-meta">Comprobante enviado · '+esc(dest)+'</div>';
-  if(t.correo_estado==='enviando') return h+'<div class="td-meta">Comprobante enviándose · '+esc(dest)+'</div>';
+  if(!t || t.estado!=='creado') return h+'<div class="td-meta">Comprobante por correo'+a+'</div>';
+  if(t.correo_estado==='enviado') return h+'<div class="td-meta">Comprobante enviado'+a+'</div>';
+  if(t.correo_estado==='enviando') return h+'<div class="td-meta">Comprobante enviándose'+a+'</div>';
   const n=Number(p.numero), ocup=(_tdCompOcupado===n);
-  const txt = t.correo_estado==='error' ? ('Comprobante sin enviar · '+esc(t.correo_detalle||'error'))
-            : ('Comprobante por enviar · '+esc(t.correo_detalle||dest));
+  const det=ve ? (t.correo_detalle||dest) : (t.correo_detalle||'');
+  // El detalle de un error puede traer la dirección (el rechazo del servidor de correo): solo para socias.
+  const txt = t.correo_estado==='error' ? ('Comprobante sin enviar'+(ve?' · '+esc(t.correo_detalle||'error'):''))
+            : ('Comprobante por enviar'+(det?' · '+esc(det):''));
   return h+'<div class="td-meta"'+(t.correo_estado==='error'?' style="color:var(--warn)"':'')+'>'+txt+'</div>'
-    +(_socia?'<div class="td-acc"><button class="btn btn-sm"'+(ocup?' disabled':'')+' onclick="_tdComprobante('+n+')">'
+    +(ve?'<div class="td-acc"><button class="btn btn-sm"'+(ocup?' disabled':'')+' onclick="_tdComprobante('+n+')">'
       +(ocup?'Enviando…':'Enviar comprobante')+'</button></div>':'');
 }
 async function _tdComprobante(numero){
