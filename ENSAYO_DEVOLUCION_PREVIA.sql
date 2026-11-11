@@ -1,7 +1,10 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ENSAYO_DEVOLUCION_PREVIA.sql  ·  11-nov-2026  ·  ENSAYO EN SECO · NO ESCRIBE NADA
+-- ✅ CORRIDO en producción el 11-nov-2026 por Andrea: 9 de 9 ok = true (7, 8 y 9 con 23514).
+--    Rollback verificado desde afuera (pg_lector): sin columnas de factura, pedido_id NOT NULL,
+--    sin el check nuevo y cero filas de ensayo.
 -- Aplica CAMBIO_DEVOLUCION_PREVIA.sql, lo prueba con filas de mentira y lo deshace
--- todo (rollback). NO SE CORRIO.
+-- todo (rollback).
 --
 -- CÓMO SE LEE
 --   Una tabla con TODAS las filas en ok = true (son 9). Un RECHAZA da ok solo si el

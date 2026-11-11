@@ -1,5 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- CAMBIO_DEVOLUCION_PREVIA.sql  ·  11-nov-2026  ·  NO SE CORRIO
+-- CAMBIO_DEVOLUCION_PREVIA.sql  ·  11-nov-2026  ·  APLICADO en producción por Andrea (11-nov)
+-- ✅ Control 2 · 1 · YES · 2 · 1 · 0. Verificado desde afuera (pg_lector): 2 columnas, pedido_id
+--    NULL-able, check ent_devolucion_origen_ok, las dos vistas con security_invoker=true, 1
+--    devolución vigente y 0 excesos como antes; REST con la anon key lee factura_id (200).
 -- Devoluciones de entregas ANTERIORES A TRUEFIE: la devolucion cuelga de una
 -- FACTURA de Odoo en vez de una entrega (ent_pedido).
 --
