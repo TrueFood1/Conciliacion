@@ -1,5 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- CAMBIO_TIENDA_FACTURA.sql  ·  11-nov-2026  ·  SIN PEGAR
+-- CAMBIO_TIENDA_FACTURA.sql  ·  11-nov-2026  ·  APLICADO en producción por Andrea (11-nov)
+-- ✅ Control 5·5·2·4·4·0·true·false·true·true·6·6. Verificado desde afuera (pg_lector): 5+5 columnas, 2 checks
+--    (factura_ok con COALESCE), 4 RPC tienda_comprobante_* solo authenticated, crear_pedido solo anon,
+--    0 pedidos, 0 usuarios de prueba; REST anon sobre tienda_pedido → 401.
 -- Factura electrónica a nombre del cliente y comprobante por correo, en la Tienda en línea.
 --
 -- POR QUÉ (Valery, contadora, 11-nov): si el cliente pide factura electrónica a su nombre es OBLIGATORIO
