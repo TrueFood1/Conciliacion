@@ -18616,6 +18616,49 @@ function _tdEntregaHTML(p){
   const nom={planta:'Recoge en planta', propio:'Mensajero propio', envio:'Envío'}[p.entrega]||esc(p.entrega);
   return '<b>'+nom+'</b>'+(p.direccion?' · '+esc(p.direccion):'');
 }
+// Factura pedida y correo del comprobante (CAMBIO_TIENDA_FACTURA.sql, 11-nov). Solo lectoras: las RPC que lee
+// Daniel no traen cédula ni correo. Sin el SQL pegado la lectura falla callada y las tarjetas quedan como antes.
+let _tdFe={}, _tdCompOcupado=0;
+const TD_FE_TIPO={'01':'Cédula física','02':'Cédula jurídica','03':'DIMEX','04':'NITE'};
+async function _tdLeerFe(c, numeros){
+  const ns=Array.from(new Set((numeros||[]).map(Number).filter(function(n){ return n>0; })));
+  if(!_lectora || !c || !ns.length) return;
+  try{
+    const {data,error}=await c.from('tienda_pedido')
+      .select('numero,correo,fe_tipo,fe_numero,fe_nombre,fe_correo,tienda_tiquete(estado,correo_estado,correo_detalle)').in('numero',ns);
+    if(error) return;
+    (data||[]).forEach(function(r){ const t=Array.isArray(r.tienda_tiquete)?r.tienda_tiquete[0]:r.tienda_tiquete;
+      _tdFe[r.numero]=Object.assign({}, r, {tiq:t||null}); });
+  }catch(e){}
+}
+// Una línea con la factura (si la pidió) y otra con el comprobante: a qué correo va y, ya en Odoo, si salió.
+function _tdFeHTML(p){
+  const f=_tdFe[Number(p.numero)]; if(!f) return '';
+  let h='';
+  if(f.fe_tipo) h+='<div class="td-meta"><b>Factura electrónica</b> · '+esc(TD_FE_TIPO[f.fe_tipo]||f.fe_tipo)+' '+esc(f.fe_numero)
+    +' · '+esc(f.fe_nombre)+'</div>';
+  const dest=f.fe_correo||f.correo, t=f.tiq;
+  if(!dest) return h+'<div class="td-meta">Sin correo: el comprobante no se envía</div>';
+  if(!t || t.estado!=='creado') return h+'<div class="td-meta">Comprobante a '+esc(dest)+'</div>';
+  if(t.correo_estado==='enviado') return h+'<div class="td-meta">Comprobante enviado · '+esc(dest)+'</div>';
+  const n=Number(p.numero), ocup=(_tdCompOcupado===n);
+  const txt = t.correo_estado==='error' ? ('Comprobante sin enviar · '+esc(t.correo_detalle||'error'))
+            : ('Comprobante por enviar · '+esc(t.correo_detalle||dest));
+  return h+'<div class="td-meta"'+(t.correo_estado==='error'?' style="color:var(--warn)"':'')+'>'+txt+'</div>'
+    +(_socia?'<div class="td-acc"><button class="btn btn-sm"'+(ocup?' disabled':'')+' onclick="_tdComprobante('+n+')">'
+      +(ocup?'Enviando…':'Enviar comprobante')+'</button></div>':'');
+}
+async function _tdComprobante(numero){
+  if(!numero || _tdCompOcupado) return;
+  _tdCompOcupado=numero; tdRender(); if(!_despAbierto) despRender();
+  let R=null; try{ R=await _escrituraPost('/comprobante',{numero:numero}); }catch(e){}
+  _tdCompOcupado=0;
+  const ok=R && !R.red && R.js && R.js.ok, est=ok ? R.js.estado : '';
+  const m = !R || R.red ? 'El servicio de Odoo no contestó.' : (!ok ? ((R.js&&R.js.texto)||('error '+R.st))
+          : est==='enviado' ? 'comprobante enviado.' : est==='error' ? (R.js.texto||'no salió.') : (R.js.detalle||'todavía no se puede enviar.'));
+  _tdAviso(ok && est==='enviado' ? 's-ok' : 's-err', 'Pedido #'+numero+': '+m);
+  await _tdLeerFe(sbClient(), [numero]); tdRender();
+}
 // UNA sola tarjeta para las tres listas. modo: 'conf' (socias) · 'ent' (entregar) · 'fact' (facturar).
 function _tdTarjeta(p, modo, i){
   const fecha=(d)=>new Date(d).toLocaleString('es-CR',{timeZone:'America/Costa_Rica',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
@@ -18637,6 +18680,7 @@ function _tdTarjeta(p, modo, i){
     +(modo==='ent'?'':'<div class="td-tot">'+cM(p.total_crc)+'</div>')+'</div>'
     +'<div class="td-meta">'+cuando+estado+' · '+metodo+' · <a href="tel:'+String(p.telefono||'').replace(/[^\d+]/g,'')+'">'+esc(p.telefono)+'</a></div>'
     +'<div class="td-ent">'+_tdEntregaHTML(p)+'</div>'
+    +(modo==='ent'?'':_tdFeHTML(p))
     +'<table class="td-lins">'+lins+envio+'</table>'
     +(acc?'<div class="td-acc">'+acc+'</div>':'')+'</div>';
 }
@@ -18668,6 +18712,7 @@ async function tdCargar(){
   try{
     const tareas=[c.rpc('tienda_por_entregar').then(function(r){ if(r.error) throw r.error; _td.ent=r.data||[]; }), _tdLeerDia(c)];
     await Promise.all(tareas);
+    await _tdLeerFe(c, _td.fact.map(function(p){ return p.numero; }));
     _td.error=''; st.classList.add('hidden');
   }catch(e){ leyo=false; _td.error=_tdErrorTxt(e); st.className='status s-err'; st.textContent='No pude leer los pedidos: '+_td.error; }
   tdRender();
@@ -18679,7 +18724,8 @@ async function tdDiaSet(v){
   _td.dia=v; _td.diaElegido=(v!==_tdHoy());
   _td.fact=[]; _td.factTxt='Leyendo ese día…'; tdRender();
   const st=document.getElementById('tdStatus');
-  try{ if(!(await _tdLeerDia(sbClient()))) return; st.classList.add('hidden'); }
+  try{ if(!(await _tdLeerDia(sbClient()))) return; st.classList.add('hidden');
+       await _tdLeerFe(sbClient(), _td.fact.map(function(p){ return p.numero; })); }
   catch(e){ st.className='status s-err'; st.classList.remove('hidden'); st.textContent='No pude leer ese día: '+_tdErrorTxt(e); }
   tdRender();
 }
@@ -18793,7 +18839,7 @@ async function despTiendaCargar(){
     await accesoSocia();
     const {data,error}=await c.rpc('tienda_por_preparar');
     if(error) throw error;
-    if(_lectora) await Promise.all([_tdLeerConf(c), _tdLeerTiq(c)]);
+    if(_lectora){ await Promise.all([_tdLeerConf(c), _tdLeerTiq(c)]); await _tdLeerFe(c, _td.conf.map(function(p){ return p.numero; })); }
     _despTienda=(data||[]).map(_tdAFac); _despTiendaErr='';
   }catch(e){ _despTiendaErr=_tdErrorTxt(e); }
   if(!_despAbierto) despRender();
