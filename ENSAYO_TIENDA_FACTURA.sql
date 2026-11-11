@@ -45,13 +45,16 @@ alter table public.tienda_pedido
   add column fe_correo text;
 alter table public.tienda_pedido add constraint tienda_pedido_correo_ok check (
   correo is null or (length(correo) <= 160 and correo ~ '^[^@\s<>"'',;]+@[^@\s<>"'',;]+\.[A-Za-z]{2,}$'));
-alter table public.tienda_pedido add constraint tienda_pedido_factura_ok check (
+-- ⚠️ coalesce(..., false): con un campo en NULL la segunda rama da NULL (no false) y un CHECK que da
+--    NULL DEJA PASAR la fila — una factura a medias entraba. Lo cazó la prueba F14 del ensayo (11-nov).
+alter table public.tienda_pedido add constraint tienda_pedido_factura_ok check (coalesce(
      (fe_tipo is null and fe_numero is null and fe_nombre is null and fe_correo is null)
   or (fe_tipo in ('01','02','03','04')
+      and fe_numero is not null and fe_nombre is not null and fe_correo is not null
       and fe_numero ~ (case fe_tipo when '01' then '^[1-9][0-9]{8}$' when '02' then '^[0-9]{10}$'
                                     when '03' then '^[1-9][0-9]{10,11}$' else '^[0-9]{10}$' end)
       and length(btrim(fe_nombre)) between 2 and 100
-      and length(fe_correo) <= 160 and fe_correo ~ '^[^@\s<>"'',;]+@[^@\s<>"'',;]+\.[A-Za-z]{2,}$'));
+      and length(fe_correo) <= 160 and fe_correo ~ '^[^@\s<>"'',;]+@[^@\s<>"'',;]+\.[A-Za-z]{2,}$'), false));
 
 -- §2 · EL ESTADO DEL CORREO DEL COMPROBANTE, al lado del tiquete. Lo escribe SOLO el servicio (con su clave).
 --      «enviando» = alguien tiene el turno (correo_reclamado_en): el cron, el botón o un doble clic no mandan dos.
