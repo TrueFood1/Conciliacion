@@ -22548,15 +22548,22 @@ async function dvCargar(force){
 //     tienen (regalias, consumo interno: tienen DESTINATARIO).
 async function dvLeer(){
   const c=sbClient(); if(!c) throw new Error('sin sesión de Supabase');
-  const [pe,de]=await Promise.all([
+  const DV_COLS='devolucion_id,fecha,recibido_en,cliente_id,cliente_nombre,pedido_id,causa,nota,creado_por,resolucion';
+  const [pe,de0]=await Promise.all([
     c.from('v_ent_pedido_estado')
      .select('pedido_id,fecha_despacho,factura_id,factura_nombre,cliente_id,cliente_nombre,'
             +'origen,motivo,alisto_id,preparado_en,estado,fecha_ab_re_04')
      .order('fecha_ab_re_04',{ascending:false}).limit(300),
-    c.from('ent_devolucion_vigente')
-     .select('devolucion_id,fecha,recibido_en,cliente_id,cliente_nombre,pedido_id,causa,nota,creado_por,resolucion')
+    c.from('ent_devolucion_vigente').select(DV_COLS+',factura_id,factura_nombre')
      .order('recibido_en',{ascending:false}).limit(100) ]);
   if(pe.error) throw pe.error;
+  // ⚠️ SI LA BASE TODAVIA NO TIENE LAS COLUMNAS DE FACTURA (CAMBIO_DEVOLUCION_PREVIA.sql
+  // sin pegar), 42703. Sin este respaldo TODO Devoluciones se cae, no solo las previas:
+  // se vuelve a leer sin ellas y la previa simplemente no se puede guardar.
+  let de=de0;
+  if(de.error && String(de.error.code)==='42703')
+    de=await c.from('ent_devolucion_vigente').select(DV_COLS)
+      .order('recibido_en',{ascending:false}).limit(100);
   if(de.error) throw de.error;
   const todas=pe.data||[];
   const devs=de.data||[];
@@ -22592,7 +22599,8 @@ async function dvLeer(){
 function _dvNueva(){
   return {cliente:null, entrega:null, pid:null, lotes:{}, lineas:[],
           causa:'', nota:'', causaEditar:false, fecha:_despHoy(), editando:-1,
-          resolucion:'', resEditar:false, reemp:{}};
+          resolucion:'', resEditar:false, reemp:{},
+          previa:null, plotes:{}};
 }
 function dvNueva(){ _dv.n=_dvNueva(); _dv.modo='nueva'; _dvVerTodas=false; _dvLot=null; dvRender(); }
 function dvVolver(){ _dv.modo='lista'; _dv.n=null; dvRender(); }
@@ -22629,7 +22637,8 @@ function dvListaHTML(){
       +'<div class="bs-f2"><span class="bs-sub">'+esc(que||'sin líneas')+'</span></div>'
       +'<div class="bs-f2"><span class="bs-sub">'+esc(cau)
       +(d.nota?(' · '+esc(d.nota)):'')+'</span>'
-      +'<span class="bs-fac">#'+d.pedido_id+'</span></div>'
+      +'<span class="bs-fac">'+(d.pedido_id!=null?('#'+d.pedido_id)
+        :esc(_despFacCorta(d.factura_nombre||'')+' · antes de Truefie'))+'</span></div>'
       +(d.resolucion==='cambio'
         ? ('<div class="bs-f2"><span class="bs-sub">Cambio · sale '
            +esc(_dvReempTxt(d.reemplazo)||'sin lo que salió')+'</span></div>') : '')
@@ -22758,6 +22767,7 @@ function dvFormHTML(){
       ? '<button class="rp-clivacio" onclick="dvAbrirClientes()">Elegir de la lista…</button>'
       : '<div class="cl-none">No hay entregas registradas para devolver.</div>';
     h+=dvFueraHTML();
+    h+=dvPreviaBuscarHTML();
   }else if(!N.entrega){
     h+='<div class="rp-clisel"><span>'+esc(N.cliente.nombre)+'</span>'
       +'<button onclick="dvCliente(null)" title="Cambiar">×</button></div>';
@@ -22772,7 +22782,7 @@ function dvFormHTML(){
     h+='</div>';
   }else{
     h+='<div class="rp-clisel"><span>'+esc(N.cliente.nombre)+' · '+esc(_entFacRotulo(N.entrega))
-      +' · '+esc(_despDia(N.entrega.fecha_despacho))+'</span>'
+      +' · '+esc(_despDia(N.entrega.fecha_despacho))+(N.entrega.previa?' · antes de Truefie':'')+'</span>'
       +'<button onclick="dvEntrega(null)" title="Cambiar">×</button></div>';
   }
   h+='</div>';
@@ -22920,6 +22930,7 @@ function dvFormHTML(){
 // agoto aparece igual, con su "salieron".
 function dvLotesHTML(){
   const N=_dv.n, pid=N.pid;
+  if(N.entrega && N.entrega.previa) return dvPreviaLotesHTML();
   const lts=dvLotesDe(pid);
   if(!lts.length) return '<div class="cl-none">Este producto no tiene lotes identificados '
     +'en esta entrega, así que no hay contra qué devolver.</div>';
@@ -22972,6 +22983,16 @@ function dvLotesHTML(){
 const DV_LOTE_OK=/^\d{1,3} \/ \d{1,2}-\d{2}$/;
 function dvLotesDe(pid){
   const N=_dv.n, out=[], M=_dvManejo(pid);
+  // Una previa no tiene lotes que salieron: son los que Daniel agrego a mano
+  // (`dvPreviaAgregarLote`), con el factor de la FACTURA para la NC.
+  if(N.entrega && N.entrega.previa){
+    const l=(N.entrega.lineas||[]).find(function(x){ return +x.producto_id===+pid; });
+    if(!l) return out;
+    (N.plotes[pid]||[]).forEach(function(lote){
+      out.push({lote:lote, salioUds:null, salioMan:null, man:M.nombre, div:M.div,
+                facCong:_dvFactorCong(l), uomFac:_dvUom(l)}); });
+    return out;
+  }
   (N.entrega.lineas||[]).forEach(function(l){
     if(+l.producto_id!==+pid) return;
     const facCong=_dvFactorCong(l), uomFac=_dvUom(l);
@@ -22988,6 +23009,8 @@ function dvLotesDe(pid){
 }
 function dvProductosDeLaEntrega(){
   const vis={}, out=[];
+  if(_dv.n.entrega && _dv.n.entrega.previa)
+    return (_dv.n.entrega.lineas||[]).map(function(l){ return +l.producto_id; });
   (_dv.n.entrega.lineas||[]).forEach(function(l){
     const tiene=(l.lotes||[]).some(function(x){ return DV_LOTE_OK.test(String(x.lote||'')); });
     if(tiene && !vis[l.producto_id]){ vis[l.producto_id]=1; out.push(+l.producto_id); }
@@ -23051,7 +23074,10 @@ function dvCliente(id,nombre){
 }
 async function dvEntrega(pid){
   const N=_dv.n;
-  if(pid==null){ N.entrega=null; N.pid=null; N.lotes={}; N.lineas=[]; N.reemp={}; dvRender(); return; }
+  if(pid==null){
+    // Una previa eligio cliente Y factura de un solo gesto: se deshacen juntos.
+    if(N.entrega && N.entrega.previa){ N.cliente=null; N.previa=null; N.plotes={}; }
+    N.entrega=null; N.pid=null; N.lotes={}; N.lineas=[]; N.reemp={}; dvRender(); return; }
   N.entrega=_dv.peds.find(function(p){ return p.pedido_id===pid; })||null;
   N.pid=null; N.lotes={}; N.lineas=[]; N.reemp={}; N.editando=-1; dvRender();
   try{
@@ -23288,6 +23314,194 @@ function dvFueraHTML(){
   return '<div class="dv-nota">¿No aparece la entrega? Avisá.</div>';
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// ENTREGAS ANTERIORES A TRUEFIE (11-nov-2026, Andrea)
+// ════════════════════════════════════════════════════════════════════════
+// EL CASO: Megasuper Escazu devuelve producto de la factura 3287 (11-may), una
+// entrega de antes de Truefie. No tiene pedido ni lotes que salieron, asi que el
+// camino de siempre no la encuentra. Se busca LA FACTURA en Odoo por su numero y
+// la devolucion cuelga de ella (`ent_devolucion.factura_id`, pedido_id null —
+// CAMBIO_DEVOLUCION_PREVIA.sql).
+//
+// ⚠️ EL LOTE SE ESCRIBE, Y POR ESO SE VERIFICA DOS VECES. En una devolucion comun
+// el lote NUNCA se escribe (sale de lo que salio); aca no hay de donde sacarlo.
+//   · Se escribe SOLO EL DIA (el numero del lote). El vencimiento lo pone Truefie
+//     con la vida util VIGENTE (ENT_VIDA_MESES), porque el producto que vuelve se
+//     REEMPACA con sticker nuevo (decision de Andrea, 11-nov): el lote que entra al
+//     congelador es `124 / 2-27`, no el `124 / 10-26` de la bolsa vieja. Es otra
+//     clave a proposito: no se mezcla con el saldo que el ancla tenga del viejo.
+//   · Antes de aceptarlo se pregunta a Odoo si ese producto tuvo produccion ESE dia
+//     (±1 por la medianoche, el 2,4% medido). Si no tuvo, no se agrega: un lote
+//     inventado es una clave de saldo que no le corresponde a ninguna orden.
+// ⚠️ EL TOPE ES LA FACTURA, y AVISA, NO FRENA, igual que el exceso de siempre: lo
+// facturado menos lo que ya volvio por este mismo camino. Las NC hechas por fuera
+// de Truefie (como la 248 de esta misma factura) no se descuentan: no hay forma de
+// saber cuales fueron producto que volvio y cuales administrativas.
+function dvPreviaBuscarHTML(){
+  const P=_dv.n.previa;
+  if(!P) return '<button class="dv-mas" onclick="dvPreviaAbrir()">Es de una entrega anterior a Truefie</button>';
+  return '<div class="rp-cond" style="margin-top:12px"><div class="rp-sec-t">Entrega anterior a Truefie</div>'
+    +'<div class="rp-pie"><span class="rp-pie-l">Número de factura</span>'
+    +'<input id="dvPrevFac" class="cl-in" type="text" inputmode="numeric" placeholder="3287" '
+    +'value="'+esc(P.num||'')+'" oninput="_dv.n.previa.num=this.value" '
+    +'onkeydown="if(event.key===\'Enter\')dvPreviaBuscar()">'
+    +'<button class="btn btn-sm" '+(P.buscando?'disabled':'')+' onclick="dvPreviaBuscar()">'
+    +(P.buscando?'Buscando…':'Buscar')+'</button></div>'
+    +(P.err?('<div class="rp-nota rp-falta">'+esc(P.err)+'</div>'):'')
+    +'<button class="dv-mas" onclick="_dv.n.previa=null;dvRender()">cancelar</button></div>';
+}
+function dvPreviaAbrir(){
+  _dv.n.previa={num:'', buscando:false, err:''}; dvRender();
+  const i=document.getElementById('dvPrevFac'); if(i) i.focus();
+}
+async function dvPreviaBuscar(){
+  const N=_dv.n, P=N.previa; if(!P || P.buscando) return;
+  const num=String(P.num||'').replace(/\D/g,'').replace(/^0+/,'');
+  if(!num){ P.err='Escribí el número de la factura.'; dvRender(); return; }
+  P.buscando=true; P.err=''; dvRender();
+  try{
+    const fin=num.padStart(10,'0');
+    const ms=(await odooCall('account.move','search_read',
+      [[['move_type','=','out_invoice'],['state','=','posted'],['name','ilike',fin]]],
+      {fields:['id','name','ref','invoice_date','partner_id','payment_state'],limit:20,context:{lang:'es_CR'}}))
+      .filter(function(m){ return String(m.name||'').slice(-10)===fin && !_tdEsTiquete(m); });
+    if(!ms.length) throw new Error('No encontré la factura '+num+' en Odoo.');
+    if(ms.length>1) throw new Error('Hay más de una factura que termina en '+num+': avisá.');
+    const m=ms[0];
+    // Solo la reversion TOTAL anula: una NC parcial (otra devolucion de esta misma
+    // factura, hecha con «Revertir») deja `reversal_move_id` puesto y la factura viva.
+    if(m.payment_state==='reversed') throw new Error('La factura '+num+' está anulada con nota de crédito.');
+    // Si la factura YA paso por Truefie, la devolucion va por el camino de siempre:
+    // ahi estan sus lotes de verdad y no hay que escribir ninguno.
+    const c=sbClient();
+    if(c){
+      const [a,b]=await Promise.all([
+        c.from('v_ent_factura_despachada').select('factura_id').eq('factura_id',m.id),
+        c.from('ent_pedido_factura_vigente').select('pedido_id,anulado').eq('factura_id',m.id)]);
+      if(a.error) throw a.error;
+      if(b.error) throw b.error;
+      if((a.data||[]).length || (b.data||[]).some(function(r){ return !r.anulado; }))
+        throw new Error('La factura '+num+' está registrada en Truefie: buscala por cliente, arriba.'); }
+    const ls=await odooCall('account.move.line','search_read',
+      [[['move_id','=',m.id],['display_type','=','product'],['product_id','in',ENT_PROD]]],
+      {fields:['product_id','product_uom_id','quantity'],limit:100,context:{lang:'es_CR'}});
+    if(!ls.length) throw new Error('La factura '+num+' no tiene productos terminados.');
+    const uids=ls.map(function(l){ return (l.product_uom_id&&l.product_uom_id[0])||1; });
+    await uomFactores(uids);
+    const porP={}, orden=[];
+    ls.forEach(function(l){
+      const pid=l.product_id[0], uid=(l.product_uom_id&&l.product_uom_id[0])||1, f=uomFac(uid);
+      if(!porP[pid]){ porP[pid]={producto_id:pid, uom_id:uid,
+        uom_nombre:(l.product_uom_id&&l.product_uom_id[1])||'Unidades', uom_factor:f, cant_uds:0, lotes:[]};
+        orden.push(pid); }
+      porP[pid].cant_uds+=(+l.quantity||0)/f;   // la NC usa el factor de la PRIMERA linea del producto
+    });
+    N.cliente={id:m.partner_id[0], nombre:m.partner_id[1]};
+    N.entrega={previa:true, pedido_id:null, factura_id:m.id, factura_nombre:m.name,
+               fecha_despacho:m.invoice_date, cliente_nombre:m.partner_id[1],
+               lineas:orden.map(function(p){ return porP[p]; })};
+    N.plotes={}; N.pid=null; N.lotes={}; N.lineas=[]; N.reemp={}; N.editando=-1;
+    P.buscando=false;
+  }catch(e){ P.buscando=false; P.err=(e&&e.message)||String(e); }
+  dvRender();
+}
+// El lote que entra, a partir del DIA escrito y de la fecha de la factura: la
+// produccion es ANTERIOR a la factura, asi que un dia mayor al de la factura es
+// del año anterior. Vence con la vida util vigente (ver arriba).
+function _dvPreviaLote(dia, facFecha){
+  const J=+dia; if(!(J>=1 && J<=366) || String(dia).length>3) return null;
+  const fd=new Date(String(facFecha)+'T12:00:00');
+  let Y=fd.getFullYear();
+  const jFac=Math.floor((fd-new Date(Y,0,1,12))/86400000)+1;
+  if(J>jFac) Y--;
+  const prod=new Date(Y,0,J,12);
+  if(prod.getFullYear()!==Y) return null;   // 366 en un año que no es bisiesto
+  const mV=prod.getMonth()+ENT_VIDA_MESES, yV=Y+Math.floor(mV/12);
+  return {lote:J+' / '+((mV%12)+1)+'-'+String(yV).slice(2), prod:prod};
+}
+function _dvPreviaYmd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+// Lo que ya volvio de este producto por este mismo camino, en devoluciones vigentes.
+function _dvPreviaYaVolvio(facId, pid){
+  let u=0;
+  (_dv.devs||[]).forEach(function(d){ if(d.factura_id!==facId) return;
+    (d.lineas||[]).forEach(function(l){ if(+l.producto_id===+pid) u+=(+l.cant_uds||0); }); });
+  return u;
+}
+function dvPreviaLotesHTML(){
+  const N=_dv.n, pid=N.pid, M=_dvManejo(pid), P=N.previa||{};
+  const L=(N.entrega.lineas||[]).find(function(x){ return +x.producto_id===+pid; })||{cant_uds:0};
+  const lts=dvLotesDe(pid);
+  let h='<div class="rp-cond">';
+  let totMan=0;
+  if(lts.length){
+    h+='<table class="cl-tbl"><tr><th>Lote</th><th>Volvió</th><th></th></tr>';
+    lts.forEach(function(x){
+      const v=N.lotes[x.lote], q=esc(x.lote).replace(/'/g,"&#39;"); totMan+=(+v||0);
+      h+='<tr><td class="cl-lote">'+esc(x.lote)+'</td>'
+        +'<td><input class="cl-in" type="number" min="0" step="any" inputmode="decimal" '
+        +'value="'+esc(v==null?'':v)+'" oninput="dvLote(\''+q+'\',this.value)"></td>'
+        +'<td style="text-align:right"><button class="btn btn-sm" onclick="dvPreviaQuitarLote('+pid+',\''+q+'\')">×</button></td></tr>';
+    });
+    h+='</table>';
+  }
+  const prev=(P.dia&&P.pid===pid)?_dvPreviaLote(P.dia, N.entrega.fecha_despacho):null;
+  h+='<div class="rp-pie" style="margin-top:10px"><span class="rp-pie-l">Lote (el día)</span>'
+    +'<input id="dvPrevDia" class="cl-in" type="text" inputmode="numeric" placeholder="124" '
+    +'value="'+esc(P.pid===pid?(P.dia||''):'')+'" oninput="dvPreviaDia('+pid+',this.value)" '
+    +'onkeydown="if(event.key===\'Enter\')dvPreviaAgregarLote('+pid+')">'
+    +'<span class="rp-nota">'+(prev?('entra como '+esc(prev.lote)):'')+'</span>'
+    +'<button class="btn btn-sm" '+((prev&&!P.verificando)?'':'disabled')+' onclick="dvPreviaAgregarLote('+pid+')">'
+    +(P.verificando?'Revisando…':'Agregar lote')+'</button></div>';
+  if(P.loteErr && P.pid===pid) h+='<div class="rp-nota rp-falta">'+esc(P.loteErr)+'</div>';
+  // El tope: lo facturado menos lo que ya volvio de esta factura. Avisa, no frena.
+  const ya=_dvPreviaYaVolvio(N.entrega.factura_id, pid);
+  if((totMan*M.div + ya) > (L.cant_uds+0.0001))
+    h+='<div class="dv-exceso">Vuelve más de lo que se facturó. <b>Se registra igual</b> y queda marcado.</div>';
+  const I=NIV_INFO[pid]||{nom:pid};
+  h+='<div class="cl-pie">'+esc(I.nom)+' · facturado '+esc(_entPresPlano(pid, L.cant_uds))
+    +(ya>0?(' · ya volvió '+esc(_entPresPlano(pid, ya))):'')
+    +' · vuelve hasta ahora <strong>'+esc(_dvManTxt(totMan, pid))+'</strong></div>';
+  h+='<div style="margin-top:14px"><button class="btn" '+(totMan>0?'':'disabled')
+    +' onclick="dvAgregarLinea()">'+(N.editando>=0?'Guardar el cambio':'Agregar a esta devolución')
+    +'</button>'
+    +(N.editando>=0?' <button class="btn btn-sm" onclick="dvQuitarLinea()">Quitar la línea</button>':'')
+    +'</div></div>';
+  return h;
+}
+function dvPreviaDia(pid, v){
+  const P=_dv.n.previa=_dv.n.previa||{};
+  P.pid=pid; P.dia=String(v||'').replace(/\D/g,''); P.loteErr='';
+  dvRender();
+  const i=document.getElementById('dvPrevDia');
+  if(i){ i.focus(); try{ i.setSelectionRange(i.value.length,i.value.length); }catch(_){} }
+}
+async function dvPreviaAgregarLote(pid){
+  const N=_dv.n, P=N.previa||{}; if(P.verificando) return;
+  if(P.pid!==pid) return;                  // el dia escrito es de OTRO producto: no se le asigna
+  const x=_dvPreviaLote(P.dia, N.entrega.fecha_despacho);
+  if(!x){ P.loteErr='Escribí el número del lote: el día, de 1 a 366.'; dvRender(); return; }
+  if((N.plotes[pid]||[]).indexOf(x.lote)>=0){ P.dia=''; dvRender(); return; }
+  P.verificando=true; P.loteErr=''; dvRender();
+  try{
+    // ±1 dia por la medianoche (CR), con la ventana en UTC: `date_start` viene en UTC
+    // y la produccion de un dia CR puede caer al dia siguiente UTC. Cubre del dia
+    // anterior al siguiente en hora CR, mas unas horas de margen.
+    const d0=new Date(x.prod.getTime()-86400000), d2=new Date(x.prod.getTime()+2*86400000);
+    const n=await odooCall('mrp.production','search_count',
+      [[['product_id','=',+pid],['state','=','done'],
+        ['date_start','>=',_dvPreviaYmd(d0)+' 00:00:00'],['date_start','<',_dvPreviaYmd(d2)+' 06:00:00']]]);
+    if(!n){ P.loteErr='No hay producción de '+_lotNom(pid)+' el día '+(+P.dia)
+      +' ('+_despDia(_dvPreviaYmd(x.prod))+'). Revisá el número del sticker.'; }
+    else{ (N.plotes[pid]=N.plotes[pid]||[]).push(x.lote); P.dia=''; }
+  }catch(e){ P.loteErr='No pude revisar el lote en Odoo: '+((e&&e.message)||String(e)); }
+  P.verificando=false; dvRender();
+}
+function dvPreviaQuitarLote(pid, lote){
+  const N=_dv.n;
+  N.plotes[pid]=(N.plotes[pid]||[]).filter(function(l){ return l!==lote; });
+  delete N.lotes[lote]; dvRender();
+}
+
 // ── LA CONFIRMACION · lo que va a pasar, en letras, ANTES de que pase ───
 // Es la simetria de "no registra una entrega nueva" del dialogo de Entregar: esta
 // pantalla SUMA, y sumar de mas es el error grave de este modulo.
@@ -23412,12 +23626,19 @@ async function dvGuardar(){
     // 1 · la cabecera. `fecha` es el dia que LLEGO; `recibido_en` lo pone la base
     // con now(), y es lo que se compara contra el corte del ancla. Dos tiempos
     // distintos a proposito (ver ENTREGAS_DEVOLUCIONES.sql).
-    const {data:dev,error:e1}=await c.from('ent_devolucion').insert({
+    // UNA PREVIA cuelga de la FACTURA y no de un pedido: la base exige exactamente
+    // uno de los dos (`ent_devolucion_origen_ok`, CAMBIO_DEVOLUCION_PREVIA.sql).
+    // Las columnas de factura van SOLO en una previa: una devolucion comun manda la
+    // misma fila de siempre.
+    const previa=!!N.entrega.previa;
+    const cab={
       fecha:N.fecha, cliente_id:N.cliente.id, cliente_nombre:N.cliente.nombre,
-      pedido_id:N.entrega.pedido_id, causa:N.causa,
+      pedido_id:(previa?null:N.entrega.pedido_id), causa:N.causa,
       nota:(N.causa==='otro'?String(N.nota||'').trim():null),
       resolucion:N.resolucion,
-      creado_por:email}).select('id').single();
+      creado_por:email};
+    if(previa){ cab.factura_id=N.entrega.factura_id; cab.factura_nombre=N.entrega.factura_nombre; }
+    const {data:dev,error:e1}=await c.from('ent_devolucion').insert(cab).select('id').single();
     if(e1) throw e1;
 
     paso='las líneas (la devolución YA quedó registrada, sin líneas)';
@@ -23455,7 +23676,7 @@ async function dvGuardar(){
     // YA estan, no salir a reconstruirlos.
     paso='la alerta de la nota de crédito (la devolución ya suma al inventario)';
     const {data:pen,error:e3}=await c.from('ent_odoo_pendiente').insert({
-      tipo:'nota_credito', pedido_id:N.entrega.pedido_id, devolucion_id:dev.id,
+      tipo:'nota_credito', pedido_id:(previa?null:N.entrega.pedido_id), devolucion_id:dev.id,
       fecha:N.fecha, cliente_id:N.cliente.id, cliente_nombre:N.cliente.nombre,
       factura_id:N.entrega.factura_id, factura_nombre:N.entrega.factura_nombre,
       creado_por:email}).select('id').single();
@@ -23732,8 +23953,8 @@ function pdOdooHTML(){
       h+='<div class="pd-exc-ped"><div class="pd-exc-cab">'
         +'<div class="pd-exc-cli">'+esc(quien)+'</div>'
         +'<div class="pd-exc-dias">'+(d===null?'—':(d<=0?'hoy':(d===1?'1 día':d+' días')))+'</div></div>'
-        +'<div class="pd-exc-meta">#'+x.pedido_id
-        +(x.factura_nombre?(' · '+esc(x.factura_nombre)):(' · '+esc(_entFacRotulo(x))))
+        +'<div class="pd-exc-meta">'+(x.pedido_id!=null?('#'+x.pedido_id+' · '):'antes de Truefie · ')
+        +(x.factura_nombre?esc(x.factura_nombre):esc(_entFacRotulo(x)))
         +' · '+x.lineas.length+(x.lineas.length===1?' línea':' líneas')+'</div>';
       // EL PAYLOAD, A LA VISTA. Es lo que hay que copiar a Odoo, y por eso se
       // muestra entero en vez de resumido: la socia lo lee mientras lo crea alla.
