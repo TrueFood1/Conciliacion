@@ -1,5 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ENSAYO_TIENDA_FACTURA.sql  ·  11-nov-2026  ·  ENSAYO EN SECO · TERMINA EN ROLLBACK · SIN CORRER
+-- ✅ CORRIDO en producción el 11-nov-2026 por Andrea (2.º intento; el 1.º cayó en F14 → check corregido en 61c2d68):
+--    fila de control 5·5·2·4·4·0·true·false·true·true·6·6. Rollback verificado desde afuera (pg_lector): 0 columnas
+--    nuevas, 0 RPC tienda_comprobante*, 0 pedidos, 0 usuarios de prueba.
 -- Aplica CAMBIO_TIENDA_FACTURA.sql, lo prueba con pedidos de mentira y lo deshace todo.
 --
 -- CÓMO SE LEE
