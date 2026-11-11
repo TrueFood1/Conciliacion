@@ -6351,7 +6351,7 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 11 nov 2026 · b164';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 11 nov 2026 · b165';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -10750,10 +10750,11 @@ function opVerReporte(){
   try{
     if(!_bsPdfListo()){ _bsExpLibs(); throw new Error('no cargó la librería de PDF; probá de nuevo en unos segundos'); }
     const blob=_opReporteDoc().output('blob'), nombre=_opReporteNombre();
-    let tactil=false; try{ tactil=window.matchMedia('(pointer:coarse)').matches; }catch(e){}
-    if(!tactil){ const url=URL.createObjectURL(blob); const w=window.open(url, '_blank');
-      if(w){ setTimeout(function(){ try{ URL.revokeObjectURL(url); }catch(e){} }, 120000); return; }
-      URL.revokeObjectURL(url); }
+    // MOSTRARLO, también en el celular (Andrea, 11-nov): se abre el PDF en una pestaña nueva, dentro
+    // del mismo toque. Solo si el navegador bloquea la pestaña cae a compartir o descargar.
+    const url=URL.createObjectURL(blob); const w=window.open(url, '_blank');
+    if(w){ setTimeout(function(){ try{ URL.revokeObjectURL(url); }catch(e){} }, 120000); return; }
+    URL.revokeObjectURL(url);
     _bsExpEntregar(blob, nombre);
   }catch(e){ _opMsg('No se pudo armar el reporte: '+((e&&e.message)||String(e)),'op-mal'); }
 }
