@@ -6351,7 +6351,7 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 13 nov 2026 · b166';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 13 nov 2026 · b167';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -18685,6 +18685,19 @@ async function _tdComprobante(numero){
   _tdAviso(ok && est==='enviado' ? 's-ok' : 's-err', 'Pedido #'+numero+': '+m);
   await _tdLeerFe(sbClient(), [numero]); tdRender();
 }
+// WHATSAPP AL CLIENTE (Andrea, 13-nov): abre el chat con el mensaje escrito; quien lo toca lo manda
+// desde SU WhatsApp. Teléfono de 8 dígitos = Costa Rica (506). Sin dos puntos ni signos de apertura.
+function _tdWaHref(p){
+  let t=String(p.telefono||'').replace(/\D/g,''); if(t.length===8) t='506'+t;
+  if(t.length<10) return '';
+  const nom=String(p.nombre||'').trim().split(/\s+/)[0];
+  const ent={planta:'Lo puedes recoger en la planta, te avisamos cuando esté listo.',
+             propio:'Tu mensajero lo puede recoger en la planta, te avisamos cuando esté listo.',
+             envio:'Te lo llevamos a la dirección que nos dejaste, te avisamos cuando vaya en camino.'}[p.entrega]||'';
+  const msg='Hola '+nom+'! Te escribimos de True Food 🤍 Recibimos tu pedido #'+Number(p.numero)+' por '+cM(p.total_crc)+'. '
+    +ent+' Cualquier cosa nos escribes por aquí!';
+  return 'https://wa.me/'+t+'?text='+encodeURIComponent(msg);
+}
 // UNA sola tarjeta para las tres listas. modo: 'conf' (socias) · 'ent' (entregar) · 'fact' (facturar).
 function _tdTarjeta(p, modo, i){
   const fecha=(d)=>new Date(d).toLocaleString('es-CR',{timeZone:'America/Costa_Rica',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
@@ -18704,7 +18717,7 @@ function _tdTarjeta(p, modo, i){
   const estado = (modo==='fact' && p.estado==='entregado') ? ' · Entregado' : '';
   return '<div class="td-card"><div class="td-top"><div class="td-nom"><span class="td-num">#'+Number(p.numero)+'</span>'+esc(p.nombre)+'</div>'
     +(modo==='ent'?'':'<div class="td-tot">'+cM(p.total_crc)+'</div>')+'</div>'
-    +'<div class="td-meta">'+cuando+estado+' · '+metodo+' · <a href="tel:'+String(p.telefono||'').replace(/[^\d+]/g,'')+'">'+esc(p.telefono)+'</a></div>'
+    +'<div class="td-meta">'+cuando+estado+' · '+metodo+' · <a href="tel:'+String(p.telefono||'').replace(/[^\d+]/g,'')+'">'+esc(p.telefono)+'</a>'+(_tdWaHref(p)?' · <a href="'+_tdWaHref(p)+'" target="_blank" rel="noopener">WhatsApp</a>':'')+'</div>'
     +'<div class="td-ent">'+_tdEntregaHTML(p)+'</div>'
     +(modo==='ent'?'':_tdFeHTML(p))
     +'<table class="td-lins">'+lins+envio+'</table>'
