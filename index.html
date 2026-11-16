@@ -18637,7 +18637,7 @@ function _tdEntregaHTML(p){
 }
 // Factura pedida y correo del comprobante (CAMBIO_TIENDA_FACTURA.sql, 11-nov). Solo lectoras: las RPC que lee
 // Daniel no traen cédula ni correo. Sin el SQL pegado la lectura falla callada y las tarjetas quedan como antes.
-let _tdFe={}, _tdCompOcupado=0;
+let _tdFe={}, _tdOrigen={}, _tdCompOcupado=0;
 const TD_FE_TIPO={'01':'Cédula física','02':'Cédula jurídica','03':'DIMEX','04':'NITE'};
 async function _tdLeerFe(c, numeros){
   const ns=Array.from(new Set((numeros||[]).map(Number).filter(function(n){ return n>0; })));
@@ -18649,6 +18649,33 @@ async function _tdLeerFe(c, numeros){
     (data||[]).forEach(function(r){ const t=Array.isArray(r.tienda_tiquete)?r.tienda_tiquete[0]:r.tienda_tiquete;
       _tdFe[r.numero]=Object.assign({}, r, {tiq:t||null}); });
   }catch(e){}
+  // De dónde llegó el pedido (TIENDA_ORIGEN.sql). Lectura aparte: si la columna todavía no existe, falla sola y
+  // la tarjeta no muestra la línea, sin tumbar la de la factura.
+  try{
+    const o=await c.from('tienda_pedido').select('numero,origen').in('numero',ns);
+    if(!o.error) (o.data||[]).forEach(function(r){ _tdOrigen[r.numero]=r.origen||null; });
+  }catch(e){}
+}
+// «Anuncio · antojo · reel1» (utm de pago), «Instagram» / «Facebook» (utm sin pago o el sitio de donde vino),
+// «Directo» (sin rastro). Sin leer todavía (o sin la columna): nada.
+function _tdOrigenTxt(o){
+  if(!o) return 'Directo';
+  const red=function(x){ x=String(x||'').toLowerCase();
+    if(/(^|\.)instagram\.com$|^(ig|instagram)$/.test(x)) return 'Instagram';
+    if(/(^|\.)facebook\.com$|^(fb|facebook|meta)$/.test(x)) return 'Facebook';
+    if(/(^|\.)google\.[a-z.]+$|^google$/.test(x)) return 'Google';
+    if(/(^|\.)whatsapp\.com$|^(wa|whatsapp)$/.test(x)) return 'WhatsApp';
+    return x; };
+  const pago=/paid|cpc|cpm|^ads?$|anuncio/i.test(o.medium||'');
+  const partes=[pago?'Anuncio':red(o.source||o.ref)];
+  if(o.campaign) partes.push(o.campaign);
+  if(o.content) partes.push(o.content);
+  if(pago && o.source) partes.push(red(o.source));
+  return partes.filter(Boolean).join(' · ')||'Directo';
+}
+function _tdOrigenHTML(p){
+  const n=Number(p.numero); if(!(n in _tdOrigen)) return '';
+  return '<div class="td-meta">Origen · '+esc(_tdOrigenTxt(_tdOrigen[n]))+'</div>';
 }
 // Una línea con la factura (si la pidió) y otra con el comprobante: a qué correo va y, ya en Odoo, si salió.
 // Cédula, nombre de la factura y correos SOLO para socias (Andrea, 11-nov): el asistente no los necesita (la factura la
@@ -18728,6 +18755,7 @@ function _tdTarjeta(p, modo, i){
     +'<div class="td-ent">'+_tdEntregaHTML(p)+'</div>'
     +(modo==='conf'?_tdSinComprobanteHTML(p):'')
     +(modo==='ent'?'':_tdFeHTML(p))
+    +(modo==='ent'?'':_tdOrigenHTML(p))
     +'<table class="td-lins">'+lins+envio+'</table>'
     +(acc?'<div class="td-acc">'+acc+'</div>':'')+'</div>';
 }
