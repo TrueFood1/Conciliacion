@@ -18698,6 +18698,13 @@ function _tdWaHref(p){
     +ent+' Cualquier cosa nos escribes por aquí!';
   return 'https://wa.me/'+t+'?text='+encodeURIComponent(msg);
 }
+// Pedido hecho sin el comprobante del SINPE o la transferencia (TIENDA_PAGAR_DESPUES.sql): sigue por confirmar
+// pago, sin «Ver comprobante». «de pago» lo separa del comprobante electrónico (tiquete) de _tdFeHTML.
+function _tdSinComprobanteHTML(p){
+  if(p.comprobante_path) return '';
+  const dias=Math.floor((Date.now()-Date.parse(p.creado_en))/86400000);
+  return '<div class="td-meta"><b>Sin comprobante de pago</b>'+(dias>=1?' · hace '+dias+(dias===1?' día':' días'):'')+'</div>';
+}
 // UNA sola tarjeta para las tres listas. modo: 'conf' (socias) · 'ent' (entregar) · 'fact' (facturar).
 function _tdTarjeta(p, modo, i){
   const fecha=(d)=>new Date(d).toLocaleString('es-CR',{timeZone:'America/Costa_Rica',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
@@ -18710,7 +18717,7 @@ function _tdTarjeta(p, modo, i){
   if(modo==='conf' && _socia){
     acc='<button class="btn btn-sm btn-g" onclick="tdPago('+i+')">Pago recibido</button>'
        +'<button class="btn btn-sm btn-warn" onclick="tdRechazar('+i+')">Rechazar</button>'
-       +'<button class="btn btn-sm" onclick="tdComprobante('+i+')">Ver comprobante</button>';
+       +(p.comprobante_path?'<button class="btn btn-sm" onclick="tdComprobante('+i+')">Ver comprobante</button>':'');
   }
   if(modo==='ent') acc='<button class="btn btn-sm" onclick="tdIrPreparar()">Ver en Entregas</button>';
   const cuando = modo==='conf' ? fecha(p.creado_en) : (p.pagado_en?('Pagado '+fecha(p.pagado_en)):'');
@@ -18719,6 +18726,7 @@ function _tdTarjeta(p, modo, i){
     +(modo==='ent'?'':'<div class="td-tot">'+cM(p.total_crc)+'</div>')+'</div>'
     +'<div class="td-meta">'+cuando+estado+' · '+metodo+' · <a href="tel:'+String(p.telefono||'').replace(/[^\d+]/g,'')+'">'+esc(p.telefono)+'</a>'+(_tdWaHref(p)?' · <a href="'+_tdWaHref(p)+'" target="_blank" rel="noopener">WhatsApp</a>':'')+'</div>'
     +'<div class="td-ent">'+_tdEntregaHTML(p)+'</div>'
+    +(modo==='conf'?_tdSinComprobanteHTML(p):'')
     +(modo==='ent'?'':_tdFeHTML(p))
     +'<table class="td-lins">'+lins+envio+'</table>'
     +(acc?'<div class="td-acc">'+acc+'</div>':'')+'</div>';
@@ -18796,7 +18804,7 @@ async function _tdAccion(fn, args, okTxt){
   _td.ocupado=false;
 }
 function tdPago(i){ const p=_td.conf[i]; if(!p) return;
-  if(!confirm('¿Pago recibido en el pedido #'+p.numero+' por '+cM(p.total_crc)+'?')) return;
+  if(!confirm('¿Pago recibido en el pedido #'+p.numero+' por '+cM(p.total_crc)+'?'+(p.comprobante_path?'':'\n\nNo tiene comprobante, confírmalo en el banco.'))) return;
   _tdAccion('tienda_marcar_pago',{p_id:p.id},'Pedido #'+p.numero+': pago recibido.'); }
 function tdRechazar(i){ const p=_td.conf[i]; if(!p) return;
   const m=prompt('Motivo del rechazo del pedido #'+p.numero+':',''); if(m===null) return;
