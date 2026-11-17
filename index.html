@@ -6351,7 +6351,7 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 17 nov 2026 · b171';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 17 nov 2026 · b172';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -15823,9 +15823,9 @@ function despRender(){
       // existe, pero un paso más adelante, en el pie del pedido ya con los lotes
       // puestos. Un botón que promete dos cosas y abre una pantalla es una
       // etiqueta que miente.
-      +(f.tienda && f.tienda.soloSinLote
-         ? '<button class="dp-btn-pri" onclick="despTiendaEntregarSinLote('+f.factura_id+')">Entregado</button>'
-         : '<button class="dp-btn-pri" onclick="despAbrir('+f.factura_id+')">Preparar</button>')
+      // Un pedido de la Tienda solo con productos sin lote TAMBIÉN se abre (Andrea, 17-nov):
+      // Daniel tiene que ver qué pidió el cliente antes de armarlo. «Entregado» va adentro.
+      +'<button class="dp-btn-pri" onclick="despAbrir('+f.factura_id+')">Preparar</button>'
       +(f.tienda?'':entPdfBtn(f.factura_id, f.factura, f.cliente, 'grande'))
       +'</div></div>';
   };
@@ -16859,8 +16859,9 @@ function despRenderPedido(body){
       // Sin selector ni «+ otro lote»: este producto no tiene lote (ENT_SIN_LOTE).
       h+=_despCantHTML(f,i)
         +'<div class="dp-l-bot">'+_despSinLoteHTML(L.producto_id,'dp-sinlote')+'</div>'
-        +'<div class="dp-l-fin dp-l-fin2">'
-        +'<button class="dp-nose" onclick="despMarcaAbrir('+i+')">No se entrega</button></div>';
+        // En un pedido de la Tienda solo sin lote no hay «No se entrega»: se entrega entero.
+        +((f.tienda && f.tienda.soloSinLote) ? '' : '<div class="dp-l-fin dp-l-fin2">'
+        +'<button class="dp-nose" onclick="despMarcaAbrir('+i+')">No se entrega</button></div>');
     }else if(!e.partido){
       h+=_despCantHTML(f,i);      // ticket 29: solo aparece al CORREGIR
       // EL AVISO DEL LOTE OBSOLETO, arriba de todo. Es lo primero que hay que
@@ -17311,6 +17312,11 @@ function _despPieHTML(f){
       +' onclick="despCorrConfirmar()">Guardar corrección</button>'
       +'</div>';
   }
+  // Tienda solo sin lote: no hay lotes que guardar (tienda_preparar los exige), así que el
+  // pie es el mismo «Entregado» que antes estaba en la tarjeta, ahora con el pedido a la vista.
+  if(f.tienda && f.tienda.soloSinLote)
+    return '<div class="dp-btns"><button class="btn btn-amarillo"'+(_despGuardando?' disabled':'')
+      +' onclick="despTiendaEntregarSinLote('+f.factura_id+')">Entregado</button></div>';
   return '<div class="cl-none" id="dpPend">'+(pend.txt?esc(pend.txt):'')+'</div>'
     +'<div class="dp-btns">'
     +'<label class="dp-fecha"><span class="dp-fecha-l">Día de entrega</span>'
@@ -18939,6 +18945,7 @@ async function despTiendaEntregarSinLote(fid){
   try{
     const {error}=await sbClient().rpc('tienda_marcar_entregado',{p_id:f.tienda.id});
     if(error) throw error;
+    if(_despAbierto===fid) _despAbierto=null;   // se marcó desde el pedido abierto: vuelve a la lista
     _tdTrasEntrega(f.tienda.numero);
   }catch(e){ alert('No se pudo marcar: '+_tdErrorTxt(e)); }
   _despGuardando=false;
