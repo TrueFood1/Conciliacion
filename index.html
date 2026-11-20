@@ -6353,7 +6353,7 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 20 nov 2026 · b174';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 20 nov 2026 · b175';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -7013,7 +7013,7 @@ async function temaResolver(){
   const email=await _temaEmail(); if(!email) return;
   let t=null;
   try{ const {data,error}=await sbClient().rpc('tema_vigente'); if(!error && (data==='claro'||data==='oscuro')) t=data; }catch(e){}
-  if(!t){ const loc=_temaLocal(); t=(loc.por&&loc.por[email]) || ((await accesoSocia()) ? 'oscuro' : 'claro'); }
+  if(!t){ const loc=_temaLocal(); t=(loc.por&&loc.por[email]) || (((await accesoSocia()) || _perfil==='contable') ? 'oscuro' : 'claro'); }
   _temaGuardarLocal(email, t);
   if(t!==temaActual()) temaAplicar(t);
 }
@@ -30777,12 +30777,13 @@ async function cliOtrosNombresCampo(){
 
 // ── ENLACES DE INVITACIÓN DE LOS GRUPOS (b121) ───────────────────────────
 // Viven SOLO en Truefie (tabla cobro_grupo_enlace, COBRO_GRUPO_ENLACE.sql), ligados al contacto
-// del grupo en Odoo. Solo las socias los leen y los cargan. El valor nunca se pinta, ni en un
+// del grupo en Odoo. Solo las socias los cargan; las socias y el perfil contable (Keylor, 20-nov,
+// para abrir el grupo desde Cobros y pagos) los leen. El valor nunca se pinta, ni en un
 // mensaje de error: la pantalla dice «Enlace guardado ✓» y nada más.
 let _grpEnl={};   // {partner_id: enlace}
 const GRP_ENL_RE=/^https:\/\/chat\.whatsapp\.com\/(invite\/)?[A-Za-z0-9]{10,40}$/;
 async function grpEnlacesCargar(){
-  if(_socia!==true){ _grpEnl={}; return _grpEnl; }
+  if(_socia!==true && _perfil!=='contable'){ _grpEnl={}; return _grpEnl; }
   try{
     const {data,error}=await sbClient().from('cobro_grupo_enlace').select('partner_id,enlace');
     if(error) throw error;
