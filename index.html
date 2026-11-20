@@ -6353,7 +6353,7 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 20 nov 2026 · b175';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 20 nov 2026 · b176';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -10094,8 +10094,15 @@ function _opFechaCR(s, conHora){
   const t=_OP_DIA[c.getUTCDay()]+' '+c.getUTCDate()+'-'+_OP_MES[c.getUTCMonth()];
   return conHora ? t+' '+String(c.getUTCHours()).padStart(2,'0')+':'+String(c.getUTCMinutes()).padStart(2,'0') : t;
 }
-function _opProdNom(pid){ return (NIV_INFO[pid]||{}).nom || ('#'+pid); }
+function _opProdNom(pid){ return (_opI(pid)||{}).nom || ('#'+pid); }
 const _OP_COLOR={451:'var(--p-blanco)',452:'var(--p-semillas)',453:'var(--p-frances)',503:'var(--p-buns)',472:'var(--p-pizza)',519:'var(--p-galletas)'};
+// BROWNIE MIX (Andrea, 20-nov: «quiero que keylor pueda meterla desde truefie»). Solo en ESTA pantalla: NIV_PROD y
+// NIV_INFO (Plan, Entregas, Tienda) no cambian. Su receta es por BOLSA, así que acá los «batches» son bolsas.
+const OP_BROWNIE={nom:'Brownie Mix', prem:534, rend:1, cap:0, cajaU:1, presDiv:1, presLbl:'uds'};
+function _opI(pid){ return +pid===533 ? OP_BROWNIE : NIV_INFO[pid]; }
+function _opProds(){ return NIV_PROD.concat([533]); }
+function _opPres(pid, uds){ if(+pid!==533) return _entPres(pid, uds);
+  const n=+uds||0; return _entPresN(n)+(Math.abs(n-1)<1e-9?' bolsa':' bolsas'); }
 function _opDot(pid){ return '<span class="op-dot" style="background:'+(_OP_COLOR[pid]||'var(--text-3)')+'"></span>'; }
 
 // ── FOTOS ───────────────────────────────────────────────────────────────
@@ -10196,7 +10203,7 @@ async function opLeer(){
 }
 function _opAplicarLectura(L){
   const O=_op, F=O.f;
-  if(NIV_INFO[L.producto_id]) F.pid=+L.producto_id;
+  if(_opI(L.producto_id)) F.pid=+L.producto_id;
   if(L.fecha) F.fecha=String(L.fecha).slice(0,10);
   if(L.hora_inicio) F.hora=String(L.hora_inicio).slice(0,5);
   if(L.lote!=null && L.lote!=='') F.lote=String(L.lote);
@@ -10214,7 +10221,7 @@ function _opAplicarLectura(L){
   O.conf=Object.assign({}, (L.confianza && typeof L.confianza==='object') ? L.confianza : {});
   // Una merma o un sobrante con cantidad y sin unidad legible se marca aunque el lector diga «alta».
   ['merma','sobrante'].forEach(function(k){ const m=L[k];
-    if(m && m.unidad==='desconocida' && +m.cantidad>0 && NIV_INFO[F.pid] && NIV_INFO[F.pid].presDiv>1) O.conf[k]='baja'; });
+    if(m && m.unidad==='desconocida' && +m.cantidad>0 && _opI(F.pid) && _opI(F.pid).presDiv>1) O.conf[k]='baja'; });
   O.avisosL=Array.isArray(L.avisos)?L.avisos:[]; O.notasL=Array.isArray(L.notas)?L.notas:[];
   O.resp=Array.isArray(L.responsables)?L.responsables:[];
   // Lo que vino del papel, para el punto verde del reporte (se borra al corregirlo a mano).
@@ -10253,23 +10260,24 @@ function _opVolverAEditar(){
 // ── FORMULARIO ──────────────────────────────────────────────────────────
 // Las unidades de la merma y el sobrante, de una lista: lo que se cuenta en el congelador.
 function _opUnidades(pid){
-  const I=NIV_INFO[pid]; if(!I) return [];
+  const I=_opI(pid); if(!I) return [];
   if(I.presDiv>1) return [['paquete','paquete de '+I.presDiv], ['u', pid===472?'base suelta':'pan suelto']];
-  return [['u', pid===519?'pote':'unidad']];
+  return [['u', pid===519?'pote':(pid===533?'bolsa':'unidad')]];
 }
 function _opUniLbl(pid, u){ const x=_opUnidades(pid).filter(function(p){ return p[0]===u; })[0]; return x?x[1]:''; }
-function _opVentaLbl(pid, n){ const I=NIV_INFO[pid]; if(!I) return '';
-  if(I.presDiv>1) return 'paq.'; if(pid===519) return Math.abs(n-1)<1e-9?'pote':'potes'; return Math.abs(n-1)<1e-9?'unidad':'unidades'; }
-function _opPorCaja(pid){ const I=NIV_INFO[pid]; return I ? (I.cajaU/(I.presDiv||1)) : 0; }
+function _opVentaLbl(pid, n){ const I=_opI(pid); if(!I) return '';
+  if(I.presDiv>1) return 'paq.'; if(pid===519) return Math.abs(n-1)<1e-9?'pote':'potes';
+  if(pid===533) return Math.abs(n-1)<1e-9?'bolsa':'bolsas'; return Math.abs(n-1)<1e-9?'unidad':'unidades'; }
+function _opPorCaja(pid){ const I=_opI(pid); return I ? (I.cajaU/(I.presDiv||1)) : 0; }
 // Rendimiento por batch en UNIDADES: el de la receta de Odoo si ya se leyó, si no el de NIV_INFO.
-function _opRendU(){ const O=_op, I=NIV_INFO[O.f.pid]; if(!I) return 0;
+function _opRendU(){ const O=_op, I=_opI(O.f.pid); if(!I) return 0;
   return (O.receta && O.recetaPid===O.f.pid && O.receta.rendU>0) ? O.receta.rendU : I.rend; }
 // Merma o sobrante llevados a la unidad de venta.
-function _opAVenta(pid, m){ const I=NIV_INFO[pid]; const n=_opNum(m&&m.cantidad); if(!I || !(n>0)) return 0;
+function _opAVenta(pid, m){ const I=_opI(pid); const n=_opNum(m&&m.cantidad); if(!I || !(n>0)) return 0;
   return (m.unidad==='u' && I.presDiv>1) ? n/I.presDiv : n; }
 // Lo que debería haber en el congelador, en unidad de venta: batches × rendimiento − merma + sobrante.
 function _opEsperado(){
-  const F=_op.f, I=NIV_INFO[F.pid]; if(!I) return null;
+  const F=_op.f, I=_opI(F.pid); if(!I) return null;
   const b=_opNum(F.batches); if(!(b>0)) return null;
   return b*_opRendU()/(I.presDiv||1) - _opAVenta(F.pid, F.merma) + _opAVenta(F.pid, F.sobrante);
 }
@@ -10288,25 +10296,28 @@ function _opInput(campo, val, attrs){
 }
 function opRenderForm(){
   const el=_opEl('opForm'), O=_op; if(!el||!O) return;
-  const F=O.f, I=NIV_INFO[F.pid];
+  const F=O.f, I=_opI(F.pid);
   const vP=_opConf('producto_id');
   let h='<div class="op-card"><div class="op-h">La orden</div>'
     +'<div class="op-f'+_opConfCls(vP)+'"><span class="op-l">Producto'+_opConfTag(vP)+'</span><div class="op-chips'+_opConfCls(vP)+'">'
-    +NIV_PROD.map(function(pid){ return '<button class="op-chip'+(F.pid===pid?' on':'')+'" onclick="opProd('+pid+')">'+_opDot(pid)+esc(NIV_INFO[pid].nom)+'</button>'; }).join('')
+    +_opProds().map(function(pid){ return '<button class="op-chip'+(F.pid===pid?' on':'')+'" onclick="opProd('+pid+')">'+_opDot(pid)+esc(_opI(pid).nom)+'</button>'; }).join('')
     +'</div></div>';
   h+='<div class="op-row">'
     +_opCampoHTML('fecha','Fecha', _opInput('fecha', F.fecha, 'type="date" max="'+_opHoy()+'"'), 'id="opFechaSub"')
     +_opCampoHTML('hora_inicio','Hora de inicio', _opInput('hora_inicio', F.hora, 'type="time"'), '')
     +_opCampoHTML('lote','Lote', _opInput('lote', F.lote, 'type="text" inputmode="numeric" autocomplete="off"'), 'id="opJul"')
-    +_opCampoHTML('batches','Batches', _opInput('batches', F.batches, 'type="text" inputmode="numeric" autocomplete="off"'), 'id="opRend"')
+    +_opCampoHTML('batches',F.pid===533?'Bolsas':'Batches', _opInput('batches', F.batches, 'type="text" inputmode="numeric" autocomplete="off"'), 'id="opRend"')
     +'</div>';
   if(I){
     const vl=(I.presDiv>1)?('paq. de '+I.presDiv):(F.pid===519?'potes':'unidades');
     h+='<div class="op-row">'
-      +_opCampoHTML('cantidad','Cantidad final · cajas de '+_opPorCaja(F.pid),
+      +(F.pid===533
+        ? _opCampoHTML('cantidad','Cantidad final · bolsas',
+            _opInput('sueltas', F.sueltas, 'type="text" inputmode="numeric" autocomplete="off" aria-label="Bolsas"'), 'id="opEsp"', ' op-f2')
+        : _opCampoHTML('cantidad','Cantidad final · cajas de '+_opPorCaja(F.pid),
           '<div class="op-pair">'+_opInput('cajas', F.cajas, 'type="text" inputmode="numeric" autocomplete="off" aria-label="Cajas"')
           +_opInput('sueltas', F.sueltas, 'type="text" inputmode="decimal" autocomplete="off" aria-label="Sueltas" placeholder="sueltas"')+'</div>',
-          'id="opEsp"', ' op-f2')
+          'id="opEsp"', ' op-f2'))
       +_opMermaHTML('merma','Merma')+_opMermaHTML('sobrante','Sobrante')
       +'</div>';
     h+='<div class="op-row"><div class="op-f" style="grid-column:1/-1"><span class="op-l">Premezcla consumida'+_opConfTag(_opConf('premezcla_mos'))+'</span>'
@@ -10329,7 +10340,7 @@ function _opMermaHTML(k, label){
   return _opCampoHTML(k, label, '<div class="op-pair">'+_opInput(k, m.cantidad, 'type="text" inputmode="decimal" autocomplete="off" placeholder="0"')+sel+'</div>', 'id="opSub_'+k+'"', ' op-fm');
 }
 function opProd(pid){
-  const O=_op; if(!O || !NIV_INFO[pid]) return;
+  const O=_op; if(!O || !_opI(pid)) return;
   if(O.f.pid!==pid){
     O.f.pid=pid; O.f.cantTocada=false;
     ['merma','sobrante'].forEach(function(k){ if(!_opUniLbl(pid, O.f[k].unidad)) O.f[k].unidad=''; });
@@ -10355,7 +10366,7 @@ function opCampo(campo, el){
 function opMermaU(k, el){ const O=_op; if(!O) return; O.f[k].unidad=el.value; _opDesmarcar(k, el); if(O.leidoC) delete O.leidoC[k]; _opVolverAEditar(); opDerivados(); }
 // Lo que se recalcula sin redibujar el formulario (para no perder el foco al escribir).
 function opDerivados(){
-  const O=_op; if(!O) return; const F=O.f, I=NIV_INFO[F.pid];
+  const O=_op; if(!O) return; const F=O.f, I=_opI(F.pid);
   const sj=_opEl('opJul');
   if(sj){
     const j=_opJul(F.fecha), l=_opInt(F.lote);
@@ -10367,7 +10378,7 @@ function opDerivados(){
   if(sf) sf.innerHTML=(F.fecha && F.fecha>_opHoy()) ? '<span class="op-amb">a futuro</span>' : '';
   const sr=_opEl('opRend');
   if(sr){ const b=_opNum(F.batches);
-    sr.textContent=I ? (_opFmtG(_opRendU()/(I.presDiv||1))+' '+_opVentaLbl(F.pid,2)+' por batch'+(b>0?(' · '+_opFmtG(b*_opRendU()/(I.presDiv||1))+' en total'):'')) : ''; }
+    sr.textContent=(I && F.pid!==533) ? (_opFmtG(_opRendU()/(I.presDiv||1))+' '+_opVentaLbl(F.pid,2)+' por batch'+(b>0?(' · '+_opFmtG(b*_opRendU()/(I.presDiv||1))+' en total'):'')) : ''; }
   ['merma','sobrante'].forEach(function(k){
     const s=_opEl('opSub_'+k); if(!s) return;
     const n=_opNum(F[k].cantidad);
@@ -10386,9 +10397,9 @@ function opDerivados(){
   if(se && I){
     const cont=_opContado(), div=I.presDiv||1;
     let t='';
-    if(cont!=null) t=esc(_entPres(F.pid, cont*div));
+    if(cont!=null) t=esc(_opPres(F.pid, cont*div));
     if(esp!=null && cont!=null && Math.abs(cont-esp)>1e-6)
-      t+=' · <span class="op-amb">calculado '+esc(_entPres(F.pid, esp*div))+'</span>';
+      t+=' · <span class="op-amb">calculado '+esc(_opPres(F.pid, esp*div))+'</span>';
     se.innerHTML=t;
   }
 }
@@ -10400,7 +10411,7 @@ function _opPremLista(){ const t=(_op&&_op.f.premTxt)||'';
     if(out.indexOf(nm)<0) out.push(nm); });
   return out; }
 async function opPremCargar(){
-  const O=_op, pid=O&&O.f.pid, I=NIV_INFO[pid]; if(!I || !I.prem) return;
+  const O=_op, pid=O&&O.f.pid, I=_opI(pid); if(!I || !I.prem) return;
   if(O.premPid===pid && O.prem) return opRenderPremChips();
   O.premPid=pid; O.prem=null; O.premErr='';
   try{
@@ -10480,7 +10491,7 @@ function _opDesvio(f){ const v=(f.val!=null)?f.val:f.receta;
 function _opDvTxt(d){ if(d==null || Math.abs(d)<0.0005) return ''; return (d>0?'+':'−')+_opFmt(Math.abs(d)*100,0)+' %'; }
 function opRenderCons(){
   const el=_opEl('opCons'), O=_op; if(!el||!O) return;
-  if(!NIV_INFO[O.f.pid]){ el.innerHTML=''; return; }
+  if(!_opI(O.f.pid)){ el.innerHTML=''; return; }
   const b=_opNum(O.f.batches);
   let h='<div class="op-card"><div class="op-h">Consumos<span class="op-g">'
     +(b>0?('receta × '+_opFmt(b)):'receta por batch')+'</span></div>';
@@ -10543,13 +10554,13 @@ function _opVal(v){
   if(v==null) return ''; if(v===true) return 'sí'; if(v===false) return 'no';
   if(typeof v==='number') return _opFmt(v); return String(v);
 }
-function _opLotesVisibles(pid){ return OP_LOTES.filter(function(l){
+function _opLotesVisibles(pid){ if(pid===533) return []; return OP_LOTES.filter(function(l){
   return pid===452 || ['semillas','linaza','girasol'].indexOf(l[0])<0 || (_op && _op.lotes[l[0]]); }); }
-function _opDetFilas(){ const O=_op, b=_opInt(O.f.batches);
+function _opDetFilas(){ const O=_op, b=_opInt(O.f.batches); if(O.f.pid===533) return 0;
   const n=Math.max(isFinite(b)?b:0, O.det.length); while(O.det.length<n) O.det.push({}); return n; }
 function opRenderDet(){
   const el=_opEl('opDet'), O=_op; if(!el||!O) return;
-  if(!NIV_INFO[O.f.pid]){ el.innerHTML=''; return; }
+  if(!_opI(O.f.pid) || O.f.pid===533){ el.innerHTML=''; return; }   // el Brownie no tiene hojas de batch
   const n=_opDetFilas();
   const celda=function(i, k){ return '<td class="n"><input class="op-in op-in-s'+(/_ini|_fin/.test(k)?'':' op-n')+'" type="text" inputmode="'+(/_ini|_fin/.test(k)?'text':'decimal')
     +'" autocomplete="off" value="'+esc(O.det[i][k]||'')+'" oninput="opDet('+i+',\''+k+'\',this)"></td>'; };
@@ -10613,7 +10624,7 @@ function _opFechaLarga(ds){ const m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(ds||''); if(!
   const DL=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   return DL[d.getUTCDay()]+' '+(+m[3])+'-'+_OP_MES[+m[2]-1]+'-'+m[1]; }
 function _opReporteDoc(){
-  const O=_op, F=O.f, I=NIV_INFO[F.pid]||{}, div=I.presDiv||1, T=_bsExpPdfTxt;
+  const O=_op, F=O.f, I=_opI(F.pid)||{}, div=I.presDiv||1, T=_bsExpPdfTxt;
   const J=window.jspdf.jsPDF, doc=new J({unit:'pt', format:'a4'});
   const W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight(), MG=37;
   const C={t:[22,22,26], t2:[85,83,77], t3:[138,135,127], b:[226,225,220], s:[246,245,241], ok:[78,122,0], warn:[154,100,16], no:[184,182,175], acc:[179,50,94]};
@@ -10642,7 +10653,7 @@ function _opReporteDoc(){
   const rango=function(a){ if(!a.length) return ''; const lo=Math.min.apply(null,a), hi=Math.max.apply(null,a); return lo===hi?_opFmtG(lo):(_opFmtG(lo)+'-'+_opFmtG(hi)); };
   const mermaN=N(F.merma.cantidad)||0, sobN=N(F.sobrante.cantidad)||0;
   const hero=[
-    ['PRODUCIDO', venta(cont), cont!=null?_entPres(F.pid, cont*div):''],
+    ['PRODUCIDO', venta(cont), cont!=null?_opPres(F.pid, cont*div):''],
     ['BATCHES', isFinite(b)?String(b):'—', isFinite(b)?(b+' premezclas · '+_opFmtG(rendV)+' '+(div>1?'paq':'u')+' c/u = '+_opFmtG(b*rendV)):''],
     ['MERMA', mermaN?(_opFmtG(mermaN)+' '+uLbl(F.merma)):'0', mermaN?'desecho en Odoo':(sobN?('sobró '+_opFmtG(sobN)+' '+uLbl(F.sobrante)):'')],
     ['PESO PROMEDIO', O.proc.peso_promedio_g?(O.proc.peso_promedio_g+' g'):'—', (temps.length?('horno '+rango(temps)+' °C'):'')+(mins.length?(' · '+rango(mins)+' min'):'')]
@@ -10691,12 +10702,13 @@ function _opReporteDoc(){
   const respT=Object.keys(quien).map(function(n){ return n+' ('+quien[n].join(', ')+')'; }).join(' · ');
   renglon('Responsables', respT, '', respT?(OP_RESP.every(function(p){ return !O.respO[p[0]] || O.leidoC['respO.'+p[0]]; })?'ok':'warn'):'no');
   // Ingredientes por batch (MA-RE-01)
+  const esBr=(F.pid===533);   // el Brownie no lleva las hojas de pan (MA-RE-01/02/03)
   y+=4;
-  sec('Ingredientes · MA-RE-01', [O.respO.ingredientes?('Responsable: '+_opPersona(O.respO.ingredientes)):'', O.proc.romana_ok?('romana: '+O.proc.romana_ok):''].filter(Boolean).join(' · '));
+  if(!esBr) sec('Ingredientes · MA-RE-01', [O.respO.ingredientes?('Responsable: '+_opPersona(O.respO.ingredientes)):'', O.proc.romana_ok?('romana: '+O.proc.romana_ok):''].filter(Boolean).join(' · '));
   const sum=function(k){ let s=0, hay=false; O.det.forEach(function(d){ const n=N(d[k]); if(n!=null){ s+=n; hay=true; } }); return hay?_opFmtG(s):''; };
   const nDet=_opDetFilas(), filasDet=Array.from({length:nDet}).map(function(_, i){ return O.det[i]||{}; });
   const numCols={}; [1,2,3,4,5].forEach(function(i){ numCols[i]={halign:'right'}; });
-  tabla(['Batch'].concat(OP_DET_ING.map(function(c){ return c[1]; }), ['Observaciones']),
+  if(!esBr) tabla(['Batch'].concat(OP_DET_ING.map(function(c){ return c[1]; }), ['Observaciones']),
     filasDet.map(function(d, i){ return [String(i+1)].concat(OP_DET_ING.map(function(c){ return d[c[0]]||'—'; }), [d.obs||'']); })
       .concat([[{content:'Total', styles:{fontStyle:'bold'}}].concat(OP_DET_ING.map(function(c){ return {content:T(sum(c[0])), styles:{fontStyle:'bold'}}; }),
         [{content:T(O.cascara?('cáscara de huevos: '+(isFinite(_opNum(O.cascara))?_opFmtG(_opNum(O.cascara)):O.cascara)+' g'):''), styles:{fontStyle:'bold'}}])]),
@@ -10718,27 +10730,27 @@ function _opReporteDoc(){
     headStyles:{fontSize:7, fontStyle:'bold', textColor:C.t3, lineColor:C.t3, lineWidth:{bottom:.6}},
     columnStyles:{1:{halign:'right'}, 2:{halign:'right'}}});
   const yIzq=doc.lastAutoTable.finalY, pagIzq=doc.internal.getCurrentPageInfo().pageNumber;
-  y=y0; sec('Lotes de insumos · MA-RE-02/03', '', xR, W-MG);
+  y=y0; if(!esBr) sec('Lotes de insumos · MA-RE-02/03', '', xR, W-MG);
   _opLotesVisibles(F.pid).forEach(function(l){ const v=O.lotes[l[0]]||'';
     renglon(l[0]==='bolsa'?('Bolsa '+_opProdNom(F.pid)):l[1], v, '', _opDotDe('lotes.'+l[0], v), xR, W-MG, 80); });
   if(doc.internal.getCurrentPageInfo().pageNumber<pagIzq) doc.setPage(pagIzq);
   y=Math.max(y, yIzq)+10;
   // Batido hasta horneado (MA-RE-02)
-  sec('Batido hasta horneado · MA-RE-02', O.respO.batido?('Responsable: '+_opPersona(O.respO.batido)):'');
+  if(!esBr) sec('Batido hasta horneado · MA-RE-02', O.respO.batido?('Responsable: '+_opPersona(O.respO.batido)):'');
   const rango2=function(a, z){ return (a||z) ? ((a||'?')+' - '+(z||'?')) : '—'; };
-  tabla(['Batch','Batido','Moldeo y fermentación','Horno (°C)','Tiempo (min)'],
+  if(!esBr) tabla(['Batch','Batido','Moldeo y fermentación','Horno (°C)','Tiempo (min)'],
     filasDet.map(function(d, i){ return [String(i+1), rango2(d.batido_ini, d.batido_fin), rango2(d.moldeo_ini, d.moldeo_fin), d.horno_c||'—', d.horno_min||'—']; }),
     {columnStyles:{3:{halign:'right'}, 4:{halign:'right'}}});
   // Corte y empaque (MA-RE-03)
   y+=4;
-  sec('Corte y empaque · MA-RE-03', O.respO.empaque?('Responsable: '+_opPersona(O.respO.empaque)):'');
+  sec(esBr?'Observaciones':'Corte y empaque · MA-RE-03', O.respO.empaque?('Responsable: '+_opPersona(O.respO.empaque)):'');
   const P=O.proc;
-  renglon('Cuchillas antes / después', (P.cuchillas_antes||'—')+' / '+(P.cuchillas_despues||'—'), '',
+  if(!esBr) renglon('Cuchillas antes / después', (P.cuchillas_antes||'—')+' / '+(P.cuchillas_despues||'—'), '',
     (P.cuchillas_antes||P.cuchillas_despues)?((_opDotDe('proc.cuchillas_antes',P.cuchillas_antes)==='warn'||_opDotDe('proc.cuchillas_despues',P.cuchillas_despues)==='warn')?'warn':'ok'):'no', null, null, 130);
   const tsb=[P.textura,P.sabor,P.bolsa];
-  renglon('Textura · sabor · bolsa', tsb.map(function(v){ return v||'—'; }).join(' · '), '',
+  if(!esBr) renglon('Textura · sabor · bolsa', tsb.map(function(v){ return v||'—'; }).join(' · '), '',
     tsb.some(Boolean)?(['textura','sabor','bolsa'].some(function(k){ return P[k] && _opDotDe('proc.'+k,P[k])==='warn'; })?'warn':'ok'):'no', null, null, 130);
-  renglon('Peso promedio', P.peso_promedio_g?(P.peso_promedio_g+' g'):'', '', _opDotDe('proc.peso_promedio_g', P.peso_promedio_g), null, null, 130);
+  if(!esBr) renglon('Peso promedio', P.peso_promedio_g?(P.peso_promedio_g+' g'):'', '', _opDotDe('proc.peso_promedio_g', P.peso_promedio_g), null, null, 130);
   const obs=[mermaN?(_opFmtG(mermaN)+' '+(uLbl(F.merma)==='paq'?'paq':'u')+' de merma'):'', sobN?('sobró '+_opFmtG(sobN)+' '+uLbl(F.sobrante)):'', String(F.nota||'').trim()].filter(Boolean).join(' · ');
   renglon('Observaciones', obs||'—', (mermaN&&div===1)?('unidad: '+(F.pid===519?'pote':'pan')):'', obs?(_opConf('merma')?'warn':'ok'):'no', null, null, 130);
   // Leyenda y pie
@@ -10756,7 +10768,7 @@ function _opReporteDoc(){
 }
 // «Ver reporte»: SIN await desde el toque (iOS exige el gesto para compartir o abrir).
 function opVerReporte(){
-  const O=_op; if(!O || !NIV_INFO[O.f.pid]){ _opMsg('Falta: producto','op-amb'); return; }
+  const O=_op; if(!O || !_opI(O.f.pid)){ _opMsg('Falta: producto','op-amb'); return; }
   try{
     if(!_bsPdfListo()){ _bsExpLibs(); throw new Error('no cargó la librería de PDF; probá de nuevo en unos segundos'); }
     const blob=_opReporteDoc().output('blob'), nombre=_opReporteNombre();
@@ -10789,7 +10801,7 @@ function _opAdjuntos(){
 
 // ── LA ORDEN, como la pide el contrato ──────────────────────────────────
 function _opOrden(){
-  const O=_op, F=O.f, falta=[], I=NIV_INFO[F.pid];
+  const O=_op, F=O.f, falta=[], I=_opI(F.pid);
   if(!I) falta.push('producto');
   if(!/^\d{4}-\d\d-\d\d$/.test(F.fecha||'')) falta.push('fecha');
   else if(F.fecha>_opHoy()) falta.push('fecha a futuro');
@@ -10814,7 +10826,7 @@ function _opOrden(){
   const prem=_opPremLista();
   const notas=[];
   const cont=_opContado();
-  if(I && cont!=null) notas.push('Contado: '+_entPres(F.pid, cont*(I.presDiv||1)));
+  if(I && cont!=null) notas.push('Contado: '+_opPres(F.pid, cont*(I.presDiv||1)));
   if(String(F.nota||'').trim()) notas.push(String(F.nota).trim());
   const orden={producto_id:F.pid, lote:lote, fecha:F.fecha, hora_inicio:String(F.hora||'').padStart(5,'0'), batches:b,
     consumos:consumos, merma:mm.merma, sobrante:mm.sobrante, premezcla_mos:prem};
@@ -10869,7 +10881,7 @@ function opRenderAcc(){
   if(O.paso==='editar')
     h='<div class="op-acc"><button class="op-btn op-btnp"'+(O.enviando||O.leyendo?' disabled':'')+' onclick="opPrevia()">'
       +(O.enviando?'Revisando…':'Vista previa')+'</button>'
-      +'<button class="op-btn"'+(NIV_INFO[O.f.pid]?'':' disabled')+' onclick="opVerReporte()">Ver reporte</button></div>';
+      +'<button class="op-btn"'+(_opI(O.f.pid)?'':' disabled')+' onclick="opVerReporte()">Ver reporte</button></div>';
   h+='<div class="op-msg '+(O.cls||'')+'" style="white-space:pre-line">'+esc(O.msg||'')+'</div>';
   el.innerHTML=h;
 }
@@ -10992,7 +11004,7 @@ async function opBorrCargar(forzar){
   O.borrCargando=true; O.borrErr=''; opRenderBorr();
   try{
     await _esperarOdoo();
-    const mos=await odooCall('mrp.production','search_read',[[['state','=','draft'],['product_id','in',NIV_PROD]]],
+    const mos=await odooCall('mrp.production','search_read',[[['state','=','draft'],['product_id','in',_opProds()]]],
       {fields:['name','product_id','product_qty','product_uom_id','date_start','create_uid'], order:'create_date desc', limit:15});
     await uomFactores((mos||[]).map(function(m){ return m.product_uom_id && m.product_uom_id[0]; }));
     O.borr=mos||[];
@@ -11012,7 +11024,7 @@ function opRenderBorr(){
         const pid=m.product_id&&m.product_id[0], uom=m.product_uom_id&&m.product_uom_id[0];
         const uds=(+m.product_qty||0)/uomFac(uom);
         return '<tr'+(nueva&&m.name===nueva?' class="op-nueva"':'')+'><td>'+esc(m.name)+'</td><td>'+_opDot(pid)+' '+esc(_opProdNom(pid))+'</td>'
-          +'<td class="n">'+esc(_entPres(pid, uds))+'</td><td>'+esc(_opFechaCR(m.date_start, true))+'</td>'
+          +'<td class="n">'+esc(_opPres(pid, uds))+'</td><td>'+esc(_opFechaCR(m.date_start, true))+'</td>'
           +'<td>'+esc((m.create_uid&&m.create_uid[1])||'—')+'</td></tr>'; }).join('')
       +'</tbody></table></div>';
   }
