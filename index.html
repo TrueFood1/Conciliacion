@@ -3507,7 +3507,9 @@ html:not([data-tema="claro"]) input[type=date]{color-scheme:dark}
 /* Solo socias: oculta por defecto y se prende con la clase del <body> (misma regla que .face-pend:
    de menos, nunca de más). */
 .face-op{display:none}
-body.es-socia .face-op{display:block}
+body.es-socia .face-op,body.es-contable .face-op{display:block}
+/* Contable (Keylor, 20-nov): en las barras solo sus dos pantallas. */
+body.es-contable .faces .face:not(.face-op):not([onclick^="irACobros"]):not(.on){display:none!important}
 #vOrdenesProd .op-grid{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:22px;align-items:start;margin-top:14px;max-width:1080px}
 #vOrdenesProd .op-main{min-width:0}
 #vOrdenesProd .op-side{position:sticky;top:12px;display:flex;flex-direction:column;gap:10px}
@@ -6351,7 +6353,7 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 // primero —PEGADO_NOTA_OPCIONAL.sql, pegado y verificado el 24-sep: el CHECK
 // solo pide nota a 'en_validacion'— y recién después esta pantalla, que es el
 // orden que evita un botón que deja mandar algo que la base rechaza.
-const BUILD = 'v 17 nov 2026 · b172';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
+const BUILD = 'v 20 nov 2026 · b174';   // solo fecha y número (b111): lo que trae cada versión va a la BITACORA
 const CURRENT_YEAR = new Date().getFullYear();
 
 // Reglas automaticas puras (sin factura, sin crear)
@@ -6768,7 +6770,7 @@ async function authEntrar(){
 // simplemente no dejarla publicada en texto plano.
 // Para sumar a alguien con correo personal: correr _saludoHuella('su@correo') en la
 // consola del navegador y pegar acá el resultado con su nombre de pila.
-const SALUDO_NOMBRES={'andrea@truefoodcr.com':'Andrea', 'lorena@truefoodcr.com':'Lorena'};
+const SALUDO_NOMBRES={'andrea@truefoodcr.com':'Andrea', 'lorena@truefoodcr.com':'Lorena', 'keylor@truefoodcr.com':'Keylor'};
 const SALUDO_HUELLAS={'gyfj9w':'Daniel'};
 function _saludoHuella(s){ let h=5381; for(let i=0;i<s.length;i++){ h=((h*33)^s.charCodeAt(i))>>>0; } return h.toString(36); }
 // El nombre de pila de quien firmó algo. UNA sola definición: el saludo del lobby
@@ -6840,6 +6842,11 @@ const ACCESO_VISTAS = {
 };
 let _accesoMods=null;   // se llena al entrar; null = todavía no se sabe → no se restringe
 function accesoPuede(mod){ return !_accesoMods || _accesoMods==='todo' || _accesoMods.indexOf(mod)>=0; }
+// PERFIL «contable» (Keylor, 20-nov): ve DOS PANTALLAS, no dos módulos. Lo que de verdad le
+// deja escribir lo deciden la base (prod_orden_odoo) y truefie-escritura (/produccion).
+const ACCESO_CONTABLE_VISTAS=['vCobros','vOrdenesProd'];
+let _accesoVistas=null;   // null = sin límite por pantalla (todos los demás perfiles)
+function accesoPuedeVista(v){ return !_accesoVistas || _accesoVistas.indexOf(v)>=0; }
 function accesoModDeVista(v){
   for(const m in ACCESO_VISTAS){ if(ACCESO_VISTAS[m].indexOf(v)>=0) return m; }
   return null;   // vista sin módulo declarado → libre
@@ -6892,6 +6899,7 @@ async function accesoSocia(){
   document.body.classList.toggle('es-socia', _socia);
   document.body.classList.toggle('es-lectora', _lectora);
   document.body.classList.toggle('es-asistente', _perfil==='asistente');
+  document.body.classList.toggle('es-contable', _perfil==='contable');
   franjasPintar();
   return _socia;
 }
@@ -6905,6 +6913,8 @@ async function accesoCargar(){
   await accesoSocia();
   const v=_lectora ? 'todo' : ACCESO_USUARIOS[email];
   _accesoMods = (v==='todo') ? 'todo' : (v || ACCESO_DEFAULT);
+  _accesoVistas = null;
+  if(_perfil==='contable'){ _accesoMods=['finanzas','operaciones']; _accesoVistas=ACCESO_CONTABLE_VISTAS; }
   accesoPintarLobby();
 }
 // «Hola» centrado en el hueco entre los tickets y la línea (Andrea, 26-oct). Desde que el buscador
@@ -7078,7 +7088,7 @@ function _modShow(id){
   // Guardia COSMÉTICO (ver ACCESO_USUARIOS): navegar directo a una vista ajena
   // devuelve al lobby. No protege los datos — eso lo hará "Roles y accesos".
   const mod=accesoModDeVista(id);
-  if(mod && !accesoPuede(mod)){ volverLobby(); return; }
+  if(mod && (!accesoPuede(mod) || !accesoPuedeVista(id))){ volverLobby(); return; }
   // ENTREGAS VA EN CLARO (24-ago). El interruptor sale de ACCESO_VISTAS.entregas,
   // que ya es la lista canónica del módulo: una vista nueva de Entregas entra en
   // claro sola, sin que nadie tenga que acordarse de tocar el CSS. Va en `body`
@@ -7130,8 +7140,8 @@ function crumbSet(area,cur){
 // Finanzas entra por Resultados en escritorio y por COBROS Y PAGOS en teléfono: es la
 // razón principal para abrir Finanzas desde el teléfono (a quién cobrar y pagar esta
 // semana). Si Andrea echa de menos Resultados a la mano, se revierte cambiando esta línea.
-function abrirFinanzas(){ return esMovil() ? irACobros() : irAResultados(); }
-function abrirOperaciones(){ irAResumen(); }              // Operaciones → 1ª sub-pestaña
+function abrirFinanzas(){ return (esMovil() || _perfil==='contable') ? irACobros() : irAResultados(); }
+function abrirOperaciones(){ if(_perfil==='contable') return irAOrdenesProd(); irAResumen(); }   // Operaciones → 1ª sub-pestaña
 function abrirContabilidad(){ abrirFinanzas(); }             // alias histórico
 function entrarHerramienta(){ abrirFinanzas(); }             // alias histórico
 function abrirConciliacion(){                                // módulo Conciliación: solo lectura (E1, sin escrituras a Odoo)
@@ -10040,7 +10050,7 @@ function _opNuevo(){
 }
 async function irAOrdenesProd(){
   _modShow('vOrdenesProd'); crumbSet('Operaciones','Órdenes de Producción');
-  if(_socia!==true){ await accesoSocia(); if(_socia!==true){ irAResumen(); return; } }
+  if(_socia!==true && _perfil!=='contable'){ await accesoSocia(); if(_socia!==true && _perfil!=='contable'){ irAResumen(); return; } }
   if(!_op) _op=_opNuevo();
   try{ _bsExpLibs(); }catch(e){}      // jsPDF se pide al ENTRAR, no al tocar «Ver reporte» (gesto de iOS)
   opRender();
