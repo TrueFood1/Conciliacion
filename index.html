@@ -10282,7 +10282,7 @@ function _opEsperado(){
   return b*_opRendU()/(I.presDiv||1) - _opAVenta(F.pid, F.merma) + _opAVenta(F.pid, F.sobrante);
 }
 function _opContado(){
-  const F=_op.f; const cj=_opNum(F.cajas), su=_opNum(F.sueltas);
+  const F=_op.f; const cj=(F.pid===533)?NaN:_opNum(F.cajas), su=_opNum(F.sueltas);   // el Brownie solo tiene «bolsas»
   if(!isFinite(cj) && !isFinite(su)) return null;
   return (isFinite(cj)?cj:0)*_opPorCaja(F.pid) + (isFinite(su)?su:0);
 }
@@ -10388,10 +10388,12 @@ function opDerivados(){
   const esp=_opEsperado();
   if(I && !F.cantTocada){
     const pc=_opPorCaja(F.pid);
-    if(esp!=null && esp>=0){ const cj=Math.floor(esp/pc+1e-9); F.cajas=String(cj); F.sueltas=_opFmt(esp-cj*pc, 2); }
+    if(esp!=null && esp>=0 && F.pid===533){ F.cajas=''; F.sueltas=_opFmt(esp, 2); }
+    else if(esp!=null && esp>=0){ const cj=Math.floor(esp/pc+1e-9); F.cajas=String(cj); F.sueltas=_opFmt(esp-cj*pc, 2); }
     else { F.cajas=''; F.sueltas=''; }
     const ins=document.querySelectorAll('#opForm .op-f2 input');
     if(ins.length===2){ ins[0].value=F.cajas; ins[1].value=F.sueltas; }
+    else if(ins.length===1){ ins[0].value=F.sueltas; }
   }
   const se=_opEl('opEsp');
   if(se && I){
@@ -10617,8 +10619,9 @@ function _opDotDe(key, val){
   if(val==null || String(val).trim()==='' || String(val).trim()==='—') return 'no';
   return (_op.leidoC[key] && !_opConf(key)) ? 'ok' : 'warn';
 }
-function _opVence(fecha){ const m=/^(\d{4})-(\d\d)/.exec(fecha||''); if(!m) return '';
-  let y=+m[1], mo=+m[2]+9; if(mo>12){ mo-=12; y++; } return String(mo).padStart(2,'0')+'-'+y; }
+function _opVence(fecha, pid){ const m=/^(\d{4})-(\d\d)/.exec(fecha||''); if(!m) return '';
+  let y=+m[1], mo=+m[2]+(+pid===533?4:9);   // el Brownie vence a los 4 meses; los panes, a los 9
+  if(mo>12){ mo-=12; y++; } return String(mo).padStart(2,'0')+'-'+y; }
 function _opFechaLarga(ds){ const m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(ds||''); if(!m) return '';
   const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));
   const DL=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
@@ -10642,9 +10645,9 @@ function _opReporteDoc(){
   doc.text(T(_opProdNom(F.pid)+' · lote '+(F.lote||'—')), MG+15, y+11);
   doc.setFont('helvetica','normal'); doc.setFontSize(8.5); col(C.t2);
   const mo=(O.creada&&O.creada.nombre) ? ('Odoo: '+O.creada.nombre) : 'Odoo: orden en borrador';
-  doc.text(T(_opFechaLarga(F.fecha)+' · vence '+_opVence(F.fecha)+' · '+mo), MG, y+26);
+  doc.text(T(_opFechaLarga(F.fecha)+' · vence '+_opVence(F.fecha, F.pid)+' · '+mo), MG, y+26);
   doc.setFontSize(7.5); col(C.t3);
-  doc.text(['Reporte de producción · Truefie','reemplaza MA-RE-01, MA-RE-02 y MA-RE-03','True Food CR'].map(T), W-MG, y+4, {align:'right', lineHeightFactor:1.4});
+  doc.text(['Reporte de producción · Truefie',F.pid===533?'Brownie Mix · sin hojas de papel':'reemplaza MA-RE-01, MA-RE-02 y MA-RE-03','True Food CR'].map(T), W-MG, y+4, {align:'right', lineHeightFactor:1.4});
   y+=34; draw(C.t); doc.setLineWidth(1.5); doc.line(MG, y, W-MG, y); y+=10;
   // Los cuatro números
   const b=_opInt(F.batches), rendV=_opRendU()/div, cont=_opContado();
@@ -10654,7 +10657,8 @@ function _opReporteDoc(){
   const mermaN=N(F.merma.cantidad)||0, sobN=N(F.sobrante.cantidad)||0;
   const hero=[
     ['PRODUCIDO', venta(cont), cont!=null?_opPres(F.pid, cont*div):''],
-    ['BATCHES', isFinite(b)?String(b):'—', isFinite(b)?(b+' premezclas · '+_opFmtG(rendV)+' '+(div>1?'paq':'u')+' c/u = '+_opFmtG(b*rendV)):''],
+    F.pid===533 ? ['BOLSAS', isFinite(b)?String(b):'—', isFinite(b)?(b+' premezclas · 1 por bolsa'):'']
+      : ['BATCHES', isFinite(b)?String(b):'—', isFinite(b)?(b+' premezclas · '+_opFmtG(rendV)+' '+(div>1?'paq':'u')+' c/u = '+_opFmtG(b*rendV)):''],
     ['MERMA', mermaN?(_opFmtG(mermaN)+' '+uLbl(F.merma)):'0', mermaN?'desecho en Odoo':(sobN?('sobró '+_opFmtG(sobN)+' '+uLbl(F.sobrante)):'')],
     ['PESO PROMEDIO', O.proc.peso_promedio_g?(O.proc.peso_promedio_g+' g'):'—', (temps.length?('horno '+rango(temps)+' °C'):'')+(mins.length?(' · '+rango(mins)+' min'):'')]
   ];
@@ -10743,7 +10747,7 @@ function _opReporteDoc(){
     {columnStyles:{3:{halign:'right'}, 4:{halign:'right'}}});
   // Corte y empaque (MA-RE-03)
   y+=4;
-  sec(esBr?'Observaciones':'Corte y empaque · MA-RE-03', O.respO.empaque?('Responsable: '+_opPersona(O.respO.empaque)):'');
+  sec(esBr?'Notas':'Corte y empaque · MA-RE-03', O.respO.empaque?('Responsable: '+_opPersona(O.respO.empaque)):'');
   const P=O.proc;
   if(!esBr) renglon('Cuchillas antes / después', (P.cuchillas_antes||'—')+' / '+(P.cuchillas_despues||'—'), '',
     (P.cuchillas_antes||P.cuchillas_despues)?((_opDotDe('proc.cuchillas_antes',P.cuchillas_antes)==='warn'||_opDotDe('proc.cuchillas_despues',P.cuchillas_despues)==='warn')?'warn':'ok'):'no', null, null, 130);
@@ -10752,7 +10756,7 @@ function _opReporteDoc(){
     tsb.some(Boolean)?(['textura','sabor','bolsa'].some(function(k){ return P[k] && _opDotDe('proc.'+k,P[k])==='warn'; })?'warn':'ok'):'no', null, null, 130);
   if(!esBr) renglon('Peso promedio', P.peso_promedio_g?(P.peso_promedio_g+' g'):'', '', _opDotDe('proc.peso_promedio_g', P.peso_promedio_g), null, null, 130);
   const obs=[mermaN?(_opFmtG(mermaN)+' '+(uLbl(F.merma)==='paq'?'paq':'u')+' de merma'):'', sobN?('sobró '+_opFmtG(sobN)+' '+uLbl(F.sobrante)):'', String(F.nota||'').trim()].filter(Boolean).join(' · ');
-  renglon('Observaciones', obs||'—', (mermaN&&div===1)?('unidad: '+(F.pid===519?'pote':'pan')):'', obs?(_opConf('merma')?'warn':'ok'):'no', null, null, 130);
+  renglon('Observaciones', obs||'—', (mermaN&&div===1)?('unidad: '+(F.pid===519?'pote':(F.pid===533?'bolsa':'pan'))):'', obs?(_opConf('merma')?'warn':'ok'):'no', null, null, 130);
   // Leyenda y pie
   espacio(30); y+=4; draw(C.b); doc.setLineWidth(.5); doc.line(MG, y, W-MG, y); y+=12;
   let x=MG; doc.setFont('helvetica','normal'); doc.setFontSize(7);
@@ -10807,7 +10811,7 @@ function _opOrden(){
   else if(F.fecha>_opHoy()) falta.push('fecha a futuro');
   if(!/^\d{1,2}:\d\d$/.test(F.hora||'')) falta.push('hora de inicio');
   const lote=_opInt(F.lote), b=_opInt(F.batches);
-  if(!(lote>0)) falta.push('lote'); if(!(b>0)) falta.push('batches');
+  if(!(lote>0)) falta.push('lote'); if(!(b>0)) falta.push(F.pid===533?'bolsas':'batches');
   const mm={};
   ['merma','sobrante'].forEach(function(k){
     const n=_opNum(F[k].cantidad), uns=_opUnidades(F.pid);
